@@ -36,24 +36,15 @@ _DE_KERNELS: Dict[str, tuple] = {
     "extended": ("de441.bsp", 3100.0),
 }
 
-_PC_SIZES: Dict[str, float] = {"base": 25.4, "medium": 72.6, "extended": 222.6}
+_PC_SIZES: Dict[str, float] = {"base": 25.4, "medium": 191.25, "extended": 222.6}
 
 _LEB2_GROUPS = list(LEB2_GROUPS)
-# Compressed LEB2 sizes (MB) per tier/group. "exotics" base is measured;
-# medium/extended exotics are estimates pending regeneration (1600-2500 island).
+# Only reviewed core assets currently have distributable sizes. Optional
+# companion groups remain absent until their clean-room regeneration review.
 _LEB2_SIZES: Dict[str, Dict[str, float]] = {
-    "base": {
-        "core": 10.6, "asteroids": 8.7, "exotics": 59.0,
-        "apogee": 11.4, "uranians": 2.1,
-    },
-    "medium": {
-        "core": 38.3, "asteroids": 29.2, "exotics": 177.0,
-        "apogee": 42.1, "uranians": 9.3,
-    },
-    "extended": {
-        "core": 334.9, "asteroids": 86.2, "exotics": 177.0,
-        "apogee": 391.7, "uranians": 84.0,
-    },
+    "base": {"core": 10.8},
+    "medium": {"core": 38.3},
+    "extended": {"core": 334.9},
 }
 
 _TIER_RANGES: Dict[str, str] = {
@@ -72,15 +63,15 @@ def _resolve_leb_entry(path: str, precision: str) -> str:
     """Resolve a directory answer for leb_file to an actual LEB file.
 
     set_leb_file() expects a file; users naturally type the leb/
-    directory here.  Prefer the merged LEB1 for the chosen tier, then
-    the LEB2 core group, then any .leb/.leb2 present; fall back to the
-    original answer unchanged.
+    directory here. Prefer the current reviewed LEB2 core, then the historical
+    merged LEB1 for the chosen tier, then any .leb/.leb2 present; fall back to
+    the original answer unchanged.
     """
     if not os.path.isdir(path):
         return path
     candidates = [
-        os.path.join(path, f"ephemeris_{precision}.leb"),
         os.path.join(path, f"{precision}_core.leb2"),
+        os.path.join(path, f"ephemeris_{precision}.leb"),
     ]
     for cand in candidates:
         if os.path.isfile(cand):
@@ -305,7 +296,9 @@ def _get_required_files(tier: str, mode: str) -> List[Dict[str, Any]]:
                     "filename": f"{tier}_{group}.leb2",
                     "size_mb": size,
                     "category": "LEB2",
-                    "status": "required",
+                    # Every tier has a pinned core; optional companions remain
+                    # local-generation-only until separately reviewed.
+                    "status": "required" if group == "core" else "optional",
                     "subdir": "leb",
                 }
             )
@@ -414,6 +407,8 @@ def _generate_toml(config: Dict[str, Any]) -> str:
     iers_dt = config.get("iers_delta_t", iers_auto)
     lines.append(f"iers_auto_download = {'true' if iers_auto else 'false'}")
     lines.append(f"iers_delta_t = {'true' if iers_dt else 'false'}")
+    deltat_model = config.get("deltat_model", "smh2016")
+    lines.append(f'deltat_model = "{_toml_str(deltat_model)}"')
     lines.append("")
 
     # --- Advanced ---
@@ -448,6 +443,13 @@ def _generate_toml(config: Dict[str, Any]) -> str:
         lines.append(f'ephemeris = "{_toml_str(ephemeris)}"')
     else:
         lines.append('# ephemeris = ""')
+
+    mmap_preload = bool(config.get("mmap_preload", False))
+    mmap_preload_start = int(config.get("mmap_preload_start", 1800))
+    mmap_preload_end = int(config.get("mmap_preload_end", 2200))
+    lines.append(f"mmap_preload = {'true' if mmap_preload else 'false'}")
+    lines.append(f"mmap_preload_start = {mmap_preload_start}")
+    lines.append(f"mmap_preload_end = {mmap_preload_end}")
 
     lines.append("")
     return "\n".join(lines)
@@ -724,9 +726,8 @@ def run_wizard(
     click.echo(_w("Minor bodies"))
 
     if mode in ("auto", "leb"):
-        click.echo(_d("  LEB files already cover 31 bodies: Sun, Moon, 8 planets,"))
-        click.echo(_d("  nodes, apsides, and 5 major asteroids (Ceres, Chiron, etc.)."))
-        click.echo(_d("  Enable auto-download of SPK kernels for any *other* minor"))
+        click.echo(_d("  LEB files cover the body groups present in your installed"))
+        click.echo(_d("  tier companions. Enable auto-download for any *other* minor"))
         click.echo(_d("  body you request (e.g. Eros, Sedna)?"))
         auto_spk_default = mode == "auto"
     elif mode == "skyfield":

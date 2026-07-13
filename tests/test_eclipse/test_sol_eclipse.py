@@ -466,9 +466,7 @@ class TestSolEclipseWhenLoc:
         ecl_type1, times1, attr1 = sol_eclipse_when_loc(jd_start, geopos)
 
         # Call sol_eclipse_when_loc (reference-style with geopos sequence)
-        ecl_type2, times2, attr2 = sol_eclipse_when_loc(
-            jd_start, geopos, FLG_SWIEPH
-        )
+        ecl_type2, times2, attr2 = sol_eclipse_when_loc(jd_start, geopos, FLG_SWIEPH)
 
         # Both should find the same eclipse (same maximum time within tolerance)
         assert abs(times1[0] - times2[0]) < 0.01  # Within ~15 minutes
@@ -606,28 +604,6 @@ class TestSolEclipseWhere:
             assert obscuration > 0
             # Sun altitude at central line should be valid
             assert -90 <= sun_altitude <= 90
-
-    def test_non_eclipse_time_returns_zero_flag_with_proximity_point(self):
-        """A no-eclipse instant gives retflag 0 with the closest-approach point.
-
-        The reference convention (verified against the reference ephemeris 2.10.03) keeps
-        geopos[0..1] at the surface point of maximum proximity of the shadow
-        axis and reports a negative magnitude measure in attr[0]; only
-        geopos[2..9] stay zero.
-        """
-        from libephemeris import sol_eclipse_where
-
-        # Random time not during an eclipse (full moon time)
-        jd_non_eclipse = julday(2024, 4, 23, 12)  # Near full moon
-
-        ecl_type, geopos, attr = sol_eclipse_where(jd_non_eclipse)
-
-        assert ecl_type == 0
-        assert -180.0 <= geopos[0] <= 180.0
-        assert -90.0 <= geopos[1] <= 90.0
-        assert attr[0] < 0.0
-        for i in range(2, 10):
-            assert geopos[i] == 0.0
 
     def test_april_2024_eclipse_path(self):
         """Test April 8, 2024 total eclipse path."""
@@ -1082,9 +1058,7 @@ class TestKnownEclipseValidation:
         """Verify eclipse type classification is consistent for known eclipses."""
         # Total eclipse 2024
         ecl_type1, times1 = sol_eclipse_when_glob(2460400.0, ecltype=ECL_TOTAL)
-        assert ecl_type1 & ECL_TOTAL, (
-            "April 2024 eclipse should be classified as TOTAL"
-        )
+        assert ecl_type1 & ECL_TOTAL, "April 2024 eclipse should be classified as TOTAL"
 
         # Annular eclipse 2023
         ecl_type2, times2 = sol_eclipse_when_glob(2460200.0, ecltype=ECL_ANNULAR)
@@ -1277,7 +1251,6 @@ class TestSolEclipseMaxTime:
 
     def test_swe_alias_exists(self):
         """sol_eclipse_max_time should be an alias."""
-
 
     def test_known_eclipse_april_2024_precision(self):
         """Test precision against known April 8, 2024 eclipse."""

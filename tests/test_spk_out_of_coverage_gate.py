@@ -231,7 +231,9 @@ class TestStrictSourceHelper:
 
 def _find_chiron_kernel():
     pattern = os.path.expanduser("~/.libephemeris/spk/2060_*.bsp")
-    files = sorted(f for f in glob.glob(pattern) if not os.path.basename(f).startswith("._"))
+    files = sorted(
+        f for f in glob.glob(pattern) if not os.path.basename(f).startswith("._")
+    )
     return files[-1] if files else None
 
 
@@ -275,13 +277,17 @@ class TestStrictGateRealKernel:
 
     def test_in_coverage_uses_kernel(self, monkeypatch):
         start, end = self._register()
-        src, pos = self._calc((start + end) / 2.0, autodl=False, monkeypatch=monkeypatch)
+        src, pos = self._calc(
+            (start + end) / 2.0, autodl=False, monkeypatch=monkeypatch
+        )
         assert src == "SPK"
         assert 0.0 <= pos[0] < 360.0
 
     def test_out_of_coverage_autodl_on_equals_off(self, monkeypatch):
         start, end = self._register()
-        src_off, pos_off = self._calc(end + 500.0, autodl=False, monkeypatch=monkeypatch)
+        src_off, pos_off = self._calc(
+            end + 500.0, autodl=False, monkeypatch=monkeypatch
+        )
         self._register()
         src_on, pos_on = self._calc(end + 500.0, autodl=True, monkeypatch=monkeypatch)
         assert src_off == "ASSIST"
@@ -325,4 +331,4 @@ class TestStrictGateRealKernel:
             a = assist_lon(jd)
             assert s is not None
             diff_arcsec = abs(((s - a + 180.0) % 360.0) - 180.0) * 3600.0
-            assert diff_arcsec < 0.05, f"jd={jd}: {diff_arcsec:.4f}\" > 0.05\""
+            assert diff_arcsec < 0.05, f'jd={jd}: {diff_arcsec:.4f}" > 0.05"'

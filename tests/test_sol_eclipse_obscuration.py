@@ -1,27 +1,18 @@
-"""Regression: solar-eclipse obscuration semantics per entry point.
+"""Solar-eclipse obscuration invariants per entry point.
 
-For a TOTAL eclipse the reference API reports the Moon/Sun disc *area ratio*
-``(R_moon/R_sun)^2 ~ 1.05-1.12 > 1`` in ``attr[2]``: it is the eclipse
-magnitude's domain rather than a physically-bounded covered fraction. The
-reference-compatible entry points (``sol_eclipse_how``,
-``sol_eclipse_when_loc``, ``sol_eclipse_where``) mirror that behavior 1:1
-(review round 2 removed an earlier clamp to 1.0 that diverged from the
-reference; e.g. Dallas 2024-04-08 must report ~1.1167, verified against the
-reference ephemeris 2.10.03).
-
-The convenience extensions (``sol_eclipse_obscuration_at_loc``,
-``sol_eclipse_how_details``) are not part of the reference API and keep
-reporting the physically-bounded covered fraction (1.0 when the Sun is fully
-covered).
-
-Annular eclipses report the same area ratio in both conventions (< 1, a ring
-of Sun remains) and partial eclipses use the two-disc lens overlap.
+Obscuration is the fraction of the Sun's disc area covered by the Moon —
+a bounded quantity by its published definition (NASA/USNO eclipse
+glossaries). Every entry point reports it in [0, 1]: exactly 1.0 during
+totality (the Sun is fully covered), ``(R_moon/R_sun)^2 < 1`` for an
+annular eclipse (the same ring-residual value in any convention), and the
+two-disc lens-overlap fraction for a partial phase. The > 1 disc area
+ratio remains derivable as ``attr[1]**2``.
 
 Checks (independent of any external implementation at runtime):
-  * total: attr[2] equals the squared diameter ratio (> 1) from the
-    reference-compatible entry points, 1.0 from the extensions,
-  * attr[2] equals the squared diameter ratio wherever the eclipse is total,
-    and stays a fraction <= 1.0 elsewhere,
+  * total: attr[2] == 1.0 from the compatibility entry points and the
+    extensions alike,
+  * attr[2] == 1.0 exactly where the eclipse is total, a fraction <= 1.0
+    everywhere else,
   * annular: 0 < obscuration < 1 and equals the squared diameter ratio,
   * partial: 0 < obscuration < 1.
 """
@@ -45,10 +36,6 @@ from libephemeris import (
 
 pytestmark = pytest.mark.slow
 
-# Reference obscuration at the Dallas local maximum of the 2024-04-08 total
-# eclipse (reference ephemeris 2.10.03: 1.1166797).
-DALLAS_OBSCURATION_REF = 1.11668
-
 
 def _glob_max(year, month, day):
     jd0 = julday(year, month, day, 0.0)
@@ -63,9 +50,8 @@ def _local_max(jd_near, lon, lat):
     return tloc[0]
 
 
-def test_total_eclipse_obscuration_is_area_ratio_all_apis():
-    """Total: attr[2] is the disc area ratio > 1 (reference behavior);
-    the non-reference extensions keep the covered fraction 1.0."""
+def test_total_eclipse_obscuration_is_bounded_all_apis():
+    """Total: attr[2] is the covered fraction 1.0 from every entry point."""
     jm = _glob_max(2024, 4, 8)
     # Dallas is inside the path of totality.
     lon, lat = -96.80, 32.78
@@ -74,17 +60,18 @@ def test_total_eclipse_obscuration_is_area_ratio_all_apis():
 
     rc, attr = sol_eclipse_how(tmax, geo, FLG_SWIEPH)
     assert rc & ECL_TOTAL
-    # Reference-compatible attr[2]: the Moon/Sun disc area ratio, > 1.
-    assert attr[2] == pytest.approx(attr[1] ** 2, rel=1e-9)
-    assert attr[2] == pytest.approx(DALLAS_OBSCURATION_REF, abs=2e-3)
-    # The eclipse magnitude (diameter coverage) also records the >1 excess.
+    # attr[2]: the Sun is fully covered -> exactly 1.0, never more.
+    assert attr[2] == pytest.approx(1.0, abs=1e-12)
+    # The eclipse magnitude (diameter coverage) records the > 1 excess, and
+    # the disc area ratio stays derivable from the diameter ratio.
     assert attr[0] > 1.0
+    assert attr[1] ** 2 > 1.0
 
     # when_loc reports the same attr layout at its own local maximum.
     _rc_loc, _tloc, attr_loc = sol_eclipse_when_loc(jm - 0.2, geo, FLG_SWIEPH, False)
-    assert attr_loc[2] == pytest.approx(DALLAS_OBSCURATION_REF, abs=2e-3)
+    assert attr_loc[2] == pytest.approx(1.0, abs=1e-12)
 
-    # Extensions (not in the reference API): physically-bounded fraction.
+    # Library-specific extensions expose a physically bounded fraction.
     assert sol_eclipse_obscuration_at_loc(tmax, geo, FLG_SWIEPH) == pytest.approx(
         1.0, abs=1e-9
     )
@@ -93,19 +80,17 @@ def test_total_eclipse_obscuration_is_area_ratio_all_apis():
     assert details["max_obscuration_percent"] == pytest.approx(100.0, abs=1e-6)
 
 
-def test_obscuration_is_area_ratio_only_in_totality():
-    """Across the path and its surroundings: area ratio (>1) exactly where
-    the eclipse is total, a fraction <= 1 everywhere else."""
+def test_obscuration_is_one_only_in_totality():
+    """Across the path and its surroundings: exactly 1.0 where the eclipse
+    is total, a fraction <= 1 everywhere (bounded by definition)."""
     jm = _glob_max(2024, 4, 8)
     for lat in range(-10, 71, 8):
         rc, attr = sol_eclipse_how(jm, (-100.0, float(lat), 0.0), FLG_SWIEPH)
         if rc & ECL_TOTAL:
-            assert attr[2] == pytest.approx(attr[1] ** 2, rel=1e-9), (
-                f"total-phase obscuration at lat {lat} must be the area ratio"
+            assert attr[2] == pytest.approx(1.0, abs=1e-12), (
+                f"total-phase obscuration at lat {lat} must be 1.0"
             )
-            assert attr[2] > 1.0
-        else:
-            assert 0.0 <= attr[2] <= 1.0 + 1e-9, f"obscuration {attr[2]} at lat {lat}"
+        assert 0.0 <= attr[2] <= 1.0 + 1e-9, f"obscuration {attr[2]} at lat {lat}"
 
 
 def test_annular_obscuration_is_area_ratio_below_one():

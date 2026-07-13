@@ -34,11 +34,8 @@ class TestDE440Default:
     def test_tidal_default_is_de431(self):
         """Verify tidal acceleration constants.
 
-        The named constant TIDAL_DEFAULT aliases the DE431 value (-25.80)
-        for 1:1 parity with the reference API's same-named constant
-        (measured black-box). The runtime automatic default is separate:
-        get_tid_acc() returns the DE440/DE441 value -25.936 out of the
-        box, matching the reference's runtime behavior.
+        The named compatibility constant TIDAL_DEFAULT aliases the DE431
+        convention. DE440/DE441 remain available as explicit selections.
         """
         from libephemeris import TIDAL_DE431
 
@@ -46,18 +43,17 @@ class TestDE440Default:
         assert TIDAL_DE440 == -25.936
         assert TIDAL_DE441 == -25.936  # DE441 uses same value
 
-    def test_get_tid_acc_returns_de440_default(self):
+    def test_get_tid_acc_returns_public_default(self):
         """Verify that get_tid_acc() returns the default tidal acceleration value.
 
-        The default is the DE440 value (-25.936), which is also the
-        reference API's default and the zero point of the Delta T
-        tidal-acceleration adjustment.
+        The automatic default is TIDAL_DEFAULT (-25.80), independently of the
+        JPL kernel selected for positional calculations.
         """
         # Reset to ensure default state
         ephem.close()
 
         tid_acc = ephem.get_tid_acc()
-        assert tid_acc == TIDAL_DE440
+        assert tid_acc == TIDAL_DEFAULT
 
 
 class TestDE440DateRange:

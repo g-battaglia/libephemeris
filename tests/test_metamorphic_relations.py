@@ -1,4 +1,4 @@
-"""Metamorphic relations — oracle-free identities that must hold across the API.
+"""Metamorphic relations — self-checking identities that must hold across the API.
 
 These need no external truth: an internal inconsistency between two ways of asking
 for the same quantity is itself a bug. They cover the frame/flag conversions
@@ -87,16 +87,8 @@ def test_south_node_is_north_plus_180(body):
         assert abs((-n[1]) - s[1]) < 1e-6
 
 
-# For the giants, HELCTR reports the planet-SYSTEM BARYCENTRE (reference API
-# convention) while the geocentric path reports the planet CENTER, so the
-# identity only holds to the physical center-vs-barycentre offset: ~1.4e-6 AU
-# for Jupiter (Galilean moons) and ~1.4e-5 AU for Pluto (Charon). Rocky
-# planets have no such offset and keep the tight bound.
-@pytest.mark.parametrize(
-    "body,tol",
-    [(MERCURY, 1e-6), (MARS, 1e-6), (JUPITER, 5e-6), (PLUTO, 5e-5)],
-)
-def test_helio_plus_sun_equals_geo(body, tol):
+@pytest.mark.parametrize("body", [MERCURY, MARS, JUPITER, PLUTO])
+def test_helio_plus_sun_equals_geo(body):
     """geocentric = heliocentric + (geocentric Sun), geometrically (FLG_TRUEPOS)."""
     base = FLG_SWIEPH | FLG_J2000 | FLG_XYZ | FLG_TRUEPOS
     for jd in _DATES:
@@ -104,7 +96,7 @@ def test_helio_plus_sun_equals_geo(body, tol):
         geo = L.calc(jd, body, base)[0]
         sun = L.calc(jd, SUN, base)[0]
         for i in range(3):
-            assert abs((helio[i] + sun[i]) - geo[i]) < tol
+            assert abs((helio[i] + sun[i]) - geo[i]) < 1e-10
 
 
 @pytest.mark.parametrize("body", _BODIES)

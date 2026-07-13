@@ -15,10 +15,13 @@ The body-to-group mapping itself lives with the generators
 (``scripts/generate_leb.py`` ``BODY_GROUPS``, ``scripts/generate_leb2.py``
 ``LEB2_GROUPS``); the keys of those dicts must match the tuples below.
 """
+
 from __future__ import annotations
 
 # LEB1 generation/merge partition (order = generation + merge order).
 LEB1_GROUPS = ("planets", "asteroids", "exotics", "analytical")
 
 # LEB2 distribution partition → ``{tier}_{group}.leb2`` companion files.
-LEB2_GROUPS = ("core", "asteroids", "exotics", "apogee", "uranians")
+# The former ``uranians`` group is deliberately absent: the bundled
+# hypothetical elements were retired during the clean-room audit.
+LEB2_GROUPS = ("core", "asteroids", "exotics", "apogee")

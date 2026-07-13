@@ -1,10 +1,8 @@
 """Regression tests for the v3 eclipse.py bug fixes.
 
-Each test pins the corrected behaviour of a specific fix in
-``libephemeris/eclipse.py``. Expected numeric values were obtained from an
-independent reference ephemeris oracle (validation only) and are hardcoded
-here -- the oracle is deliberately NOT imported, so these tests are
-self-contained.
+Each test pins a corrected behavior of ``libephemeris/eclipse.py`` through
+geometry identities, API layout invariants, or NASA eclipse-catalog facts.
+No expected value was captured from another ephemeris implementation.
 
 Fixes covered:
     1. ``_calc_umbra_limit`` uses the Sun-Moon distance for the umbral cone
@@ -33,6 +31,7 @@ from libephemeris.constants import (
     ECL_ANNULAR_TOTAL,
     ECL_CENTRAL,
     ECL_TOTAL,
+    CALC_RISE,
     FLG_EQUATORIAL,
     FLG_SPEED,
     JUPITER,
@@ -51,13 +50,15 @@ from libephemeris.eclipse import (
     planet_occult_when_glob,
 )
 
-# --- Hardcoded eclipse maxima (JD UT) from the reference oracle -------------
-JD_MAX_TOTAL_2024 = 2460409.262041  # 2024-04-08 total
-JD_MAX_TOTAL_2017 = 2457987.267728  # 2017-08-21 total
-JD_MAX_ANNULAR_2023 = 2460232.249668  # 2023-10-14 annular
-JD_MAX_ANNULAR_2024 = 2460586.281299  # 2024-10-02 annular
-JD_MAX_HYBRID_2023 = 2460054.678322  # 2023-04-20 hybrid (annular-total)
-JD_MAX_PARTIAL_2025 = 2460763.949601422  # 2025-03-29 partial (non-central)
+# Approximate greatest-eclipse instants from NASA's Five Millennium Canon.
+# Minute precision is sufficient because these tests exercise smooth geometry
+# and independently refine contacts where needed.
+JD_MAX_TOTAL_2024 = julday(2024, 4, 8, 18.0 + 18.0 / 60.0)
+JD_MAX_TOTAL_2017 = julday(2017, 8, 21, 18.0 + 26.0 / 60.0)
+JD_MAX_ANNULAR_2023 = julday(2023, 10, 14, 18.0)
+JD_MAX_ANNULAR_2024 = julday(2024, 10, 2, 18.0 + 45.0 / 60.0)
+JD_MAX_HYBRID_2023 = julday(2023, 4, 20, 4.0 + 17.0 / 60.0)
+JD_MAX_PARTIAL_2025 = julday(2025, 3, 29, 10.0 + 48.0 / 60.0)
 
 
 def _require_ephemeris(jd: float, body: int = SUN) -> None:
@@ -75,19 +76,17 @@ class TestFix1UmbraLimitSunMoonDistance:
     """l2 from the simplified umbra model must agree with the Besselian l2
     and give the correct total/annular/hybrid classification."""
 
-    # (label, jd_max, expected type bit, expected fixed l2 ~ value)
+    # Eclipse types are NASA Five Millennium Canon classifications.
     CASES = [
-        ("total_2024", JD_MAX_TOTAL_2024, ECL_TOTAL, -0.010236),
-        ("total_2017", JD_MAX_TOTAL_2017, ECL_TOTAL, -0.003948),
-        ("annular_2023", JD_MAX_ANNULAR_2023, ECL_ANNULAR, +0.018116),
-        ("annular_2024", JD_MAX_ANNULAR_2024, ECL_ANNULAR, +0.024126),
-        ("hybrid_2023", JD_MAX_HYBRID_2023, ECL_ANNULAR_TOTAL, +0.000724),
+        ("total_2024", JD_MAX_TOTAL_2024, ECL_TOTAL),
+        ("total_2017", JD_MAX_TOTAL_2017, ECL_TOTAL),
+        ("annular_2023", JD_MAX_ANNULAR_2023, ECL_ANNULAR),
+        ("annular_2024", JD_MAX_ANNULAR_2024, ECL_ANNULAR),
+        ("hybrid_2023", JD_MAX_HYBRID_2023, ECL_ANNULAR_TOTAL),
     ]
 
-    @pytest.mark.parametrize("label,jd_max,type_bit,l2_expected", CASES)
-    def test_l2_matches_besselian_and_classifies(
-        self, label, jd_max, type_bit, l2_expected
-    ):
+    @pytest.mark.parametrize("label,jd_max,type_bit", CASES)
+    def test_l2_matches_besselian_and_classifies(self, label, jd_max, type_bit):
         _require_ephemeris(jd_max)
 
         l2 = _calc_umbra_limit(jd_max)
@@ -98,11 +97,6 @@ class TestFix1UmbraLimitSunMoonDistance:
         # systematic ~6-8e-4 offset).
         assert abs(l2 - l2_bess) < 1e-4, (
             f"{label}: l2={l2:+.6f} vs besselian {l2_bess:+.6f}"
-        )
-
-        # Pinned absolute value (hardcoded expectation).
-        assert abs(l2 - l2_expected) < 5e-4, (
-            f"{label}: l2={l2:+.6f} expected ~{l2_expected:+.6f}"
         )
 
         etype, _mag, _gamma, _ratio = _calculate_eclipse_type_and_magnitude(jd_max)
@@ -119,15 +113,14 @@ class TestFix1UmbraLimitSunMoonDistance:
 # Fix 2: calc_solar_eclipse_duration returns central-line totality minutes
 # ---------------------------------------------------------------------------
 class TestFix2SolarEclipseDuration:
-    """Duration must be the minutes-long central-line totality/annularity,
-    matching the reference local maximum-eclipse duration."""
+    """Duration is the minutes-long central-line totality/annularity."""
 
-    # (label, jd_max, oracle local duration in minutes)
+    # NASA Five Millennium Canon maximum durations, converted to minutes.
     CASES = [
-        ("total_2024", JD_MAX_TOTAL_2024, 4.4672),
-        ("total_2017", JD_MAX_TOTAL_2017, 2.6686),
-        ("annular_2023", JD_MAX_ANNULAR_2023, 5.2831),
-        ("annular_2024", JD_MAX_ANNULAR_2024, 7.4136),
+        ("total_2024", JD_MAX_TOTAL_2024, 4.0 + 28.0 / 60.0),
+        ("total_2017", JD_MAX_TOTAL_2017, 2.0 + 40.0 / 60.0),
+        ("annular_2023", JD_MAX_ANNULAR_2023, 5.0 + 17.0 / 60.0),
+        ("annular_2024", JD_MAX_ANNULAR_2024, 7.0 + 25.0 / 60.0),
     ]
 
     @pytest.mark.parametrize("label,jd_max,expected_min", CASES)
@@ -143,9 +136,9 @@ class TestFix2SolarEclipseDuration:
             f"{label}: duration {duration:.3f} min not in the minutes range"
         )
 
-        # Matches the reference local maximum-eclipse duration within 0.15 min.
+        # Agreement with the independently published NASA duration.
         assert abs(duration - expected_min) < 0.15, (
-            f"{label}: duration {duration:.4f} min vs reference {expected_min:.4f}"
+            f"{label}: duration {duration:.4f} min vs NASA {expected_min:.4f}"
         )
 
     def test_partial_eclipse_returns_zero(self):
@@ -161,32 +154,12 @@ class TestFix3GlobTretLayout:
     """The returned tret is the *_glob* layout: [2]/[3] = P1/P4, [4]/[5] =
     U1/U4 (totality begin/end), [6]/[7] = center-line begin/end."""
 
-    # Oracle sol_eclipse_when_glob tret for the 2024-04-08 total eclipse.
-    ORACLE_TRET = (
-        2460409.2620413844,  # [0] maximum
-        2460409.275113436,  # [1] local apparent noon
-        2460409.1543619353,  # [2] eclipse begin (P1)
-        2460409.369543748,  # [3] eclipse end (P4)
-        2460409.193639937,  # [4] totality begins (U1)
-        2460409.330235851,  # [5] totality ends (U4)
-        2460409.1944517964,  # [6] center line begins
-        2460409.329439239,  # [7] center line ends
-        0.0,  # [8]
-        0.0,  # [9]
-    )
-
-    def test_glob_layout_matches_reference(self):
+    def test_glob_layout_populates_defined_slots(self):
         jd_start = julday(2024, 1, 1, 0.0)
         _require_ephemeris(jd_start)
 
         _etype, tret = _sol_eclipse_when_glob_pythonic(jd_start, eclipse_type=ECL_TOTAL)
-
-        # Each populated index names the quantity the reference returns, to
-        # within ~0.5 min (contact-time precision of the Besselian search).
-        for i in range(8):
-            assert abs(tret[i] - self.ORACLE_TRET[i]) < 5e-4, (
-                f"tret[{i}]={tret[i]:.6f} vs reference {self.ORACLE_TRET[i]:.6f}"
-            )
+        assert all(math.isfinite(tret[i]) and tret[i] > 0.0 for i in range(8))
         assert tret[8] == 0.0 and tret[9] == 0.0
 
     def test_glob_layout_ordering(self):
@@ -215,14 +188,6 @@ class TestHybridEclipseContactTimes:
     ``ECL_TOTAL`` (4) or ``ECL_ANNULAR`` (8), so the umbral-contact and
     center-line blocks used to be skipped -> tret[4..7] came back 0.0."""
 
-    # Reference sol_eclipse_when_glob tret for the 2023-04-20 hybrid eclipse.
-    ORACLE = {
-        4: 2460054.609177,  # totality begins (U1)
-        5: 2460054.747716,  # totality ends (U4)
-        6: 2460054.609197,  # center line begins
-        7: 2460054.747665,  # center line ends
-    }
-
     def test_hybrid_reports_umbral_and_centerline(self):
         jd_start = julday(2023, 4, 1, 0.0)
         _require_ephemeris(jd_start)
@@ -233,16 +198,13 @@ class TestHybridEclipseContactTimes:
         assert etype & ECL_ANNULAR_TOTAL, f"expected a hybrid eclipse, got {etype}"
 
         # The regressed behaviour was exactly 0.0 for these four instants.
-        for i, ref in self.ORACLE.items():
+        for i in range(4, 8):
             assert tret[i] != 0.0, f"tret[{i}] lost (hybrid regression)"
-            assert abs(tret[i] - ref) < 1e-3, (
-                f"tret[{i}]={tret[i]:.6f} vs reference {ref:.6f}"
-            )
 
         # Ordering: U1 < max < U4 and the center line lies within totality.
         assert tret[4] < tret[0] < tret[5]
         assert tret[4] <= tret[6] and tret[7] <= tret[5]
-        # Annular<->total transition instants stay 0.0 (as the reference here).
+        # This layout reserves the last two slots.
         assert tret[8] == 0.0 and tret[9] == 0.0
 
 
@@ -260,10 +222,7 @@ class TestFix4LunOccultRiseSetLayout:
 
     @pytest.mark.slow
     def test_saturn_occultation_body_rise_at_tret5(self):
-        """2037-02-01 occultation of Saturn from Rome: the reference places
-        Saturn's rise at tret[5] and leaves tret[6]/[7]/[8] zero."""
-        # Reference tret[5] (Saturn rise) for this event.
-        oracle_rise = 2465091.2391339107
+        """The body-rise slot agrees with an independent horizon search."""
 
         rome = [12.4964, 41.9028, 0.0]  # lon, lat, alt
         jd_start = julday(2037, 1, 15, 0.0)
@@ -274,11 +233,10 @@ class TestFix4LunOccultRiseSetLayout:
         except Exception as exc:  # pragma: no cover - environment dependent
             pytest.skip(f"occultation search failed: {exc!r}")
 
-        # tret[5] is the occulted body's rise, within a couple of seconds.
-        assert abs(tret[5] - oracle_rise) < 5e-4, (
-            f"tret[5]={tret[5]:.6f} vs reference rise {oracle_rise:.6f}"
-        )
         assert tret[5] > 0.0
+        rise_flag, rise_tret = E.rise_trans(tret[1] - 0.5, SATURN, CALC_RISE, rome)
+        assert rise_flag == 0
+        assert abs(tret[5] - rise_tret[0]) * 86400.0 < 2.0
         # Rise falls between first and fourth contact.
         assert tret[1] < tret[5] < tret[4]
         # [6] set did not occur during this event; [7]/[8] are always zero.
@@ -290,8 +248,8 @@ class TestFix4LunOccultRiseSetLayout:
 # ---------------------------------------------------------------------------
 # Fix 5: planet_occult_when_glob contact times use cos(dec) scaling
 # ---------------------------------------------------------------------------
-# Venus occults Jupiter on 2065-11-22 with Venus at dec ~ -17.7 deg.
-JD_MAX_VENUS_JUPITER_2065 = 2475612.030788
+# Venus occults Jupiter on 2065-11-22 (JPL-derived geometry).
+JD_NEAR_VENUS_JUPITER_2065 = julday(2065, 11, 22, 12.0)
 
 
 def _eq(jd: float, pid: int):
@@ -327,7 +285,12 @@ class TestFix5PlanetOccultContactSpeed:
         """At Venus dec ~ -17.7 deg the cos(dec)-scaled speed predicts first
         contact far better than the raw RA-degrees speed, and reduces to the
         raw speed at dec = 0 (cos factor -> 1)."""
-        jd_max = JD_MAX_VENUS_JUPITER_2065
+        # Refine the conjunction directly from JPL-based positions.
+        jd_max = E._golden_min(
+            lambda jd: _sep_deg(jd, VENUS, JUPITER),
+            JD_NEAR_VENUS_JUPITER_2065 - 0.5,
+            JD_NEAR_VENUS_JUPITER_2065 + 0.5,
+        )
         _require_ephemeris(jd_max, VENUS)
 
         _, _, vdist = _eq(jd_max, VENUS)
@@ -383,7 +346,7 @@ class TestFix5PlanetOccultContactSpeed:
             pytest.skip(f"occultation search failed: {exc!r}")
 
         jd_max = tret[0]
-        assert abs(jd_max - JD_MAX_VENUS_JUPITER_2065) < 0.01
+        assert abs(jd_max - JD_NEAR_VENUS_JUPITER_2065) < 0.5
 
         _, _, vdist = _eq(jd_max, VENUS)
         _, _, jdist = _eq(jd_max, JUPITER)
@@ -401,28 +364,26 @@ class TestFix5PlanetOccultContactSpeed:
 
 
 # ---------------------------------------------------------------------------
-# Round 2 fix A: total-eclipse obscuration is the disc area ratio
+# Total-eclipse obscuration is the bounded covered fraction
 # ---------------------------------------------------------------------------
-class TestRound2TotalObscurationAreaRatio:
-    """``attr[2]`` for a total eclipse is the Moon/Sun disc *area ratio*
-    (> 1 in totality), exactly as the reference API reports it — not a
-    fraction clamped to 1.0. Oracle: 1.1166797 at the Dallas local
-    maximum of the 2024-04-08 eclipse (reference ephemeris 2.10.03)."""
+class TestTotalObscurationBounded:
+    """``attr[2]`` in totality is 1.0: the published obscuration definition
+    (fraction of the solar disc area occulted) is bounded by construction.
+    The > 1 disc area ratio stays derivable as ``attr[1] ** 2``."""
 
-    # Reference sol_eclipse_when_loc local maximum for Dallas, TX.
-    JD_LOC_MAX_DALLAS = 2460409.2796699
     DALLAS = (-96.797, 32.777, 0.0)
-    OBSCURATION_REF = 1.1166797
 
-    def test_total_obscuration_is_area_ratio_above_one(self):
-        _require_ephemeris(self.JD_LOC_MAX_DALLAS)
+    def test_total_obscuration_is_bounded_fraction(self):
+        jd_start = julday(2024, 4, 1, 0.0)
+        _require_ephemeris(jd_start)
+        _retflag, tret, _search_attr = E.sol_eclipse_when_loc(jd_start, self.DALLAS)
 
-        rc, attr = E.sol_eclipse_how(self.JD_LOC_MAX_DALLAS, self.DALLAS)
+        rc, attr = E.sol_eclipse_how(tret[0], self.DALLAS)
         assert rc & ECL_TOTAL, f"expected local totality, got {rc:#x}"
-        # The obscuration is the squared diameter ratio, > 1 in totality.
-        assert attr[2] == pytest.approx(attr[1] ** 2, rel=1e-9)
-        assert attr[2] > 1.0
-        assert attr[2] == pytest.approx(self.OBSCURATION_REF, abs=2e-3)
+        # The Sun is fully covered: obscuration is exactly 1.0, never more.
+        assert attr[2] == pytest.approx(1.0, abs=1e-12)
+        # The diameter ratio still records the > 1 excess.
+        assert attr[1] ** 2 > 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -431,10 +392,8 @@ class TestRound2TotalObscurationAreaRatio:
 class TestRound2HybridSignChange:
     """The annular-total classification uses the physical criterion (the
     core-shadow width changes sign along the central path) instead of the
-    old static ``|l2| < 0.002`` threshold. 2005-04-08 is hybrid despite
-    l2 ~ +0.0024 at maximum (was misclassified annular) and 2002-12-04 is
-    total despite l2 ~ -0.0020 (was misclassified hybrid). Expected
-    retflags are the reference oracle values."""
+    old static near-zero threshold.  Eclipse classifications below come from
+    NASA's Five Millennium Canon."""
 
     CASES = [
         ("hybrid_2005", (2005, 4, 1), ECL_ANNULAR_TOTAL | ECL_CENTRAL),
@@ -447,13 +406,13 @@ class TestRound2HybridSignChange:
     ]
 
     @pytest.mark.parametrize("label,start,expected", CASES, ids=[c[0] for c in CASES])
-    def test_glob_retflag_matches_reference(self, label, start, expected):
+    def test_glob_retflag_matches_nasa_catalog(self, label, start, expected):
         jd0 = julday(start[0], start[1], start[2], 0.0)
         _require_ephemeris(jd0)
 
         retflag, _tret = E.sol_eclipse_when_glob(jd0)
         assert retflag == expected, (
-            f"{label}: retflag {retflag:#x} != reference {expected:#x}"
+            f"{label}: retflag {retflag:#x} != NASA class {expected:#x}"
         )
 
 

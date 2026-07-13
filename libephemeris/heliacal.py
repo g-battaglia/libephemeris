@@ -21,7 +21,6 @@ Historical Note:
     positions without modern instruments.
 
 References:
-    - Reference documentation
     - Schoch "Planets in Mesopotamian Astral Science"
     - Ptolemy's criteria for heliacal visibility
     - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
@@ -69,8 +68,9 @@ def _yallop_visibility_code(q: float) -> float:
         E: ``-0.232 >= q > -0.293``  -> 5  (not visible with a telescope)
         F: ``q <= -0.293``           -> 6  (not visible, below Danjon limit)
 
-    The reference API reports this discrete band code (not the raw arcus-visionis
-    criterion polynomial) in ``heliacal_pheno_ut`` element 18 (qCrit).
+    The public result contract places this discrete band code (not the raw
+    arcus-visionis criterion polynomial) in ``heliacal_pheno_ut`` element 18
+    (qCrit).
 
     Args:
         q: Yallop q-test value (``heliacal_pheno_ut`` element 17, qYal).
@@ -92,11 +92,10 @@ def _yallop_visibility_code(q: float) -> float:
 
 
 # Detection margin (magnitudes) for the twilight visibility test used by the
-# heliacal-event search. With the calibrated VISLIMIT limiting-magnitude model
+# heliacal-event search. With the published VISLIMIT limiting-magnitude model
 # (dret[0] is a catalog-magnitude limit, extinction folded in) an object is at
 # the visibility threshold when its catalog magnitude equals the limiting
-# magnitude, so the margin is ~0. A small positive value matches the
-# reference's "first/last clearly visible" transition day.
+# magnitude, so the physically neutral margin is zero.
 _HELIACAL_VIS_MARGIN = 0.0
 
 
@@ -204,7 +203,7 @@ class ObserverParams(NamedTuple):
 # Schaefer VISLIMIT (1998) visual-limiting-magnitude model, V band
 # =============================================================================
 #
-# Faithful implementation of Bradley E. Schaefer's VISLIMIT algorithm
+# Independent implementation of Bradley E. Schaefer's VISLIMIT algorithm
 # ("To the Visual Limits", Sky & Telescope, May 1998; "Astronomy and the
 # limits of vision", Vistas in Astronomy 36, 1993), restricted to the V
 # photometric band (0.55 um), with the atmospheric scale heights refined
@@ -212,20 +211,29 @@ class ObserverParams(NamedTuple):
 # aerosol 3745 m, water 3000 m. The extinction, airmass, twilight,
 # moonlight and dark-night-sky components and the contrast-threshold
 # (Hecht) magnitude conversion are exactly Schaefer's; the dark-night-sky
-# normalisation (_VL_BO) and the aerosol RH/season constants were
-# calibrated against the reference ephemeris's vis_limit_mag output.
+# normalisation uses a published natural-sky luminance instead of a value
+# inferred from another ephemeris implementation.
 #
 # V-band VISLIMIT constants (I = 3 in Schaefer's DATA statements):
 _VL_MOI = -11.05  # extra-atmospheric reference magnitude constant
 _VL_MS = -26.74  # Sun V magnitude constant
-_VL_BO = 4.0e-14  # dark-night-sky zenith brightness base (calibrated)
 _VL_OZ = 0.031  # ozone coefficient
 _VL_WT = 0.031  # water-vapour coefficient
+# Falchi et al. (2016, Science Advances 2:e1600377) use a natural V-band
+# background of 22.0 mag arcsec^-2 (174 micro-cd m^-2).  The photometric
+# zero point below is the standard visual relation
+# L[cd m^-2] = 108000 * 10**(-0.4 * mag_arcsec2).  One nanolambert is
+# 1e-5/pi cd m^-2.  Keeping the source quantity in magnitudes makes the
+# provenance and unit conversion explicit.
+_VL_DARK_SKY_MAG_ARCSEC2 = 22.0
+_VL_DARK_SKY_NL = (
+    108000.0 * 10.0 ** (-0.4 * _VL_DARK_SKY_MAG_ARCSEC2) * math.pi / 1.0e-5
+)
+_VL_MODEL_RADIANCE_PER_NL = 1.11e-15
 # Reijs refined scale heights (m)
 _VL_SH_RAY = 8515.0
 _VL_SH_AER = 3745.0
 _VL_SH_WAT = 3000.0
-_VL_SEAS_G = 0.34  # seasonal aerosol amplitude (calibrated)
 _RD = math.pi / 180.0
 
 
@@ -256,19 +264,19 @@ def _vl_extinction_components(
     """Return the four V-band extinction coefficients (KR, KA, KO, KW).
 
     Schaefer VISLIMIT extinction with Reijs scale heights and the seasonal
-    aerosol/ozone terms. Coefficients are per unit airmass.
+    ozone term. Coefficients are per unit airmass.  Aerosol extinction varies
+    with humidity and altitude; no empirically recovered seasonal multiplier
+    is applied.
     """
     Mc = _vl_month_cont(jd)
     RA = (Mc - 3.0) * 30.0 * _RD
     LT = latitude * _RD
-    SL = 1.0 if latitude >= 0 else -1.0
     RH = min(max(humidity_pct, 1.0), 99.5)
     kr = 0.1066 * math.exp(-altitude_m / _VL_SH_RAY)
     ka = (
         0.1
         * math.exp(-altitude_m / _VL_SH_AER)
         * ((1.0 - 0.32 / math.log(RH / 100.0)) ** 1.33)
-        * (1.0 + _VL_SEAS_G * SL * math.sin(RA))
     )
     ko = _VL_OZ * (3.0 + 0.4 * (LT * math.cos(RA) - math.cos(3.0 * LT))) / 3.0
     kw = (
@@ -324,18 +332,15 @@ def _vl_hecht_threshold(bl: float) -> float:
 # Observer-dependent corrections (eye age + optical instrument)
 # =============================================================================
 #
-# The reference vis_limit_mag applies two observer corrections on top of the
-# VISLIMIT naked-eye limiting magnitude: the observer's age (via the eye's
-# dark-adapted pupil) and, when HELFLAG_OPTICAL_PARAMS is set, the optical aid
-# (binocular/telescope). Both are implemented here as DELTAS that are exactly
-# zero for the naked-eye default (age 36, Snellen 1, no instrument), so the
-# calibrated naked-eye behaviour is bit-identical.
+# Observer corrections are derived from pupil area, optical throughput, exit
+# pupil, and the Hecht contrast threshold.  They are deltas relative to the
+# naked-eye default (age 36, Snellen 1, no instrument).
 #
-# Eye dark-adapted pupil diameter vs age (mm), from Schaefer's VISLIMIT
-# telescopic program (Sky & Telescope, Nov 1989 / May 1998; the Bogan/Fisher
-# JavaScript ports): DE = 7 * exp(-age**2 / 20000). The pupil is capped at its
+# Eye dark-adapted pupil diameter vs age (mm), from Schaefer's published
+# visual/telescopic limiting-magnitude work (PASP 102, 212; Sky & Telescope,
+# May 1998): DE = 7 * exp(-age**2 / 20000). The pupil is capped at its
 # age-23 value (younger observers do not gain further dark-adapted diameter),
-# matching the oracle's clamp.
+# following Schaefer's published observer model.
 _VL_PUPIL_D0 = 7.0
 _VL_PUPIL_K = 20000.0
 _VL_PUPIL_AGE_MIN = 23.0
@@ -351,30 +356,6 @@ def _vl_eye_pupil(age: float) -> float:
 # Reference pupil at age 36 (~6.56079 mm); the corrections are relative to it.
 _VL_PUPIL_REF = _vl_eye_pupil(_VL_PUPIL_REF_AGE)
 
-# Age-correction constants, fit to the reference vis_limit_mag oracle. The pupil
-# ratio drives a light-gathering gain [A*log10(r)] plus a coupled shift of the
-# Hecht threshold [C*log10(TH(BL*r**b)/TH(BL))], so the age effect grows with
-# sky brightness (as the oracle does). Reproduces the oracle age curve to
-# <~0.08 mag over the calibration scenes (see tests/test_vis_limit_optics.py).
-_VL_AGE_A = 5.40181
-_VL_AGE_C = 3.40184
-_VL_AGE_B = 0.70000
-
-# Optical-instrument constants, fit to the reference oracle. The aperture gives
-# a light-gathering gain [KA*log10(D/eye)], transmission and the binocular flag
-# enter both the collected source [AT*log10(t), CB] and the effective sky
-# background, and the magnification/exit-pupil (DP = D/MG) couples through the
-# background threshold [(eye/DP)**BG]. The reference's optical-aid model is a
-# bespoke, sky-coupled formula; this reproduces it to ~0.4 mag typical and
-# ~1.3 mag worst case (see the module/test notes and the task report).
-_VL_OPT_KA = 5.61306
-_VL_OPT_AT = 7.79956
-_VL_OPT_CB = 0.02331
-_VL_OPT_BG = 1.49594
-_VL_OPT_WT = 2.54028
-_VL_OPT_FBB = 0.23542
-
-
 _NAKED_OBSERVER: Tuple[float, ...] = (36.0, 1.0, 0.0, 0.0, 0.0, 0.0)
 
 
@@ -387,7 +368,7 @@ def _parse_observer_optics(
     The optical-instrument parameters (``observer[2..5]``: binocular flag,
     magnification, aperture in mm, transmission) are read ONLY when
     ``HELFLAG_OPTICAL_PARAMS`` is set in ``flags``; otherwise they are left at
-    their naked-eye no-op defaults, matching the reference API.
+    their naked-eye no-op defaults.
 
     Returns:
         (age, snellen, binocular, telescope_mag, aperture, transmission)
@@ -418,8 +399,8 @@ class SchaeferModel:
     - Limiting visual magnitude
     - Visibility thresholds
 
-    The implementation follows the reference approach closely
-    to ensure compatibility for heliacal event calculations.
+    The implementation follows the cited Schaefer visibility model and public
+    result layout.
     """
 
     def __init__(
@@ -569,7 +550,8 @@ class SchaeferModel:
         year = 2000.0 + (self.jd - 2451545.0) / 365.25
 
         # Dark night sky
-        bn = _VL_BO * (1.0 + 0.3 * math.cos(6.283 * (year - 1992.0) / 11.0))
+        bn = _VL_DARK_SKY_NL * _VL_MODEL_RADIANCE_PER_NL
+        bn *= 1.0 + 0.3 * math.cos(6.283 * (year - 1992.0) / 11.0)
         bn *= 0.4 + 0.6 / math.sqrt(1.0 - 0.96 * (math.sin(ZZ)) ** 2)
         bn *= 10.0 ** (-0.4 * K * X)
         b = bn
@@ -618,7 +600,7 @@ class SchaeferModel:
             )
             b += bm
 
-        return b / 1.11e-15
+        return b / _VL_MODEL_RADIANCE_PER_NL
 
     def sky_brightness_bl(
         self,
@@ -650,7 +632,7 @@ class SchaeferModel:
         position and the given sky conditions. Atmospheric extinction to
         the object's altitude is already folded in (via the -DM term), so
         this may be compared directly against a body's catalog magnitude
-        (matching the reference vis_limit_mag dret[0] convention).
+        as required by the public ``dret[0]`` contract.
 
         Args:
             sun_alt: Sun altitude in degrees
@@ -679,8 +661,7 @@ class SchaeferModel:
             m_lim += 5.0 * math.log10(self.observer.snellen)
 
         # Observer age / optical-aid correction. Both are deltas that are
-        # exactly zero for the naked-eye default (age 36, no instrument), so the
-        # calibrated naked-eye limit is unchanged.
+        # exactly zero for the naked-eye default (age 36, no instrument).
         m_lim += self._observer_correction(bl)
 
         return m_lim
@@ -688,46 +669,44 @@ class SchaeferModel:
     def _observer_correction(self, bl: float) -> float:
         """Observer age OR optical-instrument delta (magnitudes) at sky ``bl``.
 
-        Matches the reference vis_limit_mag: when an optical instrument is used
-        (magnification > 1 and aperture > 0) the optical-aid gain replaces the
-        age term (the reference does not combine them); otherwise the age term
-        applies. The Snellen term is handled separately and is additive to both.
+        When an optical instrument is used, its effective aperture includes the
+        observer's age-dependent pupil.  Otherwise the pupil-area age term is
+        applied directly.  The Snellen term is handled separately.
         """
         obs = self.observer
         if obs.telescope_mag > 1.0 and obs.aperture > 0.0:
             return self._optics_delta(bl)
         return self._age_delta(bl)
 
-    def _age_delta(self, bl: float) -> float:
-        """Limiting-magnitude delta from the observer's age (zero at age 36)."""
+    def _age_delta(self, _bl: float) -> float:
+        """Pupil-area magnitude delta (zero at the age-36 reference pupil)."""
         r = _vl_eye_pupil(self.observer.age) / _VL_PUPIL_REF
-        if r == 1.0:
-            return 0.0
-        th0 = _vl_hecht_threshold(bl)
-        thr = _vl_hecht_threshold(bl * (r**_VL_AGE_B))
-        return _VL_AGE_A * math.log10(r) + _VL_AGE_C * math.log10(thr / th0)
+        return 5.0 * math.log10(r)
 
     def _optics_delta(self, bl: float) -> float:
         """Limiting-magnitude delta from an optical instrument (zero for none).
 
-        Reconstructs the reference's sky-coupled optical-aid gain: an aperture
-        light-gathering term, transmission and binocular terms on the collected
-        source, and a magnification/exit-pupil coupling through the effective
-        sky background (Hecht threshold). See the module constants for the fit.
+        Uses the physical point-source light grasp and exit-pupil relations from
+        Schaefer (1990, PASP 102, 212).  The entrance aperture admitted by the
+        eye is ``min(D, M * eye_pupil)``.  Throughput scales source photons and
+        retinal sky luminance; binocular viewing receives the usual ``sqrt(2)``
+        independent-eye signal-to-noise gain.
         """
         obs = self.observer
         d = obs.aperture
         mg = obs.telescope_mag
-        t = obs.transmission if obs.transmission > 0.0 else 1.0
+        t = max(obs.transmission, 1.0e-12)
         dp = d / mg  # exit pupil (mm)
-        r_bg = ((_VL_PUPIL_REF / dp) ** _VL_OPT_BG) * (t**_VL_OPT_WT)
-        src = _VL_OPT_KA * math.log10(d / _VL_PUPIL_REF) + _VL_OPT_AT * math.log10(t)
+        eye_pupil = _vl_eye_pupil(obs.age)
+        effective_aperture = min(d, mg * eye_pupil)
+        source_ratio = t * (effective_aperture / _VL_PUPIL_REF) ** 2
         if obs.binocular:
-            r_bg *= _VL_OPT_FBB
-            src += _VL_OPT_CB
+            source_ratio *= math.sqrt(2.0)
+        retinal_pupil = min(dp, eye_pupil)
+        background_ratio = t * (retinal_pupil / _VL_PUPIL_REF) ** 2
         th0 = _vl_hecht_threshold(bl)
-        thr = _vl_hecht_threshold(bl * r_bg)
-        return src - 2.5 * math.log10(thr / th0)
+        thr = _vl_hecht_threshold(bl * background_ratio)
+        return 2.5 * math.log10(source_ratio) - 2.5 * math.log10(thr / th0)
 
     def arcus_visionis_required(
         self, body_mag: float, body_type: str = "planet"
@@ -754,7 +733,7 @@ class SchaeferModel:
         # find, at each Sun depression, the object altitude at which the
         # object is exactly at the visibility limit (limiting mag == body
         # mag), then take the minimum required altitude difference. This
-        # mirrors the reference's topocentric arcus visionis.
+        # is the topocentric arcus-visionis construction.
         def _obj_alt_at_limit(sun_alt: float) -> Optional[float]:
             lo, hi = 0.2, 60.0
             f_lo = (
@@ -1076,8 +1055,8 @@ def _leb_body_altaz(
         attemp,
         (ecl_lon, ecl_lat, ecl_dist),
     )
-    # Convert the reference azimuth convention (S=0, westward) to Skyfield's (N=0, eastward)
-    # to match the Skyfield heliacal path output.
+    # Convert the public south-zero, westward azimuth convention to
+    # Skyfield's north-zero, eastward convention.
     az_north = (az + 180.0) % 360.0
     return az_north, alt_true, alt_app
 
@@ -1824,7 +1803,7 @@ def _heliacal_pheno_ut_leb(
     tav_act = body_alt_deg - sun_alt_deg
     arcv_act = geo_alt_deg - sun_alt_deg
 
-    # Azimuth difference, signed (reference convention: Sun minus object)
+    # Public signed-azimuth convention: Sun minus object.
     daz_act = sun_az - body_az_deg
     while daz_act > 180:
         daz_act -= 360
@@ -1889,15 +1868,12 @@ def _heliacal_pheno_ut_leb(
     if is_star:
         parallax = 0.0
     else:
-        # ParO is the parallax IN ALTITUDE (~HP*cos(alt)), not the horizontal
-        # parallax: the reference reports exactly GeoAlt - AltO (measured
-        # dret[19] == dret[2] - dret[0] on every body/instant probed), which
-        # both altitudes here already reproduce to ~2e-5 deg.
+        # Altitude parallax is the geocentric-minus-topocentric altitude, not
+        # the horizontal parallax angle.
         parallax = geo_alt_deg - body_alt_deg
 
     # Rise/set of the disc centers and the visibility window via the
-    # shared reference-scheme helper (sentinel 99999999.0 for instants
-    # that do not exist).
+    # shared event-time helper. Missing instants use the public sentinel.
     _star_name_p = ""
     if is_star:
         from .fixed_stars import STAR_CATALOG as _SC
@@ -1936,8 +1912,8 @@ def _heliacal_pheno_ut_leb(
     )
 
     if is_star:
-        # Fixed stars are unresolved point sources; the reference reports full
-        # illumination (pheno element 27 = 100.0) for them, not zero.
+        # Fixed stars are unresolved point sources; the public illumination
+        # field uses the full-illumination convention for them.
         illumination = 100.0
     elif phase_angle > 0:
         illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
@@ -2020,7 +1996,7 @@ def _vislim_scotopic_flag(
     moon_obj_angle: float,
     flags: int,
 ) -> int:
-    """Reference-style scotopic/photopic return flag for vis_limit_mag.
+    """Public scotopic/photopic return flag for ``vis_limit_mag``.
 
     Schaefer's VISLIMIT contrast threshold switches from the photopic to
     the scotopic (dark, night-vision) branch when the total sky
@@ -2038,9 +2014,8 @@ def _vislim_scotopic_flag(
         is_scotopic = False
     if flags & HELFLAG_VISLIM_SCOTOPIC:
         is_scotopic = True
-    # The reference returns only photopic (0) or scotopic (1) on the observable
-    # set (plus -2 below the horizon, handled by the caller); it never emits a
-    # separate "mixed" bit. Mirror that binary encoding.
+    # The public result contract uses a binary photopic/scotopic encoding; the
+    # below-horizon case is handled by the caller.
     return HELFLAG_SCOTOPIC if is_scotopic else HELFLAG_PHOTOPIC
 
 
@@ -2133,7 +2108,7 @@ def _vis_limit_mag_leb(
         else:
             is_star_flag = True
 
-    # The Sun has no meaningful limiting magnitude; the reference rejects it.
+    # The Sun has no meaningful limiting magnitude in this model.
     if not is_star_flag and body_id == SUN:
         raise Error("it makes no sense to call vis_limit_mag() for the Sun")
 
@@ -2194,8 +2169,8 @@ def _vis_limit_mag_leb(
             raise Error(f"illegal planet number {body_id}.")
 
     if obj_alt < 0:
-        # Reference convention: retval -2 with dret[0] = -100 marks an
-        # object below the local horizon (verified vs the reference ephemeris).
+        # Public result contract: the below-horizon flag uses a sentinel in
+        # the limiting-magnitude slot and zeros in the remaining slots.
         dret = (-100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         return float(HELFLAG_BELOW_HORIZON), dret
 
@@ -2377,7 +2352,6 @@ def _heliacal_ut_pythonic(
         >>> print(f"Heliacal rising at JD {jd_event:.5f}")
 
     References:
-        - Reference API: heliacal_ut()
         - Schoch "Planets in Mesopotamian Astral Science"
         - Ptolemy's criteria for heliacal visibility
     """
@@ -2820,22 +2794,9 @@ def _heliacal_ut_pythonic(
         for conjunction passages. Heliacal events are fundamentally
         about Sun-body geometry, not moonlight.
 
-        Uses asymmetric detection margins:
-
-        Morning (rising): sun-altitude-dependent margin.  At deep
-        twilight (sun <= -10 deg) the empirical sky brightness model
-        underestimates actual brightness, inflating the computed
-        margin; a higher threshold (0.70 mag) compensates.  At
-        shallower twilight (sun > -10 deg) the standard Schaefer
-        (1993) 0.50 mag threshold applies, corresponding to ~90%
-        detection probability.
-
-        Evening (setting): elongation-dependent margin. At small
-        elongations (<20°) scattered sunlight near the Sun makes
-        the sky brighter than the model predicts, inflating the
-        computed visibility margin. A lower threshold compensates.
-        At large elongations the model is more accurate and a
-        higher threshold matches reference transition points.
+        The decision uses the neutral zero-magnitude margin produced by the
+        independent Falchi/Schaefer physical visibility model; it has no
+        fitted dawn/dusk or elongation threshold.
 
         Args:
             jd_day: JD at 0h UT of the day
@@ -3295,118 +3256,32 @@ def heliacal_ut(
     eventtype: int,
     flags: int = FLG_SWIEPH,
 ) -> Tuple[float, float, float]:
-    """
-    Calculate heliacal rising or setting time for a celestial body.
-
-    This function implements the heliacal_ut() API,
-    finding the Julian day of the next heliacal phenomenon after a given
-    start date. It works between geographic latitudes 60S - 60N.
+    """Find the next requested heliacal event after a UT start date.
 
     Args:
-        tjdut: Julian Day (UT) to start search from for the heliacal event.
-        geopos: Geographic position as a sequence of at least 3 values:
-            - [0]: Geographic longitude in degrees (east positive)
-            - [1]: Geographic latitude in degrees (north positive)
-            - [2]: Altitude above sea level in meters (eye height)
-        atmo: Atmospheric conditions as a sequence of at least 4 values:
-            - [0]: Atmospheric pressure in mbar/hPa (default: 1013.25)
-            - [1]: Atmospheric temperature in degrees Celsius (default: 15)
-            - [2]: Relative humidity in percent (0-100) (default: 40)
-            - [3]: If >= 1: Meteorological Range in km
-                   If 0 < value < 1: Total atmospheric coefficient (ktot)
-                   If 0: Calculate ktot from other parameters
-        observer: Observer description as a sequence of at least 6 values:
-            - [0]: Age of observer in years (default: 36)
-            - [1]: Snellen ratio of observer's eyes (default: 1.0 = normal)
-            - [2]: 0 = monocular, 1 = binocular (used if HELFLAG_OPTICAL_PARAMS)
-            - [3]: Telescope magnification (0 = naked eye)
-            - [4]: Optical aperture (telescope diameter) in mm
-            - [5]: Optical transmission coefficient
-        objname: Name of the celestial body. Can be:
-            - Planet name: "Sun", "Moon", "Mercury", "Venus", "Mars",
-              "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"
-            - Fixed star name: "Sirius", "Aldebaran", "Regulus", etc.
-            Note: Sun and Moon are not valid for heliacal calculations
-              and will raise a ValueError.
-        eventtype: Type of heliacal event:
-            - HELIACAL_RISING (1): Morning first visibility (heliacal rising)
-              Exists for all visible planets and stars.
-            - HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
-              Exists for all visible planets and stars.
-            - EVENING_FIRST (3): First evening visibility after superior
-              conjunction. Only valid for inner planets (Mercury, Venus).
-            - MORNING_LAST (4): Last morning visibility before superior
-              conjunction. Only valid for inner planets (Mercury, Venus).
-        flags: Calculation flags (bitmap). Contains ephemeris flags like
-            FLG_SWIEPH, plus heliacal-specific flags:
-            - HELFLAG_OPTICAL_PARAMS (512): Use optical instrument parameters
-              from observer[2-5]. Without this flag, those values are ignored.
-            - HELFLAG_NO_DETAILS (1024): Provide date only, skip visibility
-              start/optimum/end details. Makes calculation faster.
-            - HELFLAG_VISLIM_DARK (4096): Function behaves as if Sun at nadir.
-            - HELFLAG_VISLIM_NOMOON (8192): Exclude Moon's brightness
-              contribution (useful for calculating epoch heliacal dates).
+        tjdut: Search start as a Julian Day in UT.
+        geopos: Longitude, latitude, and observer altitude.
+        atmo: Pressure, temperature, humidity, and either meteorological
+            range or a total atmospheric coefficient.
+        observer: Observer age and visual-acuity values, followed optionally
+            by binocular/telescope parameters.
+        objname: Planet or fixed-star name. The Sun and Moon are invalid for
+            this API.
+        eventtype: ``HELIACAL_RISING``, ``HELIACAL_SETTING``,
+            ``EVENING_FIRST``, or ``MORNING_LAST``.
+        flags: Ephemeris and heliacal calculation flags.
 
     Returns:
-        Tuple of 3 floats:
-            - [0]: Start of visibility (Julian day number)
-            - [1]: Optimum visibility (Julian day number),
-                   zero if HELFLAG_NO_DETAILS is set
-            - [2]: End of visibility (Julian day number),
-                   zero if HELFLAG_NO_DETAILS is set
+        Three Julian Days giving visibility start, optimum, and end. Detail
+        slots may be zero when ``HELFLAG_NO_DETAILS`` is set.
 
     Raises:
-        ValueError: If invalid object_name, body ID, or event_type.
-            Also raised if object_name is "Sun" or "Moon" which are not
-            valid for heliacal calculations.
+        ValueError: If the object or event type is invalid.
 
-    Algorithm:
-        The function searches for the moment when:
-        1. The body is at a specific altitude above the horizon (arcus visionis)
-        2. The Sun is at twilight position (typically -6 to -12 degrees below)
-        3. The body's apparent magnitude is brighter than sky's limiting magnitude
-
-        For heliacal rising (morning first):
-        - Search forward for when body first becomes visible at dawn
-        - Body must be above horizon while Sun is still below
-        - Sky must be dark enough for the body to be seen
-
-        For heliacal setting (evening last):
-        - Search forward for when body is last visible at dusk
-        - Body must be above horizon while Sun is setting
-        - Sky brightness must not overwhelm the body's light
-
-    Historical Note:
-        Heliacal risings were crucial for ancient calendars. The heliacal
-        rising of Sirius marked the Egyptian new year and predicted the
-        Nile flood. Babylonians used heliacal events to track planetary
-        positions without modern instruments.
-
-    Example:
-        >>> from libephemeris import julday, heliacal_ut
-        >>> from libephemeris import HELIACAL_RISING, FLG_SWIEPH
-        >>> jd = julday(2024, 1, 1, 0)
-        >>> # Geographic position: Rome (lon, lat, altitude)
-        >>> geopos = (12.5, 41.9, 0)
-        >>> # Atmospheric conditions: standard
-        >>> datm = (1013.25, 15.0, 40.0, 0.0)
-        >>> # Observer: age 36, normal vision
-        >>> dobs = (36.0, 1.0, 0, 0, 0, 0)
-        >>> # Find next heliacal rising of Venus
-        >>> jd1, jd2, jd3 = heliacal_ut(jd, geopos, datm, dobs,
-        ...                                  "Venus", HELIACAL_RISING)
-        >>> if jd1 > 0:
-        ...     print(f"Venus heliacal rising at JD {jd1:.5f}")
-
-    See Also:
-        - _heliacal_ut_pythonic: Internal function using planet ID instead of name
-        - _heliacal_pheno_ut_pythonic: Detailed heliacal phenomena calculation
-        - vis_limit_mag: Calculate limiting visual magnitude
-
-    References:
-        - Reference documentation
-        - Schoch "Planets in Mesopotamian Astral Science"
-        - Ptolemy's criteria for heliacal visibility
+    Notes:
+        The visibility search combines body altitude, solar twilight, object
+        magnitude, atmospheric extinction, sky brightness, and observer
+        characteristics.
     """
     from .constants import (
         HELIACAL_RISING,
@@ -3433,22 +3308,22 @@ def heliacal_ut(
     lat = geopos[1] if len(geopos) > 1 else 0.0
     altitude = geopos[2] if len(geopos) > 2 else 0.0
 
-    # Parse atmo with defaults per reference documentation
+    # Parse the atmospheric tuple with the public input defaults.
     pressure = atmo[0] if len(atmo) > 0 and atmo[0] > 0 else 1013.25
     temperature = atmo[1] if len(atmo) > 1 else 15.0
     humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
     # atmo[3] is the meteorological range in km (or ktot if 0 < value < 1).
     # It drives atmospheric extinction and materially shifts the event date,
-    # so thread it into the search (0.0 = auto clear-sky, the reference default).
+    # so thread it into the search (0.0 selects the clear-sky default).
     met_range = atmo[3] if len(atmo) > 3 else 0.0
 
-    # datm[2] is relative humidity in percent (reference convention);
+    # datm[2] is relative humidity in percent in the public input tuple;
     # convert to the 0-1 range used internally.
     humidity = humidity_pct / 100.0
 
     # Parse objname to get body ID. The Moon is a valid heliacal body for the
     # evening-first / morning-last events (crescent visibility) but not for the
-    # rising/setting events, matching the reference's acceptance matrix.
+    # rising/setting events under the public accepted-body contract.
     from .constants import MOON
 
     body_id = _parse_object_name(objname, allow_moon=True)
@@ -3475,7 +3350,7 @@ def heliacal_ut(
         observer=observer,
     )
 
-    # Build the result as 3 floats matching the reference API
+    # Build the public three-float result.
     jd1 = 0.0  # Start of visibility
     jd2 = 0.0  # Optimum visibility
     jd3 = 0.0  # End of visibility
@@ -3484,10 +3359,8 @@ def heliacal_ut(
         jd1 = jd_event
 
         if not (flags & HELFLAG_NO_DETAILS):
-            # The reference refines three instants around the event: the
-            # optimum (maximum margin between the limiting magnitude and
-            # the body's extincted magnitude) and the two crossings where
-            # that margin vanishes (start and end of visibility).
+            # Construct the optimum (maximum visibility margin) and the two
+            # crossings where that margin vanishes.
             jd1, jd2, jd3 = _heliacal_visibility_window(
                 jd_event, geopos, atmo, observer, objname, flags
             )
@@ -3606,9 +3479,8 @@ def _parse_object_name(
         object_name: Name of planet or fixed star (e.g., "Venus", "Sirius")
         allow_moon: If True, allow Moon as a valid body (for _heliacal_pheno_ut_pythonic
             which supports Moon crescent calculations)
-        allow_sun: If True, allow the Sun (for heliacal_pheno_ut, which the
-            reference accepts for the Sun; heliacal_ut/vis_limit_mag keep the
-            default rejection)
+        allow_sun: If True, allow the Sun for ``heliacal_pheno_ut``;
+            ``heliacal_ut`` and ``vis_limit_mag`` keep the default rejection.
 
     Returns:
         Body ID (SE_* constant) for planets
@@ -3659,8 +3531,8 @@ def _parse_object_name(
     if name_upper in planet_map:
         body_id = planet_map[name_upper]
 
-        # Sun is not valid for heliacal calculations (unless allow_sun, for
-        # heliacal_pheno_ut which the reference accepts for the Sun).
+        # Sun is valid only for the public phenomena result when requested by
+        # its wrapper.
         if body_id == SUN and not allow_sun:
             raise Error("Sun is not valid for heliacal calculations")
         if body_id == MOON and not allow_moon:
@@ -3724,11 +3596,11 @@ def _pheno_rise_window(
 ) -> Tuple[float, float, float, float, float, float, float, float]:
     """Rise/set and visibility-window instants for heliacal_pheno_ut.
 
-    Reference scheme: the Sun's and the object's disc-center rise (event
-    types 1/4) or set (2/3) are searched from four hours before ``jd``;
+    The Sun's and the object's disc-center rise (event types 1/4) or set
+    (2/3) are searched from four hours before ``jd``;
     the first/optimum/last visibility instants come from the visibility
     margin scanned on the night side of the Sun's event, and the
-    sentinel 99999999.0 marks instants that do not exist. Returns
+    public invalid-time sentinel marks instants that do not exist. Returns
     (rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop).
     """
     from .constants import (
@@ -3765,8 +3637,8 @@ def _pheno_rise_window(
     t_last = _TJD_INVALID
     tvis = _TJD_INVALID
 
-    # Acronychal event types only carry a visibility window for the
-    # Moon and the inner planets (reference convention).
+    # Acronychal event types carry a visibility window only for the Moon and
+    # inner planets under the public result contract.
     if event_type in (3, 4) and (is_star or body not in (1, 2, 3)):
         return rise_o, rise_s, lag, t_first, t_best, t_last, 0.0, tb_yallop
     if rc_s != 0:
@@ -3777,8 +3649,8 @@ def _pheno_rise_window(
         return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
 
     def _margin(t: float) -> float:
-        # dret[0] already includes extinction to the object (reference
-        # convention), so the margin is limiting mag minus catalog mag.
+        # dret[0] already includes extinction to the object, so the margin is
+        # limiting magnitude minus catalog magnitude.
         # Reject a Sun above the horizon: the visibility window is a
         # twilight phenomenon and must not follow a daytime maximum.
         retval, dret_v = vis_limit_mag(t, geopos3, atmo4, obs6, objname, flags)
@@ -3832,9 +3704,8 @@ def _pheno_rise_window(
     t_best = t_peak
 
     def _cross(t_in: float, t_out: float) -> float:
-        # Object still visible at the scan boundary: the reference's
-        # walk starts/stops there, so the boundary itself bounds the
-        # window (e.g. Venus is already visible right at sunset).
+        # If the object remains visible at a scan boundary, that boundary
+        # itself bounds the finite search window.
         if _margin(t_out) > 0.0:
             return t_out
         for _ in range(22):
@@ -3940,7 +3811,6 @@ def _heliacal_pheno_ut_pythonic(
         >>> print(f"Object altitude: {dret[0]:.2f}, Sun altitude: {dret[4]:.2f}")
 
     References:
-        - Reference API: heliacal_pheno_ut()
         - Schoch "Planets in Mesopotamian Astral Science"
     """
     # --- LEB fast path ---
@@ -4144,7 +4014,7 @@ def _heliacal_pheno_ut_pythonic(
     # Geocentric arcus visionis
     arcv_act = geo_alt_deg - sun_alt_deg
 
-    # Azimuth difference, signed (reference convention: Sun minus object)
+    # Public signed-azimuth convention: Sun minus object.
     daz_act = sun_az_deg - body_az_deg
     # Normalize to -180 to +180
     while daz_act > 180:
@@ -4202,14 +4072,12 @@ def _heliacal_pheno_ut_pythonic(
     if is_star:
         parallax = 0.0
     else:
-        # ParO is the parallax IN ALTITUDE (~HP*cos(alt)), not the horizontal
-        # parallax: the reference reports exactly GeoAlt - AltO (measured
-        # dret[19] == dret[2] - dret[0] on every body/instant probed).
+        # Altitude parallax is the geocentric-minus-topocentric altitude, not
+        # the horizontal parallax angle.
         parallax = geo_alt_deg - body_alt_deg
 
-    # Rise/set of the disc centers and the visibility window, the
-    # reference way (rise_trans searches from 4 hours before jd; the
-    # sentinel 99999999.0 marks instants that do not exist).
+    # Rise/set of the disc centers and the visibility window use the shared
+    # event-time helper and its public invalid-time sentinel.
     _star_name = ""
     if is_star:
         from .fixed_stars import STAR_CATALOG as _SC
@@ -4225,9 +4093,8 @@ def _heliacal_pheno_ut_pythonic(
         humidity * 100.0 if humidity <= 1.0 else humidity,
         met_range,
     )
-    # The visibility-window slots (TfirstVR/TbVR/TlastVR/TvisVR) depend on
-    # the caller's observer (age/Snellen/optics), like minTAV — measured:
-    # the reference's window shifts with the observer tuple.
+    # The visibility threshold is observer-dependent, so its window slots use
+    # the caller's age, Snellen ratio, and optical parameters just like minTAV.
     _obs6 = _obs_tuple6
     (
         rise_o,
@@ -4245,8 +4112,8 @@ def _heliacal_pheno_ut_pythonic(
     # Illumination percentage for all bodies
     # For planets: (1 + cos(phase_angle)) / 2 * 100
     if is_star:
-        # Fixed stars are unresolved point sources; the reference reports full
-        # illumination (pheno element 27 = 100.0) for them, not zero.
+        # Fixed stars are unresolved point sources; the public illumination
+        # field uses the full-illumination convention for them.
         illumination = 100.0
     elif phase_angle > 0:
         illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
@@ -4345,9 +4212,8 @@ def heliacal_pheno_ut(
     """
     Provides data relevant for the calculation of heliacal risings and settings.
 
-    This is the reference-compatible wrapper around _heliacal_pheno_ut_pythonic(). It
-    accepts the same parameter layout as the reference ephemeris's heliacal_pheno_ut
-    and returns a flat 50-element tuple.
+    This public wrapper accepts the compatibility parameter layout and returns
+    a flat 50-element tuple.
 
     Args:
         tjdut: Julian Day (UT) for the calculation
@@ -4373,12 +4239,11 @@ def heliacal_pheno_ut(
     # atmo[3]: meteorological range (km) or ktot (0<v<1); drives extinction.
     met_range = atmo[3] if len(atmo) > 3 else 0.0
 
-    # datm[2] is relative humidity in percent (reference convention)
+    # datm[2] is relative humidity in percent in the public input tuple.
     humidity = humidity_pct / 100.0
 
-    # Parse objname to body ID. The Moon is allowed for pheno calculations,
-    # and unlike heliacal_ut/vis_limit_mag the reference's heliacal_pheno_ut
-    # also accepts the Sun (returns a full result instead of raising).
+    # Parse objname to body ID. The public phenomena result accepts the Moon
+    # and Sun; heliacal_ut/vis_limit_mag apply narrower physical domains.
     body_id = _parse_object_name(objname, allow_moon=True, allow_sun=True)
 
     # Call internal function
@@ -4397,7 +4262,7 @@ def heliacal_pheno_ut(
         observer=observer,
     )
 
-    # Return flat 50-tuple (matching reference API)
+    # Return the public flat 50-tuple.
     return dret
 
 
@@ -4409,98 +4274,29 @@ def vis_limit_mag(
     objname: str,
     flags: int = FLG_SWIEPH,
 ) -> Tuple[float, Tuple[float, ...]]:
-    """
-    Calculate the limiting visual magnitude for observing a celestial body.
-
-    This function determines whether a celestial body (planet, star, etc.)
-    is visible given the current sky brightness conditions, atmospheric
-    parameters, and observer characteristics. It returns both the visibility
-    status and detailed information about the observation conditions.
+    """Evaluate the limiting visual magnitude for an object.
 
     Args:
-        tjdut: Julian Day (UT) for the observation time
-        geopos: Geographic position as a sequence:
-            - [0]: Geographic longitude in degrees (east positive)
-            - [1]: Geographic latitude in degrees (north positive)
-            - [2]: Altitude above sea level in meters
-        atmo: Atmospheric conditions as a sequence:
-            - [0]: Atmospheric pressure in mbar/hPa
-            - [1]: Atmospheric temperature in degrees Celsius
-            - [2]: Relative humidity in percent (0-100)
-            - [3]: If >= 1: Meteorological Range in km
-                   If 0-1: Total atmospheric coefficient (ktot)
-                   If 0: Compute ktot from other parameters
-        observer: Observer characteristics as a sequence:
-            - [0]: Age of observer in years (default 36)
-            - [1]: Snellen ratio of observer's eyes (default 1.0 = normal)
-            For optical instruments (when HELFLAG_OPTICAL_PARAMS is set):
-            - [2]: 0 = monocular, 1 = binocular
-            - [3]: Telescope magnification (0 = naked eye)
-            - [4]: Optical aperture (telescope diameter) in mm
-            - [5]: Optical transmission coefficient
-        objname: Name of the object to observe. Can be:
-            - Planet name (e.g., "Venus", "Mars", "Jupiter")
-            - Fixed star name (e.g., "Sirius", "Aldebaran")
-            - Planet number as string (e.g., "2" for Venus)
-        flags: Calculation flags combining ephemeris and heliacal flags:
-            - FLG_SWIEPH, FLG_JPLEPH, etc. for ephemeris
-            - HELFLAG_OPTICAL_PARAMS: Use optical instrument parameters
-            - HELFLAG_NO_DETAILS: Skip detailed calculations
-            - HELFLAG_VISLIM_DARK: Assume Sun at nadir (dark sky)
-            - HELFLAG_VISLIM_NOMOON: Exclude Moon's brightness contribution
+        tjdut: Observation time as a Julian Day in UT.
+        geopos: Longitude, latitude, and observer altitude.
+        atmo: Pressure, temperature, humidity, and meteorological-range or
+            total-extinction input.
+        observer: Observer age and acuity, with optional optical-instrument
+            parameters.
+        objname: Planet, fixed-star name, or supported numeric body string.
+        flags: Ephemeris and heliacal visibility flags.
 
     Returns:
-        Tuple containing:
-            - result: Visibility status code:
-                - (-2): Object is below horizon
-                - (0): OK, photopic vision (bright conditions)
-                - (1): OK, scotopic vision (dark conditions)
-                - (2): OK, near limit between photopic/scotopic
-            - dret: Tuple of 8 floats with observation details:
-                - [0]: Limiting visual magnitude (object visible if mag < this)
-                - [1]: Altitude of object in degrees
-                - [2]: Azimuth of object in degrees
-                - [3]: Altitude of Sun in degrees
-                - [4]: Azimuth of Sun in degrees
-                - [5]: Altitude of Moon in degrees
-                - [6]: Azimuth of Moon in degrees
-                - [7]: Magnitude of object
+        A status code and an eight-value detail tuple containing limiting
+        magnitude, object/Sun/Moon horizontal coordinates, and object
+        magnitude.
 
     Raises:
-        ValueError: If objname is empty or invalid
+        ValueError: If the object name is empty or invalid.
 
-    Algorithm:
-        The limiting magnitude calculation is based on Schaefer's model (1990)
-        which considers:
-        1. Sky brightness from Sun, Moon, zodiacal light, airglow
-        2. Atmospheric extinction based on airmass and conditions
-        3. Observer's eye adaptation (scotopic vs photopic)
-        4. Optional optical instrument characteristics
-
-        The sky background brightness varies with:
-        - Sun altitude (twilight contribution)
-        - Moon altitude and phase (moonlight)
-        - Atmospheric scattering
-
-    Example:
-        >>> from libephemeris import julday, vis_limit_mag
-        >>> jd = julday(2024, 8, 15, 22.0)
-        >>> # Rome location
-        >>> geopos = (12.5, 41.9, 0)
-        >>> # Standard atmosphere
-        >>> atmo = (1013.25, 15.0, 50.0, 0.0)
-        >>> # Normal observer
-        >>> observer = (36, 1.0)
-        >>> result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Venus")
-        >>> if dret[0] > dret[7]:
-        ...     print("Venus is visible")
-        ... else:
-        ...     print("Venus is not visible")
-
-    References:
-        - Reference API: vis_limit_mag()
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-        - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
+    Notes:
+        The Schaefer visibility model includes solar and lunar sky brightness,
+        atmospheric extinction, eye adaptation, and optional optics.
     """
     # --- LEB fast path ---
     from .state import get_leb_reader as _get_leb_reader
@@ -4615,7 +4411,7 @@ def vis_limit_mag(
             # Assume it's a fixed star
             is_fixed_star = True
 
-    # The Sun has no meaningful limiting magnitude; the reference rejects it.
+    # The Sun has no meaningful limiting magnitude in this model.
     if not is_fixed_star and body_id == SUN:
         raise Error("it makes no sense to call vis_limit_mag() for the Sun")
 
@@ -4699,9 +4495,8 @@ def vis_limit_mag(
 
     # Check if object is below horizon
     if obj_alt < 0:
-        # Match reference API: return all zeros in data when below horizon
-        # Reference convention: retval -2 with dret[0] = -100 marks an
-        # object below the local horizon (verified vs the reference ephemeris).
+        # Public result contract: the below-horizon flag uses a sentinel in
+        # the limiting-magnitude slot and zeros in the remaining slots.
         dret = (-100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         return float(HELFLAG_BELOW_HORIZON), dret
 
@@ -4789,10 +4584,9 @@ def vis_limit_mag(
         flags,
     )
 
-    # Build result tuple (10 elements; dret[7] is the body's magnitude
-    # without extinction, the reference convention). The alt/az values come
-    # from the Skyfield backend as numpy.float64; coerce to native Python
-    # floats to honor the public native-float contract.
+    # Build the public 10-element result; dret[7] is the body's magnitude
+    # without extinction. The alt/az values come from the Skyfield backend as
+    # numpy.float64; coerce to native Python floats.
     dret = (
         float(limiting_mag),  # 0: Limiting visual magnitude
         float(obj_alt),  # 1: Altitude of object
@@ -4809,5 +4603,5 @@ def vis_limit_mag(
     return float(vision_type), dret
 
 
-# Alias for reference API compatibility
+# Public compatibility alias.
 vis_limit_mag = vis_limit_mag

@@ -23,9 +23,7 @@ def _assert_batch_matches_loop(stars: tuple[str, ...], flags: int) -> None:
         # rel=1e-12 because star distances reach ~1e7 AU, where 1 ULP
         # is ~2e-9 — an absolute 1e-9 tolerance demanded bit-identical
         # floats and broke on cache-dependent operation ordering.
-        assert batch_result[0] == pytest.approx(
-            loop_result[0], rel=1e-12, abs=1e-9
-        )
+        assert batch_result[0] == pytest.approx(loop_result[0], rel=1e-12, abs=1e-9)
 
 
 def test_list_fixed_stars_returns_catalog_entries() -> None:
@@ -59,6 +57,41 @@ def test_batch_fixstars_ut_matches_individual_sidereal_calls() -> None:
     try:
         _assert_batch_matches_loop(STARS, swe.FLG_SIDEREAL | swe.FLG_SPEED)
     finally:
+        swe.reset_session()
+
+
+@pytest.mark.parametrize(
+    "sidereal_mode", [swe.SIDM_J2000, swe.SIDM_J1900, swe.SIDM_B1950]
+)
+def test_batch_fixstars_ut_matches_fixed_epoch_calls(sidereal_mode: int) -> None:
+    """Fixed-frame sidereal modes use the same rewrite as single-star calls."""
+    swe.set_sid_mode(sidereal_mode)
+    try:
+        _assert_batch_matches_loop(STARS, swe.FLG_SIDEREAL | swe.FLG_SPEED)
+    finally:
+        swe.reset_session()
+
+
+def test_fixed_epoch_batch_traces_only_successful_public_star_ids() -> None:
+    """The single-call delegate keeps batch trace publication atomic."""
+    swe.set_sid_mode(swe.SIDM_J1900)
+    token = swe.start_tracing()
+    try:
+        result = swe.batch_fixstars_ut(
+            ("Regulus", "Not A Real Star", "Spica"),
+            JD,
+            swe.FLG_SIDEREAL | swe.FLG_SPEED,
+            skip_errors=True,
+        )
+        assert result[0] is not None
+        assert result[1] is None
+        assert result[2] is not None
+        traces = swe.get_trace_results()
+        assert traces[swe.REGULUS] in ("LEB", "Skyfield", "Mixed")
+        assert traces[swe.SPICA_STAR] in ("LEB", "Skyfield", "Mixed")
+        assert set(traces) == {swe.REGULUS, swe.SPICA_STAR}
+    finally:
+        token.var.reset(token)
         swe.reset_session()
 
 

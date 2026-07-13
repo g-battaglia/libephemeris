@@ -92,7 +92,9 @@ def compare_besselian_elements():
                 ok = "OK" if diff < 1e-6 else "FAIL"
                 if diff >= 1e-6:
                     all_pass = False
-                print(f"    {fname:10s}: LEB={val_leb:+12.6f}  SF={val_sf:+12.6f}  diff={diff:.2e}  [{ok}]")
+                print(
+                    f"    {fname:10s}: LEB={val_leb:+12.6f}  SF={val_sf:+12.6f}  diff={diff:.2e}  [{ok}]"
+                )
             except Exception as e:
                 print(f"    {fname:10s}: ERROR {e}")
                 all_pass = False
@@ -137,7 +139,9 @@ def compare_eclipse_timing():
                 all_pass = False
             print(f"    sol_glob: type={type_leb}  max_diff={jd_diff_sec:.3f}s  [{ok}]")
             speedup = dt_sf / dt_leb if dt_leb > 0 else float("inf")
-            print(f"              LEB: {dt_leb:.3f}s  Skyfield: {dt_sf:.3f}s  speedup: {speedup:.1f}x")
+            print(
+                f"              LEB: {dt_leb:.3f}s  Skyfield: {dt_sf:.3f}s  speedup: {speedup:.1f}x"
+            )
         else:
             print(f"    sol_glob: TYPE MISMATCH LEB={type_leb} SF={type_sf}")
             all_pass = False
@@ -182,7 +186,9 @@ def compare_rise_trans():
     for loc_name, geopos in locations:
         try:
             _, tret_leb = _run_with_mode("leb", rise_trans, jd, SUN, CALC_RISE, geopos)
-            _, tret_sf = _run_with_mode("skyfield", rise_trans, jd, SUN, CALC_RISE, geopos)
+            _, tret_sf = _run_with_mode(
+                "skyfield", rise_trans, jd, SUN, CALC_RISE, geopos
+            )
 
             if tret_leb[0] > 0 and tret_sf[0] > 0:
                 diff_sec = abs(tret_leb[0] - tret_sf[0]) * 86400.0
@@ -209,7 +215,9 @@ def main():
 
     reader = get_leb_reader()
     if reader is None:
-        print("\nERROR: No LEB reader configured. Results would be Skyfield-vs-Skyfield.")
+        print(
+            "\nERROR: No LEB reader configured. Results would be Skyfield-vs-Skyfield."
+        )
         return 1
     print(f"LEB reader: {reader}")
     print()

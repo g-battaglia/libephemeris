@@ -7,6 +7,7 @@ opt into the network (``@pytest.mark.network``, deselected by ``-m "not network"
 and skipped when offline) and assert that live Horizons output agrees numerically
 with the independent Skyfield/DE440 backend for real bodies.
 """
+
 from __future__ import annotations
 
 
@@ -38,6 +39,7 @@ def _ang_diff(a: float, b: float) -> float:
 def horizons_vs_skyfield():
     """Return a comparator (jd_tt, body, flags) -> (horizons, skyfield) tuples,
     or skip the test if Horizons can't be reached."""
+
     def _both(jd_tt, body, flags):
         L.set_calc_mode("skyfield")
         sky = L.calc(jd_tt, body, flags)[0]
@@ -63,8 +65,8 @@ def test_horizons_apparent_ecliptic_matches_skyfield(horizons_vs_skyfield):
         dlon = _ang_diff(hor[0], sky[0]) * 3600.0
         dlat = abs(hor[1] - sky[1]) * 3600.0
         ddist = abs(hor[2] - sky[2])
-        assert dlon < 1.0, f"body {body}: Horizons-Skyfield dlon={dlon:.3f}\""
-        assert dlat < 1.0, f"body {body}: Horizons-Skyfield dlat={dlat:.3f}\""
+        assert dlon < 1.0, f'body {body}: Horizons-Skyfield dlon={dlon:.3f}"'
+        assert dlat < 1.0, f'body {body}: Horizons-Skyfield dlat={dlat:.3f}"'
         assert ddist < 1e-5, f"body {body}: dist diff {ddist:.2e} AU"
 
 

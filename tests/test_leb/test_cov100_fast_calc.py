@@ -25,6 +25,7 @@ import pytest
 import libephemeris.fast_calc as fc
 from libephemeris.constants import (
     EARTH,
+    HARRINGTON,
     MEAN_NODE,
     MOON,
     SUN,
@@ -66,8 +67,8 @@ SKIP_NO_LEB = pytest.mark.skipif(
     reason="LEB base file not found",
 )
 
-# A Uranian body (heliocentric, COORD_HELIO_ECL) present in the base file.
-URANIAN_ID = 40
+# Independently reviewed heliocentric fictitious orbit (COORD_HELIO_ECL).
+HARRINGTON_ID = HARRINGTON
 JD = 2451545.0
 
 
@@ -168,29 +169,64 @@ def test_aberration_bradley_zero_adist(monkeypatch):
 
 
 def test_cob_non_outer_planet_returns_pos():
-    """ipl not an outer planet -> no COB applied (line 333)."""
+    """A non-outer body needs no system-to-center offset."""
     pos = (1.0, 2.0, 3.0)
     assert _apply_cob_correction(pos, MOON, JD) == pos
 
 
-def test_cob_planet_not_in_naif_falls_back(monkeypatch):
-    """planet_name absent from NAIF map -> analytical fallback (343->358)."""
+def test_cob_planet_not_in_naif_falls_back_to_barycentre(monkeypatch):
+    """An unavailable planet-center mapping retains the system barycentre."""
     monkeypatch.setattr(fc, "_PLANET_CENTER_NAIF_IDS", {}, raising=False)
     # Patch the symbol used inside the function via planets module import.
     import libephemeris.planets as planets
 
     monkeypatch.setattr(planets, "_PLANET_CENTER_NAIF_IDS", {}, raising=False)
-    out = _apply_cob_correction((1.0, 2.0, 3.0), 5, JD)
-    assert all(math.isfinite(v) for v in out)
+    pos = (1.0, 2.0, 3.0)
+    assert _apply_cob_correction(pos, 5, JD) == pos
 
 
-def test_cob_segment_none_falls_back(monkeypatch):
-    """get_planet_center_segment returns None -> analytical fallback (346->358)."""
+def test_cob_segment_none_falls_back_to_barycentre(monkeypatch):
+    """An unavailable JPL center segment retains the system barycentre."""
     import libephemeris.state as state
 
-    monkeypatch.setattr(state, "get_planet_center_segment", lambda naif_id: None)
-    out = _apply_cob_correction((1.0, 2.0, 3.0), 6, JD)
-    assert all(math.isfinite(v) for v in out)
+    monkeypatch.setattr(
+        state, "get_planet_center_segment", lambda naif_id, jd_tt=None: None
+    )
+    pos = (1.0, 2.0, 3.0)
+    assert _apply_cob_correction(pos, 6, JD) == pos
+
+
+def test_eval_body_center_state_applies_position_and_velocity_offset(monkeypatch):
+    """A JPL center offset and its centered derivative form one state."""
+
+    class Reader:
+        def eval_body(self, ipl, jd_tt):
+            return (1.0, 2.0, 3.0), (0.1, 0.2, 0.3)
+
+    def fake_cob(pos, ipl, jd_tt):
+        dt = jd_tt - JD
+        offset = (0.5 + 2.0 * dt, -0.25 - 3.0 * dt, 0.1 + 0.25 * dt)
+        return tuple(pos[index] + offset[index] for index in range(3))
+
+    monkeypatch.setattr(fc, "_apply_cob_correction", fake_cob)
+    pos, vel = fc._eval_body_center_state(Reader(), 5, JD, True)
+
+    assert pos == pytest.approx((1.5, 1.75, 3.1), abs=1e-15)
+    assert vel == pytest.approx((2.1, -2.8, 0.55), abs=1e-6)
+
+
+def test_eval_body_center_state_retains_barycentre_fallback(monkeypatch):
+    """Without a center segment the stored barycentric state is unchanged."""
+
+    class Reader:
+        def eval_body(self, ipl, jd_tt):
+            return (1.0, 2.0, 3.0), (0.1, 0.2, 0.3)
+
+    monkeypatch.setattr(fc, "_apply_cob_correction", lambda pos, ipl, jd_tt: pos)
+    assert fc._eval_body_center_state(Reader(), 5, JD, True) == (
+        (1.0, 2.0, 3.0),
+        (0.1, 0.2, 0.3),
+    )
 
 
 # =============================================================================
@@ -498,21 +534,33 @@ def test_pipeline_ecliptic_j2000_wrap_negative(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_helio_geocentric_default(reader):
     """Default geocentric helio conversion (covers _geo_j2000 path)."""
-    res = _pipeline_helio(reader, JD, URANIAN_ID, FLG_SPEED)
+    res = _pipeline_helio(reader, JD, HARRINGTON_ID, FLG_SPEED)
     assert len(res) == 6
     assert 0.0 <= res[0] < 360.0
+
+
+@pytest.mark.parametrize("body_id", range(40, 59))
+def test_fictitious_channels_fall_through_to_runtime_models(body_id):
+    """Every public fictitious ID bypasses even a matching legacy channel."""
+
+    class LegacyReader:
+        def has_body(self, _body_id):
+            raise AssertionError("legacy fictitious channel must not be inspected")
+
+    with pytest.raises(KeyError, match="runtime analytical model"):
+        fast_calc_tt(LegacyReader(), JD, body_id, 0)
 
 
 @SKIP_NO_LEB
 def test_pipeline_helio_dlon_wrap_positive(reader, monkeypatch):
     """Geocentric helio: dlon > 180 wrap (line 1614)."""
     # Patch _precess_ecliptic to passthrough (default branch precesses), and
-    # patch reader.eval_body so the uranian's geocentric longitude straddles
+    # patch reader.eval_body so Harrington's geocentric longitude straddles
     # 0/360 between prev (jd-1) and nxt (jd+1).
     real_eval = reader.eval_body
 
     def fake_eval(body_id, jd):
-        if body_id == URANIAN_ID:
+        if body_id == HARRINGTON_ID:
             # Heliocentric (lon, lat, dist) sweeping across the wrap.
             if jd < JD:
                 lon = 359.0
@@ -525,7 +573,7 @@ def test_pipeline_helio_dlon_wrap_positive(reader, monkeypatch):
 
     monkeypatch.setattr(reader, "eval_body", fake_eval)
     monkeypatch.setattr(fc, "_precess_ecliptic", lambda lo, la, a, b: (lo, la))
-    res = _pipeline_helio(reader, JD, URANIAN_ID, FLG_SPEED)
+    res = _pipeline_helio(reader, JD, HARRINGTON_ID, FLG_SPEED)
     assert all(math.isfinite(v) for v in res)
 
 
@@ -535,7 +583,7 @@ def test_pipeline_helio_dlon_wrap_negative(reader, monkeypatch):
     real_eval = reader.eval_body
 
     def fake_eval(body_id, jd):
-        if body_id == URANIAN_ID:
+        if body_id == HARRINGTON_ID:
             if jd < JD:
                 lon = 1.0
             elif jd > JD:
@@ -547,7 +595,7 @@ def test_pipeline_helio_dlon_wrap_negative(reader, monkeypatch):
 
     monkeypatch.setattr(reader, "eval_body", fake_eval)
     monkeypatch.setattr(fc, "_precess_ecliptic", lambda lo, la, a, b: (lo, la))
-    res = _pipeline_helio(reader, JD, URANIAN_ID, FLG_SPEED)
+    res = _pipeline_helio(reader, JD, HARRINGTON_ID, FLG_SPEED)
     assert all(math.isfinite(v) for v in res)
 
 
@@ -555,7 +603,7 @@ def test_pipeline_helio_dlon_wrap_negative(reader, monkeypatch):
 def test_pipeline_helio_eq_j2000(reader):
     """Helio EQ+J2000 path (lines 1631-1651)."""
     res = _pipeline_helio(
-        reader, JD, URANIAN_ID, FLG_SPEED | FLG_EQUATORIAL | FLG_J2000
+        reader, JD, HARRINGTON_ID, FLG_SPEED | FLG_EQUATORIAL | FLG_J2000
     )
     assert len(res) == 6
     assert all(math.isfinite(v) for v in res)
@@ -567,7 +615,7 @@ def test_pipeline_helio_eq_j2000_sidereal_meanobl(reader):
     res = _pipeline_helio(
         reader,
         JD,
-        URANIAN_ID,
+        HARRINGTON_ID,
         FLG_SPEED | FLG_EQUATORIAL | FLG_J2000 | FLG_SIDEREAL,
     )
     assert all(math.isfinite(v) for v in res)
@@ -577,7 +625,7 @@ def test_pipeline_helio_eq_j2000_sidereal_meanobl(reader):
 def test_pipeline_helio_eq_of_date_sidereal_meanobl(reader):
     """Helio EQ of date sidereal -> mean obliquity (line 1658)."""
     res = _pipeline_helio(
-        reader, JD, URANIAN_ID, FLG_SPEED | FLG_EQUATORIAL | FLG_SIDEREAL
+        reader, JD, HARRINGTON_ID, FLG_SPEED | FLG_EQUATORIAL | FLG_SIDEREAL
     )
     assert all(math.isfinite(v) for v in res)
 
@@ -591,7 +639,7 @@ def test_pipeline_helio_eq_of_date_wrap_positive(reader, monkeypatch):
         return next(seq)
 
     monkeypatch.setattr(fc, "_cotrans", fake_cotrans)
-    res = _pipeline_helio(reader, JD, URANIAN_ID, FLG_SPEED | FLG_EQUATORIAL)
+    res = _pipeline_helio(reader, JD, HARRINGTON_ID, FLG_SPEED | FLG_EQUATORIAL)
     assert all(math.isfinite(v) for v in res)
 
 
@@ -604,7 +652,7 @@ def test_pipeline_helio_eq_of_date_wrap_negative(reader, monkeypatch):
         return next(seq)
 
     monkeypatch.setattr(fc, "_cotrans", fake_cotrans)
-    res = _pipeline_helio(reader, JD, URANIAN_ID, FLG_SPEED | FLG_EQUATORIAL)
+    res = _pipeline_helio(reader, JD, HARRINGTON_ID, FLG_SPEED | FLG_EQUATORIAL)
     assert all(math.isfinite(v) for v in res)
 
 
@@ -679,7 +727,11 @@ def test_helio_body_topoctr_raises(reader):
     """Heliocentric body + FLG_TOPOCTR raises KeyError (line 1976)."""
     with pytest.raises(KeyError, match="TOPOCTR"):
         fast_calc_tt(
-            reader, JD, URANIAN_ID, FLG_TOPOCTR | FLG_SPEED, topo=(12.5, 41.9, 0.0)
+            reader,
+            JD,
+            HARRINGTON_ID,
+            FLG_TOPOCTR | FLG_SPEED,
+            topo=(12.5, 41.9, 0.0),
         )
 
 

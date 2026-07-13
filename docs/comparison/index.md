@@ -1,46 +1,43 @@
-# Swiss Ephemeris Comparison
+# Compatibility comparison
 
-This section is the **single place** in the libephemeris documentation where the
-library is compared head-to-head with Swiss Ephemeris (via its Python wrapper
-`pyswisseph`). The methodology pages elsewhere in these docs explain *what*
-libephemeris computes and *why*, on their own merits; this section is where the
-direct, measured comparison lives.
+LibEphemeris targets 1:1 compatibility with the public PySwissEphemeris API so
+existing programs can migrate with minimal changes. The implementation itself
+is independent and uses NASA JPL, IAU/ERFA, primary literature, and permissively
+licensed catalogue sources.
 
-libephemeris targets 1:1 API compatibility with Swiss Ephemeris, so existing code
-ports with minimal changes. The two engines produce results that are extremely
-close in the modern era but are not bit-identical, because they are built on
-different foundations:
+PySwissEphemeris is used only as an external reference API for behavioral
+comparison. A validation run may compare public return values in memory, but
+those values are ephemeral. Raw output, per-date deltas, golden files, fitted
+coefficients, recovered datasets, and encoded comparison artifacts may not be
+written to this repository or its validation worktree.
 
-| | libephemeris | Swiss Ephemeris (pyswisseph) |
-|---|---|---|
-| Planetary ephemeris | NASA JPL DE440/DE441 (2021) | JPL DE431 (2013), repackaged + Moshier fallback |
-| Lunar model | DE440 numerical integration | ELP/MPP02 analytical + DE431 |
-| Precession / obliquity | Vondrák 2011 long-term (valid ±200 ka) via ERFA | IAU 2006 polynomial |
-| Nutation | IAU 2006/2000A via pyerfa | IAU 2006/2000A (internal) |
-| ΔT (TT − UT1) | IERS observed + SMH-2016, differs only in the deep-past / future extrapolation | IERS observed + SMH-2016 (≥ SE 2.06) |
-| Outer-planet center | Body center (SPK + analytical), automatic | System barycenter by default |
-| Velocities | Central finite difference (numerical) | Chebyshev derivative (analytical) |
-| Implementation | Pure Python + Skyfield + pyerfa | C with Python wrapper |
+## Independent model basis
 
-Both engines produce scientifically valid results. Where they differ, the cause
-is documented below, with the underlying numbers, so users know exactly what to
-expect.
+| Area | LibEphemeris basis |
+|---|---|
+| Planetary and lunar states | NASA JPL DE440/DE441 through Skyfield, Horizons, or reviewed LEB approximations |
+| Mean lunar arguments | ERFA implementation of IERS 2003 Delaunay arguments |
+| Precession and nutation | IAU 2006/2000A and Vondrák 2011 through ERFA |
+| Delta T | IERS observations plus the published Stephenson–Morrison–Hohenkerk model |
+| Atmosphere | Published Sæmundsson/Bennett relations and ICAO atmosphere ray tracing |
+| Photometry | Published almanac and peer-reviewed planetary magnitude models |
+| Historical hypothetical bodies | Independently published elements, cited per supported ID |
+
+The reference API's internal models and data are neither inspected nor inferred.
+Numerical differences are interpreted only in light of LibEphemeris's own
+documented model choices.
 
 ## Pages in this section
 
-- **[Measured precision](precision.md)** — arcsecond-level precision tables for
-  every category (planets, Moon, nodes, houses, fixed stars, eclipses,
-  coordinate modes) plus independent triangulation against JPL Horizons and
-  astropy/ERFA.
-- **[Known differences](known-differences.md)** — the *why* behind each
-  divergence (ephemeris generation, lunar model, ΔT, long-term sidereal time,
-  asteroids), followed by a granular per-API catalog.
-- **[Intentional divergences](intentional-divergences.md)** — the few cases where
-  libephemeris deliberately departs from Swiss Ephemeris behaviour for physical
-  correctness (`SIDEREAL | J2000` for lunar nodes/apsides; total-eclipse
-  obscuration).
-- **[API compatibility](api-compatibility.md)** — function-signature
-  differences, the validation methodology, and validation results.
+- [Precision and validation](precision.md) explains independent accuracy checks,
+  cross-backend consistency, and how compatibility observations are summarized
+  without retaining source output.
+- [Known differences](known-differences.md) catalogs documented model and API
+  differences without per-date reference data.
+- [Intentional divergences](intentional-divergences.md) records deliberate public
+  behavior choices and the independent reason for each.
+- [API compatibility](api-compatibility.md) covers signatures, return shapes,
+  flags, errors, and the validation process.
 
-> All measurements here were taken with the reference API's Python binding
-> used purely as a black-box oracle.
+See [Independent Implementation Methodology](../methodology/independence.md) for
+the project-wide clean-room rules.

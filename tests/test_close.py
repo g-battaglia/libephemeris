@@ -151,4 +151,3 @@ class TestCloseFunction:
         assert abs(pos1[2] - pos2[2]) < 1e-6, (
             f"Distance differs after close(): {pos1[2]} vs {pos2[2]}"
         )
-

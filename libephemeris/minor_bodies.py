@@ -537,8 +537,7 @@ def detect_mean_motion_resonance(
     elements: "OrbitalElements",
     tolerance: float = DEFAULT_RESONANCE_TOLERANCE,
 ) -> ResonanceResult:
-    """
-    Detect if a body is in mean motion resonance with Neptune.
+    """Detect whether a body is near a mean-motion resonance with Neptune.
 
     Checks if the body's mean motion is close to a resonant ratio with Neptune's
     mean motion. Bodies in mean motion resonance have their secular perturbations
@@ -552,14 +551,10 @@ def detect_mean_motion_resonance(
     Returns:
         ResonanceResult: Contains detection result, resonance info, and warning
 
-    Algorithm:
-        For each known Neptune resonance p:q, checks if:
-        |n_body / n_Neptune - p/q| < tolerance * (p/q)
-
-        where n is mean motion. In a p:q resonance, the body completes p orbits
-        while Neptune completes q, so n_body/n_Neptune = p/q.
-        This is equivalent to checking if the semi-major axis is within
-        tolerance of the resonant value.
+    Notes:
+        For each known ``p:q`` resonance, the fractional difference between
+        the measured mean-motion ratio and ``p / q`` is compared with
+        ``tolerance``.
 
     Example:
         >>> from libephemeris.minor_bodies import detect_mean_motion_resonance
@@ -569,14 +564,14 @@ def detect_mean_motion_resonance(
         >>> result.resonance.name
         'plutino'
 
-    Note:
+    Warning:
         Bodies in resonance may have secular perturbation calculations that
         are less accurate than for non-resonant bodies. The warning_message
         field provides guidance in such cases.
 
     References:
-        Murray & Dermott "Solar System Dynamics" Ch. 8
-        Malhotra (1995) "The origin of Pluto's peculiar orbit"
+        Murray and Dermott, *Solar System Dynamics*, chapter 8; Malhotra
+        (1995), *The Origin of Pluto's Peculiar Orbit*.
     """
     a = elements.a
     n = elements.n

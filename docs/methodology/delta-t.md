@@ -97,13 +97,14 @@ specifically expect them; the default `smh2016` is the recommended choice.
 
 > **Scope — which calculations the selector (and `userdef` / IERS) affect.**
 > All three ΔT priorities feed `deltat()` / `deltat_ex()`, and hence the TT used by
-> the **LEB / fast / Horizons** position backends (the default is **LEB**), as well
+> the **LEB / fast / Horizons** position backends (normally the first paths in
+> `auto` mode), as well
 > as eclipses, heliacal events and long-term sidereal time. The **`"skyfield"`**
 > position backend is the exception: it derives TT from Skyfield's *own* internal
 > ΔT model (SMH-2016 + IERS), so its planetary positions ignore
 > `set_delta_t_model()`, `set_delta_t_userdef()` and the IERS toggle. Concretely,
 > selecting `espenak_meeus` (or forcing a `userdef` value) shifts positions in the
-> default LEB backend — e.g. a `userdef` step of 0.1 day moves the Sun by ~364″ —
+> usual auto-mode LEB path — e.g. a `userdef` step of 0.1 day moves the Sun by ~364″ —
 > but leaves `"skyfield"`-mode positions unchanged. This is a pre-existing property
 > of all three overrides, not specific to the model selector.
 

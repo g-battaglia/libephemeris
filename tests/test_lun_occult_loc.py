@@ -161,12 +161,7 @@ class TestSweLunOccultWhenLoc:
         assert 0.0 <= attr[7] < 2.0
 
     def test_body_zero_is_the_sun(self):
-        """Body 0 is the Sun: the search finds a solar eclipse.
-
-        The reference treats ipl=0 (Sun) as a legitimate occultation
-        target - an occultation of the Sun by the Moon is a solar
-        eclipse (verified against the reference ephemeris 2.10.03).
-        """
+        """Body 0 is the Sun, so the search finds a solar eclipse."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = [-96.797, 32.7767, 0.0]  # Dallas, 2024-04-08 path
 

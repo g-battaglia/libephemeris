@@ -205,17 +205,18 @@ class TestCompressBodyChunked:
         )
         # 25 segments / 10 per chunk -> 3 chunks (10, 10, 5)
         assert len(chunks) == 3
-        assert [c[1] for c in chunks] == [10 * n_coeffs * 8, 10 * n_coeffs * 8,
-                                          5 * n_coeffs * 8]
+        assert [c[1] for c in chunks] == [
+            10 * n_coeffs * 8,
+            10 * n_coeffs * 8,
+            5 * n_coeffs * 8,
+        ]
 
         # Decompress each chunk and reassemble; result approximates the input.
         out = b""
         offsets = [0, 10, 20]
         counts = [10, 10, 5]
         for (compressed, uncompressed_size), n in zip(chunks, counts):
-            out += decompress_body(
-                compressed, uncompressed_size, n, degree, components
-            )
+            out += decompress_body(compressed, uncompressed_size, n, degree, components)
         restored = np.frombuffer(out, dtype=np.float64)
         original = np.frombuffer(raw_bytes, dtype=np.float64)
         np.testing.assert_allclose(restored, original, atol=1e-5)

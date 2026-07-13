@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MIT
+# Copyright (c) 2005 Johannes Gajdosik
 # Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md
 """
 TASS 1.7 - Theorie Analytique des Satellites de Saturne.

@@ -479,18 +479,14 @@ def download_assist_data(
 _EPS_J2000_RAD: float = math.radians(23.4392911)
 
 
-def _ecliptic_j2000_to_icrs(
-    x: float, y: float, z: float
-) -> Tuple[float, float, float]:
+def _ecliptic_j2000_to_icrs(x: float, y: float, z: float) -> Tuple[float, float, float]:
     """Rotate a vector from ecliptic J2000 to equatorial ICRS."""
     ce = math.cos(_EPS_J2000_RAD)
     se = math.sin(_EPS_J2000_RAD)
     return (x, y * ce - z * se, y * se + z * ce)
 
 
-def _icrs_to_ecliptic_j2000(
-    x: float, y: float, z: float
-) -> Tuple[float, float, float]:
+def _icrs_to_ecliptic_j2000(x: float, y: float, z: float) -> Tuple[float, float, float]:
     """Rotate a vector from equatorial ICRS to ecliptic J2000."""
     ce = math.cos(_EPS_J2000_RAD)
     se = math.sin(_EPS_J2000_RAD)
@@ -529,7 +525,7 @@ def _assist_disable_self_perturber(extras, ephem, x, y, z, t_rel) -> Optional[st
             a = ephem.get_particle(name, t_rel)
         except Exception:  # noqa: BLE001
             continue
-        if (x - a.x) ** 2 + (y - a.y) ** 2 + (z - a.z) ** 2 < _ASSIST_SELF_AU ** 2:
+        if (x - a.x) ** 2 + (y - a.y) ** 2 + (z - a.z) ** 2 < _ASSIST_SELF_AU**2:
             hit = name
             break
     if hit is not None and "ASTEROIDS" in extras.forces:
@@ -540,7 +536,7 @@ def _assist_disable_self_perturber(extras, ephem, x, y, z, t_rel) -> Optional[st
             f"propagate: the body being propagated coincides with the ASSIST "
             f"asteroid perturber '{hit}', so the ASTEROIDS force was disabled for "
             f"this integration to avoid a self-interaction singularity (the "
-            f"perturbations from the other major asteroids, < ~0.01\", are "
+            f'perturbations from the other major asteroids, < ~0.01", are '
             f"omitted).",
             stacklevel=3,
         )
@@ -1060,7 +1056,11 @@ def propagate_orbit_assist(
     # Avoid the self-interaction singularity when the propagated body is itself
     # one of ASSIST's asteroid perturbers (Ceres/Vesta/Pallas/Juno/...).
     _assist_disable_self_perturber(
-        extras, ephem, x0 + sun0.x, y0 + sun0.y, z0 + sun0.z,
+        extras,
+        ephem,
+        x0 + sun0.x,
+        y0 + sun0.y,
+        z0 + sun0.z,
         jd_start - ephem.jd_ref,
     )
 
@@ -1199,7 +1199,11 @@ def propagate_trajectory(
                 # perturber set, which does not change along the trajectory, so a
                 # per-step re-check would be redundant.
                 _assist_disable_self_perturber(
-                    extras, ephem, x0 + sun0.x, y0 + sun0.y, z0 + sun0.z,
+                    extras,
+                    ephem,
+                    x0 + sun0.x,
+                    y0 + sun0.y,
+                    z0 + sun0.z,
                     jd_start - ephem.jd_ref,
                 )
 

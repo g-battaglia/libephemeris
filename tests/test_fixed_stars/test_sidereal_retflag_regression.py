@@ -1,21 +1,16 @@
 """Regression tests for fixed-star sidereal reduction and echoed flags.
 
-Covers two findings, both verified against the reference API:
-
-* I2-F1 -- sidereal fixed-star positions must be referred to the MEAN equinox
+* I2-F1 -- sidereal fixed-star positions are referred to the mean equinox
   of date: the ecliptic longitude uses the TRUE ayanamsha (mean + nutation in
   longitude) and the equatorial output is measured on the MEAN equator with the
-  MEAN ayanamsha removed from right ascension. The pre-fix code subtracted the
-  mean ayanamsha from the true (of-date) longitude / true-equator RA, leaving a
-  ~14" error equal to the nutation in longitude.
+  mean ayanamsha removed from right ascension.
 
-* I2-F2 -- the UT entry points (fixstar_ut / fixstar2_ut) echo the flags the
-  reference API's plausibility step implies: FLG_NONUT for J2000/SIDEREAL and
+* I2-F2 -- the UT entry points (fixstar_ut / fixstar2_ut) echo implied flags:
+  FLG_NONUT for J2000/SIDEREAL and
   FLG_NOGDEFL | FLG_NOABERR for heliocentric / true-position output.
 
-The tests are reference-free: F1 checks internal consistency against the
-library's own nutation and ayanamsha, F2 pins the documented echoed-flag
-convention.
+The tests check internal consistency against the library's independently
+implemented nutation and ayanamsha models.
 """
 
 from __future__ import annotations
@@ -28,6 +23,11 @@ import libephemeris as ephem
 def _wrap_deg(x: float) -> float:
     """Wrap an angular difference (degrees) to (-180, 180]."""
     return ((x + 180.0) % 360.0) - 180.0
+
+
+def _set_independent_sidereal_mode() -> None:
+    """Select an arbitrary caller-defined zero point for frame invariants."""
+    ephem.set_sid_mode(ephem.SIDM_USER, 2451545.0, 24.0)
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ class TestSiderealStarMeanEquinox:
         longitude leaves exactly dpsi. dpsi is read reference-free as the
         of-date minus mean-ecliptic (NONUT) longitude.
         """
-        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
+        _set_independent_sidereal_mode()
         saw_nonzero = False
         for star in self.STARS:
             for y, m, d in self.DATES:
@@ -79,7 +79,7 @@ class TestSiderealStarMeanEquinox:
         ayanamsha subtraction. The pre-fix code used the true equator, leaving
         a nutation-in-RA error and a shifted declination.
         """
-        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
+        _set_independent_sidereal_mode()
         for star in self.STARS:
             for y, m, d in [(2000, 1, 1), (1950, 1, 1)]:
                 jd = ephem.julday(y, m, d, 12.0)
@@ -102,7 +102,7 @@ class TestSiderealStarMeanEquinox:
 
     def test_j2000_and_nonut_sidereal_use_mean_ayanamsha(self):
         """SID|J2000 and SID|NONUT subtract the mean ayanamsha (no dpsi)."""
-        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
+        _set_independent_sidereal_mode()
         star = "Regulus"
         jd = ephem.julday(2000, 1, 1, 12.0)
         mean_aya = ephem.get_ayanamsa_ut(jd)
@@ -118,11 +118,11 @@ class TestSiderealStarMeanEquinox:
         Since sidereal longitude = mean_lon - mean_ayanamsha, its rate equals
         the mean-ecliptic (NONUT) longitude rate minus the mean-ayanamsha
         drift, with no d(dpsi)/dt term. Comparing against the NONUT speed and a
-        finite-difference ayanamsha rate is reference-free; the pre-fix code
+        finite-difference ayanamsha rate is independently computed; the pre-fix code
         differenced the true (of-date) longitude and so retained d(dpsi)/dt,
         ~0.16"/day at 1900/2200.
         """
-        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
+        _set_independent_sidereal_mode()
         h = 1.0
         for star in self.STARS:
             for y in (1900, 2000, 2200):
@@ -133,7 +133,7 @@ class TestSiderealStarMeanEquinox:
                 nonut_sp = ephem.fixstar2_ut(
                     star, jd, ephem.FLG_SPEED | ephem.FLG_NONUT
                 )[0][3]
-                aya_rate = (
+                aya_rate = _wrap_deg(
                     ephem.get_ayanamsa_ut(jd + h) - ephem.get_ayanamsa_ut(jd - h)
                 ) / (2.0 * h)
                 resid = (sid_sp - (nonut_sp - aya_rate)) * 3600.0
@@ -151,7 +151,7 @@ class TestSiderealStarMeanEquinox:
 class TestFixstarUtRetflagImpliedBits:
     _JD = 2451545.0  # J2000.0
 
-    # (input flags, expected echoed retflag) -- reference-neutral convention:
+    # (input flags, expected echoed retflag):
     #   * default ephemeris bit FLG_SWIEPH added when none given
     #   * FLG_NONUT echoed for J2000 / SIDEREAL (mean-equinox output)
     #   * FLG_NOGDEFL | FLG_NOABERR echoed for HELCTR / TRUEPOS
@@ -188,7 +188,7 @@ class TestFixstarUtRetflagImpliedBits:
     def test_ut_retflag_echoes_implied_bits(
         self, func_name: str, flags_in: int, expected: int
     ):
-        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
+        _set_independent_sidereal_mode()
         func = getattr(ephem, func_name)
         retflag = func("Regulus", self._JD, flags_in)[2]
         assert retflag == expected, (

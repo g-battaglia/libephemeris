@@ -5,7 +5,7 @@ These tests verify:
 - AutoSpkConfig class functionality
 - Registration and de-registration of auto-SPK
 - Cache path generation
-- Import checks for astroquery
+- Direct JPL Horizons download delegation
 - Integration with the main SPK system
 
 Note: Tests that require actual network downloads are skipped by default.
@@ -14,7 +14,7 @@ Set LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD=1 to run them.
 
 import os
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from pathlib import Path
 
@@ -99,8 +99,7 @@ class TestEnableDisableAutoSpk:
         """Clear registry after each test."""
         spk_auto.disable_all()
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_enable_auto_spk(self, mock_check):
+    def test_enable_auto_spk(self):
         """Enable auto-SPK for a body."""
         spk_auto.enable_auto_spk(
             ipl=CHIRON,
@@ -110,8 +109,7 @@ class TestEnableDisableAutoSpk:
 
         assert spk_auto.is_auto_spk_enabled(CHIRON) is True
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_disable_auto_spk(self, mock_check):
+    def test_disable_auto_spk(self):
         """Disable auto-SPK for a body."""
         spk_auto.enable_auto_spk(
             ipl=CHIRON,
@@ -126,8 +124,7 @@ class TestEnableDisableAutoSpk:
         """Check auto-SPK status for unconfigured body."""
         assert spk_auto.is_auto_spk_enabled(CHIRON) is False
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_get_auto_spk_config(self, mock_check):
+    def test_get_auto_spk_config(self):
         """Get configuration for a body."""
         spk_auto.enable_auto_spk(
             ipl=CHIRON,
@@ -147,8 +144,7 @@ class TestEnableDisableAutoSpk:
         """Get config for unconfigured body returns None."""
         assert spk_auto.get_auto_spk_config(CHIRON) is None
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_list_auto_spk_bodies(self, mock_check):
+    def test_list_auto_spk_bodies(self):
         """List all configured bodies."""
         spk_auto.enable_auto_spk(ipl=CHIRON, body_id="2060")
         spk_auto.enable_auto_spk(ipl=CERES, body_id="1")
@@ -159,8 +155,7 @@ class TestEnableDisableAutoSpk:
         assert CERES in bodies
         assert len(bodies) == 2
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_disable_all(self, mock_check):
+    def test_disable_all(self):
         """Disable all auto-SPK configurations."""
         spk_auto.enable_auto_spk(ipl=CHIRON, body_id="2060")
         spk_auto.enable_auto_spk(ipl=CERES, body_id="1")
@@ -170,8 +165,8 @@ class TestEnableDisableAutoSpk:
         assert len(spk_auto.list_auto_spk_bodies()) == 0
 
 
-class TestAstroqueryCheck:
-    """Test astroquery availability check."""
+class TestAstroqueryCompatibilityProbe:
+    """Test the retained, optional Astroquery compatibility probe."""
 
     def test_check_available_when_installed(self):
         """Check returns True when astroquery is available."""
@@ -192,14 +187,18 @@ class TestAstroqueryCheck:
 
 
 class TestEnableWithoutAstroquery:
-    """Test behavior when astroquery is not installed.
+    """Auto-SPK configuration does not require the optional package."""
 
-    Note: astroquery is now a required dependency, so these tests are skipped.
-    """
+    def test_enable_does_not_check_astroquery(self):
+        with patch.object(
+            spk_auto,
+            "_check_astroquery_available",
+            side_effect=AssertionError("legacy probe must not be called"),
+        ):
+            spk_auto.enable_auto_spk(CHIRON, "2060")
 
-    @pytest.mark.skip(reason="astroquery is now a required dependency")
-    def test_enable_raises_import_error(self):
-        pass
+        assert spk_auto.is_auto_spk_enabled(CHIRON)
+        spk_auto.disable_auto_spk(CHIRON)
 
 
 class TestCacheInfo:
@@ -420,8 +419,7 @@ class TestEnableCommonBodies:
         """Clear registry after each test."""
         spk_auto.disable_all()
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_enable_common_bodies(self, mock_check):
+    def test_enable_common_bodies(self):
         """Enable common minor bodies."""
         spk_auto.enable_common_bodies()
 
@@ -431,8 +429,7 @@ class TestEnableCommonBodies:
         assert CHIRON in bodies
         assert CERES in bodies
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_enable_common_bodies_with_dates(self, mock_check):
+    def test_enable_common_bodies_with_dates(self):
         """Enable common bodies with custom date range."""
         spk_auto.enable_common_bodies(
             start="2020-01-01",
@@ -491,9 +488,7 @@ class TestModuleExports:
 class TestSpkAutoDownloadIntegration:
     """Integration tests that download actual SPK files.
 
-    These tests require:
-    - Network access
-    - astroquery installed
+    These tests require network access.
 
     Skipped by default; set LIBEPHEMERIS_TEST_SPK_AUTO_DOWNLOAD=1 to run.
     """
@@ -513,7 +508,7 @@ class TestSpkAutoDownloadIntegration:
         state._SPK_BODY_MAP.clear()
 
     def test_download_chiron_spk(self, tmp_path):
-        """Download Chiron SPK using astroquery."""
+        """Download Chiron SPK using the direct Horizons client."""
         spk_auto.enable_auto_spk(
             ipl=CHIRON,
             body_id="2060",
@@ -688,9 +683,17 @@ class TestFindCoveringSpk:
 class TestAutoGetSpkValidation:
     """Test auto_get_spk input validation."""
 
-    @pytest.mark.skip(reason="astroquery is now a required dependency")
-    def test_raises_import_error_without_astroquery(self, tmp_path):
-        pass
+    @patch.object(spk_auto, "_download_spk_astroquery")
+    def test_download_does_not_check_astroquery(self, mock_download, tmp_path):
+        """The compatibility probe is not part of the direct HTTP path."""
+        with patch.object(
+            spk_auto,
+            "_check_astroquery_available",
+            side_effect=AssertionError("legacy probe must not be called"),
+        ):
+            spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(tmp_path))
+
+        mock_download.assert_called_once()
 
     def test_raises_value_error_for_invalid_range(self, tmp_path):
         """Raises ValueError when jd_end <= jd_start."""
@@ -761,11 +764,8 @@ class TestAutoGetSpkDefaultDirectory:
         expected = os.path.join(os.path.expanduser("~"), ".libephemeris", "spk")
         assert spk_auto.DEFAULT_AUTO_SPK_DIR == expected
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     @patch.object(spk_auto, "_download_spk_astroquery")
-    def test_uses_default_directory(
-        self, mock_download, mock_check, tmp_path, monkeypatch
-    ):
+    def test_uses_default_directory(self, mock_download, tmp_path, monkeypatch):
         """Uses default directory when none specified."""
         # Monkeypatch the default directory
         test_default = str(tmp_path / "default_cache")
@@ -1048,68 +1048,136 @@ class TestIsSpkCachedModuleExport:
 # =============================================================================
 
 
-@pytest.mark.skip(
-    reason="download_spk_from_horizons now uses direct HTTP API, not astroquery"
-)
 class TestDownloadSpkFromHorizonsValidation:
     """Test download_spk_from_horizons input validation."""
 
-    def test_raises_import_error_without_astroquery(self, tmp_path):
-        pass
+    @patch("libephemeris.spk.download_spk")
+    def test_raises_value_error_for_invalid_range(self, mock_download, tmp_path):
+        with pytest.raises(ValueError, match="must be greater than"):
+            spk_auto.download_spk_from_horizons(
+                "2060", 2462502.5, 2458849.5, str(tmp_path / "invalid.bsp")
+            )
 
-    def test_raises_value_error_for_invalid_range(self, tmp_path):
-        pass
+        mock_download.assert_not_called()
 
 
-@pytest.mark.skip(
-    reason="download_spk_from_horizons now uses direct HTTP API, not astroquery"
-)
 class TestDownloadSpkFromHorizonsDirectoryCreation:
     """Test download_spk_from_horizons output directory handling."""
 
-    def test_creates_output_directory(self, tmp_path):
-        pass
+    @patch("libephemeris.spk.download_spk")
+    def test_creates_output_directory(self, mock_download, tmp_path):
+        output_path = tmp_path / "nested" / "test.bsp"
+        mock_download.return_value = str(output_path)
+
+        result = spk_auto.download_spk_from_horizons(
+            "2060", 2458849.5, 2462502.5, str(output_path)
+        )
+
+        assert result == str(output_path)
+        assert output_path.parent.is_dir()
 
 
-@pytest.mark.skip(
-    reason="download_spk_from_horizons now uses direct HTTP API, not astroquery"
-)
 class TestDownloadSpkFromHorizonsErrorHandling:
     """Test download_spk_from_horizons error handling."""
 
-    def test_handles_body_not_found(self, tmp_path):
-        pass
+    @pytest.mark.parametrize(
+        "error",
+        [
+            ValueError("body not found"),
+            KeyError("missing response field"),
+            OSError("cannot write response"),
+        ],
+    )
+    def test_wraps_download_failures_as_value_error(self, error, tmp_path):
+        with (
+            patch("libephemeris.spk.download_spk", side_effect=error),
+            pytest.raises(ValueError, match="Failed to download SPK for '2060'"),
+        ):
+            spk_auto.download_spk_from_horizons(
+                "2060", 2458849.5, 2462502.5, str(tmp_path / "test.bsp")
+            )
 
-    def test_handles_no_matches_found(self, tmp_path):
-        pass
-
-    def test_handles_date_range_too_large(self, tmp_path):
-        pass
-
-    def test_handles_network_timeout(self, tmp_path):
-        pass
-
-    def test_handles_http_error(self, tmp_path):
-        pass
-
-    def test_handles_generic_error(self, tmp_path):
-        pass
+    def test_preserves_connection_error_type(self, tmp_path):
+        with (
+            patch(
+                "libephemeris.spk.download_spk",
+                side_effect=ConnectionError("request timed out"),
+            ),
+            pytest.raises(ConnectionError, match="Network error downloading SPK"),
+        ):
+            spk_auto.download_spk_from_horizons(
+                "2060", 2458849.5, 2462502.5, str(tmp_path / "test.bsp")
+            )
 
 
-@pytest.mark.skip(
-    reason="download_spk_from_horizons now uses direct HTTP API, not astroquery"
-)
 class TestDownloadSpkFromHorizonsSuccess:
     """Test download_spk_from_horizons success cases."""
 
-    def test_calls_horizons_with_correct_params(self, tmp_path):
-        pass
+    @patch("libephemeris.spk.download_spk")
+    def test_calls_direct_client_with_correct_params(self, mock_download, tmp_path):
+        output_path = tmp_path / "test.bsp"
+        mock_download.return_value = str(output_path)
 
-    def test_custom_location(self, tmp_path):
-        pass
+        result = spk_auto.download_spk_from_horizons(
+            "2060", 2458849.5, 2462502.5, str(output_path)
+        )
 
-    def test_accepts_integer_body_id(self, tmp_path):
-        pass
+        assert result == str(output_path)
+        mock_download.assert_called_once_with(
+            body="2060",
+            start="2020-01-01",
+            end="2030-01-01",
+            path=str(tmp_path),
+            center="500@0",
+            overwrite=True,
+        )
+
+    @pytest.mark.parametrize(
+        ("location", "expected_center"),
+        [("@399", "500@399"), ("500@10", "500@10")],
+    )
+    def test_custom_location(self, location, expected_center, tmp_path):
+        output_path = tmp_path / "test.bsp"
+        with patch(
+            "libephemeris.spk.download_spk", return_value=str(output_path)
+        ) as mock_download:
+            spk_auto.download_spk_from_horizons(
+                "2060",
+                2458849.5,
+                2462502.5,
+                str(output_path),
+                location=location,
+            )
+
+        assert mock_download.call_args.kwargs["center"] == expected_center
+
+    @patch("libephemeris.spk.download_spk")
+    def test_accepts_integer_body_id(self, mock_download, tmp_path):
+        output_path = tmp_path / "test.bsp"
+        mock_download.return_value = str(output_path)
+
+        spk_auto.download_spk_from_horizons(
+            2060, 2458849.5, 2462502.5, str(output_path)
+        )
+
+        assert mock_download.call_args.kwargs["body"] == "2060"
+
+    def test_moves_generated_file_to_requested_path(self, tmp_path):
+        generated = tmp_path / "generated-name.bsp"
+        requested = tmp_path / "requested-name.bsp"
+
+        def fake_download(**kwargs):
+            generated.write_bytes(b"DAF/SPK fixture")
+            return str(generated)
+
+        with patch("libephemeris.spk.download_spk", side_effect=fake_download):
+            result = spk_auto.download_spk_from_horizons(
+                "2060", 2458849.5, 2462502.5, str(requested)
+            )
+
+        assert result == str(requested)
+        assert requested.read_bytes() == b"DAF/SPK fixture"
+        assert not generated.exists()
 
 
 class TestDownloadSpkFromHorizonsModuleExport:
@@ -1252,9 +1320,8 @@ class TestAutoGetSpkWithRegistration:
         state._SPK_BODY_MAP.clear()
         state._SPK_KERNELS.clear()
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     @patch.object(spk_auto, "_download_spk_astroquery")
-    def test_registers_spk_when_ipl_provided(self, mock_download, mock_check, tmp_path):
+    def test_registers_spk_when_ipl_provided(self, mock_download, tmp_path):
         """auto_get_spk registers SPK body when ipl is provided."""
 
         # Mock download to create a file
@@ -1279,11 +1346,8 @@ class TestAutoGetSpkWithRegistration:
             call_args = mock_register.call_args
             assert call_args[0][2] == CHIRON  # ipl argument
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     @patch.object(spk_auto, "_download_spk_astroquery")
-    def test_does_not_register_when_ipl_not_provided(
-        self, mock_download, mock_check, tmp_path
-    ):
+    def test_does_not_register_when_ipl_not_provided(self, mock_download, tmp_path):
         """auto_get_spk does not register SPK body when ipl is not provided."""
 
         # Mock download to create a file
@@ -1299,14 +1363,18 @@ class TestAutoGetSpkWithRegistration:
             # Verify registration was NOT called
             mock_register.assert_not_called()
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_registers_cached_spk_when_ipl_provided(self, mock_check, tmp_path):
+    def test_registers_cached_spk_when_ipl_provided(self, tmp_path):
         """auto_get_spk registers cached SPK when ipl is provided."""
-        # Create a cached SPK file
+        # The covering-file search validates real BSP contents. Keep this test
+        # focused on the cached-registration branch by mocking that search;
+        # dummy bytes must not be accepted as a valid kernel.
         spk_file = tmp_path / "2060_2458849_2462502.bsp"
-        spk_file.write_bytes(b"cached SPK data")
+        spk_file.write_bytes(b"test fixture")
 
-        with patch.object(spk_auto, "_register_spk_after_download") as mock_register:
+        with (
+            patch.object(spk_auto, "_find_covering_spk", return_value=str(spk_file)),
+            patch.object(spk_auto, "_register_spk_after_download") as mock_register,
+        ):
             result = spk_auto.auto_get_spk(
                 "2060",
                 2458849.5,
@@ -1324,9 +1392,8 @@ class TestAutoGetSpkWithRegistration:
             assert call_args[0][0] == str(spk_file)  # spk_path
             assert call_args[0][2] == CHIRON  # ipl
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     @patch.object(spk_auto, "_download_spk_astroquery")
-    def test_passes_naif_id_to_registration(self, mock_download, mock_check, tmp_path):
+    def test_passes_naif_id_to_registration(self, mock_download, tmp_path):
         """auto_get_spk passes naif_id to registration."""
 
         # Mock download to create a file
@@ -1372,104 +1439,64 @@ class TestDownloadSpkFromHorizonsWithRegistration:
         state._SPK_BODY_MAP.clear()
         state._SPK_KERNELS.clear()
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_registers_spk_when_ipl_provided(self, mock_check, tmp_path):
+    def test_registers_spk_when_ipl_provided(self, tmp_path):
         """download_spk_from_horizons registers SPK body when ipl is provided."""
         output_path = str(tmp_path / "test.bsp")
 
-        mock_horizons_class = MagicMock()
-        mock_horizons_obj = MagicMock()
-        mock_horizons_class.return_value = mock_horizons_obj
-        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
-
-        with patch.dict(
-            "sys.modules",
-            {
-                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
-                "astroquery.jplhorizons": mock_jplhorizons,
-            },
+        with (
+            patch(
+                "libephemeris.spk.download_spk", return_value=output_path
+            ) as mock_download,
+            patch.object(spk_auto, "_register_spk_after_download") as mock_register,
         ):
-            with patch.object(
-                spk_auto, "_register_spk_after_download"
-            ) as mock_register:
-                spk_auto.download_spk_from_horizons(
-                    "2060",
-                    2458849.5,
-                    2462502.5,
-                    output_path,
-                    ipl=CHIRON,
-                )
+            spk_auto.download_spk_from_horizons(
+                "2060",
+                2458849.5,
+                2462502.5,
+                output_path,
+                ipl=CHIRON,
+            )
 
-                # Verify registration was called
-                mock_register.assert_called_once()
-                call_args = mock_register.call_args
-                assert call_args[0][0] == output_path  # spk_path
-                assert call_args[0][1] == "2060"  # body_id
-                assert call_args[0][2] == CHIRON  # ipl
+            mock_download.assert_called_once()
+            mock_register.assert_called_once_with(output_path, "2060", CHIRON, None)
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_does_not_register_when_ipl_not_provided(self, mock_check, tmp_path):
+    def test_does_not_register_when_ipl_not_provided(self, tmp_path):
         """download_spk_from_horizons does not register when ipl is not provided."""
         output_path = str(tmp_path / "test.bsp")
 
-        mock_horizons_class = MagicMock()
-        mock_horizons_obj = MagicMock()
-        mock_horizons_class.return_value = mock_horizons_obj
-        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
-
-        with patch.dict(
-            "sys.modules",
-            {
-                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
-                "astroquery.jplhorizons": mock_jplhorizons,
-            },
+        with (
+            patch("libephemeris.spk.download_spk", return_value=output_path),
+            patch.object(spk_auto, "_register_spk_after_download") as mock_register,
         ):
-            with patch.object(
-                spk_auto, "_register_spk_after_download"
-            ) as mock_register:
-                spk_auto.download_spk_from_horizons(
-                    "2060",
-                    2458849.5,
-                    2462502.5,
-                    output_path,
-                )
+            spk_auto.download_spk_from_horizons(
+                "2060",
+                2458849.5,
+                2462502.5,
+                output_path,
+            )
 
-                # Verify registration was NOT called
-                mock_register.assert_not_called()
+            mock_register.assert_not_called()
 
-    @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
-    def test_passes_naif_id_to_registration(self, mock_check, tmp_path):
+    def test_passes_naif_id_to_registration(self, tmp_path):
         """download_spk_from_horizons passes naif_id to registration."""
         output_path = str(tmp_path / "test.bsp")
 
-        mock_horizons_class = MagicMock()
-        mock_horizons_obj = MagicMock()
-        mock_horizons_class.return_value = mock_horizons_obj
-        mock_jplhorizons = MagicMock(Horizons=mock_horizons_class)
-
-        with patch.dict(
-            "sys.modules",
-            {
-                "astroquery": MagicMock(jplhorizons=mock_jplhorizons),
-                "astroquery.jplhorizons": mock_jplhorizons,
-            },
+        with (
+            patch("libephemeris.spk.download_spk", return_value=output_path),
+            patch.object(spk_auto, "_register_spk_after_download") as mock_register,
         ):
-            with patch.object(
-                spk_auto, "_register_spk_after_download"
-            ) as mock_register:
-                spk_auto.download_spk_from_horizons(
-                    "2060",
-                    2458849.5,
-                    2462502.5,
-                    output_path,
-                    ipl=CHIRON,
-                    naif_id=NAIF_CHIRON,
-                )
+            spk_auto.download_spk_from_horizons(
+                "2060",
+                2458849.5,
+                2462502.5,
+                output_path,
+                ipl=CHIRON,
+                naif_id=NAIF_CHIRON,
+            )
 
-                # Verify naif_id was passed
-                mock_register.assert_called_once()
-                call_args = mock_register.call_args
-                assert call_args[0][3] == NAIF_CHIRON  # naif_id
+            mock_register.assert_called_once_with(
+                output_path, "2060", CHIRON, NAIF_CHIRON
+            )
 
 
 # Network-dependent tests for registration

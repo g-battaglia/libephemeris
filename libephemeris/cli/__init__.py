@@ -10,12 +10,9 @@ Usage:
     libephemeris download base          Download data for 'base' tier (1850-2150)
     libephemeris download medium        Download data for 'medium' tier (1550-2650)
     libephemeris download extended      Download data for 'extended' tier (-13200 to +17191)
-    libephemeris download leb-base      Download LEB binary ephemeris for 'base' (~53 MB)
-    libephemeris download leb-medium    Download LEB binary ephemeris for 'medium' (~175 MB)
-    libephemeris download leb-extended  Download LEB binary ephemeris for 'extended'
-    libephemeris download leb2-base     Download LEB2 compressed ephemeris for 'base'
-    libephemeris download leb2-medium   Download LEB2 compressed ephemeris for 'medium'
-    libephemeris download leb2-extended Download LEB2 compressed ephemeris for 'extended'
+    libephemeris download leb2-base     Install reviewed LEB2 assets for 'base'
+    libephemeris download leb2-medium   Install reviewed LEB2 assets for 'medium'
+    libephemeris download leb2-extended Install reviewed LEB2 assets for 'extended'
     libephemeris download assist        Download ASSIST n-body data files (~714 MB)
     libephemeris status                 Show comprehensive library and data status
     libephemeris --version              Show version
@@ -37,7 +34,7 @@ import sys
 import click
 
 from .. import __version__
-from .shared import TIER_INFO, leb_download_help, tier_download_help
+from .shared import SPK_BODY_COUNT, TIER_INFO, leb_download_help, tier_download_help
 
 
 # ---------------------------------------------------------------------------
@@ -93,9 +90,7 @@ Examples:
   libephemeris download medium        Download data for the default tier
   libephemeris download base          Lightweight, modern-era data
   libephemeris download extended      Full range (-13200 to +17191 CE)
-  libephemeris download leb-base      LEB binary ephemeris (~53 MB, ~14x speedup)
-  libephemeris download leb-medium    LEB binary ephemeris (~175 MB, ~14x speedup)
-  libephemeris download leb2-base     LEB2 compressed ephemeris (smaller, modular)
+  libephemeris download leb2-base     Install reviewed modular LEB2 assets
   libephemeris download assist        ASSIST n-body data (~714 MB)
   libephemeris status                 Show comprehensive library and data status
 
@@ -120,13 +115,13 @@ def cli() -> None:
 
 @click.group(
     "download",
-    short_help="Download data files: tier SPKs, LEB, LEB2, ASSIST.",
+    short_help="Download tier SPKs, reviewed LEB2 assets, and ASSIST data.",
     help="Download data files required by libephemeris.\n\n"
-    "Four types of data:\n\n"
+    "Available data:\n\n"
     "  Tier data (base/medium/extended)   DE440/441 kernels + asteroid SPKs\n"
-    "  LEB files (leb-base/medium/ext)    Precomputed Chebyshev (~14x speedup)\n"
-    "  LEB2 files (leb2-base/medium/ext)  Compressed modular (4-10x smaller)\n"
+    "  LEB2 files (leb2-base/medium/ext)  Independently reviewed modular assets\n"
     "  ASSIST data                        N-body integration files (~714 MB)\n\n"
+    "Historical leb-* commands install the pinned core in the current format.\n\n"
     "Most users need only: libephemeris download medium",
 )
 def download_group() -> None:
@@ -183,15 +178,20 @@ for _tier in TIER_INFO:
 
 
 def _make_leb_download(tier: str) -> click.Command:
-    """Create a LEB download command for a tier."""
+    """Create the compatibility command that installs a tier's LEB core."""
 
     @click.command(
         f"leb-{tier}",
-        short_help=f"Download LEB1 binary ephemeris for '{tier}' tier (~14x speedup).",
-        help=f"Download LEB binary ephemeris for '{tier}' tier.\n\n"
-        + leb_download_help(tier),
+        short_help=f"Install the pinned core LEB asset for '{tier}'.",
+        help=leb_download_help(tier),
     )
-    @_download_options
+    @click.option(
+        "--force", "-f", is_flag=True, help="Reinstall even if already present."
+    )
+    @click.option(
+        "--no-progress", is_flag=True, help="Disable download progress display."
+    )
+    @click.option("--quiet", "-q", is_flag=True, help="Suppress progress output.")
     def cmd(force: bool, no_progress: bool, quiet: bool) -> None:
         from ..download import download_leb_for_tier
 
@@ -213,20 +213,20 @@ for _tier in TIER_INFO:
 
 # --- LEB2 downloads ---
 
-_LEB2_SIZES = {"base": "~33 MB", "medium": "~119 MB", "extended": "~897 MB"}
-
 
 def _make_leb2_download(tier: str) -> click.Command:
     """Create a LEB2 download command for a tier."""
 
     @click.command(
         f"leb2-{tier}",
-        short_help=f"Download LEB2 compressed ephemeris for '{tier}' tier ({_LEB2_SIZES.get(tier, '')}).",
-        help=f"Download LEB2 compressed modular ephemeris for '{tier}' tier.\n\n"
+        short_help=f"Install reviewed LEB2 assets for the '{tier}' tier.",
+        help=f"Install reviewed LEB2 assets for the '{tier}' tier.\n\n"
         f"LEB2 uses error-bounded lossy compression (mantissa truncation + zstd)\n"
-        f'to achieve 4-10x smaller files while maintaining <0.001" precision vs LEB1.\n\n'
-        f"Downloads 4 group files: core, asteroids, apogee, uranians.\n"
-        f"Total size: {_LEB2_SIZES.get(tier, 'varies')}.\n\n"
+        f"to achieve 4-10x smaller files.\n\n"
+        f"Only SHA-256-pinned entries in the current manifest are used.\n"
+        f"The reviewed base core is copied from the wheel; pinned medium and\n"
+        f"extended cores are fetched from the data release. Other precomputed\n"
+        f"companions are skipped pending artifact-specific review.\n\n"
         f"Files are saved to ~/.libephemeris/leb/ by default.",
     )
     @_download_options
@@ -399,10 +399,33 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
 
 # --- download all: download everything for all tiers/modes ---
 
+_DOWNLOAD_ALL_HELP = f"""Download every data file for complete offline readiness.
+
+Downloads LEB2 files, DE kernels, planet centers, SPK kernels, and IERS
+Earth orientation data for ALL three tiers (base, medium, extended).
+
+\b
+WARNING: This will download approximately 5-6 GB of data.
+
+\b
+Files downloaded:
+  - LEB2 ephemeris for base, medium, extended  (~1050 MB)
+  - DE kernels: de440s, de440, de441            (~3.2 GB)
+  - Planet centers for all tiers                (~320 MB)
+  - SPK kernels for {SPK_BODY_COUNT} minor bodies             (~varies)
+  - IERS data: finals, leap seconds, delta T    (~3 MB)
+
+\b
+Examples:
+  libephemeris download all            Download everything
+  libephemeris download all --force    Re-download everything
+"""
+
 
 @download_group.command(
     "all",
     short_help="Download ALL data files for every tier and mode (~5 GB + IERS).",
+    help=_DOWNLOAD_ALL_HELP,
 )
 @_download_options
 @click.option(
@@ -412,29 +435,7 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
     help="Skip the ~5 GB download confirmation prompt",
 )
 def download_all(force: bool, no_progress: bool, quiet: bool, yes: bool) -> None:
-    """Download every data file for complete offline readiness.
-
-    Downloads LEB2 files, DE kernels, planet centers, SPK kernels, and IERS
-    Earth orientation data for ALL three tiers (base, medium, extended).
-    This lets you switch between any configuration without needing to
-    download anything later.
-
-    \b
-    WARNING: This will download approximately 5-6 GB of data.
-
-    \b
-    Files downloaded:
-      - LEB2 ephemeris for base, medium, extended  (~1050 MB)
-      - DE kernels: de440s, de440, de441            (~3.2 GB)
-      - Planet centers for all tiers                (~320 MB)
-      - SPK kernels for 21 minor bodies             (~varies)
-      - IERS data: finals, leap seconds, delta T    (~3 MB)
-
-    \b
-    Examples:
-      libephemeris download all            Download everything
-      libephemeris download all --force    Re-download everything
-    """
+    """Download every data file for complete offline readiness."""
     from .init_wizard import _d, _g, _w, _y
 
     tiers = ["base", "medium", "extended"]
@@ -667,19 +668,20 @@ def config() -> None:
     click.echo("  Python:   set_leb_file('path/to/ephemeris_medium.leb')")
     click.echo(f"  Location: {data_dir}/leb/")
     click.echo()
-    click.echo("  LEB1 files (full precision, larger):")
-    click.echo("    ephemeris_base.leb     ~53 MB    1849-2150")
-    click.echo("    ephemeris_medium.leb   ~175 MB   1549-2650")
-    click.echo("    ephemeris_extended.leb ~1.6 GB   -5000 to +5000")
+    click.echo("  Core distribution:")
+    click.echo("    All tiers have an exact SHA-256-pinned core asset.")
+    click.echo("    Existing LEB1 files remain loadable by explicit path.")
     click.echo()
-    click.echo("  LEB2 files (compressed, modular, 4 groups per tier):")
+    click.echo("  Canonical LEB2 group names (not all are published):")
     click.echo("    {tier}_core.leb2       core 14 bodies")
     click.echo("    {tier}_asteroids.leb2  Chiron, Ceres, Pallas, Juno, Vesta")
+    click.echo(
+        "    {tier}_exotics.leb2    31 registry bodies; extended has 23 (no NEAs)"
+    )
     click.echo("    {tier}_apogee.leb2     OscuApog, IntpApog, IntpPerig")
-    click.echo("    {tier}_uranians.leb2   Cupido-Transpluto (9 bodies)")
     click.echo()
-    click.echo("  Download:  libephemeris download leb-medium")
-    click.echo("             libephemeris download leb2-base")
+    click.echo("  Install a core: libephemeris download leb-medium")
+    click.echo("  Install reviewed groups: libephemeris download leb2-medium")
     click.echo()
 
     # --- SPK cache ---
@@ -720,6 +722,36 @@ def config() -> None:
         f"{_cur}"
     )
     click.echo("  Files:    finals2000A.data, Leap_Second.dat, deltat.data")
+    click.echo()
+
+    # --- Delta T model ---
+    try:
+        from ..state import get_delta_t_model
+
+        deltat_model = get_delta_t_model()
+    except Exception:
+        deltat_model = "smh2016"
+    click.echo(_b("Delta T model"))
+    click.echo(f"  Current:  {deltat_model}")
+    click.echo(
+        f"  Env var:  {_e('LIBEPHEMERIS_DELTAT_MODEL')}  (smh2016 | espenak_meeus)"
+    )
+    click.echo("  Python:   set_delta_t_model('smh2016')")
+    click.echo('  TOML:     deltat_model = "smh2016"')
+    click.echo()
+
+    # --- LEB mmap preloading ---
+    from .._config_toml import get_bool, get_int
+
+    mmap_preload = get_bool("mmap_preload")
+    mmap_start = get_int("mmap_preload_start")
+    mmap_end = get_int("mmap_preload_end")
+    click.echo(_b("LEB mmap preloading"))
+    click.echo(f"  Current:  {mmap_preload if mmap_preload is not None else False}")
+    click.echo("  TOML:     mmap_preload = false")
+    click.echo(f"            mmap_preload_start = {mmap_start or 1800}")
+    click.echo(f"            mmap_preload_end = {mmap_end or 2200}")
+    click.echo("  Preloads only the configured year range when a reader opens.")
     click.echo()
 
     # --- ASSIST ---

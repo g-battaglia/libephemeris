@@ -240,7 +240,9 @@ class TestSweApiConvention:
         dallas_lat, dallas_lon = 32.7767, -96.797
 
         # Legacy function: lat, lon order
-        result_legacy = _sol_eclipse_magnitude_at_loc_pythonic(jd, dallas_lat, dallas_lon)
+        result_legacy = _sol_eclipse_magnitude_at_loc_pythonic(
+            jd, dallas_lat, dallas_lon
+        )
 
         # swe version: geopos = [lon, lat, alt]
         result_swe = sol_eclipse_magnitude_at_loc(
@@ -259,8 +261,12 @@ class TestEdgeCases:
         jd = 2460409.28
         lat, lon = 32.7767, -96.797
 
-        magnitude_sea_level = _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon, altitude=0)
-        magnitude_high_alt = _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon, altitude=5000)
+        magnitude_sea_level = _sol_eclipse_magnitude_at_loc_pythonic(
+            jd, lat, lon, altitude=0
+        )
+        magnitude_high_alt = _sol_eclipse_magnitude_at_loc_pythonic(
+            jd, lat, lon, altitude=5000
+        )
 
         # Both should detect eclipse, small difference possible
         assert magnitude_sea_level > 0
@@ -315,7 +321,8 @@ class TestMagnitudeProgression:
         times_before_max = [2460409.24, 2460409.26, 2460409.27]
 
         magnitudes = [
-            _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon) for jd in times_before_max
+            _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon)
+            for jd in times_before_max
         ]
 
         # Magnitudes should generally increase
@@ -334,7 +341,8 @@ class TestMagnitudeProgression:
         times_after_max = [2460409.29, 2460409.30, 2460409.31]
 
         magnitudes = [
-            _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon) for jd in times_after_max
+            _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon)
+            for jd in times_after_max
         ]
 
         # Magnitudes should generally decrease

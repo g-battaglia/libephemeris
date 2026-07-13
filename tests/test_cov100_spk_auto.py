@@ -158,7 +158,9 @@ class TestDownloadSpkAstroquery:
 
         with patch("libephemeris.spk.download_spk", side_effect=fake_download):
             result = spk_auto._download_spk_astroquery(
-                body_id="2060", start="2020-01-01", end="2030-01-01",
+                body_id="2060",
+                start="2020-01-01",
+                end="2030-01-01",
                 output_path="out.bsp",
             )
         assert result == "out.bsp"
@@ -174,7 +176,9 @@ class TestDownloadSpkAstroquery:
 
         with patch("libephemeris.spk.download_spk", side_effect=fake_download):
             result = spk_auto._download_spk_astroquery(
-                body_id="2060", start="2020-01-01", end="2030-01-01",
+                body_id="2060",
+                start="2020-01-01",
+                end="2030-01-01",
                 output_path=out,
             )
         assert result == out
@@ -188,7 +192,9 @@ class TestDownloadSpkAstroquery:
         ):
             with pytest.raises(ValueError, match="Failed to download SPK"):
                 spk_auto._download_spk_astroquery(
-                    body_id="2060", start="2020-01-01", end="2030-01-01",
+                    body_id="2060",
+                    start="2020-01-01",
+                    end="2030-01-01",
                     output_path=out,
                 )
 
@@ -237,9 +243,7 @@ class TestEnableDisable:
 
     def test_enable_resolves_cache_dir_from_state(self):
         """cache_dir None pulls from state (branch 433->436)."""
-        with patch(
-            "libephemeris.state.get_spk_cache_dir", return_value="/some/dir"
-        ):
+        with patch("libephemeris.state.get_spk_cache_dir", return_value="/some/dir"):
             spk_auto.enable_auto_spk(ipl=CHIRON, body_id="2060")
         cfg = spk_auto.get_auto_spk_config(CHIRON)
         assert cfg is not None
@@ -274,11 +278,15 @@ class TestEnsureSpkDownloaded:
     def test_download_now_triggers_download(self, tmp_path):
         """download_now reaches _ensure_spk_downloaded (line 527)."""
         config = spk_auto.AutoSpkConfig(
-            ipl=CHIRON, body_id="2060", naif_id=NAIF_CHIRON,
+            ipl=CHIRON,
+            body_id="2060",
+            naif_id=NAIF_CHIRON,
             cache_dir=str(tmp_path),
         )
         spk_auto.enable_auto_spk(
-            ipl=CHIRON, body_id="2060", naif_id=NAIF_CHIRON,
+            ipl=CHIRON,
+            body_id="2060",
+            naif_id=NAIF_CHIRON,
             cache_dir=str(tmp_path),
         )
 
@@ -286,10 +294,13 @@ class TestEnsureSpkDownloaded:
             with open(kwargs["output_path"], "wb") as f:
                 f.write(b"x")
 
-        with patch.object(
-            spk_auto, "_download_spk_astroquery", side_effect=fake_download
-        ), patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]), \
-                patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch.object(
+                spk_auto, "_download_spk_astroquery", side_effect=fake_download
+            ),
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             result = spk_auto.download_now(CHIRON)
         assert result == config.get_cache_path() or result.endswith(".bsp")
         mock_reg.assert_called_once()
@@ -297,18 +308,21 @@ class TestEnsureSpkDownloaded:
     def test_cached_valid_file_used(self, tmp_path):
         """Cached + valid file is reused without download (lines 549-551)."""
         config = spk_auto.AutoSpkConfig(
-            ipl=CHIRON, body_id="2060", naif_id=NAIF_CHIRON,
+            ipl=CHIRON,
+            body_id="2060",
+            naif_id=NAIF_CHIRON,
             cache_dir=str(tmp_path),
         )
         cache_path = config.get_cache_path()
         with open(cache_path, "wb") as f:
             f.write(b"x")
 
-        with patch.object(spk_auto, "_is_valid_bsp", return_value=True), \
-                patch.object(spk_auto, "_download_spk_astroquery") as mock_dl, \
-                patch(
-                    "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-                ), patch("libephemeris.spk.register_spk_body"):
+        with (
+            patch.object(spk_auto, "_is_valid_bsp", return_value=True),
+            patch.object(spk_auto, "_download_spk_astroquery") as mock_dl,
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch("libephemeris.spk.register_spk_body"),
+        ):
             result = spk_auto._ensure_spk_downloaded(config)
         assert result == cache_path
         assert config.spk_path == cache_path
@@ -317,7 +331,9 @@ class TestEnsureSpkDownloaded:
     def test_corrupted_cache_redownload(self, tmp_path):
         """Corrupted cached file is removed + re-downloaded (lines 552-560)."""
         config = spk_auto.AutoSpkConfig(
-            ipl=CHIRON, body_id="2060", naif_id=NAIF_CHIRON,
+            ipl=CHIRON,
+            body_id="2060",
+            naif_id=NAIF_CHIRON,
             cache_dir=str(tmp_path),
         )
         cache_path = config.get_cache_path()
@@ -328,13 +344,14 @@ class TestEnsureSpkDownloaded:
             with open(kwargs["output_path"], "wb") as f:
                 f.write(b"fresh")
 
-        with patch.object(spk_auto, "_is_valid_bsp", return_value=False), \
-                patch.object(
-                    spk_auto, "_download_spk_astroquery", side_effect=fake_download
-                ) as mock_dl, \
-                patch(
-                    "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-                ), patch("libephemeris.spk.register_spk_body"):
+        with (
+            patch.object(spk_auto, "_is_valid_bsp", return_value=False),
+            patch.object(
+                spk_auto, "_download_spk_astroquery", side_effect=fake_download
+            ) as mock_dl,
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch("libephemeris.spk.register_spk_body"),
+        ):
             result = spk_auto._ensure_spk_downloaded(config)
         assert result == cache_path
         mock_dl.assert_called_once()
@@ -342,7 +359,9 @@ class TestEnsureSpkDownloaded:
     def test_corrupted_cache_remove_oserror(self, tmp_path):
         """os.remove failure on corrupted cache is swallowed (lines 558-559)."""
         config = spk_auto.AutoSpkConfig(
-            ipl=CHIRON, body_id="2060", naif_id=NAIF_CHIRON,
+            ipl=CHIRON,
+            body_id="2060",
+            naif_id=NAIF_CHIRON,
             cache_dir=str(tmp_path),
         )
         cache_path = config.get_cache_path()
@@ -353,21 +372,24 @@ class TestEnsureSpkDownloaded:
             with open(kwargs["output_path"], "wb") as f:
                 f.write(b"fresh")
 
-        with patch.object(spk_auto, "_is_valid_bsp", return_value=False), \
-                patch("os.remove", side_effect=OSError("locked")), \
-                patch.object(
-                    spk_auto, "_download_spk_astroquery", side_effect=fake_download
-                ), \
-                patch(
-                    "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-                ), patch("libephemeris.spk.register_spk_body"):
+        with (
+            patch.object(spk_auto, "_is_valid_bsp", return_value=False),
+            patch("os.remove", side_effect=OSError("locked")),
+            patch.object(
+                spk_auto, "_download_spk_astroquery", side_effect=fake_download
+            ),
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch("libephemeris.spk.register_spk_body"),
+        ):
             result = spk_auto._ensure_spk_downloaded(config)
         assert result == cache_path
 
     def test_naif_id_detected_from_file(self, tmp_path):
         """Detected NAIF overrides config (lines 578-581)."""
         config = spk_auto.AutoSpkConfig(
-            ipl=CHIRON, body_id="2060", naif_id=None,
+            ipl=CHIRON,
+            body_id="2060",
+            naif_id=None,
             cache_dir=str(tmp_path),
         )
 
@@ -375,11 +397,13 @@ class TestEnsureSpkDownloaded:
             with open(kwargs["output_path"], "wb") as f:
                 f.write(b"x")
 
-        with patch.object(
-            spk_auto, "_download_spk_astroquery", side_effect=fake_download
-        ), patch(
-            "libephemeris.spk._get_spk_targets", return_value=[20002060]
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch.object(
+                spk_auto, "_download_spk_astroquery", side_effect=fake_download
+            ),
+            patch("libephemeris.spk._get_spk_targets", return_value=[20002060]),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             spk_auto._ensure_spk_downloaded(config)
         assert config.naif_id == 20002060
         mock_reg.assert_called_once()
@@ -387,7 +411,9 @@ class TestEnsureSpkDownloaded:
     def test_naif_id_deduced(self, tmp_path):
         """NAIF deduced from body_id when none detected (lines 582-583)."""
         config = spk_auto.AutoSpkConfig(
-            ipl=CHIRON, body_id="2060", naif_id=None,
+            ipl=CHIRON,
+            body_id="2060",
+            naif_id=None,
             cache_dir=str(tmp_path),
         )
 
@@ -395,11 +421,13 @@ class TestEnsureSpkDownloaded:
             with open(kwargs["output_path"], "wb") as f:
                 f.write(b"x")
 
-        with patch.object(
-            spk_auto, "_download_spk_astroquery", side_effect=fake_download
-        ), patch.object(
-            spk_auto, "_detect_naif_id_from_file", return_value=None
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch.object(
+                spk_auto, "_download_spk_astroquery", side_effect=fake_download
+            ),
+            patch.object(spk_auto, "_detect_naif_id_from_file", return_value=None),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             spk_auto._ensure_spk_downloaded(config)
         assert config.naif_id == NAIF_CHIRON
         mock_reg.assert_called_once()
@@ -407,7 +435,9 @@ class TestEnsureSpkDownloaded:
     def test_naif_id_cannot_deduce_raises(self, tmp_path):
         """Undeducible NAIF raises ValueError (lines 584-588)."""
         config = spk_auto.AutoSpkConfig(
-            ipl=CHIRON, body_id="NoNumber", naif_id=None,
+            ipl=CHIRON,
+            body_id="NoNumber",
+            naif_id=None,
             cache_dir=str(tmp_path),
         )
 
@@ -415,10 +445,11 @@ class TestEnsureSpkDownloaded:
             with open(kwargs["output_path"], "wb") as f:
                 f.write(b"x")
 
-        with patch.object(
-            spk_auto, "_download_spk_astroquery", side_effect=fake_download
-        ), patch.object(
-            spk_auto, "_detect_naif_id_from_file", return_value=None
+        with (
+            patch.object(
+                spk_auto, "_download_spk_astroquery", side_effect=fake_download
+            ),
+            patch.object(spk_auto, "_detect_naif_id_from_file", return_value=None),
         ):
             with pytest.raises(ValueError, match="Cannot deduce NAIF ID"):
                 spk_auto._ensure_spk_downloaded(config)
@@ -426,7 +457,9 @@ class TestEnsureSpkDownloaded:
     def test_inlock_recheck_finds_file(self, tmp_path):
         """File appearing between checks skips download (branch 566->573)."""
         config = spk_auto.AutoSpkConfig(
-            ipl=CHIRON, body_id="2060", naif_id=NAIF_CHIRON,
+            ipl=CHIRON,
+            body_id="2060",
+            naif_id=NAIF_CHIRON,
             cache_dir=str(tmp_path),
         )
         cache_path = config.get_cache_path()
@@ -442,11 +475,12 @@ class TestEnsureSpkDownloaded:
                 return state["count"] > 2
             return real_exists(p)
 
-        with patch("os.path.exists", side_effect=exists_side), \
-                patch.object(spk_auto, "_download_spk_astroquery") as mock_dl, \
-                patch(
-                    "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-                ), patch("libephemeris.spk.register_spk_body"):
+        with (
+            patch("os.path.exists", side_effect=exists_side),
+            patch.object(spk_auto, "_download_spk_astroquery") as mock_dl,
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch("libephemeris.spk.register_spk_body"),
+        ):
             result = spk_auto._ensure_spk_downloaded(config, force=False)
         assert result == cache_path
         mock_dl.assert_not_called()
@@ -458,7 +492,9 @@ class TestEnsureSpkDownloaded:
         from libephemeris import state
 
         config = spk_auto.AutoSpkConfig(
-            ipl=CHIRON, body_id="2060", naif_id=NAIF_CHIRON,
+            ipl=CHIRON,
+            body_id="2060",
+            naif_id=NAIF_CHIRON,
             cache_dir=str(tmp_path),
         )
         resolved = config.get_cache_path()
@@ -470,21 +506,25 @@ class TestEnsureSpkDownloaded:
         try:
             # (a) Same path already registered -> register is skipped.
             state._SPK_BODY_MAP[CHIRON] = (resolved, NAIF_CHIRON)
-            with patch.object(
-                spk_auto, "_download_spk_astroquery", side_effect=fake_download
-            ), patch(
-                "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-            ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+            with (
+                patch.object(
+                    spk_auto, "_download_spk_astroquery", side_effect=fake_download
+                ),
+                patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+                patch("libephemeris.spk.register_spk_body") as mock_reg,
+            ):
                 spk_auto._ensure_spk_downloaded(config)
             mock_reg.assert_not_called()
 
             # (b) A different (stale) path registered -> re-register.
             state._SPK_BODY_MAP[CHIRON] = ("stale_old.bsp", NAIF_CHIRON)
-            with patch.object(
-                spk_auto, "_download_spk_astroquery", side_effect=fake_download
-            ), patch(
-                "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-            ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+            with (
+                patch.object(
+                    spk_auto, "_download_spk_astroquery", side_effect=fake_download
+                ),
+                patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+                patch("libephemeris.spk.register_spk_body") as mock_reg,
+            ):
                 spk_auto._ensure_spk_downloaded(config)
             mock_reg.assert_called_once()
         finally:
@@ -508,19 +548,19 @@ class TestTryAutoDownload:
     def test_success(self):
         """Returns ensure result on success (lines 617-618)."""
         cfg = spk_auto.AutoSpkConfig(ipl=CHIRON, body_id="2060")
-        with patch.object(spk_auto, "get_auto_spk_config", return_value=cfg), \
-                patch.object(
-                    spk_auto, "_ensure_spk_downloaded", return_value="/p.bsp"
-                ):
+        with (
+            patch.object(spk_auto, "get_auto_spk_config", return_value=cfg),
+            patch.object(spk_auto, "_ensure_spk_downloaded", return_value="/p.bsp"),
+        ):
             assert spk_auto.try_auto_download(CHIRON) == "/p.bsp"
 
     def test_failure_returns_none(self):
         """Exception in ensure is swallowed -> None (lines 619-622)."""
         cfg = spk_auto.AutoSpkConfig(ipl=CHIRON, body_id="2060")
-        with patch.object(spk_auto, "get_auto_spk_config", return_value=cfg), \
-                patch.object(
-                    spk_auto, "_ensure_spk_downloaded", side_effect=Error("x")
-                ):
+        with (
+            patch.object(spk_auto, "get_auto_spk_config", return_value=cfg),
+            patch.object(spk_auto, "_ensure_spk_downloaded", side_effect=Error("x")),
+        ):
             assert spk_auto.try_auto_download(CHIRON) is None
 
     def test_disabled_returns_none(self):
@@ -847,10 +887,12 @@ class TestAutoGetSpk:
             with open(kwargs["output_path"], "wb") as f:
                 f.write(b"x")
 
-        with patch("libephemeris.state.get_spk_date_padding", return_value=10), \
-                patch.object(
-                    spk_auto, "_download_spk_astroquery", side_effect=fake_download
-                ):
+        with (
+            patch("libephemeris.state.get_spk_date_padding", return_value=10),
+            patch.object(
+                spk_auto, "_download_spk_astroquery", side_effect=fake_download
+            ),
+        ):
             spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(tmp_path))
         # With padding the start date moves earlier than 2020-01-01.
         assert captured["start"] < "2020-01-01"
@@ -861,13 +903,14 @@ class TestAutoGetSpk:
         f.write_bytes(b"x")
         # _find_covering_spk reads real segment metadata via get_spk_coverage;
         # the dummy file has none, so patch it to report a covering span.
-        with patch(
-            "libephemeris.spk.get_spk_coverage",
-            return_value=(2450000.0, 2470000.0),
-        ), patch.object(spk_auto, "_is_valid_bsp", return_value=True), \
-                patch.object(
-                    spk_auto, "_register_spk_after_download"
-                ) as mock_reg:
+        with (
+            patch(
+                "libephemeris.spk.get_spk_coverage",
+                return_value=(2450000.0, 2470000.0),
+            ),
+            patch.object(spk_auto, "_is_valid_bsp", return_value=True),
+            patch.object(spk_auto, "_register_spk_after_download") as mock_reg,
+        ):
             result = spk_auto.auto_get_spk(
                 "2060", 2458849.5, 2462502.5, str(tmp_path), ipl=CHIRON
             )
@@ -879,13 +922,12 @@ class TestAutoGetSpk:
         # Make _find_covering_spk miss but the exact output_path exist & valid.
         out = tmp_path / "2060_2458849_2462502.bsp"
         out.write_bytes(b"x")
-        with patch.object(
-            spk_auto, "_find_covering_spk", return_value=None
-        ), patch.object(spk_auto, "_is_valid_bsp", return_value=True), \
-                patch.object(
-                    spk_auto, "_register_spk_after_download"
-                ) as mock_reg, \
-                patch.object(spk_auto, "_download_spk_astroquery") as mock_dl:
+        with (
+            patch.object(spk_auto, "_find_covering_spk", return_value=None),
+            patch.object(spk_auto, "_is_valid_bsp", return_value=True),
+            patch.object(spk_auto, "_register_spk_after_download") as mock_reg,
+            patch.object(spk_auto, "_download_spk_astroquery") as mock_dl,
+        ):
             result = spk_auto.auto_get_spk(
                 "2060", 2458849.5, 2462502.5, str(tmp_path), ipl=CHIRON
             )
@@ -897,16 +939,13 @@ class TestAutoGetSpk:
         """Output exists+valid in lock, ipl None -> no register (branch 1437->1439)."""
         out = tmp_path / "2060_2458849_2462502.bsp"
         out.write_bytes(b"x")
-        with patch.object(
-            spk_auto, "_find_covering_spk", return_value=None
-        ), patch.object(spk_auto, "_is_valid_bsp", return_value=True), \
-                patch.object(
-                    spk_auto, "_register_spk_after_download"
-                ) as mock_reg, \
-                patch.object(spk_auto, "_download_spk_astroquery") as mock_dl:
-            result = spk_auto.auto_get_spk(
-                "2060", 2458849.5, 2462502.5, str(tmp_path)
-            )
+        with (
+            patch.object(spk_auto, "_find_covering_spk", return_value=None),
+            patch.object(spk_auto, "_is_valid_bsp", return_value=True),
+            patch.object(spk_auto, "_register_spk_after_download") as mock_reg,
+            patch.object(spk_auto, "_download_spk_astroquery") as mock_dl,
+        ):
+            result = spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(tmp_path))
         assert result == str(out)
         mock_dl.assert_not_called()
         mock_reg.assert_not_called()
@@ -923,18 +962,13 @@ class TestAutoGetSpk:
             covering.write_bytes(b"x")
             return str(covering)
 
-        with patch.object(
-            spk_auto, "_find_covering_spk", side_effect=find_side_effect
-        ), patch.object(
-            spk_auto, "_is_valid_bsp", return_value=False
-        ), patch.object(
-            spk_auto, "_register_spk_after_download"
-        ) as mock_reg, patch.object(
-            spk_auto, "_download_spk_astroquery"
-        ) as mock_dl:
-            result = spk_auto.auto_get_spk(
-                "2060", 2458849.5, 2462502.5, str(tmp_path)
-            )
+        with (
+            patch.object(spk_auto, "_find_covering_spk", side_effect=find_side_effect),
+            patch.object(spk_auto, "_is_valid_bsp", return_value=False),
+            patch.object(spk_auto, "_register_spk_after_download") as mock_reg,
+            patch.object(spk_auto, "_download_spk_astroquery") as mock_dl,
+        ):
+            result = spk_auto.auto_get_spk("2060", 2458849.5, 2462502.5, str(tmp_path))
         assert result == str(covering)
         mock_dl.assert_not_called()
         mock_reg.assert_not_called()
@@ -953,15 +987,12 @@ class TestAutoGetSpk:
             covering.write_bytes(b"x")
             return str(covering)
 
-        with patch.object(
-            spk_auto, "_find_covering_spk", side_effect=find_side_effect
-        ), patch.object(
-            spk_auto, "_is_valid_bsp", return_value=False
-        ), patch.object(
-            spk_auto, "_register_spk_after_download"
-        ) as mock_reg, patch.object(
-            spk_auto, "_download_spk_astroquery"
-        ) as mock_dl:
+        with (
+            patch.object(spk_auto, "_find_covering_spk", side_effect=find_side_effect),
+            patch.object(spk_auto, "_is_valid_bsp", return_value=False),
+            patch.object(spk_auto, "_register_spk_after_download") as mock_reg,
+            patch.object(spk_auto, "_download_spk_astroquery") as mock_dl,
+        ):
             result = spk_auto.auto_get_spk(
                 "2060", 2458849.5, 2462502.5, str(tmp_path), ipl=CHIRON
             )
@@ -995,9 +1026,10 @@ class TestRegisterSpkAfterDownload:
         """Detected NAIF overrides None and register is called (1491, 1504)."""
         f = tmp_path / "x.bsp"
         f.write_bytes(b"x")
-        with patch.object(
-            spk_auto, "_detect_naif_id_from_file", return_value=20002060
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch.object(spk_auto, "_detect_naif_id_from_file", return_value=20002060),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             spk_auto._register_spk_after_download(str(f), "2060", CHIRON, None)
         mock_reg.assert_called_once()
         assert mock_reg.call_args[0][2] == 20002060
@@ -1006,9 +1038,10 @@ class TestRegisterSpkAfterDownload:
         """naif_id None, detected None, deduced succeeds (branch 1496->1504)."""
         f = tmp_path / "x.bsp"
         f.write_bytes(b"x")
-        with patch.object(
-            spk_auto, "_detect_naif_id_from_file", return_value=None
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch.object(spk_auto, "_detect_naif_id_from_file", return_value=None),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             spk_auto._register_spk_after_download(str(f), "2060", CHIRON, None)
         mock_reg.assert_called_once()
         assert mock_reg.call_args[0][2] == NAIF_CHIRON
@@ -1090,9 +1123,7 @@ class TestDownloadSpkFromHorizons:
     def test_value_error_wrapped(self, tmp_path):
         """ValueError from download is re-wrapped (lines 1622-1626)."""
         out = tmp_path / "v.bsp"
-        with patch(
-            "libephemeris.spk.download_spk", side_effect=ValueError("bad body")
-        ):
+        with patch("libephemeris.spk.download_spk", side_effect=ValueError("bad body")):
             with pytest.raises(ValueError, match="Failed to download SPK"):
                 spk_auto.download_spk_from_horizons(
                     "2060", 2458849.5, 2462502.5, str(out)
@@ -1113,9 +1144,7 @@ class TestDownloadSpkFromHorizons:
     def test_generic_error_wrapped(self, tmp_path):
         """OSError/KeyError fall into the generic arm (lines 1631-1632)."""
         out = tmp_path / "g.bsp"
-        with patch(
-            "libephemeris.spk.download_spk", side_effect=OSError("disk")
-        ):
+        with patch("libephemeris.spk.download_spk", side_effect=OSError("disk")):
             with pytest.raises(ValueError, match="Failed to download SPK"):
                 spk_auto.download_spk_from_horizons(
                     "2060", 2458849.5, 2462502.5, str(out)
@@ -1156,9 +1185,10 @@ class TestDiscoverLocalSpks:
     def test_register_new_body(self, tmp_path):
         """A matching NAIF target is registered (lines 1755-1763)."""
         (tmp_path / "chiron.bsp").write_bytes(b"x")
-        with patch(
-            "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             result = spk_auto.discover_local_spks(str(tmp_path))
         assert mock_reg.called
         assert "registered" in result.values()
@@ -1183,20 +1213,19 @@ class TestDiscoverLocalSpks:
     def test_unknown_target_skipped(self, tmp_path):
         """A NAIF not in the reverse map is skipped (branch 1722)."""
         (tmp_path / "x.bsp").write_bytes(b"x")
-        with patch(
-            "libephemeris.spk._get_spk_targets", return_value=[999999999]
-        ):
+        with patch("libephemeris.spk._get_spk_targets", return_value=[999999999]):
             result = spk_auto.discover_local_spks(str(tmp_path))
         assert result == {}
 
     def test_register_error_recorded(self, tmp_path):
         """register_spk_body failure is recorded as error (lines 1764-1771)."""
         (tmp_path / "chiron.bsp").write_bytes(b"x")
-        with patch(
-            "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-        ), patch(
-            "libephemeris.spk.register_spk_body",
-            side_effect=ValueError("reg fail"),
+        with (
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch(
+                "libephemeris.spk.register_spk_body",
+                side_effect=ValueError("reg fail"),
+            ),
         ):
             result = spk_auto.discover_local_spks(str(tmp_path))
         assert any(str(v).startswith("error:") for v in result.values())
@@ -1213,11 +1242,11 @@ class TestDiscoverLocalSpks:
                 return (2451545.0, 2451645.0)  # narrow span
             return (2451545.0, 2461545.0)  # wide span
 
-        with patch(
-            "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-        ), patch(
-            "libephemeris.spk.get_spk_coverage", side_effect=coverage_side
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch("libephemeris.spk.get_spk_coverage", side_effect=coverage_side),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             result = spk_auto.discover_local_spks(str(tmp_path))
         mock_reg.assert_called()
         assert result.get(_body_name()) == "registered"
@@ -1229,12 +1258,14 @@ class TestDiscoverLocalSpks:
         (tmp_path / "chiron.bsp").write_bytes(b"x")
         state._SPK_BODY_MAP[CHIRON] = ("existing.bsp", NAIF_CHIRON)
 
-        with patch(
-            "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-        ), patch(
-            "libephemeris.spk.get_spk_coverage",
-            return_value=(2451545.0, 2461545.0),
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch(
+                "libephemeris.spk.get_spk_coverage",
+                return_value=(2451545.0, 2461545.0),
+            ),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             result = spk_auto.discover_local_spks(str(tmp_path))
         mock_reg.assert_not_called()
         assert result.get(_body_name()) == "already_registered"
@@ -1246,11 +1277,11 @@ class TestDiscoverLocalSpks:
         (tmp_path / "chiron.bsp").write_bytes(b"x")
         state._SPK_BODY_MAP[CHIRON] = ("existing.bsp", NAIF_CHIRON)
 
-        with patch(
-            "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-        ), patch(
-            "libephemeris.spk.get_spk_coverage", return_value=None
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch("libephemeris.spk.get_spk_coverage", return_value=None),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             result = spk_auto.discover_local_spks(str(tmp_path))
         mock_reg.assert_not_called()
         assert result.get(_body_name()) == "already_registered"
@@ -1264,12 +1295,14 @@ class TestDiscoverLocalSpks:
         (tmp_path / "b.bsp").write_bytes(b"x")
         state._SPK_BODY_MAP[CHIRON] = ("existing.bsp", NAIF_CHIRON)
 
-        with patch(
-            "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-        ), patch(
-            "libephemeris.spk.get_spk_coverage",
-            return_value=(2451545.0, 2461545.0),
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch(
+                "libephemeris.spk.get_spk_coverage",
+                return_value=(2451545.0, 2461545.0),
+            ),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             result = spk_auto.discover_local_spks(str(tmp_path))
         mock_reg.assert_not_called()
         assert result.get(_body_name()) == "already_registered"
@@ -1286,11 +1319,11 @@ class TestDiscoverLocalSpks:
             999: ("dupB", 2000060),  # same naif -> same horizons_naif (collision)
         }
         (tmp_path / "x.bsp").write_bytes(b"x")
-        with patch(
-            "libephemeris.constants.SPK_BODY_NAME_MAP", crafted
-        ), patch(
-            "libephemeris.spk._get_spk_targets", return_value=[999999999]
-        ), patch("libephemeris.spk._get_body_name", return_value=None):
+        with (
+            patch("libephemeris.constants.SPK_BODY_NAME_MAP", crafted),
+            patch("libephemeris.spk._get_spk_targets", return_value=[999999999]),
+            patch("libephemeris.spk._get_body_name", return_value=None),
+        ):
             result = spk_auto.discover_local_spks(str(tmp_path))
         assert result == {}
 
@@ -1301,12 +1334,14 @@ class TestDiscoverLocalSpks:
         (tmp_path / "chiron.bsp").write_bytes(b"x")
         state._SPK_BODY_MAP[CHIRON] = ("existing.bsp", NAIF_CHIRON)
 
-        with patch(
-            "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
-        ), patch(
-            "libephemeris.spk.get_spk_coverage",
-            side_effect=ValueError("bad"),
-        ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+        with (
+            patch("libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]),
+            patch(
+                "libephemeris.spk.get_spk_coverage",
+                side_effect=ValueError("bad"),
+            ),
+            patch("libephemeris.spk.register_spk_body") as mock_reg,
+        ):
             result = spk_auto.discover_local_spks(str(tmp_path))
         mock_reg.assert_not_called()
         assert result.get(_body_name()) == "already_registered"
@@ -1351,9 +1386,11 @@ class TestEnsureAllEphemerides:
         eph_dir.mkdir()
         (eph_dir / eph_file).write_bytes(b"x")
 
-        with patch.object(state, "_EPHEMERIS_PATH", str(eph_dir)), \
-                patch("libephemeris.spk.download_and_register_spk") as mock_dl, \
-                patch("sys.stdout") as mock_stdout:
+        with (
+            patch.object(state, "_EPHEMERIS_PATH", str(eph_dir)),
+            patch("libephemeris.spk.download_and_register_spk") as mock_dl,
+            patch("sys.stdout") as mock_stdout,
+        ):
             mock_stdout.isatty.return_value = False
             result = spk_auto.ensure_all_ephemerides(show_progress=True)
 
@@ -1368,11 +1405,13 @@ class TestEnsureAllEphemerides:
 
         loader = MagicMock()
 
-        with patch.object(state, "_EPHEMERIS_PATH", None), \
-                patch("os.path.exists", return_value=False), \
-                patch("libephemeris.state.get_loader", return_value=loader), \
-                patch("libephemeris.spk.download_and_register_spk"), \
-                patch("sys.stdout") as mock_stdout:
+        with (
+            patch.object(state, "_EPHEMERIS_PATH", None),
+            patch("os.path.exists", return_value=False),
+            patch("libephemeris.state.get_loader", return_value=loader),
+            patch("libephemeris.spk.download_and_register_spk"),
+            patch("sys.stdout") as mock_stdout,
+        ):
             mock_stdout.isatty.return_value = True
             result = spk_auto.ensure_all_ephemerides(force_download=True)
 
@@ -1387,11 +1426,13 @@ class TestEnsureAllEphemerides:
         def loader(_):
             raise OSError("download failed")
 
-        with patch.object(state, "_EPHEMERIS_PATH", None), \
-                patch("os.path.exists", return_value=False), \
-                patch("libephemeris.state.get_loader", return_value=lambda f: loader(f)), \
-                patch("libephemeris.spk.download_and_register_spk"), \
-                patch("sys.stdout") as mock_stdout:
+        with (
+            patch.object(state, "_EPHEMERIS_PATH", None),
+            patch("os.path.exists", return_value=False),
+            patch("libephemeris.state.get_loader", return_value=lambda f: loader(f)),
+            patch("libephemeris.spk.download_and_register_spk"),
+            patch("sys.stdout") as mock_stdout,
+        ):
             mock_stdout.isatty.return_value = False
             result = spk_auto.ensure_all_ephemerides()
 
@@ -1413,9 +1454,11 @@ class TestEnsureAllEphemerides:
         eph_dir.mkdir()
         (eph_dir / tier.ephemeris_file).write_bytes(b"x")
 
-        with patch.object(state, "_EPHEMERIS_PATH", str(eph_dir)), \
-                patch("libephemeris.spk.download_and_register_spk") as mock_dl, \
-                patch("sys.stdout") as mock_stdout:
+        with (
+            patch.object(state, "_EPHEMERIS_PATH", str(eph_dir)),
+            patch("libephemeris.spk.download_and_register_spk") as mock_dl,
+            patch("sys.stdout") as mock_stdout,
+        ):
             mock_stdout.isatty.return_value = False
             result = spk_auto.ensure_all_ephemerides()
 
@@ -1431,11 +1474,14 @@ class TestEnsureAllEphemerides:
         eph_dir.mkdir()
         (eph_dir / tier.ephemeris_file).write_bytes(b"x")
 
-        with patch.object(state, "_EPHEMERIS_PATH", str(eph_dir)), \
-                patch(
-                    "libephemeris.spk.download_and_register_spk",
-                    side_effect=ValueError("no spk"),
-                ), patch("sys.stdout") as mock_stdout:
+        with (
+            patch.object(state, "_EPHEMERIS_PATH", str(eph_dir)),
+            patch(
+                "libephemeris.spk.download_and_register_spk",
+                side_effect=ValueError("no spk"),
+            ),
+            patch("sys.stdout") as mock_stdout,
+        ):
             mock_stdout.isatty.return_value = False
             result = spk_auto.ensure_all_ephemerides()
 
@@ -1452,13 +1498,15 @@ class TestEnsureAllEphemerides:
         (eph_dir / tier.ephemeris_file).write_bytes(b"x")
 
         # Patch the map so only the blocked body is processed.
-        with patch.object(state, "_EPHEMERIS_PATH", str(eph_dir)), \
-                patch(
-                    "libephemeris.constants.SPK_BODY_NAME_MAP",
-                    {BENNU: ("101955", 2101955)},
-                ), patch(
-                    "libephemeris.spk.download_and_register_spk"
-                ) as mock_dl, patch("sys.stdout") as mock_stdout:
+        with (
+            patch.object(state, "_EPHEMERIS_PATH", str(eph_dir)),
+            patch(
+                "libephemeris.constants.SPK_BODY_NAME_MAP",
+                {BENNU: ("101955", 2101955)},
+            ),
+            patch("libephemeris.spk.download_and_register_spk") as mock_dl,
+            patch("sys.stdout") as mock_stdout,
+        ):
             mock_stdout.isatty.return_value = False
             result = spk_auto.ensure_all_ephemerides()
 

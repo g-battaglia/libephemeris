@@ -12,8 +12,8 @@ import libephemeris as ephem
 
 from .conftest import (
     TOLS,
-    FORMULA_SIDEREAL_MODES,
-    STAR_BASED_SIDEREAL_MODES,
+    ADDITIONAL_SIDEREAL_MODES,
+    SIDEREAL_MODE_SWEEP,
     CompareHelper,
     year_to_jd,
     generate_test_dates,
@@ -27,11 +27,11 @@ def ayanamsha_dates():
 
 
 class TestAyanamshaValues:
-    """Direct ayanamsha value comparison for formula-based modes."""
+    """Direct ayanamsha value comparison across the public mode sweep."""
 
     @pytest.mark.leb_compare
     @pytest.mark.slow
-    @pytest.mark.parametrize("sid_mode", FORMULA_SIDEREAL_MODES)
+    @pytest.mark.parametrize("sid_mode", SIDEREAL_MODE_SWEEP)
     def test_ayanamsha_value(
         self, compare: CompareHelper, ayanamsha_dates: list[float], sid_mode: int
     ):
@@ -67,7 +67,7 @@ class TestAyanamshaConsistency:
 
         The sidereal offset = (tropical_lon - sidereal_lon) mod 360.
         LEB and Skyfield must produce identical offsets since both use
-        the same formula-based ayanamsha.  We compare the offsets rather
+        the same selected ayanamsha definition. We compare the offsets rather
         than comparing against get_ayanamsa_ex_ut() because the
         nutation component in the ayanamsha is handled differently
         (known limitation: ~17" dpsi*cos(eps) architectural difference).
@@ -81,9 +81,7 @@ class TestAyanamshaConsistency:
 
             # LEB: tropical - sidereal offset
             trop_leb, _ = compare.leb(ephem.calc_ut, jd, SUN, FLG_SPEED)
-            sid_leb, _ = compare.leb(
-                ephem.calc_ut, jd, SUN, FLG_SPEED | FLG_SIDEREAL
-            )
+            sid_leb, _ = compare.leb(ephem.calc_ut, jd, SUN, FLG_SPEED | FLG_SIDEREAL)
             offset_leb = (trop_leb[0] - sid_leb[0]) % 360.0
 
             # Skyfield: tropical - sidereal offset
@@ -101,15 +99,15 @@ class TestAyanamshaConsistency:
         )
 
 
-class TestStarBasedAyanamshaFallback:
-    """Star-based modes should produce identical results."""
+class TestAdditionalAyanamshaModes:
+    """Additional modes should produce identical results across backends."""
 
     @pytest.mark.leb_compare
-    @pytest.mark.parametrize("sid_mode", STAR_BASED_SIDEREAL_MODES[:4])
-    def test_star_based_identical(
+    @pytest.mark.parametrize("sid_mode", ADDITIONAL_SIDEREAL_MODES[:4])
+    def test_additional_mode_identical(
         self, compare: CompareHelper, ayanamsha_dates: list[float], sid_mode: int
     ):
-        """Star-based ayanamsha produces identical results (both fallback)."""
+        """Catalog and compatibility ayanamshas share one implementation."""
         for jd in ayanamsha_dates[:5]:
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
@@ -117,5 +115,5 @@ class TestStarBasedAyanamshaFallback:
             leb = compare.leb(ephem.get_ayanamsa_ut, jd)
 
             assert ref == pytest.approx(leb, rel=1e-10), (
-                f"Star-based mode {sid_mode} differs at JD {jd}"
+                f"Additional mode {sid_mode} differs at JD {jd}"
             )

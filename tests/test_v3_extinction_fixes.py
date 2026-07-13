@@ -1,7 +1,7 @@
 """Regression tests for two physical-correctness fixes in extinction.py.
 
 These validate the extinction/visibility model by *physical correctness* and
-internal continuity (this module has no reference-API oracle):
+internal continuity (this module needs no external reference):
 
 Fix 1 - Non-monotonic limiting magnitude across the photopic/mesopic sky
         boundary (16 mag/arcsec^2). The mesopic branch used to restart near

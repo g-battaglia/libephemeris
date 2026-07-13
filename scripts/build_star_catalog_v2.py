@@ -21,8 +21,8 @@ table - exclusively from public astronomical catalogs:
   IAU-CSN (maintained by E. Mamajek),
   https://www.pas.rochester.edu/~emamajek/WGSN/IAU-CSN.txt
 
-The Swiss Ephemeris star file is NOT used as a data source; it serves
-only as an external reference in verification scripts.
+Validation of the generated catalog uses only the cited public catalogs and
+independent astronomical invariants.
 
 Selection: every IAU-named star, every star with Hipparcos magnitude
 Hp <= 5.2 that carries a Bayer or Flamsteed designation, and every star
@@ -113,7 +113,9 @@ def fetch_vizier_tables(verbose: bool) -> dict:
         columns=["HIP", "RArad", "DErad", "Plx", "pmRA", "pmDE", "Hpmag"],
         row_limit=-1,
     )
-    out["hip2"] = v.query_constraints(catalog="I/311/hip2", Hpmag=f"<{HP_LIMIT + 2.0}")[0]
+    out["hip2"] = v.query_constraints(catalog="I/311/hip2", Hpmag=f"<{HP_LIMIT + 2.0}")[
+        0
+    ]
 
     if verbose:
         print("fetching I/239/hip_main (HD numbers, Vmag) ...", flush=True)
@@ -252,7 +254,9 @@ def build(verbose: bool) -> tuple[list[tuple], dict]:
             _val(row["Plx"], float) or 0.0,
             _val(row["pmRA"], float) or 0.0,
             _val(row["pmDE"], float) or 0.0,
-            _val(row["Hpmag"], float) if _val(row["Hpmag"], float) is not None else 99.0,
+            _val(row["Hpmag"], float)
+            if _val(row["Hpmag"], float) is not None
+            else 99.0,
         )
 
     hd_by_hip: dict[int, int] = {}
@@ -320,8 +324,15 @@ def build(verbose: bool) -> tuple[list[tuple], dict]:
         if hip not in selected:
             (name, nomen, ra, dec, pmra, pmde, plx, rv, mag) = row
             selected[hip] = dict(
-                name=name, nomen=nomen, ra=ra, dec=dec,
-                pm_ra=pmra, pm_dec=pmde, plx=plx, rv=rv, mag=mag,
+                name=name,
+                nomen=nomen,
+                ra=ra,
+                dec=dec,
+                pm_ra=pmra,
+                pm_dec=pmde,
+                plx=plx,
+                rv=rv,
+                mag=mag,
             )
 
     # Curated names win for the preserved stars (they carry the library's
@@ -408,8 +419,6 @@ sources only:
   VizieR IV/27A/catalog.
 - Radial velocities: XHIP (Anderson & Francis 2012), VizieR V/137D.
 - Proper names: IAU WGSN Catalog of Star Names (IAU-CSN).
-
-The Swiss Ephemeris star data file is not a source of this table.
 
 Row layout:
     (id, name, nomenclature, hip,

@@ -189,18 +189,9 @@ class TestHousesEx2SpeedFlag:
         assert cusps_speed1 == cusps_speed2, "Whole Sign: speeds differ"
         assert ascmc_speed1 == ascmc_speed2, "Whole Sign: ascmc speeds differ"
 
-        # Most cusp velocities are zero (fixed at sign boundaries)
-        # but cusps 1,7 (ASC/DESC) and 4,10 (IC/MC) get ASC/MC speeds
-        # to match the reference ephemeris behaviour.
-        for i in [1, 2, 4, 5, 7, 8]:  # 0-indexed: cusps 2,3,5,6,8,9
-            assert cusps_speed1[i] == 0.0, (
-                f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed1[i]}"
-            )
-        # Cusps at ASC/DESC/MC/IC positions have non-zero speeds
-        assert cusps_speed1[0] != 0.0, "Cusp 1 (ASC) speed should be non-zero"
-        assert cusps_speed1[3] != 0.0, "Cusp 4 (IC) speed should be non-zero"
-        assert cusps_speed1[6] != 0.0, "Cusp 7 (DESC) speed should be non-zero"
-        assert cusps_speed1[9] != 0.0, "Cusp 10 (MC) speed should be non-zero"
+        # Whole-sign cusps are fixed boundaries between sign changes.
+        assert all(speed == 0.0 for speed in cusps_speed1)
+        assert any(speed != 0.0 for speed in ascmc_speed1)
 
     """Tests for velocities in houses_armc_ex2."""
 
@@ -319,18 +310,8 @@ class TestHousesEx2SpeedFlag:
             armc, lat, eps, ord("W")
         )
 
-        # Most cusp velocities are zero (fixed at sign boundaries)
-        # but cusps 1,7 (ASC/DESC) and 4,10 (IC/MC) get ASC/MC speeds
-        # to match the reference ephemeris behaviour.
-        for i in [1, 2, 4, 5, 7, 8]:  # 0-indexed: cusps 2,3,5,6,8,9
-            assert cusps_speed[i] == 0.0, (
-                f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed[i]}"
-            )
-        # Cusps at ASC/DESC/MC/IC positions have non-zero speeds
-        assert cusps_speed[0] != 0.0, "Cusp 1 (ASC) speed should be non-zero"
-        assert cusps_speed[3] != 0.0, "Cusp 4 (IC) speed should be non-zero"
-        assert cusps_speed[6] != 0.0, "Cusp 7 (DESC) speed should be non-zero"
-        assert cusps_speed[9] != 0.0, "Cusp 10 (MC) speed should be non-zero"
+        assert all(speed == 0.0 for speed in cusps_speed)
+        assert any(speed != 0.0 for speed in ascmc_speed)
 
 
 class TestHouseCuspVelocityEdgeCases:
@@ -425,12 +406,8 @@ class TestHouseCuspVelocityProgression:
         jd1 = 2451545.0
         jd2 = 2451545.5  # 12 hours later
 
-        _, _, _, ascmc_speed1 = ephem.houses_ex2(
-            jd1, lat, lon, ord("P"), FLG_SPEED
-        )
-        _, _, _, ascmc_speed2 = ephem.houses_ex2(
-            jd2, lat, lon, ord("P"), FLG_SPEED
-        )
+        _, _, _, ascmc_speed1 = ephem.houses_ex2(jd1, lat, lon, ord("P"), FLG_SPEED)
+        _, _, _, ascmc_speed2 = ephem.houses_ex2(jd2, lat, lon, ord("P"), FLG_SPEED)
 
         # MC velocity should be similar at different times
         # (variation possible due to Earth's orbital motion)

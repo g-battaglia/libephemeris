@@ -49,12 +49,10 @@ from .planets import calc_ut, calc
 def _normalize_cross_target(x2cross: float, flags: int) -> Tuple[float, int]:
     """Resolve ``FLG_RADIANS`` on a crossing target longitude.
 
-    The reference interprets ``x2cross`` in radians when ``FLG_RADIANS`` is
-    set (measured: ``solcross_ut(radians(90), ..., FLG_RADIANS)`` returns the
-    same instant as the plain 90-degree call). The crossing math here is
-    degree-based, so the target is converted up front and the flag stripped
-    from the flags handed to calc()/calc_ut() — otherwise the returned
-    longitude would come back in radians and corrupt the Newton/wrap steps.
+    The public flag contract interprets ``x2cross`` in radians when
+    ``FLG_RADIANS`` is set. The crossing solver is degree-based, so the target
+    is converted up front and the flag is stripped from internal position
+    calls.
     """
     if flags & FLG_RADIANS:
         x2cross = math.degrees(x2cross)
@@ -433,16 +431,13 @@ _SYNODIC = {
 # and Mars were previously excluded on the assumption that the forward-scan
 # window already spanned their first crossing, but a momentarily slow (pre-
 # station) inner planet still lets Newton overshoot diff/speed into the NEXT
-# synodic cycle's crossing (measured skips of tens-to-hundreds of days). The
-# guard's forward re-validation is cheap (it early-exits on the first crossing),
-# so it is applied to them too.
+# synodic cycle's crossing. The guard's forward re-validation is cheap (it
+# early-exits on the first crossing), so it is applied to them too.
 _SLOW_GUARD_PLANETS = (2, 3, 4, 5, 6, 7, 8, 9)  # Mercury..Pluto
-# Safe UPPER bound on each body's peak geocentric daily motion (deg/day; measured
-# peaks Mer 2.202, Ven 1.259, Mars 0.776, Jup 0.242, Sat 0.130, Ura 0.061,
-# Nep/Plu 0.039, padded ~10-25%). Used to size a forward-scan step that provably
-# cannot step over a crossing: while the body is more than ``_RETRO_ARC`` degrees
-# from the target, a step of (gap - arc) / max_rate advances it by at most
-# (gap - arc) degrees, so it cannot reach the target mid-step.
+# Conservative upper bounds on geocentric daily motion size the forward scan.
+# While the body is more than ``_RETRO_ARC`` degrees from the target, a step of
+# (gap - arc) / max_rate advances it by at most (gap - arc) degrees and therefore
+# cannot step across the target.
 _SLOW_MAX_RATE = {2: 2.5, 3: 1.35, 4: 0.85, 5: 0.30, 6: 0.16, 7: 0.08, 8: 0.05, 9: 0.05}
 
 
@@ -684,10 +679,8 @@ def solcross_ut(
 
         # No dead-band skip here: (x2cross - lon) % 360 already maps a
         # just-passed target to ~360 (next cycle), while a body exactly
-        # at or seconds before the target legitimately crosses now —
-        # the reference returns the immediate crossing (verified:
-        # the reference solcross_ut from the exact crossing instant returns that
-        # instant, not one cycle later).
+        # at or immediately before the target has its first crossing at the
+        # current instant rather than one cycle later.
 
     dt_guess = diff / speed
     jd_guess = tjdut + dt_guess
@@ -808,10 +801,8 @@ def solcross(
 
         # No dead-band skip here: (x2cross - lon) % 360 already maps a
         # just-passed target to ~360 (next cycle), while a body exactly
-        # at or seconds before the target legitimately crosses now —
-        # the reference returns the immediate crossing (verified:
-        # the reference solcross_ut from the exact crossing instant returns that
-        # instant, not one cycle later).
+        # at or immediately before the target has its first crossing at the
+        # current instant rather than one cycle later.
 
     dt_guess = diff / speed
     jd_guess = tjdet + dt_guess
@@ -919,10 +910,8 @@ def mooncross_ut(
 
         # No dead-band skip here: (x2cross - lon) % 360 already maps a
         # just-passed target to ~360 (next cycle), while a body exactly
-        # at or seconds before the target legitimately crosses now —
-        # the reference returns the immediate crossing (verified:
-        # the reference solcross_ut from the exact crossing instant returns that
-        # instant, not one cycle later).
+        # at or immediately before the target has its first crossing at the
+        # current instant rather than one cycle later.
 
     dt_guess = diff / speed
     jd_guess = tjdut + dt_guess
@@ -1044,10 +1033,8 @@ def mooncross(
 
         # No dead-band skip here: (x2cross - lon) % 360 already maps a
         # just-passed target to ~360 (next cycle), while a body exactly
-        # at or seconds before the target legitimately crosses now —
-        # the reference returns the immediate crossing (verified:
-        # the reference solcross_ut from the exact crossing instant returns that
-        # instant, not one cycle later).
+        # at or immediately before the target has its first crossing at the
+        # current instant rather than one cycle later.
 
     dt_guess = diff / speed
     jd_guess = tjdet + dt_guess
@@ -1127,12 +1114,9 @@ def mooncross_node_ut(
         Moon crosses each node approximately every 13.6 days (half the nodal
         month of ~27.2 days).
 
-        Both engines solve the SAME event — the Moon's ecliptic-latitude-zero
-        crossing (measured black-box: identical instants). The only
-        divergence is the time frame of the *_ut return value: the reference
-        reports the TT/ET instant unconverted, while libephemeris reports
-        the true UT instant, so the gap is exactly Delta-T (~64 s at J2000,
-        growing at extreme epochs). See known-differences.md §11.
+        The search is performed in TT and the solved instant is converted back
+        to UT before return. Use :func:`mooncross_node` when the caller already
+        works in TT.
 
     Example:
         >>> # Find next lunar node crossing
@@ -1195,16 +1179,8 @@ def mooncross_node(
         Error: If convergence fails or calculation error occurs
 
     Note:
-        TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
-        which varies from ~32 seconds (year 2000) to minutes (historical times).
-        For most astrological applications, use mooncross_node_ut() instead.
-
-        Both engines solve the SAME event — the Moon's ecliptic-latitude-zero
-        crossing (measured black-box: identical instants). The only
-        divergence is the time frame of the *_ut return value: the reference
-        reports the TT/ET instant unconverted, while libephemeris reports
-        the true UT instant, so the gap is exactly Delta-T (~64 s at J2000,
-        growing at extreme epochs). See known-differences.md §11.
+        TT and UT differ by the epoch-dependent Delta T. Use
+        :func:`mooncross_node_ut` when the caller starts from or needs UT.
 
     Example:
         >>> # Find next lunar node crossing using TT
@@ -1779,11 +1755,10 @@ def helio_cross_ut(
         guess_speed = speed_default if speed_default > 1e-9 else 1.0
         dt_guess = diff / guess_speed  # diff <= 0, guess_speed > 0 -> negative dt
     else:
-        # No forward dead-band: a body a hair before (or exactly at) the target
-        # legitimately crosses now, and the reference returns that imminent
-        # crossing — not one orbital period later. This mirrors solcross/
-        # mooncross/cross_ut, which have no dead-band either. (x2cross - lon)
-        # % 360 already maps a just-passed target to ~360, i.e. the next cycle.
+        # No forward dead-band: a body immediately before (or exactly at) the
+        # target has its first crossing now, not one orbital period later.
+        # (x2cross - lon) % 360 already maps a just-passed target to ~360,
+        # i.e. the next cycle.
         if abs(speed) < 0.0001:
             speed = speed_default
         dt_guess = diff / speed
@@ -1977,11 +1952,10 @@ def helio_cross(
         guess_speed = speed_default if speed_default > 1e-9 else 1.0
         dt_guess = diff / guess_speed  # diff <= 0, guess_speed > 0 -> negative dt
     else:
-        # No forward dead-band: a body a hair before (or exactly at) the target
-        # legitimately crosses now, and the reference returns that imminent
-        # crossing — not one orbital period later. This mirrors solcross/
-        # mooncross/cross_ut, which have no dead-band either. (x2cross - lon)
-        # % 360 already maps a just-passed target to ~360, i.e. the next cycle.
+        # No forward dead-band: a body immediately before (or exactly at) the
+        # target has its first crossing now, not one orbital period later.
+        # (x2cross - lon) % 360 already maps a just-passed target to ~360,
+        # i.e. the next cycle.
         if abs(speed) < 0.0001:
             speed = speed_default
         dt_guess = diff / speed

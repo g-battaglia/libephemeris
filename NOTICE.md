@@ -8,20 +8,25 @@ library for Python, licensed under the **Apache License, Version 2.0** (see
 
 All astronomical computations are based on:
 
-- **JPL DE440/DE441** planetary and lunar ephemerides, accessed via the
-  [Skyfield](https://rhodesmill.org/skyfield/) library (Brandon Rhodes, MIT license)
+- **JPL DE440/DE441** planetary and lunar ephemerides, accessed through the
+  local [Skyfield](https://rhodesmill.org/skyfield/) path (Brandon Rhodes, MIT
+  license), precomputed LEB coefficients, or NASA JPL Horizons state vectors
+  ([bundled base-core build attestation](docs/leb/base-core-provenance.md))
 - **IAU 2006/2000A** precession-nutation and **Vondrák 2011** long-term
   precession, via [pyerfa](https://github.com/liberfa/pyerfa) (BSD-3-Clause)
 - **Peer-reviewed academic sources**, including:
   - Meeus, J. — *Astronomical Algorithms*, 2nd ed. (1998)
   - Simon, J.L. et al. — A&A 282, 663 (1994)
-  - Chapront, J. et al. — A&A 387, 700 (2002); ELP 2000-85 lunar theory
+  - Chapront, J. et al. — A&A 387, 700 (2002), for independent lunar context
   - Park, R.S. et al. — "The JPL Planetary and Lunar Ephemerides DE440 and
     DE441", AJ 161, 105 (2021)
   - Lieske, J.H. — "Galilean satellite ephemerides E5", A&AS 129, 205 (1998)
-- **Primary historical sources** for hypothetical bodies: Witte, A. &
-  Lefeldt, H. — *Regelwerk für Planetenbilder* (1928); Neely, J. (1988);
-  Makransky, B. — *Primary Directions* (1988).
+- **Historical hypothetical-body conventions (IDs 40–58)**. Transpluto and
+  Harrington have primary-source derivations; per-body source status is
+  documented in the
+  [per-body source record](docs/methodology/hypothetical-bodies.md).
+- **Sidereal zero points and catalogue geometry** documented per mode in the
+  [ayanamsha source table](docs/reference/ayanamsha.md).
 
 ## API Compatibility
 
@@ -31,18 +36,18 @@ ephemeris API (function names, parameters and flag constants match, e.g.
 does not imply code derivation: the algorithms and implementation are
 independently written.
 
-## Calibration Data Disclosure
+## Validation
 
-Two generated data sets are fitted against the reference API used strictly
-as a black-box oracle, and are disclosed for transparency: the interpolated
-lunar-apse residual tables (`libephemeris/lunar_apse_corrections.py` and the
-perturbation coefficients in `lunar.py` — the INTP_APOG/INTP_PERG bodies are
-constructs defined by the reference API, so behavioral parity requires
-fitting to its output), and four fictitious-body element rows in
-`libephemeris/data/fictitious_orbits.csv` (Nibiru, Proserpina, the Selena
-digits, the Waldemath reconstruction) that have no known publication and are
-carried as interoperability values. These tables contain numeric program
-*output*, not source expression; all runtime code is original.
+Compatibility with the reference API is verified by calling its public
+interface and comparing outputs. These comparisons are ephemeral: results are
+not recorded as fixtures, fitted into coefficients, or encoded into artifacts.
+Reference-distribution source, prose, algorithms, and data are not part of
+this repository.
+
+All numerical data and models are reproducible from the independent sources
+listed above. Mean lunar points use ERFA's IERS 2003 Delaunay arguments; true
+and osculating points use the active NASA JPL state; and Harrington uses its
+cited publication.
 
 ## Vendored Components
 
@@ -61,6 +66,5 @@ is held by Giacomo Battaglia.
 ## Trademarks
 
 "Swiss Ephemeris" is a product name of Astrodienst AG. References to it in
-this repository are nominative only (interface compatibility and black-box
-verification targets). LibEphemeris is not affiliated with, or endorsed by,
-Astrodienst AG.
+this repository are nominative only (interface compatibility). LibEphemeris is
+not affiliated with, or endorsed by, Astrodienst AG.

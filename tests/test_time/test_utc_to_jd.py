@@ -166,6 +166,14 @@ class TestUtcToJdCalendars:
         # Should produce valid JD
         assert jd_ut > 0
 
+    @pytest.mark.unit
+    def test_julian_label_mapping_to_utc_era_uses_gregorian_instant(self):
+        """Julian 1971-12-19 is Gregorian 1972-01-01, in the UTC era."""
+        julian_result = ephem.utc_to_jd(1971, 12, 19, 0, 0, 0.0, JUL_CAL)
+        gregorian_result = ephem.utc_to_jd(1972, 1, 1, 0, 0, 0.0, GREG_CAL)
+
+        assert julian_result == gregorian_result
+
 
 class TestUtcToJdEdgeCases:
     """Test edge cases and boundary conditions."""

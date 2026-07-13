@@ -695,6 +695,9 @@ For n >= 8 (above horizon):
 ```
 
 **Properties:** Works at all latitudes, same computational simplicity as Porphyry.
+For public-API compatibility, `house_pos()` collapses the Sripati wrap interval
+above house number 12 to exactly `1.0`; this includes house 12 and the first
+half of house 1. The cusp-12 boundary itself remains `12.0`.
 
 ---
 

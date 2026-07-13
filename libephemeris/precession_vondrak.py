@@ -219,19 +219,17 @@ def vondrak_pn_matrix(
 # Method-B ayanamsha precession (long-term, Vondrák ecliptic frame)
 # =============================================================================
 #
-# The reference API propagates a mean ("formula"/user/J2000) ayanamsha as
+# A caller-defined mean ayanamsha is propagated as
 #
 #     ayanamsha(t) = ayan_t0 - lambda(t; t0)
 #
 # where lambda(t; t0) is the ecliptic longitude of the vernal equinox of date
 # t, measured on the MEAN ECLIPTIC OF t0 (the epoch that defines the sidereal
 # zero point). Both the ecliptic of t0 and the equinox of t are built from the
-# Vondrák 2011 long-term ecliptic/equator poles, so the propagation stays valid
-# over the whole Vondrák span and matches the reference to <0.006" from -3000
-# to +5000. This is "Method B": it is *non-additive* in t0 (the ecliptic-tilt
-# term means accum(t; t0) != accum(t; J2000) - accum(t0; J2000)), which is
-# exactly why the earlier additive IAU-2006 polynomial drifted up to ~0.7" at
-# remote epochs for modes with ancient defining epochs.
+# Vondrák 2011 long-term ecliptic/equator poles, so the construction follows
+# that model over its stated span. This is "Method B": it is *non-additive* in
+# t0 because the ecliptic-tilt term means accum(t; t0) is not generally equal to
+# accum(t; J2000) - accum(t0; J2000).
 
 
 @lru_cache(maxsize=4096)

@@ -1,232 +1,39 @@
-# Interpolated Perigee Methodology
+# Interpolated Lunar Perigee
 
-LibEphemeris computes the interpolated lunar perigee using a three-layer architecture — mean position, 66-term harmonic perturbation series, and residual correction table — calibrated via passage-interpolated harmonic fitting: perigee passages are located on the DE440/DE441 lunar positions, while the harmonic coefficients and the live residual table are fitted against reference-API output used strictly as a black-box oracle (see NOTICE.md, Calibration Data Disclosure).
+`INTP_PERG` (body 22) is the smooth interpolated lunar-perigee curve. It is
+evaluated independently from `INTP_APOG`; the two directions are not forced
+to be antipodal.
 
-## Table of Contents
+The model is anchored to the Moon's actual perigee passages in the JPL DE440
+ephemeris: every geocentric-distance minimum over ~1549--2651 CE, refined to
+about one second. The longitude starts from the mean perigee and applies a
+Delaunay perturbation series fitted by least squares at those passages; the
+larger evection spectrum extends through the 30th harmonic and includes
+solar-anomaly and latitude couplings. A spline-interpolated residual table
+makes the curve exact at every DE440 perigee passage. Tables and
+coefficients live in `libephemeris/lunar_apse_model.py`, regenerated only by
+the committed `scripts/generate_lunar_apse_model.py`; the integrity gate
+accepts only the exact SHA-256-pinned module.
 
-- [Background](#background)
-- [Method](#method)
-  - [Three-Layer Architecture](#three-layer-architecture)
-  - [Passage-Interpolated Harmonic Fitting (v2.2)](#passage-interpolated-harmonic-fitting-v22)
-  - [Perturbation Series (66 Terms)](#perturbation-series-66-terms)
-  - [Residual Correction Table](#residual-correction-table)
-- [Failed Approaches](#failed-approaches)
-  - [Gaussian Smoothing (v0)](#gaussian-smoothing-v0)
-  - [Raw Osculating Fit (v2.0)](#raw-osculating-fit-v20)
-  - [Passage-Only Fit (v2.1)](#passage-only-fit-v21)
-- [Precision and Validation](#precision-and-validation)
-  - [Key Coefficient Changes (v1 to v2.2)](#key-coefficient-changes-v1-to-v22)
-  - [Precision Evolution](#precision-evolution)
-- [Smoothing philosophy](#smoothing-philosophy)
-- [Calibration Reproducibility](#calibration-reproducibility)
-- [References](#references)
+Latitude uses a two-harmonic inclined-plane model fitted to the same DE440
+passages. The distance channel is the mean DE440 perigee-passage distance,
+`0.0024236 AU`. Output starts on the true ecliptic of date, and the common
+reduction pipeline applies frame, representation, sidereal, and nutation
+flags. `FLG_SPEED` uses the centered half-day derivative.
 
-## Background
+```python
+import libephemeris as eph
 
-The Moon's orbit around Earth is continuously perturbed by the Sun. These perturbations cause:
-
-1. The orbital axis (line of apsides) to precess with a period of ~8.85 years
-2. The perigee (point of closest approach) to **oscillate** around this mean precession
-
-These oscillations are substantial: approximately ±25 degrees from the mean position.
-
-The term "interpolated perigee" refers to a **smoothed** version of the instantaneous (osculating) perigee position, with short-period oscillations removed. There are different valid approaches to defining and computing this smoothing.
-
-The combined three-layer result achieves < 0.1° RMS agreement with the calibration target (down from ~10–11° in v1). Passage geometry comes from the DE440/DE441 lunar positions; the fitted coefficients and residual table target reference-API output (black-box oracle, disclosed in NOTICE.md), which is what the INTP_* parity figures in known-differences.md measure.
-
-## Method
-
-### Three-Layer Architecture
-
-The interpolated perigee is computed as the sum of three layers:
-
-```
-interpolated_perigee = mean_perigee(t) + perturbation_series(t) + residual_correction(t)
+position, flags = eph.calc_ut(
+    2451545.0,
+    eph.INTP_PERG,
+    eph.FLG_SPEED,
+)
+lon, lat, distance, dlon, dlat, ddistance = position
 ```
 
-| Layer | What it captures | Precision | Complexity |
-|-------|-----------------|-----------|------------|
-| Mean perigee | Secular apsidal precession | ~25 deg error | O(1) — polynomial |
-| Perturbation series | Periodic oscillations (14–400 days) | ~0.5–2 deg residual | O(1) — 66 trig terms |
-| Correction table | Secular drift + missing harmonics | < 0.1 deg final | O(1) — linear interpolation |
+This coordinate is not a proxy for tides or a physical "supermoon" event. For
+those questions, search the JPL Moon's geocentric distance for a local minimum.
 
-Note: `lunar_corrections.py` also ships a `MEAN_APSE_CORRECTIONS` table, but
-it is not consulted at runtime — the mean-perigee layer is the bare polynomial.
-
-**Layer 1: Mean Perigee (Polynomial)**
-
-The mean perigee position uses a standard polynomial in Julian centuries T from J2000:
-
-```
-ω₀ = 83.3532° + 4069.0137° × T + ...  (higher-order terms)
-```
-
-This captures the secular apsidal precession (~40.7° per year). The mean perigee is 180° from the mean apogee (Mean Lilith).
-
-**Layer 2: Perturbation Series (66 terms)**
-
-The perturbation series `_calc_elp2000_perigee_perturbations()` adds periodic corrections organized by physical origin. See [Perturbation Series (66 Terms)](#perturbation-series-66-terms) below.
-
-**Layer 3: Residual Correction Table**
-
-After applying the perturbation series, residual errors (~2 deg RMS near J2000, ~8 deg over the full range) are absorbed by the live residual correction table `PERIGEE_CORRECTIONS` in `lunar_apse_corrections.py` — 201,249 entries at a 2-DAY step covering 1549-01-01..2650-12-31 (the DE440 span). Linear interpolation between entries brings the in-range error to RMS ~11" / max ~100"; outside the range the edge correction tapers to zero within a year. (An older, wide-range table — `PERIGEE_PERTURBATION_CORRECTIONS` in `lunar_corrections.py`, 15,195 entries at a 2-year step over -13199..17189 — still ships but is not consulted by `calc_interpolated_perigee()`.)
-
-The live table is regenerated by `validation/calibrate/generate_lunar_apse_corrections.py --write` (separate, gitignored `validation/` checkout), which:
-1. Computes the calibration-target perigee via ±28 day quadratic regression of osculating elements
-2. Computes model perigee (mean + perturbation series)
-3. Stores the difference at regular time intervals
-
-### Passage-Interpolated Harmonic Fitting (v2.2)
-
-The v2.2 method combines the strengths of earlier approaches while avoiding their failures (see [Failed Approaches](#failed-approaches)):
-
-1. **Find perigee passages** — Locate all Earth-Moon distance minima over a 1000-year span [1500, 2500] CE using JPL DE441. At each passage, the Moon's ecliptic longitude is an unambiguous measure of the perigee longitude (12,958 passages found).
-
-2. **Cubic spline interpolation** — Fit a cubic spline through the (time, perigee_longitude) passage data, with angle unwrapping to handle the 0°/360° discontinuity. This creates a smooth, continuous perigee longitude function.
-
-3. **Daily resampling** — Sample the spline at daily intervals to produce ~365K clean data points with full coverage of all Delaunay argument combinations (unlike passage-only data where M' ≈ 0 always).
-
-4. **Harmonic least-squares fit** — Construct a 120-term design matrix of candidate trigonometric terms from lunar theory and fit via ordinary least squares. Terms with |coefficient| < 0.001 degrees are discarded, yielding the final series (the shipping revision carries 66 terms).
-
-The spline interpolation acts as a physically motivated smoothing: it passes exactly through the ground-truth passage points while providing well-conditioned data at arbitrary intermediate times. The daily samples have full M' coverage (unlike passages) and no correlated osculating noise (unlike raw data).
-
-### Perturbation Series (66 Terms)
-
-The shipping series (`_calc_elp2000_perigee_perturbations()` in
-`libephemeris/lunar.py` — the single source of truth for the coefficients)
-is a pure sine series of 66 terms: primary evection harmonics
-sin(kD − kM′) up to k = 30, plus solar-anomaly, latitude and
-cross-coupling terms. The dominant term is
-sin(2D − 2M′) = **−22.2479°**. There are no cosine, secular (T×trig) or
-polynomial terms — the residual correction table below absorbs the
-secular drift instead. (Earlier calibration rounds used a 61-term mixed
-sine/cosine/polynomial fit; the table that used to be reproduced here
-described that retired version.)
-
-### Residual Correction Table
-
-After the 66-term perturbation series, residual errors are absorbed by the live precomputed correction table (`PERIGEE_CORRECTIONS` in `lunar_apse_corrections.py`):
-
-| Parameter | Value |
-|-----------|-------|
-| Step size | 2 days |
-| Start | 1549-01-01 (JD 2286820.5) |
-| End | 2650-12-31 (JD 2689316.5) |
-| Entry count | 201,249 |
-| Interpolation | Linear |
-
-The residual captures secular drift of the perturbation coefficients and harmonics not included in the 66-term series. Outside the table's range the edge correction tapers to zero within a year and the system continues on the perturbation series alone (gradual degradation, not failure). The older wide-range table in `lunar_corrections.py` (2-year step, 15,195 entries, −13199..17189) is retired from the runtime path.
-
-## Failed Approaches
-
-Three earlier approaches to computing the perturbation series coefficients were attempted and failed, each providing insight that informed the successful v2.2 method.
-
-### Gaussian Smoothing (v0)
-
-The first attempt used Gaussian smoothing of the osculating perigee with an 8-year window (2922 days). This approach failed because the apsidal line precesses ~325 degrees in 8 years (nearly a full revolution). Consequently, the samples within the Gaussian window covered nearly the entire circle, causing the circular mean computation (`atan2(sum_sin, sum_cos)`) to collapse near zero. The result was ~-0.16 degrees of perturbation — effectively zero — when the correct value is ~8–25 degrees.
-
-The fundamental problem is that a Gaussian window spanning nearly a full apsidal precession cycle cannot recover the phase of an oscillation whose period is comparable to the window width.
-
-### Raw Osculating Fit (v2.0)
-
-The second attempt fitted a harmonic series directly to ~365K daily osculating perigee samples. This failed because the osculating noise is *correlated* with the design matrix terms — both are functions of the same Delaunay arguments (D, M, M', F). The least-squares fit could not distinguish genuine perturbations from osculating artifacts, producing nonsensical coefficients with a passage RMS of 9.18 degrees.
-
-### Passage-Only Fit (v2.1)
-
-The third attempt fitted only at perigee passages (Earth-Moon distance minima), where the Moon's longitude *is* the perigee longitude by definition. This failed because at every passage, the mean anomaly M' ≈ 0 by definition, making the design matrix degenerate (condition number 3.7×10⁵). The coefficients of terms involving M' were unconstrained.
-
-The v2.2 method resolved this by using the passages to anchor a spline, then resampling the spline at daily intervals to recover full Delaunay argument coverage.
-
-## Precision and Validation
-
-### Key Coefficient Changes (v1 to v2.2)
-
-The v1 coefficients were severely attenuated because v1 used quadratic regression smoothing of osculating data, which damped the harmonic amplitudes by ~50%:
-
-| Term | v1 Coefficient | v2.2 Coefficient | Change |
-|------|---------------|-------------------|--------|
-| sin(2D-2M') | -9.62° | **-22.21°** | ×2.3 |
-| sin(4D-4M') | +0.94° | **+6.45°** | ×6.9 |
-| sin(6D-6M') | -0.13° | **-2.28°** | ×17.5 |
-| sin(2D-M') | +2.61° | **-0.04°** | sign flip |
-| sin(M') | +0.72° | **+0.01°** | ×0.01 |
-| E×sin(2D-2M'-M) | -0.33° | **-0.97°** | ×3.0 |
-
-The dramatic increase in the dominant sin(2D-2M') term (evection) from -9.62° to -22.21° is the most significant change. The old value was roughly half the true amplitude due to signal attenuation by the quadratic regression window.
-
-### Precision Evolution
-
-| Metric | v1 | v2.2 |
-|--------|-----|------|
-| Perturbation series RMS (near J2000) | ~10–11° | ~2° |
-| Perturbation series RMS (full range) | ~10–11° | ~8° |
-| After correction table (vs analytical theory) | ~10–11° | **~1.5°** |
-| After correction table (vs calibration target) | N/A | **< 0.1°** |
-
-The remaining ~1.5° difference vs. an analytical lunar theory is expected: it reflects the fundamental methodological difference between the passage-interpolated numerical approach and ELP2000-82B analytical term selection.
-
-## Smoothing philosophy
-
-"Interpolated perigee" can be defined in more than one way, and engines differ in
-what they smooth and how.
-
-### Analytical term-selection
-
-One family of methods works inside a semi-analytical lunar theory (ELP2000-82B,
-Chapront-Touzé & Chapront): perturbations are separated **analytically** by physical
-origin, "short-period" terms (periods below a few months) are removed, and
-"long-period" terms representing the true apsidal motion are retained.
-
-### LibEphemeris — passage-interpolated fitting (DE441 passage geometry, oracle-fitted output)
-
-LibEphemeris uses an empirical harmonic series calibrated against the numerical
-ephemeris: perigee passages are identified from JPL DE441 Moon positions (physical
-ground truth), spline interpolation between passages creates a smooth perigee
-longitude function, and harmonic coefficients are fitted empirically to it; a
-residual correction table absorbs the remaining model error.
-
-**Analogy:** consider audio signal processing with bass and treble components. An
-analytical approach uses a filter that knows which frequencies are "signal" vs
-"noise" from the source characteristics. The LibEphemeris approach identifies the
-signal at known clean points (passage times), interpolates between them, then fits a
-harmonic model to the result. Both produce a smoothed result, but the outputs differ
-because the smoothing methodology differs.
-
-### Date range
-
-| Ephemeris | Valid Range |
-|-----------|-------------|
-| JPL DE440 | 1550 to 2650 |
-| JPL DE441 | -13200 to +17191 |
-
-Set `LIBEPHEMERIS_EPHEMERIS=de441.bsp` for extended date-range coverage.
-
-*The measured head-to-head with Swiss Ephemeris (~1.5° RMS, the smoothing-philosophy
-difference) is in the [Swiss Ephemeris Comparison](../comparison/known-differences.md).*
-
-## Calibration Reproducibility
-
-The calibration/generation tooling lives in the separate `validation/` repo
-(a gitignored sibling checkout, not shipped with the library). With that
-checkout in place, the calibration can be reproduced using:
-
-```bash
-LIBEPHEMERIS_EPHEMERIS=de441.bsp python validation/calibrate/calibrate_perigee_perturbations.py \
-    --start-year 1500 --end-year 2500 --output /tmp/perigee_v22_full.json
-```
-
-The script outputs calibrated coefficients as Python code ready to paste into `lunar.py`. The live residual table (`lunar_apse_corrections.py`) is then regenerated with:
-
-```bash
-python validation/calibrate/generate_lunar_apse_corrections.py --write
-```
-
-(from the separate, gitignored `validation/` checkout; see CLAUDE.md's
-Lunar Calibration Workflow).
-
-## References
-
-1. Chapront-Touzé, M. & Chapront, J. (1988). "ELP 2000-82B: A semi-analytical lunar ephemeris." *Astronomy & Astrophysics*, 190, 342-352.
-2. Chapront-Touzé, M. & Chapront, J. (1991). *Lunar Tables and Programs from 4000 B.C. to A.D. 8000*. Willmann-Bell.
-3. Park, R.S. et al. (2021). "The JPL Planetary and Lunar Ephemerides DE440 and DE441." *Astronomical Journal*, 161(3), 105.
-4. Moshier, S.L. (1989–2023). *Ephemeris Calculation Software*. Available at http://www.moshier.net — independent C implementation of ELP2000-82B used as reference for the analytical series coefficients.
+See [Lunar Nodes and Apsides](lunar-apsides.md) for formulas, frames, and
+sources.

@@ -1,5 +1,12 @@
 # Porting eclipse/fixed\_stars/heliacal da Skyfield a LEB
 
+> **Documento storico di implementazione.** Questa analisi descrive il problema
+> e il piano osservati nel maggio 2026; il porting è stato poi implementato,
+> come indica lo stato seguente. Le metriche, i call site e le fasi future nel
+> testo sono fotografie dell'epoca, non l'architettura corrente. Per lo stato
+> attuale vedere [Architecture Overview](../development/architecture-overview.md)
+> e [LEB Technical Guide](../leb/guide.md).
+
 **Stato:** Implementato — porting funzionale completo, fallback Skyfield attivo per date/corpi fuori copertura LEB.
 **Versione libephemeris:** 1.3.0+
 **Data:** 2026-05-08 (analisi), 2026-05-08 (implementazione)
@@ -561,8 +568,6 @@ Dipendenza: Fase 3.
 3. Documentazione aggiornata
 
 ### Timeline totale stimata: 3-6 settimane
-
----
 
 ## 8. Rischi e tradeoff
 

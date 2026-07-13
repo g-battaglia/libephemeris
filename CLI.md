@@ -4,7 +4,7 @@ libephemeris has three CLI interfaces:
 
 | CLI | Purpose | Entry point |
 |-----|---------|-------------|
-| `leph` | Developer tools: tests, generation, lint, release | `libephemeris.dev_cli:main` |
+| `leph` | Developer tools: tests, generation, lint, release | repo launcher `./leph` |
 | `libephemeris` | End-user: download data, check status | `libephemeris.cli:main` |
 | `poe` | Curated shortcuts that delegate to `leph` | poethepoet (pyproject.toml) |
 
@@ -18,14 +18,16 @@ All three support `-h` / `--help` on every command and subcommand.
 uv pip install -e ".[dev]"
 ```
 
-This installs both `leph` and `libephemeris` as console scripts in the virtualenv.
+This installs the production `libephemeris` console script. The developer CLI
+is intentionally repo-only; invoke its checked-in launcher from the source
+checkout.
 
 ### Running commands
 
 If the virtualenv is activated, use directly:
 
 ```bash
-leph test skyfield essential
+./leph test skyfield essential
 libephemeris download medium
 poe lint
 ```
@@ -33,7 +35,7 @@ poe lint
 If the virtualenv is **not** activated, prefix with `uv run`:
 
 ```bash
-uv run leph test skyfield essential
+uv run ./leph test skyfield essential
 uv run libephemeris download medium
 uv run poe lint
 ```
@@ -49,7 +51,7 @@ directly without activating the venv) and wire up TAB completion through
 #### Quick test (try it now, no permanent changes)
 
 ```bash
-eval "$(uv run leph completion zsh)"
+eval "$(uv run ./leph completion zsh)"
 ```
 
 After running this, `leph` and TAB completion work in that terminal session.
@@ -60,23 +62,23 @@ After running this, `leph` and TAB completion work in that terminal session.
 
 ```bash
 # Option A: append directly to .zshrc
-uv run leph completion zsh >> ~/.zshrc
+uv run ./leph completion zsh >> ~/.zshrc
 
 # Option B: separate file (cleaner)
-uv run leph completion zsh > ~/.leph-completion.zsh
+uv run ./leph completion zsh > ~/.leph-completion.zsh
 echo 'source ~/.leph-completion.zsh' >> ~/.zshrc
 ```
 
 **bash**:
 
 ```bash
-uv run leph completion bash >> ~/.bashrc
+uv run ./leph completion bash >> ~/.bashrc
 ```
 
 **fish**:
 
 ```bash
-uv run leph completion fish > ~/.config/fish/conf.d/leph.fish
+uv run ./leph completion fish > ~/.config/fish/conf.d/leph.fish
 ```
 
 Then reload your shell (`source ~/.zshrc`, `source ~/.bashrc`, or restart fish).
@@ -85,17 +87,17 @@ Then reload your shell (`source ~/.zshrc`, `source ~/.bashrc`, or restart fish).
 
 The generated script does two things:
 
-1. **Shell function**: creates `leph() { uv run leph "$@"; }` so you can type
-   `leph test skyfield essential` directly — no `uv run` prefix, no venv activation.
-   If the venv _is_ activated (so `leph` is in PATH), the function is not created
-   and the real binary is used directly.
+1. **Shell function**: creates a repo-anchored wrapper around
+   `uv run --project /path/to/libephemeris python -m libephemeris.dev_cli`, so
+   `leph test skyfield essential` works from any directory without activating
+   the virtualenv. Regenerate the completion file after moving the checkout.
 
 2. **TAB completion**: wires up completions that work at every nesting level,
    with descriptions:
 
 ```
 leph <TAB>                         # test, code, leb, download, ...
-leph test <TAB>                    # skyfield, leb-backend, compare, ...
+leph test <TAB>                    # skyfield, leb-backend, leb-format, ...
 leph test skyfield <TAB>           # essential, smoke, unit, unit-fast, ...
 leph test leb-format vs-skyfield <TAB>  # base, medium, extended, crosstier, ...
 ```
@@ -120,7 +122,7 @@ _LIBEPHEMERIS_COMPLETE=fish_source libephemeris | source
 
 ## Dev CLI (`leph`)
 
-The dev CLI has ~120 commands organized in 10 subgroups. Every command name
+The dev CLI has over 100 commands organized in 11 subgroups. Every command name
 makes it clear WHAT is being tested/generated and WHICH backend is used.
 
 ### `leph code` — Code quality
@@ -141,10 +143,10 @@ leph code typecheck           # mypy static type checker
 Positions are computed in real time from DE440 binary kernels via Skyfield.
 
 ```bash
-leph test skyfield essential      # ~490 tests, ~20s — fast sanity check
-leph test skyfield smoke          # ~1460 tests, ~30s — broader sanity check
-leph test skyfield unit           # ~5890 tests, ~2 min — all unit tests, sequential
-leph test skyfield unit-fast      # ~5890 tests, ~1 min — all unit tests, parallel
+leph test skyfield essential      # ~900 tests, ~20s — fast sanity check
+leph test skyfield smoke          # ~1,700 tests, ~30s — broader sanity check
+leph test skyfield unit           # ~16,000 tests, ~2 min — all unit tests, sequential
+leph test skyfield unit-fast      # ~16,000 tests, ~1 min — all unit tests, parallel
 leph test skyfield unit-full      # ALL tests including @slow (~10+ min)
 leph test skyfield all            # unit + compare, sequential
 leph test skyfield all-fast       # unit + compare, parallel
@@ -159,7 +161,7 @@ Same test suite but positions come from precomputed Chebyshev polynomials (~14x 
 Requires `data/leb/ephemeris_medium.leb` (generate it with `leph leb generate medium groups`).
 
 ```bash
-leph test leb-backend essential   # ~490 tests, ~20s — fast sanity check (parallel)
+leph test leb-backend essential   # ~900 tests, ~20s — fast sanity check (parallel)
 leph test leb-backend unit        # Sequential, verbose
 leph test leb-backend unit-fast   # Parallel (~1 min) [RECOMMENDED for daily dev]
 leph test leb-backend unit-full   # Including @slow
@@ -169,9 +171,9 @@ leph test leb-backend unit-full   # Including @slow
 
 ```bash
 leph test lunar all       # All lunar tests (nodes, Lilith, perigee, apogee)
-leph test lunar perigee   # ELP2000 coefficients + interpolated/osculating perigee
-leph test lunar apogee    # ELP2000 coefficients + interpolated apogee
-leph test lunar lilith    # Mean + true Lilith precision (8 test files)
+leph test lunar perigee   # Interpolated-model + osculating perigee contracts
+leph test lunar apogee    # Mean/interpolated/osculating apogee contracts
+leph test lunar lilith    # Mean + osculating Lilith geometry and precision
 ```
 
 #### `leph test leb-format` — LEB binary format internals
@@ -199,11 +201,11 @@ leph test leb-format vs-skyfield legacy-quick    # Legacy, no @slow
 #### `leph test leb2-format` — LEB2 compressed format
 
 ```bash
-leph test leb2-format all                # Compression + reader unit tests (27)
-leph test leb2-format precision-base     # LEB2 vs LEB1, base tier (~15s)
-leph test leb2-format precision-medium   # LEB2 vs LEB1, medium tier (~15s)
-leph test leb2-format precision-extended # LEB2 vs LEB1, extended tier (~15s)
-leph test leb2-format precision-all      # All tiers (~45s)
+leph test leb2-format all                # Compression + reader unit tests
+leph test leb2-format precision-base     # Core LEB2 vs LEB1, base tier (~15s)
+leph test leb2-format precision-medium   # Core LEB2 vs LEB1, medium tier (~15s)
+leph test leb2-format precision-extended # Core LEB2 vs LEB1, extended tier (~15s)
+leph test leb2-format precision-all      # Core companions, all tiers (~45s)
 ```
 
 #### `leph test horizons` — Horizons API precision (requires internet)
@@ -228,17 +230,18 @@ leph test coverage full   # Including @slow
 Recommended workflow (avoids macOS multiprocessing deadlocks):
 
 ```bash
-leph leb generate medium groups    # planets + asteroids + analytical + merge
+leph leb generate medium groups    # planets + asteroids + exotics + analytical + merge
 ```
 
 All generation modes per tier (`base`, `medium`, `extended`):
 
 ```bash
 leph leb generate <tier> groups      # Recommended: group-by-group then merge
-leph leb generate <tier> full        # All bodies at once (may deadlock on macOS)
-leph leb generate <tier> single      # One body at a time (lowest memory)
+leph leb generate <tier> full        # All eligible bodies at once (may deadlock on macOS)
+leph leb generate <tier> single      # One eligible body at a time (lowest memory)
 leph leb generate <tier> planets     # Planets group only
 leph leb generate <tier> asteroids   # Asteroids group only
+leph leb generate <tier> exotics     # Exotic registry group only
 leph leb generate <tier> analytical  # Analytical group only
 leph leb generate <tier> merge       # Merge partial files
 leph leb generate <tier> body <name> # Specific body (e.g. 'moon', '1,2,3')
@@ -257,16 +260,15 @@ leph leb verify extended
 
 ```bash
 # Convert LEB1 -> LEB2
-leph leb2 convert base              # All 4 groups (core/asteroids/apogee/uranians)
+leph leb2 convert base              # All active groups (includes exotics)
 leph leb2 convert medium
 leph leb2 convert extended
-leph leb2 convert base-core         # Core group only (~10.6 MB, for PyPI)
-leph leb2 convert base-asteroids    # Asteroids group only
-leph leb2 convert base-apogee       # Apogee group only
-leph leb2 convert base-uranians     # Uranians group only
+leph leb2 convert base-core         # One group only (~10.7 MB, for PyPI)
+leph leb2 convert base-exotics      # The exotic registry group only
+leph leb2 convert medium-apogee     # Any tier/group combination is available
 
-# Verify (per tier)
-leph leb2 verify base               # Compare against LEB1 reference
+# Verify the exact 14-body core in native stored component units
+leph leb2 verify base               # base_core.leb2 against LEB1
 leph leb2 verify medium
 leph leb2 verify extended
 ```
@@ -312,35 +314,24 @@ leph generate planet-centers-extended
 leph generate planet-centers-all       # All three tiers
 leph generate planet-centers-spk       # Legacy alias for medium
 
-# Lunar corrections
-leph generate lunar-corrections        # Regenerate correction tables
-
 # Keplerian orbital elements
 leph generate keplerian-elements       # Multi-epoch elements for 37 bodies
 leph generate keplerian-dry-run        # Preview available SPKs
 ```
 
-### Lunar calibration (separate `validation/` repo)
+### Lunar model reproducibility
 
-The perigee/residual-table calibration is **not** a command of this
-package's dev CLI — it lives in the separate `validation/` repository,
-which drives the reference binding as a black-box oracle. The workflow
-(run from `validation/`): calibrate the perigee perturbations, paste the
-coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`,
-regenerate the residual table into `lunar_apse_corrections.py`, then run
-`leph test lunar perigee` here. See `docs/methodology/interpolated-perigee.md`.
+Mean lunar points are evaluated directly from ERFA/IERS fundamental arguments.
+Interpolated apogee and perigee are evaluated at runtime from the active NASA
+JPL state with a deterministic symmetric smoothing kernel. There are no lunar
+compatibility-model artifacts or oracle-output generators to rebuild. See
+`docs/methodology/lunar-apsides.md`.
 
 ### `leph release` — Release management
 
-```bash
-leph release leb <version>              # Upload all LEB files to GitHub Release
-leph release leb-base <version>         # Upload base tier only
-leph release leb-medium <version>       # Upload medium tier only
-leph release leb-extended <version>     # Upload extended tier only
-leph release leb-dry-run <version>      # Preview without uploading
-```
-
-Requires: `gh` CLI authenticated (`gh auth login`).
+The historical LEB upload tasks are retired together with the former published
+LEB assets. The wheel bundles only the reviewed `base_core.leb2`; generate other
+LEB files locally and do not upload them through the legacy release workflow.
 
 ### `leph manual` — Documentation builds
 
@@ -369,12 +360,6 @@ For end-users: download data files and check library status.
 libephemeris download base              # DE440s + planet centers + SPKs (1850-2150)
 libephemeris download medium            # DE440 + planet centers + SPKs (default)
 libephemeris download extended          # DE441 + planet centers + SPKs
-libephemeris download leb-base          # LEB1 binary (~53 MB)
-libephemeris download leb-medium        # LEB1 binary (~175 MB)
-libephemeris download leb-extended      # LEB1 binary
-libephemeris download leb2-base         # LEB2 compressed (~33 MB, modular)
-libephemeris download leb2-medium       # LEB2 compressed (~119 MB, modular)
-libephemeris download leb2-extended     # LEB2 compressed (~897 MB, modular)
 libephemeris download assist            # ASSIST n-body data (~714 MB)
 
 # Status (comprehensive: version, config, all data files)
@@ -396,6 +381,11 @@ libephemeris download medium --no-progress     # Suppress progress bars
 libephemeris download medium --quiet           # Suppress all output
 ```
 
+All commands that downloaded prebuilt LEB assets are retired because the former
+monolithic and modular release files do not satisfy the current provenance
+policy. The wheel bundles the reviewed `base_core.leb2`; generate every other
+LEB1/LEB2 file locally with `leph leb generate` / `leph leb2 convert`.
+
 ### `libephemeris status` output
 
 The `status` command shows a comprehensive overview:
@@ -403,8 +393,9 @@ The `status` command shows a comprehensive overview:
 - **Configuration**: version, calc mode, precision tier, LEB file, data directory
 - **Ephemeris Kernels**: de440s.bsp, de440.bsp, de441.bsp with [OK]/[--] and sizes
 - **Planet Center Corrections**: per-tier BSP files, active tier marked with `*`
-- **LEB1 Binary Ephemeris**: per-tier .leb files, active one marked with `*`
-- **LEB2 Compressed Ephemeris**: per-tier group counts (core/asteroids/apogee/uranians)
+- **Locally generated LEB1 Binary Ephemeris**: per-tier .leb files, active one marked with `*`
+- **LEB2 Compressed Ephemeris**: per-tier group counts
+  (core/asteroids/exotics/apogee)
 - **SPK Asteroid Cache**: directory path, file count, total size
 - **ASSIST N-body Data**: planet ephemeris + asteroid perturbers
 - **IERS Earth Orientation Data**: finals2000A, leap seconds, delta T with age in days
@@ -412,11 +403,14 @@ The `status` command shows a comprehensive overview:
 
 ### Backward compatibility
 
+The reader can decode legacy LEB files that contain the retired hypothetical
+group, but active generation, conversion, and publication never create that
+group. Legacy `<tier>-uranians` conversion selectors fail closed.
+
 Old colon-separated syntax still works:
 
 ```bash
 libephemeris download:medium      # Same as: libephemeris download medium
-libephemeris download:leb:base    # Same as: libephemeris download leb-base
 ```
 
 ### `libephemeris config`
@@ -427,10 +421,12 @@ The `config` command is a reference guide showing every configurable setting:
 - **Precision tier**: base/medium/extended with kernel sizes and date ranges
 - **Ephemeris file**: DE kernel override
 - **Calculation mode**: auto/skyfield/leb/horizons with descriptions
-- **LEB binary ephemeris**: LEB1 and LEB2 file listings, sizes, download commands
+- **LEB binary ephemeris**: bundled base core and locally generated LEB1/LEB2 listings
 - **SPK asteroid cache**: directory, auto-download toggle
 - **Planet center corrections**: per-tier BSP files
 - **IERS Earth orientation data**: file names, env vars
+- **Delta T model**: current model, env var, Python API, and TOML key
+- **LEB mmap preloading**: current toggle and TOML year range
 - **ASSIST n-body data**: file names, sizes, install requirements
 - **.env file**: location and override env var
 - **TOML config file**: path, loaded values, generate command
@@ -462,6 +458,7 @@ auto_spk = true              # auto-download SPK for minor bodies
 strict_precision = true      # require SPK for major asteroids
 iers_auto_download = false   # auto-download IERS data
 iers_delta_t = false         # use observed Delta T from IERS
+deltat_model = "smh2016"     # smh2016 | espenak_meeus
 log_level = "WARNING"        # DEBUG | INFO | WARNING | ERROR | CRITICAL
 mmap_preload = false         # pre-fault mmap pages for a date range
 mmap_preload_start = 1800    # start year (when mmap_preload = true)
@@ -489,7 +486,7 @@ TOML file search order:
 
 Curated aliases for the most common workflows. Every shortcut delegates to `leph`.
 
-Every backend gets **core / fast / full** unit tests, plus **compare / compare:full**.
+Backend shortcuts expose the documented **core / fast / full** scopes below.
 
 ```bash
 # Code quality
@@ -498,12 +495,12 @@ poe format                              # -> leph code format
 poe typecheck                           # -> leph code typecheck
 
 # Skyfield backend: core / fast / full
-poe test:skyfield:core                  # -> leph test skyfield essential (~490, ~20s)
-poe test:skyfield:fast                  # -> leph test skyfield unit-fast (~5890, ~1 min)
+poe test:skyfield:core                  # -> leph test skyfield essential (~900, ~20s)
+poe test:skyfield:fast                  # -> leph test skyfield unit-fast (~16,000, ~1 min)
 poe test:skyfield:full                  # -> leph test skyfield all-full-fast (+@slow)
 
 # LEB backend: core / fast / full
-poe test:leb:core                       # -> leph test leb-backend essential (~490, ~20s)
+poe test:leb:core                       # -> leph test leb-backend essential (~900, ~20s)
 poe test:leb:fast                       # -> leph test leb-backend unit-fast [RECOMMENDED]
 poe test:leb:full                       # -> leph test leb-backend unit-full (+@slow)
 
@@ -542,7 +539,7 @@ For single-file or single-test runs, use pytest directly:
 pytest tests/test_file.py -v                          # One file
 pytest tests/test_file.py::TestClass::test_method -v  # One test
 pytest tests/test_file.py -k "pattern" -v             # By keyword
-pytest tests/ -m "not slow" --calc-mode leb            # With LEB backend
+pytest tests/test_file.py -v --calc-mode leb           # One file with LEB backend
 ```
 
 ---
@@ -555,19 +552,19 @@ pytest tests/ -m "not slow" --calc-mode leb            # With LEB backend
 |--------|----------|---------|
 | `__init__.py` | 1 | Root group, registers all subgroups |
 | `cmd_code.py` | 4 | lint, format, format-black, typecheck |
-| `cmd_test.py` | 51 | All test suites with backend/target naming |
-| `cmd_leb.py` | 28 | LEB1 generate (per-tier, per-group, body) + verify |
-| `cmd_leb2.py` | 10 | LEB2 convert + verify (per tier) |
+| `cmd_test.py` | 41 | All test suites with backend/target naming |
+| `cmd_leb.py` | 31 | LEB1 generate (per-tier, per-group, body) + verify |
+| `cmd_leb2.py` | 21 | LEB2 convert + verify (per tier) |
 | `cmd_download.py` | 7 | SPK, LEB, ASSIST downloads |
 | `cmd_diag.py` | 4 | Tier diagnostics, data download |
-| `cmd_generate.py` | 8 | Planet centers SPK, lunar corrections, Keplerian |
-| `cmd_release.py` | 5 | LEB upload to GitHub Releases |
+| `cmd_generate.py` | 7 | Planet-center SPKs and Keplerian elements |
+| `cmd_release.py` | 5 | Retired LEB publication commands (fail closed) |
 | `cmd_manual.py` | 8 | Manual build (EPUB/PDF, pandoc/ebooklib) |
 | `cmd_completion.py` | 3 | Shell completion scripts (zsh, bash, fish) |
 
 ### Production CLI source: `libephemeris/cli/__init__.py`
 
-Click-based CLI with `download` subgroup (tier data, LEB1, LEB2, ASSIST),
+Click-based CLI with `download` subgroup (JPL tier data and ASSIST),
 comprehensive `status` command (with `--json`), and `config` reference guide.
 Backward compatible with old colon-separated syntax via alias rewriting.
 

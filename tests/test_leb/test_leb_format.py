@@ -254,10 +254,9 @@ class TestBodyParams:
             assert body_id in BODY_PARAMS, f"Body {body_id} missing from BODY_PARAMS"
 
     @pytest.mark.unit
-    def test_uranians_present(self):
-        """Uranian hypotheticals and Transpluto must be in BODY_PARAMS."""
-        for body_id in [40, 41, 42, 43, 44, 45, 46, 47, 48]:
-            assert body_id in BODY_PARAMS, f"Body {body_id} missing from BODY_PARAMS"
+    def test_reviewed_hypothetical_policy(self):
+        """Fictitious-body models must never enter persisted LEB data."""
+        assert not set(range(40, 59)).intersection(BODY_PARAMS)
 
     @pytest.mark.unit
     def test_coord_types_valid(self):

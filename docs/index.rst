@@ -4,17 +4,17 @@ libephemeris Documentation
 libephemeris is a pure-Python astronomical ephemeris library, API-compatible
 with pyswisseph. It provides high-precision planetary positions,
 house calculations, eclipse predictions, and more using NASA JPL DE440/DE441
-ephemerides via Skyfield.
+through local Skyfield, precomputed LEB, and remote Horizons backends.
 
 Features
 --------
 
 - **pyswisseph Compatible**: Drop-in replacement for pyswisseph
 - **Readable Python**: the ephemeris algorithms are plain, inspectable Python (on the standard NumPy/Skyfield/pyerfa stack)
-- **High Precision**: Uses NASA JPL DE440/DE441 ephemeris via Skyfield
+- **High Precision**: Uses NASA JPL DE440/DE441 ephemerides and IAU/ERFA reductions
 - **Four Calculation Modes**: auto, skyfield, leb, horizons
 - **25 House Systems**: Including Placidus, Koch, Whole Sign, and more (26 codes with A/E alias)
-- **47 Ayanamshas**: Full sidereal zodiac support
+- **Sidereal compatibility surface**: all 47 predefined modes plus user-defined epochs
 - **Eclipses**: Solar and lunar eclipse calculations
 - **Fixed Stars**: 1,447 Hipparcos stars with proper motion
 - **Minor Bodies**: Asteroids, centaurs, and TNOs with SPK kernel support
@@ -36,7 +36,7 @@ Quick Start
    print(f"Ascendant: {ascmc[0]:.2f} degrees")
 
    # Sidereal calculations
-   swe.set_sid_mode(swe.SIDM_LAHIRI)
+   swe.set_sid_mode(swe.SIDM_TRUE_CITRA)
    pos_sid, _ = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)
    print(f"Moon (sidereal): {pos_sid[0]:.4f} degrees")
 
@@ -91,16 +91,19 @@ Contents
    :caption: Methodology
 
    methodology/overview
+   methodology/independence
    methodology/delta-t
    methodology/sidereal-time-longterm
    methodology/planet-centers-spk
    methodology/lunar-apsides
+   methodology/planetary-nodes-apsides
    methodology/interpolated-apogee
    methodology/interpolated-perigee
    methodology/true-lilith
    methodology/hypothetical-bodies
    methodology/pyerfa-integration
    methodology/rebound-integration
+   methodology/galilean-e5-spec
 
 .. toctree::
    :maxdepth: 2
@@ -117,6 +120,7 @@ Contents
    :caption: LEB Binary Ephemeris
 
    leb/guide
+   leb/base-core-provenance
    leb/algorithms
    leb/quickstart
    leb/testing
@@ -130,6 +134,22 @@ Contents
    development/precision-history
    development/keplerian-improvements
    development/full-range-coverage
+   analysis/skyfield-to-leb-porting
+   analysis/test-performance-analysis
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Manuals
+
+   manual/en/README
+   manual/it/README
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Documentation Map
+
+   README
+   PRECISION
 
 
 Indices and Tables

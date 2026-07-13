@@ -418,15 +418,14 @@ def main() -> int:
     print(
         "  True/Mean Node and Lilith are specialised derived quantities\n"
         "  not directly available as Horizons body positions.\n"
-        "  Validated via the reference ephemeris hyper-validation (4400 rounds, 0 FAIL)."
+        "  They are therefore outside the scope of this Horizons report."
     )
     report["sections"]["1.2_lunar_node_lilith"] = {
         "note": (
-            "True/Mean Node and Lilith validated via the reference ephemeris hyper-validation "
-            "(4400 rounds, 0 FAIL). These derived astrological quantities are not "
-            "directly available as Horizons body positions."
+            "True/Mean Node and Lilith are derived quantities that are not directly "
+            "available as Horizons body positions, so this report does not validate them."
         ),
-        "validation_method": "reference_ephemeris_comparison",
+        "validation_method": "outside_horizons_scope",
     }
 
     # ---------------------------------------------------------------

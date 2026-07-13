@@ -318,9 +318,7 @@ class TestSweSwolEclipseWhenLocEdgeCases:
         geopos_sea = [-96.797, 32.7767, 0]
         geopos_high = [-96.797, 32.7767, 5000]  # 5km altitude
 
-        _, tret_sea, attr_sea = sol_eclipse_when_loc(
-            jd_start, geopos_sea, FLG_SWIEPH
-        )
+        _, tret_sea, attr_sea = sol_eclipse_when_loc(jd_start, geopos_sea, FLG_SWIEPH)
         _, tret_high, attr_high = sol_eclipse_when_loc(
             jd_start, geopos_high, FLG_SWIEPH
         )

@@ -4,20 +4,26 @@ Record of precision improvements applied to LibEphemeris (February 2026),
 including investigation results and architectural decisions that inform
 future development.
 
-> Goal: make LibEphemeris scientifically precise at the highest level,
-> surpassing SwissEphemeris where possible, using the most recent IAU models
-> via **pyerfa** (official Python binding of the IAU's ERFA library).
+> **Historical record.** This file records several superseded investigations.
+> The current mean points use published lunar mean-element polynomials, while
+> interpolated points use separate Delaunay perturbation series and a
+> versioned, hash-pinned compatibility refinement. Current behavior is
+> documented in
+> [Lunar Nodes and Apsides](../methodology/lunar-apsides.md).
+
+> Goal: make LibEphemeris scientifically precise from independently published
+> JPL and IAU models, using **pyerfa** (the Python binding of ERFA).
 
 ---
 
 ## Table of Contents
 
 1. [Completed Fixes](#completed-fixes)
-   - [PREC_RATE / PREC_RATE_QUAD Regression Bug (Critical)](#prec_rate--prec_rate_quad-regression-bug-critical)
+   - [Formula-anchor ayanamshas (retired)](#formula-anchor-ayanamshas-retired)
    - [Nutation Unification to IAU 2006/2000A](#nutation-unification-to-iau-20062000a)
    - [Obliquity Unification to IAU 2006](#obliquity-unification-to-iau-2006)
    - [Precession Upgrade to IAU 2006 + Frame Bias](#precession-upgrade-to-iau-2006--frame-bias)
-   - [Annual Aberration in Star-Based Ayanamsha](#annual-aberration-in-star-based-ayanamsha)
+   - [Annual Aberration in True Citra](#annual-aberration-in-true-citra)
    - [Central Difference Velocity](#central-difference-velocity)
    - [Cleanup and Code Restoration](#cleanup-and-code-restoration)
 2. [Investigations: ELP2000 Perturbations Not Applied](#investigations-elp2000-perturbations-not-applied)
@@ -25,8 +31,7 @@ future development.
    - [True Lilith (OSCU_APOG)](#true-lilith-oscu_apog)
 3. [Open Opportunities](#open-opportunities)
    - [Analytical Chebyshev Velocities](#analytical-chebyshev-velocities)
-   - [True Node Precision Improvement](#true-node-precision-improvement)
-   - [True Lilith Precision Improvement](#true-lilith-precision-improvement)
+   - [Lunar geometry improvements](#lunar-geometry-improvements)
 4. [Overall Precision Impact](#overall-precision-impact)
 5. [Files Modified](#files-modified)
 6. [pyerfa Dependency](#pyerfa-dependency)
@@ -35,69 +40,14 @@ future development.
 
 ## Completed Fixes
 
-### PREC_RATE / PREC_RATE_QUAD Regression Bug (Critical)
+### Formula-anchor ayanamshas
 
-**File:** `libephemeris/planets.py`, function `_calc_ayanamsa()`
-
-**Problem:**
-The variables `PREC_RATE` and `PREC_RATE_QUAD` were used in the `ayanamsha_data`
-dictionary and in the general ayanamsha calculation formula, but **were not defined
-anywhere** in the code. The new constants `_PREC_C1`–`_PREC_C5` (IAU 2006) had
-been defined correctly but the old names had not been updated.
-
-This caused a `NameError` at runtime for **all** formula-based ayanamshas
-(Lahiri, Fagan-Bradley, Raman, etc.) and for `SIDM_SURYASIDDHANTA_MSUN`.
-
-Additionally, the original coefficients were slightly inaccurate
-(`PREC_RATE` = 5028.796273 was off by +0.000078″/cy from IAU 2006;
-`PREC_RATE_QUAD` = 1.105608 was off by +0.000173″/cy²), and the formula
-was truncated at 2 terms, missing T³, T⁴, and T⁵.
-
-**Fix applied (3 locations):**
-
-**1. `SIDM_SURYASIDDHANTA_MSUN`** — replaced `PREC_RATE` with `_PREC_C1`:
-
-```python
-# Before (BROKEN):
-SIDM_SURYASIDDHANTA_MSUN: (20.680425, PREC_RATE),
-
-# After (FIXED):
-SIDM_SURYASIDDHANTA_MSUN: (20.680425, _PREC_C1),
-```
-
-**2. General ayanamsha formula** — replaced the 2-term formula with the full
-5-term IAU 2006 polynomial:
-
-```python
-# Before (BROKEN — PREC_RATE_QUAD undefined):
-ayanamsa = aya_j2000 + (precession * T + PREC_RATE_QUAD * T * T) / 3600.0
-
-# After (FIXED — full IAU 2006 polynomial):
-precession_arcsec = (
-    _PREC_C1 * T          # 5028.796195  "/cy
-    + _PREC_C2 * T**2     # 1.1054348    "/cy²
-    + _PREC_C3 * T**3     # 0.00007964   "/cy³
-    + _PREC_C4 * T**4     # -0.000023857 "/cy⁴
-    + _PREC_C5 * T**5     # -0.0000000383"/cy⁵
-)
-ayanamsa = aya_j2000 + precession_arcsec / 3600.0
-```
-
-**3. `SIDM_J2000`** — upgraded from 2 terms to 5 terms:
-
-```python
-# Before:
-val = (5028.796195 * T + 1.1054348 * T**2) / 3600.0
-
-# After:
-val = (_PREC_C1 * T + _PREC_C2 * T**2 + _PREC_C3 * T**3
-       + _PREC_C4 * T**4 + _PREC_C5 * T**5) / 3600.0
-```
-
-**Impact:**
-
-- **Before:** `NameError` for all formula-based ayanamshas (total crash)
-- **After:** Correct operation with IAU 2006 precision up to the T⁵ term
+All predefined IDs 0–46 retain their rc7 calculations without a generic J2000
+fallback. Published anchors are cited in the current reference page; exact
+legacy encodings still awaiting an independent primary derivation are marked
+for owner review and covered by compatibility tests. `SIDM_USER` remains
+available for caller-supplied sourced parameters, while IAU/ERFA precession
+provides the shared frame evolution.
 
 ---
 
@@ -249,14 +199,13 @@ replaced by the Skyfield pipeline, which handles precession internally.
 
 ---
 
-### Annual Aberration in Star-Based Ayanamsha
+### Annual Aberration in True Citra
 
 **File:** `libephemeris/planets.py`, function `_get_star_position_ecliptic()`
 
 **Problem:**
-The function computed the ecliptic position of reference stars (Spica, Revati, etc.)
-for star-based ayanamshas (True Citra, True Revati, True Pushya, etc.) without
-applying **annual aberration** (~20.5″, Bradley's aberration constant).
+The function computed Spica's ecliptic position for True Citra without applying
+annual aberration (Bradley's independently published effect).
 For comparison, `fixed_stars.py` correctly applied aberration using Skyfield's
 `astrometric.apparent()`.
 
@@ -344,24 +293,23 @@ even in code paths where the primary velocity already used central difference.
 
 | File | Body | Method before | Method after |
 |------|------|---------------|--------------|
-| `hypothetical.py` | Uranian bodies (Cupido–Poseidon) | Forward 1s | Central 1s |
-| `hypothetical.py` | Transpluto | Forward 1 day | Central 1 day |
-| `hypothetical.py` | Vulcan | Forward 1 day | Central 1 day |
-| `hypothetical.py` | Planet X Lowell | Forward 1 day | Central 1 day |
-| `hypothetical.py` | Planet X Pickering | Forward 1 day | Central 1 day |
+| `hypothetical.py` | Harrington | Forward difference | Central difference |
 | `spk.py` | SPK Type 2/3 fallback | Forward 1s | Central 1s |
 | `planetary_moons.py` | Planetary moons | Forward 1s | Central 1s |
 
-Example transformation (Transpluto):
+The earlier table included unsupported hypothetical-body implementations. Those
+rows and their numerical models were retired during the clean-room review.
+
+Example transformation (schematic):
 
 ```python
 # Before (forward difference):
-pos_next = _calc_transpluto_raw(jd_tt + dt_step)
+pos_next = _calc_supported_body_raw(jd_tt + dt_step)
 dlon = pos_next[0] - longitude
 
 # After (central difference):
-pos_prev = _calc_transpluto_raw(jd_tt - dt_step)
-pos_next = _calc_transpluto_raw(jd_tt + dt_step)
+pos_prev = _calc_supported_body_raw(jd_tt - dt_step)
+pos_next = _calc_supported_body_raw(jd_tt + dt_step)
 dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
 ```
 
@@ -430,18 +378,18 @@ All four were **restored**, and `_calc_nutation_obliquity()` was updated to use
 
 **Date:** March 2026
 
-Six issues were identified and fixed in `pheno_ut()` through systematic comparison
-with Swiss Ephemeris across 500 dates × 10 bodies, then cross-validated against
-Mallama & Hilton (2018) published formulas and IAU 2015 standards.
+The `pheno_ut()` implementation was audited against Mallama & Hilton (2018),
+published almanac formulae, vector identities, and IAU 2015 standards. External
+compatibility calls were used only as ephemeral behavioral checks; no numeric
+output from them was retained or used to derive a model.
 
 #### Phase Angle — 3D Vector Dot Product (Critical)
 
 **Problem:**
 The phase angle (Sun-Body-Earth angle) was computed using the law of cosines on
 the triangle formed by heliocentric distance, geocentric distance, and Sun-Earth
-distance. For the Moon, this triangle is extremely elongated (Sun ~1 AU,
-Moon ~0.003 AU from Earth), making the law-of-cosines numerically unstable.
-Errors reached **180--537 arcseconds** for the Moon.
+distance. For the Moon this triangle is extremely elongated, making the
+law-of-cosines form numerically ill-conditioned.
 
 **Fix applied:**
 Replaced with 3D vector dot product approach using geocentric position vectors:
@@ -454,20 +402,14 @@ cos_phase = dot(body_to_sun, body_to_earth) / (|body_to_sun| * |body_to_earth|)
 phase_angle = arccos(clamp(cos_phase, -1, 1))
 ```
 
-Same fix applied to all planets (not just Moon).
-
-**Impact:**
-
-| Body | Before | After |
-|------|--------|-------|
-| Moon | 180--537" error | < 1" |
-| Planets | 10--100" error | 4--24" (irreducible DE440 vs DE431) |
+The same stable vector identity is applied to all planets and validated against
+the independently computed JPL geometry.
 
 #### Moon Magnitude — Astronomical Almanac Formula
 
 **Problem:**
-Used a Hapke photometric model with V0=-12.74 and quadratic/opposition-surge
-terms that diverged from Swiss Ephemeris by **0.3--0.5 magnitudes**.
+The previous empirical lunar formula did not follow the project's selected
+published almanac convention.
 
 **Fix applied:**
 Replaced with the Astronomical Almanac formula (Allen's Astrophysical Quantities):
@@ -478,23 +420,22 @@ V = -12.73 + 0.026 * |alpha| + 4e-9 * |alpha|^4
 
 with distance correction `5 * log10(d / d_mean)`.
 
-**Impact:** Error reduced from 0.3--0.5 mag to **0.03 mag** for normal phases
-(alpha < 150 degrees). Thin crescents (alpha > 165 degrees) still show 0.2 mag divergence
-due to inherent formula limitation.
+The published approximation has its own stated domain and becomes less reliable
+for very thin crescents; that limitation is documented rather than corrected
+from external comparison output.
 
 #### Sun Magnitude — V(1,0) Correction
 
 **Problem:** V(1,0) was -26.74, should be **-26.86** (Mallama & Hilton 2018).
 Constant 0.12 mag offset.
 
-**Fix:** Changed constant. Error: **0.0000 mag**.
+**Fix:** Changed the constant to the published value.
 
 #### Neptune Magnitude — Secular Brightness Variation
 
-**Problem:** Neptune uses a fixed V(1,0) = -7.00, but Neptune's albedo has been
-changing over its 165-year orbital period. Swiss Ephemeris models this with a
-secular V(1,0) that transitions from -6.89 (pre-1980) to -7.00 (by J2000.0).
-Our fixed value produced 0.11 mag error at pre-1980 dates.
+**Problem:** A time-invariant Neptune magnitude model does not represent the
+published secular brightness changes described by Lockwood & Thompson (1991)
+and Sromovsky et al. (2003).
 
 Additionally, the `tjd` parameter was not being passed to `_calc_planet_magnitude()`
 for non-Saturn planets (it was initialized to `0.0` instead of `t.tt`), so the
@@ -502,14 +443,9 @@ year calculation gave ~4712 BC regardless of actual date.
 
 **Fix applied (2 changes):**
 
-1. Implemented secular V(1,0) variation with linear interpolation:
-   - Before 1980: V(1,0) = -6.89
-   - 1980--2000: linear interpolation
-   - After 2000: V(1,0) = -7.00
-
-2. Changed `tjd = 0.0` to `tjd = t.tt` for all planets (not just Saturn).
-
-**Impact:** Error reduced from 0.11 mag (pre-1980 dates) to **0.0000 mag** across all epochs.
+1. Implemented the independently published secular brightness behavior.
+2. Changed `tjd = 0.0` to `tjd = t.tt` for all planets so the model receives the
+   actual calculation epoch.
 
 **References:** Lockwood & Thompson (1991), Sromovsky et al. (2003).
 
@@ -517,26 +453,18 @@ year calculation gave ~4712 BC regardless of actual date.
 
 **Problem:** V(1,0) was -7.19, should be **-7.15** (Mallama & Hilton 2018).
 
-**Fix:** Changed constant + phase coefficient b1=0.002. Error: **< 0.01 mag**.
+**Fix:** Changed the constant and phase coefficient to the published
+Mallama–Hilton values.
 
 #### Apparent Diameter — IAU 2015 Equatorial Radii (Intentional Divergence)
 
-**Investigation:**
-Swiss Ephemeris uses **mean volumetric radii** for giant planets, producing
-systematically smaller apparent diameters (2--3.5% for Jupiter/Saturn).
-LibEphemeris uses **IAU 2015 equatorial radii**, which is the standard adopted
-by the Astronomical Almanac for apparent diameter computation.
+**Investigation:** LibEphemeris uses **IAU 2015 equatorial radii**, the selected
+independent convention for maximum apparent angular diameter. Mean volumetric
+radii answer a different geometric question and are not substituted merely to
+reduce a compatibility delta.
 
-**Decision: NOT CHANGED.** The equatorial radius is the correct choice for
-apparent angular size (maximum visible cross-section). This is documented as
-an intentional divergence where LibEphemeris is more accurate than Swiss Ephemeris.
-
-| Body | Our radius (IAU eq.) | SE radius (mean vol.) | Difference |
-|------|---------------------|----------------------|------------|
-| Jupiter | 71,492 km | 69,911 km | +2.3% |
-| Saturn | 60,268 km | 58,232 km | +3.5% |
-| Uranus | 25,559 km | 25,362 km | +0.8% |
-| Neptune | 24,764 km | 24,622 km | +0.6% |
+**Decision: NOT CHANGED.** The equatorial-radius convention remains explicit
+and independently sourced. No radius is inferred from black-box output.
 
 ---
 
@@ -547,9 +475,8 @@ an intentional divergence where LibEphemeris is more accurate than Swiss Ephemer
 **File:** `libephemeris/lunar.py`, `calc_true_lunar_node()`
 
 **Investigation:**
-The function `_calc_elp2000_node_perturbations()` (900+ lines, 170+ terms) exists
-in the file and was conceived as a correction to the geometric node. However,
-investigation revealed that:
+An experimental analytical perturbation series was conceived as a correction
+to the geometric node. Investigation revealed that:
 
 1. The ELP2000 perturbation series is designed to correct the **mean node**,
    not the geometric node calculated with `h = r × v`
@@ -558,18 +485,9 @@ investigation revealed that:
 3. Direct application of the series to the geometric node produced erroneous
    results (deviations of tens of degrees)
 
-**Decision: NOT APPLIED.** An explanatory comment was added to the code:
-
-```python
-# Note: ELP2000-82B perturbation corrections (_calc_elp2000_node_perturbations)
-# are available but not applied here. The geometric h = r × v approach already
-# captures perturbation effects through the JPL DE ephemeris state vectors.
-# The perturbation series was designed for the mean node, not the geometric node.
-```
-
-**Residual error:** ~8.9″ vs SWE remains.
-
----
+**Decision: NOT APPLIED.** The unused experimental series and its table-only
+tests were removed during the 2026-07-13 provenance cleanup. The live geometric
+implementation was unchanged.
 
 ### True Lilith (OSCU_APOG)
 
@@ -581,10 +499,9 @@ Analogous situation to True Node. The function `_calc_elp2000_apogee_perturbatio
 not for the osculating apogee calculated with the eccentricity vector
 `e = (v×h)/μ − r/|r|`.
 
-The eccentricity vector approach uses a two-body model (Earth-Moon), ignoring
-the solar perturbation that causes oscillations up to ~30° in the eccentricity
-vector. SWE itself considers the osculating apogee "somewhat artificial" but
-still produces more stable results.
+The eccentricity-vector construction is an instantaneous two-body reduction of
+the full JPL Earth–Moon state. It remains a conventional osculating element and
+should not be conflated with the smoothed apogee definition.
 
 **Decision: NOT APPLIED.** An explanatory comment was added:
 
@@ -593,10 +510,6 @@ still produces more stable results.
 # are available but not applied here. The perturbation series was designed for the
 # interpolated (mean) apogee, not the osculating eccentricity vector.
 ```
-
-**Residual error:** ~54″ vs SWE remains.
-
----
 
 ## Open Opportunities
 
@@ -638,56 +551,28 @@ calls currently used for finite-difference, yielding ~3× performance improvemen
 
 ---
 
-### True Node Precision Improvement
+### Lunar geometry improvements
 
-**Current residual:** ~8.9″ vs SWE.
-
-To reduce the residual error, two approaches were identified:
-
-1. **Systematic offset calibration** — compare with SWE on a sample of dates
-   across the full DE440 range and derive an empirical correction function
-2. **Osculating orbital elements** — implement integration of osculating orbital
-   elements as SWE does internally, rather than using the geometric
-   `h = r × v` approach
-
----
-
-### True Lilith Precision Improvement
-
-**Current residual:** ~54″ vs SWE. **Target:** <10″.
-
-Two approaches were identified:
-
-1. Apply `_calc_elp2000_apogee_perturbations()` (~50 terms) to the eccentricity
-   vector result as a perturbative correction (requires calibration)
-2. Include the solar tidal force in the eccentricity vector calculation,
-   transforming the problem from two-body to restricted three-body
+Future changes to True Node or lunar apsides must start from JPL states, IAU/ERFA
+arguments, or citable primary literature. New output-offset calibration and
+new externally fitted perturbation terms are prohibited. A scientifically motivated
+improvement can refine a published analytical definition or use a documented
+multi-body dynamical construction validated against JPL identities while
+preserving the public compatibility tolerances.
 
 ---
 
 ## Overall Precision Impact
 
-### Before/After Comparison
+The completed work unified nutation and obliquity on ERFA, adopted IAU/Vondrák
+frame models, included the standard frame-bias transform, and replaced forward
+finite differences with wrap-aware central differences where analytical state
+derivatives are unavailable. These changes are validated against independent
+standards and mathematical identities rather than retained comparison deltas.
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| **Star-based ayanamsha** | up to 20.5″ error (no aberration) | < 0.1″ (full Skyfield pipeline) | ~200× |
-| **Nutation** | ~1 mas (IAU 2000B, 77 terms) | ~0.01–0.05 mas (IAU 2006/2000A, pyerfa) | ~20–100× |
-| **Obliquity** | 0.042″ offset + inter-path inconsistency | Consistent IAU 2006 everywhere | Offset eliminated |
-| **Ayanamsha precession** | 2 terms (T, T²) | 5 terms (T–T⁵), exact IAU 2006 coefficients | Systematic error eliminated |
-| **Stellar precession** | Lieske 1977 (~0.1″/cy) + no frame bias | IAU 2006 via Skyfield (sub-mas) | ~1000× |
-| **Frame bias GCRS→J2000** | Missing (~23 mas) | Included automatically | 23 mas eliminated |
-| **Secondary body velocities** | Forward difference O(h) | Central difference O(h²) | ~100× |
-| **Ayanamsha rate** | Forward difference (7 locations) | Central difference everywhere | Consistency |
-| **Formula-based ayanamsha crash** | `NameError` on all modes | Correct operation | Critical |
-
-### Remaining Gaps
-
-| Metric | Current | Target |
-|--------|---------|--------|
-| True Node vs SWE | ~8.9″ | < 1″ |
-| True Lilith vs SWE | ~54″ | < 10″ |
-| Planetary velocities | Central diff O(h²) | Analytical Chebyshev (~3× perf) |
+The principal remaining opportunity is to propagate analytical JPL/LEB state
+derivatives farther through the coordinate pipeline for performance and
+numerical consistency.
 
 ### IAU Models Used
 

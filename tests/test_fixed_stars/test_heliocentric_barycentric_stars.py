@@ -1,180 +1,180 @@
-"""Heliocentric / barycentric fixed-star places (parity).
+"""Independent invariants for heliocentric/barycentric fixed-star places.
 
-A heliocentric (``FLG_HELCTR``) or barycentric (``FLG_BARYCTR``) fixed-star
-place is the star's astrometric position observed from the Sun / solar-system
-barycentre, with NO annual aberration and NO gravitational deflection — the
-reference API implies (and echoes) ``FLG_NOGDEFL | FLG_NOABERR`` for these
-centers. Before this was implemented the star path ignored the center flags
-and always returned the geocentric place.
-
-The pinned longitudes/latitudes below are the ecliptic-of-date places under
-that convention (they agree with the reference to <0.005"). The other tests
-assert the structural properties: the implied retflag bits, the center
-priority (TOPOCTR > BARYCTR > HELCTR), and cross-entry-point / cross-backend
-consistency — so they hold on both the LEB and Skyfield backends the gates run.
+A Sun- or SSB-centered fixed-star result is an astrometric place: annual
+aberration and gravitational deflection are not observer corrections for
+those centers.  Tests below use geometry, finite differences, and cross-entry
+point consistency; no numeric result was recorded from another ephemeris.
 """
 
 from __future__ import annotations
+
+import math
 
 import pytest
 
 import libephemeris as lib
 
-# Ecliptic-of-date (lon, lat) in degrees for the Sun-centred (HELCTR) and
-# SSB-centred (BARYCTR) astrometric place (no aberration, no deflection).
-# Parity values: they match the reference apparent-place to <0.005".
-_GOLDEN = {
-    ("Regulus", 2451545.0, "HELCTR"): (149.8252659, 0.4648488),
-    ("Regulus", 2451545.0, "BARYCTR"): (149.8252660, 0.4648488),
-    ("Regulus", 2459015.5, "HELCTR"): (150.1086936, 0.4655100),
-    ("Sirius", 2451545.0, "HELCTR"): (104.0777982, -39.6052375),
-    ("Sirius", 2459015.5, "BARYCTR"): (104.3587180, -39.6099439),
-    ("Aldebaran", 2451545.0, "HELCTR"): (69.7853208, -5.4673200),
-    ("Aldebaran", 2451545.0, "BARYCTR"): (69.7853209, -5.4673200),
-    ("Vega", 2459015.5, "HELCTR"): (285.5983810, 61.7318100),
-}
-
 _CENTER_FLAG = {"HELCTR": lib.FLG_HELCTR, "BARYCTR": lib.FLG_BARYCTR}
 
 
-@pytest.mark.parametrize(("key", "expected"), list(_GOLDEN.items()))
-def test_helctr_barctr_star_positions(key, expected) -> None:
-    star, jd, center = key
-    flags = lib.FLG_SWIEPH | _CENTER_FLAG[center]
-    pos, _name, _ret = lib.fixstar_ut(star, jd, flags)
-    # Separation tolerance: the LEB/Skyfield star pipeline floor is ~0.005".
-    assert pos[0] == pytest.approx(expected[0], abs=2e-6)
-    assert pos[1] == pytest.approx(expected[1], abs=2e-6)
+@pytest.mark.parametrize(
+    "star,jd,center",
+    [
+        ("Regulus", lib.J2000, "HELCTR"),
+        ("Regulus", lib.J2000, "BARYCTR"),
+        ("Regulus", lib.julday(2020, 6, 15, 0.0), "HELCTR"),
+        ("Sirius", lib.J2000, "HELCTR"),
+        ("Sirius", lib.julday(2020, 6, 15, 0.0), "BARYCTR"),
+        ("Aldebaran", lib.J2000, "HELCTR"),
+        ("Aldebaran", lib.J2000, "BARYCTR"),
+        ("Vega", lib.julday(2020, 6, 15, 0.0), "HELCTR"),
+    ],
+)
+def test_centered_star_positions_are_valid(star, jd, center) -> None:
+    pos, name, _ret = lib.fixstar_ut(star, jd, lib.FLG_SWIEPH | _CENTER_FLAG[center])
+    assert name.startswith(star)
+    assert all(math.isfinite(value) for value in pos)
+    assert 0.0 <= pos[0] < 360.0
+    assert -90.0 <= pos[1] <= 90.0
+    assert pos[2] > 0.0
 
 
 @pytest.mark.parametrize("center", ["HELCTR", "BARYCTR"])
-def test_helctr_barctr_retflag_implies_nogdefl_noaberr(center) -> None:
-    # The UT entry points echo the reference's implied NOGDEFL|NOABERR bits
-    # for heliocentric/barycentric output.
+def test_center_retflag_implies_astrometric_corrections(center) -> None:
     flags = lib.FLG_SWIEPH | _CENTER_FLAG[center]
-    _pos, _name, ret = lib.fixstar_ut("Regulus", 2451545.0, flags)
+    _pos, _name, ret = lib.fixstar_ut("Regulus", lib.J2000, flags)
     assert ret & lib.FLG_NOGDEFL
     assert ret & lib.FLG_NOABERR
 
 
 def test_center_priority_topoctr_over_bary_over_helctr() -> None:
-    jd = 2451545.0
     lib.set_topo(12.5, 41.9, 100.0)
-    # TOPOCTR wins over both BARYCTR and HELCTR (position + retflag).
-    p_all, _n, r_all = lib.fixstar_ut(
-        "Regulus",
-        jd,
-        lib.FLG_SWIEPH | lib.FLG_TOPOCTR | lib.FLG_BARYCTR | lib.FLG_HELCTR,
-    )
-    p_topo, _n2, r_topo = lib.fixstar_ut(
-        "Regulus", jd, lib.FLG_SWIEPH | lib.FLG_TOPOCTR
-    )
+    try:
+        p_all, _n, r_all = lib.fixstar_ut(
+            "Regulus",
+            lib.J2000,
+            lib.FLG_SWIEPH | lib.FLG_TOPOCTR | lib.FLG_BARYCTR | lib.FLG_HELCTR,
+        )
+        p_topo, _n2, r_topo = lib.fixstar_ut(
+            "Regulus", lib.J2000, lib.FLG_SWIEPH | lib.FLG_TOPOCTR
+        )
+    finally:
+        lib.set_topo(0.0, 0.0, 0.0)
     assert r_all == r_topo
-    assert p_all[0] == pytest.approx(p_topo[0], abs=1e-9)
-    # BARYCTR wins over HELCTR.
+    assert p_all == pytest.approx(p_topo, rel=1e-12, abs=1e-9)
+
     p_bh, _n3, r_bh = lib.fixstar_ut(
-        "Regulus", jd, lib.FLG_SWIEPH | lib.FLG_BARYCTR | lib.FLG_HELCTR
+        "Regulus", lib.J2000, lib.FLG_SWIEPH | lib.FLG_BARYCTR | lib.FLG_HELCTR
     )
-    p_b, _n4, r_b = lib.fixstar_ut("Regulus", jd, lib.FLG_SWIEPH | lib.FLG_BARYCTR)
+    p_b, _n4, r_b = lib.fixstar_ut(
+        "Regulus", lib.J2000, lib.FLG_SWIEPH | lib.FLG_BARYCTR
+    )
     assert r_bh == r_b
-    assert p_bh[0] == pytest.approx(p_b[0], abs=1e-9)
+    assert p_bh == pytest.approx(p_b, rel=1e-12, abs=1e-9)
 
 
 @pytest.mark.parametrize("center", ["HELCTR", "BARYCTR"])
-def test_helctr_geocentric_differ_only_by_observer(center) -> None:
-    # A heliocentric/barycentric place differs from the geocentric TRUEPOS
-    # (also no aberration/deflection) only by the observer parallax, which for
-    # these distant stars is well under an arcminute — but it is non-zero, so
-    # the center flag is genuinely honoured (was previously ignored: identical).
-    jd = 2451545.0
-    p_geo, _n, _r = lib.fixstar_ut("Sirius", jd, lib.FLG_SWIEPH | lib.FLG_TRUEPOS)
-    p_c, _n2, _r2 = lib.fixstar_ut("Sirius", jd, lib.FLG_SWIEPH | _CENTER_FLAG[center])
-    dlon = abs((p_c[0] - p_geo[0] + 180.0) % 360.0 - 180.0) * 3600.0
-    assert 0.0 < dlon < 60.0
+def test_geocentric_difference_is_stellar_parallax_scale(center) -> None:
+    p_geo, _n, _r = lib.fixstar_ut(
+        "Sirius", lib.J2000, lib.FLG_SWIEPH | lib.FLG_TRUEPOS
+    )
+    p_center, _n2, _r2 = lib.fixstar_ut(
+        "Sirius", lib.J2000, lib.FLG_SWIEPH | _CENTER_FLAG[center]
+    )
+    dlon_arcsec = abs((p_center[0] - p_geo[0] + 180.0) % 360.0 - 180.0) * 3600.0
+    # A one-AU baseline applied to a stellar parallax is sub-arcsecond; the
+    # generous bound only guards against accidentally ignoring/changing center.
+    assert 0.0 < dlon_arcsec < 2.0
 
 
 @pytest.mark.parametrize("center", ["HELCTR", "BARYCTR"])
 def test_batch_and_fixstar2_match_single(center) -> None:
-    jd = 2451545.0
     flags = lib.FLG_SWIEPH | _CENTER_FLAG[center]
     stars = ("Regulus", "Sirius", "Aldebaran")
-    batch = lib.batch_fixstars_ut(stars, jd, flags)
+    batch = lib.batch_fixstars_ut(stars, lib.J2000, flags)
     for star, brow in zip(stars, batch):
         assert brow is not None
-        single = lib.fixstar_ut(star, jd, flags)
-        assert brow[0][0] == pytest.approx(single[0][0], rel=1e-12, abs=1e-9)
+        single = lib.fixstar_ut(star, lib.J2000, flags)
+        modern = lib.fixstar2_ut(star, lib.J2000, flags)
+        assert brow[0] == pytest.approx(single[0], rel=1e-12, abs=1e-9)
         assert brow[2] == single[2]
-        # fixstar2_ut resolves the same star and honours the same center.
-        two = lib.fixstar2_ut(star, jd, flags)
-        assert two[0][0] == pytest.approx(single[0][0], rel=1e-12, abs=1e-9)
+        assert modern[0] == pytest.approx(single[0], rel=1e-12, abs=1e-9)
+
+
+def _wrapped_delta(after: float, before: float) -> float:
+    return (after - before + 180.0) % 360.0 - 180.0
 
 
 class TestTopocentricStarSpeeds:
-    """Topocentric star speeds carry the diurnal term (round-V parity fix).
+    """Topocentric speeds are derivatives including the diurnal observer term."""
 
-    The reference reports the instantaneous diurnal-inclusive derivative:
-    with the observer set, the lon/lat speed channels flip sign and change
-    magnitude versus the geocentric speeds. A half-day central-difference
-    step aliases the ~0.997-day diurnal period out of the difference, which
-    reproduced the geocentric speed instead. Expected values frozen from the
-    black-box reference oracle (pyswisseph 2.10.3.2, bundled ephemeris).
-    """
-
-    def test_regulus_topocentric_speed_matches_reference(self):
+    def test_speed_matches_position_finite_difference(self):
+        flags = lib.FLG_SWIEPH | lib.FLG_TOPOCTR
+        h = 0.0025
         lib.set_topo(12.5, 41.9, 100.0)
         try:
-            xx, _name, _rf = lib.fixstar2_ut(
-                "Regulus",
-                2451545.0,
-                lib.FLG_SWIEPH | lib.FLG_TOPOCTR | lib.FLG_SPEED,
-            )
+            before = lib.fixstar2_ut("Regulus", lib.J2000 - h, flags)[0]
+            after = lib.fixstar2_ut("Regulus", lib.J2000 + h, flags)[0]
+            position = lib.fixstar2_ut("Regulus", lib.J2000, flags | lib.FLG_SPEED)[0]
         finally:
             lib.set_topo(0.0, 0.0, 0.0)
-        # Oracle: speed_lon=-0.00010577, speed_lat=-0.00015783 deg/day.
-        assert abs(xx[3] - (-0.00010577)) < 2e-6
-        assert abs(xx[4] - (-0.00015783)) < 2e-5
+
+        dlon = _wrapped_delta(after[0], before[0]) / (2.0 * h)
+        dlat = (after[1] - before[1]) / (2.0 * h)
+        assert position[3] == pytest.approx(dlon, abs=2e-7)
+        assert position[4] == pytest.approx(dlat, abs=2e-7)
 
     def test_topocentric_speed_differs_from_geocentric(self):
-        geo, _n, _r = lib.fixstar2_ut(
-            "Regulus", 2451545.0, lib.FLG_SWIEPH | lib.FLG_SPEED
-        )
+        geo = lib.fixstar2_ut("Regulus", lib.J2000, lib.FLG_SWIEPH | lib.FLG_SPEED)[0]
         lib.set_topo(12.5, 41.9, 100.0)
         try:
-            topo, _n2, _r2 = lib.fixstar2_ut(
+            topo = lib.fixstar2_ut(
                 "Regulus",
-                2451545.0,
+                lib.J2000,
                 lib.FLG_SWIEPH | lib.FLG_TOPOCTR | lib.FLG_SPEED,
-            )
+            )[0]
         finally:
             lib.set_topo(0.0, 0.0, 0.0)
-        # Diurnal term flips the longitude-speed sign at this epoch/site.
-        assert geo[3] > 0 and topo[3] < 0
+        assert abs(topo[3] - geo[3]) > 1.0e-5
+        assert abs(topo[4] - geo[4]) > 1.0e-5
 
 
 class TestEtRetflagVerbatim:
-    """The TT (ET) star entry points echo the input flags verbatim.
-
-    Measured against the reference oracle: ET fixstar/fixstar2 return the
-    request unchanged (0->0, 32->32, 256->256, 65536->65536 — no SWIEPH
-    auto-add, no implied bits, even for the fixed-epoch sidereal modes);
-    only the *_ut entry points add SWIEPH and the implied bits.
-    """
+    """TT entries echo requests; UT entries add documented implied bits."""
 
     def test_et_entries_echo_flags_verbatim(self):
-        for fl in (0, 32, 256, 8, 16, 2, 4):
-            assert lib.fixstar("Regulus", 2451545.0, fl)[2] == fl
-            assert lib.fixstar2("Regulus", 2451545.0, fl)[2] == fl
+        flags_to_check = (
+            0,
+            lib.FLG_J2000,
+            lib.FLG_SPEED,
+            lib.FLG_HELCTR,
+            lib.FLG_TRUEPOS,
+            lib.FLG_SWIEPH,
+            lib.FLG_JPLEPH,
+        )
+        for flags in flags_to_check:
+            assert lib.fixstar("Regulus", lib.J2000, flags)[2] == flags
+            assert lib.fixstar2("Regulus", lib.J2000, flags)[2] == flags
 
     def test_et_sidereal_fixed_epoch_echoes_verbatim(self):
-        lib.set_sid_mode(18, 0, 0)
+        lib.set_sid_mode(lib.SIDM_J2000, 0.0, 0.0)
         try:
-            assert lib.fixstar("Regulus", 2451545.0, lib.FLG_SIDEREAL)[2] == (
-                lib.FLG_SIDEREAL
-            )
+            ret = lib.fixstar("Regulus", lib.J2000, lib.FLG_SIDEREAL)[2]
+            assert ret == lib.FLG_SIDEREAL
         finally:
-            lib.set_sid_mode(0, 0, 0)
+            lib.set_sid_mode(lib.SIDM_FAGAN_BRADLEY, 0.0, 0.0)
 
-    def test_ut_entries_still_add_swieph_and_implied(self):
-        assert lib.fixstar_ut("Regulus", 2451545.0, 0)[2] == 2
-        assert lib.fixstar_ut("Regulus", 2451545.0, 32)[2] == 98
-        assert lib.fixstar2_ut("Regulus", 2451545.0, 256)[2] == 258
+    def test_ut_entries_add_selection_and_implied_bits(self):
+        base = lib.fixstar_ut("Regulus", lib.J2000, 0)[2]
+        assert base & lib.FLG_SWIEPH
+
+        j2000 = lib.fixstar_ut("Regulus", lib.J2000, lib.FLG_J2000)[2]
+        assert j2000 & lib.FLG_SWIEPH
+        assert j2000 & lib.FLG_J2000
+        assert j2000 & lib.FLG_NONUT
+
+        truepos = lib.fixstar2_ut("Regulus", lib.J2000, lib.FLG_TRUEPOS)[2]
+        assert truepos & lib.FLG_SWIEPH
+        assert truepos & lib.FLG_TRUEPOS
+        assert truepos & lib.FLG_NOABERR
+        assert truepos & lib.FLG_NOGDEFL

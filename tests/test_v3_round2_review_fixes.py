@@ -19,12 +19,11 @@ from libephemeris.state import _resolve_data_dir
 
 
 class TestParityOneLiners:
-    def test_pheno_sun_illuminated_fraction_matches_reference(self) -> None:
-        """pheno_ut: the Sun's illuminated fraction attr[1] is 0.0, matching
-        the reference API (which reports it inapplicable, not the physical 1.0)."""
+    def test_pheno_sun_disc_is_fully_illuminated(self) -> None:
+        """The emitting solar disc has zero phase angle and full illumination."""
         attr = le.pheno_ut(2451545.0, SUN, 0)
         assert attr[0] == 0.0  # phase angle
-        assert attr[1] == 0.0  # illuminated fraction (reference-API parity)
+        assert attr[1] == 1.0
 
     def test_context_set_topo_alt_defaults_to_zero(self) -> None:
         """Context.set_topo parity with the module-level set_topo(alt=0.0)."""
@@ -76,9 +75,10 @@ class TestHypothetical:
     def test_undefined_fictitious_id_raises(self) -> None:
         """An id in the fictitious range but without an ephemeris must raise,
         not return a phantom (0,0,0) position."""
+        from libephemeris.exceptions import UnknownBodyError
         from libephemeris.hypothetical import calc_hypothetical_position
 
-        with pytest.raises(ValueError):
+        with pytest.raises(UnknownBodyError):
             calc_hypothetical_position(59, 2451545.0)
 
 
@@ -102,15 +102,10 @@ class TestTime:
 
 class TestSplitDeg:
     def test_nakshatra_index_for_unnormalized_longitude(self) -> None:
-        """split_deg with the nakshatra flag keeps the raw index for a
-        longitude >= 373.33 deg, wrapping only the exact 360 rollover (idx 27),
-        matching the reference API."""
+        """Nakshatra indices use the longitude modulo one full circle."""
         nak = le.SPLIT_DEG_NAKSHATRA
-        assert le.split_deg(360.0, nak)[4] == 0  # exact rollover -> 0
-        assert le.split_deg(365.0, nak)[4] == 0  # index 27 -> 0
-        assert le.split_deg(373.4, nak)[4] == 28  # index 28 kept
-        assert le.split_deg(476.58, nak)[4] == 35
-        assert le.split_deg(700.0, nak)[4] == 52
+        for angle in (0.0, 17.25, 359.9, 720.0):
+            assert le.split_deg(angle, nak) == le.split_deg(angle + 360.0, nak)
 
 
 class TestReaderResourceSafety:
@@ -133,11 +128,40 @@ class TestReaderResourceSafety:
                 gc.collect()
             assert not [w for w in caught if issubclass(w.category, ResourceWarning)]
 
+    def test_process_global_leb_reader_closes_at_interpreter_exit(self) -> None:
+        """Lazy global readers register an interpreter-shutdown finalizer."""
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        leb_path = (
+            Path(__file__).parents[1]
+            / "libephemeris"
+            / "data"
+            / "leb2"
+            / "base_core.leb2"
+        )
+        code = (
+            "import libephemeris.state as s; "
+            f"s.set_leb_file({str(leb_path)!r}); "
+            "assert s.get_leb_reader() is not None"
+        )
+        result = subprocess.run(
+            [sys.executable, "-W", "always::ResourceWarning", "-c", code],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "ResourceWarning" not in result.stderr
+
 
 class TestCalcFlags:
     def test_ephemeris_bits_are_mutually_exclusive(self) -> None:
-        """calc_ut never echoes two ephemeris bits at once. The reference
-        the reference makes them mutually exclusive (JPLEPH > SWIEPH), so
+        """calc_ut never echoes two ephemeris bits at once.
+
+        The public flag contract makes them mutually exclusive (JPLEPH >
+        SWIEPH), so
         FLG_JPLEPH|FLG_SWIEPH must collapse to a single-bit retflag."""
         from libephemeris.constants import FLG_JPLEPH, FLG_MOSEPH, FLG_SWIEPH
 
@@ -150,7 +174,7 @@ class TestCalcFlags:
             assert not (retflag & FLG_JPLEPH and retflag & FLG_SWIEPH), (
                 f"retflag {retflag} has both ephemeris bits set"
             )
-            # JPLEPH wins the priority, matching the reference's measured retflags.
+            # JPLEPH has the documented public priority.
             assert retflag & FLG_JPLEPH and not (retflag & FLG_SWIEPH)
 
         # A lone ephemeris bit (or none) is preserved / defaulted as before.

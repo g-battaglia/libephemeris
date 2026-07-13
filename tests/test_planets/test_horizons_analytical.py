@@ -1,7 +1,7 @@
 """Tests for Horizons backend analytical bodies and calc_mode switching.
 
 These tests verify the offline analytical paths in the Horizons backend
-(Mean Node, Mean Apogee, Uranians) which require no HTTP calls.
+(mean lunar points and reviewed fictitious orbits), which require no HTTP.
 """
 
 from __future__ import annotations
@@ -124,31 +124,28 @@ class TestHorizonsAnalyticalBodies:
 
 
 @pytest.mark.unit
-class TestHorizonsUranianAnalytical:
-    """Test Uranians via Horizons analytical path (heliocentric only)."""
+class TestHorizonsFictitiousAnalytical:
+    """Exercise the no-HTTP native-center hypothetical paths."""
 
-    URANIAN_IDS = [40, 41, 42, 43, 44, 45, 46, 47]
-    URANIAN_NAMES = [
-        "Cupido",
-        "Hades",
-        "Zeus",
-        "Kronos",
-        "Apollon",
-        "Admetos",
-        "Vulkanus",
-        "Poseidon",
-    ]
-
-    @pytest.mark.parametrize(
-        "body_id,name",
-        list(zip(URANIAN_IDS, URANIAN_NAMES)),
-    )
-    def test_uranian_helio_analytical(self, body_id, name):
-        """Uranian body via horizons_calc_ut heliocentric should work."""
+    @pytest.mark.parametrize("body_id", [*range(40, 56), 57])
+    def test_restored_helio_analytical(self, body_id):
+        """Every heliocentric historical model is available without HTTP."""
         result = horizons_calc_ut(None, JD_J2000, body_id, FLG_SWIEPH | FLG_HELCTR)
         data = result[0]
-        assert len(data) == 6, f"{name}: expected 6 values, got {len(data)}"
-        assert 0.0 <= data[0] < 360.0, f"{name}: lon={data[0]} out of range"
+        assert len(data) == 6
+        assert 0.0 <= data[0] < 360.0
+
+    @pytest.mark.parametrize("body_id", [56, 58])
+    def test_native_geocentric_analytical(self, body_id, monkeypatch):
+        """White Moon and Waldemath use their native geocentric models."""
+        from libephemeris import mean_lunar_apse
+
+        monkeypatch.setattr(
+            mean_lunar_apse, "_active_ephemeris_range", lambda: (None, 0.0, 0.0)
+        )
+        data, _ = horizons_calc_ut(None, JD_J2000, body_id, FLG_SWIEPH)
+        assert len(data) == 6
+        assert 0.0 <= data[0] < 360.0
 
 
 @pytest.mark.unit

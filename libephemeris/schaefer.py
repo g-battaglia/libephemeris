@@ -299,7 +299,10 @@ def calc_airmass(altitude_deg: float) -> float:
         cos_z = math.cos(z_rad)
         denominator = cos_z + 0.50572 * (96.07995 - z) ** (-1.6364)
         airmass = 1.0 / denominator
-    except (ValueError, ZeroDivisionError):  # pragma: no cover - altitude in (0,90) keeps the denominator strictly positive
+    except (
+        ValueError,
+        ZeroDivisionError,
+    ):  # pragma: no cover - altitude in (0,90) keeps the denominator strictly positive
         airmass = 40.0
 
     return min(max(airmass, 1.0), 40.0)

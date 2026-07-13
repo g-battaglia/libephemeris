@@ -4,22 +4,38 @@ LibEphemeris is a pure-Python astronomical ephemeris library with a Swiss Epheme
 
 **Always maintain 1:1 compatibility with PySwissEphemeris.**
 
+## Independence
+
+LibEphemeris is 100% independent. Every implementation, model, and data file
+is derived from NASA JPL/IAU data and standards, cited primary literature,
+and permissively licensed sources.
+
+- Never inspect, retrieve, possess, read, translate, adapt, or copy Swiss
+  Ephemeris source code, source comments, documentation prose, algorithms, or
+  data files. Reference-distribution files must not enter this repository.
+- The reference API may be used only for ephemeral behavioral comparison:
+  call its public API and compare outputs. Never persist, fit, or commit
+  those outputs.
+- Run `uv run python scripts/check_provenance.py` for integrity checks.
+
 ## Commands
 
 ```bash
 uv pip install -e ".[dev]"              # Install with dev deps
 
-leph code lint                          # Ruff linter with auto-fix
-leph code format                        # Ruff formatter
-leph code typecheck                     # mypy
+uv run ./leph code lint                 # Ruff linter with auto-fix
+uv run ./leph code format               # Ruff formatter
+uv run ./leph code typecheck            # mypy
 
-leph test skyfield essential            # ~490 tests, ~20s (fast sanity check)
-leph test leb-backend unit-fast         # ~5890 tests, ~1 min [RECOMMENDED]
+uv run ./leph test skyfield essential   # ~900 tests, ~20s (fast sanity check)
+uv run ./leph test leb-backend unit-fast # ~16,000 tests, ~1 min [RECOMMENDED]
 pytest tests/test_file.py -v            # Single file
 pytest tests/test_file.py::test_name -v # Single test
 ```
 
-**Never run the full test suite.** Always use `leph test <subgroup>` or `pytest` on specific files. Full CLI reference (dev, prod, poe shortcuts, TAB completion setup): see `CLI.md`.
+**Never run the full test suite.** Always use `uv run ./leph test <subgroup>`
+or `pytest` on specific files. Full CLI reference (dev, prod, poe shortcuts,
+TAB completion setup): see `CLI.md`.
 
 ## Code Style
 

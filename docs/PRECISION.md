@@ -51,14 +51,14 @@ astrologically meaningful daily motion of the chart frame.
 
 ## Lunar Points
 
-| Point | Max Diff | Independent Verification |
-|-------|----------|--------------------------|
-| Mean Node | < 0.001° | — |
-| True Node | < 0.01" | Verified vs JPL Horizons to machine precision |
-| Mean Lilith | < 0.015" (lon) | Latitude ~20" systematic (different node formulas) |
-| True Lilith | < 0.5" | Both libraries ~240" from Horizons (inherent two-body limit) |
-| Interpolated Apogee | ~0.36° | Genuine algorithm difference (JPL DE440 vs ELP2000-82B perturbation series) |
-| Interpolated Perigee | ~2.6° | JPL DE440 physical passages vs truncated ELP2000-82B perturbation series |
+| Point | Construction | Independent Verification |
+|-------|--------------|--------------------------|
+| Mean Node | ERFA/IERS Delaunay argument | Standards and rate tests |
+| True Node | JPL angular-momentum geometry | Verified against JPL Horizons |
+| Mean Lilith | ERFA/IERS arguments and inclined-orbit geometry | Standards and geometric identities |
+| True Lilith | JPL eccentricity-vector geometry | Two-body state invariants |
+| Interpolated Apogee | Delaunay perturbation series and hash-pinned refinement | Hash, continuity, parity, and rate tests |
+| Interpolated Perigee | Separate Delaunay series and hash-pinned refinement | Hash, continuity, parity, and rate tests |
 
 ## House Cusps
 
@@ -95,8 +95,12 @@ Max difference: 0.51" (Rigil Kentaurus — nearest star, parallax not modeled).
 
 ## Ayanamsha
 
-- Standard modes (Lahiri, Fagan-Bradley, Raman): < 0.0002°
-- Star-based modes (True Citra, True Revati): < 0.006°
+- Native fixed-epoch modes are validated against ERFA frame transforms.
+- Native True Citra and Galactic Centre 0 Sagittarius modes are validated
+  against the independent Spica catalogue and IAU galactic-frame pipelines.
+- Every predefined ID 0–46 is operational without a warn-and-degrade fallback.
+  Published, catalogue/IAU geometry, and compatibility-anchor definitions are
+  distinguished in the per-mode ayanamsha source table.
 
 ## Eclipses
 
@@ -117,7 +121,10 @@ Max difference: 0.51" (Rigil Kentaurus — nearest star, parallax not modeled).
 
 ## Hypothetical Planets
 
-Uranian hypothetical planets: < 1" (Keplerian from published elements).
+All historical IDs 40–58 have built-in runtime models. Harrington (ID 50) has
+an independent primary-source derivation; models whose complete primary
+transcription is pending, including White Moon, are documented in
+[the provenance record](methodology/hypothetical-bodies.md).
 
 ## Heliocentric / Barycentric / Equatorial / XYZ
 

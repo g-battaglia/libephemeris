@@ -11,10 +11,6 @@ wheels/
 de421.bsp
 stuff
 
-# Local-only reference data (never bundled)
-_ref/
-_local_*/
-
 # Hypothesis test database
 .hypothesis/
 
@@ -35,16 +31,13 @@ de440s.bsp
 *.bsp
 implementation_plans
 .opencode/plans
-compare_scripts_tests.log
-*.log
 
 # LEB binary ephemeris files (generated, large)
 data/leb/*.leb
 
-# LEB2 compressed files — only base_core.leb2 is tracked (ships in PyPI wheel)
-# All others are published via GitHub Releases
+# Root LEB2 outputs are generated and ignored. The only tracked core payload is
+# libephemeris/data/leb2/base_core.leb2; release assets require separate review.
 data/leb2/*.leb2
-!data/leb2/base_core.leb2
 
 # Environment files (may contain local paths/config)
 .env
@@ -57,8 +50,8 @@ data/leb2/*.leb2
 data/leb/.DS_Store
 data/.DS_Store
 
-# Reference ephemeris data for comparison tests (dev-only)
-data/reference/
+# Reference-distribution artifacts are deliberately not ignored: the
+# provenance gate rejects them even when untracked.
 
 # Manual build output (EPUB/PDF)
 docs/build/
@@ -66,7 +59,3 @@ docs/build/
 
 # JS tooling
 node_modules/
-/data/leb2/base_core.leb2
-/HANDOFF.md
-/data-bk
-validation

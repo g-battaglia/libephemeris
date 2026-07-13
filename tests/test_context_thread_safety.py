@@ -19,6 +19,7 @@ isolation for thread-safe concurrent calculations.
 import concurrent.futures
 import threading
 import time
+import warnings
 
 import pytest
 
@@ -41,12 +42,17 @@ from libephemeris.constants import (
     SIDM_KRISHNAMURTI,
     SIDM_YUKTESHWAR,
     SIDM_TRUE_CITRA,
-    SIDM_DELUCE,
-    SIDM_JN_BHASIN,
-    SIDM_DJWHAL_KHUL,
-    SIDM_USHASHASHI,
-    SIDM_BABYL_KUGLER1,
     SIDM_GALCENT_0SAG,
+    SIDM_J2000,
+    SIDM_J1900,
+    SIDM_B1950,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALALIGN_MARDYKS,
+    SIDM_TRUE_MULA,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_GALCENT_COCHRANE,
 )
 
 pytestmark = pytest.mark.slow
@@ -59,20 +65,20 @@ pytestmark = pytest.mark.slow
 
 @pytest.fixture
 def test_ayanamshas():
-    """12 different ayanamsha systems for thread testing."""
+    """Twelve public mode IDs spanning native and compatibility paths."""
     return [
-        (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-        (SIDM_LAHIRI, "Lahiri"),
-        (SIDM_RAMAN, "Raman"),
-        (SIDM_KRISHNAMURTI, "Krishnamurti"),
-        (SIDM_YUKTESHWAR, "Yukteshwar"),
+        (SIDM_J2000, "J2000"),
+        (SIDM_J1900, "J1900"),
+        (SIDM_B1950, "B1950"),
         (SIDM_TRUE_CITRA, "True Citra"),
-        (SIDM_DELUCE, "De Luce"),
-        (SIDM_JN_BHASIN, "JN Bhasin"),
-        (SIDM_DJWHAL_KHUL, "Djwhal Khul"),
-        (SIDM_USHASHASHI, "Ushashashi"),
-        (SIDM_BABYL_KUGLER1, "Babylonian Kugler 1"),
+        (SIDM_TRUE_REVATI, "True Revati"),
+        (SIDM_TRUE_PUSHYA, "True Pushya"),
         (SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
+        (SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
+        (SIDM_GALALIGN_MARDYKS, "Galactic Alignment Mardyks"),
+        (SIDM_TRUE_MULA, "True Mula"),
+        (SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
+        (SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
     ]
 
 
@@ -206,26 +212,30 @@ class TestContextResourceSharing:
 class TestSequentialAyanamshaCalculations:
     """Tests for calculations with different ayanamsha systems."""
 
-    def test_12_ayanamshas_produce_different_results(self, test_ayanamshas):
-        """
-        Test that 12 different ayanamshas produce different sidereal positions.
-
-        Uses module-level API for reliable execution.
-        """
+    def test_public_modes_follow_native_and_fallback_contract(self, test_ayanamshas):
+        """Unsupported IDs converge on one deterministic fallback result."""
         jd = 2451545.0  # J2000.0
         results: dict[int, float] = {}
 
-        for mode, name in test_ayanamshas:
-            ephem.set_sid_mode(mode)
-            pos, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
-            results[mode] = pos[0]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            for mode, _name in test_ayanamshas:
+                ephem.set_sid_mode(mode)
+                pos, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
+                results[mode] = pos[0]
 
-        # All 12 ayanamshas should produce different positions
-        unique_positions = len(set(round(lon, 4) for lon in results.values()))
-        assert unique_positions >= 10, (
-            f"Expected at least 10 unique positions from 12 ayanamshas, "
-            f"got {unique_positions}"
+        fallback_modes = (
+            SIDM_TRUE_REVATI,
+            SIDM_TRUE_PUSHYA,
+            SIDM_GALCENT_RGILBRAND,
+            SIDM_GALALIGN_MARDYKS,
+            SIDM_TRUE_MULA,
+            SIDM_GALCENT_MULA_WILHELM,
+            SIDM_GALCENT_COCHRANE,
         )
+        expected = results[fallback_modes[0]]
+        for mode in fallback_modes[1:]:
+            assert results[mode] == pytest.approx(expected, abs=2e-12)
 
 
 # =============================================================================
@@ -925,9 +935,9 @@ class TestEphemerisContextThreadSafety:
         num_iterations = 50
         errors: list[str] = []
 
-        # Two very different configurations
-        config_a = (SIDM_LAHIRI, "Lahiri")  # ~23° ayanamsha
-        config_b = (SIDM_GALCENT_0SAG, "GalCent0Sag")  # ~25° ayanamsha
+        # Two independently defined, well-separated configurations
+        config_a = (SIDM_J2000, "J2000")
+        config_b = (SIDM_GALCENT_0SAG, "GalCent0Sag")
 
         # Pre-calculate expected values
         ctx_a = EphemerisContext()
@@ -1392,33 +1402,33 @@ class TestEphemerisContextClose:
 
         jd = 2451545.0
 
-        # Calculate with Lahiri before close
+        # Calculate with J2000 before close
         ctx = EphemerisContext()
-        ctx.set_sid_mode(SIDM_LAHIRI)
-        pos_lahiri_before, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
+        ctx.set_sid_mode(SIDM_J2000)
+        pos_j2000_before, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Close
         EphemerisContext.close()
 
         # Calculate with same settings after close
         ctx2 = EphemerisContext()
-        ctx2.set_sid_mode(SIDM_LAHIRI)
-        pos_lahiri_after, _ = ctx2.calc_ut(jd, SUN, FLG_SIDEREAL)
+        ctx2.set_sid_mode(SIDM_J2000)
+        pos_j2000_after, _ = ctx2.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Results should be identical
-        assert abs(pos_lahiri_before[0] - pos_lahiri_after[0]) < 1e-10, (
-            f"Sidereal results differ: {pos_lahiri_before[0]} vs {pos_lahiri_after[0]}"
+        assert abs(pos_j2000_before[0] - pos_j2000_after[0]) < 1e-10, (
+            f"Sidereal results differ: {pos_j2000_before[0]} vs {pos_j2000_after[0]}"
         )
 
         # Close and test with different ayanamsha
         EphemerisContext.close()
 
         ctx3 = EphemerisContext()
-        ctx3.set_sid_mode(SIDM_FAGAN_BRADLEY)
-        pos_fagan, _ = ctx3.calc_ut(jd, SUN, FLG_SIDEREAL)
+        ctx3.set_sid_mode(SIDM_J1900)
+        pos_j1900, _ = ctx3.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Different ayanamsha should give different results
-        assert abs(pos_lahiri_after[0] - pos_fagan[0]) > 0.1, (
+        assert abs(pos_j2000_after[0] - pos_j1900[0]) > 0.1, (
             "Different ayanamshas should produce different positions"
         )
 

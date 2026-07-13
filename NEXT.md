@@ -33,8 +33,10 @@ State at the v3.0.0 release:
   join, true cusp derivatives, modern star catalogues, true rates in the speed
   slots) we **do not replicate the reference's data or its defects**.
 - Precision is demonstrated against **independent arbiters** (JPL Horizons,
-  IERS, astropy/ERFA, peer-reviewed literature), never against the reference
-  itself.
+  IERS, Astropy/ERFA, peer-reviewed literature), never against the reference
+  itself. Reference-API calls may check public behavior ephemerally, but their
+  values may not be saved as fixtures, fitted into corrections, or used to
+  derive shipped models.
 - Published models (e.g. Schaefer 1993 for heliacal visibility, historical
   Ptolemaic/Babylonian criteria) are implemented **from the literature**.
 
@@ -45,19 +47,17 @@ State at the v3.0.0 release:
 Documented in `docs/comparison/intentional-divergences.md` and
 `docs/comparison/known-differences.md`. Summary:
 
-| Topic | Divergence | Why we are the correct one |
+| Topic | Bounded difference | Independent basis |
 |---|---|---|
-| Modern ΔT | ±100–144 ms in 2024 | We use the real IERS signal; the reference uses an internal table + extrapolation |
-| Historic/future ΔT | up to 20 s @1582, 875 s @3000 | We use a newer peer-reviewed long-term model |
-| GMST / houses from 2050 | ~2" (up to 9" @2340 via ΔT) | The reference has a ~1.9" discontinuity at 2050-01-01; we join continuously |
-| Placidus/Koch cusp speed | up to 2392"/day | We report the true derivative |
-| MEAN apside lat speed | different slot | The reference stores the position at t+1d; we store the true rate |
-| MEAN planetary apside speed | ~0.15°/day (speed channels only) | The reference's convention is unidentified; positions and nodes match exactly |
-| Planetary nodes (scattered days) | transient spikes up to 3.5" | A transient glitch in the reference's apparent-place corrector |
-| Star radial-velocity slots | ~250 "AU" on Spica | We use a modern catalogue; angular positions are unaffected |
-| Minor-body historic orbit solutions | 80–130" (Nessus/Amor/Bennu, 1900–1970) | We follow the SPK/Horizons solution; Horizons confirms us to ≤0.25" |
-| Near-polar rise/set search window | Moon events at lat ±80–85° | The reference searches ~1 day and reports none; we search 2 |
-| Heliacal visibility model | 3–14 days, apparition selection | Margin calibration; the physical rebuild lands in Wave 4 |
+| Modern ΔT | Small interpolation residual | IERS observations |
+| Historic/future ΔT | Growing extrapolation uncertainty | Stephenson–Morrison–Hohenkerk reconstruction |
+| Remote-epoch GMST / houses | Smooth model-dependent drift | IAU 2006 plus continuous Vondrák long-term realization |
+| House and apside speeds | Derivative-convention differences | Derivative of the reported position, checked by step halving |
+| Planetary nodes | Occasional apparent-place convention differences | Independent orbital geometry and IAU aberration/deflection |
+| Star distance/radial speed | Catalog and semantic differences | Hipparcos/Gaia/Astropy space motion |
+| Minor-body historic orbits | Orbit-solution differences | JPL SPK/Horizons or optional ASSIST integration |
+| Near-polar rise/set | Search-policy differences | Documented two-day physical search window |
+| Heliacal visibility | Atmosphere/observer-model differences | Schaefer VISLIMIT, Reijs scale heights, and published optics relations |
 
 ---
 
@@ -105,26 +105,27 @@ aberration / sidereal pipeline, SPK registration with auto-detect).*
 - **3.1 `SIDBIT`** (resolves the composite-mode guard in `set_sid_mode`): today
   the projection bits are accepted with a warning and the base mode is used.
   Implement the `ECL_T0` / `ECL_DATE` / `SSY_PLANE` / `PREC_ORIG` projections
-  from their geometric definition, after a multi-date black-box characterisation
-  (bit × mode × epoch).
+  from published geometric definitions and verify with independent frame
+  invariants. Compatibility calls, if used, remain ephemeral.
 - **3.2 `rise_trans`: full BIT_HINDU_RISING** — only the geocentric-no-ecliptic-
   latitude component is missing; the rest of the rsmi bits are already handled.
 - **3.3 `FLG_JPLHOR` / `JPLHOR_APPROX` policy**: bits accepted and documented as
   no-ops (our positions are already DE440/ICRS-native); a true frame-fix
   emulation is optional and out of scope.
-- **3.4 Close the MEAN planetary apside speed investigation**: one final
-  time-boxed black-box session; if the convention does not emerge, keep the
-  documented divergence and mark the channel EXPECTED in the validator.
+- **3.4 Close the MEAN planetary apside speed investigation**: search for an
+  independent published convention; if none exists, keep the true derivative
+  and document the bounded difference without deriving a correction from
+  compatibility output.
 - **3.5 Per-flag certification of minor surfaces**: micro-rounds for per-bit
   `rise_trans`, `refrac`/`refrac_extended` on a P/T/altitude grid, `azalt`
   round-trip, `gauquelin_sector` 0–5.
 
-### Wave 4 — Heliacal: unified physics (the big build)
+### Wave 4 — Heliacal: continued physical-model consolidation
 
-Today `heliacal.py` carries an empirical `SchaeferModel` with hard-coded margins.
-The real physics already exists but is disconnected (`extinction.py`,
-`schaefer.py`), the AVKIND criteria are ignored, and the search skeleton is
-duplicated between the two backends. Target architecture:
+The core now uses the published Schaefer VISLIMIT family, Reijs atmospheric
+scale heights, a natural-sky baseline, and physical pupil/optics relations.
+Future work can consolidate the remaining duplicated search and extinction
+paths without changing that provenance boundary. Target architecture:
 
 ```
 extinction.py (physics source) → visibility.py NEW (vectorised VisibilityEngine)
@@ -132,13 +133,12 @@ extinction.py (physics source) → visibility.py NEW (vectorised VisibilityEngin
 → heliacal.py (API + dispatch) → schaefer.py (deprecated shim)
 ```
 
-Phased so each phase lands with a green suite: black-box characterisation +
-golden captures; the engine in bit-identical legacy mode; physical
-`vis_limit_mag` behind a transition flag; the unified search (twilight session
-as the unit, boundary bisection, coherent jd1/jd2/jd3, conjunction tracking);
-test migration behind a model flag; default flip; final validation against a
-10-body × 6-location × 4-season grid and the literature (Schaefer 1993,
-Krisciunas & Schaefer 1991, Yallop 1997, the Venus tablets of Ammisaduqa).
+Each phase must land with independent defining-condition and metamorphic tests:
+the unified search (twilight session as the unit, boundary bisection, coherent
+`jd1`/`jd2`/`jd3`, conjunction tracking), backend equivalence, and validation
+against the literature (Schaefer 1993, Krisciunas & Schaefer 1991, Yallop 1997,
+and the Venus tablets of Ammisaduqa). No golden capture from a compatibility
+oracle may enter the repository.
 
 ### Wave 5 — Certification: dual verdict
 

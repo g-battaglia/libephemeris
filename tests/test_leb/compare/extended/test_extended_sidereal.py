@@ -34,7 +34,7 @@ from libephemeris.constants import (
 from tests.test_leb.compare.conftest import (
     CompareHelper,
     ECLIPTIC_TOLERANCES,
-    FORMULA_SIDEREAL_MODES,
+    SIDEREAL_MODE_SWEEP,
     lon_error_arcsec,
 )
 
@@ -75,7 +75,7 @@ PIPELINE_B_INTERP = [
 ALL_ECLIPTIC_BODIES = PIPELINE_B_MEAN + PIPELINE_B_TRUE + PIPELINE_B_INTERP
 
 # Sidereal tolerance: LEB vs Skyfield should be near-zero since both
-# use the same formula-based ayanamsha.  The position tolerance is the
+# use the same selected ayanamsha definition. The position tolerance is the
 # Chebyshev approximation error, NOT ayanamsha model difference.
 # Extended tier uses 0.005" instead of 0.001" because nutation polynomial
 # degradation beyond +-20 centuries from J2000 adds ~0.003" (known limitation #12).
@@ -90,7 +90,7 @@ SID_ECLIPTIC_TOL = TOLS_EXT.ECLIPTIC_ARCSEC  # 0.1" (Meeus polynomial limits)
 # Combined: up to ~0.002 deg/day for Moon.  Other bodies are well below 0.001.
 SID_SPEED_TOL = 0.002  # deg/day (Moon-dominated, other bodies <0.001)
 
-# A subset of formula-based sidereal modes for combinatorial tests
+# A subset of public sidereal modes for combinatorial tests
 SID_MODES_SUBSET = [
     0,
     1,
@@ -473,13 +473,13 @@ class TestExtSiderealSpeed:
 
 
 class TestExtSiderealMultiAyanamsha:
-    """All 27+ formula-based ayanamsha modes for sidereal position."""
+    """Broad public ayanamsha-mode sweep for sidereal positions."""
 
     @pytest.mark.leb_compare_extended
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", [(SUN, "Sun"), (MARS, "Mars")])
-    @pytest.mark.parametrize("sid_mode", FORMULA_SIDEREAL_MODES)
-    def test_all_formula_modes(
+    @pytest.mark.parametrize("sid_mode", SIDEREAL_MODE_SWEEP)
+    def test_all_sidereal_modes(
         self,
         compare: CompareHelper,
         ext_dates_50: list[float],
@@ -487,7 +487,7 @@ class TestExtSiderealMultiAyanamsha:
         body_name: str,
         sid_mode: int,
     ):
-        """Sidereal lon matches Skyfield for all formula-based modes."""
+        """Sidereal longitude matches the direct backend for every swept mode."""
         flags = FLG_SPEED | FLG_SIDEREAL
         max_err = 0.0
 

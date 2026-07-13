@@ -1,2 +1,0 @@
-worst |error| vs erfa.pmat76: 0.00000 arcsec @ cy=-50 lon=0.0 lat=-5.0
-PASS (tolerance 0.005 arcsec)

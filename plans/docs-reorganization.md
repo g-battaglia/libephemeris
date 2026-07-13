@@ -1,5 +1,10 @@
 # Piano di riordino documentazione
 
+> **Stato: completato e superato.** Questo file conserva il piano storico
+> precedente al riordino. L'inventario, i percorsi e i collegamenti proposti
+> qui sotto non descrivono la struttura corrente e non sono un indice attivo;
+> usare [`docs/README.md`](../docs/README.md).
+
 ## Stato attuale
 
 La cartella `docs/` contiene 40+ file markdown distribuiti senza una logica chiara.

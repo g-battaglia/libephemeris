@@ -11,6 +11,7 @@ wide plausible range. This validates the actual numbers two independent ways:
     radii; umbra radius l2 < 0 for a total eclipse; axis declination within a few
     degrees of the Moon's declination).
 """
+
 from __future__ import annotations
 
 import math
@@ -50,9 +51,11 @@ def _independent_besselian(jd_ut):
 
     def cart(p):
         ra, dec, r = math.radians(p[0]), math.radians(p[1]), p[2]
-        return (r * math.cos(dec) * math.cos(ra),
-                r * math.cos(dec) * math.sin(ra),
-                r * math.sin(dec))
+        return (
+            r * math.cos(dec) * math.cos(ra),
+            r * math.cos(dec) * math.sin(ra),
+            r * math.sin(dec),
+        )
 
     rs, rm = cart(sp), cart(mp)
     g = [rs[i] - rm[i] for i in range(3)]
@@ -62,9 +65,11 @@ def _independent_besselian(jd_ut):
     a = math.atan2(gh[1], gh[0])
     exy = math.hypot(gh[0], gh[1])
     ex = [-gh[1] / exy, gh[0] / exy, 0.0]
-    ey = [gh[1] * ex[2] - gh[2] * ex[1],
-          gh[2] * ex[0] - gh[0] * ex[2],
-          gh[0] * ex[1] - gh[1] * ex[0]]
+    ey = [
+        gh[1] * ex[2] - gh[2] * ex[1],
+        gh[2] * ex[0] - gh[0] * ex[2],
+        gh[0] * ex[1] - gh[1] * ex[0],
+    ]
     x = sum(rm[i] * ex[i] for i in range(3)) / _RE
     y = sum(rm[i] * ey[i] for i in range(3)) / _RE
     z = sum(rm[i] * gh[i] for i in range(3)) / _RE
@@ -79,8 +84,14 @@ def _independent_besselian(jd_ut):
 @pytest.mark.parametrize("label,total,start", _ECLIPSES)
 def test_besselian_matches_independent_geometry(label, total, start):
     jd = _greatest_eclipse_jd(*start)
-    lib = (L.calc_besselian_x(jd), L.calc_besselian_y(jd), L.calc_besselian_d(jd),
-           L.calc_besselian_mu(jd), L.calc_besselian_l1(jd), L.calc_besselian_l2(jd))
+    lib = (
+        L.calc_besselian_x(jd),
+        L.calc_besselian_y(jd),
+        L.calc_besselian_d(jd),
+        L.calc_besselian_mu(jd),
+        L.calc_besselian_l1(jd),
+        L.calc_besselian_l2(jd),
+    )
     ind = _independent_besselian(jd)
     # Same positions, independent geometry -> agree to round-off.
     assert abs(lib[0] - ind[0]) < 1e-6, f"{label} x"

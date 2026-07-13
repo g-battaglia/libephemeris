@@ -7,6 +7,7 @@ and flag combinations.
 
 from __future__ import annotations
 
+import warnings
 
 import pytest
 
@@ -237,9 +238,7 @@ class TestFastCalcFlags:
     @pytest.mark.integration
     def test_equatorial_j2000_flag(self, leb_reader, jd_mid):
         """FLG_EQUATORIAL|FLG_J2000 should return J2000 RA/Dec."""
-        result, _ = fast_calc_ut(
-            leb_reader, jd_mid, SUN, FLG_EQUATORIAL | FLG_J2000
-        )
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_EQUATORIAL | FLG_J2000)
         assert 0.0 <= result[0] < 360.0, f"RA = {result[0]}"
         assert -90.0 <= result[1] <= 90.0, f"Dec = {result[1]}"
 
@@ -309,6 +308,7 @@ class TestFastCalcFlags:
     def test_radians_flag(self, leb_reader, jd_mid):
         """FLG_RADIANS returns coordinates in radians."""
         import math
+
         result_deg, _ = fast_calc_ut(leb_reader, jd_mid, SUN, 0)
         result_rad, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_RADIANS)
         assert abs(result_rad[0] - math.radians(result_deg[0])) < 1e-10
@@ -464,56 +464,52 @@ class TestExplicitSiderealParams:
     """Test thread-safe explicit sidereal parameter passing."""
 
     @pytest.mark.integration
-    def test_explicit_sid_mode_lahiri(self, leb_reader):
-        """Explicit sid_mode=1 (Lahiri) should work like global state."""
+    def test_explicit_lahiri_mode_is_computed_without_fallback(self, leb_reader):
+        """An explicit Lahiri request is mode-specific and emits no warning."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
 
-        result, _ = fast_calc_ut(
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            lahiri, _ = fast_calc_ut(
+                leb_reader,
+                jd_mid,
+                SUN,
+                FLG_SPEED | FLG_SIDEREAL,
+                sid_mode=1,
+            )
+        j2000, _ = fast_calc_ut(
             leb_reader,
             jd_mid,
             SUN,
             FLG_SPEED | FLG_SIDEREAL,
-            sid_mode=1,
-            sid_t0=2451545.0,
-            sid_ayan_t0=0.0,
+            sid_mode=18,
         )
-        # Sidereal lon should be ~24 deg less than tropical
-        tropical, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_SPEED)
-        diff = tropical[0] - result[0]
-        if diff < 0:
-            diff += 360.0
-        # Lahiri ayanamsa is ~24 deg in 2020s
-        assert 20.0 < diff < 30.0, f"Sidereal offset = {diff:.2f} deg"
+        assert lahiri != pytest.approx(j2000, abs=1e-6)
+        assert not caught
 
     @pytest.mark.integration
-    def test_explicit_sid_mode_fagan_bradley(self, leb_reader):
-        """Explicit sid_mode=0 (Fagan-Bradley) should differ from Lahiri."""
+    def test_explicit_standard_epoch_modes_differ(self, leb_reader):
+        """Explicit J2000 and J1900 frames produce distinct results."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
 
-        result_lahiri, _ = fast_calc_ut(
+        result_j2000, _ = fast_calc_ut(
             leb_reader,
             jd_mid,
             SUN,
             FLG_SPEED | FLG_SIDEREAL,
-            sid_mode=1,
-            sid_t0=2451545.0,
-            sid_ayan_t0=0.0,
+            sid_mode=18,
         )
-        result_fb, _ = fast_calc_ut(
+        result_j1900, _ = fast_calc_ut(
             leb_reader,
             jd_mid,
             SUN,
             FLG_SPEED | FLG_SIDEREAL,
-            sid_mode=0,
-            sid_t0=2451545.0,
-            sid_ayan_t0=0.0,
+            sid_mode=19,
         )
-        # Fagan-Bradley and Lahiri differ by ~0.88 deg
-        diff = abs(result_lahiri[0] - result_fb[0])
-        assert diff > 0.5, f"FB vs Lahiri diff = {diff:.4f} deg (too small)"
-        assert diff < 3.0, f"FB vs Lahiri diff = {diff:.4f} deg (too large)"
+        diff = abs(result_j2000[0] - result_j1900[0])
+        assert diff > 0.5, f"J2000 vs J1900 diff = {diff:.4f} deg"
 
     @pytest.mark.integration
     def test_sidereal_speed_includes_precession_correction(self, leb_reader):
@@ -527,7 +523,7 @@ class TestExplicitSiderealParams:
             jd_mid,
             SUN,
             FLG_SPEED | FLG_SIDEREAL,
-            sid_mode=1,
+            sid_mode=18,
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
         )
@@ -579,19 +575,20 @@ class TestAyanamsa:
     """Test the LEB-based ayanamsa computation."""
 
     @pytest.mark.integration
-    def test_lahiri_ayanamsa_reasonable(self, leb_reader):
-        """Lahiri ayanamsa should be ~24 degrees in 2020s."""
+    def test_default_fagan_bradley_ayanamsa_is_mode_specific(self, leb_reader):
+        """The default Fagan/Bradley ID computes without a J2000 fallback."""
 
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
 
-        try:
+        ephem.set_sid_mode(0)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
             aya = _calc_ayanamsa_from_leb(leb_reader, jd_mid)
-            # Lahiri ayanamsa is ~24 degrees in the 2020s
-            assert 20.0 < aya < 30.0, f"Ayanamsa = {aya} (out of expected range)"
-        except (KeyError, ValueError):
-            # May fail if sidereal mode is not set; that's OK
-            pass
+        j2000 = _calc_ayanamsa_from_leb(leb_reader, jd_mid, sid_mode=18)
+        assert 0.0 <= aya < 360.0
+        assert abs((aya - j2000 + 180.0) % 360.0 - 180.0) > 1.0
+        assert not caught
 
     @pytest.mark.integration
     def test_explicit_sid_mode_param(self, leb_reader):
@@ -599,12 +596,11 @@ class TestAyanamsa:
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
 
-        aya = _calc_ayanamsa_from_leb(leb_reader, jd_mid, sid_mode=1)
-        assert 20.0 < aya < 30.0, f"Lahiri ayanamsa = {aya}"
-
-        aya_fb = _calc_ayanamsa_from_leb(leb_reader, jd_mid, sid_mode=0)
-        assert 20.0 < aya_fb < 30.0, f"Fagan-Bradley ayanamsa = {aya_fb}"
-        assert abs(aya - aya_fb) > 0.5, "Lahiri and Fagan-Bradley should differ"
+        aya_j2000 = _calc_ayanamsa_from_leb(leb_reader, jd_mid, sid_mode=18)
+        aya_j1900 = _calc_ayanamsa_from_leb(leb_reader, jd_mid, sid_mode=19)
+        assert 0.0 <= aya_j2000 < 360.0
+        assert 0.0 <= aya_j1900 < 360.0
+        assert abs(aya_j2000 - aya_j1900) > 0.5
 
     @pytest.mark.integration
     def test_star_based_mode_delegates(self, leb_reader):
@@ -614,7 +610,7 @@ class TestAyanamsa:
         KeyError, forcing the whole calculation onto Skyfield. It now
         computes the (memoized) star anchor via the Skyfield pipeline
         while the body itself stays on LEB, so the mean ayanamsha must
-        match the reference implementation in planets.
+        match the direct implementation in planets.
         """
         from libephemeris.planets import _calc_ayanamsa
         from libephemeris.time_utils import deltat

@@ -119,9 +119,7 @@ class TestTDBTTBasics:
 
         # Get Moon position (fastest moving body)
         pos_tt, _ = ephem.calc(jd_tt, ephem.MOON, ephem.FLG_SPEED)
-        pos_offset, _ = ephem.calc(
-            jd_tt + dt_tdb_tt, ephem.MOON, ephem.FLG_SPEED
-        )
+        pos_offset, _ = ephem.calc(jd_tt + dt_tdb_tt, ephem.MOON, ephem.FLG_SPEED)
 
         # Position difference in arcseconds
         lon_diff_arcsec = abs(pos_tt[0] - pos_offset[0]) * 3600

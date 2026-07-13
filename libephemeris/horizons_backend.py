@@ -28,6 +28,14 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
+from .constants import (
+    FICT_OFFSET,
+    PROSERPINA,
+    VULCAN,
+    WALDEMATH,
+    WHITE_MOON,
+)
+
 logger = logging.getLogger("libephemeris")
 
 # =============================================================================
@@ -63,8 +71,13 @@ _ANALYTICAL_BODIES = {10, 12}  # Mean Node, Mean Apogee
 # Bodies computed from Moon state vectors (single HTTP for Moon)
 _MOON_DERIVED_BODIES = {11, 13, 21, 22}  # True Node, Oscu Apogee, Interp Apogee/Perigee
 
-# Heliocentric-only bodies (Uranians) — analytical, no HTTP
-_URANIAN_BODIES = {40, 41, 42, 43, 44, 45, 46, 47, 48}
+# Historical compatibility bodies are local analytical models. Heliocentric
+# models can be returned directly for FLG_HELCTR; native geocentric models are
+# likewise direct. Other center requests raise KeyError so the normal
+# deterministic Skyfield fallback can perform the Earth/Sun vector subtraction.
+_HYPOTHETICAL_BODIES = frozenset(range(FICT_OFFSET, WALDEMATH + 1))
+_GEOCENTRIC_HYPOTHETICAL_BODIES = frozenset({WHITE_MOON, WALDEMATH})
+_OF_DATE_HYPOTHETICAL_BODIES = frozenset({VULCAN, WHITE_MOON, PROSERPINA, WALDEMATH})
 
 # Deflector bodies for gravitational light bending
 _DEFLECTOR_NAIF = {
@@ -384,8 +397,19 @@ def _is_horizons_body(body_id: int) -> bool:
         body_id in _HORIZONS_COMMAND
         or body_id in _ANALYTICAL_BODIES
         or body_id in _MOON_DERIVED_BODIES
-        or body_id in _URANIAN_BODIES
+        or body_id in _HYPOTHETICAL_BODIES
     )
+
+
+def _trace_source(body_id: int, iflag: int) -> str:
+    """Return the actual source used by a successful Horizons dispatch."""
+    from .constants import FLG_HELCTR
+
+    if body_id in _ANALYTICAL_BODIES or body_id in _HYPOTHETICAL_BODIES:
+        return "Analytical"
+    if body_id == 0 and iflag & FLG_HELCTR:
+        return "Analytical"
+    return "Horizons"
 
 
 def horizons_calc_ut(
@@ -403,7 +427,7 @@ def horizons_calc_ut(
         client: HorizonsClient instance.
         jd_ut: Julian Day UT.
         body_id: SE_* body constant.
-        iflag: The reference-ephemeris calculation flags.
+        iflag: Public calculation flags.
         sid_mode: Sidereal mode override; reads the global state when None.
             An explicit value lets EphemerisContext dispatch through
             Horizons without swapping the global sidereal mode across the
@@ -457,18 +481,23 @@ def horizons_calc_ut(
     if body_id in _ANALYTICAL_BODIES:
         return _calc_analytical(jd_ut, body_id, iflag, sid_mode)
 
+    # Local hypothetical models. A center conversion that needs the real Earth
+    # or Sun falls through deterministically to the shared Skyfield pipeline;
+    # it must never be misreported as an unknown body.
+    if body_id in _HYPOTHETICAL_BODIES:
+        native_geocentric = body_id in _GEOCENTRIC_HYPOTHETICAL_BODIES
+        asks_heliocentric = bool(iflag & FLG_HELCTR)
+        asks_barycentric = bool(iflag & FLG_BARYCTR)
+        if asks_barycentric or native_geocentric == asks_heliocentric:
+            raise KeyError(
+                f"Fictitious body {body_id} center conversion uses Skyfield fallback"
+            )
+        return _calc_hypothetical(jd_ut, body_id, iflag, sid_mode)
+
     if iflag & FLG_NONUT:
         # The state-vector frames below always include nutation; defer to
         # Skyfield (same policy as the LEB backend).
         raise KeyError("FLG_NONUT not supported by Horizons backend")
-
-    # Uranian hypotheticals — analytical, heliocentric only
-    if body_id in _URANIAN_BODIES:
-        if not (iflag & FLG_HELCTR):
-            raise KeyError(
-                f"Uranian body {body_id} geocentric not supported via Horizons"
-            )
-        return _calc_uranian(jd_ut, body_id, iflag, sid_mode)
 
     # Bodies not in Horizons command map
     if body_id not in _HORIZONS_COMMAND:
@@ -507,43 +536,55 @@ def horizons_calc_ut(
                 tgt_sv.vz - sun_sv.vz,
             )
             if not (iflag & FLG_TRUEPOS):
-                # Light-time baseline parity with the LEB/Skyfield backend:
-                # for the major planets (Mercury..Pluto) the HELCTR light
-                # time is measured over the BARYCENTRIC distance
-                # |target - SSB| / c, iterated once on the retarded
-                # barycentric position (fast_calc._HELCTR_BARY_LT_BODIES);
-                # other bodies keep the heliocentric baseline.
-                _bary_lt = body_id in {2, 3, 4, 5, 6, 7, 8, 9}
-                if _bary_lt:
-                    dist = _math.sqrt(tgt_sv.x**2 + tgt_sv.y**2 + tgt_sv.z**2)
-                else:
-                    dist = _math.sqrt(
-                        rel_pos[0] ** 2 + rel_pos[1] ** 2 + rel_pos[2] ** 2
-                    )
-                if dist > 0.0:
-                    lt = dist / c_au_day
-                    tgt_lt = client.fetch_state_vector(command, jd_tt - lt, "@0", "TDB")
-                    if _bary_lt:
-                        # One refinement pass on the retarded barycentric
-                        # distance (the fast_calc loop converges here too).
-                        dist2 = _math.sqrt(tgt_lt.x**2 + tgt_lt.y**2 + tgt_lt.z**2)
-                        if dist2 > 0.0:
-                            lt = dist2 / c_au_day
-                            tgt_lt = client.fetch_state_vector(
-                                command, jd_tt - lt, "@0", "TDB"
-                            )
+                # Solve |target(t-lt) - Sun(t)| = c*lt. The target is retarded
+                # while the heliocentric observer remains at observation time.
+                tgt_lt = tgt_sv
+                lt = 0.0
+                for _ in range(3):
                     rel_pos = (
                         tgt_lt.x - sun_sv.x,
                         tgt_lt.y - sun_sv.y,
                         tgt_lt.z - sun_sv.z,
                     )
-                    rel_vel = (
-                        tgt_lt.vx - sun_sv.vx,
-                        tgt_lt.vy - sun_sv.vy,
-                        tgt_lt.vz - sun_sv.vz,
+                    dist = _math.sqrt(
+                        rel_pos[0] ** 2 + rel_pos[1] ** 2 + rel_pos[2] ** 2
                     )
-            # Speed slots are 0.0 without FLG_SPEED (matching the reference
-            # ephemeris and the geocentric branch below, which zeroes velocity).
+                    if dist == 0.0:
+                        break
+                    lt = dist / c_au_day
+                    tgt_lt = client.fetch_state_vector(command, jd_tt - lt, "@0", "TDB")
+
+                rel_pos = (
+                    tgt_lt.x - sun_sv.x,
+                    tgt_lt.y - sun_sv.y,
+                    tgt_lt.z - sun_sv.z,
+                )
+                rel_vel = (
+                    tgt_lt.vx - sun_sv.vx,
+                    tgt_lt.vy - sun_sv.vy,
+                    tgt_lt.vz - sun_sv.vz,
+                )
+
+                # Differentiate the same propagation equation so the speed is
+                # the derivative of the retarded heliocentric position.
+                dist = _math.sqrt(rel_pos[0] ** 2 + rel_pos[1] ** 2 + rel_pos[2] ** 2)
+                if dist > 0.0:
+                    direction = tuple(component / dist for component in rel_pos)
+                    target_radial = (
+                        direction[0] * tgt_lt.vx
+                        + direction[1] * tgt_lt.vy
+                        + direction[2] * tgt_lt.vz
+                    )
+                    relative_radial = sum(
+                        direction[index] * rel_vel[index] for index in range(3)
+                    )
+                    lt_rate = relative_radial / (c_au_day + target_radial)
+                    rel_vel = (
+                        tgt_lt.vx * (1.0 - lt_rate) - sun_sv.vx,
+                        tgt_lt.vy * (1.0 - lt_rate) - sun_sv.vy,
+                        tgt_lt.vz * (1.0 - lt_rate) - sun_sv.vz,
+                    )
+            # Speed slots are zero without FLG_SPEED, as in the geocentric path.
             if not (iflag & FLG_SPEED):
                 rel_vel = (0.0, 0.0, 0.0)
             return _to_ecliptic_output(rel_pos, rel_vel, jd_tt, jd_ut, iflag, sid_mode)
@@ -556,9 +597,7 @@ def horizons_calc_ut(
             if dist > 0.0:
                 lt = dist / c_au_day
                 sv = client.fetch_state_vector(command, jd_tt - lt, "@0", "TDB")
-        # Speed slots are 0.0 without FLG_SPEED (matching the reference
-        # ephemeris and the geocentric branch below, which passes a zero
-        # velocity in that case).
+        # Speed slots are zero without FLG_SPEED, as in the geocentric path.
         bary_vel = sv.vel if (iflag & FLG_SPEED) else (0.0, 0.0, 0.0)
         return _to_ecliptic_output(sv.pos, bary_vel, jd_tt, jd_ut, iflag, sid_mode)
 
@@ -623,9 +662,8 @@ def horizons_calc_ut(
     else:
         lt = 0.0
 
-    # Gravitational deflection (suppressed for true geometric positions, matching
-    # fast_calc and the reference ephemeris, which gate deflection on both
-    # NOGDEFL and TRUEPOS — like the light-time and aberration steps).
+    # Gravitational deflection is suppressed for true geometric positions and
+    # when explicitly disabled, like the light-time and aberration steps.
     if apply_deflection:
         geo = _apply_deflection_horizons(geo, earth_sv.pos, jd_tt, lt, batch, client)
 
@@ -700,9 +738,8 @@ def horizons_calc_ut(
 class _HorizonsDeflectorSource:
     """Adapter exposing Horizons state vectors via LEBReader's eval_body API.
 
-    Lets the Horizons pipeline reuse fast_calc._apply_gravitational_deflection
-    (the verified NOVAS/Skyfield formula) instead of maintaining a second
-    deflection implementation.  Deflector positions come from the prefetch
+    Lets the Horizons pipeline reuse fast_calc._apply_gravitational_deflection,
+    the shared PPN deflection implementation. Deflector positions come from the prefetch
     batch when available, otherwise from the (cached) client.
     """
 
@@ -736,7 +773,7 @@ def _apply_deflection_horizons(
     """Apply gravitational deflection using Horizons-fetched deflector data.
 
     Delegates the geometry to fast_calc._apply_gravitational_deflection so
-    all three backends share one verified PPN formula.  Network failures for
+    all three backends share one PPN formula. Network failures for
     a deflector degrade gracefully (that deflector is skipped inside the
     shared routine via its KeyError/ValueError handling).
     """
@@ -799,9 +836,8 @@ def _to_ecliptic_output(
         """
         if iflag & FLG_J2000:
             if iflag & FLG_EQUATORIAL:
-                # Mean equator/equinox of J2000: ICRS rotated by the frame
-                # bias (the reference's measured J2000 equatorial frame,
-                # same convention as the LEB pipeline)
+                # Mean equator/equinox of J2000: ICRS rotated by the standard
+                # frame-bias matrix, using the same convention as the LEB path.
                 return _rotate_icrs_to_j2000_mean_equator(*p)
             # J2000 ecliptic
             return _rotate_icrs_to_ecliptic_j2000(*p)
@@ -881,10 +917,8 @@ def _to_ecliptic_output(
     # same rule as planets._calc_body_pctr and fast_calc).
     #
     # Only Pipeline-A-like bodies (planets/asteroids/helio/bary state vectors)
-    # reach _to_ecliptic_output; the deferred ecliptic-direct bodies
-    # (nodes/apogees) are handled by _calc_analytical and never arrive here, so
-    # the simple J2000 handling below — without fast_calc's _deferred_sid_j2k
-    # rebuild — is correct for every body that does.
+    # reach _to_ecliptic_output; ecliptic-direct lunar points are handled by
+    # _calc_analytical and never arrive here.
     if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
         from .planets import _get_ayanamsa_for_flags
 
@@ -937,9 +971,8 @@ def _to_ecliptic_output(
                 # FLG_NONUT and true otherwise), matching the Skyfield and LEB
                 # backends (see fast_calc's sidereal speed correction).
                 # Unwrap the delta into (-180, 180]: the ayanamsha is mod 360,
-                # and the two samples can straddle the 0/360 wrap (e.g.
-                # SIDM_GALCENT_COCHRANE near JD 2533810), which would turn the
-                # raw -360 difference into a ~1.6e7 deg/day speed spike.
+                # and the two samples can straddle the 0/360 wrap, which would
+                # turn the raw -360 difference into a ~1.6e7 deg/day spike.
                 _dt_aya = 1.0 / 86400.0
                 _aya_p = _get_ayanamsa_for_flags(jd_ut + _dt_aya, iflag, sid_mode)
                 _aya_m = _get_ayanamsa_for_flags(jd_ut - _dt_aya, iflag, sid_mode)
@@ -1011,8 +1044,9 @@ def _calc_analytical(
         FLG_J2000,
         FLG_EQUATORIAL,
         FLG_SPEED,
+        FLG_SPEED3,
+        FLG_TOPOCTR,
     )
-    from .constants import _MOON_MEAN_DIST_AU, _MOON_MEAN_APOG_DIST_AU
     from .planets import (
         _apply_output_flags,
         _apply_sidereal_correction,
@@ -1030,78 +1064,93 @@ def _calc_analytical(
     # ~14 arcsec of of-date nutation into the J2000 frame.
     _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
     add_nutation = not (iflag & (FLG_NONUT | FLG_J2000)) and not _sid_eq
+    use_speed3_velocity = bool(iflag & FLG_SPEED) and bool(
+        iflag & (FLG_SPEED3 | FLG_TOPOCTR)
+    )
 
     if body_id == 10:  # Mean Node
-        from .lunar import calc_mean_lunar_node
+        from .lunar import calc_mean_lunar_node_state
 
-        lon = calc_mean_lunar_node(jd_tt)
-        lat = 0.0
-        dist = _MOON_MEAN_DIST_AU
+        lon, lat, dist, dlon, dlat, ddist = calc_mean_lunar_node_state(
+            jd_tt, speed3=use_speed3_velocity
+        )
     elif body_id == 12:  # Mean Apogee (Lilith)
-        from .lunar import calc_mean_lilith_with_latitude
+        from .lunar import calc_mean_lilith_state
 
-        lon, lat = calc_mean_lilith_with_latitude(jd_tt)
-        dist = _MOON_MEAN_APOG_DIST_AU
+        lon, lat, dist, dlon, dlat, ddist = calc_mean_lilith_state(
+            jd_tt, speed3=use_speed3_velocity
+        )
     else:
         raise KeyError(f"Body {body_id} not analytical")
 
-    # The analytical formulae return the MEAN ecliptic of date; the reference
-    # outputs the TRUE ecliptic, so add Δψ to the longitude unless suppressed.
+    # The analytical formulae return the mean ecliptic of date. Convert to the
+    # requested true ecliptic by adding Δψ unless nutation is suppressed.
     if add_nutation:
         dpsi_rad, _ = get_cached_nutation(jd_tt)
         lon = (lon + math.degrees(dpsi_rad)) % 360.0
 
-    # Speed via ±0.5-day central difference (matching the canonical path).
-    dlon, dlat = 0.0, 0.0
     if iflag & FLG_SPEED:
-        dt = 0.5
-        if body_id == 10:
-            lon_prev = calc_mean_lunar_node(jd_tt - dt)
-            lon_next = calc_mean_lunar_node(jd_tt + dt)
-        else:
-            lon_prev, lat_prev = calc_mean_lilith_with_latitude(jd_tt - dt)
-            lon_next, lat_next = calc_mean_lilith_with_latitude(jd_tt + dt)
-            dlat = (lat_next - lat_prev) / (2.0 * dt)
-        lon_diff = lon_next - lon_prev
-        if lon_diff > 180:
-            lon_diff -= 360.0
-        elif lon_diff < -180:
-            lon_diff += 360.0
-        dlon = lon_diff / (2.0 * dt)
         # True-ecliptic output: the speed carries the nutation rate, exactly
         # as the position carries Δψ.
         if add_nutation:
-            dlon += _nutation_rate_deg_per_day(jd_tt, dt)
+            dlon += _nutation_rate_deg_per_day(jd_tt, 0.001)
+    else:
+        dlon = dlat = ddist = 0.0
 
-    # Sidereal correction (flag-aware ayanamsa + ayanamsha-rate speed term),
-    # ecliptic longitude only — equatorial sidereal output uses the mean-equator
-    # frame in _maybe_equatorial_convert with no ayanamsa.
-    if is_sidereal and not (iflag & FLG_EQUATORIAL):
+    result = (lon, lat, dist, dlon, dlat, ddist)
+    _sid_j2000_ecl = (
+        is_sidereal and bool(iflag & FLG_J2000) and not bool(iflag & FLG_EQUATORIAL)
+    )
+    if _sid_j2000_ecl:
+        result = _maybe_equatorial_convert(result, jd_tt, iflag)
+        lon, lat, dist, dlon, dlat, ddist = result
         lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag, sid_mode)
+        result = (lon, lat, dist, dlon, dlat, ddist)
+    else:
+        if is_sidereal and not (iflag & FLG_EQUATORIAL):
+            lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag, sid_mode)
+            result = (lon, lat, dist, dlon, dlat, ddist)
+        result = _maybe_equatorial_convert(result, jd_tt, iflag)
 
-    result = (lon, lat, dist, dlon, dlat, 0.0)
-    # FLG_J2000 (precession) and FLG_EQUATORIAL conversion, then the output
-    # representation flags (FLG_XYZ / FLG_RADIANS).
-    result = _maybe_equatorial_convert(result, jd_tt, iflag)
+    # Output representation flags (FLG_XYZ / FLG_RADIANS).
     result = _apply_output_flags(result, iflag)
+
+    # SPEED3 differentiates positions in the requested final representation.
+    # Solve UT for exact TT samples at t±h, reuse this analytical path without
+    # velocity bits, and apply the clean-room centered finite difference.
+    if iflag & FLG_SPEED3:
+        from .fast_calc import (
+            _SPEED3_STEP_DAYS,
+            _apply_central_speed3_stencil,
+        )
+
+        sample_iflag = iflag & ~(FLG_SPEED | FLG_SPEED3)
+
+        def _sample_at_tt(
+            target_tt: float,
+        ) -> Tuple[float, float, float, float, float, float]:
+            sample_ut = target_tt - deltat(jd_ut)
+            sample_ut = target_tt - deltat(sample_ut)
+            return _calc_analytical(sample_ut, body_id, sample_iflag, sid_mode)[0]
+
+        previous = _sample_at_tt(jd_tt - _SPEED3_STEP_DAYS)
+        following = _sample_at_tt(jd_tt + _SPEED3_STEP_DAYS)
+        result = _apply_central_speed3_stencil(result, previous, following, iflag)
     return (result, iflag)
 
 
-def _calc_uranian(
+def _calc_hypothetical(
     jd_ut: float, body_id: int, iflag: int, sid_mode: int | None = None
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
-    """Calculate Uranian hypothetical body (heliocentric only)."""
+    """Calculate a hypothetical body in its native center without HTTP."""
     from .time_utils import deltat
     from .constants import FLG_SIDEREAL, FLG_J2000, FLG_EQUATORIAL, FLG_SPEED
 
     jd_tt = jd_ut + deltat(jd_ut)
 
-    from .hypothetical import calc_uranian_planet, calc_transpluto
+    from .hypothetical import calc_hypothetical_position
 
-    if body_id == 48:
-        lon, lat, dist, dlon, dlat, ddist = calc_transpluto(jd_tt)
-    else:
-        lon, lat, dist, dlon, dlat, ddist = calc_uranian_planet(body_id, jd_tt)
+    lon, lat, dist, dlon, dlat, ddist = calc_hypothetical_position(body_id, jd_tt)
 
     # Zero the speed slots when FLG_SPEED is absent so callers never receive
     # unrequested velocity data — mirroring the state-vector and analytical
@@ -1110,23 +1159,31 @@ def _calc_uranian(
     if not (iflag & FLG_SPEED):
         dlon = dlat = ddist = 0.0
 
-    # calc_uranian_planet / calc_transpluto return a J2000-frame ecliptic
-    # longitude. Precess it to the ecliptic OF DATE unless FLG_J2000 is set
-    # (carrying the velocity when FLG_SPEED so the of-date speed is the true
-    # derivative of the of-date position), add the of-date nutation Δψ, then
-    # apply the sidereal correction — mirroring the canonical heliocentric
-    # Uranian path in planets._calc_body so both backends agree.
-    if not (iflag & FLG_J2000):
+    # IDs 40--54 are J2000 ecliptic; 55--58 are defined in the mean ecliptic
+    # of date. Transform exactly once into the requested frame, carrying rates.
+    native_of_date = body_id in _OF_DATE_HYPOTHETICAL_BODIES
+    needs_precession = (native_of_date and bool(iflag & FLG_J2000)) or (
+        not native_of_date and not bool(iflag & FLG_J2000)
+    )
+    if needs_precession:
         if iflag & FLG_SPEED:
             from .planets import _precess_ecliptic_state
 
             lon, lat, dlon, dlat = _precess_ecliptic_state(
-                lon, lat, dlon, dlat, jd_tt, to_j2000=False
+                lon,
+                lat,
+                dlon,
+                dlat,
+                jd_tt,
+                to_j2000=native_of_date,
             )
         else:
             from .astrometry import _precess_ecliptic
 
-            lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+            source_jd, target_jd = (
+                (jd_tt, 2451545.0) if native_of_date else (2451545.0, jd_tt)
+            )
+            lon, lat = _precess_ecliptic(lon, lat, source_jd, target_jd)
 
     from .planets import _add_of_date_nutation
 
@@ -1138,7 +1195,7 @@ def _calc_uranian(
         lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag, sid_mode)
 
     # Equatorial conversion and output-representation flags, mirroring the
-    # canonical heliocentric Uranian path in planets._calc_body. The bare
+    # canonical heliocentric fictitious-body path in planets._calc_body. The bare
     # return above produced ecliptic spherical DEGREES for every request, so
     # FLG_EQUATORIAL / FLG_XYZ / FLG_RADIANS were silently ignored — a
     # tens-of-degrees / wrong-representation divergence from the LEB/Skyfield

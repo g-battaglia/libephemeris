@@ -138,9 +138,7 @@ class TestLunOccultWhenGlob:
         jd_start = julday(2017, 1, 1, 0)
 
         retflags1, tret1 = lun_occult_when_glob(jd_start, "Regulus", FLG_SWIEPH, 0)
-        retflags2, tret2 = lun_occult_when_glob(
-            jd_start, "Regulus", FLG_SWIEPH, 0
-        )
+        retflags2, tret2 = lun_occult_when_glob(jd_start, "Regulus", FLG_SWIEPH, 0)
 
         assert tret1 == tret2
         assert retflags1 == retflags2

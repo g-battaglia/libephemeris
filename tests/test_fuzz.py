@@ -208,8 +208,8 @@ class TestInvalidBodyIDs:
     def test_invalid_body_raises_known_exception(self, body_id: int) -> None:
         """Invalid body IDs should raise UnknownBodyError or similar.
 
-        Note: body ID -1 (ECL_NUT) is valid in Swiss Ephemeris (returns
-        Earth nutation values), so it is excluded from this test.
+        Note: body ID -1 (ECL_NUT) is a valid public special body that returns
+        Earth nutation values, so it is excluded from this test.
         """
         with pytest.raises(ACCEPTABLE_EXCEPTIONS):
             swe.calc_ut(self.JD, body_id, 0)

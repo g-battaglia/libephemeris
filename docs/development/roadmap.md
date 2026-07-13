@@ -1,8 +1,16 @@
-# Roadmap
+# Historical Roadmap and Status Record
 
-Current project status and remaining tasks for LibEphemeris.
+This document preserves the development plan and completion record assembled in
+March 2026.
 
 > Last updated: March 2026
+
+> **Historical snapshot — not the current release checklist.** Later releases
+> changed test commands, counts, download manifests, module locations, and some
+> fallback behavior. Completed items below describe the state when they were
+> closed; open items must be revalidated against current code before being
+> treated as planned work. Use the [Architecture Overview](architecture-overview.md),
+> [Testing Guide](testing.md), and current issue tracker for present behavior.
 
 ## Table of Contents
 
@@ -33,7 +41,10 @@ Each body in the LEB file has its own independent date range. Planets cover the 
 - **1.3 Update reader for per-body range** — Already implemented. The reader (`leb_reader.py:eval_body()`) uses per-body `jd_start`/`jd_end` fields and raises `ValueError` when out of range, caught by `calc_ut()`/`calc()` for Skyfield fallback.
 - **1.4 Transparent fallback for out-of-range bodies** — Already implemented. The dispatch in `calc_ut()` and `calc()` catches both `KeyError` (body not in LEB) and `ValueError` (JD out of per-body range) for transparent per-body fallback.
 - **1.5 Abort if SPK missing (strict mode for generator)** — Removed scalar Keplerian fallback from `generate_body_icrs_asteroid()`. The generator now raises `RuntimeError` if SPK is unavailable; `assemble_leb()` excludes asteroids without SPK with an `(EXCLUDED)` message.
-- **1.6 Improve verify_leb() for asteroids and ecliptic bodies** — Rewrote `verify_leb()` with proper verification for all body types: planets (Skyfield), asteroids (`spktype21`), ecliptic bodies (analytic functions from `lunar.py`), heliocentric bodies (`calc_uranian_planet()`/`calc_transpluto()`). All body types report error in arcsec with PASS/FAIL status.
+- **1.6 Improve verify_leb() for asteroids and ecliptic bodies** — Rewrote
+  `verify_leb()` for independently sourced body types: planets, JPL asteroids,
+  and ecliptic bodies. The historical unsupported-hypothetical verification
+  branch was later retired.
 - **1.7 Poe commands for medium and extended with adaptive range** — Commands for group generation already exist and work automatically with per-body range since the logic is entirely in the generator.
 - **1.8 Update documentation** — Documented per-body range concept, SPK coverage limits, fallback behavior, and effective range tables in `docs/leb/guide.md` and `README.md`.
 
@@ -62,10 +73,11 @@ Vectorization completed for all 6 ecliptic bodies. A single Skyfield call `(moon
 | Planets (11 bodies) | ~15s | ~15s | — |
 | Asteroids (5 bodies) | ~3-5 min | ~3-5 min | — (spktype21 limited) |
 | Ecliptics (6 bodies) | ~5-8 min | **~38s** | **~10x** |
-| Uranians (9 bodies) | ~10s | ~10s | — |
-| **Total (base tier)** | **~10-15 min** | **~5 min** | **~2-3x** |
+| **Supported groups total (historical measurement)** | **~10-15 min** | **~5 min** | **~2-3x** |
 
-All 31 bodies pass verification with sub-arcsecond precision. Tests: 137 LEB tests + 12 generator tests all green.
+These historical timings predate the clean-room removal of unsupported
+hypothetical and fitted lunar models. Current verification is source-based and
+uses only independently derived data.
 
 ---
 
@@ -77,9 +89,9 @@ All 31 bodies pass verification with sub-arcsecond precision. Tests: 137 LEB tes
 
 The library has four calculation modes (default: `auto`):
 
-1. **Auto mode** (default): tries LEB (bundled, auto-discovered, or auto-downloaded), then Horizons API (if no local DE440), then Skyfield.
+1. **Auto mode** (default): tries a bundled, auto-discovered, or reviewed LEB2 installation, then Horizons API (if no local DE440), then Skyfield.
 2. **Skyfield mode**: queries Skyfield in real time (SPK + frame rotation + nutation). Precise but slower (~120µs/call).
-3. **LEB mode**: requires a valid LEB file (configured, auto-discovered, or auto-downloaded). Calls served from precomputed Chebyshev coefficients (~2µs/call, ~14x speedup). Falls back to Skyfield for unsupported bodies/flags.
+3. **LEB mode**: requires a valid locally generated LEB1 or reviewed LEB2 file (configured or auto-discovered). Calls served from precomputed Chebyshev coefficients (~2µs/call, ~14x speedup). Falls back to Skyfield for unsupported bodies/flags.
 4. **Horizons mode**: prefers NASA JPL Horizons REST API. Falls back to Skyfield for unsupported bodies/flags.
 
 ### Goal
@@ -90,9 +102,13 @@ Make the library fully transparent without LEB. A user can use `libephemeris` by
 
 - **3.1 Verify LEB-free mode is complete** — Already implemented. `_LEB_FILE` and `_LEB_READER` initialize to `None`; `get_leb_reader()` returns `None` when no LEB is configured; the `if reader is not None:` guard in `calc_ut()`/`calc()` skips the entire LEB block. All non-LEB tests exercise this path.
 - **3.2 Document both modes** — Documented in `README.md` (new "Binary Ephemeris Mode (LEB)" section) and `docs/leb/guide.md` (Calculation Mode section with mode table, examples, env var documentation).
-- **3.3 Environment variable for explicit mode** — Implemented `LIBEPHEMERIS_MODE` with four values: `auto` (default: LEB → Horizons → Skyfield), `skyfield` (force Skyfield), `leb` (require LEB with auto-discovery/download), `horizons` (prefer Horizons API). Added `set_calc_mode()`/`get_calc_mode()` in `state.py`, exported in `__init__.py`, reset in `close()`.
+- **3.3 Environment variable for explicit mode** — Implemented `LIBEPHEMERIS_MODE` with four values: `auto` (default: LEB → Horizons → Skyfield), `skyfield` (force Skyfield), `leb` (require LEB with auto-discovery), `horizons` (prefer Horizons API). Added `set_calc_mode()`/`get_calc_mode()` in `state.py`, exported in `__init__.py`, reset in `close()`.
 - **3.4 Graceful handling of missing LEB** — Already implemented. `get_leb_reader()` handles all edge cases: missing file (warning + `None`), corrupt file (warning + `None`), range too narrow (`ValueError` caught for per-body fallback), no file specified (`None` without warning).
-- **3.5 Distribution of pre-generated LEB files** — Implemented with GitHub Releases (`data-v1`), release script (`scripts/release_leb.py`, run directly — the former `poe release:leb:*` aliases were removed), CLI download (`libephemeris download leb-{base,medium,extended}`), runtime auto-discovery (`~/.libephemeris/leb/ephemeris_{tier}.leb`), and programmatic download (`libephemeris.download_leb_for_tier("medium")`). Available tiers: `base` (~53 MB), `medium` (~175 MB), `extended` (~1604 MB).
+- **3.5 Distribution of pre-generated LEB files** — The wheel bundles the
+  reviewed, hash-pinned base core. `download_leb_for_tier()` and
+  `download_leb2_for_tier()` install pinned base, medium, and extended core
+  assets; locally generated LEB1 and LEB2 files remain available through
+  explicit configuration.
 
 ---
 
@@ -168,7 +184,9 @@ Dependencies: `rebound>=4.0.0`, `assist>=1.1.0` (optional, in `pyproject.toml` a
 
 ### 4.5 Caching of REBOUND Results for Asteroids — DEPRIORITIZED
 
-**Priority:** Low — performance optimization. The precomputed LEB system + automatic download already covers the primary use case. REBOUND/ASSIST fallback is adequate for sporadic queries.
+**Priority:** Low — performance optimization. The bundled reviewed base core
+and locally generated LEB files cover the primary use case. REBOUND/ASSIST
+fallback is adequate for sporadic queries.
 
 ### 4.6 Systematic Keplerian Precision Validation — COMPLETED
 
@@ -186,11 +204,10 @@ Two items remain before this roadmap is fully closed:
 
 ASSIST data files (~714 MB total: `linux_p1550p2650.440` ~98 MB + `sb441-n16.bsp` ~616 MB) need to be downloaded and the full end-to-end path verified with real planetary perturbations. Nine conditional tests are currently skipped due to missing data files. Also pending: documentation for `pip install libephemeris[nbody]`.
 
-### 2. Extended Tier LEB File — COMPLETED
+### 2. Extended-tier LEB core — completed
 
-**Status:** Completed
-
-All three LEB tiers are available via GitHub Releases (`data-v1`) and CLI download: `base` (~53 MB), `medium` (~175 MB), `extended` (~1604 MB).
+The reviewed, SHA-256-pinned extended core is installable from the data
+release. Optional extended companion groups still require local generation.
 
 ### 3. ASSIST Performance Verification for Single Evaluations
 

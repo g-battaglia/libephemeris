@@ -77,9 +77,7 @@ class TestLunEclipseHow:
 
         ecl_type, attr = lun_eclipse_how(jd_no_eclipse, (london_lon, london_lat, 0.0))
 
-        # No umbral immersion; the penumbral measure stays as the
-        # (negative) distance-from-penumbra value, the reference
-        # convention (verified against the reference ephemeris 2.10.03).
+        # No umbral immersion; the signed penumbral separation is negative.
         assert attr[0] == 0.0
         assert attr[1] < 0.0
         # Eclipse type should be 0
@@ -216,9 +214,7 @@ class TestSweLunEclipseHow:
 
         ecl_type, attr = lun_eclipse_how(jd_eclipse, la_geopos, FLG_SWIEPH)
 
-        # Totality in progress and Moon above the horizon: the retflag
-        # carries the phase (the reference ephemeris 2.10.03 returns ECL_TOTAL here;
-        # no visibility bits are set by this function).
+        # Totality is in progress and the Moon is above the horizon.
         assert ecl_type & ECL_TOTAL
 
         # Umbral magnitude should be > 1 for total eclipse at maximum
@@ -481,10 +477,7 @@ class TestLunEclipseHowEdgeCases:
 
 
 class TestValidationRequirements:
-    """Tests for ECLIPSE-005 validation requirements.
-
-    These tests verify the implementation matches the reference ephemeris output
-    within the specified tolerances for the 2022-Nov-08 total lunar eclipse.
+    """Physical validation for the 2022-Nov-08 total lunar eclipse.
 
     Reference: Nov 8, 2022 total lunar eclipse
     - Maximum eclipse: ~10:59 UTC (JD 2459891.9578)
@@ -601,9 +594,7 @@ class TestValidationRequirements:
         moon_alt_wrong = attr_wrong[5]
 
         # Correct LA should have the eclipse observable (nonzero retflag)
-        assert retflag_correct != 0, (
-            "Moon should be visible at correct LA position"
-        )
+        assert retflag_correct != 0, "Moon should be visible at correct LA position"
         assert moon_alt_correct > 30, (
             f"Moon altitude at correct LA should be high, got {moon_alt_correct}°"
         )

@@ -13,10 +13,12 @@ Output:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import sys
 import time
+from pathlib import Path
 
 sys.path.insert(0, ".")
 import libephemeris as swe  # noqa: E402
@@ -24,6 +26,43 @@ import libephemeris as swe  # noqa: E402
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 OUTPUT_FILE = "tests/golden/golden_reference.json"
+REVIEWED_CORE = (
+    Path(__file__).resolve().parents[1]
+    / "libephemeris"
+    / "data"
+    / "leb2"
+    / "base_core.leb2"
+)
+
+
+def configure_reviewed_core() -> str:
+    """Pin generation exclusively to the reviewed clean-room LEB core.
+
+    Planet-center SPKs are optional tier assets whose presence depends on the
+    user's data directory.  Golden output must not change when one happens to
+    be installed, so this process-local generator explicitly disables their
+    lookup.  Gas-giant positions therefore come only from the pinned LEB core.
+    """
+    from libephemeris import state
+    from libephemeris.download import DATA_FILES
+
+    expected = DATA_FILES["base_core.leb2"]["sha256"]
+    digest = hashlib.sha256(REVIEWED_CORE.read_bytes()).hexdigest()
+    if digest != expected:
+        raise RuntimeError(
+            "Refusing to generate golden data: bundled base_core.leb2 failed "
+            f"SHA-256 verification (expected {expected}, got {digest})"
+        )
+    swe.set_leb_file(str(REVIEWED_CORE))
+    swe.set_calc_mode("leb")
+
+    def no_optional_planet_center(naif_id: int, jd: float | None = None) -> None:
+        del naif_id, jd
+        return None
+
+    state.get_planet_center_segment = no_optional_planet_center
+    return digest
+
 
 # Julian dates spanning key eras
 JDS = [
@@ -149,8 +188,8 @@ def generate_sidereal_entries() -> list[dict]:
     entries = []
     jd = 2451545.0
     modes = [
-        (swe.SIDM_LAHIRI, "Lahiri"),
-        (swe.SIDM_FAGAN_BRADLEY, "FaganBradley"),
+        (swe.SIDM_J2000, "J2000"),
+        (swe.SIDM_TRUE_CITRA, "TrueCitra"),
     ]
 
     for mode, mode_name in modes:
@@ -169,7 +208,7 @@ def generate_sidereal_entries() -> list[dict]:
             )
 
     # Reset to default
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    swe.set_sid_mode(swe.SIDM_J2000)
     return entries
 
 
@@ -255,6 +294,7 @@ def main() -> None:
     """Generate the golden reference file."""
     print("Generating golden reference file...")
     start = time.monotonic()
+    source_sha256 = configure_reviewed_core()
 
     all_entries: list[dict] = []
     all_entries.extend(generate_calc_ut_entries())
@@ -268,6 +308,13 @@ def main() -> None:
     golden = {
         "version": 1,
         "generator": "scripts/generate_golden.py",
+        "provenance": (
+            "LibEphemeris independent NASA JPL/IAU/IERS runtime output; "
+            "no external-reference calls"
+        ),
+        "source_artifact": "libephemeris/data/leb2/base_core.leb2",
+        "source_sha256": source_sha256,
+        "optional_planet_centers": "disabled; base_core-only regression",
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "entry_count": len(all_entries),
         "entries": all_entries,

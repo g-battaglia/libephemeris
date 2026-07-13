@@ -11,9 +11,8 @@ Each element is evaluated as ``c0 + c1*T + c2*T**2 + c3*T**3`` with T in
 Julian centuries of 36525 days from J2000.0 TT, and refers to the mean
 ecliptic and equinox **of date**.
 
-These mean elements feed the NODBIT_MEAN branch of ``nod_aps`` /
-``nod_aps_ut``: the reference API computes mean nodes and apsides of the
-planets from this published element set (verified black-box to <0.1").
+These published mean elements feed the NODBIT_MEAN branch of ``nod_aps`` /
+``nod_aps_ut``.
 """
 
 from __future__ import annotations
@@ -30,6 +29,7 @@ from .constants import (
 )
 
 # Per planet: a (AU, polynomial), e, i (deg), Omega (deg), pi (deg).
+# Values from Meeus, Table 31.A (Simon et al. 1994).
 # i / Omega / pi refer to the mean ecliptic and equinox of date.
 # Earth has no node (its orbit defines the ecliptic): Omega is None.
 _MEAN_ELEMENTS: dict[int, dict[str, tuple[float, ...] | None]] = {

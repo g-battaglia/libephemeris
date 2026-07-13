@@ -141,20 +141,6 @@ class TestGetSetPrecisionTier:
 # =============================================================================
 
 
-def _local_leb_for_tier(tier: str):
-    """Return a locally-present .leb path for the tier, or None.
-
-    Mirrors the local-file portion of state._discover_leb_file() WITHOUT the
-    network auto-download fallback, so tests never touch the network.
-    """
-    leb_dir = os.path.join(state._get_data_dir(), "leb")
-    for name in (f"{tier}_core.leb2", f"{tier}_core.leb", f"ephemeris_{tier}.leb"):
-        candidate = os.path.join(leb_dir, name)
-        if os.path.isfile(candidate):
-            return candidate
-    return None
-
-
 class _FakeLebReader:
     """Minimal stand-in for a LEB reader that records close()."""
 
@@ -196,46 +182,30 @@ class TestSetPrecisionTierInvalidatesLebReader:
         assert state._LEB_FILE == "/some/explicit/path.leb"
         assert state._LEB_READER is None
 
-    def test_reader_reload_serves_new_tier_range(self):
-        """End-to-end: after switching medium->base the reader re-resolves to the
-        base file, so a date inside medium's range but outside base's now raises;
-        the round trip back to medium is bit-identical (no state corruption).
-
-        Gated on both tier files being present locally (no network)."""
-        from libephemeris import calc_ut
-        from libephemeris.constants import SUN
-        from libephemeris.exceptions import EphemerisRangeError
-        from libephemeris.time_utils import julday
-
-        if _local_leb_for_tier("medium") is None or _local_leb_for_tier("base") is None:
-            pytest.skip("requires local base and medium .leb files")
-
-        jd_1700 = julday(1700, 1, 1, 0.0)  # in medium (1550-2650), not base
+    def test_auto_discovery_uses_reviewed_base_as_safe_tier_fallback(
+        self, monkeypatch, tmp_path
+    ):
+        """Medium gets a fast path without trusting an unreviewed wider cache."""
         old_mode = state.get_calc_mode()
-        # Exercise per-tier auto-discovery, so neither an explicit _LEB_FILE nor
-        # the LIBEPHEMERIS_LEB env var (both of which pin one file across every
-        # tier by design, e.g. the leb-backend test runner) may be active.
         saved_env = os.environ.pop("LIBEPHEMERIS_LEB", None)
+        monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
+        import libephemeris._config_toml as config_toml
+
+        monkeypatch.setattr(config_toml, "get_str", lambda key: None)
         try:
             state.set_calc_mode("leb")
             state.set_leb_file(None)
 
             set_precision_tier("medium")
-            pos_medium, _ = calc_ut(jd_1700, SUN, 0)
             reader_medium = state.get_leb_reader()
             assert reader_medium is not None
+            assert str(reader_medium.path).endswith("base_core.leb2")
 
             set_precision_tier("base")
             reader_base = state.get_leb_reader()
             assert reader_base is not None
-            assert reader_base is not reader_medium  # not the stale medium reader
-            with pytest.raises(EphemerisRangeError):
-                calc_ut(jd_1700, SUN, 0)
-
-            set_precision_tier("medium")
-            pos_medium_again, _ = calc_ut(jd_1700, SUN, 0)
-            assert pos_medium_again == pos_medium  # bit-identical round trip
         finally:
+            state.close()
             state.set_calc_mode(old_mode)
             if saved_env is not None:
                 os.environ["LIBEPHEMERIS_LEB"] = saved_env

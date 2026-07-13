@@ -46,7 +46,7 @@ def _brute_first(
     planet: int, start: float, target: float, window: float, step: float = 2.0
 ):
     """First genuine sign-change crossing of the library's own longitude curve,
-    via a fine forward scan + bisection. The independent oracle cross_ut must
+    via a fine forward scan + bisection. The library's cross_ut must
     reproduce. Returns None if no crossing lies within ``window`` days."""
     prev = _lon(planet, start)
     jd = start
@@ -103,13 +103,13 @@ def test_repro_returns_first_crossing(name, planet, target, start, first_jd, old
 
 @pytest.mark.parametrize("name,planet,target,start,first_jd,old_jd", _REPROS)
 def test_repro_no_earlier_crossing(name, planet, target, start, first_jd, old_jd):
-    """Independent confirmation: an oracle fine scan of the library's own curve
-    agrees the returned crossing is the earliest one at or after the start."""
+    """Independent confirmation: a brute-force fine scan of the library's own
+    curve agrees the returned crossing is the earliest one at or after the start."""
     got = L.cross_ut(planet, target, start, FLG_SWIEPH)
     truth = _brute_first(planet, start, target, window=(got - start) + 400.0)
     assert truth is not None
     assert abs(got - truth) < 1.0, (
-        f"{name}: cross_ut +{got - start:.1f} d vs oracle +{truth - start:.1f} d"
+        f"{name}: cross_ut +{got - start:.1f} d vs scan +{truth - start:.1f} d"
     )
 
 
@@ -145,7 +145,7 @@ def test_slow_planet_far_targets_are_first_crossing(planet, syn, lead_cap, seed)
     the geometry that trips Newton into a wrong loop), cross_ut reproduces the
     first crossing found by an independent fine scan. Targets are the planet's
     own longitude at a bounded future epoch, so they span 0-360 while keeping the
-    oracle window tractable."""
+    scan window tractable."""
     import random
 
     rng = random.Random(seed)

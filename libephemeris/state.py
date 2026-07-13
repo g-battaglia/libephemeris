@@ -18,6 +18,7 @@ compatible with the reference ephemeris's threading model (thread-unsafe by desi
 
 from __future__ import annotations
 
+import hashlib
 import os
 import threading
 import warnings
@@ -146,13 +147,19 @@ _LOADER: Optional[Loader] = None  # Skyfield data loader
 _PLANETS: Optional[SpiceKernel] = None  # Loaded planetary ephemeris
 _PLANET_CENTERS: Optional[SpiceKernel] = None  # Planet center offsets (599, 699, etc.)
 _PLANET_CENTERS_TIER: Optional[str] = None  # Tier of loaded planet_centers file
+# Files that failed the planet-center manifest hash. The full stat fingerprint
+# makes this a fail-safe negative cache: replacing or modifying the file causes
+# a fresh hash check, while an unchanged stale multi-megabyte asset is not
+# re-hashed on every planetary calculation.
+_PLANET_CENTER_REJECTED_FILES: set[tuple[str, int, int, str]] = set()
+_PLANET_CENTER_CACHE_TIER: Optional[str] = None
 _TS: Optional[Timescale] = None  # Timescale object
 _TOPO: Optional[Topos] = None  # Observer location
 _SIDEREAL_MODE: Optional[int] = None  # Active sidereal mode ID
 _SIDEREAL_AYAN_T0: float = 0.0  # Ayanamsha value at reference epoch
 _SIDEREAL_T0: float = 0.0  # Reference epoch (JD) for ayanamsha
 _ANGLES_CACHE: dict[str, float] = {}  # Pre-calculated angles {name: longitude}
-_TIDAL_ACCELERATION: Optional[float] = None  # Tidal acceleration for Delta T
+_TIDAL_ACCELERATION: Optional[float] = None  # Explicit Delta-T tidal acceleration
 _DELTA_T_USERDEF: Optional[float] = None  # User-defined Delta T value
 _LAPSE_RATE: Optional[float] = None  # Atmospheric lapse rate for refraction
 
@@ -215,8 +222,9 @@ def set_calc_mode(mode: Optional[str]) -> None:
       local DE440), then Skyfield. This is the standard behavior.
     - ``"skyfield"``: Always use Skyfield/DE440. Fails if DE440 is not
       available locally.
-    - ``"leb"``: Require a valid LEB file (configured, auto-discovered,
-      or auto-downloaded). Raises RuntimeError if none can be resolved.
+    - ``"leb"``: Require a valid explicitly configured LEB file, a
+      hash-pinned cached tier core, or the bundled base-core fallback. Raises
+      RuntimeError if none can be resolved.
       Bodies not in the .leb file fall through to Skyfield.
     - ``"horizons"``: Always use NASA JPL Horizons API (requires internet).
       Bodies not supported by Horizons fall through to Skyfield.
@@ -328,77 +336,113 @@ def set_leb_file(filepath: Optional[str]) -> None:
         _fast_calc._leb_frame_cache.clear()
 
 
-def _discover_leb_file() -> Optional[str]:
-    """Auto-discover a LEB file for the active precision tier.
+def _matches_pinned_data_file(path: str, manifest_name: str) -> bool:
+    """Return whether *path* matches a reviewed data-manifest SHA-256."""
+    if not os.path.isfile(path):
+        return False
 
-    Checks in order:
-    1. LEB2 modular files in user data dir: ``~/.libephemeris/leb/{tier}_core.leb2``
-    2. LEB2 legacy extension: ``~/.libephemeris/leb/{tier}_core.leb``
-    3. LEB1 merged file in user data dir: ``~/.libephemeris/leb/ephemeris_{tier}.leb``
-    4. Bundled LEB2 core file shipped with the package (base tier only)
-    5. Auto-download LEB2 from GitHub Releases (in ``"auto"`` mode only)
+    from .download import DATA_FILES
+
+    file_info = DATA_FILES.get(manifest_name)
+    expected = file_info.get("sha256") if file_info is not None else None
+    if not isinstance(expected, str):
+        return False
+
+    digest = hashlib.sha256()
+    try:
+        with open(path, "rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError:
+        return False
+    return digest.hexdigest() == expected
+
+
+def _is_reviewed_base_core(path: str) -> bool:
+    """Return whether *path* has the pinned clean-room base-core hash."""
+    return _matches_pinned_data_file(path, "base_core.leb2")
+
+
+def _is_reviewed_tier_core(path: str, tier: str) -> bool:
+    """Return whether *path* matches the pinned core for ``tier``."""
+    if tier == "base":
+        return _is_reviewed_base_core(path)
+    return _matches_pinned_data_file(path, f"{tier}_core.leb2")
+
+
+def _is_reviewed_core(path: str) -> bool:
+    """Return whether *path* is any hash-pinned tier core in the manifest."""
+    filename = os.path.basename(path)
+    if not filename.endswith("_core.leb2"):
+        return False
+    if filename == "base_core.leb2":
+        return _is_reviewed_base_core(path)
+    return _matches_pinned_data_file(path, filename)
+
+
+def _discover_leb_file() -> Optional[str]:
+    """Auto-discover a reviewed core or a standard local LEB1 filename.
+
+    Distributed LEB2 assets are trusted implicitly only when they match the
+    manifest pin. For backward compatibility, user-owned LEB1 files at the two
+    historical standard paths (``{tier}_core.leb`` and
+    ``ephemeris_{tier}.leb``) remain discoverable; arbitrary filenames still
+    require :func:`set_leb_file`, ``LIBEPHEMERIS_LEB``, or TOML configuration.
+
+    The current tier's reviewed cached/bundled core wins, followed by the
+    standard local LEB1 paths. Until a wider core has been installed, the
+    bundled base core is a safe fallback for every tier; its own header range
+    still gates evaluation, so dates outside 1850--2150 fall through instead
+    of being extrapolated.
 
     Returns:
-        Path to the discovered LEB file, or None if not found.
+        Path to a discovered LEB file, or None when none is available.
     """
     tier = get_precision_tier()
     leb_dir = os.path.join(_get_data_dir(), "leb")
-
-    # Check for LEB2 modular files first (core is the primary)
-    leb2_core = os.path.join(leb_dir, f"{tier}_core.leb2")
-    if os.path.isfile(leb2_core):
-        return leb2_core
-
-    # Legacy: LEB2 files with .leb extension (backward compatibility)
-    leb2_core_legacy = os.path.join(leb_dir, f"{tier}_core.leb")
-    if os.path.isfile(leb2_core_legacy):
-        return leb2_core_legacy
-
-    # Fall back to LEB1 merged file
-    candidate = os.path.join(leb_dir, f"ephemeris_{tier}.leb")
-    if os.path.isfile(candidate):
-        return candidate
-
-    # Fall back to bundled LEB2 core (ships with the PyPI wheel, base tier only)
-    if tier == "base":
-        bundled = os.path.join(
-            os.path.dirname(__file__), "data", "leb2", "base_core.leb2"
+    cached = os.path.join(leb_dir, f"{tier}_core.leb2")
+    if _is_reviewed_tier_core(cached, tier):
+        return cached
+    if os.path.isfile(cached):
+        get_logger().warning(
+            "Ignoring unreviewed cached LEB core %s; configure it explicitly "
+            "only if its provenance has been independently verified",
+            cached,
         )
-        if os.path.isfile(bundled):
-            return bundled
-        # Legacy bundled path
-        bundled_legacy = os.path.join(
-            os.path.dirname(__file__), "data", "leb2", "base_core.leb"
-        )
-        if os.path.isfile(bundled_legacy):
-            return bundled_legacy
 
-    # Auto-download LEB2 from GitHub Releases when no local LEB exists.
-    # In "auto" mode: gives new users fast LEB2 calculations (~33 MB)
-    # instead of falling through to Skyfield which downloads DE440 (~114 MB).
-    # In "leb" mode: download what the user asked for instead of crashing.
-    mode = get_calc_mode()
-    if mode in ("auto", "leb"):
-        logger = get_logger()
-        logger.info(
-            "No LEB file found for '%s' tier. Downloading LEB2 from GitHub Releases...",
-            tier,
+    # A wider tier core may be bundled in a future wheel. Base is deliberately
+    # deferred until after local LEB1 discovery: the bundled base file is the
+    # universal fallback, not a reason to ignore an existing legacy base file.
+    if tier != "base":
+        bundled_tier = os.path.join(
+            os.path.dirname(__file__), "data", "leb2", f"{tier}_core.leb2"
         )
-        try:
-            from .download import download_leb2_for_tier
-
-            downloaded = download_leb2_for_tier(
-                tier, quiet=False, show_progress=True, activate=False
+        if _is_reviewed_tier_core(bundled_tier, tier):
+            return bundled_tier
+        if os.path.isfile(bundled_tier):
+            get_logger().error(
+                "Bundled LEB core failed its pinned SHA-256: %s", bundled_tier
             )
-            if downloaded:
-                # Re-check — the download should have placed the file
-                leb2_core = os.path.join(leb_dir, f"{tier}_core.leb2")
-                if os.path.isfile(leb2_core):
-                    logger.info("LEB2 downloaded and ready: %s", leb2_core)
-                    return leb2_core
-        except Exception as e:
-            logger.warning("LEB2 auto-download failed: %s", e)
 
+    # Preserve the rc7 discovery contract for user-generated and historical
+    # monolithic files. The reader validates the format when it opens the path.
+    for legacy_name in (f"{tier}_core.leb", f"ephemeris_{tier}.leb"):
+        legacy_path = os.path.join(leb_dir, legacy_name)
+        if os.path.isfile(legacy_path):
+            return legacy_path
+
+    # Default medium installs must retain a useful zero-configuration fast
+    # path while reviewed wider assets are optional downloads. The reviewed
+    # base core is immutable and range-checked by its reader.
+    bundled_base = os.path.join(
+        os.path.dirname(__file__), "data", "leb2", "base_core.leb2"
+    )
+    if _is_reviewed_base_core(bundled_base):
+        return bundled_base
+    if os.path.isfile(bundled_base):
+        get_logger().error(
+            "Bundled LEB core failed its pinned SHA-256: %s", bundled_base
+        )
     return None
 
 
@@ -506,6 +550,7 @@ def get_leb_reader() -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
     LIBEPHEMERIS_MODE environment variable:
 
     - ``"skyfield"``: Always returns None (LEB disabled).
+    - ``"horizons"``: Always returns None (the remote backend is forced).
     - ``"leb"``: Returns LEBReader or raises RuntimeError if unavailable.
     - ``"auto"`` (default): Returns LEBReader if configured or
       auto-discovered, else None.
@@ -514,7 +559,8 @@ def get_leb_reader() -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
 
     1. Explicit path via ``set_leb_file()``
     2. ``LIBEPHEMERIS_LEB`` environment variable
-    3. Auto-discovery: ``~/.libephemeris/leb/ephemeris_{tier}.leb``
+    3. Auto-discovery of the hash-pinned reviewed active-tier core
+    4. Bundled reviewed base core as a range-limited fallback
 
     If the .leb file path is invalid or the file is corrupted,
     logs a warning and returns None (silent fallback to Skyfield),
@@ -531,8 +577,9 @@ def get_leb_reader() -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
     global _LEB_READER
     mode = get_calc_mode()
 
-    # In skyfield mode, never use LEB
-    if mode == "skyfield":
+    # Forced non-LEB backends must bypass even an already-open reader. Keep
+    # the cached reader alive so switching back to auto/leb can reuse it.
+    if mode in ("skyfield", "horizons"):
         return None
 
     if _LEB_READER is None:
@@ -571,7 +618,12 @@ def _get_leb_reader_locked(mode):
             path = os.path.expanduser(path)
             try:
                 basename = os.path.splitext(os.path.basename(path))[0]
-                if "_" in basename:
+                # The reviewed bundled core must remain a closed trust unit:
+                # never attach arbitrary same-prefix companions left in the
+                # user's cache. Explicitly selected/generated non-pinned group
+                # files retain normal companion discovery.
+                reviewed_core = _is_reviewed_core(path)
+                if "_" in basename and not reviewed_core:
                     from .leb_composite import CompositeLEBReader
 
                     _LEB_READER = CompositeLEBReader.from_file_with_companions(path)
@@ -579,6 +631,12 @@ def _get_leb_reader_locked(mode):
                     from .leb_reader import open_leb
 
                     _LEB_READER = open_leb(path)
+                # Register the raw handles with a weakref finalizer as soon as
+                # the process-global reader is created. Finalizers run during
+                # normal garbage collection and at interpreter shutdown, so a
+                # caller is not required to invoke close() merely to avoid
+                # leaked mmap/file ResourceWarnings at process exit.
+                _release_when_unused(_LEB_READER)
                 _maybe_warm_reader(_LEB_READER)
             except (FileNotFoundError, ValueError, OSError) as e:
                 if mode == "leb":
@@ -865,6 +923,7 @@ def _close_kernel_resources() -> None:
     after _SHARED_LOCK).
     """
     global _LOADER, _PLANETS, _PLANET_CENTERS, _LEB_READER
+    global _PLANET_CENTER_CACHE_TIER
 
     with _INIT_LOCK:
         if _LEB_READER is not None:
@@ -883,6 +942,8 @@ def _close_kernel_resources() -> None:
             _release_when_unused(_PLANET_CENTERS)
         _PLANET_CENTERS = None
         _PLANET_CENTER_MISSING.clear()
+        _PLANET_CENTER_REJECTED_FILES.clear()
+        _PLANET_CENTER_CACHE_TIER = None
         _LOADER = None
 
         # Kernel-derived computation caches must not outlive the kernel.
@@ -967,6 +1028,7 @@ def set_precision_tier(tier: str) -> None:
         'extended'
     """
     global _PRECISION_TIER, _PLANETS, _LEB_READER, _EPHEMERIS_FILE_EXPLICIT
+    global _PLANET_CENTER_CACHE_TIER
     if tier not in TIERS:
         raise ValueError(
             f"Invalid tier: {tier!r}. Must be one of: {list(TIERS.keys())}"
@@ -974,6 +1036,9 @@ def set_precision_tier(tier: str) -> None:
     with _STATE_LOCK:
         _PRECISION_TIER = tier
         _EPHEMERIS_FILE_EXPLICIT = False
+        _PLANET_CENTER_MISSING.clear()
+        _PLANET_CENTER_REJECTED_FILES.clear()
+        _PLANET_CENTER_CACHE_TIER = None
         # Close old kernel and clear caches before reloading
         if _PLANETS is not None:
             try:
@@ -983,13 +1048,11 @@ def set_precision_tier(tier: str) -> None:
         _PLANETS = None
 
         # Invalidate the LEB reader so the new tier's ephemeris is used on the
-        # next access. Mirrors set_leb_file()/_close_inner(): the auto-discovered
-        # .leb file is ephemeris_{tier}.leb, so a tier change points at a
-        # different file; a retained reader would keep serving the previous
-        # tier's data (e.g. medium's 1550-2650 range answering a base query
-        # that should raise EphemerisRangeError). _LEB_FILE is deliberately
-        # preserved, so an explicitly pinned file re-opens unchanged while only
-        # an auto-discovered path re-resolves to the new tier.
+        # next access. Mirrors set_leb_file()/_close_inner(): a retained
+        # auto-discovered tier-core reader would otherwise survive a tier
+        # change. _LEB_FILE is deliberately preserved, so an explicitly
+        # selected file re-opens unchanged while discovery re-evaluates the
+        # pinned assets for the active tier.
         if _LEB_READER is not None:
             try:
                 _LEB_READER.close()
@@ -1168,11 +1231,15 @@ def get_planet_centers() -> Optional[SpiceKernel]:
     for Jupiter (599), Saturn (699), Uranus (799), Neptune (899), and Pluto (999).
 
     The function loads the appropriate file for the current precision tier:
-    - base: planet_centers_base.bsp (1850-2150)
-    - medium: planet_centers_medium.bsp (1550-2650)
+    - base: planet_centers_base.bsp (per-body coverage varies)
+    - medium: planet_centers_medium.bsp (Saturn/Uranus/Neptune 1550-2650;
+      Jupiter 1600-2200; Pluto 1800-2200)
     - extended: planet_centers_extended.bsp (extended range, partial coverage)
 
-    Falls back to legacy planet_centers.bsp if tier-specific file not found.
+    For the base tier only, falls back to the legacy ``planet_centers.bsp``
+    destination when it matches the exact pinned base-tier artifact. Files are
+    never loaded by filename alone: every candidate must match its reviewed
+    manifest SHA-256.
 
     Returns:
         SpiceKernel containing planet center segments, or None if not available.
@@ -1197,6 +1264,13 @@ def get_planet_centers() -> Optional[SpiceKernel]:
 def _get_planet_centers_locked(current_tier):
     """Lazy-load planet centers kernel (must hold _INIT_LOCK)."""
     global _PLANET_CENTERS, _PLANET_CENTERS_TIER
+    global _PLANET_CENTER_CACHE_TIER
+
+    if _PLANET_CENTER_CACHE_TIER != current_tier:
+        _PLANET_CENTER_REJECTED_FILES.clear()
+        _PLANET_CENTER_MISSING.clear()
+        _PLANET_CENTER_CACHE_TIER = current_tier
+
     if _PLANET_CENTERS is None or _PLANET_CENTERS_TIER != current_tier:
         _PLANET_CENTERS = None
         _PLANET_CENTERS_TIER = None
@@ -1204,16 +1278,59 @@ def _get_planet_centers_locked(current_tier):
 
         data_dir = _get_data_dir()
 
-        # Search order: tier-specific → legacy
+        # Search order: exact tier-specific artifact, then the legacy base-tier
+        # destination.  A legacy base file must never stand in for medium or
+        # extended coverage.
         candidates = [
-            os.path.join(data_dir, f"planet_centers_{current_tier}.bsp"),
-            os.path.join(data_dir, "planet_centers.bsp"),
+            (
+                os.path.join(data_dir, f"planet_centers_{current_tier}.bsp"),
+                f"planet_centers_{current_tier}.bsp",
+            ),
         ]
+        if current_tier == "base":
+            candidates.append(
+                (os.path.join(data_dir, "planet_centers.bsp"), "planet_centers.bsp")
+            )
 
         load = get_loader()
 
-        for path in candidates:
+        for path, manifest_name in candidates:
             if os.path.exists(path):
+                try:
+                    stat_result = os.stat(path)
+                    rejected_key = (
+                        os.path.abspath(path),
+                        stat_result.st_size,
+                        stat_result.st_mtime_ns,
+                        manifest_name,
+                    )
+                except OSError:
+                    rejected_key = None
+
+                if rejected_key is not None:
+                    # Discard obsolete fingerprints for a replaced file so
+                    # the cache remains bounded and the new bytes are checked.
+                    obsolete_keys = {
+                        key
+                        for key in _PLANET_CENTER_REJECTED_FILES
+                        if key[0] == rejected_key[0]
+                        and key[3] == manifest_name
+                        and key != rejected_key
+                    }
+                    _PLANET_CENTER_REJECTED_FILES.difference_update(obsolete_keys)
+                    if rejected_key in _PLANET_CENTER_REJECTED_FILES:
+                        continue
+
+                if not _matches_pinned_data_file(path, manifest_name):
+                    if rejected_key is not None:
+                        _PLANET_CENTER_REJECTED_FILES.add(rejected_key)
+                    get_logger().warning(
+                        "Ignoring unreviewed planet-centers file %s; its "
+                        "SHA-256 does not match the pinned %s artifact",
+                        path,
+                        manifest_name,
+                    )
+                    continue
                 try:
                     _PLANET_CENTERS = load(path)
                     _PLANET_CENTERS_TIER = current_tier
@@ -1261,22 +1378,45 @@ def get_planet_center_segment(naif_id: int, jd: Optional[float] = None):
     if centers is None:
         return None
 
-    for seg in centers.segments:
-        if seg.target == naif_id:
-            # If jd provided, check coverage
-            if jd is not None:
+    matches = [seg for seg in centers.segments if seg.target == naif_id]
+    if matches:
+        if jd is not None:
+            # Later descriptors take precedence at shared endpoints, matching
+            # Skyfield's Stack selection. A generated planet-centers kernel
+            # can contain many consecutive descriptors for one target; testing
+            # only the first silently truncated Jupiter at 1997 and Saturn at
+            # 2014 even after the remaining descriptors were preserved.
+            for seg in reversed(matches):
                 try:
-                    start_jd = getattr(seg, "start_jd", None)
-                    end_jd = getattr(seg, "end_jd", None)
-                    if start_jd is not None and end_jd is not None:
-                        if not (start_jd <= jd <= end_jd):
-                            return None  # Outside coverage, trigger fallback
+                    # Skyfield's public segment wrapper keeps the actual
+                    # jplephem coverage metadata on ``spk_segment``. Inspect
+                    # that object when present; evaluating a polynomial a few
+                    # days beyond its declared coverage can otherwise return
+                    # a finite but physically meaningless extrapolation.
+                    coverage_segment = getattr(seg, "spk_segment", seg)
+                    start_jd = getattr(coverage_segment, "start_jd", None)
+                    end_jd = getattr(coverage_segment, "end_jd", None)
+                    if start_jd is None or end_jd is None:
+                        return seg
+                    if start_jd <= jd <= end_jd:
+                        return seg
                 except (AttributeError, TypeError):
-                    # If we can't check coverage, return segment anyway
+                    # If we cannot check coverage, let the segment's own
+                    # evaluator decide instead of discarding usable data.
                     get_logger().debug(
                         "Could not check SPK segment coverage for jd=%.1f", jd
                     )
-            return seg
+                    return seg
+            return None
+
+        if len(matches) == 1:
+            return matches[0]
+
+        # Stack dispatches scalar and vector epochs to the matching descriptor.
+        # Copy the list because Stack filters mismatched centers in-place.
+        from skyfield.jpllib import Stack
+
+        return Stack(list(matches))
 
     # NAIF ID not found in any segment — remember for future calls
     _PLANET_CENTER_MISSING.add(naif_id)
@@ -1344,8 +1484,9 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
 
     Note:
         Affects all position calculations when FLG_SIDEREAL is set.
-        Default is Fagan/Bradley (SIDM_FAGAN_BRADLEY) if never set,
-        matching the reference API.
+        The default public ID is Fagan/Bradley (SIDM_FAGAN_BRADLEY) if never
+        set. Every predefined base mode 0--46 has a runtime definition; only
+        unsupported SIDBIT projection flags warn and reduce to the base mode.
     """
     # Strip the SIDBIT_* projection flags (>= 256: ECL_T0, SSY_PLANE,
     # USER_UT, ECL_DATE, NO_PREC_OFFSET, PREC_ORIG). These select alternative
@@ -1591,10 +1732,10 @@ def set_tid_acc(acc: float) -> None:
     values.
 
     Setting a non-default value rescales the Delta T returned by deltat()
-    and deltat_ex() for dates before 1955.0, exactly as the reference API
-    does (see ``time_utils._tid_acc_adjustment_seconds`` for the measured
-    formula). From 1955.0 onwards Delta T is pinned by modern observations
-    and is not affected by this setting.
+    and deltat_ex() for dates before 1955.0 using the IERS mean-lunar-motion
+    conversion in ``time_utils._tid_acc_adjustment_seconds``. From 1955.0
+    onwards Delta T is pinned by modern observations and is not affected by
+    this setting.
 
     Args:
         acc: Tidal acceleration in arcsec/century^2.
@@ -1602,14 +1743,13 @@ def set_tid_acc(acc: float) -> None:
              or TIDAL_AUTOMATIC (999999) to use the default.
 
     Note:
-        - The default value is based on DE440 (-25.936 arcsec/cy^2),
-          which leaves Delta T unchanged
+        - The automatic public-API default is -25.80 arcsec/cy^2
         - This setting only affects Delta T calculations for dates
           before 1955 (historical studies, ancient astronomy)
         - Common values:
           - DE421: -25.85 arcsec/cy^2
           - DE431: -25.80 arcsec/cy^2
-          - DE440/DE441: -25.936 arcsec/cy^2 (default)
+          - DE440/DE441: -25.936 arcsec/cy^2
 
     Example:
         >>> from libephemeris import set_tid_acc, get_tid_acc
@@ -1633,40 +1773,37 @@ def get_tid_acc() -> float:
 
     Returns:
         float: The tidal acceleration in arcsec/century^2.
-               Returns TIDAL_DE440 (-25.936) if not explicitly set — the
-               default of the reference API and the value consistent with
-               the DE440/DE441 ephemeris used by this library.
+               Returns TIDAL_DEFAULT (-25.80) in automatic mode.
 
     Note:
         The tidal acceleration affects how Delta T is extrapolated for dates
         outside the range of direct observations. This is particularly
         important for historical astronomical calculations.
 
-        If set_tid_acc() was called with TIDAL_AUTOMATIC (999999),
-        this returns the default value.
+        This value changes exclusively through ``set_tid_acc()``. Delta-T
+        queries (``deltat()``, ``deltat_ex()``) resolve any flag-selected
+        acceleration functionally and never mutate it.
 
     Example:
         >>> from libephemeris import get_tid_acc, set_tid_acc, TIDAL_DE441
         >>> get_tid_acc()  # Default value
-        -25.936
+        -25.8
         >>> set_tid_acc(TIDAL_DE441)
         >>> get_tid_acc()
         -25.936
     """
-    from .constants import TIDAL_DE440
+    from .constants import TIDAL_DEFAULT
 
-    if _TIDAL_ACCELERATION is None:
-        return TIDAL_DE440
-    return _TIDAL_ACCELERATION
+    if _TIDAL_ACCELERATION is not None:
+        return _TIDAL_ACCELERATION
+    return TIDAL_DEFAULT
 
 
 def _tid_acc_is_set() -> bool:
     """Return True if a tidal acceleration was explicitly set.
 
-    Used by ``deltat_ex()`` to decide whether FLG_MOSEPH selects its own
-    tidal acceleration (TIDAL_MOSEPH) or defers to the user's setting,
-    matching the reference API's precedence (a set_tid_acc() value wins
-    over the flag-implied one).
+    Used by Delta-T calls to distinguish a user setting from the mutable
+    ephemeris-selected value exposed while automatic mode remains active.
     """
     return _TIDAL_ACCELERATION is not None
 
@@ -1896,6 +2033,7 @@ def _close_inner() -> None:
     global _PRECISION_TIER
     global _LEB_FILE, _LEB_READER, _CALC_MODE
     global _HORIZONS_CLIENT, _HORIZONS_WARNED
+    global _PLANET_CENTER_CACHE_TIER
 
     # Close the Horizons client if loaded
     if _HORIZONS_CLIENT is not None:
@@ -1928,6 +2066,13 @@ def _close_inner() -> None:
 
     _fast_calc._reset_active_reader()
 
+    # The interpolated lunar-apsides model owns a separate mmap and chunk
+    # cache. A full close releases it; reset_session() intentionally leaves it
+    # warm alongside the main LEB reader and other process-level caches.
+    from .lunar import release_interpolated_apsides_reader
+
+    release_interpolated_apsides_reader()
+
     # Close the SPK kernel file handles if loaded
     if _PLANETS is not None:
         try:
@@ -1957,6 +2102,8 @@ def _close_inner() -> None:
     _PLANETS = None
     _PLANET_CENTERS = None
     _PLANET_CENTER_MISSING.clear()
+    _PLANET_CENTER_REJECTED_FILES.clear()
+    _PLANET_CENTER_CACHE_TIER = None
     _TS = None
     _TOPO = None
     _SIDEREAL_MODE = None
@@ -2139,12 +2286,12 @@ def set_auto_spk_download(enabled: Optional[bool]) -> None:
                  or None to use the environment variable (LIBEPHEMERIS_AUTO_SPK).
 
     Note:
-        - Requires the 'astroquery' package to be installed for downloads
-        - Downloads are cached in ~/.libephemeris/spk/ directory
-        - If astroquery is not available and auto-download is enabled,
-          the library will silently fall back to Keplerian propagation
-        - Set to False for offline use or to ensure consistent behavior
-        - Default is True (enabled) when no env var is set
+        - Downloads use the direct JPL Horizons HTTP client and require no
+          optional Python dependency.
+        - Downloads are cached in ~/.libephemeris/spk/ directory.
+        - Network and API failures fall back to Keplerian propagation.
+        - Set to False for offline use or to ensure consistent behavior.
+        - Default is True (enabled) when no env var is set.
 
     Environment Variable:
         LIBEPHEMERIS_AUTO_SPK: Set to "0", "false", or "no" to disable,
@@ -2447,8 +2594,8 @@ def get_iers_delta_t_enabled() -> bool:
 # LEB / fast / Horizons position backends, eclipses, heliacal events and long-term
 # sidereal time. The Skyfield position backend instead derives TT from Skyfield's
 # own internal ΔT model (SMH-2016 + IERS), so its planetary positions are NOT
-# affected. Selecting a model therefore changes positions in the default (LEB)
-# backend but not in "skyfield" mode.
+# affected. Selecting a model therefore changes positions in the usual
+# auto-mode LEB path but not in "skyfield" mode.
 _DELTA_T_MODEL_ENV_VAR = "LIBEPHEMERIS_DELTAT_MODEL"
 _VALID_DELTA_T_MODELS = ("smh2016", "espenak_meeus")
 _DEFAULT_DELTA_T_MODEL = "smh2016"
@@ -2477,8 +2624,8 @@ def set_delta_t_model(model: Optional[str]) -> None:
         positions of the LEB / fast / Horizons backends, eclipses, heliacal
         events and long-term sidereal time. The Skyfield backend obtains TT from
         Skyfield's own internal ΔT model, so its planetary positions are
-        unaffected — selecting a model changes positions in the default (LEB)
-        backend but not in ``"skyfield"`` mode.
+        unaffected — selecting a model changes positions in the usual
+        auto-mode LEB path but not in ``"skyfield"`` mode.
     """
     global _DELTA_T_MODEL
     if model is None:

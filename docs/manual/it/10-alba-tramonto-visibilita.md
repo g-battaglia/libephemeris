@@ -239,7 +239,7 @@ Al solstizio d'estate a Milano (45° N), il crepuscolo astronomico non finisce m
 
 La **rifrazione** è la curvatura della luce causata dall'atmosfera terrestre. L'atmosfera è più densa in basso e più rarefatta in alto, e la luce segue una curva invece di una retta. L'effetto è massimo all'orizzonte e diminuisce man mano che si guarda più in alto:
 
-- All'orizzonte (0°): **~34'** di rifrazione — quasi il diametro del Sole!
+- All'orizzonte (0°): **~29'** con i valori predefiniti dell'API — quasi il diametro del Sole!
 - A 10° di altezza: ~5'
 - A 45°: ~1'
 - Allo zenit (90°): 0' (la luce arriva verticalmente, nessuna curvatura)
@@ -251,13 +251,13 @@ import libephemeris as ephem
 
 # Da altezza vera ad apparente
 alt_vera = 0.0  # oggetto esattamente all'orizzonte geometrico
-alt_apparente = ephem.refrac(alt_vera, calc_flag=ephem.TRUE_TO_APP)
+alt_apparente = ephem.refrac(alt_vera, flag=ephem.TRUE_TO_APP)
 print(f"Altezza vera: {alt_vera:.2f}° → apparente: {alt_apparente:.2f}°")
-# → circa 0.57° (34 arcminuti sopra l'orizzonte)
+# → circa 0.48° (29 arcminuti sopra l'orizzonte)
 
 # Da apparente a vera
 alt_app = 5.0
-alt_true = ephem.refrac(alt_app, calc_flag=ephem.APP_TO_TRUE)
+alt_true = ephem.refrac(alt_app, flag=ephem.APP_TO_TRUE)
 print(f"Altezza apparente: {alt_app:.2f}° → vera: {alt_true:.2f}°")
 ```
 
@@ -266,6 +266,11 @@ Altezza vera: 0.00° → apparente: 0.48°
 Altezza apparente: 5.00° → vera: 4.84°
 ```
 
+Le due direzioni usano le formule pubblicate di Sæmundsson e Bennett, invece
+di essere inverse numeriche esatte. Vicino all'orizzonte, una conversione che
+produrrebbe un risultato non positivo restituisce invariata l'altezza in
+ingresso. Imposta `atpress=0` per disabilitare la rifrazione.
+
 La rifrazione dipende dalle condizioni atmosferiche — pressione e temperatura:
 
 ```python
@@ -273,20 +278,26 @@ import libephemeris as ephem
 
 # Rifrazione a diverse temperature (all'orizzonte)
 for temp in [-20, 0, 15, 35]:
-    r = ephem.refrac(0.0, pressure=1013.25, temperature=temp)
+    r = ephem.refrac(0.0, atpress=1013.25, attemp=temp)
     print(f"T = {temp:+3d}°C → rifrazione all'orizzonte: {r:.2f}°")
 ```
 
 ```
-T = -20°C → rifrazione all'orizzonte: 0.54°
-T =  +0°C → rifrazione all'orizzonte: 0.50°
+T = -20°C → rifrazione all'orizzonte: 0.56°
+T =  +0°C → rifrazione all'orizzonte: 0.51°
 T = +15°C → rifrazione all'orizzonte: 0.48°
-T = +35°C → rifrazione all'orizzonte: 0.45°
+T = +35°C → rifrazione all'orizzonte: 0.43°
 ```
 
 ### Rifrazione estesa: osservatori in quota
 
 Se osservi da una montagna o da un aereo, l'orizzonte è più basso del normale (l'"abbassamento dell'orizzonte" o "dip"). La funzione `refrac_extended` tiene conto di questo:
+
+A differenza delle approssimazioni compatte di `refrac`, la funzione estesa
+traccia il raggio attraverso il profilo dell'Atmosfera Standard ICAO e applica
+il dip geometrico dell'orizzonte. Il risultato dipende quindi dal modello
+fisico scelto e può differire da software che usa un'altra continuazione vicino
+o sotto l'orizzonte.
 
 ```python
 import libephemeris as ephem
@@ -296,9 +307,9 @@ alt_obj = 0.5  # oggetto mezzo grado sopra l'orizzonte geometrico
 
 alt_result, dettagli = ephem.refrac_extended(
     alt_obj,
-    altitude_geo=4810.0,  # altitudine dell'osservatore in metri
-    pressure=550.0,       # pressione ridotta in quota
-    temperature=-10.0     # freddo!
+    geoalt=4810.0,   # altitudine dell'osservatore in metri
+    atpress=550.0,   # pressione ridotta in quota
+    attemp=-10.0,    # freddo!
 )
 
 alt_vera, alt_app, rifrazione, dip = dettagli
@@ -311,9 +322,9 @@ print(f"Dip dell'orizzonte: {dip:.3f}°")
 
 ```
 Altezza vera:     0.500°
-Altezza apparente: 0.744°
-Rifrazione:        0.244°
-Dip dell'orizzonte: -1.926°
+Altezza apparente: 0.748°
+Rifrazione:        0.248°
+Dip dell'orizzonte: -2.035°
 ```
 
 ### Orizzonte personalizzato
@@ -366,10 +377,10 @@ lat, lon = 30.0, 31.2  # Il Cairo (dove gli Egizi la osservavano)
 jd_evento, *_ = ephem.heliacal_ut(
     jd,
     geopos=(31.2, 30.0, 0.0),      # Il Cairo (lon, lat, alt)
-    datm=(1013.25, 25.0, 30.0, 0.0),  # pressione, temp, umidità%, lapse
-    dobs=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    object_name="Sirius",
-    event_type=ephem.HELIACAL_RISING  # levata eliacale mattutina
+    atmo=(1013.25, 25.0, 30.0, 0.0),  # pressione, temp, umidità%, visibilità
+    observer=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    objname="Sirius",
+    eventtype=ephem.HELIACAL_RISING,  # levata eliacale mattutina
 )
 
 if jd_evento > 0:

@@ -131,11 +131,11 @@ swe_calc_ut(jd, SE_JUPITER, flags)
 | Mercury (2) | LEB | none | LEB nutation | NO* |
 | Venus (3) | LEB | none | LEB nutation | NO* |
 | Mars (4) | LEB | none | LEB nutation | NO* |
-| Jupiter (5) | LEB | analytical (E5) | LEB nutation | YES (via deflection + COB) |
-| Saturn (6) | LEB | analytical (TASS) | LEB nutation | YES (via deflection + COB) |
-| Uranus (7) | LEB | analytical (Kepl) | LEB nutation | YES (via COB) |
-| Neptune (8) | LEB | analytical (Triton) | LEB nutation | YES (via COB) |
-| Pluto (9) | LEB | analytical (Charon) | LEB nutation | YES (via COB) |
+| Jupiter (5) | LEB | JPL center or system barycenter | LEB nutation | Depends on center segment/deflection |
+| Saturn (6) | LEB | JPL center or system barycenter | LEB nutation | Depends on center segment/deflection |
+| Uranus (7) | LEB | JPL center or system barycenter | LEB nutation | Depends on center segment |
+| Neptune (8) | LEB | JPL center or system barycenter | LEB nutation | Depends on center segment |
+| Pluto (9) | LEB | JPL center or system barycenter | LEB nutation | Depends on center segment |
 | Earth (14) | LEB | none | LEB nutation | NO |
 | Mean Node (10) | LEB | none | LEB nutation | NO |
 | True Node (11) | LEB | none | LEB nutation | NO |
@@ -148,39 +148,21 @@ swe_calc_ut(jd, SE_JUPITER, flags)
 | Pallas (18) | LEB | none | LEB nutation | NO* |
 | Juno (19) | LEB | none | LEB nutation | NO* |
 | Vesta (20) | LEB | none | LEB nutation | NO* |
-| Uranians (40+) | LEB | none | LEB nutation | NO |
+| Harrington (50) | Analytical runtime | none | Runtime frame | Depends on requested corrections |
+| Unsupported IDs | Error | none | none | NO |
 
-*NO* = no di per sé, ma se la deflection gravitazionale calcola Jupiter/Saturn come deflettori, la COB per quei corpi tocca Skyfield indirettamente.
+*NO* = no di per sé; la deflessione può comunque richiedere stati JPL dei
+deflettori.
 
-### 3.3 COB: SPK vs Analitico
+### 3.3 Centro fisico JPL vs baricentro di sistema
 
-La correzione COB ha due path con fallback:
+Il tracing deve registrare una delle due scelte effettive:
 
-```python
-# fast_calc.py:303-362
-def _apply_cob_correction(pos, ipl, jd_tt):
-    t = get_cached_time_tt(jd_tt)          # ← Skyfield sempre
+- `target="jpl_center"` quando un segmento JPL del centro fisico copre l'epoca;
+- `target="system_barycenter"` quando il segmento non è disponibile.
 
-    # Path 1: SPK (alta precisione, metri)
-    seg = get_planet_center_segment(naif_id)
-    if seg is not None:
-        offset = seg.at(t).position.au     # ← Skyfield SPK evaluation
-        return pos + offset
-
-    # Path 2: Analitico (fallback, km)
-    offset = get_cob_offset(bary_name, t)  # ← Python puro, ma t è Skyfield Time
-    return pos + offset                     # usa solo t.tt (un float)
-```
-
-| Pianeta | Ampiezza COB | Precisione SPK | Precisione Analitica | Analitico sufficiente? |
-|---------|-------------|----------------|---------------------|----------------------|
-| Giove | ~742 km | metri | ~100-200 km (~0.05") | Sì per astrologia |
-| Saturno | ~760 km | metri | ~50-100 km (~0.05") | Sì per astrologia |
-| Urano | ~170 km | metri | ~100-200 km (~0.005") | Sì |
-| Nettuno | ~320 km | metri | ~20-50 km (~0.003") | Sì |
-| Plutone | ~2130 km | metri | ~1-5 km (~0.01") | Sì |
-
-**Nota**: `planet_centers.bsp` non è mai auto-scaricato. La maggioranza degli utenti usa l'analitico senza saperlo.
+Non esiste un fallback COB analitico. Il light-time usa sempre il vettore
+osservatore→target selezionato, anche per `FLG_HELCTR` e `FLG_BARYCTR`.
 
 ### 3.4 Frame Data: LEB vs Skyfield
 
@@ -194,19 +176,7 @@ def _frame_data(jd_tt):
 
 Se il file LEB ha dati di nutation (tutti i file generati li hanno), il path è **Python puro**. Se il file LEB non ha nutation, fallback a Skyfield.
 
-### 3.5 Teorie Analitiche COB — Dettagli
-
-| Pianeta | Teoria | File | Righe | Epoca riferimento | Validità stimata |
-|---------|--------|------|-------|-------------------|-----------------|
-| Giove | E5/Meeus (Lieske 1998) | `moon_theories/galilean.py` | ~450 | JDE 2443000.5 (~1976) | ~±200 anni |
-| Saturno | TASS 1.7 (Vienne & Duriez) | `moon_theories/tass17.py` | ~400 | JD 2444240.0 (1980) | ~±500 anni |
-| Urano | Kepleriano 5 lune (GUST86) | `moon_theories/uranian.py` | ~190 | J2000 | Degrada fuori epoca |
-| Nettuno | Triton Kepleriano (NEP097) | `moon_theories/triton.py` | ~100 | J2000 | Degrada fuori epoca |
-| Plutone | 2-body Charon (PLU060) | `moon_theories/charon.py` | ~100 | J2000 | Stabile |
-
-Tutti i moduli sono **100% Python puro**, zero import Skyfield. L'unico tocco Skyfield è nel caller `fast_calc.py` che crea un oggetto `Time` inutile.
-
-### 3.6 Copertura planet_centers.bsp per Tier
+### 3.5 Copertura planet_centers.bsp per Tier
 
 | Tier | File | Dimensione | Copertura |
 |------|------|-----------|-----------|
@@ -214,7 +184,7 @@ Tutti i moduli sono **100% Python puro**, zero import Skyfield. L'unico tocco Sk
 | medium | `planet_centers_medium.bsp` | 73 MB | Parziale: Giove 1600-2200, Plutone 1800-2200 |
 | extended | `planet_centers_extended.bsp` | 223 MB | Parziale: Giove 1600-2200, Saturno -502/+4500, Urano/Nettuno pieni |
 
-**Fuori copertura SPK**: sempre fallback analitico.
+**Fuori copertura SPK**: baricentro di sistema esplicito.
 
 ---
 
@@ -257,7 +227,7 @@ Punti di instrumentazione (~5 chiamate `_record_detail` per pianeta):
 | Punto | Cosa registrare |
 |-------|----------------|
 | `_fast_calc_core()` inizio | `source="LEB"`, `coord_type`, `leb_file` |
-| `_apply_cob_correction()` | `cob="spk"` o `"analytical"`, `cob_theory`, `cob_precision` |
+| Planet-center resolution | `target="jpl_center"` o `"system_barycenter"`, copertura segmento |
 | `_frame_data()` | `frame_data="leb_nutation"` o `"skyfield"` |
 | `_pipeline_icrs()` fine | `light_time_iters`, `deflection_applied`, `aberration_applied` |
 | `skyfield_used=True/False` | Se qualsiasi chiamata Skyfield è stata fatta |
@@ -344,7 +314,7 @@ import libephemeris as swe
 token = swe.start_tracing(detail=True)
 result = swe.swe_calc_ut(2451545.0, swe.SE_JUPITER, swe.SEFLG_SPEED)
 detail = swe.get_trace_detail()
-# {5: {"source": "LEB", "cob": "analytical", "cob_theory": "galilean_e5", ...}}
+# {5: {"source": "LEB", "target": "jpl_center", "center_segment": true, ...}}
 token.var.reset(token)
 ```
 
@@ -379,7 +349,8 @@ token.var.reset(token)
 1. `leph diag trace` — verifica output tabellare come nell'esempio
 2. `leph diag trace --now --body jupiter` — dettaglio per singolo corpo
 3. `LIBEPHEMERIS_TRACE=1 python -c "import libephemeris as s; s.swe_calc_ut(2451545.0, 5, 0); print(s.get_trace_detail())"` — env var
-4. Con `planet_centers.bsp` presente: COB cambia da "analytical" a "spk"
+4. Con un segmento centro-pianeta coperto: il target cambia da
+   `system_barycenter` a `jpl_center`
 5. `LIBEPHEMERIS_MODE=skyfield leph diag trace` — tutti corpi mostrano Source=Skyfield
 6. `pytest tests/test_tracing.py` — test esistenti non si rompono
 7. Benchmark: `pytest tests/test_performance_benchmarks.py -v` — nessun regressione >1%
@@ -433,7 +404,7 @@ Questo renderebbe la path LEB 100% Skyfield-independent per tutti i 30 corpi. Sk
 
 | File | Dimensione | Contenuto | Richiede Skyfield? |
 |------|-----------|-----------|-------------------|
-| `ephemeris_base.leb` / `*_core.leb2` | 10-53 MB | LEB completo per tier | No |
+| LEB1/LEB2 aggiuntivo generato localmente | dipende dall'inventario | Coefficienti da fonti JPL/indipendenti approvate | No |
 | `planet_centers_base.bsp` | 25 MB | COB offsets SPK | Sì (per leggere .bsp) |
 | `de440s.bsp` | 32 MB | JPL ephemeris (tier base) | Sì |
 | `de440.bsp` | 114 MB | JPL ephemeris (tier medium) | Sì |

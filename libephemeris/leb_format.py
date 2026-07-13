@@ -66,7 +66,9 @@ COMPRESSION_ZSTD_TRUNC_SHUFFLE = (
 
 # LEB2 v2 chunk index constants (10-year temporal chunks per body)
 CHUNK_INTERVAL_DAYS = 10 * 365.25  # 10 years in days
-CHUNK_INDEX_HEADER_FMT = "<IIfI"  # chunk_count, reserved, chunk_interval_days, reserved2
+CHUNK_INDEX_HEADER_FMT = (
+    "<IIfI"  # chunk_count, reserved, chunk_interval_days, reserved2
+)
 CHUNK_INDEX_HEADER_SIZE = struct.calcsize(CHUNK_INDEX_HEADER_FMT)  # 16
 CHUNK_ENTRY_FMT = "<ddQQQII"  # jd_start, jd_end, blob_offset, compressed_size, uncompressed_size, segment_start, segment_count
 CHUNK_ENTRY_SIZE = struct.calcsize(CHUNK_ENTRY_FMT)  # 48
@@ -263,16 +265,6 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     18: (8, 13, COORD_ICRS_BARY, 3),  # PALLAS
     19: (8, 13, COORD_ICRS_BARY, 3),  # JUNO
     20: (8, 13, COORD_ICRS_BARY, 3),  # VESTA
-    # Uranian hypotheticals: heliocentric ecliptic — pure analytical, ~0" error
-    40: (256, 7, COORD_HELIO_ECL, 3),  # CUPIDO
-    41: (256, 7, COORD_HELIO_ECL, 3),  # HADES
-    42: (256, 7, COORD_HELIO_ECL, 3),  # ZEUS
-    43: (256, 7, COORD_HELIO_ECL, 3),  # KRONOS
-    44: (256, 7, COORD_HELIO_ECL, 3),  # APOLLON
-    45: (256, 7, COORD_HELIO_ECL, 3),  # ADMETOS
-    46: (256, 7, COORD_HELIO_ECL, 3),  # VULKANUS
-    47: (256, 7, COORD_HELIO_ECL, 3),  # POSEIDON
-    48: (256, 7, COORD_HELIO_ECL, 3),  # ISIS
 }
 
 # Exotic minor bodies (centaurs / TNOs / NEAs) served from JPL SPK over their
@@ -523,9 +515,7 @@ def write_chunk_index_header(
     )
 
 
-def read_chunk_index_header(
-    data: Any, offset: int
-) -> tuple:
+def read_chunk_index_header(data: Any, offset: int) -> tuple:
     """Unpack a chunk index header. Returns (chunk_count, chunk_interval_days)."""
     fields = struct.unpack_from(CHUNK_INDEX_HEADER_FMT, data, offset)
     return fields[0], fields[2]  # chunk_count, chunk_interval_days

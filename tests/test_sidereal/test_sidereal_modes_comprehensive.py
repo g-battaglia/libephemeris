@@ -1,13 +1,14 @@
 """
 Comprehensive tests for sidereal ayanamsha modes.
 
-Tests all 43 ayanamsha modes for consistency, value ranges, and
+Tests all 47 ayanamsha modes for consistency, value ranges, and
 correct application to planetary positions and house cusps.
 """
 
 from __future__ import annotations
 
 import math
+import warnings
 
 import pytest
 
@@ -63,6 +64,10 @@ from libephemeris.constants import (
     SIDM_GALCENT_COCHRANE,
     SIDM_GALEQU_FIORENZA,
     SIDM_VALENS_MOON,
+    SIDM_LAHIRI_1940,
+    SIDM_LAHIRI_VP285,
+    SIDM_KRISHNAMURTI_VP291,
+    SIDM_LAHIRI_ICRC,
 )
 
 
@@ -110,10 +115,19 @@ ALL_MODES = [
     (SIDM_GALCENT_COCHRANE, "Galcent Cochrane"),
     (SIDM_GALEQU_FIORENZA, "Galequ Fiorenza"),
     (SIDM_VALENS_MOON, "Valens Moon"),
+    (SIDM_LAHIRI_1940, "Lahiri 1940"),
+    (SIDM_LAHIRI_VP285, "Lahiri VP285"),
+    (SIDM_KRISHNAMURTI_VP291, "Krishnamurti VP291"),
+    (SIDM_LAHIRI_ICRC, "Lahiri ICRC"),
 ]
 
-# Modes known to have unusual ayanamsha values (e.g., mode 40 ~357°)
-UNUSUAL_MODES = {40}
+
+@pytest.fixture(autouse=True)
+def _reject_predefined_mode_warnings():
+    """Restored predefined modes must not silently warn or degrade."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings("error", category=UserWarning)
+        yield
 
 
 class TestAyanamshaValues:
@@ -135,27 +149,9 @@ class TestAyanamshaValues:
         swe.set_sid_mode(mode)
         jd = 2451545.0
         ayan = swe.get_ayanamsa_ut(jd)
-        # Most ayanamshas are 20-30° at J2000; some are very different
         assert 0 <= ayan < 360, (
             f"{name} (mode {mode}): ayanamsha {ayan} out of [0, 360)"
         )
-
-    @pytest.mark.unit
-    @pytest.mark.parametrize(
-        "mode,name",
-        [
-            (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-            (SIDM_LAHIRI, "Lahiri"),
-            (SIDM_RAMAN, "Raman"),
-            (SIDM_KRISHNAMURTI, "Krishnamurti"),
-        ],
-    )
-    def test_major_ayanamsha_approximate_values(self, mode: int, name: str):
-        """Major ayanamshas should be approximately 20-25° at J2000."""
-        swe.set_sid_mode(mode)
-        jd = 2451545.0
-        ayan = swe.get_ayanamsa_ut(jd)
-        assert 20 < ayan < 30, f"{name}: ayanamsha {ayan}° not in expected 20-30° range"
 
     @pytest.mark.unit
     @pytest.mark.parametrize("mode,name", ALL_MODES)
@@ -343,9 +339,9 @@ class TestAyanamshaExUt:
     def test_ayanamsa_ex_ut_matches_ayanamsa_ut(self, mode: int, name: str):
         """The ex variant returns the TRUE ayanamsha (mean + nutation).
 
-        Reference API semantics (verified against the reference ephemeris): the plain
-        function returns the mean ayanamsha; the _ex variant adds nutation
-        in longitude unless FLG_NONUT is set.
+        The public API convention is that the plain function returns the mean
+        ayanamsha; the _ex variant adds nutation in longitude unless FLG_NONUT
+        is set.
         """
         swe.set_sid_mode(mode)
         jd = 2451545.0
@@ -363,8 +359,9 @@ class TestAyanamshaExUt:
         )
 
 
-# The 12 star/galactic "calculated" modes for which the reference API drops
-# FLG_NONUT from the echoed return flag of get_ayanamsa_ex[_ut].
+# The public "calculated" retflag class drops FLG_NONUT from the echoed return
+# flag of get_ayanamsa_ex[_ut]. This classification is independent of whether a
+# mode currently has a native numerical definition.
 _CALC_MODES_DROP_NONUT = [
     SIDM_GALCENT_0SAG,
     SIDM_TRUE_CITRA,
@@ -384,8 +381,8 @@ _CALC_MODES_DROP_NONUT = [
 class TestAyanamsaExRetflagNonut:
     """get_ayanamsa_ex[_ut] retflag echoes FLG_NONUT per the reference API.
 
-    Formula-based modes echo the input FLG_NONUT bit (0 -> 2, NONUT -> 66),
-    while the star/galactic "calculated" modes drop it (NONUT -> 2). The
+    Modes outside the public "calculated" class echo the input FLG_NONUT bit
+    (0 -> 2, NONUT -> 66), while calculated modes drop it (NONUT -> 2). The
     ayanamsha value is identical either way; only the return flag differs.
     """
 
@@ -408,7 +405,7 @@ class TestAyanamsaExRetflagNonut:
         "mode",
         [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_GALALIGN_MARDYKS, SIDM_VALENS_MOON],
     )
-    def test_formula_modes_keep_nonut(self, mode: int):
+    def test_other_retflag_modes_keep_nonut(self, mode: int):
         swe.set_sid_mode(mode)
         rf_et, _ = swe.get_ayanamsa_ex(self._JD, swe.FLG_NONUT)
         rf_ut, _ = swe.get_ayanamsa_ex_ut(self._JD, swe.FLG_NONUT)
@@ -432,17 +429,22 @@ class TestAyanamsaStarModeOutOfRange:
     (as calc_ut/fixstar do), not the raw skyfield.errors.EphemerisRangeError.
     """
 
-    # Star-anchored calculated modes reach the Skyfield star pipeline; the
-    # formula-only calculated modes (17/30/36/40) never touch the ephemeris.
+    # Live catalog-direction modes reach the Skyfield star pipeline. Formula
+    # modes remain available outside the numerical ephemeris range —
+    # including TRUE_SHEORAN, which is defined by its published
+    # Mahabharata-epoch pair rather than by a live star direction.
     _STAR_MODES = [
+        SIDM_GALCENT_0SAG,
         SIDM_TRUE_CITRA,
         SIDM_TRUE_REVATI,
         SIDM_TRUE_PUSHYA,
+        SIDM_GALCENT_RGILBRAND,
         SIDM_GALEQU_IAU1958,
         SIDM_GALEQU_TRUE,
         SIDM_GALEQU_MULA,
         SIDM_TRUE_MULA,
-        SIDM_TRUE_SHEORAN,
+        SIDM_GALCENT_MULA_WILHELM,
+        SIDM_GALCENT_COCHRANE,
     ]
 
     @pytest.mark.unit

@@ -39,7 +39,7 @@ Main Functions:
 Precision Notes:
 Core Calculations (Phase 1 improved):
 - GAST (sidereal time): ~0.001 sec = ~0.015 arcsec (Skyfield IAU SOFA)
-- Obliquity: ~0.01 arcsec (Laskar 1986 + IAU 2000B nutation)
+- Obliquity: Vondrák 2011 long-term mean obliquity + IAU 2006/2000A nutation
 - Vertex: Exact at equator, ~0.001° elsewhere (rigorous limiting formula)
 - Iterative systems (Placidus/Koch): ~0.00036 arcsec convergence (1e-7°)
 - Non-iterative systems: Limited by obliquity/GAST precision (~0.01 arcsec)
@@ -50,10 +50,6 @@ Expected Accuracy by System:
 - Iterative (Placidus, Koch): ~0.001-0.01° (a few arcseconds)
 - Complex (Campanus, Regiomontanus, Topocentric): ~0.01°
 - Horizontal: ~0.01° (with convergence fallback to Porphyry)
-
-Comparison with the reference ephemeris:
-- Typical agreement: 0.001-0.1° depending on system and location
-- Test suite validates against 130+ reference cases with tolerances 0.1-1.0°
 
 Polar Latitudes:
 - Placidus, Koch undefined > ~66° latitude (circumpolar ecliptic points)
@@ -69,7 +65,6 @@ Algorithm Sources:
 
 References:
 - Meeus "Astronomical Algorithms" 2nd Ed., Ch. 13 (coordinate systems)
-- Reference documentation (house systems)
 - Hand "Astrological Houses" (comprehensive house treatise)
 - IERS Conventions 2003 (nutation models)
 """
@@ -475,9 +470,8 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
     through zenith perpendicular to meridian) intersects the ecliptic in the western sky.
     Often used in astrology for fateful encounters or significant relationships.
 
-    At the equator (lat=0), the formula has a 1/tan(lat) singularity. We clamp
-    latitude to a tiny positive value so the formula evaluates to the correct
-    limiting value, matching the reference behavior.
+    At the equator (lat=0), the formula has a 1/tan(lat) singularity. The
+    positive-latitude limit is used as a deterministic convention.
 
     Args:
         armc_deg: Right Ascension of Midheaven (sidereal time) in degrees
@@ -491,15 +485,10 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
     """
     eps_rad = math.radians(eps)
 
-    # At equator (lat=0), the Vertex formula has a 1/tan(lat) singularity.
-    # Clamp to a tiny latitude so the formula evaluates to the correct
-    # limiting value, PRESERVING the sign: the reference gives tiny nonzero
-    # latitudes their own one-sided limit (measured: lat=-1e-11 -> the
-    # lat->0- Vertex, 180 deg away from the lat->0+ one). Exact 0.0 lands
-    # on the positive side (the reference's lat==0 behavior for every
-    # system except 'H', which is special-cased by the callers).
-    if abs(lat) < 1e-10:
-        lat = -1e-10 if lat < 0.0 else 1e-10
+    # Preserve real nonzero latitudes. Only the exact singularity needs a
+    # deterministic one-sided limit.
+    if lat == 0.0:
+        lat = 1e-12
 
     # Standard formula: Vertex is where Prime Vertical intersects ecliptic in West
     armc_rad = math.radians(armc_deg)
@@ -510,9 +499,7 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
 
     # 0/0 singularity at |lat| == eps with armc 90/270 (den collapses to
     # cos(eps) - cos(eps)): atan2 of the rounding noise is meaningless.
-    # The reference resolves it to the cardinal (armc + 270) % 360 —
-    # 0 at armc 90, 180 at armc 270 (measured black-box for both
-    # latitude signs); pin the same value.
+    # At this geometric degeneracy choose the western cardinal intersection.
     if abs(num) < 1e-12 and abs(den) < 1e-12:
         return (armc_deg + 270.0) % 360.0
 
@@ -527,8 +514,7 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
     # *ecliptic* longitude against the ARMC, an *equatorial* longitude;
     # that mixed-frame test is off by up to ~2.5 deg and flipped the
     # Vertex by 180 deg whenever it fell within that margin of
-    # ARMC + 180, which is reachable at |lat| < eps.  Verified against
-    # the reference API on a dense armc x lat x eps grid.)
+    # ARMC + 180, which is reachable at |lat| < eps.
     vtx_r = math.radians(vtx)
     ra_vtx = (
         math.degrees(math.atan2(math.cos(eps_rad) * math.sin(vtx_r), math.cos(vtx_r)))
@@ -586,9 +572,8 @@ def _ra_to_ecliptic_longitude(
     denominator = cos_obliquity * cos_ra - sin_obliquity * tan_pole
 
     # 0/0 singularity (e.g. the CoAsc Munkasey path at |lat| == eps with
-    # ra == 180): atan2 of the rounding noise is meaningless. The reference
-    # resolves it to the right ascension itself (measured black-box:
-    # 180 at armc 90, 0 at armc 270); pin the same limit.
+    # ra == 180): atan2 of the rounding noise is meaningless. Use the
+    # continuous right-ascension limit.
     if abs(numerator) < 1e-12 and abs(denominator) < 1e-12:
         return ra_deg % 360.0
 
@@ -640,10 +625,9 @@ def _sun_declination_analytic(tjdut: float) -> float:
     """Low-precision apparent solar declination (Meeus 1998, ch. 25).
 
     Fallback for the Sunshine ('I'/'i') Sun-declination fetch when the
-    loaded ephemeris does not cover the date: the reference implementation
-    likewise falls back to an analytic solar position instead of failing,
-    and substituting 0.0 would silently bend the cusps (up to degrees at
-    high latitude). Accuracy ~0.01 deg — ample for cusp geometry.
+    loaded ephemeris does not cover the date. An analytic solar position avoids
+    the severe cusp distortion that a 0.0 substitute would cause at high latitude.
+    Accuracy is ~0.01 deg, ample for cusp geometry.
     """
     t = (tjdut + _deltat(tjdut) - 2451545.0) / 36525.0
     l0 = (280.46646 + 36000.76983 * t + 0.0003032 * t * t) % 360.0
@@ -826,15 +810,9 @@ def houses(
     if asc >= 360.0 or (360.0 - asc) < 1e-10:
         asc = 0.0
 
-    # Vertex uses armc_deg (Original)
-    # The horizontal system computes its equator-degenerate angles on
-    # the negative-latitude side (reference behavior — its vertex and
-    # coasc2 at lat 0 equal the lat -> 0- limits, other systems the
-    # lat -> 0+ limits). Only EXACT lat==0.0 is special: tiny nonzero
-    # latitudes keep their own sign through the _calc_vertex clamp
-    # (measured black-box on 'H' at lat=+1e-11 -> the lat->0+ limit).
-    _vtx_lat = -1e-9 if (hsys_char == "H" and lat == 0.0) else lat
-    vertex = _calc_vertex(armc_deg, eps, _vtx_lat)
+    # Vertex uses the original ARMC and the geometric equator convention in
+    # _calc_vertex.
+    vertex = _calc_vertex(armc_deg, eps, lat)
 
     # Equatorial Ascendant (East Point)
     # This is the intersection of the ecliptic with the celestial equator in the east
@@ -864,29 +842,14 @@ def houses(
     # Co-Ascendant (Munkasey) formula:
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
-    # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
-    # The one-sided limits are 180 (lat -> 0+) and 0 (lat -> 0-).
-    # The reference outputs 180.0 at exactly lat 0 for every system
-    # except the horizontal system 'H', whose internal latitude
-    # handling lands on the negative-side limit 0.0 (verified per
-    # system against the reference ephemeris at armc 0/90/180/270).
-    if abs(lat) < 1e-10:
-        # Sign-aware clamp: the reference preserves the one-sided limits
-        # (lat->0+ = 180, lat->0- = 0) for EVERY system, including H; the
-        # H special case applies only at exactly lat == 0, where the
-        # reference lands on 0 instead of 180 (verified black-box across
-        # the whole |lat| < 1e-10 band at armc 0/90/180/270).
-        if hsys_char == "H":
-            co_asc = 180.0 if lat > 0.0 else 0.0
-        else:
-            co_asc = 180.0 if lat >= 0.0 else 0.0
+    # At the equator coasc2_lat is +90 degrees; _calc_ascendant applies its
+    # explicit polar limiting convention.
+    coasc2_armc = (armc_deg + 90.0) % 360.0
+    if lat >= 0:
+        coasc2_lat = 90.0 - lat
     else:
-        coasc2_armc = (armc_deg + 90.0) % 360.0
-        if lat >= 0:
-            coasc2_lat = 90.0 - lat
-        else:
-            coasc2_lat = -90.0 - lat
-        co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
+        coasc2_lat = -90.0 - lat
+    co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
 
     # Polar Ascendant M. Munkasey (polasc)
     # Polar Ascendant formula:
@@ -908,8 +871,6 @@ def houses(
     # 3. House Cusps
     # Use armc_active for house calculations
     # If MC was flipped, we might need to flip latitude for intermediate cusps (Regiomontanus, etc.)
-    # Verified for Regiomontanus: using -lat with flipped MC matches reference.
-
     calc_lat = lat
     if armc_active != armc_deg:
         # MC was flipped. Flip latitude for intermediate cusp calculations.
@@ -931,9 +892,7 @@ def houses(
             sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
             sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
         except EphemerisRangeError:
-            # Date outside the loaded ephemeris: analytic solar declination
-            # (the reference falls back analytically too; 0.0 would silently
-            # bend the cusps).
+            # Date outside the loaded ephemeris: analytic solar declination.
             sun_dec = _sun_declination_analytic(tjdut)
         except (IndexError, TypeError, ValueError, CalculationError):
             # Fallback to 0 declination (same as equinox behavior)
@@ -1425,15 +1384,9 @@ def houses_armc(
     if asc >= 360.0 or (360.0 - asc) < 1e-10:
         asc = 0.0
 
-    # Vertex uses armc_deg (Original)
-    # The horizontal system computes its equator-degenerate angles on
-    # the negative-latitude side (reference behavior — its vertex and
-    # coasc2 at lat 0 equal the lat -> 0- limits, other systems the
-    # lat -> 0+ limits). Only EXACT lat==0.0 is special: tiny nonzero
-    # latitudes keep their own sign through the _calc_vertex clamp
-    # (measured black-box on 'H' at lat=+1e-11 -> the lat->0+ limit).
-    _vtx_lat = -1e-9 if (hsys_char == "H" and lat == 0.0) else lat
-    vertex = _calc_vertex(armc_deg, eps, _vtx_lat)
+    # Vertex uses the original ARMC and the geometric equator convention in
+    # _calc_vertex.
+    vertex = _calc_vertex(armc_deg, eps, lat)
 
     # Equatorial Ascendant (East Point)
     # This is the intersection of the ecliptic with the celestial equator in the east
@@ -1457,29 +1410,14 @@ def houses_armc(
     # Co-Ascendant M. Munkasey (coasc2)
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
-    # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
-    # The one-sided limits are 180 (lat -> 0+) and 0 (lat -> 0-).
-    # The reference outputs 180.0 at exactly lat 0 for every system
-    # except the horizontal system 'H', whose internal latitude
-    # handling lands on the negative-side limit 0.0 (verified per
-    # system against the reference ephemeris at armc 0/90/180/270).
-    if abs(lat) < 1e-10:
-        # Sign-aware clamp: the reference preserves the one-sided limits
-        # (lat->0+ = 180, lat->0- = 0) for EVERY system, including H; the
-        # H special case applies only at exactly lat == 0, where the
-        # reference lands on 0 instead of 180 (verified black-box across
-        # the whole |lat| < 1e-10 band at armc 0/90/180/270).
-        if hsys_char == "H":
-            co_asc = 180.0 if lat > 0.0 else 0.0
-        else:
-            co_asc = 180.0 if lat >= 0.0 else 0.0
+    # At the equator coasc2_lat is +90 degrees; _calc_ascendant applies its
+    # explicit polar limiting convention.
+    coasc2_armc = (armc_deg + 90.0) % 360.0
+    if lat >= 0:
+        coasc2_lat = 90.0 - lat
     else:
-        coasc2_armc = (armc_deg + 90.0) % 360.0
-        if lat >= 0:
-            coasc2_lat = 90.0 - lat
-        else:
-            coasc2_lat = -90.0 - lat
-        co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
+        coasc2_lat = -90.0 - lat
+    co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
 
     # Polar Ascendant M. Munkasey (polasc)
     # polasc = Asc(ARMC - 90°, latitude)
@@ -1651,11 +1589,6 @@ def houses_armc_ex2(
     # it for every other system.
     cusps, ascmc = houses_armc(armc, lat, eps, hsys, ascmc9)
 
-    # Normalize the house code once so the system-specific overrides below fire
-    # whether the caller passed an int, bytes (b'P'), or str ('P').
-    hsys_code = _hsys_code(hsys)
-
-    # Always calculate velocities (matching the reference behavior).
     # Compute d(cusp)/d(ARMC) via centered finite differences, then
     # scale by the sidereal rotation rate to obtain deg/day.
     #
@@ -1663,17 +1596,10 @@ def houses_armc_ex2(
     # (one extra rotation relative to the Sun).  Previous code used
     # 360°/day (solar rate), which under-estimated all speeds by the
     # ratio 360/360.9856 ≈ 0.27 %.
-    _SIDEREAL_RATE = 360.98564736629  # ARMC degrees per mean solar day
+    _SIDEREAL_RATE = 360.98564736629  # ARMC deg per mean solar day (Meeus ch. 12)
 
-    # ARMC step for the finite difference: 1 second of sidereal rotation
-    # for every system.  At the 1-minute step previously used for the
-    # non-iterative systems, the centered difference's truncation error
-    # reached ~0.14 deg/day on fast-moving cusps (e.g. the Equal cusps at
-    # ARMC 270, lat 60, where the ascendant rate peaks at ~1580 deg/day)
-    # and ~0.0025 deg/day on the ascmc rates.  The reference API's speeds
-    # match the true d(cusp)/d(ARMC) derivative to ~1e-5 deg/day, and the
-    # 1-second step reproduces that (verified against the reference on an
-    # armc x lat grid across all house systems).
+    # A one-second rotation step balances centered-difference truncation and
+    # binary64 roundoff for the smooth spherical functions used here.
     d_armc = _SIDEREAL_RATE / 86400.0  # sidereal degrees per 1 second
 
     # Calculate positions at ARMC ± d_armc
@@ -1692,11 +1618,8 @@ def houses_armc_ex2(
     def fd_speed(after: float, before: float) -> float:
         """Centered-difference rate in deg/day; 0.0 across a discontinuity.
 
-        A change larger than 90 deg across the ±1 s window cannot be smooth
-        motion (it would require a rate above ~3.9e6 deg/day); it is a genuine
-        jump of the angle — e.g. the Vertex flipping between the equinoxes at
-        lat 0 when the ARMC crosses 0/180.  No derivative exists there and the
-        reference API reports 0.0 for such angles.
+        A change larger than 90 degrees across the stencil is treated as a
+        branch discontinuity, where no finite derivative exists.
         """
         diff = angular_diff_local(after, before)
         if abs(diff) > 90.0:
@@ -1716,47 +1639,7 @@ def houses_armc_ex2(
         fd_speed(ascmc_after[i], ascmc_before[i]) for i in range(len(ascmc))
     )
 
-    # ── System-specific cusp speed overrides ──────────────────────
-    if hsys_code == ord("W"):
-        # Whole Sign: cusps are at fixed sign boundaries (0°, 30°, …).
-        # Most cusps have zero speed (they jump discontinuously).
-        # Cusps 1,7 (ASC/DESC) get ASC speed; cusps 4,10 (IC/MC) get
-        # MC speed — matching the reference behavior.
-        v_asc = ascmc_speed[0]
-        v_mc = ascmc_speed[1]
-        cs = [0.0] * len(cusps)
-        cs[0] = v_asc  # cusp 1  = ASC
-        cs[3] = v_mc  # cusp 4  = IC
-        cs[6] = v_asc  # cusp 7  = DESC
-        cs[9] = v_mc  # cusp 10 = MC
-        cusps_speed = tuple(cs)
-    elif hsys_code in (ord("N"), ord("U")):
-        # Aries houses ('N') have fixed cusps and Krusinski ('U') has
-        # no analytic speed model in the reference: the reference ephemeris returns
-        # the ASC rate on cusps 1/7, the MC rate on 4/10, and zeros on
-        # the intermediate cusps for both systems.  Mirror that.
-        v_asc = ascmc_speed[0]
-        v_mc = ascmc_speed[1]
-        cs = [0.0] * len(cusps)
-        cs[0] = v_asc
-        cs[3] = v_mc
-        cs[6] = v_asc
-        cs[9] = v_mc
-        cusps_speed = tuple(cs)
-    elif hsys_code == ord("O"):
-        # Porphyry: the reference derives cusp speeds from the angle
-        # rates as v = v_mc + k (v_asc - v_mc)/3 with k = 3,2,1,0 for
-        # cusps 1-4 and k = 4,5 for cusps 5-6 (continuing the
-        # progression across the IC rather than re-interpolating
-        # toward the descendant; verified against the reference ephemeris).
-        v_asc = ascmc_speed[0]
-        v_mc = ascmc_speed[1]
-        step = (v_asc - v_mc) / 3.0
-        ks = [3, 2, 1, 0, 4, 5]
-        cs = [v_mc + ks[i % 6] * step for i in range(len(cusps))]
-        cusps_speed = tuple(cs)
-    # Other systems (Placidus, Koch, Campanus, Regiomontanus, ...): the cusp
-    # speeds above are the genuine derivative of the cusp functions with respect
+    # The speeds are the derivative of the reported cusp functions with respect
     # to ARMC, scaled by the sidereal rate. This is the most accurate speed
     # obtainable from an ARMC input alone: with only the ARMC (and no Julian
     # Day) the small obliquity-rate term dε/dt — worth ~0.01 deg/day — cannot be
@@ -1764,14 +1647,6 @@ def houses_armc_ex2(
     # finite-differences the full house solution in time and so captures every
     # time-dependent term exactly.
     #
-    # Known deviation: for the intermediate Placidus, Koch, and Gauquelin
-    # sector cusps the reference API does NOT return d(cusp)/d(ARMC) —
-    # its reported rates differ from the numerical derivative of its
-    # *own* cusp positions (up to ~1.4 deg/day for Placidus and tens of
-    # deg/day for Koch/Gauquelin), so it evidently uses a separate speed
-    # model for those systems.  We deliberately keep the true derivative
-    # here.
-
     # degnorm on the angle outputs (not the speeds) snaps the bare-%360
     # artifact (exactly 360.0 from a tiny-negative angle) back to 0.0.
     return (
@@ -1791,32 +1666,22 @@ def _houses_fixed_epoch_sidereal(
     flags: int,
     sid_mode: int,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
-    """Sidereal houses for the fixed-epoch modes (J2000/J1900/B1950/GALALIGN).
+    """Sidereal houses for the fixed-epoch modes (J2000/J1900/B1950).
 
-    The reference computes these on the mean ecliptic of the mode's epoch t0
-    (measured black-box, oracle-exact for every house system): the house
-    engine runs against the ascending node of the mean ecliptic of t0 on the
-    true equator of date — the ARMC is re-based to that node and the
+    These modes are evaluated on the mean ecliptic of their epoch ``t0``. The
+    independent construction runs against the ascending node of that ecliptic
+    on the true equator of date — the ARMC is re-based to that node and the
     obliquity becomes the inclination between the two planes — and the
     resulting cusp arcs are measured from the mean equinox of t0 along the
-    t0 ecliptic. GALALIGN_MARDYKS additionally subtracts its constant
-    30-degree longitude offset (its ayanamsha is exactly 30 degrees at t0).
+    t0 ecliptic.
 
-    One measured reference quirk is reproduced: near t0, when the mean and
-    true ayanamshas (net of the mode's constant offset) have opposite signs
-    (a window of roughly ±4 months around t0), the reference shifts every
-    ecliptic output by -2x the (unwrapped) net true ayanamsha.
-
-    The reported ARMC slot keeps the tropical ARMC: the reference's own
-    ARMC drifts from it by <~15" over five centuries with no clean
-    geometric model (documented micro-divergence). 'N' (Aries) cusps stay
-    anchored at 0deg Aries, unshifted, like the general sidereal path.
+    The reported ARMC slot keeps the tropical geometric ARMC. ``N`` (Aries)
+    cusps stay anchored at zero degrees Aries, like the general sidereal path.
     """
     import numpy as np
 
-    from .planets import get_ayanamsa_ex_ut
     from .precession_vondrak import vondrak_pn_matrix, vondrak_precession_matrix
-    from .sidereal_epoch import FIXED_EPOCH_LON_OFFSET, FIXED_EPOCH_T0
+    from .sidereal_epoch import FIXED_EPOCH_T0
 
     import erfa
 
@@ -1843,28 +1708,9 @@ def _houses_fixed_epoch_sidereal(
     ang_n = math.degrees(math.atan2(float(n_eq[1]), float(n_eq[0]))) % 360.0
     armc_p = (trop_ascmc[2] - ang_n) % 360.0
 
-    # Near-t0 sign quirk: fires when the mean and true ayanamshas have
-    # opposite signs (both unwrapped). The mean ayanamsha of a fixed-epoch
-    # mode is the precession accumulated since t0, so its sign is exactly
-    # sign(jd_tt - t0) — used directly because our mean value at t0 can sit
-    # a fraction of a milliarcsecond on the wrong side of zero (B1950).
-    # For an offset mode (GALALIGN_MARDYKS: ayanamsha == offset at t0) the
-    # zero-crossing reference is the offset, not zero.
-    off = FIXED_EPOCH_LON_OFFSET.get(sid_mode, 0.0)
-    aya_true = (
-        (get_ayanamsa_ex_ut(tjdut, flags & (FLG_JPLEPH | FLG_SWIEPH))[1] - off + 180.0)
-        % 360.0
-    ) - 180.0
-    corr = 0.0
-    if (jd_tt >= t0) != (aya_true > 0.0):
-        corr = 2.0 * aya_true
-
     # Sun declination of date for the Sunshine systems. Unlike the
-    # ayanamsha-based sidereal modes (where the reference computes 'i'
-    # identically to 'I'), the fixed-epoch modes keep 'i' as a distinct
-    # Makransky solution (measured: at lat 60 under SIDM_J2000 the
-    # reference's 'i' cusps differ from 'I' by up to ~78 deg), so no
-    # collapse happens here.
+    # ayanamsha-based sidereal modes, the fixed-epoch modes keep ``i`` as a
+    # distinct Makransky geometric solution, so no collapse happens here.
     engine_hsys = hsys_char
     ascmc9 = 0.0
     if engine_hsys in ("I", "i"):
@@ -1885,11 +1731,11 @@ def _houses_fixed_epoch_sidereal(
         # Aries houses stay anchored at 0 deg of the zodiac in use.
         cusps = tuple(float(i * 30) for i in range(12))
     else:
-        cusps = tuple((lon_node + c + corr - off) % 360.0 for c in eng_cusps)
+        cusps = tuple((lon_node + c) % 360.0 for c in eng_cusps)
 
     ascmc_list = list(trop_ascmc)
     for i in (0, 1, 3, 4, 5, 6, 7):
-        ascmc_list[i] = (lon_node + eng_ascmc[i] + corr - off) % 360.0
+        ascmc_list[i] = (lon_node + eng_ascmc[i]) % 360.0
     # ascmc[2] (ARMC) keeps the tropical value (see docstring).
     return cusps, tuple(ascmc_list)
 
@@ -1954,10 +1800,7 @@ def houses_ex(
             return cusps, ascmc
 
         # Sidereal house cusps use the MEAN-equinox ayanamsha (no nutation
-        # term — houses are geometric ARMC-frame quantities): cusps differ
-        # from tropical by get_ayanamsa_ex(jd, 0), which is 13.9" away from
-        # the plain (true) get_ayanamsa at J2000. Verified against the
-        # reference ephemeris for P/E at Fagan-Bradley and Lahiri.
+        # term — houses are geometric ARMC-frame quantities).
         from .planets import get_ayanamsa_ex_ut
 
         ayanamsa = get_ayanamsa_ex_ut(tjdut, 0)[1]
@@ -2043,10 +1886,8 @@ def houses_ex(
     # tiny-negative angle, e.g. after the ayanamsha subtraction) to 0.0.
     cusps = tuple(degnorm(c) for c in cusps)
     ascmc = tuple(degnorm(a) for a in ascmc)
-    # FLG_RADIANS converts every position output — all cusps (including the
-    # 36 Gauquelin sectors) and all 8 ascmc slots, even the equatorial ARMC —
-    # exactly like the reference API (verified black-box, incl. the
-    # SIDEREAL+RADIANS combination).
+    # FLG_RADIANS converts every angular position output, including Gauquelin
+    # sectors and the ASCMC slots.
     if flags & FLG_RADIANS:
         cusps = tuple(math.radians(c) for c in cusps)
         ascmc = tuple(math.radians(a) for a in ascmc)
@@ -2062,8 +1903,7 @@ def houses_ex2(
     This function is an extended version of houses_ex() that also returns
     the velocities (derivatives) of house cusps and angles.
 
-    Velocities are always calculated, matching the reference behavior (like
-    houses_armc_ex2). This is useful for progressed chart applications where
+    Velocities are always calculated. This is useful for progressed chart applications where
     the rate of change of house cusps is needed.
 
     Velocities are computed via centered finite differences of houses_ex(),
@@ -2096,8 +1936,8 @@ def houses_ex2(
     # Calculate positions at current time
     # Work in degrees internally: FLG_RADIANS is stripped here and applied
     # once to the final position tuples below, so the finite-difference
-    # speed stencil stays in degrees (the reference API keeps the speed
-    # tuples in deg/day even under FLG_RADIANS).
+    # speed stencil stays in degrees. The speed tuples are documented in
+    # degrees per day regardless of the position-output unit flag.
     _flags_deg = flags & ~FLG_RADIANS
     cusps, ascmc = houses_ex(tjdut, lat, lon, hsys, _flags_deg)
 
@@ -2111,16 +1951,14 @@ def houses_ex2(
     #
     # evaluated on houses_ex() itself, so every time-dependent term (ARMC rate,
     # dε/dt, nutation) — and the FLG_SIDEREAL ayanamsa, which houses() does not
-    # apply — is captured automatically. A step of dt = 2 seconds is the
-    # measured optimum: the result is stable to ~1e-3 deg/day from dt≈30 s down
-    # to dt≈1 s, while dt≳4 s starts to feel the cusp's curvature and dt≲0.5 s is
-    # dominated by floating-point noise.
+    # apply — is captured automatically. A one-second step balances
+    # centered-difference truncation and binary64 roundoff.
     #
     # This is the genuine derivative of the reported cusps for every system,
     # including the iteratively-solved ones (Placidus, Koch): integrating it
     # reproduces the cusp motion, which an analytic speed approximation of those
     # systems does not.
-    _DT_DAYS = 2.0 / 86400.0
+    _DT_DAYS = 1.0 / 86400.0
     cusps_minus, ascmc_minus = houses_ex(tjdut - _DT_DAYS, lat, lon, hsys, _flags_deg)
     cusps_plus, ascmc_plus = houses_ex(tjdut + _DT_DAYS, lat, lon, hsys, _flags_deg)
 
@@ -2130,12 +1968,8 @@ def houses_ex2(
             d -= 360.0
         elif d < -180.0:
             d += 360.0
-        # A change larger than 90 deg across the ±2 s window cannot be smooth
-        # motion (it would be a rate above ~3.9e6 deg/day); it is a genuine
-        # jump of the angle -- e.g. the Vertex flipping between the equinoxes
-        # at lat 0 when the ARMC crosses 0/180 deg. No derivative exists there
-        # and the reference API reports 0.0 for such angles. Mirrors fd_speed
-        # in houses_armc_ex2 (see its docstring).
+        # A change larger than 90 degrees across the stencil is a branch
+        # discontinuity, where no finite derivative exists.
         if abs(d) > 90.0:
             return 0.0
         return d / (2.0 * _DT_DAYS)
@@ -2143,52 +1977,12 @@ def houses_ex2(
     cusps_speed = tuple(_rate(cusps_plus[i], cusps_minus[i]) for i in range(len(cusps)))
     ascmc_speed = tuple(_rate(ascmc_plus[i], ascmc_minus[i]) for i in range(len(ascmc)))
 
-    # Sign-locked / non-analytic systems are the only ones whose cusps are NOT
-    # smooth functions of time: Whole Sign ('W') and Aries ('N') cusps sit at
-    # fixed sign boundaries and Krusinski ('U') has no smooth speed model, so
-    # their instantaneous derivative is ~0 except at the discontinuous sign
-    # jumps. For these we report the speed of the point that drives the wheel —
-    # the Ascendant rate on cusps 1/7, the MC rate on 4/10, zero on the
-    # intermediates — i.e. the astrologically meaningful daily motion of the
-    # chart frame. Porphyry ('O') uses the reference's analytic cusp-speed
-    # progression (handled below); every other system keeps the true
-    # time-derivative computed above, which by construction integrates to the
-    # cusp's actual motion.
-    if _hsys_code(hsys) in (ord("W"), ord("N"), ord("U")):
-        if _hsys_code(hsys) == ord("W") and (flags & FLG_SIDEREAL):
-            # Whole Sign in SIDEREAL mode is a special case in the reference:
-            # every cusp speed is reported as the Ascendant rate (not the
-            # angle-driven pattern below). Tropical W and systems N/U are
-            # unchanged. This mirrors the reference family-wide (verified
-            # against W tropical and N/E/D, which keep their own patterns).
-            cusps_speed = tuple(ascmc_speed[0] for _ in range(len(cusps)))
-        else:
-            cs = [0.0] * len(cusps)
-            cs[0] = ascmc_speed[0]  # cusp 1  = Asc
-            cs[3] = ascmc_speed[1]  # cusp 4  = IC  -> MC rate
-            cs[6] = ascmc_speed[0]  # cusp 7  = Desc
-            cs[9] = ascmc_speed[1]  # cusp 10 = MC
-            cusps_speed = tuple(cs)
-    elif _hsys_code(hsys) == ord("O"):
-        # Porphyry: the reference derives the intermediate cusp speeds from the
-        # angle rates as v = v_mc + k*(v_asc - v_mc)/3 with k = 3,2,1,0 for cusps
-        # 1-4 and k = 4,5 for cusps 5-6 (continuing the progression across the IC
-        # rather than re-interpolating toward the Descendant). houses_armc_ex2
-        # already applies this; mirror it here so both speed APIs agree and stay
-        # 1:1 with the reference.
-        v_asc = ascmc_speed[0]
-        v_mc = ascmc_speed[1]
-        step = (v_asc - v_mc) / 3.0
-        ks = [3, 2, 1, 0, 4, 5]
-        cusps_speed = tuple(v_mc + ks[i % 6] * step for i in range(len(cusps)))
-
     # degnorm on the angle outputs (not the speeds) snaps the bare-%360
     # artifact (exactly 360.0 from a tiny-negative angle) back to 0.0.
     cusps = tuple(degnorm(c) for c in cusps)
     ascmc = tuple(degnorm(a) for a in ascmc)
-    # FLG_RADIANS converts the two POSITION tuples only — the reference API
-    # keeps the speed tuples in deg/day even under FLG_RADIANS (verified
-    # black-box).
+    # FLG_RADIANS converts position tuples only; speed tuples retain their
+    # documented degree-per-day unit.
     if flags & FLG_RADIANS:
         cusps = tuple(math.radians(c) for c in cusps)
         ascmc = tuple(math.radians(a) for a in ascmc)
@@ -4550,11 +4344,8 @@ def _houses_sunshine_makransky(
     cusps[4] = (mc + 180.0) % 360.0
     cusps[7] = (asc + 180.0) % 360.0
 
-    # Ascensional difference.  When |tan(dec)*tan(lat)| >= 1 the Sun is
-    # circumpolar (never rises or never sets), the diurnal semi-arcs do
-    # not exist, and the reference raises rather than substituting a
-    # different house system (verified: the reference ephemeris errors for 'i' at
-    # exactly |lat|+|dec| >= 90, e.g. 66.56/23.44, 80/11.47).
+    # When |tan(dec)*tan(lat)| >= 1 the Sun is circumpolar, so the diurnal
+    # semi-arcs required by this construction do not exist.
     ad_arg = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
     if abs(ad_arg) >= 1.0:
         raise PolarCircleError(
@@ -4969,10 +4760,8 @@ def _apc_cusp(house: int, lat_rad: float, eps_rad: float, armc_rad: float) -> fl
         _numer = _tphi_teps * math.cos(armc_rad)
         _denom = 1 + _tphi_teps * math.sin(armc_rad)
         if _denom == 0.0:
-            # Inside the polar circle the denominator can vanish at one armc.
-            # Observed black-box: the reference API returns the +-pi/2
-            # limit of atan at this pole; take the same limit instead of
-            # raising ZeroDivisionError.
+            # Inside the polar circle the denominator can vanish at one ARMC.
+            # Use the signed analytic limit of atan at the pole.
             asc_diff = math.copysign(math.pi / 2, _numer)
         else:
             asc_diff = math.atan(_numer / _denom)
@@ -5074,12 +4863,11 @@ def _houses_apc(
     return cusps
 
 
-# Shared placement constants: the epsilon guard for degenerate spherical
-# arguments, and the cusp-boundary nudge (1/1000 arcsec) that pushes a body
-# sitting exactly on a cusp into the following house — the documented
-# convention of the reference API for house_pos().
+# Shared placement constants. Degenerate spherical arguments use a small
+# binary64 guard. Cusp placement is unbiased; exact cusps belong to the
+# interval selected by the geometric comparisons below.
 _NEAR_ZERO = 1e-10
-CUSP_BOUNDARY_OFFSET = 1.0 / 3600000.0
+CUSP_BOUNDARY_OFFSET = 0.0
 
 
 # --- Degree-argument trigonometry ------------------------------------------
@@ -5458,6 +5246,8 @@ def _hpos_sripati(lon: float, armc: float, eps: float, geolat: float) -> float:
     the Porphyry house — equivalently, the Porphyry placement advanced by
     half a house (standard Hindu-astrology construction; see e.g.
     B.V. Raman, "A Manual of Hindu Astrology").
+
+    The final half-house shift is wrapped continuously across house 12.
     """
     asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
     mc = _armc_to_mc(armc, eps)
@@ -5476,12 +5266,8 @@ def _hpos_sripati(lon: float, armc: float, eps: float, geolat: float) -> float:
     else:
         hpos += 3.0 + (arc_from_asc - 180.0 + quadrant) * 3.0 / quadrant
     hpos += 0.5
-    # The half-house shift lands hpos in [1.5, 13.5). Wrap only the true
-    # overflow (>= 13) back to [1, 1.5), preserving the fraction; collapsing
-    # everything > 12 onto 1.0 would swallow house 12 and half of house 1.
-    if hpos >= 13.0:
-        hpos -= 12.0
-    return hpos
+
+    return (hpos - 1.0) % 12.0 + 1.0
 
 
 def _hpos_sunshine_apc(
@@ -5500,8 +5286,8 @@ def _hpos_sunshine_apc(
 
       * Sunshine (Makransky, "Primary Directions"): the reference
         declination is the Sun's. ``house_pos()`` receives no Sun context,
-        so the reference declination falls back to 0 — matching the
-        behaviour of the reference API for the same call.
+        so the reference declination falls back to 0 by definition of this
+        context-free entry point.
       * APC (Knegt): the reference declination is the ascendant's.
 
     Construction: start from the body's Regiomontanus position (the pole
@@ -5695,8 +5481,7 @@ def _house_pos_pythonic(
         >>> position = pos - house  # Position within house (e.g., 0.5 = halfway)
     """
     _NEAR_ZERO = 1e-10
-    # Tiny offset (~0.28 microdeg) to avoid bodies landing exactly on a cusp boundary
-    CUSP_BOUNDARY_OFFSET = 1.0 / 3600000.0
+    CUSP_BOUNDARY_OFFSET = 0.0
 
     # Declare typed local variables for proper type narrowing
     lon: float
@@ -5750,7 +5535,8 @@ def _house_pos_pythonic(
         else:
             lon = float(lon_or_hsys) if lon_or_hsys is not None else 0.0
 
-    # Normalize inputs
+    # Normalize angular inputs
+    armc %= 360.0
     lon = lon % 360.0
     eps = obliquity
     geolat = lat
@@ -5869,9 +5655,7 @@ def _house_pos_pythonic(
         # meridian point is above or below the horizon — at polar
         # latitudes the upper-meridian point can be below it (altitude
         # 90 - |lat - dec| < 0 ⟺ tan(lat) tan(dec) < -1) and the limit
-        # of the closed form lands on the opposite branch (verified:
-        # the reference ephemeris puts the MC degree in house 4 at armc 90,
-        # lat -80).
+        # of the closed form lands on the opposite branch.
         _tt = math.tan(math.radians(geolat)) * math.tan(math.radians(dec))
         if abs(md_upper) < _NEAR_ZERO:
             pos_deg = 270.0 if _tt > -1.0 else 90.0
@@ -5892,6 +5676,13 @@ def _house_pos_pythonic(
             if md_upper < 0:
                 pos_deg += 180.0
             pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
+
+        # Python's float modulo can round a value infinitesimally below zero
+        # to exactly 360.0.  The angles are identical geometrically, but the
+        # latter would encode the nonexistent decimal house 13.0 rather than
+        # the first cusp.  Keep the public house-position interval half-open.
+        if pos_deg >= 360.0:
+            pos_deg -= 360.0
 
         hpos = pos_deg / 30.0 + 1.0
         return hpos
@@ -6060,17 +5851,10 @@ def _house_pos_pythonic(
         if not invalid and abs(mc_semi_arc) > 0:
             # The valid fraction range is the closed interval [0, 2]: both
             # endpoints are reached by real bodies.  A body exactly on the
-            # meridian lands on a fraction of 0 or 2 depending on which
-            # side of the east/west split above IEEE 754 noise pushed its
-            # meridian distance (e.g. md_upper = -1e-14 for a body on the
-            # MC selects the west branch, whose fraction is then exactly
-            # 2).  The reference API places such bodies in house 10 (MC)
-            # or house 4 (IC), never in the "undefined" class, so the
-            # boundary checks accept [0, 2] with a small tolerance for
-            # rounding noise and clamp back into the interval; only
-            # fractions genuinely outside (circumpolar area) stay
-            # undefined.  Verified against the reference on a dense
-            # armc x lat x lon grid including exact cusp coincidences.
+            # meridian can land infinitesimally outside an endpoint because of
+            # binary64 roundoff. Accept a small numerical tolerance and clamp
+            # back into the geometrically valid interval; fractions genuinely
+            # outside it remain undefined.
             _FRACTION_TOL = 1e-9
             if md_upper >= 0:  # east
                 arc_fraction = (md_upper - ad_body + ad_mc) / mc_semi_arc
@@ -6526,8 +6310,7 @@ def _gauquelin_sector_pythonic(
         pressure: Atmospheric pressure in mbar (default 1013.25)
         temperature: Atmospheric temperature in degrees Celsius (default 15.0)
         flags: Calculation flags (FLG_SWIEPH, FLG_TOPOCTR, etc.)
-            Note: The gauquelin_sector() wrapper defaults to
-            FLG_SWIEPH | FLG_TOPOCTR (32770) per the reference ephemeris.
+            The public wrapper defaults to FLG_SWIEPH | FLG_TOPOCTR.
         method: Calculation method:
             - 0: with latitude
             - 1: without latitude
@@ -6640,8 +6423,7 @@ def gauquelin_sector(
         pressure: Atmospheric pressure in mbar (default 1013.25)
         temperature: Atmospheric temperature in degrees Celsius (default 15.0)
         flags: Calculation flags (FLG_SWIEPH, FLG_TOPOCTR, etc.)
-            Note: The gauquelin_sector() wrapper defaults to
-            FLG_SWIEPH | FLG_TOPOCTR (32770) per the reference ephemeris.
+            The public wrapper defaults to FLG_SWIEPH | FLG_TOPOCTR.
         method: Calculation method:
             - 0: with latitude
             - 1: without latitude

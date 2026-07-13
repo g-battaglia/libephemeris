@@ -395,12 +395,9 @@ would require an unnecessary inverse rotation.
 
 #### COORD_HELIO_ECL (type 2) — Heliocentric Ecliptic
 
-**Used for:** Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus,
-Poseidon, Transpluto (Uranian hypothetical bodies)
-
-Stores (longitude, latitude, distance) in degrees/degrees/AU in heliocentric
-ecliptic coordinates. These bodies are defined by Keplerian orbital elements
-relative to the Sun.
+Reserved for locally generated bodies whose independently sourced definition is
+heliocentric ecliptic. The reviewed bundled core does not use this coordinate
+type. Unsupported compatibility IDs must never be materialized into LEB data.
 
 #### COORD_GEO_ECLIPTIC (type 3) — Reserved
 
@@ -507,11 +504,14 @@ Three iterations are sufficient because:
 
 ### Light-Time for System Barycenters
 
-For bodies stored as `COORD_ICRS_BARY_SYSTEM` (Jupiter-Pluto), the light-time
-iteration uses the raw system barycenter (smooth, easy to interpolate). The COB
-correction is applied **after** the light-time iteration converges, at
-**observer time** (not retarded time). This matches Skyfield's behavior in
-`_SpkCenterTarget._observe_from_bcrs()`.
+For bodies stored as `COORD_ICRS_BARY_SYSTEM` (Jupiter-Pluto), runtime first
+resolves the physical planet center from the matching JPL center segment when
+that segment covers the requested epoch. Light time is then iterated on the
+observer-to-body-center vector, including for `FLG_HELCTR` and `FLG_BARYCTR`.
+
+If no center segment covers the epoch, the fallback is explicit: the stored
+system barycenter is used as the target. No analytical satellite theory is
+substituted for a missing JPL center segment.
 
 ---
 
@@ -724,34 +724,32 @@ oscillatory components:
 
 1. **Generator**: Stores the pure system barycenter position (smooth, easy
    to fit with 32-64 day intervals and degree 13)
-2. **Runtime**: Applies the COB correction using either:
-   - `planet_centers.bsp` SPK segments (<0.001" precision), or
-   - Analytical moon theory corrections (<0.01" precision) as fallback
+2. **Runtime**: Uses the pinned tier-specific planet-center SPK segment when
+   it covers the retarded epoch; otherwise it retains the stored system
+   barycenter unchanged.
 
 ### COB Evaluation Timing
 
-**Critical**: The COB correction is evaluated at **observer time** (jd_tt),
-not at **retarded time** (jd_tt - light_time). This matches Skyfield's
-`_SpkCenterTarget._observe_from_bcrs()` behavior:
+**Critical**: The planet-center offset is evaluated at the **retarded emission
+time** (`jd_tt - light_time`) during each light-time iteration. This keeps the
+observer-to-target vector tied to the physical center whenever a segment is
+available:
 
 ```python
-# Skyfield's approach (simplified):
+# Runtime approach (simplified):
 def _observe_from_bcrs(observer_pos, observer_t):
-    # Light-time iteration on barycenter
+    # Light-time iteration on the selected center/barycenter target
     for _ in range(10):
-        dist = |barycenter(t_retarded) - observer_pos|
+        target = center_if_covered_else_barycenter(t_retarded)
+        dist = |target - observer_pos|
         lt = dist / c
         t_retarded = observer_t - lt
 
-    # COB correction at OBSERVER time (not retarded time)
-    center_offset = planet_centers_segment.at(observer_t)
-    target_pos = barycenter(t_retarded) + center_offset
-
-    return target_pos - observer_pos
+    return target - observer_pos
 ```
 
-A previous bug in LEB evaluated COB at retarded time, producing ~0.002"
-systematic errors for outer planets.
+At coverage boundaries the position and speed stencil source-lock to the
+system barycenter instead of mixing center and barycenter samples.
 
 ### SPK Planet Center Segments
 
@@ -770,10 +768,17 @@ These segments have limited date coverage per tier:
 | Tier | File | Coverage varies by planet |
 |------|------|---------------------------|
 | Base | `planet_centers_base.bsp` | ~1849-2150 |
-| Medium | `planet_centers_medium.bsp` | Varies (Jupiter: 1600-1997, Saturn: 1750-2014, etc.) |
+| Medium | `planet_centers_medium.bsp` | Jupiter 1600-2200; Pluto 1800-2200; Saturn/Uranus/Neptune cover 1550-2650 after regeneration |
 
-When the SPK segment doesn't cover the requested date, the analytical
-COB fallback is used automatically.
+When the SPK segment does not cover the requested date, runtime explicitly uses
+the stored system barycenter. There is no analytical COB fallback.
+
+The generator copies every matching DAF descriptor. JPL partitions several
+center targets into consecutive segments; retaining only the first descriptor
+caused the former 1997/2014/1989 cutoffs. Near any remaining physical coverage
+boundary, both samples of an `FLG_SPEED` stencil use the same system-barycenter
+fallback so the finite center offset cannot become a sign-changing velocity
+spike.
 
 ---
 
@@ -896,7 +901,7 @@ independent contributions:
 |--------|-------------------|-----------------|
 | Chebyshev fitting residual | 1e-12 to 1e-8 AU | All |
 | COB correction (SPK) | <0.001" | Jupiter-Pluto |
-| COB correction (analytical fallback) | <0.01" | Jupiter-Pluto |
+| Missing center segment | Explicit system-barycenter fallback | Jupiter-Pluto |
 | Gravitational deflection omission | Up to 0.004" | **Fixed**: now included |
 | Aberration formula (1st-order vs rigorous) | <0.001" | All ICRS bodies |
 | Delta-T interpolation | 0.004s -> 0.002" (Moon only) | **Fixed**: use deltat() |
@@ -905,14 +910,14 @@ independent contributions:
 
 ### Achieved Precision
 
-After all fixes, the combined error for all 31 bodies across all three tiers:
+After all fixes, the local JPL/runtime verification for independently sourced
+bodies across the three tiers is summarized below:
 
 | Category | Base (<0.001") | Medium (<0.001") | Extended |
 |----------|---------------|------------------|----------|
 | All planets (Sun-Pluto, Earth) | **<0.001"** | **<0.001"** | **<0.001"** |
 | All asteroids (Chiron, Ceres-Vesta) | **<0.001"** | **<0.001"** | **<0.001"** |
 | All ecliptic bodies (Nodes, Lilith) | **<0.001"** | **<0.001"** | <0.1" * |
-| All hypothetical bodies (Uranians) | **~0.000"** | **~0.000"** | **~0.000"** |
 
 \* Ecliptic body precision on the extended tier is limited by Meeus polynomial
 degradation beyond ±20 centuries from J2000.0. Within ±1000 CE of J2000,
@@ -975,19 +980,21 @@ COB correction. The COB correction contains high-frequency oscillations from
 inner moons that Chebyshev polynomials cannot fit efficiently.
 
 **Solution**: Created `COORD_ICRS_BARY_SYSTEM` (type 4). Store pure system
-barycenters (smooth) in the LEB file; apply COB correction at runtime using
-`planet_centers.bsp` or analytical moon theory.
+barycenters (smooth) in the LEB file; use a pinned JPL planet-center segment at
+runtime when it covers the requested epoch, otherwise retain the barycenter.
 
-### Problem 4: COB Evaluation Time Bug (v3)
+### Problem 4: Center-source timing and edge continuity
 
-**Symptom**: ~0.002" systematic error for outer planets, even with runtime COB.
+**Symptom**: center/barycenter mismatch in light time and velocity spikes at
+coverage edges.
 
-**Cause**: `_apply_cob_correction()` was evaluating the COB correction at
-**retarded time** (jd_tt - light_time), but Skyfield evaluates COB at
-**observer time** (jd_tt).
+**Cause**: evaluating the offset at observer time does not describe the body at
+the emission epoch, while sampling opposite sides of a coverage boundary from
+different sources turns a finite center offset into an artificial speed.
 
-**Solution**: One-line fix: changed `jd_tt - lt` to `jd_tt` in the COB
-evaluation call.
+**Solution**: evaluate the selected physical center at each retarded epoch and
+source-lock both samples of the velocity stencil; use the system barycenter on
+both sides when the stencil crosses an outer edge.
 
 ### Problem 5: Asteroid Pipeline Mismatch (v3)
 

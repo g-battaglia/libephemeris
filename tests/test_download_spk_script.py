@@ -10,7 +10,7 @@ These tests verify the script's functionality including:
 
 import os
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Add scripts directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
@@ -61,34 +61,6 @@ class TestDownloadSpkBodyDefinitions:
             "sedna",
         ]
         assert COMMON_BODIES == expected
-
-
-class TestCheckAstroquery:
-    """Test astroquery availability checking."""
-
-    def test_check_astroquery_available(self):
-        """Test check when astroquery is available."""
-        from scripts.download_spk import check_astroquery
-
-        # Create a mock for successful import
-        with patch.dict(
-            "sys.modules",
-            {"astroquery": MagicMock(), "astroquery.jplhorizons": MagicMock()},
-        ):
-            # Note: check_astroquery tries to import, so we need to ensure the mock is in place
-            # This test may pass or fail depending on actual astroquery installation
-            result = check_astroquery()
-            assert isinstance(result, bool)
-
-    def test_check_astroquery_not_available(self):
-        """Test check when astroquery is not available."""
-        from scripts.download_spk import check_astroquery
-
-        # Remove astroquery from modules to simulate it being unavailable
-        with patch.dict("sys.modules", {"astroquery.jplhorizons": None}):
-            with patch("builtins.__import__", side_effect=ImportError("No module")):
-                result = check_astroquery()
-                assert result is False
 
 
 class TestListAvailableBodies:
@@ -173,7 +145,7 @@ class TestDownloadSpkForBody:
 
         # Mock the download function to avoid actual network call
         with patch("libephemeris.spk_auto.download_spk_from_horizons") as mock_download:
-            mock_download.side_effect = ImportError("astroquery not available for test")
+            mock_download.side_effect = ValueError("direct download failed for test")
 
             result = download_spk_for_body(
                 body_name="chiron",
@@ -241,19 +213,20 @@ class TestMainFunction:
         captured = capsys.readouterr()
         assert "Available bodies" in captured.out
 
-    def test_main_no_astroquery(self, monkeypatch, capsys):
-        """Test main() when astroquery is not available."""
+    def test_main_download_has_no_astroquery_gate(self, monkeypatch):
+        """The download script works with only the package's core dependencies."""
         from scripts.download_spk import main, _init_bodies
 
         _init_bodies()
         monkeypatch.setattr(sys, "argv", ["download_spk.py", "--bodies", "chiron"])
 
-        with patch("scripts.download_spk.check_astroquery", return_value=False):
+        with patch(
+            "scripts.download_spk.download_spk_for_body", return_value=(1, 0, 0)
+        ) as mock_download:
             result = main()
 
-        assert result == 1
-        captured = capsys.readouterr()
-        assert "astroquery" in captured.err
+        assert result == 0
+        mock_download.assert_called_once()
 
     def test_main_unknown_body(self, monkeypatch, capsys):
         """Test main() with unknown body."""
@@ -264,8 +237,7 @@ class TestMainFunction:
             sys, "argv", ["download_spk.py", "--bodies", "unknown_body_xyz"]
         )
 
-        with patch("scripts.download_spk.check_astroquery", return_value=True):
-            result = main()
+        result = main()
 
         assert result == 1
         captured = capsys.readouterr()
@@ -343,18 +315,17 @@ class TestArgumentParsing:
             ],
         )
 
-        with patch("scripts.download_spk.check_astroquery", return_value=True):
-            with patch(
-                "scripts.download_spk.download_spk_for_body",
-                return_value=(1, 0, 0),
-            ) as mock_download:
-                result = main()
+        with patch(
+            "scripts.download_spk.download_spk_for_body",
+            return_value=(1, 0, 0),
+        ) as mock_download:
+            result = main()
 
-                # Check that download was called with correct dates
-                mock_download.assert_called_once()
-                call_args = mock_download.call_args
-                assert call_args.kwargs["start_date"] == "2020-01-01"
-                assert call_args.kwargs["end_date"] == "2050-01-01"
+            # Check that download was called with correct dates
+            mock_download.assert_called_once()
+            call_args = mock_download.call_args
+            assert call_args.kwargs["start_date"] == "2020-01-01"
+            assert call_args.kwargs["end_date"] == "2050-01-01"
 
     def test_quiet_flag(self, monkeypatch, capsys):
         """Test quiet flag suppresses output."""
@@ -367,12 +338,11 @@ class TestArgumentParsing:
             ["download_spk.py", "--bodies", "chiron", "--quiet"],
         )
 
-        with patch("scripts.download_spk.check_astroquery", return_value=True):
-            with patch(
-                "scripts.download_spk.download_spk_for_body",
-                return_value=(1, 0, 0),
-            ):
-                result = main()
+        with patch(
+            "scripts.download_spk.download_spk_for_body",
+            return_value=(1, 0, 0),
+        ):
+            result = main()
 
         captured = capsys.readouterr()
         assert "Downloading" not in captured.out

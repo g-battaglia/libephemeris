@@ -226,10 +226,10 @@ class TestInvalidInputHandling:
 
 @pytest.mark.unit
 class TestCalcPctrSpeed3Regression:
-    """calc_pctr FLG_SPEED3 semantics (measured against the reference).
+    """calc_pctr FLG_SPEED3 public flag semantics.
 
     calc()/calc_ut() remap FLG_SPEED3 -> FLG_SPEED before computing, but
-    calc_pctr() preserves FLG_SPEED3 in the echoed retflag. The reference
+    calc_pctr() preserves FLG_SPEED3 in the echoed retflag. The public contract
     computes the pctr velocity only when FLG_SPEED is set: FLG_SPEED3
     alone echoes the bit yet returns zero velocity slots, while
     FLG_SPEED|FLG_SPEED3 returns the FLG_SPEED velocity.
@@ -239,8 +239,7 @@ class TestCalcPctrSpeed3Regression:
         from libephemeris.constants import FLG_SPEED3
 
         pos3, ret3 = swe.calc_pctr(JD_J2000, MOON, MARS, FLG_SPEED3)
-        # The reference returns zero velocity for SPEED3-alone (the bit is
-        # echoed in the retflag, but only FLG_SPEED triggers computation).
+        # The bit is echoed, but only FLG_SPEED triggers computation.
         assert pos3[3:] == (0.0, 0.0, 0.0)
         assert ret3 & FLG_SPEED3
 

@@ -160,8 +160,7 @@ def _sol_glob_accepts(mask: int, retflag: int) -> bool:
     Decides whether an eclipse whose classified type is ``retflag`` (one
     geometry bit ECL_CENTRAL/ECL_NONCENTRAL plus one type bit
     ECL_TOTAL/ECL_ANNULAR/ECL_PARTIAL/ECL_ANNULAR_TOTAL) satisfies the
-    caller's ``mask`` filter, matching the reference semantics verified
-    against the oracle across all 64 masks:
+    caller's ``mask`` filter according to the public API's flag contract:
 
     * ``mask == 0`` accepts any eclipse.
     * A geometry-only mask (no type bits) never matches.
@@ -257,8 +256,7 @@ _AU_KM = 149597870.7
 # Physical equatorial radii of planets in km, used for dynamic angular
 # disc-size computation. Sources: IAU volumetric mean radii (Archinal et
 # al.; IAU 2015 nominal values, NASA Planetary Fact Sheet). Disc sizes
-# computed from these radii reproduce the reference API's apparent
-# diameters on output; asteroid values from the Bowell database.
+# computed from these radii follow the independent physical disc geometry.
 _PLANET_RADIUS_KM = {
     MERCURY: 2439.4,
     VENUS: 6051.8,
@@ -270,15 +268,16 @@ _PLANET_RADIUS_KM = {
     PLUTO: 1188.3,
 }
 
-# Bodies beyond the classical planets for which the reference API reports
-# a finite apparent disc (radii in km, public survey values).
+# Bodies beyond the classical planets with a finite apparent disc. Diameters
+# are from the NASA JPL Small-Body Database (queried 2026-07-13), divided by
+# two to obtain radii.
 _EXTRA_BODY_RADIUS_KM = {
-    CHIRON: 135.685,
-    PHOLUS: 145.0,
+    CHIRON: 83.0,
+    PHOLUS: 95.0,
     CERES: 469.7,
-    PALLAS: 272.5,
+    PALLAS: 256.5,
     JUNO: 123.298,
-    VESTA: 262.7,
+    VESTA: 261.385,
     EARTH: 6371.0084,
 }
 
@@ -293,21 +292,16 @@ _ECL_RMOON_AU = 1738.15 / _ECL_AU_KM
 _ECL_REARTH_AU = 6378.140 / _ECL_AU_KM
 _ECL_EARTH_FLATTENING = 1.0 / 298.25642
 
+# Danjon lunar-shadow convention used by NASA's Five Millennium Catalog.
+# Instead of multiplying both completed shadow diameters by an empirical
+# factor, it increases the Moon's equatorial horizontal parallax term by one
+# percent while leaving the solar semidiameter and solar-parallax terms
+# geometric.  See Espenak & Meeus, NASA/TP-2009-214173, Eqs. 1-5 and 1-6.
+_DANJON_MOON_PARALLAX_SCALE = 1.01
+
 # Earth equatorial radius in km (IAU 1976 system, Astronomical Almanac),
 # used directly by the occultation shadow-geometry phase equations.
 _EARTH_EQ_RADIUS_KM = 6378.140
-
-# Lunar-eclipse shadow-scale factors (dimensionless), fitted black-box on
-# reference-API output magnitudes; penumbra ~= umbra^2. See _lun_how_core.
-_LUN_UMBRA_SCALE = 0.99405
-_LUN_PENUMBRA_SCALE = 0.98813
-
-# Inner-contact (2nd/3rd) lunar-radius scale for occultations and solar
-# eclipses, established black-box: the reference API's inner-contact times
-# correspond to a lunar radius reduced by this factor (fitted on contact
-# times; physically consistent with using the Moon's smaller polar/mean
-# limb for the moment of complete immersion).
-_INNER_CONTACT_MOON_SCALE = 0.99916
 
 # --- Lunar-occultation search parameters (derived, not tuned) ---------------
 # Mean lunar sidereal motion is ~13.18 deg/day, so gap/13 is a safe
@@ -731,8 +725,8 @@ def _sol_how_core(
 
     attr: [0] magnitude as diameter fraction (negative when the limbs do
     not yet overlap), [1] lunar/solar diameter ratio, [2] obscuration
-    (the lunar/solar disc area ratio during totality, > 1 per reference
-    behavior), [3] 0 (callers fill the core-shadow width), [4] azimuth of the Sun,
+    (fraction of the solar disc area covered, 1.0 during totality),
+    [3] 0 (callers fill the core-shadow width), [4] azimuth of the Sun,
     [5] true altitude, [6] apparent altitude, [7] Moon-Sun center
     separation in degrees, [8] NASA magnitude, [9]/[10] saros series and
     member.
@@ -774,12 +768,13 @@ def _sol_how_core(
     elif rsun <= 0.0:
         attr[2] = 1.0
     elif retc in (ECL_TOTAL, ECL_ANNULAR):
-        # One disc lies entirely within the other: the reference API reports
-        # the lunar/solar disc area ratio. Total (larger Moon): the ratio
-        # exceeds 1 - reference behavior, deliberately not clamped to the
-        # physical 100% fraction. Annular (smaller Moon): a ring of Sun
-        # remains and the ratio is the obscured fraction (< 1).
-        attr[2] = (rmoon / rsun) ** 2
+        # One disc lies entirely within the other. Total (larger Moon): the
+        # Sun is fully covered, so the obscured fraction is 1.0 — the
+        # published definition of obscuration (fraction of the solar disc
+        # area occulted) is bounded by construction; the > 1 disc area ratio
+        # remains available as attr[1]**2. Annular (smaller Moon): a ring of
+        # Sun remains and the covered fraction is (rmoon/rsun)**2 < 1.
+        attr[2] = min(1.0, (rmoon / rsun) ** 2)
     elif dctr <= 0.0:
         # Exactly concentric discs in the partial branch are reachable only at
         # the annular/total boundary (rsun == rmoon); the overlap is the whole
@@ -825,9 +820,9 @@ def _lun_how_core(
     Works in the selenocentric frame: the Earth's shadow cone is built
     from the selenocentric Sun and Earth vectors, the Moon's immersion
     follows from the shadow-axis offset at the Moon. The shadow diameters
-    carry the conventional one-fiftieth atmospheric enlargement
-    (Astronomical Almanac 1998, L4) and the reference's NASA-agreement
-    deflators (0.99405 core, 0.98813 penumbra).
+    use Danjon's independently published atmospheric convention: the lunar
+    horizontal-parallax term is enlarged by one percent (Espenak & Meeus,
+    NASA/TP-2009-214173). No output-fitted shadow deflator is applied.
 
     Returns ``(retc, attr, dcore)``:
         retc: ECL_TOTAL, ECL_PARTIAL, ECL_PENUMBRAL or 0.
@@ -880,30 +875,22 @@ def _lun_how_core(
     r0_sq = dm * dm - s0 * s0
     r0 = math.sqrt(r0_sq) if r0_sq > 0.0 else 0.0
 
-    enlarge = 1.0 + 1.0 / 50.0  # atmospheric enlargement, AA 1998 L4
+    # Exact cone sections with Danjon's atmospheric correction.  Scaling only
+    # the leading Earth-radius term implements NASA's angular definitions
+    # Ru = 1.01*Pm - Ss + Ps and Rp = 1.01*Pm + Ss + Ps; multiplying a
+    # completed shadow radius would instead be Chauvenet's different 1/50
+    # convention.
     d0 = (
-        abs(s0 / dsm * (2.0 * rsun_au - 2.0 * rearth_au) - 2.0 * rearth_au)
-        * enlarge
+        abs(
+            s0 / dsm * (2.0 * rsun_au - 2.0 * rearth_au)
+            - 2.0 * _DANJON_MOON_PARALLAX_SCALE * rearth_au
+        )
         / cosf1
     )
     cap_d0 = (
-        (s0 / dsm * (2.0 * rsun_au + 2.0 * rearth_au) + 2.0 * rearth_au)
-        * enlarge
-        / cosf2
-    )
-    # Shadow-scale convention, established black-box: reproducing the
-    # reference API's published lunar-eclipse magnitudes requires a second
-    # cone-slope projection of both shadow diameters plus fixed scale
-    # factors (umbra 0.99405, penumbra 0.98813 ~= 0.99405^2). The factors
-    # were fitted on output magnitudes over a multi-century eclipse sweep
-    # (see tests/test_lun_eclipse_*), consistent with the family of
-    # published shadow-enlargement conventions (Danjon-style scaling of
-    # the geometric shadow).
-    d0 /= cosf1
-    cap_d0 /= cosf2
-    d0 *= _LUN_UMBRA_SCALE
-    cap_d0 *= _LUN_PENUMBRA_SCALE
-
+        s0 / dsm * (2.0 * rsun_au + 2.0 * rearth_au)
+        + 2.0 * _DANJON_MOON_PARALLAX_SCALE * rearth_au
+    ) / cosf2
     attr = [0.0] * 20
     retc = 0
     if d0 / 2.0 >= r0 + rmoon_au / cosf1:
@@ -1258,11 +1245,11 @@ def _calculate_obscuration_safe(r_sun: float, r_moon: float, d: float) -> float:
         d: Center-to-center separation in degrees
 
     Returns:
-        Obscuration: the Moon/Sun disc area ratio (r_moon/r_sun)^2 when one
-        disc lies entirely within the other (> 1 for a total eclipse, < 1
-        for an annular one — reference behavior, deliberately not clamped),
-        the two-disc lens-overlap fraction for a partial eclipse, and 0.0
-        with no overlap.
+        Obscuration: the fraction of the Sun's disc area covered by the
+        Moon, bounded to [0, 1] by the published definition — 1.0 for a
+        total eclipse, (r_moon/r_sun)^2 < 1 for an annular one, the
+        two-disc lens-overlap fraction for a partial eclipse, and 0.0 with
+        no overlap.
     """
     # Handle edge case: no overlap
     if d >= r_sun + r_moon:
@@ -1270,9 +1257,9 @@ def _calculate_obscuration_safe(r_sun: float, r_moon: float, d: float) -> float:
 
     # Edge case: one disc lies entirely within the other (or is concentric).
     if d <= abs(r_sun - r_moon) or d < MINIMUM_SEPARATION_FOR_LENS:
-        # Total (Moon >= Sun): area ratio > 1 (reference behavior).
+        # Total (Moon >= Sun): the Sun is fully covered -> 1.0.
         # Annular (Moon < Sun): a ring remains -> disc area ratio < 1.0.
-        return (r_moon / r_sun) ** 2
+        return min(1.0, (r_moon / r_sun) ** 2)
 
     # Calculate lens-shaped intersection area
     # d1 is distance from Sun center to intersection chord
@@ -2301,9 +2288,9 @@ def sol_eclipse_max_time(
 
     Example:
         >>> # Find precise global maximum time for April 8, 2024 eclipse
-        >>> from libephemeris import julday, sol_eclipse_max_time, _sol_eclipse_when_glob_pythonic
+        >>> from libephemeris import julday, sol_eclipse_max_time, sol_eclipse_when_glob
         >>> jd_start = julday(2024, 3, 1, 0)
-        >>> ecl_type, times = _sol_eclipse_when_glob_pythonic(jd_start)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start)
         >>> jd_max, gamma = sol_eclipse_max_time(times[0])
         >>> print(f"Maximum at JD {jd_max:.8f}, gamma = {gamma:.6f}")
 
@@ -2590,7 +2577,7 @@ def _sol_eclipse_when_glob_pythonic(
 
     # Reject type masks that describe geometries which cannot occur
     # (central partial; non-central hybrid) before any search - the
-    # reference raises for these rather than searching (matches oracle).
+    # public contract rejects these rather than starting a futile search.
     _sol_glob_reject_impossible(eclipse_type)
 
     # Keep the raw mask (0 == "any type") for the acceptance test; do NOT
@@ -3612,15 +3599,15 @@ def _sol_eclipse_when_loc_impl(
 
         # Contact times. Outer contacts: center separation equals the
         # sum of the apparent radii evaluated at the contact itself.
-        # Inner contacts: the lunar radius is reduced by the black-box
-        # inner-contact scale (see _INNER_CONTACT_MOON_SCALE).
+        # Inner contacts use the exact tangency of the two apparent discs:
+        # center separation equals the absolute semidiameter difference.
         def _f_outer(jd_c: float) -> float:
             rs_c, rm_c, sep_c = _radii_sep(jd_c)
             return sep_c - (rs_c + rm_c)
 
         def _f_inner(jd_c: float) -> float:
             rs_c, rm_c, sep_c = _radii_sep(jd_c)
-            return abs(rs_c - _INNER_CONTACT_MOON_SCALE * rm_c) - sep_c
+            return abs(rs_c - rm_c) - sep_c
 
         two_hours = 2.0 / 24.0
         jd_first = _root_bisect(_f_outer, jd_local_max - two_hours, jd_local_max)
@@ -4109,7 +4096,7 @@ def _sol_eclipse_how_details_impl(
         >>> print(f"Duration of totality: {details['duration_total_minutes']:.1f} min")
 
     References:
-        - Reference documentation
+        - Espenak & Meeus, NASA/TP-2009-214173, Eqs. 1-5 and 1-6
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     # Validate and extract geopos
@@ -5869,47 +5856,27 @@ def lun_occult_when_glob(
     ecltype: int = 0,
     backwards: "bool | int | str" = False,
 ) -> Tuple[int, Tuple[float, ...]]:
-    """
-    Find the next lunar occultation of a planet or star anywhere on Earth.
+    """Find a lunar occultation visible somewhere on Earth.
 
     Args:
-        tjdut: Julian Day (UT) to start search from
-        body: Planet identifier (int) or fixed-star name (str)
-        flags: Calculation flags (FLG_SWIEPH, etc.)
-        ecltype: Occultation-type filter (ECL_TOTAL, ECL_PARTIAL,
-            ECL_CENTRAL, ECL_NONCENTRAL, or 0 for any). Annular types
-            only exist when the occulted body is the Sun.
-        backwards: False/0 searches forward, True/1 backward; direction
-            strings are accepted per :func:`_coerce_backwards`. The int
-            value may carry ECL_ONE_TRY: then only the conjunction
-            nearest the start date is examined - if it shows no
-            occultation of the wanted type, the function returns
-            retflag 0 with tret[0] holding a date from which to
-            continue the search.
+        tjdut: Search start as a Julian Day in UT.
+        body: Planet identifier or fixed-star name.
+        flags: Calculation flags.
+        ecltype: Requested occultation-type mask, or zero for any type.
+        backwards: Search direction. Integer values may also include
+            ``ECL_ONE_TRY``.
 
     Returns:
-        Tuple containing:
-            - retflag: occultation type (ECL_TOTAL/ANNULAR/PARTIAL with
-              ECL_CENTRAL/ECL_NONCENTRAL; stars are point sources, so
-              their occultations are always total), or 0 for the
-              ECL_ONE_TRY miss case.
-            - tret: Tuple of 10 floats:
-                [0]: time of maximum occultation
-                [1]: time when occultation takes place at local
-                     apparent noon (0 if none)
-                [2]: occultation begin, [3]: occultation end
-                [4]: totality begin, [5]: totality end
-                [6]: center line begin, [7]: center line end
-                [8]/[9]: 0.0
+        An occultation retflag and ten-value event-time tuple.
 
     Raises:
-        Error: for impossible type filters (central partial; annular
-            for a body other than the Sun; a star with |ecl. lat.| > 7)
-            and when no matching occultation is found in the search
-            window.
+        Error: If the type filter is impossible or no event is found in the
+            search window.
 
-    References:
-        - Reference API: lun_occult_when_glob()
+    Notes:
+        With ``ECL_ONE_TRY``, only the conjunction nearest the start is
+        examined; a miss returns retflag zero and a continuation date in the
+        first time slot.
     """
     from .exceptions import Error
     from .constants import ECL_ONE_TRY
@@ -5956,10 +5923,9 @@ def lun_occult_when_glob(
         return sep - (rmoon + rbody)
 
     def _lon_diff(jd: float) -> float:
-        # The noon-transit search runs in right ascension: measured on
-        # reference-API output, tret[1] corresponds to the Moon-body
-        # conjunction in RA, not in ecliptic longitude (which the
-        # conjunction stepping above uses).
+        # The noon-transit slot is defined by Moon-body conjunction in right
+        # ascension, while the coarse conjunction stepping above uses
+        # ecliptic longitude.
         if is_star:
             from .fixed_stars import fixstar_ut
 
@@ -6248,16 +6214,15 @@ def _lun_occult_when_loc_pythonic(
         else:
             phase = ECL_PARTIAL
 
-        # Contact times. Inner contacts use the reduced lunar radius
-        # (see _INNER_CONTACT_MOON_SCALE); for point-source stars the
-        # outer contacts coincide with them.
+        # Inner contacts use exact apparent-disc tangency; for point-source
+        # stars the outer contacts coincide with them.
         def _f_outer(jd_c: float) -> float:
             rb_c, rm_c, sep_c = _radii_sep(jd_c)
             return sep_c - (rb_c + rm_c)
 
         def _f_inner(jd_c: float) -> float:
             rb_c, rm_c, sep_c = _radii_sep(jd_c)
-            return abs(rb_c - _INNER_CONTACT_MOON_SCALE * rm_c) - sep_c
+            return abs(rb_c - rm_c) - sep_c
 
         jd_second = 0.0
         jd_third = 0.0
@@ -6353,9 +6318,8 @@ def _lun_occult_when_loc_pythonic(
         rc_where, _wlon, _wlat, dcore = _eclipse_where_core(jd_max, flags, body)
         retflag |= rc_where & ECL_NONCENTRAL
         attr_list[3] = dcore[0]
-        # Measured on reference-API output: for occultations the diameter
-        # fraction and the obscuration are capped at 1.0; apply the same
-        # cap for 1:1 parity.
+        # The compatibility attr layout defines occultation diameter fraction
+        # and obscuration as fractions, hence both are capped at unity.
         attr_list[0] = min(attr_list[0], 1.0)
         attr_list[2] = min(attr_list[2], 1.0)
 
@@ -6374,77 +6338,29 @@ def lun_occult_when_loc(
     flags: int = FLG_SWIEPH,
     backwards: "bool | int | str" = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
-    """
-    Find the next lunar occultation visible from a specific location.
-
-    This function matches the reference lun_occult_when_loc() API exactly.
-
-    A lunar occultation occurs when the Moon passes in front of (occults)
-    a planet or star as seen from Earth. This function searches forward
-    (or backward) in time to find the next occultation visible from a specific
-    geographic location, where both the Moon and the target are above the horizon.
+    """Find a lunar occultation visible from one location.
 
     Args:
-        tjdut: Julian Day (UT) to start search from
-        body: Planet identifier (int) or star name (str)
-            For planets: MERCURY, VENUS, MARS, JUPITER, SATURN, etc.
-            For stars: e.g., "Regulus", "Spica", "Aldebaran"
-        geopos: Sequence of [longitude_degrees, latitude_degrees, altitude_meters]
-                NOTE: longitude comes first (this matches reference API convention)
-        flags: Calculation flags (FLG_SWIEPH, etc.)
-        backwards: If True, search backward in time instead of forward;
-            direction strings are accepted per :func:`_coerce_backwards`
-            and the int value may carry ECL_ONE_TRY
+        tjdut: Search start as a Julian Day in UT.
+        body: Planet identifier, fixed-star identifier, or fixed-star name.
+        geopos: Longitude, latitude, and altitude in metres.
+        flags: Calculation flags.
+        backwards: Search direction. Integer values may also include
+            ``ECL_ONE_TRY``.
 
     Returns:
-        Tuple containing:
-            - retflags: Occultation type flags bitmask (int):
-                ECL_TOTAL: Total occultation (body fully behind Moon)
-                ECL_PARTIAL: Partial occultation (body partially behind Moon)
-                ECL_VISIBLE: Occultation visible from location
-                ECL_MAX_VISIBLE: Maximum visible from location
-                ECL_1ST_VISIBLE: First contact visible
-                ECL_4TH_VISIBLE: Fourth contact visible
-            - tret: Tuple of 10 floats with occultation phase times (JD UT):
-                [0]: Time of maximum occultation (minimum separation)
-                [1]: Time of first contact (occultation begins)
-                [2]: Time of second contact (full occultation begins, or 0)
-                [3]: Time of third contact (full occultation ends, or 0)
-                [4]: Time of fourth contact (occultation ends)
-                [5]: Time the occulted body rises, if it rises between first
-                     and fourth contact (else 0)
-                [6]: Time the occulted body sets, if it sets between first
-                     and fourth contact (else 0)
-                [7]: Reserved (0)
-                [8]: Reserved (0)
-                [9]: Reserved (0)
-            - attr: Tuple of 20 floats with occultation attributes:
-                [0]: Fraction of target diameter covered by Moon (magnitude)
-                [1]: Ratio of lunar diameter to target diameter
-                [2]: Fraction of target disc covered by Moon (obscuration)
-                [3]: Diameter of core shadow in km (0 for stars)
-                [4]: Azimuth of target at maximum occultation (degrees)
-                [5]: True altitude of target above horizon at maximum (degrees)
-                [6]: Apparent altitude of target above horizon at maximum (degrees)
-                [7]: Angular separation (elongation) at maximum (degrees)
-                [8-19]: Reserved (0)
+        The occultation retflag, a ten-value phase-time tuple, and a
+        twenty-value local-circumstance tuple. In the phase-time tuple,
+        ``tret[5]`` is when the occulted body rises and ``tret[6]`` is when the
+        occulted body sets at the observer location.
 
     Raises:
-        Error: If no occultation visible from location within search limit
-        ValueError: If body is invalid or geopos has wrong length
+        Error: If no visible occultation is found in the search window.
+        ValueError: If the body or geographic position is invalid.
 
-    Example:
-        >>> # Find next occultation of Regulus visible from Rome
-        >>> from libephemeris import julday, lun_occult_when_loc, FLG_SWIEPH
-        >>> jd = julday(2017, 1, 1, 0)
-        >>> rome_geopos = [12.4964, 41.9028, 0]  # lon, lat, alt
-        >>> retflags, tret, attr = lun_occult_when_loc(jd, "Regulus", rome_geopos)
-        >>> print(f"Occultation maximum at JD {tret[0]:.5f}")
-        >>> print(f"Moon altitude: {attr[5]:.1f}°")
-
-    References:
-        - Reference API: lun_occult_when_loc()
-        - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
+    Notes:
+        Local attributes include covered diameter/disc fractions, target
+        azimuth and altitude, elongation, and the event contact times.
     """
 
     # Validate geopos
@@ -6691,9 +6607,9 @@ def _rise_trans_impl(
         - Reference API: rise_trans()
         - Meeus "Astronomical Algorithms" Ch. 15 (Rise, Set, Transit)
     """
-    # Measured on output: rise_trans() behaves as rise_trans_true_hor()
-    # with a horizon height of 0; mirror that
-    # so both entry points share one rise/set engine (twilight bits,
+    # ``rise_trans`` is the zero-horizon specialization of
+    # ``rise_trans_true_hor``. Both entry points share one rise/set engine
+    # (twilight bits,
     # disc selection, refraction and the dip convention included).
     return _rise_trans_true_hor_impl(
         tjdut, body, rsmi, geopos, atpress, attemp, 0.0, flags, reader=reader
@@ -6703,8 +6619,8 @@ def _rise_trans_impl(
 def _make_tret(jd_event: float = 0.0) -> Tuple[float, ...]:
     """Build a 10-element tret tuple for rise_trans return value.
 
-    The reference ephemeris returns a 10-element tuple where only index 0 is meaningful
-    (the Julian Day of the event). Remaining elements are always 0.0.
+    The compatibility return contract uses a 10-element tuple where only index
+    0 is meaningful (the Julian Day of the event); remaining elements are 0.0.
 
     jd_event is coerced to a native float: the transit path derives it from a
     numpy hour-angle expression, so without this rise_trans would leak a
@@ -6870,8 +6786,8 @@ def _calculate_rise_set(
     """
     # Circumpolar pre-check from the declination extremes. For
     # fast-moving bodies (the Moon moves ~13 degrees/day) the declination
-    # changes during the search window, so a measured declination speed
-    # widens the margin.
+    # changes during the search window, so a finite-difference estimate of
+    # declination speed widens the margin.
     _, dec = _get_body_ra_dec(jd_start)
     max_search = 2.0  # days
     _, dec2 = _get_body_ra_dec(jd_start + 1.0 / 24.0)
@@ -7092,11 +7008,9 @@ def _rise_trans_true_hor_impl(
     horizon_altitude = horhgt
     is_fixed_star = isinstance(body, str)
 
-    # Extract the event type from rsmi's low bits with the reference's
-    # tolerance and precedence (measured black-box): SET > RISE > ITRANSIT >
-    # MTRANSIT when several bits are set, and a missing event type (e.g. a
-    # bare BIT_CIVIL_TWILIGHT/BIT_DISC_CENTER/BIT_NO_REFRACTION modifier, or
-    # rsmi=0) defaults to RISE — the reference never raises here.
+    # Extract the event type from rsmi's low bits using the compatibility
+    # precedence SET > RISE > ITRANSIT > MTRANSIT. A modifier-only mask or
+    # missing event type defaults to RISE.
     if rsmi & CALC_SET:
         event_type = CALC_SET
     elif rsmi & CALC_RISE:
@@ -8260,36 +8174,20 @@ from dataclasses import dataclass  # noqa: E402 (section-local import)
 
 @dataclass
 class BesselianElements:
-    """
-    Besselian elements for a solar eclipse at a given reference time.
+    """Besselian elements for a solar eclipse at a reference time.
 
     Besselian elements are the fundamental quantities used to calculate
-    the circumstances of a solar eclipse for any location on Earth.
-    They describe the geometry of the Moon's shadow relative to Earth
-    in a standardized coordinate system called the fundamental plane.
-
-    The fundamental plane passes through Earth's center and is perpendicular
-    to the Moon-Sun line (shadow axis). The coordinate system has:
-    - x-axis: pointing east (increasing right ascension)
-    - y-axis: pointing north
-    - z-axis: along shadow axis toward the Moon
+    local eclipse circumstances. They describe the lunar shadow relative to
+    Earth on a fundamental plane perpendicular to the shadow axis.
 
     Attributes:
-        t0: Reference time (Julian Day, UT) for these elements.
-            Elements are exact at this time; derivatives allow interpolation.
-        x: Shadow axis x-coordinate on fundamental plane (Earth radii).
-            Positive = shadow axis is east of Earth's center.
-        y: Shadow axis y-coordinate on fundamental plane (Earth radii).
-            Positive = shadow axis is north of Earth's equator.
-        d: Declination of the shadow axis (degrees).
-            The angle between the shadow axis and the equatorial plane.
-        l1: Radius of the penumbral shadow cone on fundamental plane (Earth radii).
-            Observers within this radius see at least a partial eclipse.
-        l2: Radius of the umbral/antumbral shadow cone (Earth radii).
-            Positive for annular eclipses (antumbra), negative for total (umbra).
-        mu: Greenwich hour angle of the shadow axis (degrees).
-            The angle measured westward from Greenwich meridian to the
-            sub-solar point on the fundamental plane.
+        t0: Reference Julian Day in UT.
+        x: Shadow-axis x-coordinate in Earth equatorial radii.
+        y: Shadow-axis y-coordinate in Earth equatorial radii.
+        d: Shadow-axis declination in degrees.
+        l1: Penumbral-cone radius in Earth equatorial radii.
+        l2: Umbral or antumbral-cone radius in Earth equatorial radii.
+        mu: Greenwich hour angle of the shadow axis in degrees.
         dx_dt: Rate of change of x (Earth radii per hour).
         dy_dt: Rate of change of y (Earth radii per hour).
         dd_dt: Rate of change of d (degrees per hour).
@@ -8309,16 +8207,13 @@ class BesselianElements:
         ... )
         >>> print(f"Shadow at x={elements.x:.4f}, y={elements.y:.4f}")
 
-    Note:
-        All angular rates (dd_dt, dmu_dt) are in degrees per hour.
-        All linear rates (dx_dt, dy_dt, dl1_dt, dl2_dt) are in Earth radii per hour.
-        Elements can be interpolated to nearby times t using:
-            x(t) ≈ x + dx_dt * (t - t0) * 24  (where t is in days)
+    Notes:
+        Angular rates are degrees per hour and linear rates are Earth radii
+        per hour. Use :func:`interpolate_besselian_elements` for nearby times.
 
     References:
-        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
-        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
-        - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
+        Meeus, *Astronomical Algorithms*, chapter 54; *Explanatory Supplement
+        to the Astronomical Almanac* (2013), chapter 11.
     """
 
     t0: float  # Reference time (Julian Day, UT)
@@ -8612,73 +8507,24 @@ def calc_besselian_d(jd: float, flags: int = FLG_SWIEPH) -> float:
 
 
 def calc_besselian_l1(jd: float, flags: int = FLG_SWIEPH) -> float:
-    """
-    Calculate the Besselian element l1 (penumbral shadow radius) for a solar eclipse.
-
-    The Besselian element l1 is the radius of the penumbral shadow cone where it
-    intersects the fundamental plane, measured in Earth equatorial radii. The
-    fundamental plane is the plane through Earth's center perpendicular to the
-    Moon-Sun line (the shadow axis direction).
-
-    The penumbral cone is formed by the external tangent lines from the Sun's limb
-    to the Moon's limb. Observers within this radius on the fundamental plane
-    would see some portion of the Sun obscured by the Moon.
+    """Calculate Besselian element ``l1`` for a solar eclipse.
 
     Args:
-        jd: Julian Day (UT) at which to calculate l1
-        flags: Calculation flags (FLG_SWIEPH, etc.)
+        jd: Julian Day in UT.
+        flags: Calculation flags.
 
     Returns:
-        The penumbral shadow radius l1 in Earth equatorial radii.
-        Always positive. Typical values range from 0.5 to 0.6 Earth radii
-        during solar eclipses.
+        Penumbral shadow radius in Earth equatorial radii.
 
-    Algorithm:
-        1. Get geocentric equatorial positions of Moon and Sun
-        2. Calculate the Sun-Moon distance
-        3. Calculate the penumbral cone semi-angle f1 using:
-           sin(f1) = (R_sun + R_moon) / D_sun-moon
-        4. Calculate the penumbral cone vertex distance from the Sun:
-           k1 = R_sun / sin(f1)
-        5. Calculate the distance from the vertex to Earth's center (fundamental plane):
-           d = D_sun - k1
-        6. The penumbral radius at the fundamental plane is:
-           l1 = d * tan(f1)
-        7. Convert to Earth radii
-
-    Mathematical basis:
-        The penumbral cone's semi-angle f1 is determined by the external
-        tangent geometry. The cone vertex is located behind the Sun at a
-        distance k1 = R_sun / sin(f1) from the Sun center. The penumbral
-        shadow radius at any plane perpendicular to the shadow axis is
-        simply the distance from that plane to the vertex multiplied by
-        tan(f1).
-
-        For the fundamental plane (at Earth's center), the distance from
-        the vertex is approximately D_sun - k1, giving:
-            l1 = (D_sun - k1) * tan(f1)
-
-    Physical constants used:
-        - Sun radius: 696,000 km (IAU nominal)
-        - Moon radius: 1,737.4 km (mean radius)
-        - Earth radius: 6,378.137 km (WGS84 equatorial)
-        - AU: 149,597,870.7 km
-
-    Precision:
-        Accurate to ~0.0001 Earth radii (~0.6 km) for typical eclipses.
-        Uses full precision Moon and Sun ephemeris positions.
-
-    Example:
-        >>> from libephemeris import julday, calc_besselian_l1
-        >>> # April 8, 2024 total solar eclipse near maximum
-        >>> jd = julday(2024, 4, 8, 18.3)  # ~18:18 UTC
-        >>> l1 = calc_besselian_l1(jd)
-        >>> print(f"Besselian l1 = {l1:.4f} Earth radii")
+    Notes:
+        The value follows the external-tangent geometry of the solar and lunar
+        limbs on the fundamental plane perpendicular to the shadow axis. It is
+        positive and is typically roughly 0.5 to 0.6 Earth radii during an
+        eclipse.
 
     References:
-        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
-        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
-        - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
+        Meeus, *Astronomical Algorithms*, chapter 54; *Explanatory Supplement
+        to the Astronomical Almanac* (2013), chapter 11.
     """
     return _besselian_core(jd, flags)[4]
 
@@ -8705,9 +8551,7 @@ def calc_besselian_l2(jd: float, flags: int = FLG_SWIEPH) -> float:
     Returns:
         The umbral/antumbral shadow radius l2 in Earth equatorial radii.
         Negative for total eclipses (umbral shadow), positive for annular
-        eclipses (antumbral shadow) — measured: 2024-04-08 total gives
-        -0.0103, 2023-10-14 annular gives +0.0181. Typical absolute values
-        range from 0.003 to 0.05 Earth radii during solar eclipses.
+        eclipses (antumbral shadow).
 
     Algorithm:
         1. Get geocentric equatorial positions of Moon and Sun
@@ -9199,30 +9043,18 @@ def calc_besselian_dmu_dt(jd: float, flags: int = FLG_SWIEPH) -> float:
 def interpolate_besselian_elements(
     elements: BesselianElements, target_jd: float
 ) -> BesselianElements:
-    """
-    Interpolate Besselian elements to any time during an eclipse.
+    """Interpolate Besselian elements to a nearby time.
 
-    Uses first-order Taylor series expansion to interpolate Besselian elements
-    from their reference time (t0) to a target time. This is accurate for
-    times within approximately ±1-2 hours of the reference time.
-
-    The interpolation formula for each element is:
-        element(t) = element(t0) + d_element_dt * (t - t0) * 24
-
-    where t and t0 are in Julian Days, and derivatives are per hour.
+    A first-order Taylor expansion advances each element from ``elements.t0``.
+    Input times are Julian Days and stored derivatives are per hour.
 
     Args:
-        elements: BesselianElements object containing values and derivatives
-                  at the reference time t0.
-        target_jd: Target Julian Day (UT) at which to interpolate elements.
+        elements: Values and derivatives at the reference time.
+        target_jd: Target Julian Day in UT.
 
     Returns:
-        A new BesselianElements object with interpolated values at target_jd.
-        The new object has:
-        - t0 set to target_jd (the new reference time)
-        - All elements (x, y, d, l1, l2, mu) interpolated to target_jd
-        - All derivatives (dx_dt, dy_dt, etc.) copied from the original
-          (derivatives change slowly and are valid for nearby times)
+        A new :class:`BesselianElements` at ``target_jd``. The six values are
+        advanced and the derivative fields are copied unchanged.
 
     Example:
         >>> from libephemeris import (
@@ -9241,19 +9073,13 @@ def interpolate_besselian_elements(
         >>> interpolated = interpolate_besselian_elements(elements, later_jd)
         >>> print(f"x at t0+0.5h: {interpolated.x:.4f}")
 
-    Note:
-        - The mu (Greenwich hour angle) is normalized to [0, 360) degrees
-          after interpolation to handle wraparound.
-        - For high accuracy over longer time spans, compute fresh elements
-          using the individual calc_besselian_* functions.
-        - Accuracy degrades quadratically with time from reference:
-          - Within ±15 min: error < 0.001 Earth radii
-          - Within ±1 hour: error < 0.01 Earth radii
-          - Beyond ±2 hours: consider recomputing elements
+    Notes:
+        ``mu`` is normalized to the interval ``[0, 360)``. For times more
+        than roughly two hours from the reference, compute fresh elements.
 
     References:
-        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
-        - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
+        Meeus, *Astronomical Algorithms*, chapter 54; *Explanatory Supplement
+        to the Astronomical Almanac* (2013), chapter 11.
     """
     # Time difference in hours (derivatives are per hour)
     dt_hours = (target_jd - elements.t0) * 24.0
@@ -9329,11 +9155,12 @@ def calc_eclipse_first_contact_c1(
         which corresponds to approximately 0.06 km or 0.04 seconds of time.
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, calc_eclipse_first_contact_c1
+        >>> from libephemeris import julday, sol_eclipse_when_glob
+        >>> from libephemeris import calc_eclipse_first_contact_c1
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> ecl_type, times = _sol_eclipse_when_glob_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate first contact
         >>> jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -9386,7 +9213,7 @@ def calc_eclipse_second_contact_c2(
 
     This function uses Besselian elements to precisely calculate C2. The
     condition for C2 is when gamma (the distance of the shadow axis from
-    Earth's center) equals 1 - |l2| (Earth radius minus umbral/antumbral cone
+    Earth's center) equals ``1 - abs(l2)`` (Earth radius minus umbral/antumbral cone
     radius), occurring before eclipse maximum.
 
     Note: C2 only exists for central eclipses (total or annular). For partial
@@ -9408,7 +9235,7 @@ def calc_eclipse_second_contact_c2(
 
     Algorithm:
         1. Calculate l2 (umbral/antumbral radius) at eclipse maximum
-        2. Compute target gamma = 1 - |l2| (condition for umbra touching Earth)
+        2. Compute target gamma = ``1 - abs(l2)`` (umbra touching Earth)
         3. Check if gamma at maximum is less than umbral limit (central phase possible)
         4. Use binary search to find when gamma equals this target before maximum
         5. The search proceeds from (jd_max - search_range) to jd_max
@@ -9419,11 +9246,12 @@ def calc_eclipse_second_contact_c2(
         which corresponds to approximately 0.06 km or 0.04 seconds of time.
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, calc_eclipse_second_contact_c2
+        >>> from libephemeris import julday, sol_eclipse_when_glob
+        >>> from libephemeris import calc_eclipse_second_contact_c2
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> ecl_type, times = _sol_eclipse_when_glob_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate second contact
         >>> jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -9489,7 +9317,7 @@ def calc_eclipse_third_contact_c3(
 
     This function uses Besselian elements to precisely calculate C3. The
     condition for C3 is when gamma (the distance of the shadow axis from
-    Earth's center) equals 1 - |l2| (Earth radius minus umbral/antumbral cone
+    Earth's center) equals ``1 - abs(l2)`` (Earth radius minus umbral/antumbral cone
     radius), occurring after eclipse maximum.
 
     Note: C3 only exists for central eclipses (total or annular). For partial
@@ -9511,7 +9339,7 @@ def calc_eclipse_third_contact_c3(
 
     Algorithm:
         1. Calculate l2 (umbral/antumbral radius) at eclipse maximum
-        2. Compute target gamma = 1 - |l2| (condition for umbra leaving Earth)
+        2. Compute target gamma = ``1 - abs(l2)`` (umbra leaving Earth)
         3. Check if gamma at maximum is less than umbral limit (central phase possible)
         4. Use binary search to find when gamma equals this target after maximum
         5. The search proceeds from jd_max to (jd_max + search_range)
@@ -9522,11 +9350,12 @@ def calc_eclipse_third_contact_c3(
         which corresponds to approximately 0.06 km or 0.04 seconds of time.
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, calc_eclipse_third_contact_c3
+        >>> from libephemeris import julday, sol_eclipse_when_glob
+        >>> from libephemeris import calc_eclipse_third_contact_c3
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> ecl_type, times = _sol_eclipse_when_glob_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate third contact
         >>> jd_c3 = calc_eclipse_third_contact_c3(jd_max)
@@ -9620,11 +9449,12 @@ def calc_eclipse_fourth_contact_c4(
         which corresponds to approximately 0.06 km or 0.04 seconds of time.
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, calc_eclipse_fourth_contact_c4
+        >>> from libephemeris import julday, sol_eclipse_when_glob
+        >>> from libephemeris import calc_eclipse_fourth_contact_c4
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> ecl_type, times = _sol_eclipse_when_glob_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate fourth contact
         >>> jd_c4 = calc_eclipse_fourth_contact_c4(jd_max)
@@ -9857,12 +9687,12 @@ def calc_lunar_eclipse_penumbral_first_contact_p1(
         iterating until the time value converges to within ~0.05 seconds.
 
     Example:
-        >>> from libephemeris import julday, _lun_eclipse_when_pythonic
+        >>> from libephemeris import julday, lun_eclipse_when
         >>> from libephemeris import calc_lunar_eclipse_penumbral_first_contact_p1
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> ecl_type, times = _lun_eclipse_when_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate penumbral first contact
         >>> jd_p1 = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max)
@@ -9929,12 +9759,12 @@ def calc_lunar_eclipse_penumbral_fourth_contact_p4(
         iterating until the time value converges to within ~0.05 seconds.
 
     Example:
-        >>> from libephemeris import julday, _lun_eclipse_when_pythonic
+        >>> from libephemeris import julday, lun_eclipse_when
         >>> from libephemeris import calc_lunar_eclipse_penumbral_fourth_contact_p4
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> ecl_type, times = _lun_eclipse_when_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate penumbral fourth contact
         >>> jd_p4 = calc_lunar_eclipse_penumbral_fourth_contact_p4(jd_max)
@@ -10008,6 +9838,7 @@ def _calc_lunar_eclipse_umbral_outer_separation(jd: float) -> float:
     moon_semidiameter = (932.56 / 3600.0) * (0.002569 / moon_dist)
 
     # Calculate umbra radius at Moon's distance
+    # (149597870.7 km = 1 AU, IAU 2012 Resolution B2)
     sun_dist_km = sun_dist * 149597870.7
     moon_dist_km = moon_dist * 149597870.7
     sun_radius_km = (SUN_RADIUS_ARCSEC / 206265.0) * sun_dist_km
@@ -10078,6 +9909,7 @@ def _calc_lunar_eclipse_umbral_inner_separation(jd: float) -> float:
     moon_semidiameter = (932.56 / 3600.0) * (0.002569 / moon_dist)
 
     # Calculate umbra radius at Moon's distance
+    # (149597870.7 km = 1 AU, IAU 2012 Resolution B2)
     sun_dist_km = sun_dist * 149597870.7
     moon_dist_km = moon_dist * 149597870.7
     sun_radius_km = (SUN_RADIUS_ARCSEC / 206265.0) * sun_dist_km
@@ -10305,12 +10137,12 @@ def calc_lunar_eclipse_umbral_first_contact_u1(
         iterating until the time value converges to within ~0.05 seconds.
 
     Example:
-        >>> from libephemeris import julday, _lun_eclipse_when_pythonic
+        >>> from libephemeris import julday, lun_eclipse_when
         >>> from libephemeris import calc_lunar_eclipse_umbral_first_contact_u1
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> ecl_type, times = _lun_eclipse_when_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate umbral first contact
         >>> jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
@@ -10378,12 +10210,12 @@ def calc_lunar_eclipse_umbral_second_contact_u2(
         iterating until the time value converges to within ~0.05 seconds.
 
     Example:
-        >>> from libephemeris import julday, _lun_eclipse_when_pythonic
+        >>> from libephemeris import julday, lun_eclipse_when
         >>> from libephemeris import calc_lunar_eclipse_umbral_second_contact_u2
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> ecl_type, times = _lun_eclipse_when_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate umbral second contact (totality begins)
         >>> jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
@@ -10450,12 +10282,12 @@ def calc_lunar_eclipse_umbral_third_contact_u3(
         iterating until the time value converges to within ~0.05 seconds.
 
     Example:
-        >>> from libephemeris import julday, _lun_eclipse_when_pythonic
+        >>> from libephemeris import julday, lun_eclipse_when
         >>> from libephemeris import calc_lunar_eclipse_umbral_third_contact_u3
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> ecl_type, times = _lun_eclipse_when_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate umbral third contact (totality ends)
         >>> jd_u3 = calc_lunar_eclipse_umbral_third_contact_u3(jd_max)
@@ -10522,12 +10354,12 @@ def calc_lunar_eclipse_umbral_fourth_contact_u4(
         iterating until the time value converges to within ~0.05 seconds.
 
     Example:
-        >>> from libephemeris import julday, _lun_eclipse_when_pythonic
+        >>> from libephemeris import julday, lun_eclipse_when
         >>> from libephemeris import calc_lunar_eclipse_umbral_fourth_contact_u4
         >>> from libephemeris import ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> ecl_type, times = _lun_eclipse_when_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate umbral fourth contact
         >>> jd_u4 = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max)
@@ -10599,11 +10431,11 @@ def calc_solar_eclipse_duration(
         duration to within about ±0.05 minutes (±3 seconds).
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic
+        >>> from libephemeris import julday, sol_eclipse_when_glob
         >>> from libephemeris import calc_solar_eclipse_duration, ECL_TOTAL
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> ecl_type, times = _sol_eclipse_when_glob_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate duration of totality
         >>> duration = calc_solar_eclipse_duration(jd_max)
@@ -10705,11 +10537,11 @@ def calc_lunar_eclipse_total_duration(
         resulting in duration precision of approximately ±0.03 minutes (±2 seconds).
 
     Example:
-        >>> from libephemeris import julday, _lun_eclipse_when_pythonic
+        >>> from libephemeris import julday, lun_eclipse_when
         >>> from libephemeris import calc_lunar_eclipse_total_duration, ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> ecl_type, times = _lun_eclipse_when_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate duration of totality
         >>> duration = calc_lunar_eclipse_total_duration(jd_max)
@@ -10794,11 +10626,11 @@ def calc_lunar_eclipse_umbral_duration(
         resulting in duration precision of approximately ±0.03 minutes (±2 seconds).
 
     Example:
-        >>> from libephemeris import julday, _lun_eclipse_when_pythonic
+        >>> from libephemeris import julday, lun_eclipse_when
         >>> from libephemeris import calc_lunar_eclipse_umbral_duration, ECL_TOTAL
         >>> # Find the November 8, 2022 total lunar eclipse
         >>> jd_start = julday(2022, 10, 1, 0.0)
-        >>> ecl_type, times = _lun_eclipse_when_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate duration of umbral phase
         >>> duration = calc_lunar_eclipse_umbral_duration(jd_max)
@@ -10938,11 +10770,11 @@ def _calc_eclipse_path_width_impl(
         grows toward sunrise/sunset where the grazing geometry dominates.
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, ECL_TOTAL
+        >>> from libephemeris import julday, sol_eclipse_when_glob, ECL_TOTAL
         >>> from libephemeris import calc_eclipse_path_width
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 1, 1, 0.0)
-        >>> ecl_type, times = _sol_eclipse_when_glob_pythonic(jd_start, eclipse_type=ECL_TOTAL)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         >>> jd_max = times[0]
         >>> # Calculate path width at eclipse maximum
         >>> width = calc_eclipse_path_width(jd_max)
@@ -11137,7 +10969,7 @@ SAROS_CYCLE_DAYS = 6585.3211  # More precise: 6585.3211 days
 # but shifted by one lunar node (ascending to descending or vice versa).
 INEX_CYCLE_DAYS = 10571.9509  # 358 * 29.530588853 = 10571.9509 days
 
-# Reference solar eclipses with known Saros series and member numbers
+# Published solar eclipses with known Saros series and member numbers
 # Comprehensive coverage of all ~25 active solar Saros series (2015-2028)
 # Data from NASA's Five Millennium Canon of Solar Eclipses (Espenak & Meeus)
 # Format: (JD of eclipse maximum, Saros series number, member number)
@@ -11167,11 +10999,10 @@ _SOLAR_SAROS_REFERENCES = (
     (2460940.321, 154, 7),
     (2461089.008, 121, 61),
     (2461265.24, 126, 48),
-    # --- Extended coverage across 1200-2999 CE: one oracle-validated
-    # anchor per additional active Saros series, so every eclipse the
-    # library can compute maps to a real (series, member) instead of the
-    # no-match sentinel. Cross-checked against the published Espenak Five
-    # Millennium Canon of Solar Eclipses.
+    # --- Extended coverage across 1200-2999 CE: one NASA-catalog anchor per
+    # additional active Saros series, so every eclipse the library can compute
+    # maps to a real (series, member) instead of the no-match sentinel. Source:
+    # Espenak & Meeus, Five Millennium Canon of Solar Eclipses.
     (2167495.93129, 87, 73),
     (2167672.0409, 92, 73),
     (2171481.9986, 88, 83),
@@ -11242,7 +11073,7 @@ _SOLAR_SAROS_REFERENCES = (
     (2775323.86784, 180, 8),
 )
 
-# Reference lunar eclipses with known Saros series and member numbers
+# Published lunar eclipses with known Saros series and member numbers
 # Comprehensive coverage of all ~30 active lunar Saros series (2015-2030)
 # Data from NASA's Five Millennium Canon of Lunar Eclipses (Espenak & Meeus)
 # Format: (JD of eclipse maximum, Saros series number, member number)
@@ -11277,10 +11108,9 @@ _LUNAR_SAROS_REFERENCES = (
     (2461782.676, 115, 58),
     (2461959.264, 120, 58),
     (2462137.203, 125, 49),
-    # --- Extended coverage across 1200-2999 CE: one oracle-validated
-    # anchor per additional active Saros series (see the solar table note);
-    # cross-checked against the Espenak Five Millennium Canon of Lunar
-    # Eclipses.
+    # --- Extended coverage across 1200-2999 CE: one NASA-catalog anchor per
+    # additional active Saros series (see the solar table note). Source:
+    # Espenak & Meeus, Five Millennium Canon of Lunar Eclipses.
     (2164202.46117, 80, 74),
     (2168366.01908, 86, 73),
     (2170965.42651, 85, 75),
@@ -11441,10 +11271,10 @@ def get_saros_number(
         in the Saros period.
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, get_saros_number
+        >>> from libephemeris import julday, sol_eclipse_when_glob, get_saros_number
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 3, 1, 0.0)
-        >>> ecl_type, times = _sol_eclipse_when_glob_pythonic(jd_start)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start)
         >>> jd_max = times[0]
         >>> saros = get_saros_number(jd_max, "solar")
         >>> print(f"Saros series: {saros}")  # Should print 139
@@ -11492,7 +11322,9 @@ _SOLAR_INEX_REFERENCES = (
     (2459369.971, 52),  # 2021-Jun-10 annular solar eclipse (Inex 52)
 )
 
-# Reference lunar eclipses with known Inex series numbers
+# Reference lunar eclipses with known Inex series numbers.
+# Series numbers from van Gent's eclipse cycle catalog; eclipse dates
+# from NASA's Five Millennium Canon (Espenak & Meeus).
 # Format: (JD of eclipse maximum, Inex series number)
 _LUNAR_INEX_REFERENCES = (
     # Inex 50 - includes 2022 total lunar eclipse
@@ -11547,10 +11379,10 @@ def get_inex_number(
         due to slight variations in the Inex period over long time spans.
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, get_inex_number
+        >>> from libephemeris import julday, sol_eclipse_when_glob, get_inex_number
         >>> # Find the April 8, 2024 total solar eclipse
         >>> jd_start = julday(2024, 3, 1, 0.0)
-        >>> ecl_type, times = _sol_eclipse_when_glob_pythonic(jd_start)
+        >>> ecl_type, times = sol_eclipse_when_glob(jd_start)
         >>> jd_max = times[0]
         >>> inex = get_inex_number(jd_max, "solar")
         >>> print(f"Inex series: {inex}")  # Should print 50
@@ -11654,10 +11486,11 @@ def calc_eclipse_central_line(
         for points along the central line, consistent with _sol_eclipse_where_pythonic().
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, calc_eclipse_central_line
+        >>> from libephemeris import julday, sol_eclipse_when_glob
+        >>> from libephemeris import calc_eclipse_central_line
         >>> # Find April 8, 2024 total solar eclipse
         >>> jd = julday(2024, 1, 1, 0.0)
-        >>> ecl_type, times_ecl = _sol_eclipse_when_glob_pythonic(jd)
+        >>> ecl_type, times_ecl = sol_eclipse_when_glob(jd)
         >>> # Bound the path by when totality/annularity begins (U1, tret[4])
         >>> # and ends (U4, tret[5]) anywhere on Earth -- the span over which
         >>> # the central line exists (see _sol_eclipse_when_glob_pythonic).
@@ -11736,81 +11569,39 @@ def calc_eclipse_northern_limit(
     step_minutes: float = 1.0,
     flags: int = FLG_SWIEPH,
 ) -> Tuple[Tuple[float, ...], Tuple[float, ...], Tuple[float, ...]]:
-    """
-    Calculate the geographic coordinates of points along the northern limit of the umbral shadow.
+    """Calculate points along the northern limit of a central eclipse path.
 
-    The northern limit is the northern boundary of the path of totality or annularity.
-    Along this line, observers see the edge of the umbral (or antumbral) shadow passing
-    overhead - they are at the extreme northern edge of where totality/annularity is visible.
-
-    This function computes a series of (latitude, longitude) points along the northern
-    limit at specified time intervals, using Besselian elements for accurate calculations.
+    The boundary is sampled from Besselian shadow geometry at a fixed time
+    interval. Samples for which the central shadow misses Earth are omitted.
 
     Args:
-        jd_start: Julian Day (UT) to start calculating the northern limit.
-                  Should be during a central solar eclipse (from _sol_eclipse_when_glob_pythonic).
-        jd_end: Julian Day (UT) to end the calculation.
-                Should be after jd_start and during the same eclipse.
-        step_minutes: Time step in minutes between calculated points (default 1.0).
-                      Smaller values give a more detailed path but take longer.
-        flags: Calculation flags (FLG_SWIEPH, etc.)
+        jd_start: First Julian Day in UT, during a central solar eclipse.
+        jd_end: Last Julian Day in UT, during the same eclipse.
+        step_minutes: Sampling interval in minutes.
+        flags: Calculation flags.
 
     Returns:
-        Tuple containing three tuples:
-            - times: Tuple of Julian Day (UT) values for each point
-            - latitudes: Tuple of geographic latitudes in degrees (North positive)
-            - longitudes: Tuple of geographic longitudes in degrees (East positive)
-
-        Points where the shadow axis doesn't intersect Earth's surface (gamma > 1)
-        or where the umbral shadow doesn't touch Earth are omitted from the results.
-
-    Algorithm:
-        For each time step:
-        1. Calculate Besselian elements (x, y, d, mu, l2) using the library functions
-        2. Calculate gamma = sqrt(x² + y²), the distance from shadow axis to Earth center
-        3. Calculate l2, the umbral/antumbral cone radius at the fundamental plane
-        4. If gamma + |l2| < ~1.5 (shadow touches Earth):
-           - Offset the central line position northward by the umbral radius
-           - Account for the shadow cone geometry and Earth's curvature
-           - Convert to geographic coordinates using spherical trigonometry
-        5. Collect all valid points into the result tuples
-
-    Precision:
-        Geographic coordinates accurate to approximately 0.1 degrees (~10 km)
-        for points along the northern limit. Accuracy is best at mid-eclipse
-        and decreases near the ends of the path where grazing geometry occurs.
+        Three tuples containing sample times, geodetic latitudes, and
+        longitudes. Coordinates are native Python floats in degrees.
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, calc_eclipse_northern_limit
+        >>> from libephemeris import julday, sol_eclipse_when_glob
+        >>> from libephemeris import calc_eclipse_northern_limit
         >>> # Find April 8, 2024 total solar eclipse
         >>> jd = julday(2024, 1, 1, 0.0)
-        >>> ecl_type, times_ecl = _sol_eclipse_when_glob_pythonic(jd)
+        >>> ecl_type, times_ecl = sol_eclipse_when_glob(jd)
         >>> jd_c1, jd_c4 = times_ecl[1], times_ecl[4]  # First and fourth contacts
-        >>> # Calculate northern limit path
-        >>> times, lats, lons = calc_eclipse_northern_limit(jd_c1, jd_c4, step_minutes=5.0)
-        >>> for i in range(len(times)):
-        ...     print(f"JD {times[i]:.5f}: lat={lats[i]:.2f}°, lon={lons[i]:.2f}°")
+        >>> times, lats, lons = calc_eclipse_northern_limit(
+        ...     jd_c1, jd_c4, step_minutes=5.0
+        ... )
 
-    Note:
-        - The function only returns points where the umbral/antumbral shadow touches Earth.
-        - For partial-only eclipses, an empty tuple is returned.
-        - The northern limit is only defined for central eclipses (total, annular, or hybrid).
-        - The northern limit latitude is always greater than or equal to the central line
-          latitude at the same time (in the northern hemisphere sense).
-        - Near the ends of the eclipse path, the northern limit may curve sharply as the
-          shadow enters or exits Earth's surface at a grazing angle.
-
-    See Also:
-        - calc_eclipse_central_line: Calculate the central line of the eclipse
-        - calc_eclipse_path_width: Calculate the width of the shadow path
-        - _sol_eclipse_where_pythonic: Find central line coordinates at a specific time
-        - calc_besselian_l2: Calculate the umbral/antumbral cone radius
+    Notes:
+        Partial-only events return empty tuples. Accuracy decreases near the
+        grazing ends of a central path.
 
     References:
-        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
-        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
-        - Explanatory Supplement to the Astronomical Almanac, Ch. 11
-        - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
+        Meeus, *Astronomical Algorithms*, chapter 54; *Explanatory Supplement
+        to the Astronomical Almanac*, chapter 11.
     """
     # WGS84 ellipsoid parameters
     EARTH_FLATTENING = 1.0 / 298.257223563
@@ -11935,82 +11726,39 @@ def calc_eclipse_southern_limit(
     step_minutes: float = 1.0,
     flags: int = FLG_SWIEPH,
 ) -> Tuple[Tuple[float, ...], Tuple[float, ...], Tuple[float, ...]]:
-    """
-    Calculate the geographic coordinates of points along the southern limit of the umbral shadow.
+    """Calculate points along the southern limit of a central eclipse path.
 
-    The southern limit is the southern boundary of the path of totality or annularity.
-    Along this line, observers see the edge of the umbral (or antumbral) shadow passing
-    overhead - they are at the extreme southern edge of where totality/annularity is visible.
-
-    This function computes a series of (latitude, longitude) points along the southern
-    limit at specified time intervals, using Besselian elements for accurate calculations.
+    The boundary is sampled from Besselian shadow geometry at a fixed time
+    interval. Samples for which the central shadow misses Earth are omitted.
 
     Args:
-        jd_start: Julian Day (UT) to start calculating the southern limit.
-                  Should be during a central solar eclipse (from _sol_eclipse_when_glob_pythonic).
-        jd_end: Julian Day (UT) to end the calculation.
-                Should be after jd_start and during the same eclipse.
-        step_minutes: Time step in minutes between calculated points (default 1.0).
-                      Smaller values give a more detailed path but take longer.
-        flags: Calculation flags (FLG_SWIEPH, etc.)
+        jd_start: First Julian Day in UT, during a central solar eclipse.
+        jd_end: Last Julian Day in UT, during the same eclipse.
+        step_minutes: Sampling interval in minutes.
+        flags: Calculation flags.
 
     Returns:
-        Tuple containing three tuples:
-            - times: Tuple of Julian Day (UT) values for each point
-            - latitudes: Tuple of geographic latitudes in degrees (North positive)
-            - longitudes: Tuple of geographic longitudes in degrees (East positive)
-
-        Points where the shadow axis doesn't intersect Earth's surface (gamma > 1)
-        or where the umbral shadow doesn't touch Earth are omitted from the results.
-
-    Algorithm:
-        For each time step:
-        1. Calculate Besselian elements (x, y, d, mu, l2) using the library functions
-        2. Calculate gamma = sqrt(x² + y²), the distance from shadow axis to Earth center
-        3. Calculate l2, the umbral/antumbral cone radius at the fundamental plane
-        4. If gamma + |l2| < ~1.5 (shadow touches Earth):
-           - Offset the central line position southward by the umbral radius
-           - Account for the shadow cone geometry and Earth's curvature
-           - Convert to geographic coordinates using spherical trigonometry
-        5. Collect all valid points into the result tuples
-
-    Precision:
-        Geographic coordinates accurate to approximately 0.1 degrees (~10 km)
-        for points along the southern limit. Accuracy is best at mid-eclipse
-        and decreases near the ends of the path where grazing geometry occurs.
+        Three tuples containing sample times, geodetic latitudes, and
+        longitudes. Coordinates are native Python floats in degrees.
 
     Example:
-        >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, calc_eclipse_southern_limit
+        >>> from libephemeris import julday, sol_eclipse_when_glob
+        >>> from libephemeris import calc_eclipse_southern_limit
         >>> # Find April 8, 2024 total solar eclipse
         >>> jd = julday(2024, 1, 1, 0.0)
-        >>> ecl_type, times_ecl = _sol_eclipse_when_glob_pythonic(jd)
+        >>> ecl_type, times_ecl = sol_eclipse_when_glob(jd)
         >>> jd_c1, jd_c4 = times_ecl[1], times_ecl[4]  # First and fourth contacts
-        >>> # Calculate southern limit path
-        >>> times, lats, lons = calc_eclipse_southern_limit(jd_c1, jd_c4, step_minutes=5.0)
-        >>> for i in range(len(times)):
-        ...     print(f"JD {times[i]:.5f}: lat={lats[i]:.2f}°, lon={lons[i]:.2f}°")
+        >>> times, lats, lons = calc_eclipse_southern_limit(
+        ...     jd_c1, jd_c4, step_minutes=5.0
+        ... )
 
-    Note:
-        - The function only returns points where the umbral/antumbral shadow touches Earth.
-        - For partial-only eclipses, an empty tuple is returned.
-        - The southern limit is only defined for central eclipses (total, annular, or hybrid).
-        - The southern limit latitude is always less than or equal to the central line
-          latitude at the same time (in the northern hemisphere sense).
-        - Near the ends of the eclipse path, the southern limit may curve sharply as the
-          shadow enters or exits Earth's surface at a grazing angle.
-
-    See Also:
-        - calc_eclipse_central_line: Calculate the central line of the eclipse
-        - calc_eclipse_northern_limit: Calculate the northern limit of the eclipse
-        - calc_eclipse_path_width: Calculate the width of the shadow path
-        - _sol_eclipse_where_pythonic: Find central line coordinates at a specific time
-        - calc_besselian_l2: Calculate the umbral/antumbral cone radius
+    Notes:
+        Partial-only events return empty tuples. Accuracy decreases near the
+        grazing ends of a central path.
 
     References:
-        - Meeus, J. "Astronomical Algorithms", Ch. 54 (Solar Eclipses)
-        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
-        - Explanatory Supplement to the Astronomical Almanac, Ch. 11
-        - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
+        Meeus, *Astronomical Algorithms*, chapter 54; *Explanatory Supplement
+        to the Astronomical Almanac*, chapter 11.
     """
     # WGS84 ellipsoid parameters
     EARTH_FLATTENING = 1.0 / 298.257223563
@@ -12702,12 +12450,11 @@ def _lun_eclipse_umbral_magnitude_pythonic(
     # Delegate to the same shadow core (_lun_how_core) that backs
     # lun_eclipse_how()/lun_eclipse_when(), so this convenience function
     # returns the identical umbral magnitude (attr[0]). That core reproduces
-    # the umbral magnitudes published in NASA's Five Millennium Canon of Lunar
-    # Eclipses to ~0.001. The older private helper
+    # the umbral magnitudes from the independently defined physical cone. The
+    # older private helper
     # _calculate_lunar_eclipse_type_and_magnitude() uses a different
-    # atmospheric-enlargement convention (1/85 vs the AA-1998 1/50 + empirical
-    # deflators) and a small-angle approximation; it disagreed with
-    # lun_eclipse_how() by up to ~0.011 in magnitude.
+    # small-angle approximation of the same Danjon family, so it can disagree
+    # slightly with lun_eclipse_how().
     _retc, attr, _dcore = _lun_how_core(jd, flags)
     return max(0.0, attr[0])
 
@@ -12955,8 +12702,7 @@ def lun_eclipse_gamma(
     tjd_ut: float,
     ifl: int = FLG_SWIEPH,
 ) -> float:
-    """
-    Calculate the gamma parameter for a lunar eclipse at a specific time.
+    """Calculate lunar-eclipse gamma at a specific time.
 
     This function matches the reference API naming convention. Gamma represents
     the distance of the Moon's center from Earth's shadow axis, measured in
@@ -12971,11 +12717,8 @@ def lun_eclipse_gamma(
         ifl: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
-        Gamma value as a float — the NON-NEGATIVE distance of the Moon's
-        center from the shadow axis in Earth radii (the reference attr[7]
-        channel is unsigned too; no north/south sign is carried):
-            - gamma ~ 0: Most central eclipse
-            - gamma > ~1.5: No eclipse
+        Non-negative distance of the Moon's centre from the terrestrial
+        shadow axis in Earth radii. Values near zero are the most central.
 
     Example:
         >>> from libephemeris import lun_eclipse_gamma, FLG_SWIEPH
@@ -12985,8 +12728,7 @@ def lun_eclipse_gamma(
         >>> print(f"Gamma: {gamma:.4f}")
 
     References:
-        - Reference API: lun_eclipse_how()
-        - Meeus "Astronomical Algorithms" Ch. 54
+        Meeus, *Astronomical Algorithms*, chapter 54.
     """
     return _lun_eclipse_gamma_pythonic(tjd_ut, ifl)
 

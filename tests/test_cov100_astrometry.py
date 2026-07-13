@@ -188,9 +188,7 @@ def test_erfa_paths_are_exercised():
 
 def test_annual_aberration_cartesian_zero_direction():
     """A near-zero target direction short-circuits to no shift (line 477)."""
-    result = astrometry._annual_aberration_cartesian(
-        (0.0, 0.0, 0.0), (1.0, 0.0, 0.0)
-    )
+    result = astrometry._annual_aberration_cartesian((0.0, 0.0, 0.0), (1.0, 0.0, 0.0))
     assert result == (0.0, 0.0, 0.0)
 
 

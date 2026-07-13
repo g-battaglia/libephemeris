@@ -213,10 +213,8 @@ def azalt(
         - Reference API convention: Azimuth is measured from South, westward.
           This differs from the common convention (from North, eastward).
           To convert: az_from_north = (azimuth + 180) % 360
-        - Refraction is ray-traced through the ICAO Standard Atmosphere
-          (see ``libephemeris/refraction.py`` for the model and References);
-          it agrees with the common empirical fits (Bennett 1982,
-          Sæmundsson 1986) within the envelope documented there.
+        - Refraction follows the clean-room closed-form compatibility model in
+          ``libephemeris/refraction.py``.
         - When pressure=0, no refraction is applied (apparent_alt = true_alt)
         - For objects below the horizon (negative altitude), refraction is
           extrapolated but becomes less accurate.
@@ -489,87 +487,34 @@ def refrac(
     attemp: float = 15.0,
     flag: int = TRUE_TO_APP,
 ) -> float:
-    """
-    Calculate true altitude from apparent altitude, or vice-versa.
-
-    Atmospheric refraction makes celestial objects appear higher than their
-    true (geometric) position. The effect is strongest near the horizon
-    and negligible at high altitudes.
-
-    This function converts between true (geometric) altitude and apparent
-    (observed) altitude by adding or removing the refraction correction.
-
-    Compatible with the reference API's refraction function.
+    """Convert between true and apparent altitude.
 
     Args:
-        alt: Altitude in degrees. For TRUE_TO_APP, this is the true
-                  (geometric) altitude. For APP_TO_TRUE, this is the apparent
-                  (observed) altitude.
-        atpress: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
-                  Use 0 to disable refraction correction (returns input altitude).
-        attemp: Atmospheric temperature in Celsius. Default is 15.0.
-        flag: Direction of conversion:
-            - TRUE_TO_APP (0): Convert true altitude to apparent altitude
-              (add refraction - object appears higher)
-            - APP_TO_TRUE (1): Convert apparent altitude to true altitude
-              (subtract refraction - object's true position)
+        alt: Input altitude in degrees.
+        atpress: Atmospheric pressure in hPa. Zero disables refraction;
+            negative values are accepted as compatibility extrapolations.
+        attemp: Atmospheric temperature in degrees Celsius.
+        flag: ``TRUE_TO_APP`` adds refraction; ``APP_TO_TRUE`` removes it.
 
     Returns:
-        The converted altitude in degrees:
-        - For TRUE_TO_APP: apparent altitude (= true altitude + refraction)
-        - For APP_TO_TRUE: true altitude (= apparent altitude - refraction)
+        Apparent altitude for ``TRUE_TO_APP``, or true altitude for
+        ``APP_TO_TRUE``, in degrees.
 
     Notes:
-        - At TRUE altitude 0 this function returns ~28.5 arcminutes of
-          refraction under standard conditions (matching the reference API);
-          the textbook "~34 arcminutes at the horizon" figure refers to
-          APPARENT altitude 0. In the APP_TO_TRUE direction the correction
-          at 0 degrees is clamped to 0 (again matching the reference API).
-        - Refraction is ray-traced through the ICAO Standard Atmosphere (see
-          ``libephemeris/refraction.py`` for the model and References), not
-          an empirical curve fit; it agrees with the Bennett 1982 /
-          Sæmundsson 1986 fits within the envelope documented there.
-        - Pressure and temperature enter through the atmospheric model
-          (refractive index n ∝ P/T), not a separate correction factor.
-
-    Examples:
-        >>> # True altitude at horizon -> apparent altitude is higher
-        >>> refrac(0.0, 1013.25, 15.0, TRUE_TO_APP)
-        0.476...  # apparent altitude
-        >>> # Apparent altitude at horizon -> true altitude (0° apparent = ~-0.5° true)
-        >>> refrac(0.5, 1013.25, 15.0, APP_TO_TRUE)
-        0.0...  # approximately 0° true altitude
-        >>> # No refraction when pressure is 0
-        >>> refrac(10.0, 0, 15.0, TRUE_TO_APP)
-        10.0  # returns input altitude unchanged
+        Plain refraction follows a clean-room closed-form behavioral model of
+        the compatibility API. The forward and reverse directions are not
+        exact numerical inverses and preserve the API's horizon and zenith
+        clamps. At true altitude zero under the defaults, apparent altitude is
+        about 28.6 arcminutes higher.
     """
-    from .refraction import calc_refraction_true_to_app, calc_refraction_app_to_true
-
-    # No refraction if pressure is zero or negative
-    if atpress <= 0:
-        return alt
+    from .refraction import (
+        calc_refrac_compat_app_to_true,
+        calc_refrac_compat_true_to_app,
+    )
 
     if flag == TRUE_TO_APP:
-        refr = calc_refraction_true_to_app(alt, atpress, attemp)
-        apparent = alt + refr
-        # Match reference API behaviour: if refraction can't bring
-        # the object above 0°, return input unchanged.
-        if apparent < 0:
-            return alt
-        return apparent
-
-    else:
-        # APP_TO_TRUE
-        # Compute the refraction at the geometric horizon to establish a
-        # threshold: apparent altitudes below this value are returned
-        # unchanged (the object is geometrically below the horizon).
-        horizon_refr = calc_refraction_true_to_app(0.0, atpress, attemp)
-        if alt < horizon_refr:
-            return alt
-
-        refr = calc_refraction_app_to_true(alt, atpress, attemp)
-        true_alt = alt - refr
-        return true_alt
+        return calc_refrac_compat_true_to_app(alt, atpress, attemp)
+    return calc_refrac_compat_app_to_true(alt, atpress, attemp)
 
 
 def refrac_extended(
@@ -641,9 +586,9 @@ def refrac_extended(
     """
     from .state import get_lapse_rate
     from .refraction import (
-        calc_refraction_ref_true_to_app,
-        calc_refraction_ref_app_to_true,
         calc_dip,
+        calc_refraction_app_to_true,
+        calc_refraction_true_to_app,
     )
 
     # Use global lapse rate if none provided
@@ -651,17 +596,16 @@ def refrac_extended(
         lapserate = get_lapse_rate()
 
     # Dip of the horizon for elevated observers (pressure/temperature scale the
-    # refraction part of the dip — up to ~190" at 1000 m). The reference API
-    # clamps below the (dipped) horizon: if refraction cannot lift the object
-    # above the local horizon the input altitude is returned untouched.
+    # refraction part of the dip). Below the dipped horizon the input altitude
+    # is returned untouched.
     dip = calc_dip(geoalt, lapserate, atpress, attemp)
 
-    # Reference-matched analytic refraction (see refraction.py). Unlike the
-    # ray-traced model used by plain refrac(), this reproduces the reference's
-    # refrac_extended curve, which keeps growing below the geometric horizon.
+    # Independently implemented ICAO Standard Atmosphere ray tracing.
     if flag == TRUE_TO_APP:
         true_alt = alt
-        refraction = calc_refraction_ref_true_to_app(alt, atpress, attemp)
+        refraction = calc_refraction_true_to_app(
+            alt, atpress, attemp, geoalt, lapserate
+        )
         apparent_alt = true_alt + refraction
         # Below the (dipped) horizon: report the input unchanged.
         if apparent_alt < dip:
@@ -672,7 +616,9 @@ def refrac_extended(
         # Apparent altitude below the (dipped) horizon: no refraction removed.
         if apparent_alt < dip:
             return (apparent_alt, (apparent_alt, apparent_alt, 0.0, dip))
-        refraction = calc_refraction_ref_app_to_true(alt, atpress, attemp)
+        refraction = calc_refraction_app_to_true(
+            alt, atpress, attemp, geoalt, lapserate
+        )
         true_alt = apparent_alt - refraction
         return (true_alt, (true_alt, apparent_alt, refraction, dip))
 
@@ -1280,7 +1226,7 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
         >>> cs2timestr(-360000)  # -1 hour wraps mod 24
         '23:00:00'
     """
-    # Accept bytes separator (the reference ephemeris uses b':')
+    # Black-box compatibility: the public API accepts a bytes separator.
     if isinstance(sep, bytes):
         sep = sep.decode("ascii")
 
@@ -1475,8 +1421,8 @@ def d2l(d: float) -> int:
 SPLIT_DEG_ROUND_SEC: int = 1  # Round to seconds
 SPLIT_DEG_ROUND_MIN: int = 2  # Round to minutes
 SPLIT_DEG_ROUND_DEG: int = 4  # Round to degrees
-SPLIT_DEG_ZODIACAL: int = 8  # Return zodiac sign number (0-11)
-SPLIT_DEG_NAKSHATRA: int = 1024  # Return nakshatra number (0-26)
+SPLIT_DEG_ZODIACAL: int = 8  # Return raw 30-degree zodiac segment
+SPLIT_DEG_NAKSHATRA: int = 1024  # Return raw nakshatra segment number
 SPLIT_DEG_KEEP_SIGN: int = 16  # Don't round to next zodiac sign/nakshatra
 SPLIT_DEG_KEEP_DEG: int = 32  # Don't round to next degree
 
@@ -1526,14 +1472,9 @@ def _split_deg_nakshatra(
     The ecliptic is divided into 27 equal segments (nakshatras) of
     13°20' each.  Returns the position within the current nakshatra.
     """
-    nakshatra_span = 360.0 / 27.0  # 13.33333...°
-
-    # Reduce to within-nakshatra position for KEEP-flag boundary checks.
-    # Plain fmod(ddeg, span) fails at exact nakshatra multiples (40°, 120°,
-    # 360°) because span = 360/27 is irrational in IEEE 754.
-    # fmod(ddeg*27, 360)/27 operates on integer multiples at those
-    # boundaries, giving exact zeros.
-    pos_in_nak = math.fmod(ddeg * 27.0, 360.0) / 27.0
+    nakshatra_span = 360.0 / 27.0
+    normalized = ddeg % 360.0
+    pos_in_nak = normalized % nakshatra_span
 
     # Determine and conditionally suppress rounding offset
     offset = _rounding_offset(roundflag)
@@ -1547,41 +1488,14 @@ def _split_deg_nakshatra(
             if pos_in_nak + offset >= nakshatra_span:
                 offset = 0.0
 
-    # Apply offset to the original degree, then reduce AND decompose in the
-    # integer centisecond domain. A *27/27 (or fmod) round trip perturbs the
-    # within-nakshatra position by ~1 ULP with a systematically LOW bias, so
-    # the integer seconds field truncated one arcsecond short of the
-    # reference for ~a third of ordinary longitudes (e.g. 0.09 deg ->
-    # 5'23".9999 -> 23 instead of 5'24"). A single multiply into
-    # centiseconds (nakshatra span = 4_800_000 cs exactly) carries no
-    # reduction error and is exact at nakshatra multiples (40 deg, 120 deg,
-    # 360 deg). Residual differences versus the reference are confined to
-    # inputs whose true value sits within ~1 ULP of an integer arcsecond
-    # (the split fields still reconstruct the identical angle).
-    ddeg += offset
-    nak_idx = int(ddeg / nakshatra_span)
-    # Reference parity: only the exact 360 deg rollover (index 27, i.e.
-    # ddeg in [360, 373.33)) wraps to 0; a raw longitude >= 373.33 keeps its
-    # computed index (e.g. 476.58 -> 35), rather than collapsing every index
-    # >= 27 to 0.
-    if nak_idx == 27:
-        nak_idx = 0
+    rounded = (normalized + offset) % 360.0
+    nak_idx = min(int(rounded / nakshatra_span), 26)
+    position = rounded - nak_idx * nakshatra_span
 
     has_rounding = bool(
         roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
     )
-    cs_tot = ddeg * 360000.0
-    ics = int(cs_tot)
-    rem = ics % 4_800_000
-    ideg = rem // 360000
-    r2 = rem % 360000
-    imin = r2 // 6000
-    r3 = r2 % 6000
-    isec = r3 // 100
-    if has_rounding:
-        secfr = float(isec)
-    else:
-        secfr = (r3 % 100) / 100.0 + (cs_tot - ics) / 100.0
+    ideg, imin, isec, secfr = _decompose_to_dms(position, has_rounding)
     return (ideg, imin, isec, secfr, nak_idx)
 
 
@@ -1602,27 +1516,32 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
             - SPLIT_DEG_ROUND_SEC (1): Round to nearest second
             - SPLIT_DEG_ROUND_MIN (2): Round to nearest minute
             - SPLIT_DEG_ROUND_DEG (4): Round to nearest degree
-            - SPLIT_DEG_ZODIACAL (8): Return zodiac sign number (0-11, each 30 deg)
-            - SPLIT_DEG_NAKSHATRA (1024): Return nakshatra number (0-26, each 13deg20')
+            - SPLIT_DEG_ZODIACAL (8): Return raw 30-degree zodiac segment index
+            - SPLIT_DEG_NAKSHATRA (1024): Return raw nakshatra segment index
             - SPLIT_DEG_KEEP_SIGN (16): Don't round to next zodiac sign/nakshatra
             - SPLIT_DEG_KEEP_DEG (32): Don't round to next degree
 
     Returns:
         Tuple of (deg, min, sec, secfr, sign) where:
-        - deg: Degrees within sign (0-29 with ZODIACAL, 0-13 with NAKSHATRA,
-               or total degrees without either flag)
+        - deg: Degrees within sign (0-29 with ZODIACAL, or 0-13 for a
+               non-negative NAKSHATRA split), otherwise total absolute degrees
         - min: Arc minutes (0-59)
         - sec: Arc seconds (0-59)
         - secfr: Fraction of arc second (0.0-0.999...), or the rounded seconds
                  value when rounding flags are used
-        - sign: Zodiac sign (0-11), nakshatra (0-26), or +1/-1 for positive/negative
+        - sign: Raw zodiac/nakshatra segment index, or +1/-1
+          for an ordinary positive/negative split
 
     Notes:
         - Without ZODIACAL or NAKSHATRA flag, sign returns +1 (positive) or -1 (negative)
-        - With ZODIACAL flag: uses absolute value, sign is 0-11
-          (0=Aries, 1=Taurus, ..., 11=Pisces)
-        - With NAKSHATRA flag: uses absolute value, sign is 0-26
-          (each nakshatra spans 13 deg 20 min = 13.333... degrees)
+        - With ZODIACAL flag: uses the absolute longitude modulo 360 degrees
+          and returns a zodiac segment index from 0 to 11.
+        - With NAKSHATRA flag, non-negative inputs are normalized modulo 360
+          degrees and split into 27 exact equal segments, indexed 0 to 26.
+        - For negative input, NAKSHATRA alone follows the ordinary signed split
+          and returns ``-1``. If ZODIACAL is also set, the zodiacal split of the
+          absolute value applies instead. For non-negative input, NAKSHATRA
+          takes precedence when both format bits are set.
         - Rounding flags affect how values are truncated/rounded
         - KEEP_SIGN prevents rounding from advancing to the next sign
         - KEEP_DEG prevents rounding from advancing to the next degree
@@ -1674,10 +1593,9 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
 
     # --- Zodiacal sign extraction (after rounding) ---
     if roundflag & SPLIT_DEG_ZODIACAL:
+        ddeg %= 360.0
         sign_out = int(ddeg / 30.0)
-        if sign_out == 12:  # exactly 360° maps back to sign 0
-            sign_out = 0
-        ddeg = math.fmod(ddeg, 30.0)
+        ddeg %= 30.0
 
     # --- Decompose into deg / min / sec / secfr ---
     ideg, imin, isec, secfr = _decompose_to_dms(ddeg, has_rounding)

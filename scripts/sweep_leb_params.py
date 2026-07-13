@@ -30,15 +30,12 @@ from numpy.polynomial.chebyshev import chebfit, chebval
 
 sys.path.insert(0, ".")
 from libephemeris import set_calc_mode, calc
-from libephemeris.constants import FLG_SPEED, FLG_HELCTR
+from libephemeris.constants import FLG_SPEED
 from libephemeris.leb_format import (
     BODY_PARAMS,
     COORD_ICRS_BARY,
     COORD_ICRS_BARY_SYSTEM,
 )
-
-# Bodies requiring heliocentric flag (COORD_HELIO_ECL in LEB format)
-_HELIO_BODIES = {40, 41, 42, 43, 44, 45, 46, 47, 48}
 
 # Bodies stored as ICRS barycentric in LEB — sweep cannot test these accurately
 # because the sweep fits ecliptic lon/lat but LEB fits ICRS x,y,z (much smoother).
@@ -52,8 +49,7 @@ _ICRS_BODIES = {
 
 def _calc_flags(body_id: int) -> int:
     """Return calc flags appropriate for this body type."""
-    if body_id in _HELIO_BODIES:
-        return FLG_SPEED | FLG_HELCTR
+    del body_id
     return FLG_SPEED
 
 
@@ -85,15 +81,6 @@ BODY_NAMES: dict[int, str] = {
     20: "Vesta",
     21: "Interp Apogee",
     22: "Interp Perigee",
-    40: "Cupido",
-    41: "Hades",
-    42: "Zeus",
-    43: "Kronos",
-    44: "Apollon",
-    45: "Admetos",
-    46: "Vulkanus",
-    47: "Poseidon",
-    48: "Transpluto",
 }
 
 # Reverse lookup
@@ -123,17 +110,6 @@ SWEEP_MATRIX: dict[int, list[tuple[float, int]]] = {
     21: [(8, 13), (16, 13), (16, 15)],
     # Interp Perigee
     22: [(8, 13), (16, 13), (16, 15)],
-    # ── HELIO_ECL bodies (helio lon/lat/dist fitting matches LEB) ──
-    # Uranians: pure analytical — test most aggressive params only
-    40: [(256, 7)],
-    41: [(256, 7)],
-    42: [(256, 7)],
-    43: [(256, 7)],
-    44: [(256, 7)],
-    45: [(256, 7)],
-    46: [(256, 7)],
-    47: [(256, 7)],
-    48: [(256, 7)],
 }
 
 # Precision target: 0.0005" (half of 0.001" to leave 2x safety margin)

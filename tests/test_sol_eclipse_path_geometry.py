@@ -57,7 +57,9 @@ def test_path_width_within_documented_band(year, month, day, _lat, _lon, width):
     w = calc_eclipse_path_width(jmax, flags=FLG_SWIEPH)
     ratio = w / width
     # Simplified model runs ~5-8% high near greatest eclipse (see docstring).
-    assert 0.95 <= ratio <= 1.15, f"{year}: path width {w:.1f} km, canon {width} (ratio {ratio:.3f})"
+    assert 0.95 <= ratio <= 1.15, (
+        f"{year}: path width {w:.1f} km, canon {width} (ratio {ratio:.3f})"
+    )
 
 
 @pytest.mark.parametrize("year,month,day,_lat,_lon,_w", _CANON)

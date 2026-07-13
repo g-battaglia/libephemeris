@@ -3,8 +3,8 @@
 """
 IAU 2006 Precession, IAU 2000B Nutation, and stellar aberration utilities.
 
-Extracted from the former analytical computation package for use by the JPL/SPK calculation
-pipeline (spk.py).  This module has NO dependencies on Skyfield or SPK files.
+Implemented from the cited IAU standards for use by the JPL/SPK calculation
+pipeline (spk.py). This module has no dependency on Skyfield or SPK files.
 Only numpy and (optionally) pyerfa are used.
 
 Functions provided:

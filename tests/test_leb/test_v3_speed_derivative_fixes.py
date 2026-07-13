@@ -9,12 +9,14 @@ agree on it. Covered:
 * L2/L3/L4/L5 node/apse LEB speeds match the Skyfield backend (J2000 equinox
   drift, nutation-in-longitude rate, TrueNode/OscuApog smoothing window,
   MeanApog latitude rate).
-* H1 hypothetical of-date speeds pick up the general-precession rate.
-* H3 fictitious bodies (49-58) carry the nutation-in-longitude rate.
-* H4 topocentric parallax is applied to the hypothetical bodies (and raises
-  without an observer, like the planets).
+* H1 the independently sourced Harrington orbit carries the required frame
+  derivatives.
+* H2 restored fictitious identifiers all remain calculable.
+* H3 topocentric parallax is applied to Harrington (and requires an observer,
+  like the planets).
 * D1 the TT and UT fast-path entry points are coherent.
 * M1 sidereal ``nod_aps`` returns native Python floats.
+* S1 ``SPEED3`` is the centered derivative of the reported positions.
 """
 
 from __future__ import annotations
@@ -88,6 +90,66 @@ def _deriv(fn, jd, idx, h):
     if idx == 0:
         d = _wrap180(d)
     return d / (2.0 * h)
+
+
+# ---------------------------------------------------------------------------
+# S1 — SPEED3 is a standard centered finite difference.
+# ---------------------------------------------------------------------------
+
+
+def test_speed3_centered_stencil_unwraps_spherical_longitude():
+    """The rate uses P(t+h)-P(t-h), including across longitude zero."""
+    current = (359.999, 1.5, 2.0, 0.0, 0.0, 0.0)
+    previous = (359.998, 1.4998, 1.9999, 0.0, 0.0, 0.0)
+    following = (0.0, 1.5002, 2.0001, 0.0, 0.0, 0.0)
+
+    result = fc._apply_central_speed3_stencil(
+        current, previous, following, C.FLG_SPEED3
+    )
+
+    assert result[:3] == current[:3]
+    assert result[3:] == pytest.approx((10.0, 2.0, 1.0), abs=1e-9)
+
+
+def test_speed3_centered_stencil_differentiates_cartesian_axes():
+    """Cartesian SPEED3 differentiates each reported coordinate directly."""
+    h = fc._SPEED3_STEP_DAYS
+    current = (1.0, -2.0, 3.0, 0.0, 0.0, 0.0)
+    expected = (0.25, -0.5, 2.0)
+    previous = tuple(current[index] - h * expected[index] for index in range(3)) + (
+        0.0,
+        0.0,
+        0.0,
+    )
+    following = tuple(current[index] + h * expected[index] for index in range(3)) + (
+        0.0,
+        0.0,
+        0.0,
+    )
+
+    result = fc._apply_central_speed3_stencil(
+        current, previous, following, C.FLG_SPEED3 | C.FLG_XYZ
+    )
+
+    assert result[:3] == current[:3]
+    assert result[3:] == pytest.approx(expected, abs=1e-12)
+
+
+@SKIP_NO_LEB
+@pytest.mark.parametrize("ipl", [C.MEAN_NODE, C.MEAN_APOG])
+def test_fast_speed3_equals_runtime_centered_position_derivative(reader, ipl):
+    """The public fast path samples its own positions at exactly t±h."""
+    h = fc._SPEED3_STEP_DAYS
+    reported = fast_calc_tt(reader, JD_2000, ipl, C.FLG_SPEED3)[0]
+    previous = fast_calc_tt(reader, JD_2000 - h, ipl, 0)[0]
+    following = fast_calc_tt(reader, JD_2000 + h, ipl, 0)[0]
+    expected_lon = _wrap180(following[0] - previous[0]) / (2.0 * h)
+    expected = (
+        expected_lon,
+        (following[1] - previous[1]) / (2.0 * h),
+        (following[2] - previous[2]) / (2.0 * h),
+    )
+    assert reported[3:] == pytest.approx(expected, abs=1e-10)
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +230,7 @@ def test_mean_apog_latitude_rate_matches_skyfield(reader, skyfield_backend):
 
 
 # ---------------------------------------------------------------------------
-# H1 — hypothetical of-date speeds pick up the general-precession rate.
+# H1 — Harrington of-date speeds pick up the general-precession rate.
 # ---------------------------------------------------------------------------
 
 
@@ -182,29 +244,28 @@ def test_mean_apog_latitude_rate_matches_skyfield(reader, skyfield_backend):
         C.FLG_SPEED | C.FLG_J2000,
     ],
 )
-def test_uranian_speed_leb_matches_skyfield(reader, skyfield_backend, flags):
+def test_harrington_speed_leb_matches_skyfield(reader, skyfield_backend, flags):
+    if not reader.has_body(C.HARRINGTON):
+        pytest.skip("Harrington not in the LEB test file")
     jd = JD_1900
-    a = _leb(reader, jd, C.CUPIDO, flags)
-    s = _sky(jd, C.CUPIDO, flags)
+    a = _leb(reader, jd, C.HARRINGTON, flags)
+    s = _sky(jd, C.HARRINGTON, flags)
     assert abs(_wrap180(a[3] - s[3]) * 3600.0) < 0.01
 
 
 @SKIP_NO_LEB
-def test_uranian_ofdate_speed_is_derivative_of_position(reader):
+def test_harrington_ofdate_speed_is_derivative_of_position(reader):
+    if not reader.has_body(C.HARRINGTON):
+        pytest.skip("Harrington not in the LEB test file")
     F = C.FLG_SPEED
-    rep = _leb(reader, JD_1900, C.CUPIDO, F)[3]
-    num = _deriv(lambda j: _leb(reader, j, C.CUPIDO, F), JD_1900, 0, 0.5)
+    rep = _leb(reader, JD_1900, C.HARRINGTON, F)[3]
+    num = _deriv(lambda j: _leb(reader, j, C.HARRINGTON, F), JD_1900, 0, 0.5)
     assert abs(_wrap180(rep - num) * 3600.0) < 0.05
 
 
 # ---------------------------------------------------------------------------
-# H1b — Uranian / Transpluto (40-48) carry nutation in longitude (Δψ).
-#
-# Regression against the former class-split: bodies 40-48 were reported on the
-# MEAN ecliptic of date (Δψ omitted, so lon(default) == lon(NONUT)), while every
-# other of-date body — and the reference API, which applies Δψ uniformly — puts
-# them on the TRUE ecliptic. Both backends must now add Δψ to the position and
-# d(Δψ)/dt to the speed.
+# H1b — Harrington carries nutation in longitude (Δψ) in the of-date frame.
+# The default result is on the true ecliptic; NONUT is on the mean ecliptic.
 # ---------------------------------------------------------------------------
 
 
@@ -217,9 +278,11 @@ def _dpsi_deg(jd_tt: float) -> float:
 
 
 @SKIP_NO_LEB
-@pytest.mark.parametrize("ipl", [C.CUPIDO, C.ISIS])
-def test_uranian_default_minus_nonut_is_nutation(reader, skyfield_backend, ipl):
-    """lon(default) - lon(NONUT) == Δψ for CUPIDO and ISIS on both backends."""
+def test_harrington_default_minus_nonut_is_nutation(reader, skyfield_backend):
+    """lon(default) - lon(NONUT) equals Δψ on both backends."""
+    if not reader.has_body(C.HARRINGTON):
+        pytest.skip("Harrington not in the LEB test file")
+    ipl = C.HARRINGTON
     for jd in (JD_1900, JD_2000, JD_2008):
         expected = _dpsi_deg(jd)  # degrees; ~ ±0.005 deg = ±17"
         for name, get in (
@@ -236,15 +299,17 @@ def test_uranian_default_minus_nonut_is_nutation(reader, skyfield_backend, ipl):
                 f"{name} ipl={ipl} jd={jd}: default-NONUT="
                 f'{dpsi * 3600.0:.4f}" vs Δψ={expected * 3600.0:.4f}"'
             )
-    # And Δψ is a real, non-trivial term at JD_1900 (~17"), not the former ~0.
+    # Δψ is a real, non-trivial term at this epoch.
     assert abs(_dpsi_deg(JD_1900) * 3600.0) > 5.0
 
 
 @SKIP_NO_LEB
-@pytest.mark.parametrize("ipl", [C.CUPIDO, C.ISIS])
-def test_uranian_default_speed_carries_nutation_rate(reader, skyfield_backend, ipl):
+def test_harrington_default_speed_carries_nutation_rate(reader, skyfield_backend):
     """The of-date speed carries d(Δψ)/dt: default vs NONUT dlon differ by the
     nutation-in-longitude rate, and the two backends agree on it."""
+    if not reader.has_body(C.HARRINGTON):
+        pytest.skip("Harrington not in the LEB test file")
+    ipl = C.HARRINGTON
     jd = JD_1900
     for get in (
         lambda j, f: _leb(reader, j, ipl, f),
@@ -263,57 +328,62 @@ def test_uranian_default_speed_carries_nutation_rate(reader, skyfield_backend, i
 
 
 # ---------------------------------------------------------------------------
-# H2/H3 — fictitious bodies (49-58) speeds are the derivative of position.
+# H2 — the sourced Harrington orbit reports position derivatives.
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "ipl",
-    [C.NIBIRU, C.VULCAN, C.WALDEMATH, C.WHITE_MOON, C.PROSERPINA],
-)
-def test_fictitious_speed_is_derivative_of_position(skyfield_backend, ipl):
+def test_harrington_speed_is_derivative_of_position(skyfield_backend):
     F = C.FLG_SPEED
     for jd in (JD_1900, JD_2000):
-        rep = _sky(jd, ipl, F)[3]
-        num = _deriv(lambda j: _sky(j, ipl, F), jd, 0, 0.005)
-        assert abs(_wrap180(rep - num) * 3600.0) < 0.06, (ipl, jd)
+        rep = _sky(jd, C.HARRINGTON, F)[3]
+        num = _deriv(lambda j: _sky(j, C.HARRINGTON, F), jd, 0, 0.005)
+        assert abs(_wrap180(rep - num) * 3600.0) < 0.06, jd
 
 
-def test_vulcan_helctr_speed_is_derivative_of_position(skyfield_backend):
-    F = C.FLG_SPEED | C.FLG_HELCTR
-    rep = _sky(JD_1900, C.VULCAN, F)[3]
-    num = _deriv(lambda j: _sky(j, C.VULCAN, F), JD_1900, 0, 0.005)
-    assert abs(_wrap180(rep - num) * 3600.0) < 0.05
+def test_harrington_j2000_heliocentric_state_rates(skyfield_backend):
+    """Both angular rates survive the J2000/of-date frame round trip."""
+    flags = C.FLG_HELCTR | C.FLG_TRUEPOS | C.FLG_J2000 | C.FLG_SPEED
+    for component in (0, 1):
+        reported = _sky(JD_1900, C.HARRINGTON, flags)[component + 3]
+        numerical = _deriv(
+            lambda jd: _sky(jd, C.HARRINGTON, flags), JD_1900, component, 0.1
+        )
+        delta = (
+            _wrap180(reported - numerical) if component == 0 else reported - numerical
+        )
+        assert abs(delta * 3600.0) < 0.01, component
+
+
+RESTORED_FICTITIOUS_IDS = tuple(range(C.FICT_OFFSET, C.WALDEMATH + 1))
+
+
+@pytest.mark.parametrize("ipl", RESTORED_FICTITIOUS_IDS)
+def test_restored_fictitious_ids_return_finite_states(skyfield_backend, ipl):
+    """Every historical compatibility ID returns a six-value state."""
+    position = _sky(JD_2000, ipl, C.FLG_SPEED)
+    assert len(position) == 6
+    assert all(math.isfinite(value) for value in position)
 
 
 # ---------------------------------------------------------------------------
-# H4 — topocentric parallax on the hypothetical bodies.
+# H3 — topocentric parallax on Harrington.
 # ---------------------------------------------------------------------------
 
 
-def test_topocentric_parallax_applied_to_hypotheticals(skyfield_backend):
+def test_topocentric_parallax_applied_to_harrington(skyfield_backend):
     le.set_topo(0.0, 0.0, 0.0)
-    # Waldemath is close (~0.006 AU) so the parallax is large (~0.4 deg).
-    geo = _sky(JD_2000, C.WALDEMATH, C.FLG_SPEED)
-    topo = _sky(JD_2000, C.WALDEMATH, C.FLG_SPEED | C.FLG_TOPOCTR)
-    sep = math.hypot(
-        _wrap180(topo[0] - geo[0]) * math.cos(math.radians(geo[1])),
-        topo[1] - geo[1],
-    )
-    # Real, of order the horizontal parallax; certainly not the silent no-op.
-    assert sep * 3600.0 > 300.0
-    # A distant Uranian has a tiny (but non-zero) parallax.
-    geo_c = _sky(JD_2000, C.CUPIDO, C.FLG_SPEED)
-    topo_c = _sky(JD_2000, C.CUPIDO, C.FLG_SPEED | C.FLG_TOPOCTR)
-    assert 0.0 < abs(_wrap180(topo_c[0] - geo_c[0])) * 3600.0 < 1.0
+    # A distant orbit has a tiny but non-zero topocentric displacement.
+    geo = _sky(JD_2000, C.HARRINGTON, C.FLG_SPEED)
+    topo = _sky(JD_2000, C.HARRINGTON, C.FLG_SPEED | C.FLG_TOPOCTR)
+    assert 0.0 < abs(_wrap180(topo[0] - geo[0])) * 3600.0 < 1.0
 
 
-def test_topocentric_hypothetical_requires_observer(skyfield_backend):
+def test_topocentric_harrington_requires_observer(skyfield_backend):
     from libephemeris.exceptions import Error
 
     le.close()  # clears any observer set by a prior test
     with pytest.raises(Error):
-        _sky(JD_2000, C.WALDEMATH, C.FLG_SPEED | C.FLG_TOPOCTR)
+        _sky(JD_2000, C.HARRINGTON, C.FLG_SPEED | C.FLG_TOPOCTR)
 
 
 # ---------------------------------------------------------------------------

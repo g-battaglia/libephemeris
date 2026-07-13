@@ -86,11 +86,11 @@ python scripts/generate_leb.py --tier base --merge \
 
 ### Output files
 
-| Tier | File | Size | Coverage |
-|------|------|------|----------|
-| Base | `data/leb/ephemeris_base.leb` | ~53 MB | 1850-2150 |
-| Medium | `data/leb/ephemeris_medium.leb` | ~175 MB | 1550-2650 |
-| Extended | `data/leb/ephemeris_extended.leb` | ~1.6 GB | -5000 / +5000 |
+| Tier | File | Bodies | Coverage |
+|------|------|--------|----------|
+| Base | `data/leb/ephemeris_base.leb` | up to 53 | 1850-2150 |
+| Medium | `data/leb/ephemeris_medium.leb` | up to 53 | 1550-2650 |
+| Extended | `data/leb/ephemeris_extended.leb` | up to 45 | -5000 / +5000 |
 
 ### LEB1 body groups
 
@@ -99,22 +99,26 @@ python scripts/generate_leb.py --tier base --merge \
 | `planets` | Sun-Pluto, Earth (11) | Vectorized Skyfield | ~1s |
 | `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | spktype21 scalar | ~15-60s |
 | `exotics` | Centaurs, TNOs, NEAs (31) | spktype21 scalar | ~2-5min |
-| `analytical` | Nodes, Lilith, Uranians, Apogees (15) | Scalar Python | ~2-3min |
+| `analytical` | Model-backed/true lunar points (6) | ERFA/IERS plus JPL geometry | range-dependent |
 
-The four groups total 62 bodies.
+The four groups total 53 registered bodies for base and medium. Extended
+generation deliberately excludes eight chaotic near-Earth asteroids, so its
+merged inventory contains 45 bodies.
 
 ---
 
 ## 2. Convert LEB1 → LEB2
 
 > LEB2 requires an existing LEB1 file as input. Generate one first
-> (section 1) if you don't have one.
+> (section 1) if you don't have one. `convert-all` requires the full local
+> 53-body base/medium or 45-body extended inventory. Do not use retired
+> historical monolithic release assets as conversion inputs.
 
 ### Via leph
 
 ```bash
-# All 5 groups for a tier
-leph leb2 convert base              # → data/leb2/base_{core,asteroids,exotics,apogee,uranians}.leb2
+# All 4 groups for a tier
+leph leb2 convert base              # → core, asteroids, exotics, apogee
 
 # Medium / Extended
 leph leb2 convert medium
@@ -126,7 +130,7 @@ leph leb2 convert extended
 ```bash
 # Single group
 python scripts/generate_leb2.py convert data/leb/ephemeris_base.leb \
-  -o data/leb2/base_core.leb2 --group core
+  -o data/leb2/base_core.leb2 --group core --tier base
 
 # All groups at once
 python scripts/generate_leb2.py convert-all data/leb/ephemeris_base.leb \
@@ -144,14 +148,13 @@ python scripts/generate_leb2.py generate --tier base --group core \
 
 ### Output files (base tier)
 
-| Group | File | Size | Bodies |
-|-------|------|------|--------|
-| core | `data/leb2/base_core.leb2` | 10.6 MB | Sun-Pluto, Earth, Nodes, Mean Apogee (14) |
-| asteroids | `data/leb2/base_asteroids.leb2` | 8.7 MB | Chiron, Ceres, Pallas, Juno, Vesta (5) |
-| exotics | `data/leb2/base_exotics.leb2` | 59.0 MB | Centaurs, TNOs, NEAs (31) |
-| apogee | `data/leb2/base_apogee.leb2` | 11.4 MB | OscuApog, IntpApog, IntpPerig (3) |
-| uranians | `data/leb2/base_uranians.leb2` | 2.1 MB | Cupido-Transpluto (9) |
-| **Total** | | **91.7 MB** | **62 bodies** |
+| Group | File | Bodies |
+|-------|------|--------|
+| core | `data/leb2/base_core.leb2` | Sun-Pluto, Earth, Nodes, Mean Apogee (14) |
+| asteroids | `data/leb2/base_asteroids.leb2` | Chiron, Ceres, Pallas, Juno, Vesta (5) |
+| exotics | `data/leb2/base_exotics.leb2` | Generated locally from JPL data |
+| apogee | `data/leb2/base_apogee.leb2` | OscuApog, IntpApog, IntpPerig (3) |
+| **Total** | | generated locally | **53 bodies** |
 
 ### LEB2 groups vs LEB1 groups
 
@@ -161,8 +164,8 @@ LEB2 groups differ from LEB1 groups:
 |------|------|------------|
 | `planets` (11) | `core` (14) | Core also includes Mean/True Node and Mean Apogee |
 | `asteroids` (5) | `asteroids` (5) | Identical |
-| `exotics` (31) | `exotics` (31) | Identical |
-| `analytical` (15) | `apogee` (3) + `uranians` (9) | Analytical split into 2 groups |
+| `exotics` (31) | `exotics` (31 base/medium; 23 extended) | Extended excludes all 8 NEAs |
+| `analytical` (6) | `core` mean/true node + mean apogee, and `apogee` (3) | Lunar channels split by runtime role |
 
 ---
 
@@ -187,12 +190,12 @@ reader.close()
 ### Verify LEB2
 
 ```bash
-# Against LEB1 reference
+# Core companion against its LEB1 reference
 leph leb2 verify base
 
 # Direct CLI
 python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
-  --reference data/leb/ephemeris_base.leb --samples 500
+  --reference data/leb/ephemeris_base.leb --samples 500 --group core --tier base
 ```
 
 ### Test suites
@@ -204,8 +207,8 @@ leph test leb-format precision     # Full precision suite
 
 # LEB2
 leph test leb2-format all          # Compression round-trip + reader tests
-leph test leb2-format precision-base  # End-to-end precision, base (~15s)
-leph test leb2-format precision-all   # All tiers (~45s)
+leph test leb2-format precision-base  # Core end-to-end precision, base (~15s)
+leph test leb2-format precision-all   # Core companions, all tiers (~45s)
 
 # With LEB active (any format)
 leph test leb-backend unit         # Unit tests in LEB mode
@@ -224,22 +227,13 @@ pytest tests/test_leb/test_leb2_reader.py -v
 
 ---
 
-## 4. Release
+## 4. Distribution policy
 
-```bash
-# 1. Generate the LEB files
-leph leb generate medium groups
-
-# 2. Dry run
-leph release leb-dry-run 1.0.0
-
-# 3. Upload + update hashes
-leph release leb 1.0.0
-
-# 4. Commit
-git add libephemeris/download.py
-git commit -m "update LEB medium tier hash after regeneration"
-```
+The wheel bundles the reviewed `base_core.leb2` file. Exact SHA-256-pinned
+medium and extended cores are available through the compatibility commands
+`libephemeris download leb-medium` and `leb-extended` (or the corresponding
+`leb2-*` modular commands). Other modular companions remain unpublished;
+generate and verify them locally from NASA JPL data.
 
 ---
 
@@ -251,8 +245,8 @@ from libephemeris import set_leb_file, set_calc_mode
 # LEB1 (single file)
 set_leb_file("data/leb/ephemeris_base.leb")
 
-# LEB2 (auto-discovers companion files)
-set_leb_file("data/leb2/base_core.leb2")
+# Locally generated LEB2 group (discovers same-prefix local companions)
+set_leb_file("data/leb2/local_base_core.leb2")
 
 # Or via environment variable
 # export LIBEPHEMERIS_LEB=/path/to/file.leb
@@ -261,14 +255,15 @@ set_leb_file("data/leb2/base_core.leb2")
 set_calc_mode("leb")
 ```
 
-Auto-discovery: files in `~/.libephemeris/leb/` are found automatically.
+Auto-discovery first accepts the active tier's core only when its SHA-256
+matches the manifest. It then preserves the historical local LEB1 names
+`{tier}_core.leb` and `ephemeris_{tier}.leb`, before using the bundled base core
+as a range-limited fallback. Other independently generated filenames can be
+selected with `set_leb_file()` or `LIBEPHEMERIS_LEB`.
 
-```bash
-# End-user download
-libephemeris download leb-base       # ~53 MB
-libephemeris download leb-medium     # ~175 MB
-libephemeris download leb-extended   # ~1.6 GB
-```
+LEB1 remains available through existing files and local generation
+(`leph leb generate`). Additional LEB2 companion groups also remain local until
+they receive an artifact-specific review and manifest pin.
 
 ---
 
@@ -281,8 +276,7 @@ libephemeris download leb-extended   # ~1.6 GB
 | **LEB1 extended** | `leph leb generate extended groups` |
 | **LEB2 base (all groups)** | `leph leb2 convert base` |
 | **LEB2 medium** | `leph leb2 convert medium` |
-| **Verify LEB2** | `leph leb2 verify base` |
+| **Verify LEB2 core** | `leph leb2 verify base` |
 | **Test LEB1** | `leph test leb-format all` |
 | **Test LEB2** | `leph test leb2-format all` |
-| **Test LEB2 precision** | `leph test leb2-format precision-base` |
-| **Release** | `leph release leb 1.0.0` |
+| **Test LEB2 core precision** | `leph test leb2-format precision-base` |

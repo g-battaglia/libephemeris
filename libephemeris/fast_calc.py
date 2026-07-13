@@ -10,7 +10,7 @@ and flag dispatch.
 Three pipelines:
     A: ICRS barycentric bodies (Sun-Pluto, Earth, Chiron, Ceres-Vesta)
     B: Ecliptic direct bodies (lunar nodes, Lilith variants)
-    C: Heliocentric bodies (Uranians, Transpluto)
+    C: Independently sourced heliocentric fictitious bodies
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple
 
 from .constants import (
     EARTH,
+    FICT_OFFSET,
     INTP_APOG,
     INTP_PERG,
     JUPITER,
@@ -38,6 +39,7 @@ from .constants import (
     TRUE_NODE,
     URANUS,
     VENUS,
+    WALDEMATH,
     FLG_BARYCTR,
     FLG_EQUATORIAL,
     FLG_HELCTR,
@@ -50,12 +52,12 @@ from .constants import (
     FLG_RADIANS,
     FLG_SIDEREAL,
     FLG_SPEED,
+    FLG_SPEED3,
     FLG_TOPOCTR,
     FLG_TRUEPOS,
     FLG_XYZ,
-    _MOON_MEAN_DIST_AU,
-    _MOON_MEAN_APOG_DIST_AU,
 )
+
 from .leb_format import (
     COORD_ECLIPTIC,
     COORD_HELIO_ECL,
@@ -67,6 +69,24 @@ from .precession_vondrak import (
     vondrak_mean_obliquity_deg,
     vondrak_pn_matrix,
     vondrak_precession_matrix,
+)
+from .ayanamsha_definitions import (
+    AYANAMSHA_DEFINING,
+    DYNAMIC_AYANAMSHA_MODES,
+)
+
+# These planet IDs were historically importable from ``libephemeris.fast_calc``.
+# Keep the module-level surface even though the current dispatcher no longer
+# needs each name directly.
+_LEGACY_REEXPORTED_PLANET_IDS = (
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
 )
 
 if TYPE_CHECKING:
@@ -97,29 +117,16 @@ if TYPE_CHECKING:
 C_LIGHT_AU_DAY = 173.1446326846693  # Speed of light in AU/day
 J2000 = 2451545.0  # J2000.0 epoch in JD
 
-# Bodies whose HELCTR light-time is measured over the BARYCENTRIC distance
-# |body - SSB|/c (the reference's bary-frame light path), reported as the
-# planet-system barycentre. This is Mercury..Pluto EXCEPT Earth. Excluded
-# (all keep the heliocentric-distance light-time, matching the reference to
-# <0.003"): the Sun (heliocentric place is the origin), the Moon (Earth-based
-# light path; barycentric-LT biases it ~0.03") and the Earth itself (already
-# matched the reference before this change; barycentric-LT biases it ~0.1").
-# Asteroids/uranians are also excluded (no reference oracle to validate a
-# change, and they use other code paths).
-_HELCTR_BARY_LT_BODIES = frozenset(
-    {MERCURY, VENUS, MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO}
-)
 # SPICE/ECLIPJ2000 obliquity (IAU 1976, 84381.448"). Used ONLY as the
-# internal bridge frame for the analytical heliocentric theories (uranians,
-# Transpluto): the stored/native theory frame and the Earth-vector rotation
-# must share one convention on both backends, so this value is frozen.
+# internal bridge frame for reviewed analytical heliocentric orbits: the
+# stored/native theory frame and the Earth-vector rotation
+# must use the same fixed standard frame on both backends.
 OBLIQUITY_J2000_DEG = 23.4392911
 OBLIQUITY_J2000_RAD = math.radians(OBLIQUITY_J2000_DEG)
 
-# The reference API's J2000 ecliptic plane (IAU 2006, 84381.406"), measured:
-# its ecliptic-J2000 output equals its equatorial-J2000 output rotated by
-# exactly this obliquity. All user-visible J2000 ecliptic/equatorial frame
-# conversions use this value.
+# IAU 2006 mean obliquity at J2000 (Capitaine et al. 2003; SOFA/ERFA obl06).
+# All user-visible J2000 ecliptic/equatorial frame conversions use this
+# independently standardized value.
 OBLIQUITY_J2000_REF_DEG = 84381.406 / 3600.0
 OBLIQUITY_J2000_REF_RAD = math.radians(OBLIQUITY_J2000_REF_DEG)
 
@@ -127,12 +134,10 @@ OBLIQUITY_J2000_REF_RAD = math.radians(OBLIQUITY_J2000_REF_DEG)
 def _build_icrs_to_j2000_frames() -> Tuple[
     Tuple[Tuple[float, float, float], ...], Tuple[Tuple[float, float, float], ...]
 ]:
-    """Build the ICRS -> reference-J2000 frame matrices.
+    """Build ICRS -> mean-equator/ecliptic J2000 frame matrices.
 
-    Measured convention of the reference API (star fit exact to 0.0003"):
-    its equatorial J2000 frame is the mean equator/equinox of J2000, i.e.
-    ICRS rotated by the frame bias, and its ecliptic J2000 frame is that
-    equatorial frame rotated by the IAU 2006 J2000 obliquity (84381.406").
+    ERFA ``bp06`` supplies the IAU 2006 frame-bias matrix. The ecliptic matrix
+    then applies the IAU 2006 mean obliquity at J2000.
     """
     import erfa
 
@@ -307,6 +312,50 @@ def _spherical_to_cartesian_with_velocity(
     return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
 
+_SPEED3_STEP_DAYS = 0.0001
+
+
+def _apply_central_speed3_stencil(
+    current: Tuple[float, float, float, float, float, float],
+    previous: Tuple[float, float, float, float, float, float],
+    following: Tuple[float, float, float, float, float, float],
+    iflag: int,
+) -> Tuple[float, float, float, float, float, float]:
+    """Rebuild SPEED3 rates with a standard centered finite difference.
+
+    The clean-room implementation uses ``(P(t+h) - P(t-h)) / (2*h)``.
+    Longitude is unwrapped around the current position for spherical output;
+    Cartesian output differentiates each axis independently.
+    """
+    if iflag & FLG_XYZ:
+        velocity = tuple(
+            (following[index] - previous[index]) / (2.0 * _SPEED3_STEP_DAYS)
+            for index in range(3)
+        )
+    else:
+        half_cycle = math.pi if iflag & FLG_RADIANS else 180.0
+        full_cycle = 2.0 * half_cycle
+        previous_delta = (
+            previous[0] - current[0] + half_cycle
+        ) % full_cycle - half_cycle
+        following_delta = (
+            following[0] - current[0] + half_cycle
+        ) % full_cycle - half_cycle
+        velocity = (
+            (following_delta - previous_delta) / (2.0 * _SPEED3_STEP_DAYS),
+            (following[1] - previous[1]) / (2.0 * _SPEED3_STEP_DAYS),
+            (following[2] - previous[2]) / (2.0 * _SPEED3_STEP_DAYS),
+        )
+    return (
+        float(current[0]),
+        float(current[1]),
+        float(current[2]),
+        float(velocity[0]),
+        float(velocity[1]),
+        float(velocity[2]),
+    )
+
+
 def _rotate_equatorial_to_ecliptic(
     x: float, y: float, z: float, eps_rad: float
 ) -> Tuple[float, float, float]:
@@ -331,7 +380,7 @@ def _rotate_equatorial_to_ecliptic(
 def _rotate_icrs_to_ecliptic_j2000(
     x: float, y: float, z: float
 ) -> Tuple[float, float, float]:
-    """Rotate ICRS to the reference's ecliptic J2000 (frame bias + IAU 2006)."""
+    """Rotate ICRS to IAU 2006 mean-ecliptic J2000 coordinates."""
     m = _ICRS_TO_ECL_J2000_REF
     return (
         m[0][0] * x + m[0][1] * y + m[0][2] * z,
@@ -359,9 +408,8 @@ def _apply_aberration(
 ) -> Tuple[float, float, float]:
     """Apply relativistic aberration to a geometric position vector.
 
-    Uses the full special-relativistic formula matching Skyfield's
-    ``add_aberration()``.  This includes the Lorentz factor γ for
-    exact agreement with the reference pipeline (< 0.001 mas).
+    Uses the full special-relativistic formula implemented by Skyfield's
+    ``add_aberration()``, including the Lorentz factor gamma.
 
     When *light_time* is zero or negative, falls back to a first-order
     approximation (classical Bradley aberration) for backward
@@ -454,10 +502,8 @@ _SYSTEM_BARY_NAMES: Dict[int, str] = {
 }
 
 # Bodies stored as a system barycentre (COORD_ICRS_BARY_SYSTEM): the giant
-# planets that carry a runtime COB offset (barycentre -> planet centre). Under
-# FLG_BARYCTR the reference reports the raw system barycentre (no COB) for
-# these, mirroring the FLG_HELCTR barycentre report. The planets.py Skyfield
-# backend imports this so both backends gate on the same body set.
+# planets that can carry a runtime JPL center-of-body offset
+# (barycentre -> planet centre).
 _SYSTEM_BARY_BODIES = frozenset(_SYSTEM_BARY_NAMES)
 
 
@@ -469,10 +515,9 @@ def _apply_cob_correction(
     """Apply center-of-body correction to a system barycenter position.
 
     Converts system barycenter ICRS position to planet center ICRS position
-    by adding the COB offset. Uses SPK planet_centers segments where available
-    (high precision), falling back to analytical moon-theory COB corrections.
-
-    This matches the behavior of _SpkCenterTarget in planets.py.
+    by adding the offset from a JPL planet-center SPK segment when one is
+    available. If no such segment covers the epoch, the system barycentre is
+    returned unchanged.
 
     Args:
         pos: System barycenter ICRS position (x, y, z) in AU.
@@ -488,7 +533,7 @@ def _apply_cob_correction(
 
     bary_name = _SYSTEM_BARY_NAMES.get(ipl)
     if bary_name is None:
-        return pos  # Not an outer planet, no COB needed
+        return pos  # This body does not need a system-to-center offset.
 
     t = get_cached_time_tt(jd_tt)
 
@@ -500,7 +545,7 @@ def _apply_cob_correction(
     # Try SPK center offset first (high precision)
     if planet_name in _PLANET_CENTER_NAIF_IDS:
         naif_id = _PLANET_CENTER_NAIF_IDS[planet_name]
-        seg = get_planet_center_segment(naif_id)
+        seg = get_planet_center_segment(naif_id, jd_tt)
         if seg is not None:
             try:
                 offset_pos = seg.at(t).position.au
@@ -510,17 +555,11 @@ def _apply_cob_correction(
                     pos[2] + float(offset_pos[2]),
                 )
             except (ValueError, ArithmeticError):
-                pass  # Fall through to analytical COB
+                pass
 
-    # Fallback: analytical COB from moon theories
-    from .moon_theories import get_cob_offset
-
-    offset = get_cob_offset(bary_name, t)
-    return (
-        pos[0] + offset[0],
-        pos[1] + offset[1],
-        pos[2] + offset[2],
-    )
+    # A system barycentre is the explicit fallback when no independently
+    # sourced JPL center segment is available for this epoch.
+    return pos
 
 
 def _apply_gravitational_deflection(
@@ -684,7 +723,8 @@ def _get_precession_matrix(
 ) -> Tuple[Tuple[float, float, float], ...]:
     """Get the ICRS->mean-equator-of-date rotation matrix (no nutation).
 
-    Used for sidereal+equatorial output, where the reference ephemeris uses the mean equator.
+    Used for the public sidereal+equatorial convention, which is expressed on
+    the mean equator.
     Now sourced from the Vondrák 2011 long-term precession (via erfa, ICRS frame
     bias included) -- the same single source as the LEB path -- so both backends
     agree and remain valid at remote epochs. (Previously this used Skyfield's
@@ -949,7 +989,7 @@ def _cotrans(lon: float, lat: float, eps: float) -> Tuple[float, float]:
     Returns:
         (transformed_lon, transformed_lat) in degrees.
     """
-    eps_rad = math.radians(-eps)  # Negate to match the reference convention
+    eps_rad = math.radians(-eps)  # Ecliptic-to-equatorial rotation sign.
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
 
@@ -999,6 +1039,17 @@ def _precess_ecliptic(
 _PREC_COEFFS = (5028.796195, 1.1054348, 0.00007964, -0.000023857, -0.0000000383)
 
 
+def _general_precession_deg(jd_tt: float) -> float:
+    """IAU 2006 general precession in longitude since J2000, in degrees."""
+    centuries = (jd_tt - J2000) / 36525.0
+    power = centuries
+    arcseconds = 0.0
+    for coefficient in _PREC_COEFFS:
+        arcseconds += coefficient * power
+        power *= centuries
+    return arcseconds / 3600.0
+
+
 def _general_precession_rate_deg_day(jd_tt: float) -> float:
     """General-precession rate dP/dT at ``jd_tt``, in degrees/day.
 
@@ -1017,84 +1068,14 @@ def _general_precession_rate_deg_day(jd_tt: float) -> float:
     return prec_rate_arcsec_cy / (3600.0 * 36525.0)
 
 
-# Ayanamsha J2000 offsets for formula-based sidereal modes (degrees).
-# Star-based / galactic modes have (0.0) placeholders and require Skyfield.
-# These values mirror the ayanamsha_data dict in planets._calc_ayanamsa().
-_AYANAMSHA_J2000: Dict[int, float] = {
-    0: 24.740300,  # SIDM_FAGAN_BRADLEY
-    1: 23.857092,  # SIDM_LAHIRI
-    2: 27.815753,  # SIDM_DELUCE
-    3: 22.410791,  # SIDM_RAMAN
-    4: 20.057541,  # SIDM_USHASHASHI
-    5: 23.760240,  # SIDM_KRISHNAMURTI
-    6: 28.359679,  # SIDM_DJWHAL_KHUL
-    7: 22.478803,  # SIDM_YUKTESHWAR
-    8: 22.762137,  # SIDM_JN_BHASIN
-    9: 23.533640,  # SIDM_BABYL_KUGLER1
-    10: 24.933640,  # SIDM_BABYL_KUGLER2
-    11: 25.783640,  # SIDM_BABYL_KUGLER3
-    12: 24.733640,  # SIDM_BABYL_HUBER
-    13: 24.522528,  # SIDM_BABYL_ETPSC
-    14: 24.758924,  # SIDM_ALDEBARAN_15TAU
-    15: 20.247788,  # SIDM_HIPPARCHOS
-    16: 19.992959,  # SIDM_SASSANIAN
-    18: 0.0,  # SIDM_J2000
-    19: 1.396581,  # SIDM_J1900
-    20: 0.698370,  # SIDM_B1950
-    21: 20.895059,  # SIDM_SURYASIDDHANTA
-    22: 20.680425,  # SIDM_SURYASIDDHANTA_MSUN
-    23: 20.895060,  # SIDM_ARYABHATA
-    24: 20.657427,  # SIDM_ARYABHATA_MSUN
-    25: 20.103388,  # SIDM_SS_REVATI
-    26: 23.005763,  # SIDM_SS_CITRA
-    37: 20.575847,  # SIDM_ARYABHATA_522
-    38: 24.615753,  # SIDM_BABYL_BRITTON
-    41: 25.000019,  # SIDM_GALEQU_FIORENZA
-}
+# Modes whose live catalog/frame geometry is evaluated by
+# planets._calc_ayanamsa(). Formula modes remain local to the LEB path.
+_DELEGATED_AYANAMSHA_MODES = DYNAMIC_AYANAMSHA_MODES
 
-# Method-B defining epochs t0 (Julian Date, used directly as TT) per formula
-# mode. Mirrors planets._AYANAMSHA_T0_TT (kept in sync). Mode 18 (SIDM_J2000)
-# has t0 = J2000, so its J2000 reference term is 0 and the formula branch below
-# yields the raw accumulation from J2000. Modes without an entry fall back to
-# the IAU 2006 polynomial.
-_AYANAMSHA_T0_TT: Dict[int, float] = {
-    0: 2432193.0409043552,  # FAGAN_BRADLEY
-    1: 2434481.759385544,  # LAHIRI
-    2: 1720306.8061153414,  # DELUCE
-    3: 2413789.398077771,  # RAMAN
-    4: 2413789.398077771,  # USHASHASHI
-    5: 2413789.398077771,  # KRISHNAMURTI
-    6: 2413789.398077771,  # DJWHAL_KHUL
-    7: 2413789.398077771,  # YUKTESHWAR
-    8: 2413789.398077771,  # JN_BHASIN
-    9: 1683792.0979864676,  # BABYL_KUGLER1
-    10: 1683792.0979864676,  # BABYL_KUGLER2
-    11: 1683792.0979864676,  # BABYL_KUGLER3
-    12: 1683792.0979864676,  # BABYL_HUBER
-    13: 1673202.5873079798,  # BABYL_ETPSC
-    14: 1683792.0979864676,  # ALDEBARAN_15TAU
-    15: 1673745.3888470717,  # HIPPARCHOS
-    16: 1926175.087777195,  # SASSANIAN
-    18: 2451545.0,  # J2000 (defining epoch)
-    19: 2413789.187449649,  # J1900
-    20: 2432193.09822503,  # B1950
-    21: 1902475.546567922,  # SURYASIDDHANTA
-    22: 1902475.546567922,  # SURYASIDDHANTA_MSUN
-    23: 1902475.546567922,  # ARYABHATA
-    24: 1902475.546567922,  # ARYABHATA_MSUN
-    25: 1902475.546567922,  # SS_REVATI
-    26: 1902475.581422878,  # SS_CITRA
-    37: 1910863.024354484,  # ARYABHATA_522
-    38: 1720306.8061153414,  # BABYL_BRITTON
-    41: 2450596.38393074,  # GALEQU_FIORENZA
-    43: 2413789.398077771,  # LAHIRI_1940
-    44: 1824413.565387254,  # LAHIRI_VP285
-    45: 1826600.9089528238,  # KRISHNAMURTI_VP291
-    46: 2434481.759385544,  # LAHIRI_ICRC
-}
-
-# Star-based modes that cannot be computed without Skyfield
-_STAR_BASED_MODES = frozenset({17, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 42})
+# Modes whose ayanamsha drift follows a live catalog direction instead of the
+# IAU general-precession polynomial. Horizons imports this private set for the
+# same derivative choice.
+_STAR_BASED_MODES = DYNAMIC_AYANAMSHA_MODES
 
 
 def _calc_ayanamsa_from_leb(
@@ -1106,11 +1087,9 @@ def _calc_ayanamsa_from_leb(
 ) -> float:
     """Compute ayanamsa for the LEB fast path.
 
-    Formula-based modes are evaluated directly from the polynomial /
-    Method-B propagation (no Skyfield). Star-based and galactic modes
-    delegate the (memoized) anchor-star longitude to the Skyfield
-    ``_calc_ayanamsa`` pipeline — the planet itself stays on the LEB path.
-    Unknown modes raise KeyError (triggering fallback).
+    Epoch/formula modes and SIDM_USER are evaluated locally from the shared
+    defining table. Live catalog and galactic modes delegate to
+    ``planets._calc_ayanamsa``; the planet itself remains on the LEB path.
 
     Args:
         reader: Open LEBReader instance.
@@ -1122,8 +1101,6 @@ def _calc_ayanamsa_from_leb(
     Returns:
         Ayanamsa in degrees.
 
-    Raises:
-        KeyError: If the sidereal mode is unknown.
     """
     if sid_mode is None:
         # Read via the locked getter so a concurrent EphemerisContext swap
@@ -1135,27 +1112,13 @@ def _calc_ayanamsa_from_leb(
 
         sid_mode, sid_t0, sid_ayan_t0 = get_sid_mode(full=True)
 
-    T = (jd_tt - J2000) / 36525.0
-
-    # IAU 2006 general precession
-    precession_arcsec = 0.0
-    T_power = T
-    for coeff in _PREC_COEFFS:
-        precession_arcsec += coeff * T_power
-        T_power *= T
-
-    # Get reference offset for active sidereal mode
-    # Default Fagan/Bradley (0), matching the reference API
     mode = sid_mode if sid_mode is not None else 0
 
-    if mode in _STAR_BASED_MODES:
-        # Star-based / galactic anchors need the Skyfield star pipeline,
-        # but only for the (memoized) anchor longitude: the planet itself
-        # can stay on the LEB fast path. Late import avoids a cycle.
+    if mode in _DELEGATED_AYANAMSHA_MODES:
+        # Late imports avoid a cycle. _calc_ayanamsa accepts UT, so invert
+        # TT approximately with the same Delta T model used in the forward
+        # conversion.
         from .planets import _calc_ayanamsa
-
-        # _calc_ayanamsa takes UT; approximate the inverse TT->UT with the
-        # same deltat used by the forward conversion (sub-ms accuracy).
         from .time_utils import deltat
 
         jd_ut = jd_tt - deltat(jd_tt)
@@ -1169,24 +1132,15 @@ def _calc_ayanamsa_from_leb(
         ayan_t0 = sid_ayan_t0 if sid_ayan_t0 is not None else 0.0
         t0 = sid_t0 if sid_t0 is not None else J2000
         mean_aya = ayan_t0 + method_b_accumulated_precession(jd_tt, t0)
-    elif mode in _AYANAMSHA_J2000:
-        aya_j2000 = _AYANAMSHA_J2000[mode]
-        t0_tt = _AYANAMSHA_T0_TT.get(mode)
-        if t0_tt is not None:
-            # Method-B propagation on the mode's defining ecliptic, referenced at
-            # TT J2000 (2451545.0) so the J2000 value reproduces the previous
-            # aya_j2000 + p(T) to <1e-12 deg and matches the Skyfield backend.
-            # Mode 18 (SIDM_J2000, t0 = J2000) is handled uniformly here: its
-            # reference term accumP_B(J2000; J2000) is 0, leaving the raw
-            # accumulation from J2000 (aya_j2000 is 0).
-            mean_aya = aya_j2000 + (
-                method_b_accumulated_precession(jd_tt, t0_tt)
-                - method_b_accumulated_precession(J2000, t0_tt)
-            )
-        else:
-            mean_aya = aya_j2000 + precession_arcsec / 3600.0
+    elif mode in AYANAMSHA_DEFINING:
+        # Published defining pair propagated with Method-B on the defining
+        # epoch's mean ecliptic — mirrors planets._calc_ayanamsa exactly.
+        defining_value, defining_epoch = AYANAMSHA_DEFINING[mode]
+        mean_aya = defining_value + method_b_accumulated_precession(
+            jd_tt, defining_epoch
+        )
     else:
-        raise KeyError(f"Unknown sidereal mode {mode}")
+        raise KeyError(mode)
 
     # Mean ayanamsa (without nutation) - get_ayanamsa_ut() returns mean value
     return mean_aya % 360.0
@@ -1354,9 +1308,43 @@ def _apparent_icrs_cartesian(
 # — dominated by the topocentric diurnal parallax rate — while leaving the
 # planets exact. The lower bound is set by the smooth position-level inputs that
 # ARE re-evaluated (frame matrices, COB and topocentric offsets): their ULP
-# noise is amplified by 1/(2h), so it re-emerges below ~1e-4 d. 5e-4 sits in the
-# sweet spot (Moon terms < 0.03"/day, planets < 0.001"/day).
+# noise is amplified by 1/(2h). The 0.0005-day half-step keeps both truncation
+# and round-off terms small; it is a numerical differentiation parameter, not
+# an astronomical fitted constant.
 _VEL_H = 0.0005
+
+
+def _eval_body_center_state(
+    reader: "LEBReaderLike",
+    ipl: int,
+    jd_tt: float,
+    is_system_bary: bool,
+) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+    """Evaluate the requested body center and its barycentric state.
+
+    LEB records for outer planets can store a system barycentre. When a JPL
+    planet-center segment covers the epoch, add that segment's position and a
+    centered derivative of the same offset. Otherwise retain the system
+    barycentre as an explicit data-availability fallback.
+    """
+    pos, vel = reader.eval_body(ipl, jd_tt)
+    if not is_system_bary:
+        return pos, vel
+
+    center_pos = _apply_cob_correction(pos, ipl, jd_tt)
+    if center_pos == pos:
+        return pos, vel
+
+    zero = (0.0, 0.0, 0.0)
+    offset_before = _apply_cob_correction(zero, ipl, jd_tt - _VEL_H)
+    offset_after = _apply_cob_correction(zero, ipl, jd_tt + _VEL_H)
+    scale = 1.0 / (2.0 * _VEL_H)
+    center_vel = (
+        vel[0] + (offset_after[0] - offset_before[0]) * scale,
+        vel[1] + (offset_after[1] - offset_before[1]) * scale,
+        vel[2] + (offset_after[2] - offset_before[2]) * scale,
+    )
+    return center_pos, center_vel
 
 
 def _nutation_rate_deg_day(jd_tt: float) -> float:
@@ -1389,8 +1377,7 @@ def _frame_transform(
     are returned.
     """
     if (iflag & FLG_EQUATORIAL) and (iflag & FLG_J2000):
-        # Mean equator/equinox of J2000: ICRS rotated by the frame bias
-        # (the reference's measured J2000 equatorial frame).
+        # Mean equator/equinox of J2000: ICRS rotated by IAU 2006 frame bias.
         v = _rotate_icrs_to_j2000_mean_equator(geo[0], geo[1], geo[2])
     elif (iflag & FLG_EQUATORIAL) and (iflag & FLG_SIDEREAL):
         # SID+EQ: mean equator of date (P matrix, no nutation).
@@ -1437,8 +1424,8 @@ def _pipeline_icrs(
     """Pipeline A: compute ecliptic coordinates for ICRS barycentric bodies.
 
     Handles both planet-center bodies (COORD_ICRS_BARY) and system-barycenter
-    bodies (COORD_ICRS_BARY_SYSTEM). For system barycenters, COB correction
-    is applied at runtime to match Skyfield's _SpkCenterTarget behavior.
+    bodies (COORD_ICRS_BARY_SYSTEM). For system barycenters, a JPL
+    center-of-body segment is applied at runtime when available.
 
     When want_velocity is False (default), returns (lon, lat, dist).
     When want_velocity is True, returns (lon, lat, dist, dlon, dlat, ddist)
@@ -1464,41 +1451,9 @@ def _pipeline_icrs(
     # to avoid using a stale (closed) reader after state.close().
     _set_active_reader(reader)
 
-    # 1. Get body position (and velocity if needed)
-    target_pos, target_vel = reader.eval_body(ipl, jd_tt)
-
-    # Heliocentric output of a major planet is reported as its system
-    # BARYCENTRE, with the light-time measured over the barycentric distance
-    # |body - SSB|/c. This single flag gates every HELCTR-specific branch below
-    # (light-time distance, COB skip, velocity light-time rate and COB rate) so
-    # the position and its derivative stay mutually consistent. The Sun (origin)
-    # and Moon (Earth-based light path) are excluded — see _HELCTR_BARY_LT_BODIES.
-    helctr_bary_lt = bool(iflag & FLG_HELCTR) and ipl in _HELCTR_BARY_LT_BODIES
-
-    # Barycentric output of a giant is likewise reported as its raw system
-    # BARYCENTRE (no COB): the reference gives the planet-system barycentre for
-    # FLG_BARYCTR too, leaving up to ~0.09" (Pluto) when the COB is applied.
-    # The BARYCTR light-time already runs on the barycentric distance |body|/c
-    # (observer is the SSB), so — unlike HELCTR — only the COB is skipped; the
-    # light-time distance and velocity light-time rate are unchanged. This flag
-    # gates every COB branch below so the position and its derivative stay
-    # mutually consistent (is_system_bary is exactly the giants Jupiter..Pluto,
-    # so inner planets/Sun/Moon/Earth are untouched).
-    barctr_bary = bool(iflag & FLG_BARYCTR) and is_system_bary
-
-    # 1b. For system barycenters, apply COB only for TRUEPOS (no light-time).
-    #     For normal path, COB is deferred until after light-time iteration
-    #     to match Skyfield's _SpkCenterTarget._observe_from_bcrs() behavior:
-    #     iterate light-time on barycenter, apply COB once at retarded time.
-    #     HELCTR/BARYCTR are excluded for the major planets: helio/bary output
-    #     reports the system barycentre (no COB) — see the post-light-time block.
-    if (
-        is_system_bary
-        and (iflag & FLG_TRUEPOS)
-        and not helctr_bary_lt
-        and not barctr_bary
-    ):
-        target_pos = _apply_cob_correction(target_pos, ipl, jd_tt)
+    # 1. Evaluate the public body center, retaining the system barycentre only
+    # when no JPL center segment covers this epoch.
+    target_pos, target_vel = _eval_body_center_state(reader, ipl, jd_tt, is_system_bary)
 
     # Pre-initialize velocity variables to satisfy type checker.
     # These are always set before use when want_velocity=True.
@@ -1538,55 +1493,24 @@ def _pipeline_icrs(
     # 3. Geometric vector
     geo = _vec3_sub(target_pos, observer)
 
-    # 4. Light-time correction (unless FLG_TRUEPOS)
-    #    For system barycenters: iterate on raw barycenter positions (smooth),
-    #    then apply COB once after convergence at OBSERVER time. This matches
-    #    Skyfield's _SpkCenterTarget._observe_from_bcrs() which:
-    #      1. Calls barycenter._observe_from_bcrs(observer) to iterate light-time
-    #         on the barycenter, returning (pos, vel, t, light_time) where
-    #         t = observer.t (the OBSERVATION time, not retarded time).
-    #      2. Evaluates center_segment.at(t) at OBSERVER time, not retarded time.
-    #    We must match this: COB offset evaluated at jd_tt (observer time).
+    # 4. Light-time correction (unless FLG_TRUEPOS). The same public body
+    # center is evaluated at every retarded epoch.
     retarded_vel = target_vel
     lt = 0.0
     if not (iflag & FLG_TRUEPOS):
-        # Heliocentric output retards light by the BARYCENTRIC distance
-        # |planet - SSB|/c (matching the reference's bary-frame light path),
-        # not the heliocentric |planet - Sun|/c. The final geo offset stays
-        # planet(retarded) - Sun(t), so barycentric/geocentric paths — which
-        # use |geo| — are untouched. This removes the ~0.5" HELCTR longitude
-        # error (and the matching speed bias, e.g. ~0.55"/day for Mercury).
+        # Solve |target(t-lt) - observer(t)| = c*lt by fixed-point iteration.
+        # For HELCTR the observer is the Sun at the observation epoch; for
+        # BARYCTR it is the SSB.
         retarded_pos = target_pos
         for _ in range(3):  # Fixed-point iterations
-            dist = _vec3_dist(retarded_pos) if helctr_bary_lt else _vec3_dist(geo)
+            dist = _vec3_dist(geo)
             if dist == 0.0:
                 break
             lt = dist / C_LIGHT_AU_DAY
-            retarded_pos, retarded_vel = reader.eval_body(ipl, jd_tt - lt)
-            geo = _vec3_sub(retarded_pos, observer)
-
-        # Center-of-body (system barycentre -> planet centre) offset epoch.
-        # The two Skyfield-backend paths use DIFFERENT conventions, and each
-        # LEB path must mirror its counterpart for cross-backend parity:
-        #   * Geocentric observe(): _SpkCenterTarget._observe_from_bcrs()
-        #     light-time-iterates the barycentre and adds the centre offset at
-        #     t = observer.t (the OBSERVATION epoch).
-        #   * BARYCTR custom loop (planets.py): evaluates
-        #     target.at(retarded_time), i.e. the centre offset at the RETARDED
-        #     epoch t - lt (physically correct: light left the centre then).
-        # Major-planet HELCTR/BARYCTR are excluded: the reference reports the
-        # planet-system BARYCENTRE for helio/bary output (no COB), so the
-        # barycentre position from the light-time loop is returned as-is.
-        # Applying the centre offset there biased the outer planets by up to
-        # ~0.05" (HELCTR Pluto) / ~0.09" (BARYCTR Pluto).
-        if is_system_bary and lt > 0.0 and not helctr_bary_lt and not barctr_bary:
-            _cob_epoch = jd_tt - lt if (iflag & FLG_BARYCTR) else jd_tt
-            retarded_pos_cob = _apply_cob_correction(
-                (geo[0] + observer[0], geo[1] + observer[1], geo[2] + observer[2]),
-                ipl,
-                _cob_epoch,
+            retarded_pos, retarded_vel = _eval_body_center_state(
+                reader, ipl, jd_tt - lt, is_system_bary
             )
-            geo = _vec3_sub(retarded_pos_cob, observer)
+            geo = _vec3_sub(retarded_pos, observer)
 
     if want_velocity:
         # Exact geometric velocity of the light-time-corrected vector, from the
@@ -1597,84 +1521,37 @@ def _pipeline_icrs(
 
         # Light-time retardation rate: the apparent place is target(t - lt(t)),
         # whose exact derivative carries a factor (1 - d(lt)/dt) on the target's
-        # retarded velocity. Omitting it biases planet longitude speeds by up to
-        # ~0.1"/day (Mars). d(lt)/dt has the closed form
+        # retarded velocity. Differentiating the propagation equation gives
         #   lt' = p̂·(r' - o') / (c + p̂·r')
         # from differentiating |target(t-lt) - observer(t)| = c·lt, where p̂ is
-        # the unit vector along the distance the light-time is measured over.
-        # For HELCTR that distance is the BARYCENTRIC one |B(t-lt)| (see the
-        # light-time loop), so lt' derives from the barycentre direction and
-        # velocity, β = B̂·B'(t-lt), giving lt' = β/(c+β); using the
-        # heliocentric geo direction there leaves a ~0.55"/day Mercury bias.
+        # the unit vector along the observer-to-target propagation distance.
         if not (iflag & FLG_TRUEPOS) and lt > 0.0:
-            if helctr_bary_lt:
-                _bdist = _vec3_dist(retarded_pos)
-                if _bdist > 0.0:
-                    _bx, _by, _bz = (
-                        retarded_pos[0] / _bdist,
-                        retarded_pos[1] / _bdist,
-                        retarded_pos[2] / _bdist,
-                    )
-                    _beta = (
-                        _bx * retarded_vel[0]
-                        + _by * retarded_vel[1]
-                        + _bz * retarded_vel[2]
-                    )
-                    _ltdot = _beta / (C_LIGHT_AU_DAY + _beta)
-                    geo_vel = (
-                        retarded_vel[0] * (1.0 - _ltdot) - observer_vel[0],
-                        retarded_vel[1] * (1.0 - _ltdot) - observer_vel[1],
-                        retarded_vel[2] * (1.0 - _ltdot) - observer_vel[2],
-                    )
-            else:
-                _dg = _vec3_dist(geo_geom)
-                if _dg > 0.0:
-                    _px, _py, _pz = (
-                        geo_geom[0] / _dg,
-                        geo_geom[1] / _dg,
-                        geo_geom[2] / _dg,
-                    )
-                    _pr = (
-                        _px * retarded_vel[0]
-                        + _py * retarded_vel[1]
-                        + _pz * retarded_vel[2]
-                    )
-                    _pv = _px * geo_vel[0] + _py * geo_vel[1] + _pz * geo_vel[2]
-                    _ltdot = _pv / (C_LIGHT_AU_DAY + _pr)
-                    geo_vel = (
-                        retarded_vel[0] * (1.0 - _ltdot) - observer_vel[0],
-                        retarded_vel[1] * (1.0 - _ltdot) - observer_vel[1],
-                        retarded_vel[2] * (1.0 - _ltdot) - observer_vel[2],
-                    )
-
-        # Center-of-body motion: geo_geom carries the COB offset (planet centre
-        # vs system barycentre) but retarded_vel is the barycentre velocity.
-        # For bodies whose satellite is a substantial fraction of the primary
-        # (Pluto–Charon, ~0.07"/day) omitting the COB velocity biases the speed.
-        # Add d(COB)/dt analytically (the offset is smooth; ~6.4 d for Pluto).
-        # Central-difference at the SAME epoch the position COB used (retarded
-        # for BARYCTR, observer time otherwise) so the reported speed stays the
-        # exact derivative of the reported position. Major-planet HELCTR/BARYCTR
-        # are excluded: the position is the barycentre (no COB), no COB speed
-        # rate.
-        if is_system_bary and not helctr_bary_lt and not barctr_bary:
-            _cob_vt = jd_tt - lt if (iflag & FLG_BARYCTR) and lt > 0.0 else jd_tt
-            _z = (0.0, 0.0, 0.0)
-            _cob_m = _apply_cob_correction(_z, ipl, _cob_vt - _VEL_H)
-            _cob_p = _apply_cob_correction(_z, ipl, _cob_vt + _VEL_H)
-            _inv = 1.0 / (2.0 * _VEL_H)
-            geo_vel = (
-                geo_vel[0] + (_cob_p[0] - _cob_m[0]) * _inv,
-                geo_vel[1] + (_cob_p[1] - _cob_m[1]) * _inv,
-                geo_vel[2] + (_cob_p[2] - _cob_m[2]) * _inv,
-            )
+            _dg = _vec3_dist(geo_geom)
+            if _dg > 0.0:
+                _px, _py, _pz = (
+                    geo_geom[0] / _dg,
+                    geo_geom[1] / _dg,
+                    geo_geom[2] / _dg,
+                )
+                _pr = (
+                    _px * retarded_vel[0]
+                    + _py * retarded_vel[1]
+                    + _pz * retarded_vel[2]
+                )
+                _pv = _px * geo_vel[0] + _py * geo_vel[1] + _pz * geo_vel[2]
+                _ltdot = _pv / (C_LIGHT_AU_DAY + _pr)
+                geo_vel = (
+                    retarded_vel[0] * (1.0 - _ltdot) - observer_vel[0],
+                    retarded_vel[1] * (1.0 - _ltdot) - observer_vel[1],
+                    retarded_vel[2] * (1.0 - _ltdot) - observer_vel[2],
+                )
 
     # 5. Gravitational deflection by Sun, Jupiter, Saturn (PPN formula).
     #    Dominant correction: up to ~4" for Saturn near the Sun's limb.
     #    Skipped for helio/bary/truepos/nogdefl and for the Moon (negligible at
     #    ~0.0026 AU, deflection < 0.000001"). NOABERR deliberately does NOT
-    #    skip deflection: the reference API disables only aberration with it
-    #    (FLG_ASTROMETRIC = NOABERR|NOGDEFL).
+    #    skip deflection: the public flag contract assigns that bit only to
+    #    aberration (FLG_ASTROMETRIC combines NOABERR and NOGDEFL).
     _do_defl = not (iflag & (FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS))
     _do_defl = _do_defl and ipl != MOON and lt > 0.0
     _defl_delta: Tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -1842,9 +1719,8 @@ def _osculating_node_radius(reader: "LEBReaderLike", jd_tt: float) -> float:
     Reconstructs the geocentric lunar state vector from the LEB Moon and
     Earth channels (barycentric ICRS Chebyshev states), rotates it to the
     ecliptic of date, computes the instantaneous two-body elements, and
-    evaluates r = p / (1 + e*cos(nu_node)). This matches the node
-    distance the reference ephemeris and the Skyfield backend return
-    (~0.0024 AU).
+    evaluates ``r = p / (1 + e*cos(nu_node))`` from that independently sourced
+    state.
     """
     moon_pos, moon_vel = reader.eval_body(MOON, jd_tt)
     earth_pos, earth_vel = reader.eval_body(EARTH, jd_tt)
@@ -1891,51 +1767,66 @@ def _pipeline_ecliptic(
     Returns:
         (lon, lat, dist, dlon, dlat, ddist)
     """
-    # When SIDEREAL+EQUATORIAL, or J2000/NONUT, the reference outputs the
-    # mean (nutation-free) ecliptic; otherwise the true ecliptic of date.
+    # Public frame convention: SIDEREAL+EQUATORIAL and J2000/NONUT use the
+    # mean (nutation-free) ecliptic; other of-date requests use the true one.
     _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
     _want_nonut_b = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
 
-    def _ofdate_pos(jd: float) -> Tuple[float, float, float]:
-        """Reported of-date (lon, lat, dist) for an ecliptic-direct body.
+    _clean_model_body = ipl in (MEAN_NODE, MEAN_APOG, INTP_APOG, INTP_PERG)
 
-        Reproduces the reference-matching distance/latitude overrides and the
-        nutation-in-longitude handling in a single place, so the reported
-        velocity below is the exact central difference of the reported
-        position — the same construction the Skyfield backend uses.
+    def _nutation_rate(jd: float) -> float:
+        """Return the local longitude-nutation rate in degrees per day."""
+        step = 0.001
+        _, dpsi_minus, _, _ = _frame_data(jd - step)
+        _, dpsi_plus, _, _ = _frame_data(jd + step)
+        return math.degrees(dpsi_plus - dpsi_minus) / (2.0 * step)
 
-        LEB stores pre-computed Chebyshev coefficients that may use older
-        models; the overrides compute the distance/latitude analytically at
-        runtime for a better match with the reference ephemeris.
+    def _ofdate_state(
+        jd: float,
+    ) -> Tuple[float, float, float, float, float, float]:
+        """Return a reported of-date state for an ecliptic-direct body.
+
+        Mean and interpolated apsides always come from the packaged clean-room
+        models, never from their legacy LEB channels.  True-node and
+        osculating-apogee positions retain the JPL-derived LEB path.
         """
-        (lo, la, di), _ = reader.eval_body(ipl, jd)
-
+        use_speed3_state = bool(iflag & FLG_SPEED3)
+        use_speed3_velocity = bool(iflag & FLG_SPEED) and (
+            use_speed3_state or bool(iflag & FLG_TOPOCTR)
+        )
         if ipl == MEAN_NODE:
-            # LEB stores 0 for dist; the reference returns the mean distance.
-            di = _MOON_MEAN_DIST_AU
-        elif ipl == TRUE_NODE:
-            # The LEB-stored value is an h_mag proxy (~0.0015 AU), NOT the
-            # osculating node radius the reference ephemeris and the Skyfield
-            # backend return (~0.0024 AU). Reconstruct the geocentric lunar
-            # state from the LEB Moon channel and evaluate the osculating-
-            # ellipse radius at the ascending node.
+            from .lunar import calc_mean_lunar_node_state
+
+            lo, la, di, dlo, dla, ddi = calc_mean_lunar_node_state(
+                jd, speed3=use_speed3_velocity
+            )
+        elif ipl == MEAN_APOG:
+            from .lunar import calc_mean_lilith_state
+
+            lo, la, di, dlo, dla, ddi = calc_mean_lilith_state(
+                jd, speed3=use_speed3_velocity
+            )
+        elif ipl in (INTP_APOG, INTP_PERG):
+            from .lunar import calc_interpolated_apse_state
+
+            lo, la, di, dlo, dla, ddi = calc_interpolated_apse_state(
+                jd, ipl, speed3=use_speed3_state
+            )
+            if use_speed3_velocity and not use_speed3_state:
+                speed3 = calc_interpolated_apse_state(jd, ipl, speed3=True)
+                dlo, dla, ddi = speed3[3:]
+        else:
+            (lo, la, di), _ = reader.eval_body(ipl, jd)
+            dlo = dla = ddi = 0.0
+
+        if ipl == TRUE_NODE:
+            # The direct channel stores an angular-momentum proxy rather than
+            # an osculating node radius. Reconstruct the geocentric lunar state
+            # and evaluate the two-body ellipse at the ascending node.
             try:
                 di = _osculating_node_radius(reader, jd)
             except (KeyError, ValueError, ArithmeticError):
                 pass  # keep the stored proxy if the Moon channel is missing
-        elif ipl == MEAN_APOG:
-            # LEB stores old 5.145°·sin(ω) latitude model (max error ~20").
-            # Override with 3-harmonic model fitted to the reference output:
-            #   lat = 5.1490449082·sin(ω) + 0.0034412113·sin(3ω)
-            # where ω = (apogee_lon - node_lon). Max residual ~1.3", RMS ~0.7".
-            from .lunar import calc_mean_lunar_node
-
-            node_lon = calc_mean_lunar_node(jd)
-            omega_rad = math.radians((lo - node_lon) % 360.0)
-            la = 5.1490449082 * math.sin(omega_rad) + 0.0034412113 * math.sin(
-                3.0 * omega_rad
-            )
-            di = _MOON_MEAN_APOG_DIST_AU
 
         # Nutation in longitude (Δψ) handling. Mean bodies are stored on the
         # mean ecliptic (add Δψ for the true ecliptic of date); true/osculating
@@ -1945,14 +1836,17 @@ def _pipeline_ecliptic(
             if not _want_nonut_b:
                 _, dpsi_rad, _, _ = _frame_data(jd)
                 lo = (lo + math.degrees(dpsi_rad)) % 360.0
+                dlo += _nutation_rate(jd)
         elif ipl in (TRUE_NODE, OSCU_APOG, INTP_APOG, INTP_PERG):
             if _want_nonut_b:
                 _, dpsi_rad, _, _ = _frame_data(jd)
                 lo = (lo - math.degrees(dpsi_rad)) % 360.0
+                if _clean_model_body:
+                    dlo -= _nutation_rate(jd)
 
-        return lo, la, di
+        return lo, la, di, dlo, dla, ddi
 
-    lon, lat, dist = _ofdate_pos(jd_tt)
+    lon, lat, dist, dlon, dlat, ddist = _ofdate_state(jd_tt)
 
     # Velocity: the reported speed is the central difference of the reported
     # of-date position, over the SAME window the Skyfield backend uses, so the
@@ -1966,12 +1860,15 @@ def _pipeline_ecliptic(
     # previously stale ddist/dlat that were left as the retired channel's
     # Chebyshev derivative). At an ephemeris edge the ±dt samples may fall out
     # of range; return zero speed there, matching the Skyfield boundary path.
-    dlon = dlat = ddist = 0.0
-    if iflag & FLG_SPEED:
-        _dt = 0.05 if ipl in (OSCU_APOG, TRUE_NODE) else 0.5
+    if (iflag & FLG_SPEED) and not _clean_model_body:
+        _dt = (
+            0.0001
+            if iflag & (FLG_SPEED3 | FLG_TOPOCTR)
+            else (0.05 if ipl in (OSCU_APOG, TRUE_NODE) else 0.5)
+        )
         try:
-            lo_m, la_m, di_m = _ofdate_pos(jd_tt - _dt)
-            lo_p, la_p, di_p = _ofdate_pos(jd_tt + _dt)
+            lo_m, la_m, di_m, _, _, _ = _ofdate_state(jd_tt - _dt)
+            lo_p, la_p, di_p, _, _, _ = _ofdate_state(jd_tt + _dt)
             _dl = lo_p - lo_m
             if _dl > 180.0:
                 _dl -= 360.0
@@ -1981,17 +1878,15 @@ def _pipeline_ecliptic(
             dlat = (la_p - la_m) / (2.0 * _dt)
             ddist = (di_p - di_m) / (2.0 * _dt)
         except (KeyError, ValueError, ArithmeticError):
-            pass
+            dlon = dlat = ddist = 0.0
+    elif not (iflag & FLG_SPEED):
+        dlon = dlat = ddist = 0.0
 
     # Coordinate transforms for ecliptic-direct bodies.
     # Input coords are always ecliptic of date.
     #
-    # FLG_J2000 is honored for ALL bodies, including TrueNode, OscuApog,
-    # IntpApog, and IntpPerg.  the reference ephemeris silently ignores J2000 for these
-    # four bodies when FLG_SIDEREAL is set — this is a behavioral bug
-    # (ayanamsha and J2000 ecliptic precession are geometrically distinct
-    # and composable operations).  LibEphemeris intentionally fixes this.
-    # See docs/comparison/intentional-divergences.md
+    # FLG_J2000 is honored uniformly for every ecliptic-direct body,
+    # including the non-mean lunar points under SIDEREAL.
     _effective_j2000 = bool(iflag & FLG_J2000)
 
     if (iflag & FLG_EQUATORIAL) and _effective_j2000:
@@ -2005,7 +1900,7 @@ def _pipeline_ecliptic(
             # The source of-date epoch varies between the two velocity samples
             # so the precession captures the ~50.29"/yr equinox drift; the
             # reported J2000 speed is then the true derivative of the reported
-            # J2000 position (matching the reference API and the Skyfield path).
+            # J2000 position, consistently across the two backends.
             lo_j, la_j = _precess_ecliptic(lo, la, src_epoch, J2000)
             return _cotrans(lo_j, la_j, -eps)
 
@@ -2057,7 +1952,7 @@ def _pipeline_ecliptic(
         # of-date epoch varies between the two velocity samples so the reported
         # J2000 speed is the true derivative of the reported J2000 position —
         # it differs from the of-date speed by the general-precession rate
-        # (~0.14"/day), matching the reference API.
+        # (~0.14"/day), as required by the time-dependent frame rotation.
         dt_step = 0.001  # days
         j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
         j_fwd_lon, j_fwd_lat = _precess_ecliptic(
@@ -2087,11 +1982,11 @@ def _pipeline_helio(
     ipl: int,
     iflag: int,
 ) -> Tuple[float, float, float, float, float, float]:
-    """Pipeline C: evaluate heliocentric ecliptic bodies (Uranians, Transpluto).
+    """Pipeline C: evaluate reviewed heliocentric ecliptic bodies.
 
     LEB stores these as heliocentric J2000 ecliptic (lon, lat, dist).
-    Default output is geocentric ecliptic of date, matching the Skyfield
-    reference path in planets.py.
+    Default output is geocentric ecliptic of date, consistent with the
+    Skyfield path in planets.py.
 
     Returns:
         (lon, lat, dist, dlon, dlat, ddist)
@@ -2117,9 +2012,8 @@ def _pipeline_helio(
             yh = h_dist * cl * math.sin(h_lon_r)
             zh = h_dist * math.sin(h_lat_r)
             # Earth heliocentric: bary(Earth) - bary(Sun) in ICRS
-            # Apply light-time correction to match Skyfield's .observe():
-            # the reference path uses sun.at(t).observe(earth) which evaluates
-            # Earth at the retarded time (t - light_time_earth_sun).
+            # Apply light-time correction by evaluating Earth at the retarded
+            # epoch while the solar observer remains at observation time.
             earth_pos, _ = reader.eval_body(EARTH, jd)
             sun_pos, _ = reader.eval_body(SUN, jd)
             ex0 = earth_pos[0] - sun_pos[0]
@@ -2173,9 +2067,8 @@ def _pipeline_helio(
     # SAME (epoch-varying) precession — instead of leaving it frozen in the
     # J2000 frame — makes the of-date speed the true time derivative of the
     # of-date position: it picks up the ~50.29"/yr general-precession rate,
-    # matching the Skyfield backend (_precess_ecliptic_state) and the reference
-    # API. Without this the of-date speed was off by the precession rate
-    # (~0.14"/day) on default / helctr / equatorial / sidereal output.
+    # matching the Skyfield backend (_precess_ecliptic_state). Without this,
+    # the derivative would omit the precession contribution.
     if not is_j2000:
         dt_step = 0.001  # days
         now_lon, now_lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
@@ -2194,8 +2087,8 @@ def _pipeline_helio(
 
     # Rotate the mean ecliptic of date onto the TRUE ecliptic of date by adding
     # nutation in longitude (Δψ), so these bodies are reported on the true
-    # ecliptic like every other of-date body and like the reference API (which
-    # applies Δψ uniformly). The velocity picks up the nutation-in-longitude
+    # ecliptic like every other of-date body. The velocity picks up the
+    # nutation-in-longitude
     # rate dΔψ/dt so the reported speed stays the exact derivative of the
     # reported longitude. Skipped for the nutation-free frames: FLG_J2000 (the
     # J2000 ecliptic carries no nutation), FLG_NONUT (mean ecliptic), and
@@ -2213,8 +2106,7 @@ def _pipeline_helio(
 
     # For EQ+J2000, both backends rotate the J2000 ecliptic to the equator with
     # the J2000 obliquity — a consistent J2000 equatorial frame, same as every
-    # other body class and the reference's measured convention (see
-    # docs/comparison/intentional-divergences.md §8, resolved).
+    # other body class under the shared IAU 2006 frame definition.
     if is_equatorial and is_j2000:
         # EQ+J2000: J2000 ecliptic → J2000 equatorial (fixed J2000 obliquity).
         eps = OBLIQUITY_J2000_REF_DEG
@@ -2509,26 +2401,41 @@ def _fast_calc_core(
     # through every coordinate-transform helper).
     _set_active_reader(reader)
 
-    # Check if body is in the .leb file
-    if not reader.has_body(ipl):
+    output_iflag = iflag
+    if FICT_OFFSET <= ipl <= WALDEMATH:
+        # Never source a fictitious-body position from a persisted LEB channel.
+        # Legacy files may contain obsolete coefficients, while all public
+        # IDs 40--58 now have runtime analytical dispatch. A KeyError is the
+        # normal LEB miss signal and lets calc/calc_ut continue to that path.
+        raise KeyError(
+            f"Fictitious body {ipl} is calculated from its runtime analytical model"
+        )
+    # FLG_J2000 is honored uniformly for every lunar point, including the
+    # non-mean ones under SIDEREAL: ayanamsha and ecliptic-plane precession
+    # are independent, composable rotations, so the deferred sid+j2k pipeline
+    # applies to all ecliptic-direct bodies alike.
+
+    # Clean-room compatibility models do not depend on legacy LEB channels.
+    # They remain available even when a custom LEB omits those body records.
+    _external_ecliptic_model = ipl in (
+        MEAN_NODE,
+        MEAN_APOG,
+        INTP_APOG,
+        INTP_PERG,
+    )
+    if not _external_ecliptic_model and not reader.has_body(ipl):
         raise KeyError(f"Body {ipl} not in LEB file")
 
-    # Moon-derived abstract points under HELCTR/BARYCTR: the reference
-    # returns an all-zero position tuple while echoing the normal retflag
-    # (mirrors the Skyfield-path guard in planets._calc_body).
+    # Moon-derived abstract points have no heliocentric or barycentric
+    # geometric definition; use the public zero sentinel for those centers.
     if ipl in (MEAN_NODE, TRUE_NODE, MEAN_APOG, OSCU_APOG, INTP_APOG, INTP_PERG) and (
         iflag & (FLG_HELCTR | FLG_BARYCTR)
     ):
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), output_iflag
 
-    body = reader._bodies[ipl]
-
-    # Flag for deferred J2000 precession — set True by Pipeline B for any
-    # ecliptic-direct body with SID+J2K (no EQ).  All Pipeline B bodies
-    # (MeanNode, MeanApog, TrueNode, OscuApog, IntpApog, IntpPerg) use
-    # the same deferred precession pattern: subtract ayanamsha first in
-    # ecliptic-of-date coords, then precess to J2000.
-    _deferred_sid_j2k = False
+    coord_type = (
+        COORD_ECLIPTIC if _external_ecliptic_model else reader._bodies[ipl].coord_type
+    )
 
     _pipeline_a = False
     _pipeline_c = False
@@ -2540,7 +2447,7 @@ def _fast_calc_core(
     _xyz_sid = bool(iflag & FLG_XYZ) and bool(iflag & FLG_SIDEREAL)
     _pipe_iflag = (iflag & ~FLG_XYZ) if _xyz_sid else iflag
 
-    if body.coord_type == COORD_ICRS_BARY:
+    if coord_type == COORD_ICRS_BARY:
         _pipeline_a = not _xyz_sid
         if iflag & FLG_SPEED:
             lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
@@ -2562,7 +2469,7 @@ def _fast_calc_core(
             )
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
-    elif body.coord_type == COORD_ICRS_BARY_SYSTEM:
+    elif coord_type == COORD_ICRS_BARY_SYSTEM:
         _pipeline_a = not _xyz_sid
         if iflag & FLG_SPEED:
             lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
@@ -2586,41 +2493,24 @@ def _fast_calc_core(
             )
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
-    elif body.coord_type == COORD_ECLIPTIC:
-        if iflag & FLG_TOPOCTR:
+    elif coord_type == COORD_ECLIPTIC:
+        if (iflag & FLG_TOPOCTR) and ipl not in (
+            MEAN_NODE,
+            TRUE_NODE,
+            MEAN_APOG,
+            OSCU_APOG,
+            INTP_APOG,
+            INTP_PERG,
+        ):
             raise KeyError("FLG_TOPOCTR not supported for ecliptic-direct bodies")
         # Pipeline B: ecliptic direct
-        #
-        # For all ecliptic-direct bodies with SID+J2K (no EQ), defer J2000
-        # precession so ayanamsha can be subtracted first in ecliptic-of-date
-        # coordinates.  The correct order is:
-        #   ecl_date → −aya → precess_to_J2000
-        # NOT:
-        #   ecl_date → precess_to_J2000 → −aya  (wrong — non-commutative)
-        #
-        # This applies to ALL Pipeline B bodies uniformly: MeanNode, MeanApog,
-        # TrueNode, OscuApog, IntpApog, IntpPerg.  the reference ephemeris only does this
-        # for mean bodies (silently ignoring J2000 for the others when sidereal
-        # is set) — LibEphemeris intentionally corrects this behavioral bug.
-        # See docs/comparison/intentional-divergences.md
-        _deferred_sid_j2k = (
-            bool(iflag & FLG_SIDEREAL)
-            and bool(iflag & FLG_J2000)
-            and not bool(iflag & FLG_EQUATORIAL)
-        )
-        # When deferring, run the pipeline with FLG_NONUT in place of
-        # FLG_J2000: the J2000 output frame is nutation-free (matching the
-        # Skyfield path), and the deferred _precess_ecliptic below is a
-        # pure precession rotation that cannot remove a nutation offset
-        # baked into the of-date longitude.
-        _pipe_flags = (iflag & ~FLG_J2000) | FLG_NONUT if _deferred_sid_j2k else iflag
         lon, lat, dist, dlon, dlat, ddist = _pipeline_ecliptic(
-            reader, jd_tt, ipl, _pipe_flags
+            reader, jd_tt, ipl, iflag
         )
         if not (iflag & FLG_SPEED):
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
-    elif body.coord_type == COORD_HELIO_ECL:
+    elif coord_type == COORD_HELIO_ECL:
         if iflag & FLG_TOPOCTR:
             raise KeyError("FLG_TOPOCTR not supported for heliocentric bodies")
         # Pipeline C: heliocentric
@@ -2630,7 +2520,7 @@ def _fast_calc_core(
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     else:
-        raise ValueError(f"Unknown coord_type {body.coord_type}")
+        raise ValueError(f"Unknown coord_type {coord_type}")
 
     # ICRS (Pipeline-A) bodies requested as XYZ+SIDEREAL are forced through the
     # spherical path (FLG_XYZ stripped via _pipe_iflag) so the sidereal longitude
@@ -2642,15 +2532,15 @@ def _fast_calc_core(
     # precession-rate terms the equivalent spherical output applies, leaving the
     # XYZ and spherical results (which must be exact coordinate transforms of one
     # another) inconsistent by ~2x the general-precession rate in dlon.
-    _xyz_sid_pipea = _xyz_sid and body.coord_type in (
+    _xyz_sid_pipea = _xyz_sid and coord_type in (
         COORD_ICRS_BARY,
         COORD_ICRS_BARY_SYSTEM,
     )
 
     # Sidereal correction
     #
-    # When EQUATORIAL is set, the reference ephemeris does NOT subtract ayanamsha from RA
-    # for any body type:
+    # Public API convention: EQUATORIAL output does not subtract ayanamsha
+    # from right ascension for any body type:
     #   - Pipeline A (ICRS): already outputs equatorial coordinates using the
     #     mean equator (P matrix) when sidereal is set.
     #   - Pipeline B/C (ecliptic/helio): the pipeline handles equatorial
@@ -2673,12 +2563,8 @@ def _fast_calc_core(
             # J2000 ecliptic has no nutation component → mean ayanamsha.
             # Ecliptic of date includes nutation → true ayanamsha (mean + Δψ).
             #
-            # This applies uniformly to ALL bodies.  the reference ephemeris uses true
-            # ayanamsha for TrueNode/OscuApog/IntpApog/IntpPerg even when
-            # FLG_J2000 is set (because it skips J2000 precession for them).
-            # LibEphemeris intentionally fixes this: when J2000 is requested,
-            # mean ayanamsha is always used, for all bodies.
-            # See docs/comparison/intentional-divergences.md
+            # FLG_J2000 is honored for every lunar point, so any body with the
+            # J2000 bit set uses the mean ayanamsha after precession.
             _eff_mean_aya = bool(iflag & (FLG_J2000 | FLG_NONUT))
             if _eff_mean_aya:
                 aya = mean_aya
@@ -2688,6 +2574,10 @@ def _fast_calc_core(
                     nutation_deg = math.degrees(dpsi_sid)
                     aya = mean_aya + nutation_deg
                 except (KeyError, ValueError) as _nut_exc:
+                    if _external_ecliptic_model:
+                        raise KeyError(
+                            "LEB frame data do not cover this clean-model epoch"
+                        ) from _nut_exc
                     from .logging_config import get_logger
 
                     # Mean-only ayanamsha is a ~9-17" silent precision loss;
@@ -2716,18 +2606,8 @@ def _fast_calc_core(
             # frame the tropical rate has no equinox motion but the mean
             # ayanamsha still drifts, so the term is the full ~p. The
             # FLG_SPEED-absent case must be excluded: dlon was zeroed and stays
-            # 0.0. For the deferred ecliptic-direct bodies (nodes/apogees)
-            # this subtraction is the ayanamsha-drift term; the frame term
-            # (dP/dt of the precession rotation) is picked up by the
-            # _deferred_sid_j2k rebuild below, which precesses the forward
-            # velocity sample from its own epoch.
-            if (iflag & FLG_SPEED) and (
-                _deferred_sid_j2k
-                or not (iflag & FLG_J2000)
-                or _pipeline_a
-                or _xyz_sid_pipea
-                or _pipeline_c
-            ):
+            # 0.0.
+            if iflag & FLG_SPEED:
                 if sid_mode in _STAR_BASED_MODES:
                     # Star-anchored modes: ayanamsha = anchor-star apparent
                     # longitude − C, so its drift is the anchor star's
@@ -2736,10 +2616,9 @@ def _fast_calc_core(
                     # position correction already delegates the ayanamsha value
                     # to Skyfield for these modes; do the same for the rate by
                     # central-differencing the actual ayanamsha (mean or true per
-                    # the active flags), exactly as the Skyfield path's
-                    # _apply_sidereal_correction does. Using the precession
-                    # polynomial here left the sidereal speed ~0.36"/day off the
-                    # reference (and off the Skyfield backend) for these modes.
+                    # the active flags), as the Skyfield path's
+                    # _apply_sidereal_correction does. A fixed precession rate
+                    # cannot represent the apparent motion of the anchor.
                     def _aya_of(_jd: float) -> float:
                         _m = _calc_ayanamsa_from_leb(
                             reader,
@@ -2757,10 +2636,9 @@ def _fast_calc_core(
                             return _m
 
                     # The ayanamsha is reported mod 360, so the two samples can
-                    # straddle the 0/360 wrap (e.g. SIDM_GALCENT_COCHRANE near
-                    # JD 2533810 crosses 0 inside the medium tier); unwrap the
-                    # delta into (-180, 180] before dividing or the raw -360
-                    # difference reports a ~1.6e7 deg/day speed spike.
+                    # straddle the 0/360 wrap; unwrap the delta into
+                    # (-180, 180] before dividing or the raw -360 difference
+                    # reports a ~1.6e7 deg/day speed spike.
                     _dt_aya = 1.0 / 86400.0
                     _d_aya = (
                         _aya_of(jd_tt + _dt_aya) - _aya_of(jd_tt - _dt_aya) + 180.0
@@ -2769,18 +2647,11 @@ def _fast_calc_core(
                 else:
                     dlon -= _general_precession_rate_deg_day(jd_tt)
 
-                    # Of-date sidereal subtracts the TRUE ayanamsha (mean + Δψ), so
-                    # its rate must also drop the nutation-in-longitude rate dΔψ/dt
-                    # (~0.05"/day, peaks ~0.23"/day) on top of the precession term
-                    # above. The mean ayanamsha (J2000/NONUT) carries no nutation,
-                    # so it is excluded via _eff_mean_aya. This mirrors the
-                    # position correction, which applies the true ayanamsha to ALL
-                    # bodies uniformly — including the Pipeline-B ecliptic-direct
-                    # bodies (nodes/apogees), whose of-date tropical speed carries
-                    # dΔψ/dt just like every other body. Gating this per-pipeline
-                    # left the Pipeline-B sidereal speed off by the nutation rate
-                    # (not the derivative of the reported position, and diverging
-                    # from both the Skyfield backend and the reference API).
+                    # Of-date sidereal longitude subtracts the true ayanamsha
+                    # (mean + Δψ), so its derivative must also subtract dΔψ/dt.
+                    # Mean-ayanamsha frames (J2000/NONUT) carry no nutation and
+                    # are excluded. This keeps speed equal to the derivative of
+                    # the reported position for every ecliptic-direct body.
                     if not _eff_mean_aya:
                         try:
                             dlon -= _nutation_rate_deg_day(jd_tt)
@@ -2799,49 +2670,55 @@ def _fast_calc_core(
     # here double-counted it against XYZ output and, together with the sidereal
     # drift above, against SID+J2000.
 
-    # Deferred J2000 precession for Pipeline B bodies with SID+J2K.
-    # The pipeline was run without FLG_J2000 so ayanamsha could be
-    # subtracted in ecliptic-of-date first.  Now precess the sidereal-
-    # corrected coords to J2000.  This applies to ALL ecliptic-direct
-    # bodies uniformly (MeanNode, MeanApog, TrueNode, OscuApog, IntpApog,
-    # IntpPerg).  See docs/comparison/intentional-divergences.md
-    if _deferred_sid_j2k:
-        dt_step = 0.001  # days
-        j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
-        # The forward sample precesses from ITS OWN epoch (jd_tt + dt_step):
-        # the derivative of P(t -> J2000)[pos(t)] carries both the rotated
-        # velocity AND the dP/dt drift of the rotation itself (~ -p, the
-        # general-precession rate). Precessing both samples from the same
-        # epoch dropped the dP/dt term, leaving the reported speed off by
-        # exactly +p versus the derivative of the reported position (and
-        # versus the Skyfield backend and the reference API).
-        j_fwd_lon, j_fwd_lat = _precess_ecliptic(
-            lon + dlon * dt_step, lat + dlat * dt_step, jd_tt + dt_step, J2000
-        )
-        d_j_lon = j_fwd_lon - j_now_lon
-        if d_j_lon > 180.0:
-            d_j_lon -= 360.0
-        elif d_j_lon < -180.0:
-            d_j_lon += 360.0
-        dlon = d_j_lon / dt_step
-        dlat = (j_fwd_lat - j_now_lat) / dt_step
-        lon = j_now_lon
-        lat = j_now_lat
-
-    # FLG_XYZ post-processing for Pipeline B/C (spherical → Cartesian)
-    # Pipeline A handles XYZ internally via _pipeline_icrs; skip here.
+    # FLG_XYZ post-processing for Pipeline B/C (spherical → Cartesian).
+    # Pipeline A handles XYZ internally via _pipeline_icrs.
     if (iflag & FLG_XYZ) and not _pipeline_a:
-        return _spherical_to_cartesian_with_velocity(
+        result = _spherical_to_cartesian_with_velocity(
             lon, lat, dist, dlon, dlat, ddist
-        ), iflag
-
-    # FLG_RADIANS: convert angular output from degrees to radians
-    # Skip when XYZ is active — values are Cartesian AU, not angles
-    if (iflag & FLG_RADIANS) and not (iflag & FLG_XYZ):
+        )
+    elif (iflag & FLG_RADIANS) and not (iflag & FLG_XYZ):
+        # FLG_RADIANS: convert angular output from degrees to radians.
         _d2r = math.pi / 180.0
-        lon = lon * _d2r
-        lat = lat * _d2r
-        dlon = dlon * _d2r
-        dlat = dlat * _d2r
+        result = (
+            lon * _d2r,
+            lat * _d2r,
+            dist,
+            dlon * _d2r,
+            dlat * _d2r,
+            ddist,
+        )
+    else:
+        result = (lon, lat, dist, dlon, dlat, ddist)
 
-    return (lon, lat, dist, dlon, dlat, ddist), iflag
+    # Mean lunar points apply SPEED3 after every requested frame and output
+    # transformation. Reusing this core with velocity bits removed gives the
+    # exact reported positions at t±h without recursively rebuilding a speed.
+    if (iflag & FLG_SPEED3) and ipl in (MEAN_NODE, MEAN_APOG):
+        sample_iflag = iflag & ~(FLG_SPEED | FLG_SPEED3)
+        previous, _ = _fast_calc_core(
+            reader,
+            jd_tt - _SPEED3_STEP_DAYS,
+            jd_ut - _SPEED3_STEP_DAYS,
+            ipl,
+            sample_iflag,
+            sid_mode=sid_mode,
+            sid_t0=sid_t0,
+            sid_ayan_t0=sid_ayan_t0,
+            topo_offset=topo_offset,
+            topo_offset_fn=topo_offset_fn,
+        )
+        following, _ = _fast_calc_core(
+            reader,
+            jd_tt + _SPEED3_STEP_DAYS,
+            jd_ut + _SPEED3_STEP_DAYS,
+            ipl,
+            sample_iflag,
+            sid_mode=sid_mode,
+            sid_t0=sid_t0,
+            sid_ayan_t0=sid_ayan_t0,
+            topo_offset=topo_offset,
+            topo_offset_fn=topo_offset_fn,
+        )
+        result = _apply_central_speed3_stencil(result, previous, following, iflag)
+
+    return result, output_iflag

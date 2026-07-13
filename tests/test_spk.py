@@ -301,7 +301,7 @@ class TestSpkRegistration:
         assert "download_spk" in message
         assert "download_and_register_spk" in message
         assert "set_auto_spk_download" in message
-        assert "libephemeris.scripts.download_spk" in message
+        assert "scripts/download_spk.py" in message
 
 
 class TestCalcWithoutSpk:

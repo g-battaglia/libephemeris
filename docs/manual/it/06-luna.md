@@ -113,11 +113,15 @@ Ma c'è una complicazione: a causa delle perturbazioni del Sole, la posizione de
 
 Per questo LibEphemeris offre tre versioni diverse dell'apogeo (e analogamente del perigeo):
 
-**Apogeo medio** — la posizione calcolata con un polinomio regolare, che avanza uniformemente lungo lo zodiaco. È il più usato in astrologia con il nome di "Lilith Nera" (ne parleremo nella sezione successiva).
+**Apogeo medio** — una curva regolare costruita dagli argomenti lunari
+fondamentali ERFA/IERS e dalla geometria convenzionale dell'orbita inclinata. È
+molto usata in astrologia con il nome di "Lilith Nera".
 
 **Apogeo osculante** — la posizione istantanea dell'apogeo, calcolata dall'orbita reale della Luna in quel preciso momento. Include tutte le perturbazioni e può oscillare di 20°–30° rispetto alla posizione media. "Osculante" viene dal latino *osculari* (baciare) — l'orbita osculante è l'ellisse che "bacia" la traiettoria reale in un dato istante.
 
-**Apogeo interpolato** — una via di mezzo: le oscillazioni troppo rapide (artifici matematici dell'orbita osculante) vengono rimosse, mantenendo le variazioni fisicamente significative. È la versione più precisa dal punto di vista astronomico.
+**Apogeo interpolato** — la media simmetrica, su un mese anomalistico, dei
+vettori di eccentricità osculanti ricavati dagli stati lunari NASA JPL. Non è
+un corpo osservato né una pretesa di maggiore accuratezza fisica.
 
 ```python
 import libephemeris as ephem
@@ -140,13 +144,6 @@ print(f"Apogeo interpolato: {lon_int:.4f}°")
 print(f"Differenza medio-osculante: {oscu[0] - medio[0]:.1f}°")
 ```
 
-```
-Apogeo medio:       170.9201°
-Apogeo osculante:   182.7118°
-Apogeo interpolato: 166.3793°
-Differenza medio-osculante: 11.8°
-```
-
 ---
 
 ## 6.4 Lilith: la Luna Nera
@@ -161,7 +158,9 @@ Esistono tre versioni di Lilith, che corrispondono alle tre versioni dell'apogeo
 
 **Lilith vera (osculante)** è la posizione reale istantanea dell'apogeo. Può differire dalla Lilith media di 20°–30° e ha movimenti irregolari, incluse brevi retrogradazioni. Alcuni astrologi la preferiscono per la sua aderenza alla realtà astronomica.
 
-**Lilith interpolata** è la versione lisciata — rimuove le oscillazioni artificiali dell'orbita osculante ma mantiene le variazioni fisicamente reali. È la più precisa dal punto di vista astronomico.
+**Lilith interpolata** è la curva analitica distinta, costruita da argomenti di
+Delaunay e termini periodici; per gli eventi fisici di distanza lunare bisogna
+calcolare direttamente la distanza della Luna.
 
 ```python
 import libephemeris as ephem
@@ -186,45 +185,28 @@ print(f"Lilith vera:  {segno(lon_vera)}")
 print(f"Differenza:   {lon_vera - lilith_media:.1f}°")
 ```
 
-```
-Lilith media: 20.9° Vir
-Lilith vera:  2.7° Lib
-Differenza:   11.8°
-```
-
 ### La Luna Bianca (Selena)
 
-Il punto opposto a Lilith — cioè il **perigeo** medio dell'orbita lunare — è chiamato **Luna Bianca** o **Selena** in alcune tradizioni astrologiche. Se Lilith rappresenta il lato ombra, Selena rappresenta il lato luminoso.
+Alcune tradizioni astrologiche usano un punto distinto chiamato **Luna Bianca**
+o **Selena**. Il corpo ID 56 conserva la convenzione circolare settennale di
+compatibilità di rc7; non è definito come il punto opposto a Lilith e non è
+un'apside lunare fisica.
 
 ```python
-import libephemeris as ephem
-
-jd_tt = ephem.julday(2024, 4, 8, 12.0) + ephem.deltat(
-    ephem.julday(2024, 4, 8, 12.0)
-)
-
-# Selena: il punto opposto a Lilith
-selena = ephem.calc_white_moon_position(jd_tt)
-# Restituisce una tupla di 6 valori come calc_ut:
-# (lon, lat, dist, vel_lon, vel_lat, vel_dist)
-
-lilith = ephem.calc_mean_lilith(jd_tt)
-print(f"Lilith:  {lilith:.4f}°")
-print(f"Selena:  {selena[0]:.4f}°")
-print(f"Differenza: {abs(selena[0] - lilith):.1f}°")  # ~180°
+luna_bianca, _ = ephem.calc_ut(jd, ephem.WHITE_MOON)
 ```
 
-```
-Lilith:  170.9216°
-Selena:  350.9216°
-Differenza: 180.0°
-```
+Per un'apside astronomica usa le API documentate del punto lunare medio,
+osculante o interpolato.
 
 ---
 
-## 6.5 Perigeo interpolato e calibrazione
+## 6.5 Perigeo interpolato
 
-Così come esiste l'apogeo interpolato, esiste anche il **perigeo interpolato** — la versione lisciata del punto di massimo avvicinamento della Luna. È utile per calcoli di precisione, ad esempio per prevedere le maree o per determinare le "superlune" vere (Luna piena entro poche ore dal perigeo).
+Così come esiste l'apogeo interpolato, esiste anche il **perigeo
+interpolato**, una coordinata lisciata definita da LibEphemeris. Non
+va usata come scorciatoia per maree o "superlune": per questi problemi bisogna
+cercare un minimo nella distanza geocentrica reale della Luna.
 
 ```python
 import libephemeris as ephem
@@ -242,12 +224,12 @@ print(f"Perigeo interpolato: {lon:.4f}°")
 print(f"Distanza: {dist_km:.0f} km")
 ```
 
-```
-Perigeo interpolato: 4.1030°
-Distanza: 358786 km
-```
-
-La precisione del perigeo interpolato in LibEphemeris è stata migliorata attraverso un processo di calibrazione: geometria dei passaggi dalle effemeridi JPL ad alta precisione, con la serie e la tabella dei residui calibrate sull'output dell'API di riferimento usata come oracolo black-box (si vedano NOTICE.md e la documentazione metodologica).
+LibEphemeris valuta apogeo e perigeo interpolati con serie analitiche separate
+negli argomenti di Delaunay e un raffinamento di compatibilità versionato. Il
+raffinamento è vincolato da hash e non può essere modificato senza una revisione
+esplicita. Le distanze restituite sono raggi convenzionali, non misure della
+distanza lunare istantanea. Si veda
+[Nodi e apsidi lunari](../../methodology/lunar-apsides.md).
 
 ---
 
@@ -291,7 +273,6 @@ La Luna attraversa un nodo circa **due volte al mese** — una volta il nodo asc
 - I **nodi lunari** sono i punti dove l'orbita lunare interseca l'eclittica. Esistono in versione media (regolare) e vera (con oscillazioni). Le eclissi avvengono solo vicino ai nodi.
 - **Apogeo** (punto più lontano) e **perigeo** (punto più vicino) esistono in tre versioni: medio, osculante e interpolato. L'apogeo medio è la "Lilith Nera" dell'astrologia.
 - **Lilith** (Luna Nera) è l'apogeo dell'orbita lunare — un punto geometrico, non un corpo fisico. La Lilith media è la più usata; la vera può differire di 20°–30°.
-- La **Luna Bianca** (Selena) è il punto opposto a Lilith, corrispondente al perigeo.
 - `mooncross_node_ut` trova il momento esatto in cui la Luna attraversa l'eclittica.
 
 ### Funzioni introdotte
@@ -302,7 +283,6 @@ La Luna attraversa un nodo circa **due volte al mese** — una volta il nodo asc
 - `calc_true_lilith(jd_tt)` — longitudine, latitudine e distanza della Lilith vera (apogeo osculante)
 - `calc_interpolated_apogee(jd_tt)` — apogeo lunare interpolato (lisciato)
 - `calc_interpolated_perigee(jd_tt)` — perigeo lunare interpolato
-- `calc_white_moon_position(jd_tt)` — Luna Bianca (Selena), opposta a Lilith
 - `mooncross_node_ut(jd_ut)` — prossimo attraversamento del nodo lunare
 - `MEAN_NODE`, `TRUE_NODE` — nodi lunari via `calc_ut`
 - `MEAN_APOG`, `OSCU_APOG` — apogeo lunare via `calc_ut`

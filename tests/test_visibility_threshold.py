@@ -18,7 +18,6 @@ References:
     - Crumey, A. (2014) "Human contrast threshold and astronomical visibility"
 """
 
-
 from libephemeris import (
     # Visibility threshold functions
     VisibilityResult,

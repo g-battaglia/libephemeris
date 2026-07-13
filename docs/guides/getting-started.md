@@ -6,12 +6,17 @@
 pip install libephemeris
 ```
 
-The PyPI wheel includes a bundled LEB2 base-tier core (~10.6 MB, 14 bodies, 1850-2150). With the default `medium` tier, LEB2 files are auto-downloaded on first use (~119 MB). Bodies not covered by LEB2 are resolved via Horizons API or Skyfield.
+The PyPI wheel includes a bundled LEB2 base-tier core (~10.7 MB, 1850–2150).
+SHA-256-pinned medium and extended cores can be installed with
+`libephemeris download leb-medium` / `leb-extended`; additional modular groups
+are generated locally. Historical LEB1 files remain readable and their standard
+tier filenames are auto-discovered. JPL tier files can still be downloaded
+normally.
 
 For full offline coverage, download a complete precision tier (DE kernel + planet centers + minor-body SPKs):
 
 ```bash
-libephemeris download medium       # 1550-2650, ~200 MB total — recommended
+libephemeris download medium       # 1550-2650, >300 MB plus SPKs — recommended
 libephemeris download base         # 1850-2150, lightweight
 libephemeris download extended     # -13200 to +17191, full range
 ```
@@ -20,8 +25,8 @@ libephemeris download extended     # -13200 to +17191, full range
 
 ```bash
 pip install libephemeris[nbody]   # REBOUND/ASSIST n-body integration for TNOs
-pip install libephemeris[stars]   # Star catalog building (astropy)
-pip install libephemeris[all]     # All permissive-licensed extras
+pip install libephemeris[stars]   # Star-catalog tooling (astropy + astroquery)
+pip install libephemeris[all]     # Permissive runtime extras (currently astropy)
 pip install libephemeris[all,nbody]  # ... plus the GPL-licensed N-body extra (provenance-ok)
 ```
 

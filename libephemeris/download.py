@@ -4,8 +4,9 @@
 Data file download utilities for libephemeris.
 
 This module provides functionality to download optional data files that enhance
-precision for certain calculations. The main file is planet_centers.bsp which
-provides precise planet center positions for outer planets (Jupiter-Pluto).
+precision for certain calculations. Pinned, tier-specific planet-center SPKs
+provide precise outer-planet center positions. The only installable precomputed
+LEB asset is the reviewed core bundled in the wheel.
 
 Usage:
     # From command line
@@ -30,6 +31,7 @@ import ssl
 import sys
 import tempfile
 import urllib.request
+from importlib import resources
 from pathlib import Path
 from typing import Any, Optional
 
@@ -75,25 +77,32 @@ GITHUB_RELEASES = (
 
 # Data file definitions: (filename, sha256 hash, description)
 DATA_FILES: dict[str, dict[str, Any]] = {
-    # Legacy single file (kept for backward compatibility)
+    # Legacy destination name kept for API compatibility. It downloads the
+    # exact pinned base-tier SPK; there is no unverified legacy release path.
     "planet_centers.bsp": {
-        "url": f"{GITHUB_RELEASES}/planet_centers.bsp",
-        "sha256": None,  # Will be set after first release
+        "url": f"{GITHUB_RELEASES}/planet_centers_base.bsp",
+        "sha256": "a9ec744ff412b095129166587ea0814f81c850faebf92586a738cb5dc103c92a",
         "size_mb": 25.4,
-        "description": "Precise planet center positions for Jupiter, Saturn, Uranus, Neptune, Pluto (1989-2049)",
+        "description": (
+            "Base-tier planet-center offsets for Jupiter, Saturn, Uranus, "
+            "Neptune, and Pluto (per-body coverage varies; see descriptors)"
+        ),
     },
     # Tier-specific files
     "planet_centers_base.bsp": {
         "url": f"{GITHUB_RELEASES}/planet_centers_base.bsp",
         "sha256": "a9ec744ff412b095129166587ea0814f81c850faebf92586a738cb5dc103c92a",
         "size_mb": 25.4,
-        "description": "Planet centers for 'base' tier (1850-2150)",
+        "description": "Planet centers for 'base' tier (per-body coverage varies)",
     },
     "planet_centers_medium.bsp": {
         "url": f"{GITHUB_RELEASES}/planet_centers_medium.bsp",
-        "sha256": "b4fd366f2d00958ee3dd4a8884164d339674d5f7f2ea25c5f6959705c2b66852",
-        "size_mb": 72.6,
-        "description": "Planet centers for 'medium' tier (1550-2650)",
+        "sha256": "d3c34f5efe9223ef588ec59a8c59c1bd6619b0eab5d5e0b35c353d675efe7b4d",
+        "size_mb": 191.25,
+        "description": (
+            "Planet centers for 'medium' tier (Saturn/Uranus/Neptune "
+            "1550-2650; Jupiter 1600-2200; Pluto 1800-2200)"
+        ),
     },
     "planet_centers_extended.bsp": {
         "url": f"{GITHUB_RELEASES}/planet_centers_extended.bsp",
@@ -101,55 +110,21 @@ DATA_FILES: dict[str, dict[str, Any]] = {
         "size_mb": 222.6,
         "description": "Planet centers for 'extended' tier (partial -12000 to +17000)",
     },
-    # LEB (LibEphemeris Binary) precomputed ephemeris files
-    "ephemeris_base.leb": {
-        "url": f"{GITHUB_RELEASES}/ephemeris_base.leb",
-        "sha256": "006073f4c1b7926b94fb9137322dc5dd0939d079a12fd81b42e771c5a1c9cb61",
-        "size_mb": 53.1,
-        "description": "LEB binary ephemeris for 'base' tier (1850-2150, ~14x speedup)",
-    },
-    "ephemeris_medium.leb": {
-        "url": f"{GITHUB_RELEASES}/ephemeris_medium.leb",
-        "sha256": "dbd7239ac2aac96ce2dc33c322a5ff9bd9fd7b3d7ec5792cfba3250e6ab3b665",
-        "size_mb": 174.6,
-        "description": "LEB binary ephemeris for 'medium' tier (1550-2650, ~14x speedup)",
-    },
-    "ephemeris_extended.leb": {
-        "url": f"{GITHUB_RELEASES}/ephemeris_extended.leb",
-        "sha256": "8f3d9ca0efac7c8616041c96efa63fa0c64f375e5a4671cb37c70f98f0193a27",
-        "size_mb": 1603.6,
-        "description": "LEB binary ephemeris for 'extended' tier (-5000 to +5000, ~14x speedup)",
-    },
-    # LEB2 compressed modular files
+    # LEB2 compressed modular files. Every distributable core must name an
+    # immutable source and exact SHA-256. The regenerated base core ships in
+    # the wheel; medium/extended are pinned release assets.
+    # Unlisted companion artifacts remain unavailable.
     # Core (14 bodies): Sun-Pluto, Earth, Mean/True Node, Mean Apogee
     "base_core.leb2": {
-        "url": f"{GITHUB_RELEASES}/base_core.leb2",
-        "sha256": "8e81f5d69aabbea6a53bc693fa0949bc546ccd1f52dddc1393a382fdf4a8a3de",
-        "size_mb": 10.6,
+        # Ships in every wheel; installed from package resources.
+        "url": None,
+        "bundled_resource": "data/leb2/base_core.leb2",
+        "sha256": "a02b15344de946f8d0945c30c3ad47c3c1ce69f335af99e545c777fe9ec1bcfd",
+        "size_mb": 10.8,
         "description": "LEB2 core bodies for 'base' tier (1850-2150)",
         "dest_subdir": "leb",
     },
-    "base_asteroids.leb2": {
-        "url": f"{GITHUB_RELEASES}/base_asteroids.leb2",
-        "sha256": "a653443ffe662e54782b404ff736b92e441cac1643658a3b955c032333e7ce6a",
-        "size_mb": 8.7,
-        "description": "LEB2 asteroids for 'base' tier (Chiron, Ceres, Pallas, Juno, Vesta)",
-        "dest_subdir": "leb",
-    },
-    "base_apogee.leb2": {
-        "url": f"{GITHUB_RELEASES}/base_apogee.leb2",
-        "sha256": "abd436fd18c21650a95dee38c6e9879e69162620179be5e12062bd172ba0d657",
-        "size_mb": 11.4,
-        "description": "LEB2 apogee variants for 'base' tier (Oscu/Interp Apogee, Interp Perigee)",
-        "dest_subdir": "leb",
-    },
-    "base_uranians.leb2": {
-        "url": f"{GITHUB_RELEASES}/base_uranians.leb2",
-        "sha256": "0ea94c9591dc4e90831aec59bf8291075fdd36ad430a01b9cadfd1d6b45f3bab",
-        "size_mb": 2.1,
-        "description": "LEB2 Uranian hypotheticals for 'base' tier (Cupido-Transpluto)",
-        "dest_subdir": "leb",
-    },
+    # Medium/extended tier assets from the data-v1 release, SHA-256-pinned.
     "medium_core.leb2": {
         "url": f"{GITHUB_RELEASES}/medium_core.leb2",
         "sha256": "4655d490ed951bdfd214c0a94fc08e8113a724d99b5afb1a026400cc290e37ad",
@@ -157,53 +132,11 @@ DATA_FILES: dict[str, dict[str, Any]] = {
         "description": "LEB2 core bodies for 'medium' tier (1550-2650)",
         "dest_subdir": "leb",
     },
-    "medium_asteroids.leb2": {
-        "url": f"{GITHUB_RELEASES}/medium_asteroids.leb2",
-        "sha256": "14502a2710ec5aab42c5bceec3d3f12045b58c9d6d59568172b3760cad53a9ce",
-        "size_mb": 29.2,
-        "description": "LEB2 asteroids for 'medium' tier",
-        "dest_subdir": "leb",
-    },
-    "medium_apogee.leb2": {
-        "url": f"{GITHUB_RELEASES}/medium_apogee.leb2",
-        "sha256": "1c4d11ff90dd304a719a673f1a66d25f16529f5f3717154a6a739490b46bd193",
-        "size_mb": 42.1,
-        "description": "LEB2 apogee variants for 'medium' tier",
-        "dest_subdir": "leb",
-    },
-    "medium_uranians.leb2": {
-        "url": f"{GITHUB_RELEASES}/medium_uranians.leb2",
-        "sha256": "872873994c5ab904cd86f5aebce37ab4ce53aa727e4afd8a3731b4ac21596798",
-        "size_mb": 9.3,
-        "description": "LEB2 Uranian hypotheticals for 'medium' tier",
-        "dest_subdir": "leb",
-    },
     "extended_core.leb2": {
         "url": f"{GITHUB_RELEASES}/extended_core.leb2",
         "sha256": "38e244d2cbcbb216269f5ea97316b543966d368a8f62a507be669aae95003389",
         "size_mb": 334.9,
         "description": "LEB2 core bodies for 'extended' tier (-5000 to +5000)",
-        "dest_subdir": "leb",
-    },
-    "extended_asteroids.leb2": {
-        "url": f"{GITHUB_RELEASES}/extended_asteroids.leb2",
-        "sha256": "e7b9f5b51ec3321864774c4a622b190bda5a8502b1cb48e39e673da7260d35ba",
-        "size_mb": 86.2,
-        "description": "LEB2 asteroids for 'extended' tier",
-        "dest_subdir": "leb",
-    },
-    "extended_apogee.leb2": {
-        "url": f"{GITHUB_RELEASES}/extended_apogee.leb2",
-        "sha256": "e129b31582f0666ec335e0916695bef9e9d5bdf0ccd7735d235bcaa79f74b5af",
-        "size_mb": 391.7,
-        "description": "LEB2 apogee variants for 'extended' tier",
-        "dest_subdir": "leb",
-    },
-    "extended_uranians.leb2": {
-        "url": f"{GITHUB_RELEASES}/extended_uranians.leb2",
-        "sha256": "deda2a45ed3df0a7efec6867f9d180007c1a1979f466a552533e1675a6ca02fe",
-        "size_mb": 84.0,
-        "description": "LEB2 Uranian hypotheticals for 'extended' tier",
         "dest_subdir": "leb",
     },
 }
@@ -470,6 +403,57 @@ def download_file(
         raise
 
 
+def _install_bundled_file(
+    resource_path: str,
+    dest_path: Path,
+    *,
+    expected_sha256: str,
+) -> None:
+    """Atomically install a hash-pinned package resource into the data dir."""
+    source = resources.files("libephemeris").joinpath(resource_path)
+    if not source.is_file():
+        raise FileNotFoundError(f"Bundled data resource is missing: {resource_path}")
+
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_fd, temp_path = tempfile.mkstemp(dir=dest_path.parent, suffix=".bundled")
+    digest = hashlib.sha256()
+    try:
+        with source.open("rb") as src, os.fdopen(temp_fd, "wb") as dst:
+            temp_fd = -1
+            for chunk in iter(lambda: src.read(64 * 1024), b""):
+                dst.write(chunk)
+                digest.update(chunk)
+            dst.flush()
+            os.fsync(dst.fileno())
+        actual_sha256 = digest.hexdigest()
+        if actual_sha256 != expected_sha256:
+            raise ValueError(
+                "Bundled data hash mismatch: "
+                f"expected {expected_sha256}, got {actual_sha256}"
+            )
+        publish_temp_file(temp_path, dest_path)
+    except BaseException:
+        if temp_fd != -1:
+            try:
+                os.close(temp_fd)
+            except OSError:
+                pass
+        try:
+            os.unlink(temp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def _file_sha256(path: Path) -> str:
+    """Return the SHA-256 of a local file without loading it into memory."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def download_planet_centers(
     force: bool = False,
     show_progress: bool = True,
@@ -497,14 +481,23 @@ def download_planet_centers(
     dest_path = get_data_dir() / "planet_centers.bsp"
     logger = get_logger()
 
-    # Check if already exists and valid
+    # Check if the cached file is both structurally valid and byte-identical to
+    # the pinned base-tier artifact. A valid-looking legacy file is not enough.
     if dest_path.exists() and not force:
-        if _is_valid_bsp(str(dest_path)):
+        expected_sha256 = file_info.get("sha256")
+        hash_matches = isinstance(expected_sha256, str) and (
+            _file_sha256(dest_path) == expected_sha256
+        )
+        if _is_valid_bsp(str(dest_path)) and hash_matches:
             if not quiet:
                 print(f"planet_centers.bsp already exists at {dest_path}")
                 print("Use --force to re-download.")
             return dest_path
-        logger.warning("Cached file %s is corrupted, re-downloading", dest_path)
+        logger.warning(
+            "Cached file %s is corrupt or does not match the pinned SHA-256; "
+            "re-downloading",
+            dest_path,
+        )
         try:
             os.remove(dest_path)
         except OSError:
@@ -1007,10 +1000,8 @@ def print_data_status(as_json: bool = False, verbose: int = 0) -> None:
     # Setup hints
     _click.echo(_click.style("Commands", bold=True))
     _click.echo("  libephemeris download <tier>         Download DE kernel + SPKs")
-    _click.echo("  libephemeris download leb-<tier>     Download LEB1 binary ephemeris")
-    _click.echo(
-        "  libephemeris download leb2-<tier>    Download LEB2 compressed ephemeris"
-    )
+    _click.echo("  libephemeris download leb-<tier>     Install pinned core LEB asset")
+    _click.echo("  libephemeris download leb2-<tier>    Install reviewed LEB2 assets")
     _click.echo("  libephemeris download assist         Download ASSIST n-body data")
     _click.echo("  Available tiers: base, medium, extended")
 
@@ -1027,7 +1018,7 @@ def init_all(
 
     Downloads:
     1. DE440.bsp planetary ephemeris (~128 MB)
-    2. planet_centers.bsp precision data (~25 MB)
+    2. medium-tier planet-center precision data (~191 MB)
     3. SPK kernels for all minor bodies defined in SPK_BODY_NAME_MAP
        (default 1550-2650, 20-year chunks)
 
@@ -1281,7 +1272,7 @@ def download_for_tier(
     Sets the precision tier, then downloads:
     1. The tier's ephemeris file (de440s / de440 / de441)
     2. planet_centers.bsp precision offsets
-    3. SPK kernels for all 21 minor bodies (full tier date range)
+    3. SPK kernels for all bodies in ``SPK_BODY_NAME_MAP`` (full tier range)
 
     For the 'extended' tier, SPK files are downloaded as single max-range
     files (1600-2500) rather than chunked, since that's the full Horizons
@@ -1420,109 +1411,52 @@ def download_leb_for_tier(
     quiet: bool = False,
     activate: bool = True,
 ) -> Path:
-    """Download the precomputed LEB binary ephemeris file for a specific tier.
+    """Install and activate the reviewed core LEB asset for a tier.
 
-    Downloads the .leb file from GitHub Releases to ~/.libephemeris/leb/.
-    After a successful download, optionally activates it via set_leb_file().
-
-    LEB files contain precomputed Chebyshev polynomial approximations for
-    all celestial bodies, providing ~14x speedup over the Skyfield pipeline.
+    This compatibility entry point historically installed a monolithic LEB1
+    file.  Current reviewed distribution assets use the auto-detected LEB2 v2
+    format, so the function delegates to :func:`download_leb2_for_tier` and
+    returns that tier's core path. Existing user-supplied LEB1 files remain
+    fully supported by :func:`libephemeris.set_leb_file` and ``open_leb()``.
 
     Args:
         tier_name: One of "base", "medium", "extended"
-        force: If True, re-download even if file already exists
-        show_progress: If True, show progress bar during download
-        quiet: If True, suppress all output except errors
-        activate: If True, call set_leb_file() after successful download
+        force: Reinstall even if the cached file is valid.
+        show_progress: Show network download progress when applicable.
+        quiet: Suppress status output.
+        activate: Activate the installed core with ``set_leb_file()``.
 
     Returns:
-        Path to the downloaded LEB file
+        Path to the installed reviewed tier core (normally ``.leb2``).
 
     Raises:
-        ValueError: If tier_name is invalid or hash verification fails
-        urllib.error.URLError: If download fails
-        RuntimeError: If the LEB file has no download hash configured
+        ValueError: If ``tier_name`` is invalid.
+        RuntimeError: If no reviewed, hash-pinned core has been published for
+            the requested tier.
     """
-    logger = get_logger()
-    filename = f"ephemeris_{tier_name}.leb"
-    file_info = DATA_FILES.get(filename)
-
-    if file_info is None:
-        valid_tiers = ["base", "medium", "extended"]
+    valid_tiers = ("base", "medium", "extended")
+    if tier_name not in valid_tiers:
         raise ValueError(
             f"Unknown tier '{tier_name}'. Valid tiers: {', '.join(valid_tiers)}"
         )
-
-    # Guard: file must have a download hash configured
-    if file_info.get("sha256") is None:
-        raise RuntimeError(
-            f"LEB file for '{tier_name}' tier has no download hash configured. "
-            f"You can generate it locally with: leph leb generate {tier_name}"
-        )
-
-    dest_path = get_leb_path_for_tier(tier_name)
-
-    # Check if already exists and valid
-    if dest_path.exists() and not force:
-        if _is_valid_leb(str(dest_path)):
-            if not quiet:
-                print(f"  {filename} already exists at {dest_path}")
-                print("  Use --force to re-download.")
-            # Activate if requested
-            if activate:
-                from .state import set_leb_file
-
-                set_leb_file(str(dest_path))
-            return dest_path
-        else:
-            logger.warning("Cached LEB file %s is corrupted, re-downloading", dest_path)
-            try:
-                os.remove(dest_path)
-            except OSError:
-                pass
-
-    size_mb = file_info.get("size_mb", 0)
-    if not quiet:
-        print(f"  Downloading {filename} (~{size_mb:.0f} MB)...")
-        print(f"  {file_info['description']}")
-        print()
-
-    # download_file streams to a temp file and only replaces dest_path
-    # after the hash verifies, so a failure here leaves any existing
-    # (force=True) valid file untouched — do not delete dest_path.
-    download_file(
-        url=str(file_info["url"]),
-        dest_path=dest_path,
-        description=filename,
-        expected_sha256=str(file_info["sha256"]),
+    installed = download_leb2_for_tier(
+        tier_name,
+        groups=["core"],
+        force=force,
         show_progress=show_progress,
+        quiet=quiet,
+        activate=activate,
     )
-
-    # Validate the downloaded file
-    if not _is_valid_leb(str(dest_path)):
-        try:
-            os.remove(dest_path)
-        except OSError:
-            pass
-        raise ValueError(
-            f"Downloaded {filename} failed LEB validation — corrupt or incompatible"
-        )
-
-    if not quiet:
-        print()
-        print(f"  Downloaded to: {dest_path}")
-        print(f"  LEB binary ephemeris for '{tier_name}' tier is now available.")
-        if activate:
-            print("  Activated automatically for this session.")
-
-    # Activate if requested
-    if activate:
-        from .state import set_leb_file
-
-        set_leb_file(str(dest_path))
-        logger.info("Activated LEB file: %s", dest_path)
-
-    return dest_path
+    core_name = f"{tier_name}_core.leb2"
+    for path in installed:
+        if Path(path).name == core_name:
+            return Path(path)
+    raise RuntimeError(
+        f"No reviewed, SHA-256-pinned LEB core is published for tier "
+        f"'{tier_name}'. Generate it locally with "
+        f"'leph leb generate {tier_name}' until the reviewed release asset is "
+        "listed in DATA_FILES."
+    )
 
 
 # Canonical distribution groups (incl. exotics). A group with no DATA_FILES
@@ -1539,22 +1473,31 @@ def download_leb2_for_tier(
     quiet: bool = False,
     activate: bool = True,
 ) -> list:
-    """Download LEB2 compressed modular ephemeris files for a tier.
+    """Install LEB2 compressed modular ephemeris files for a tier.
 
-    Downloads group files (core, asteroids, exotics, apogee, uranians)
-    from GitHub Releases to ~/.libephemeris/leb/.
+    Bundled assets are copied from the installed package; remote assets are
+    accepted only when their URL and SHA-256 are both present in ``DATA_FILES``.
+    This keeps publication fail-closed while allowing independently regenerated
+    medium and extended cores to use the same installer once reviewed.
 
     Args:
         tier_name: One of "base", "medium", "extended"
         groups: List of groups to download. Default: all groups.
-        force: Re-download even if files exist.
-        show_progress: Show progress bars.
+        force: Reinstall even if files exist.
+        show_progress: Retained for API compatibility; bundled installs do not
+            display a network progress bar.
         quiet: Suppress output.
         activate: Activate the core file via set_leb_file() after download.
 
     Returns:
-        List of downloaded file paths.
+        List of installed file paths.
     """
+    valid_tiers = ("base", "medium", "extended")
+    if tier_name not in valid_tiers:
+        raise ValueError(
+            f"Unknown tier '{tier_name}'. Valid tiers: {', '.join(valid_tiers)}"
+        )
+
     logger = get_logger()
     if groups is None:
         groups = list(LEB2_GROUPS)
@@ -1571,30 +1514,49 @@ def download_leb2_for_tier(
             continue
 
         dest_path = leb_dir / filename
+        bundled_resource = file_info.get("bundled_resource")
+        remote_url = file_info.get("url")
+        expected_sha256 = file_info.get("sha256")
+        if not isinstance(expected_sha256, str) or not expected_sha256:
+            if not quiet:
+                print(f"  [SKIP] {filename}: no reviewed SHA-256 pin")
+            continue
+        if not isinstance(bundled_resource, str) and not isinstance(remote_url, str):
+            if not quiet:
+                print(f"  [SKIP] {filename}: no reviewed distribution source")
+            continue
 
         if dest_path.exists() and not force:
             if _is_valid_leb(str(dest_path)):
+                hash_matches = _file_sha256(dest_path) == expected_sha256
+                if hash_matches:
+                    if not quiet:
+                        print(f"  [OK] {filename} already exists")
+                    downloaded.append(dest_path)
+                    continue
                 if not quiet:
-                    print(f"  [OK] {filename} already exists")
-                downloaded.append(dest_path)
-                continue
+                    print(f"  [UPDATE] {filename}: replacing unreviewed cached core")
 
         size_mb = file_info.get("size_mb", 0)
         if not quiet:
-            print(f"  Downloading {filename} (~{size_mb:.0f} MB)...")
+            print(f"  Installing {filename} (~{size_mb:.0f} MB)...")
 
         try:
-            download_file(
-                url=str(file_info["url"]),
-                dest_path=dest_path,
-                description=filename,
-                expected_sha256=file_info.get("sha256"),
-                show_progress=show_progress and not quiet,
-            )
-            # Validate the downloaded file (download_file only checks the hash
-            # when one is present; a DATA_FILES entry without a sha256 would
-            # otherwise let a truncated/corrupt file through). Mirror
-            # download_leb_for_tier / _download_planet_centers_for_tier.
+            if isinstance(bundled_resource, str):
+                _install_bundled_file(
+                    bundled_resource,
+                    dest_path,
+                    expected_sha256=expected_sha256,
+                )
+            else:
+                download_file(
+                    url=str(remote_url),
+                    dest_path=dest_path,
+                    description=filename,
+                    show_progress=show_progress,
+                    expected_sha256=expected_sha256,
+                )
+            # Validate the installed file independently of its pinned hash.
             if not _is_valid_leb(str(dest_path)):
                 try:
                     dest_path.unlink()
@@ -1655,12 +1617,20 @@ def _download_planet_centers_for_tier(
     dest_path = get_data_dir() / filename
 
     if dest_path.exists() and not force:
-        if _is_valid_bsp(str(dest_path)):
+        expected_sha256 = file_info.get("sha256")
+        hash_matches = isinstance(expected_sha256, str) and (
+            _file_sha256(dest_path) == expected_sha256
+        )
+        if _is_valid_bsp(str(dest_path)) and hash_matches:
             if not quiet:
                 print(f"  {filename} already exists at {dest_path}")
             return dest_path
         else:
-            logger.warning("Cached file %s is corrupted, re-downloading", dest_path)
+            logger.warning(
+                "Cached file %s is corrupt or does not match the pinned "
+                "SHA-256; re-downloading",
+                dest_path,
+            )
             try:
                 os.remove(dest_path)
             except OSError:

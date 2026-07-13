@@ -5,14 +5,27 @@ LibEphemeris is a high-precision astronomical ephemeris library for Python, prov
 VERY IMPORTANT:
 *Keep always 1:1 compatibility with PySwissEphemeris.*
 
+## Independence
+
+LibEphemeris is 100% independent. Every implementation, model, and data file
+is derived from NASA JPL/IAU data and standards, cited primary literature,
+and permissively licensed sources.
+
+- Never inspect, retrieve, possess, read, translate, adapt, or copy Swiss
+  Ephemeris source code, source comments, documentation prose, algorithms, or
+  data files. Reference-distribution files must not enter this repository.
+- The reference API may be used only for ephemeral behavioral comparison:
+  call its public API and compare outputs. Never persist, fit, or commit
+  those outputs.
+- Run `uv run python scripts/check_provenance.py` for integrity checks.
+
 ## Commands
 
 Uses `uv` for dependencies and `poe` (poethepoet) for task running.
 
 The `leph` dev CLI is repo tooling and is not shipped in wheels: from a
 source checkout use `./leph`, `python -m libephemeris.dev_cli`, or
-`poe leph -- <args>` (an installed editable venv may still expose a
-`leph` script).
+`poe leph -- <args>`. No `leph` console entry point is installed.
 
 ```bash
 uv pip install -e ".[dev]"        # Install with dev dependencies
@@ -28,24 +41,22 @@ poe typecheck                     # mypy
 ```bash
 pytest tests/test_file.py -v                          # Single file
 pytest tests/test_file.py::TestClass::test_method -v  # Single test
-pytest -k "pattern" -v                                # By keyword
+pytest tests/test_file.py -k "pattern" -v             # By keyword within one file
 
 # Skyfield backend (main unit test suite)
-poe test:skyfield:core       # Essential ~490 tests, ~20s (parallel)
-poe test:skyfield:fast       # All unit tests ~5890, ~1 min (parallel, no @slow)
-poe test:skyfield:full       # ALL tests including @slow (parallel)
+poe test:skyfield:core       # Essential ~900 tests, ~20s (parallel)
+poe test:skyfield:fast       # All unit tests ~16,000, ~1 min (parallel, no @slow)
 
 # LEB backend (precomputed Chebyshev ephemeris, ~14x faster)
-poe test:leb:core            # LEB essential ~490 tests, ~20s (parallel)
-poe test:leb:fast            # LEB unit tests ~5890, ~1 min (parallel, no @slow) [RECOMMENDED]
-poe test:leb:full            # LEB ALL unit tests including @slow (sequential)
+poe test:leb:core            # LEB essential ~900 tests, ~20s (parallel)
+poe test:leb:fast            # LEB unit tests ~16,000, ~1 min (parallel, no @slow) [RECOMMENDED]
 
 # Feature-specific suites (via leph CLI)
-leph test lunar all          # All lunar tests (nodes, Lilith, perigee, apogee), no @slow
-leph test lunar perigee      # Perigee tests only
-leph test lunar apogee       # Apogee tests only
-leph test lunar lilith       # Lilith tests only (7 files)
-leph test leb2-format all    # LEB2 format unit tests (compression + reader)
+./leph test lunar all          # All lunar tests (nodes, Lilith, perigee, apogee), no @slow
+./leph test lunar perigee      # Perigee tests only
+./leph test lunar apogee       # Apogee tests only
+./leph test lunar lilith       # Lilith tests only (7 files)
+./leph test leb2-format all    # LEB2 format unit tests (compression + reader)
 ```
 
 ## Code Style
@@ -74,13 +85,22 @@ LEB Chebyshev approximation error vs Skyfield reference, per body group and tier
 | **Planets** (Sun-Pluto, Earth) | <0.001" | <0.001" | <0.001" |
 | **Moon** | <0.001" (0.000332") | <0.001" (0.000325") | <0.001" |
 | **Asteroids** (Chiron-Vesta) | <0.001" (0.000045") | <0.001" (0.000036") | <0.001" |
-| **Ecliptic** (Nodes, Lilith) | <0.001" (0.000049") | <0.001" (0.000075") | <0.001" modern, <0.005" extreme dates |
-| **IntpApog/IntpPerig** | ~1-2° (pre-regen) | ~1-2° (pre-regen) | ~1-2° (pre-regen) |
+| **Ecliptic** (Nodes, Lilith) | <0.001" (0.000049") | <0.001" (0.000075") | <0.001" modern, up to 0.054" extreme dates |
+| **IntpApog/IntpPerig** | Covered by the ecliptic tolerance | Covered by the ecliptic tolerance | Covered by the 0.1" extreme-date tolerance |
 | **Uranians** | ~0.000000" | ~0.000000" | ~0.000000" |
 
-**Precession at extreme dates**: the apparent-place reduction uses the **Vondrák 2011** long-term precession (valid ±200,000 years), via pyerfa — see `libephemeris/precession_vondrak.py`. This replaced the IAU 2006 precession (only valid a few centuries from J2000, ~36" off for the Sun at year -3000) and matches Swiss Ephemeris's precession model. Modern results are unchanged (Vondrák ≡ IAU 2006 to <1 mas near J2000).
+**Precession at extreme dates**: the apparent-place reduction uses the
+**Vondrák 2011** long-term precession through ERFA; see
+`libephemeris/precession_vondrak.py`. Near J2000 it converges with the IAU 2006
+model, while its published validity interval makes it suitable for the extended
+DE441 tier.
 
-**Known limitations at extreme dates**: (1) the nutation series still adds ~0.003" of degradation beyond ±2000 years (a physical limit, not a Chebyshev fit error; test floor 0.005" for extended extreme-date tests). (2) Versus pyswisseph specifically, the underlying ephemeris differs (libephemeris DE441 vs Swiss .se1/DE431), an irreducible floor of tens-to-hundreds of arcsec for planets at deep-BCE dates that Vondrák does NOT remove (e.g. Mars ~600" at -3000). For the Sun this floor is small (~6" at -3000 once precession and ΔT are accounted for).
+**Known limitations at extreme dates**: nutation and Earth-orientation models
+have narrower published validity intervals than DE441. Treat deep-time apparent
+coordinates as model-dependent even when the underlying barycentric state is
+within kernel coverage. Compatibility checks may use the public reference API
+only ephemerally; no per-date outputs or fitted corrections belong in this
+repository.
 
 **Asteroid SPK coverage**: Safe range 1920-2080 CE. Outside this range, SPK data is unavailable and calculations use Keplerian fallback (catastrophically wrong for LEB compare tests). Test dates are filtered to this range.
 
@@ -105,7 +125,12 @@ Runtime always uses a **single merged file** for LEB1. See `docs/leb/guide.md` f
 
 ## LEB2 Compressed Format
 
-LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major reorder + byte shuffle + zstd) to achieve 4-10x compression while maintaining <0.001" precision vs LEB1.
+LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major
+reorder + byte shuffle + zstd) to achieve 4-10x compression. The core
+end-to-end gate requires <0.001" angular agreement with LEB1; the direct
+verifier reports normalized per-component errors in native stored units
+(AU for Cartesian ICRS; degrees/degrees/AU for ecliptic data), after checking
+the declared inventory and per-body metadata against LEB1.
 
 ### Architecture
 
@@ -116,17 +141,20 @@ LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major reo
 | `libephemeris/leb_composite.py` | `CompositeLEBReader` — wraps multiple LEB files, dispatches by body_id |
 | `libephemeris/leb_reader.py` | `open_leb()` factory auto-detects LEB1/LEB2 via magic bytes |
 | `scripts/generate_leb2.py` | LEB2 conversion engine (invoked via `leph leb2`) |
-| `scripts/test_leb2_precision.py` | Fast precision test: all bodies x 6 flags x N dates per tier |
+| `scripts/test_leb2_precision.py` | Fast precision test: 14 core bodies x 6 flags x N dates per tier |
 
 ### Body Groups
 
 | Group | Bodies | Base size |
 |-------|--------|-----------|
-| `core` | Sun-Pluto, Earth, Mean/True Node, Mean Apogee (14) | ~10.6 MB |
+| `core` | Sun-Pluto, Earth, Mean/True Node, Mean Apogee (14) | ~10.7 MB |
 | `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | ~8.7 MB |
 | `apogee` | OscuApog, IntpApog, IntpPerig (3) | ~11.4 MB |
-| `uranians` | Cupido-Transpluto (9) | ~2.1 MB |
 | `exotics` | Centaurs, TNOs, NEAs (31) | ~59.0 MB |
+
+The former precomputed `uranians` LEB group is not shipped. Hypothetical bodies
+are evaluated by the analytical runtime registry; each row carries a source
+annotation checked by the integrity gate.
 
 ### Per-body Precision Targets (`BODY_TARGET_AU` in `leb_compression.py`)
 
@@ -136,11 +164,12 @@ Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amp
 
 ```bash
 poe leb2:convert:base              # Convert LEB1 -> LEB2 (all 5 groups)
-leph leb2 convert base-core        # Core group only (~10.6 MB)
-poe leb2:verify:base               # Verify against LEB1
-leph test leb2-format all          # Unit tests (compression + reader)
-leph test leb2-format precision-base   # Fast precision test (~15s)
-leph test leb2-format precision-all    # All tiers (~45s)
+./leph leb2 convert base-core      # Core group only (~10.7 MB)
+./leph leb2 convert base-exotics   # Exotic registry group only
+poe leb2:verify:base               # Verify base_core.leb2 against LEB1
+./leph test leb2-format all             # Unit tests (compression + reader)
+./leph test leb2-format precision-base  # Fast precision test
+./leph test leb2-format precision-all   # Core companions, all tiers
 ```
 
 ### Full documentation
@@ -157,7 +186,7 @@ Zero-install ephemeris via NASA JPL Horizons REST API. Used automatically in `"a
 | Mode | Flow | Fails when |
 |------|------|-----------|
 | `"auto"` (default) | LEB → Horizons (if no DE440) → Skyfield | never (always has fallback) |
-| `"leb"` | Require LEB (auto-discovered or auto-downloaded if needed); unsupported bodies/flags fall back to Skyfield | no LEB resolvable |
+| `"leb"` | Require an explicitly configured LEB or the hash-pinned bundled base core; unsupported bodies/flags fall back to Skyfield | no LEB resolvable |
 | `"horizons"` | Prefer Horizons; unsupported bodies/flags fall back to Skyfield | no internet |
 | `"skyfield"` | Always Skyfield/DE440 | DE440 not downloaded |
 
@@ -181,16 +210,17 @@ Set via `set_calc_mode()` or env var `LIBEPHEMERIS_MODE`.
 ### Full documentation
 - `proposals/horizons-live-backend.md` — Original proposal with detailed design
 
-## Lunar Calibration Workflow
+## Independent Lunar Model Workflow
 
-The calibration/generation tooling (which fits coefficients against the reference
-ephemeris as a black-box oracle) now lives in the **separate `validation/` repo**,
-not in this library. Workflow:
+Mean lunar points use ERFA's implementation of the IERS 2003 Delaunay
+arguments and conventional inclined-orbit geometry. Interpolated apsides are
+anchored to the actual JPL DE440 apsis passages: a Delaunay series fitted at
+the passages plus residual tables, regenerated only by
+`scripts/generate_lunar_apse_model.py` and pinned by SHA-256.
 
-1. From `validation/`: run the perigee calibration (`validation/calibrate/calibrate_perigee_perturbations.py`)
-2. Paste coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`
-3. From `validation/`: regenerate the residual table (`validation/calibrate/generate_lunar_apse_corrections.py --write`),
-   which rewrites `lunar_apse_corrections.py` (the live residual table) in this repo
-4. `leph test lunar perigee` (the reference-free perigee tests in this repo)
+For lunar changes, document the JPL/IAU or primary-literature basis, run
+the targeted lunar tests, and run
+`uv run python scripts/check_provenance.py` before release.
 
-See `docs/methodology/interpolated-perigee.md` for the full methodology.
+See `docs/methodology/independence.md` and
+`docs/methodology/interpolated-perigee.md` for the methodology.

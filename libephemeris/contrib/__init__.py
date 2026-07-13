@@ -218,16 +218,48 @@ SQUISQUARE: float = 22.5
 # =============================================================================
 
 _RASI_NAMES = (
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+    "Aries",
+    "Taurus",
+    "Gemini",
+    "Cancer",
+    "Leo",
+    "Virgo",
+    "Libra",
+    "Scorpio",
+    "Sagittarius",
+    "Capricorn",
+    "Aquarius",
+    "Pisces",
 )
 
 _NAKSHATRA_NAMES = (
-    "Aswini", "Bharani", "Kritikha", "Rohini", "Mrigasira", "Aridra",
-    "Punarvasu", "Pushyami", "Aslesha", "Makha", "Pubba", "Uttara",
-    "Hasta", "Chitta", "Swathi", "Vishaka", "Anuradha", "Jyesta",
-    "Moola", "Poorvashada", "Uttarashada", "Sravana", "Dhanishta",
-    "Satabisha", "Poorvabhadra", "Uttarabhadra", "Revathi",
+    "Aswini",
+    "Bharani",
+    "Kritikha",
+    "Rohini",
+    "Mrigasira",
+    "Aridra",
+    "Punarvasu",
+    "Pushyami",
+    "Aslesha",
+    "Makha",
+    "Pubba",
+    "Uttara",
+    "Hasta",
+    "Chitta",
+    "Swathi",
+    "Vishaka",
+    "Anuradha",
+    "Jyesta",
+    "Moola",
+    "Poorvashada",
+    "Uttarashada",
+    "Sravana",
+    "Dhanishta",
+    "Satabisha",
+    "Poorvabhadra",
+    "Uttarabhadra",
+    "Revathi",
 )
 
 _HOUSE_SYSTEM_NAMES = {
@@ -328,7 +360,9 @@ def rasi_dif2(r1: int, r2: int) -> int:
     return d
 
 
-def antiscion(lon: float) -> tuple[
+def antiscion(
+    lon: float,
+) -> tuple[
     tuple[float, float, float, float, float, float],
     tuple[float, float, float, float, float, float],
 ]:
@@ -410,18 +444,18 @@ def house_system_name(code: str) -> str:
 # Domicile lordship: which planet rules each sign (Vedic tradition)
 # Indices match RASI codes; values are Vedic planet ids.
 _RASI_LORDS = (
-    KUJA,    # Aries  - Mars
-    SUKRA,   # Taurus - Venus
-    BUDHA,   # Gemini - Mercury
-    CHANDRA, # Cancer - Moon
-    SURYA,   # Leo    - Sun
-    BUDHA,   # Virgo  - Mercury
-    SUKRA,   # Libra  - Venus
-    KUJA,    # Scorpio- Mars
-    GURU,    # Sagittarius - Jupiter
-    SANI,    # Capricorn   - Saturn
-    SANI,    # Aquarius    - Saturn
-    GURU,    # Pisces - Jupiter
+    KUJA,  # Aries  - Mars
+    SUKRA,  # Taurus - Venus
+    BUDHA,  # Gemini - Mercury
+    CHANDRA,  # Cancer - Moon
+    SURYA,  # Leo    - Sun
+    BUDHA,  # Virgo  - Mercury
+    SUKRA,  # Libra  - Venus
+    KUJA,  # Scorpio- Mars
+    GURU,  # Sagittarius - Jupiter
+    SANI,  # Capricorn   - Saturn
+    SANI,  # Aquarius    - Saturn
+    GURU,  # Pisces - Jupiter
 )
 
 
@@ -442,9 +476,7 @@ _EXALTATION = {
 }
 
 # Debilitation degree: 180° away from exaltation.
-_DEBILITATION = {
-    p: ((sign + 6) % 12, deg) for p, (sign, deg) in _EXALTATION.items()
-}
+_DEBILITATION = {p: ((sign + 6) % 12, deg) for p, (sign, deg) in _EXALTATION.items()}
 
 
 def ochchabala(planet: int, longitude: float) -> float:
@@ -480,13 +512,13 @@ def residential_strength(deg: float) -> float:
 #   2 = friend, 1 = neutral, 0 = enemy
 # Order: from <- to for the table key.
 _NAISARGIKA = {
-    SURYA:  {SURYA: 1, CHANDRA: 2, KUJA: 2, BUDHA: 1, GURU: 2, SUKRA: 0, SANI: 0},
-    CHANDRA:{SURYA: 2, CHANDRA: 1, KUJA: 1, BUDHA: 2, GURU: 1, SUKRA: 1, SANI: 1},
-    KUJA:   {SURYA: 2, CHANDRA: 2, KUJA: 1, BUDHA: 0, GURU: 2, SUKRA: 1, SANI: 1},
-    BUDHA:  {SURYA: 2, CHANDRA: 0, KUJA: 1, BUDHA: 1, GURU: 1, SUKRA: 2, SANI: 1},
-    GURU:   {SURYA: 2, CHANDRA: 2, KUJA: 2, BUDHA: 0, GURU: 1, SUKRA: 0, SANI: 1},
-    SUKRA:  {SURYA: 0, CHANDRA: 0, KUJA: 1, BUDHA: 2, GURU: 1, SUKRA: 1, SANI: 2},
-    SANI:   {SURYA: 0, CHANDRA: 0, KUJA: 0, BUDHA: 2, GURU: 1, SUKRA: 2, SANI: 1},
+    SURYA: {SURYA: 1, CHANDRA: 2, KUJA: 2, BUDHA: 1, GURU: 2, SUKRA: 0, SANI: 0},
+    CHANDRA: {SURYA: 2, CHANDRA: 1, KUJA: 1, BUDHA: 2, GURU: 1, SUKRA: 1, SANI: 1},
+    KUJA: {SURYA: 2, CHANDRA: 2, KUJA: 1, BUDHA: 0, GURU: 2, SUKRA: 1, SANI: 1},
+    BUDHA: {SURYA: 2, CHANDRA: 0, KUJA: 1, BUDHA: 1, GURU: 1, SUKRA: 2, SANI: 1},
+    GURU: {SURYA: 2, CHANDRA: 2, KUJA: 2, BUDHA: 0, GURU: 1, SUKRA: 0, SANI: 1},
+    SUKRA: {SURYA: 0, CHANDRA: 0, KUJA: 1, BUDHA: 2, GURU: 1, SUKRA: 1, SANI: 2},
+    SANI: {SURYA: 0, CHANDRA: 0, KUJA: 0, BUDHA: 2, GURU: 1, SUKRA: 2, SANI: 1},
 }
 
 
@@ -547,7 +579,9 @@ def saturn_4_stars(jd: float) -> tuple[float, float, float, float]:
             # remains the documented signal for "value unavailable".
             _logger.debug(
                 "saturn_4_stars: fixstar_ut(%r) failed at jd=%.6f: %s",
-                name, jd, exc,
+                name,
+                jd,
+                exc,
             )
             out.append(_math.nan)
     return tuple(out)  # type: ignore[return-value]
@@ -561,8 +595,7 @@ def saturn_4_stars(jd: float) -> tuple[float, float, float, float]:
 def jdnow() -> float:
     """Return the current Julian Day (UT) at the moment of call."""
     now = _dt.datetime.now(_dt.timezone.utc)
-    frac = (now.hour + now.minute / 60.0 + now.second / 3600.0
-            + now.microsecond / 3.6e9)
+    frac = now.hour + now.minute / 60.0 + now.second / 3600.0 + now.microsecond / 3.6e9
     return _julday(now.year, now.month, now.day, frac)
 
 
@@ -772,9 +805,7 @@ def next_aspect(
         matters, or post-process the returned JD with a bisection of
         your own.
     """
-    return _walk_until_aspect(
-        jd_start, body, target_lon, aspect, orb, 0.5, 365.25 * 3
-    )
+    return _walk_until_aspect(jd_start, body, target_lon, aspect, orb, 0.5, 365.25 * 3)
 
 
 def next_aspect2(

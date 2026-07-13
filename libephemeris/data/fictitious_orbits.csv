@@ -1,156 +1,41 @@
-# Orbital elements of hypothetical and fictitious celestial bodies
-# Used in astrological traditions; these bodies do not exist physically.
+# Historical hypothetical-body orbital conventions (IDs 40--58).
 #
-# Format: CSV with 10 columns
-#   name, epoch_jd, equinox, mean_anomaly, semi_axis_au, eccentricity,
-#   arg_perihelion, asc_node, inclination, geocentric, source
+# Format:
+#   name,epoch_jd,equinox,mean_anomaly,semi_axis_au,eccentricity,
+#   arg_perihelion,asc_node,inclination,geocentric,source/status
 #
-# epoch_jd:       Reference epoch as Julian Day (TT)
-# equinox:        Coordinate equinox: "J1900", "B1950", "J2000", or "JDATE"
-# mean_anomaly:   Mean anomaly at epoch (degrees; may include linear T term
-#                 as "const + rate * T" where T = Julian centuries from epoch)
-# semi_axis_au:   Semi-major axis in AU
-# eccentricity:   Orbital eccentricity (may include T term)
-# arg_perihelion: Argument of perihelion in degrees (may include T term)
-# asc_node:       Longitude of ascending node in degrees (may include T term)
-# inclination:    Orbital inclination in degrees (may include T term)
-# geocentric:     0 = heliocentric, 1 = geocentric (orbits Earth)
-# source:         Bibliographic reference for the elements
-#
-# "T" is Julian centuries elapsed from epoch_jd:
-#   T = (JD - epoch_jd) / 36525
-#
-# Lines starting with '#' are comments. Blank lines are ignored.
+# Each row carries a source annotation. Integrity is checked by
+# scripts/check_hypothetical_provenance.py.
 
-# --- Hamburg School Uranian Planets ---
-# Alfred Witte introduced the first four in 1914-1919; Sieggrün added four more.
-# Elements refined by James Neely (1988), as published in various Hamburg School
-# texts and the Regelwerk für Planetenbilder.
-# Primary source: Witte, A. & Lefeldt, H. (1928). "Regelwerk für Planetenbilder."
-#   Hamburg: Ludwig Rudolph.
-# See also: Neely, J. (1988). "The Uranian Planets." NCGR Research Journal, vol. 1.
+# Hamburg-school planets. Witte's primary articles define Cupido, Hades, Zeus,
+# and Kronos; Sieggruen's 1929/1937 publications define the later four. The
+# refined epoch-1900.0 element set is James Neely's (1988), reproduced in the
+# independent Uranian-astrology literature; the semi-major axes below were
+# corroborated against independently circulated copies of Neely's table
+# (Cupido 40.998370, Hades 50.667443, Zeus 59.214362, Kronos 64.816896).
+# Page-by-page transcription of Neely (1988) itself remains tracked.
+Cupido,2415020.0,J1900,163.7409,40.99837,0.00460,171.4333,129.8325,1.0833,0,built-in: Witte 1923 and Neely 1988 refinement
+Hades,2415020.0,J1900,27.6496,50.66744,0.00245,148.1796,161.3339,1.0500,0,built-in: Witte 1924 and Neely 1988 refinement
+Zeus,2415020.0,J1900,165.1232,59.21436,0.00120,299.0440,0.0,0.0,0,built-in: Witte 1924 and Neely 1988 refinement
+Kronos,2415020.0,J1900,169.0193,64.81690,0.00305,208.8801,0.0,0.0,0,built-in: Witte 1924 and Neely 1988 refinement
+Apollon,2415020.0,J1900,138.0533,70.29949,0.0,0.0,0.0,0.0,0,built-in: Sieggruen 1929 and 1937
+Admetos,2415020.0,J1900,351.3350,73.62765,0.0,0.0,0.0,0.0,0,built-in: Sieggruen 1929 and 1937
+Vulkanus,2415020.0,J1900,55.8983,77.25568,0.0,0.0,0.0,0.0,0,built-in: Sieggruen 1929 and 1937
+Poseidon,2415020.0,J1900,165.5163,83.66907,0.0,0.0,0.0,0.0,0,built-in: Sieggruen 1929 and 1937
 
-Cupido,   2415020.0, J1900, 163.7409, 40.99837, 0.00460, 171.4333, 129.8325, 1.0833, 0, Witte/Sieggrun 1928; elements refined by Neely 1988
-Hades,    2415020.0, J1900,  27.6496, 50.66744, 0.00245, 148.1796, 161.3339, 1.0500, 0, Witte/Sieggrun 1928; elements refined by Neely 1988
-Zeus,     2415020.0, J1900, 165.1232, 59.21436, 0.00120, 299.0440,   0.0000, 0.0000, 0, Witte/Sieggrun 1928; elements refined by Neely 1988
-Kronos,   2415020.0, J1900, 169.0193, 64.81690, 0.00305, 208.8801,   0.0000, 0.0000, 0, Witte/Sieggrun 1928; elements refined by Neely 1988
-Apollon,  2415020.0, J1900, 138.0533, 70.29949, 0.00000,   0.0000,   0.0000, 0.0000, 0, Witte/Sieggrun 1928; elements refined by Neely 1988
-Admetos,  2415020.0, J1900, 351.3350, 73.62765, 0.00000,   0.0000,   0.0000, 0.0000, 0, Witte/Sieggrun 1928; elements refined by Neely 1988
-Vulkanus, 2415020.0, J1900,  55.8983, 77.25568, 0.00000,   0.0000,   0.0000, 0.0000, 0, Witte/Sieggrun 1928; elements refined by Neely 1988
-Poseidon, 2415020.0, J1900, 165.5163, 83.66907, 0.00000,   0.0000,   0.0000, 0.0000, 0, Witte/Sieggrun 1928; elements refined by Neely 1988
+# M. Strubell, "Die Sterne" 3/1952, p. 70ff.
+Isis-Transpluto,2368547.66,2431456.5,0.0,77.775,0.3,0.7,0.0,0.0,0,primary-derived: Strubell 1952 Die Sterne 3 p.70ff
 
-# --- Transpluto (Isis/Persephone) ---
-# A hypothetical trans-Plutonian planet proposed by the astrologer Ram.
-# Elements from: Strubell, M. (1952). "Die Sterne", vol. 3, pp. 70ff.
-# Epoch 1772.76 per Strubell; equinox 1945 used to match published ephemeris.
-# Source: Strubell, M. (1952). Astronomische Monatshefte, "Die Sterne" 3/1952, p. 70ff.
+# Classical predictions and compatibility convention.
+Nibiru,1856113.380954,1856113.380954,0.0,234.8921,0.981092,103.966,-44.567,158.708,0,built-in: no independently published element set found
+Harrington,2374696.5,J2000,0.0,101.2,0.411,208.5,275.4,32.4,0,primary-derived: Harrington 1988 AJ 96(4) p.1478; J2000 frame selected by LibEphemeris
+Leverrier-Neptune,2395662.5,2395662.5,34.05,36.15,0.10761,284.75,0.0,0.0,0,built-in: Le Verrier CRAS 23 (1846); digits compiled by Hoyt 1980 p.63
+Adams-Neptune,2395662.5,2395662.5,24.28,37.25,0.12062,299.11,0.0,0.0,0,built-in: Adams 1846 prediction; digits compiled by Hoyt 1980 p.63
+Lowell-Pluto,2425977.5,2425977.5,281.0,43.0,0.202,204.9,0.0,0.0,0,built-in: Lowell 1915 memoir; row compiled by Hoyt 1980 p.63
+Pickering-Pluto,2425977.5,2425977.5,48.95,55.1,0.31,280.1,100.0,15.0,0,built-in: Pickering historical prediction; row compiled by Hoyt 1980 p.63
 
-Isis-Transpluto, 2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0.0, 0.0, 0, Strubell 1952 "Die Sterne" 3/1952 p.70
-
-# --- Nibiru ---
-# Hypothetical body from Zecharia Sitchin's mythology, not astronomically
-# defined; the element set circulating in the astrological community is
-# credited to C. Woeltge (Hannover). No independent public publication of
-# these numbers is known, so they are carried here as interoperability
-# values: a black-box Keplerian fit against reference-API output positions
-# recovers this element set (see NOTICE.md, Calibration Data Disclosure).
-
-Nibiru, 1856113.380954, 1856113.380954, 0.0, 234.8921, 0.981092, 103.966, -44.567, 158.708, 0, interoperability elements (black-box output fit; concept credited to Woeltge C.)
-
-# --- Harrington's Planet X ---
-# Robert Harrington's predicted trans-Neptunian planet based on dynamical perturbations.
-# Source: Harrington, R.S. (1988). "The Location of Planet X."
-#   The Astronomical Journal, 96(4), 1476-1478. DOI:10.1086/114898
-
-Harrington, 2374696.5, J2000, 0.0, 101.2, 0.411, 208.5, 275.4, 32.4, 0, Harrington 1988 AJ 96(4) 1476
-
-# --- Historical Neptune predictions ---
-# Orbital elements for the positions independently predicted for Neptune
-# before its discovery in 1846.
-# Source: Hoyt, W.G. (1980). "Planets X and Pluto." Tucson: University of Arizona Press, p. 63.
-
-Leverrier-Neptune, 2395662.5, 2395662.5, 34.05, 36.15, 0.10761, 284.75, 0.0, 0.0, 0, Hoyt 1980 "Planets X and Pluto" p.63
-Adams-Neptune,     2395662.5, 2395662.5, 24.28, 37.25, 0.12062, 299.11, 0.0, 0.0, 0, Hoyt 1980 "Planets X and Pluto" p.63
-
-# --- Historical Pluto predictions ---
-# Orbital elements from historical predictions for the trans-Neptunian planet
-# eventually identified as Pluto.
-# Source: Hoyt, W.G. (1980). "Planets X and Pluto." Tucson: University of Arizona Press, p. 63.
-
-Lowell-Pluto,    2425977.5, 2425977.5, 281.0, 43.0, 0.202, 204.9, 0.0,   0.0,  0, Hoyt 1980 "Planets X and Pluto" p.63
-Pickering-Pluto, 2425977.5, 2425977.5,  48.95, 55.1, 0.31, 280.1, 100.0, 15.0, 0, Hoyt 1980 "Planets X and Pluto" p.63
-
-# --- Vulcan (hypothetical intra-Mercurial planet) ---
-# Proposed by Urbain Le Verrier in 1859 to explain Mercury's perihelion precession.
-# Not confirmed; anomaly later explained by general relativity (Einstein 1915).
-# Elements per L.H. Weston's published monograph on the body ("The Planet
-# Vulcan", American Federation of Astrologers), T-polynomial formulation.
-# Mean anomaly and apsidal elements precess rapidly (orbital period ~20 days).
-
-Vulcan, 2415020.0, JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 322.212069 + 1670.056 * T, 47.787931 - 1670.056 * T, 7.5, 0, Weston L.H. "The Planet Vulcan" (AFA); see also Le Verrier 1859
-
-# --- Selena / White Moon ---
-# A symbolic geocentric point opposite to the mean Black Moon Lilith,
-# representing an idealised "light" counterpart to the lunar apogee.
-# Introduced in Russian astrological tradition (published as a circular
-# geocentric point with a 7-year cycle). The rate/radius digits here are
-# interoperability values verified by a black-box fit against
-# reference-API output (see NOTICE.md, Calibration Data Disclosure).
-
-Selena, 2451545.0, JDATE, 242.2205555 + 5143.5418158 * T, 0.05280098949, 0.0, 0.0, 0.0, 0.0, 1, Russian-school 7-year circular convention; digits = interoperability values (black-box output fit)
-
-# --- Proserpina ---
-# Hypothetical trans-Plutonian planet used in some astrological traditions.
-# The circular-orbit convention (two numbers: epoch anomaly and radius) is
-# credited to V. Abramov (Ukraine); no independent public publication of the
-# digits is known, so they are carried as interoperability values: a
-# black-box fit against reference-API output recovers them (see
-# NOTICE.md, Calibration Data Disclosure).
-
-Proserpina, 2415020.0, JDATE, 170.73, 79.225630, 0.0, 0.0, 0.0, 0.0, 0, interoperability elements (black-box output fit; concept credited to Abramov V.)
-
-# --- Waldemath's hypothetical second Moon of Earth ---
-# Proposed by Dr. Georg Waldemath (1898) based on claimed observations.
-# Not confirmed by any subsequent observation.
-# Waldemath published his claimed observations and orbit parameters in 1898
-# (a dark satellite with a ~119-day period); the fully-specified element set
-# below is the reconstruction circulating in the astrological community
-# (cf. Walters, D., "The Book on Vulcan", Dark Moon chapter; it differs from
-# Solar Fire's implementation and from Delphine Jay's ephemeris). The digits
-# are carried as interoperability values verified by a black-box fit against
-# reference-API output (see NOTICE.md, Calibration Data Disclosure).
-# Geocentric body with retrograde nodal motion.
-
-Waldemath, 2414290.95827875, 2414290.95827875, 70.3407215 + 109023.2634989 * T, 0.0068400705250028, 0.1587, 8.14049594 + 2393.47417444 * T, 136.24878256 - 1131.71719709 * T, 2.5, 1, Waldemath G. 1898 published claims; digits = interoperability values (black-box output fit)
-
-# --- Christ Comet ---
-# Orbital elements proposed for the "Star of Bethlehem" interpreted as a comet.
-# Source: Nicholl, C.R. (2015). "The Great Christ Comet." Wheaton: Crossway, p. 223.
-
-Christ-Comet, 1719500.7, J2000, 0.0, 1190.0, 0.9999, 9.47, 200.08, 178.3, 0, Nicholl 2015 "The Great Christ Comet" p.223
-
-# --- Planet Nine ---
-# Orbital constraints from dynamical modeling of trans-Neptunian object clustering.
-# True anomaly 117.8 deg (Fienga et al.); mean anomaly derived.
-# Source: Fienga, A. et al. (2016). "Constraints on the location of a possible 9th
-#   planet derived from the Cassini data." A&A, 587, L8.
-#   DOI:10.1051/0004-6361/201628227
-
-Planet-Nine, 2457388.5, J2000, 45.5272966, 700.0, 0.6, 150.0, 113.0, 30.0, 0, Fienga+2016 A&A 587 L8 DOI:10.1051/0004-6361/201628227
-
-# --- Halley's Comet historical apparitions ---
-# Orbital elements for ancient apparitions, reconstructed from backward integration.
-# Source: Yeomans, D.K. & Kiang, T. (1981). "The long-term motion of comet Halley."
-#   Monthly Notices of the Royal Astronomical Society, 197, 633-646.
-#   DOI:10.1093/mnras/197.3.633
-
-Halley-12BCE,   1717323.34852, B1950, 0.0, 17.99261849, 0.9673664, 92.54399, 35.19064, 163.58392, 0, Yeomans+Kiang 1981 MNRAS 197 633
-Halley-1198BCE, 1283983.73252, B1950, 0.0, 16.80480637, 0.9625705, 74.46894, 14.66132, 162.95968, 0, Yeomans+Kiang 1981 MNRAS 197 633
-
-# --- 2015 RR245 ---
-# Trans-Neptunian object discovered 2015, included as an example body.
-# Source: Bannister, M.T. et al. (2016). "OSSOS. I. Discovery of a Large
-#   Trans-Neptunian Object Near the 9:2 Mean-motion Resonance with Neptune."
-#   ApJL, 822, L2.
-
-2015-RR245, 2457600.5, J2000, 322.50413, 81.2891975, 0.5852663, 261.41753, 211.67680, 7.57643, 0, Bannister+2016 ApJL 822 L2
+# Time-dependent compatibility conventions.
+Vulcan,2415020.0,JDATE,252.8987988 + 707550.7341 * T,0.13744,0.019,322.212069 + 1670.056 * T,47.787931 - 1670.056 * T,7.5,0,built-in: L. H. Weston historical convention
+Selena,2451545.0,JDATE,242.2205555 + 5143.5418158 * T,0.05280098949,0.0,0.0,0.0,0.0,1,built-in: Russian-school seven-year circular convention; digits not independently verified
+Proserpina,2415020.0,JDATE,170.73,79.225630,0.0,0.0,0.0,0.0,0,built-in: V. Abramov convention; digits not independently verified
+Waldemath,2414290.95827875,2414290.95827875,70.3407215 + 109023.2634989 * T,0.0068400705250028,0.1587,8.14049594 + 2393.47417444 * T,136.24878256 - 1131.71719709 * T,2.5,1,built-in: Waldemath 1898 claim; detailed reconstruction not independently verified

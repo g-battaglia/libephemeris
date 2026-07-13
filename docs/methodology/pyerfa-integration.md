@@ -14,7 +14,7 @@ LibEphemeris integrates PyERFA (the Python wrapper for the IAU SOFA/ERFA library
   - [Cached Nutation](#cached-nutation)
 - [API Reference](#api-reference)
 - [Precision and Validation](#precision-and-validation)
-- [When to Use PyERFA](#when-to-use-pyerfa)
+- [Runtime Role](#runtime-role)
 - [Installation](#installation)
 - [References](#references)
 
@@ -22,19 +22,27 @@ LibEphemeris integrates PyERFA (the Python wrapper for the IAU SOFA/ERFA library
 
 Precession and nutation are fundamental corrections required for transforming celestial coordinates between epochs. Precession describes the slow, secular drift of Earth's rotational axis over millennia, while nutation describes the shorter-period oscillations superimposed on this drift, driven primarily by the gravitational torques of the Moon and Sun on Earth's equatorial bulge.
 
-The International Astronomical Union (IAU) has adopted progressively refined models for these effects. The IAU 2000A nutation model uses ~1300 terms to achieve ~0.2 mas precision. The IAU 2006 precession model improves upon the IAU 2000 precession by incorporating updated rate corrections derived from VLBI observations. PyERFA provides reference implementations of these models, enabling LibEphemeris to offer observatory-grade accuracy as an optional precision tier.
+The International Astronomical Union (IAU) has adopted progressively refined
+models for these effects. The IAU 2000A nutation model uses ~1300 terms to
+achieve ~0.2 mas precision. The IAU 2006 precession model improves upon the IAU
+2000 precession by incorporating updated rate corrections derived from VLBI
+observations. PyERFA provides reference implementations of these models and is
+a required runtime dependency, giving every LibEphemeris installation the same
+observatory-grade reduction chain.
 
 ## Method
 
 ### Nutation Models
 
-LibEphemeris provides access to three nutation models via PyERFA, each offering a different precision-performance tradeoff:
+PyERFA exposes three relevant nutation functions. LibEphemeris always uses
+`nut06a()` in its runtime reduction; the others support validation and model
+comparison:
 
-| Model | Precision | Terms | Use Case |
-|-------|-----------|-------|----------|
-| IAU 2000A | ~0.2 mas | ~1300 | Highest precision nutation |
-| IAU 2000B | ~1 mas | ~80 | High precision, faster computation |
-| IAU 2006/2000A (nut06a) | ~0.01-0.05 mas | ~1300 | Best overall precision with improved precession |
+| Model | Precision | Terms | LibEphemeris role |
+|-------|-----------|-------|-------------------|
+| IAU 2000A | ~0.2 mas | ~1300 | Validation/model comparison |
+| IAU 2000B | ~1 mas | ~80 | Validation/model comparison |
+| IAU 2006/2000A (`nut06a`) | ~0.01-0.05 mas | ~1300 | Required runtime model |
 
 The nut06a model combines the IAU 2006 precession with IAU 2000A nutation, providing the best available precision for equinox-based coordinates. It applies small corrections to the IAU 2000A nutation to account for the updated precession rates.
 
@@ -86,37 +94,26 @@ coefficients are transcribed by hand and no copyleft source is consulted:
 import erfa
 epj = 2000.0 + (jd_tt - 2451545.0) / 365.25
 P = erfa.ltpb(epj)      # ICRS -> mean equator/equinox of date (frame bias included)
-pecl = erfa.ltpecl(epj) # ecliptic pole (for the of-date mean obliquity)
-pequ = erfa.ltpequ(epj) # equator pole
 ```
 
 `libephemeris/precession_vondrak.py` wraps these into the matrix builders used by
 every reduction path (the LEB fast path, the Skyfield reference path, and the
-ecliptic-body / SPK / fixed-star paths). The of-date mean obliquity is taken as
-the angle between the Vondrák equator and ecliptic poles (long-term valid),
-replacing the IAU 2006 obliquity polynomial which also diverges at remote epochs.
-Nutation remains IAU 2006/2000A and is layered on top of the Vondrák precession.
+ecliptic-body / SPK / fixed-star paths). The of-date mean obliquity is evaluated
+from Vondrák's direct published `ε_A` polynomial-plus-periodic series in
+`sidereal_longterm.mean_obliquity_series_rad()`. Nutation remains IAU
+2006/2000A and is layered on top of the Vondrák precession.
 
 The remaining model floor at deep-BCE dates is the underlying ephemeris generation
 (DE441), which the precession model does not affect.
 
-#### Of-date mean obliquity — a long-term-valid choice
+#### Of-date mean obliquity — direct Vondrák series
 
-The of-date mean obliquity used in every reduction (and reported by the `ECL_NUT`
-pseudo-body) is the **true angle between the of-date equator and ecliptic poles**
-of the Vondrák model (`erfa.ltpequ` · `erfa.ltpecl`). This is the self-consistent
-companion to the Vondrák precession and stays rigorous over ±200,000 years,
-replacing the IAU 2006 obliquity polynomial (`erfa.obl06`), which is only valid a
-few centuries from J2000 and is an out-of-range extrapolation at remote epochs.
-
-Crucially, **the obliquity choice does not affect ecliptic longitude** — for a body
-near the ecliptic the longitude is invariant to a small tilt of the frame; only the
-latitude absorbs it. So the choice is confined to ecliptic latitude (sub-arcsecond
-within recorded history, identically zero in the modern era, and at deep-BCE still
-well below the ephemeris-generation floor on the planets). How this of-date
-obliquity compares against Swiss Ephemeris at deep-BCE epochs — a small, deliberate,
-bounded deviation — is documented in the
-[Swiss Ephemeris Comparison](../comparison/intentional-divergences.md#3-of-date-mean-obliquity-at-deep-bce-epochs).
+The of-date mean obliquity used in every reduction and reported by the
+`ECL_NUT` pseudo-body is the direct Vondrák `ε_A` series. It is long-term valid,
+avoids extrapolating the short-range IAU 2006 polynomial at remote epochs, and
+reproduces the measured public convention from years −5000 through +5000. The
+separate pole-angle diagnostic is retained internally but is not used for
+public coordinate reductions.
 
 ### Cached Nutation
 
@@ -154,25 +151,17 @@ The precision improvement is most significant for:
 - Applications requiring arcsecond or better accuracy
 - Professional astronomical calculations
 
-## When to Use PyERFA
+## Runtime Role
 
-### Recommended Use Cases
+PyERFA is used for every standard installation and requires no user toggle.
+Its `nut06a()` routine supplies nutation for the apparent-place and house
+pipelines, while ERFA frame transformations keep the coordinate reductions
+internally consistent. The Vondrák 2011 model supplies the separate long-term
+precession behavior at remote epochs.
 
-1. **High-precision coordinate transformations**: When milliarcsecond accuracy is required for precessing coordinates between epochs.
-
-2. **Observatory-grade calculations**: Professional astronomical applications requiring IAU-standard algorithms.
-
-3. **Validation against external sources**: When comparing results with JPL Horizons or other professional ephemeris services.
-
-4. **Long-term extrapolation**: Calculations more than 50 years from J2000.0 benefit most from IAU 2006 improvements.
-
-### When the Default Is Sufficient
-
-1. **Typical astrological applications**: The default precision (~1 arcsec) is adequate for most astrological chart calculations.
-
-2. **Performance-critical code**: The built-in approximation is faster when milliarcsecond precision is not required.
-
-3. **Dates near J2000.0**: Within 50 years of J2000.0, the differences between models are minimal for most applications.
+The alternative analytical helpers retained in the repository are useful for
+tests and model comparisons only. They are not a faster selectable runtime
+tier and are not used as a fallback when calculating positions.
 
 ## Installation
 

@@ -90,9 +90,7 @@ class TestMoonNodeCrossings:
     ):
         """Moon node crossing timing matches within tolerance."""
         for jd_start in crossing_dates:
-            ref_result = compare.skyfield(
-                ephem.mooncross_node_ut, jd_start, node_type
-            )
+            ref_result = compare.skyfield(ephem.mooncross_node_ut, jd_start, node_type)
             leb_result = compare.leb(ephem.mooncross_node_ut, jd_start, node_type)
 
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0

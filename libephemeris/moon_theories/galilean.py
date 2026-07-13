@@ -490,6 +490,7 @@ def _fundamental_arguments(t: float) -> _E5Arguments:
         The argument set, in degrees, with the longitude-correction and
         true-longitude fields still zeroed.
     """
+    # Fundamental arguments of Lieske's E5 theory (Lieske 1998, A&AS 129).
     # Principal inequality in Jupiter's longitude, folded into G below.
     gamma = 0.33033 * math.sin(_to_radians(163.679 + 0.0010512 * t))
     gamma += 0.03439 * math.sin(_to_radians(34.486 - 0.0161731 * t))

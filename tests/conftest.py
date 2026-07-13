@@ -260,7 +260,7 @@ def common_house_systems():
 
 @pytest.fixture
 def all_ayanamshas():
-    """All 43 ayanamsha modes."""
+    """All 47 predefined ayanamsha mode IDs."""
     return [
         (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
         (SIDM_LAHIRI, "Lahiri"),
@@ -305,6 +305,10 @@ def all_ayanamshas():
         (SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
         (SIDM_GALEQU_FIORENZA, "Galactic Equator Fiorenza"),
         (SIDM_VALENS_MOON, "Valens Moon"),
+        (SIDM_LAHIRI_1940, "Lahiri 1940"),
+        (SIDM_LAHIRI_VP285, "Lahiri VP285"),
+        (SIDM_KRISHNAMURTI_VP291, "Krishnamurti VP291"),
+        (SIDM_LAHIRI_ICRC, "Lahiri ICRC"),
     ]
 
 
@@ -322,17 +326,10 @@ def major_ayanamshas():
 
 @pytest.fixture
 def star_based_ayanamshas():
-    """Star-based ayanamshas (require relaxed tolerance).
-
-    Note: GALCENT modes are no longer included as they now use
-    SE-calibrated formulas with <0.001° precision.
-    """
+    """Native catalog-direction ayanamshas (require relaxed tolerance)."""
     return [
         SIDM_TRUE_CITRA,
-        SIDM_TRUE_REVATI,
-        SIDM_TRUE_PUSHYA,
-        SIDM_TRUE_MULA,
-        SIDM_TRUE_SHEORAN,
+        SIDM_GALCENT_0SAG,
     ]
 
 

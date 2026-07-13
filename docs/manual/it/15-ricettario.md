@@ -217,7 +217,7 @@ Pesci         18/02/2025  10:06 UT
 
 ```python
 import libephemeris as ephem
-from libephemeris.crossing import find_station_ut, is_retrograde
+from libephemeris.crossing import is_retrograde
 
 jd = ephem.julday(2024, 1, 1, 0.0)
 jd_fine = ephem.julday(2025, 1, 1, 0.0)
@@ -228,7 +228,7 @@ segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
 print("--- Retrogradazioni di Mercurio nel 2024 ---")
 print()
 while jd < jd_fine:
-    jd_station, tipo = find_station_ut(
+    jd_station, tipo = ephem.find_station_ut(
         ephem.MERCURY, jd, "any"
     )
     if jd_station >= jd_fine:
@@ -266,7 +266,9 @@ Stazione Diretta    15/12/2024  20:56 UT  a   6.4° Sgr
 Mercurio retrogrado l'8/4/2024? True
 ```
 
-> **Nota**: `find_station_ut` e `is_retrograde` si importano da `libephemeris.crossing` perché non sono esposti a livello di modulo principale.
+> **Nota**: `find_station_ut` è disponibile dal modulo principale
+> `libephemeris`; solo `is_retrograde` va importato da
+> `libephemeris.crossing`.
 
 ---
 
@@ -438,19 +440,21 @@ Parziale     1/06/2030  05:04 UT  magnitudine: 0.816
 
 ---
 
-## Ricetta 7 — Carta siderale (vedica)
+## Ricetta 7 — Carta siderale con un modo da fonte indipendente
 
-**Problema**: calcolare le posizioni planetarie nello zodiaco siderale con ayanamsha Lahiri, includendo i Nakshatra.
+**Problema**: calcolare le posizioni in un modo siderale, includendo i
+Nakshatra. L'esempio usa True Citra; anche Lahiri e gli altri modi base
+predefiniti sono operativi, con stato delle fonti documentato nella reference.
 
 **A cosa serve**: l'astrologia vedica (Jyotish) usa lo zodiaco siderale anziché quello tropicale — le posizioni sono sfasate di circa 24° rispetto a quelle occidentali. I Nakshatra sono 27 "stazioni lunari" di 13°20' ciascuna, ulteriormente divise in 4 Pada; la posizione della Luna nel Nakshatra è fondamentale per calcolare i Dasha (periodi planetari che governano la vita). Per esempio, chi ha la Luna nel Nakshatra di Ashwini vivrà il primo periodo sotto Ketu (7 anni), poi sotto Venere (20 anni), ecc. Un'applicazione concreta: un software di Jyotish che genera la carta siderale, i Nakshatra e il calcolo dei Dasha.
 
 ```python
 import libephemeris as ephem
-from libephemeris.constants import (SIDM_LAHIRI,
+from libephemeris.constants import (SIDM_TRUE_CITRA,
                                     FLG_SIDEREAL, FLG_SPEED)
 
 jd = ephem.julday(2024, 4, 8, 14.5)
-ephem.set_sid_mode(SIDM_LAHIRI)
+ephem.set_sid_mode(SIDM_TRUE_CITRA)
 
 nakshatras = [
     "Ashwini", "Bharani", "Krittika", "Rohini",
@@ -479,7 +483,7 @@ corpi = [
 ]
 
 ayan = ephem.get_ayanamsa_ut(jd)
-print("--- Carta Siderale (Lahiri) ---")
+print("--- Carta Siderale (True Citra) ---")
 print(f"Ayanamsha: {ayan:.4f}°")
 print()
 
@@ -506,22 +510,7 @@ pada_k = int((ketu % (360 / 27)) / (360 / 108)) + 1
 print(f"Ketu      {gradi_k:5.1f}° {segno_k:10s}"
       f"  Nakshatra: {nak_k} (Pada {pada_k})")
 
-ephem.set_sid_mode(0)  # ripristina
-```
-
-```
---- Carta Siderale (Lahiri) ---
-Ayanamsha: 24.1961°
-
-Surya      25.0° Meen        Nakshatra: Revati (Pada 3)
-Chandra    22.8° Meen        Nakshatra: Revati (Pada 2)
-Mangal     18.7° Kumbh       Nakshatra: Shatabhisha (Pada 4)
-Budha       0.7° Mesh        Nakshatra: Ashwini (Pada 1)
-Guru       24.8° Mesh        Nakshatra: Bharani (Pada 4)
-Shukra     10.1° Meen        Nakshatra: Uttara Bhadra (Pada 3)
-Shani      20.2° Kumbh       Nakshatra: Purva Bhadra (Pada 1)
-Rahu       21.5° Meen        Nakshatra: Revati (Pada 2)
-Ketu       21.5° Kanya       Nakshatra: Hasta (Pada 4)
+ephem.set_sid_mode(ephem.SIDM_J2000)  # ripristina un frame nativo esplicito
 ```
 
 ---
@@ -985,7 +974,7 @@ Ogni ricetta è autocontenuta e pronta all'uso: basta copiare il codice, modific
 - `difdeg2n(p1, p2)` — differenza angolare normalizzata [-180, 180]
 - `solcross_ut(x, jd)` — attraversamento del Sole a una longitudine
 - `mooncross_ut(x, jd)` — attraversamento della Luna a una longitudine
-- `find_station_ut(body, jd, tipo)` — prossima stazione retrograda/diretta (da `libephemeris.crossing`)
+- `find_station_ut(body, jd, tipo)` — prossima stazione retrograda/diretta
 - `is_retrograde(body, jd)` — verifica retrogradazione (da `libephemeris.crossing`)
 - `sol_eclipse_when_loc(jd, geopos)` — eclissi solare locale
 - `set_sid_mode(mode)` / `get_ayanamsa_ut(jd)` — zodiaco siderale

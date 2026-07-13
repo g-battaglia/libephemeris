@@ -962,7 +962,7 @@ class _SpkType21Target:
         Returns:
             Tuple of (position, velocity, None, None)
         """
-        AU_KM = 149597870.7
+        AU_KM = 149597870.7  # 1 AU in km (IAU 2012 Resolution B2)
 
         # Get Sun SSB position (ICRS, AU)
         sun_pos = self._sun.at(t)

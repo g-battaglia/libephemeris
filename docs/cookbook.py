@@ -45,7 +45,7 @@ from libephemeris.constants import (
     FLG_SPEED,
     FLG_SIDEREAL,
     # Sidereal modes
-    SIDM_LAHIRI,
+    SIDM_TRUE_CITRA,
     ECL_TOTAL,
     ECL_ANNULAR,
     ECL_PARTIAL,
@@ -170,7 +170,7 @@ def calculate_natal_chart(
             b"E" = Equal
             b"R" = Regiomontanus
             b"C" = Campanus
-        sidereal: If True, use Lahiri ayanamsha for sidereal calculations
+        sidereal: If True, use the independently sourced True Citra mode
 
     Returns:
         Dictionary containing:
@@ -195,7 +195,7 @@ def calculate_natal_chart(
     # Step 2: Set up sidereal mode if requested
     calc_flags = FLG_SWIEPH | FLG_SPEED
     if sidereal:
-        ephem.set_sid_mode(SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_TRUE_CITRA)
         calc_flags |= FLG_SIDEREAL
         ayanamsha = ephem.get_ayanamsa_ut(jd)
     else:
@@ -386,9 +386,7 @@ def find_next_transit(
         crossing_jd = ephem.mooncross_ut(target_longitude, start_jd, FLG_SWIEPH)
     else:
         # cross_ut works for any planet
-        crossing_jd = ephem.cross_ut(
-            planet_id, target_longitude, start_jd, FLG_SWIEPH
-        )
+        crossing_jd = ephem.cross_ut(planet_id, target_longitude, start_jd, FLG_SWIEPH)
 
     # Convert Julian Day back to calendar date
     year, month, day, hour = ephem.revjul(crossing_jd)

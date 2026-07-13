@@ -7,6 +7,7 @@ number. This checks that, for every combination that falls back, the result is
 identical to forcing the Skyfield backend directly (the fallback must BE
 Skyfield, not an approximation of it).
 """
+
 from __future__ import annotations
 
 import os
@@ -15,13 +16,20 @@ import pytest
 
 import libephemeris as L
 from libephemeris.constants import (
-    SUN, MOON, MARS, MEAN_NODE, MEAN_APOG, FLG_SWIEPH, FLG_TOPOCTR, FLG_ICRS,
+    SUN,
+    MOON,
+    MARS,
+    MEAN_NODE,
+    MEAN_APOG,
+    HARRINGTON,
+    FLG_SWIEPH,
+    FLG_TOPOCTR,
+    FLG_ICRS,
     FLG_RADIANS,
 )
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 LEB_MEDIUM = os.path.join(PROJECT_ROOT, "data", "leb", "ephemeris_medium.leb")
-CUPIDO = 40
 JD = 2451545.0
 
 skip_no_leb = pytest.mark.skipif(
@@ -34,7 +42,7 @@ skip_no_leb = pytest.mark.skipif(
 _FALLBACK_CASES = [
     ("node_topo", MEAN_NODE, FLG_SWIEPH | FLG_TOPOCTR),
     ("lilith_topo", MEAN_APOG, FLG_SWIEPH | FLG_TOPOCTR),
-    ("uranian_topo", CUPIDO, FLG_SWIEPH | FLG_TOPOCTR),
+    ("harrington_topo", HARRINGTON, FLG_SWIEPH | FLG_TOPOCTR),
     ("mars_icrs", MARS, FLG_SWIEPH | FLG_ICRS),
     ("moon_icrs", MOON, FLG_SWIEPH | FLG_ICRS),
     ("sun_radians", SUN, FLG_SWIEPH | FLG_RADIANS),

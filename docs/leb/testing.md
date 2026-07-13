@@ -1,6 +1,7 @@
 # LEB vs Skyfield — Comparison Test Guide
 
-> **Updated:** March 2026 — reflects <0.001" precision achieved for all 31 bodies.
+> **Updated:** July 2026 — verification covers independently sourced bodies and
+> locally generated files; no external comparison output is retained.
 
 This guide explains how to run and interpret the tests that compare LEB (LibEphemeris Binary) calculation results with Skyfield (direct calculation from NASA JPL ephemerides).
 
@@ -25,11 +26,13 @@ If the LEB file is not found, tests are **skipped** (they don't fail).
 
 ### Available Tiers
 
-| Tier | Ephemeris | Range | File |
-|------|-----------|-------|------|
-| `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (~53 MB) |
-| `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (~175 MB) |
-| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` (~1.6 GB) |
+Tests use locally generated LEB1 files or reviewed LEB2 companions. Historical
+monolithic LEB1 release assets are retired and must not be used as test inputs.
+| Tier | Ephemeris | Range | Local file |
+|------|-----------|-------|------------|
+| `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (up to 53 bodies) |
+| `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (up to 53 bodies) |
+| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` (up to 45 bodies) |
 
 ### Dependencies
 
@@ -49,9 +52,9 @@ Asteroid tests require network access to automatically download SPK21 files from
 # All medium comparison tests (full, ~90 seconds with -n 4)
 leph test leb-format vs-skyfield medium
 
-# With parallelism (direct pytest)
+# The subgroup already applies the registered marker and parallelism policy.
 LIBEPHEMERIS_LEB=/path/to/ephemeris_medium.leb \
-  pytest tests/test_leb/compare/ -m "leb_compare" -v --tb=short -n 4
+  leph test leb-format vs-skyfield medium
 ```
 
 ### Base tier
@@ -60,8 +63,9 @@ LIBEPHEMERIS_LEB=/path/to/ephemeris_medium.leb \
 # All base tests (~90 seconds with -n 4)
 leph test leb-format vs-skyfield base
 
-# With parallelism (direct pytest)
-pytest tests/test_leb/compare/base/ -m "leb_compare_base" -v --tb=short -n 4
+# Override the discovered file while retaining the registered subgroup.
+LIBEPHEMERIS_LEB=/path/to/ephemeris_base.leb \
+  leph test leb-format vs-skyfield base
 ```
 
 ### Extended tier
@@ -79,8 +83,8 @@ pytest tests/test_leb/compare/test_compare_leb_planets.py -v -n 4
 # A specific test
 pytest "tests/test_leb/compare/test_compare_leb_planets.py::TestPlanetPrecision::test_all_components" -v
 
-# By keyword
-pytest tests/test_leb/compare/ -m "leb_compare" -k "asteroid" -v -n 4
+# By keyword within one explicit file
+pytest tests/test_leb/compare/test_compare_leb_asteroids.py -k "asteroid" -v -n 4
 ```
 
 ---
@@ -94,8 +98,8 @@ tests/test_leb/compare/
 ├── conftest.py                          # Shared infrastructure (tolerances, helpers, fixtures)
 ├── test_compare_leb_planets.py          # Lon, lat, dist, speed for ICRS planets
 ├── test_compare_leb_asteroids.py        # Position, speed, distance for asteroids
-├── test_compare_leb_hypothetical.py     # Uranian bodies (Cupido, Hades, Zeus, ...)
-├── test_compare_leb_velocities.py       # Speed lon/lat/dist for all 31 bodies
+├── test_compare_leb_hypothetical.py     # Runtime models for historical IDs 40–58
+├── test_compare_leb_velocities.py       # Speed lon/lat/dist for covered bodies
 ├── test_compare_leb_distances.py        # Geocentric and heliocentric distance
 ├── test_compare_leb_crossings.py        # cross_ut, solcross_ut, ...
 ├── test_compare_leb_eclipses_solar.py   # Solar eclipses
@@ -226,10 +230,12 @@ TOLS = TierTolerances.for_tier("medium")  # Loads medium tier defaults
 
 ```bash
 # Override for a specific tier
-LEB_TOL_BASE_POSITION_ARCSEC=10.0 pytest ...
+LEB_TOL_BASE_POSITION_ARCSEC=10.0 \
+  pytest tests/test_leb/compare/test_compare_leb_planets.py -v
 
 # Global override (fallback for all tiers)
-LEB_TOL_POSITION_ARCSEC=10.0 pytest ...
+LEB_TOL_POSITION_ARCSEC=10.0 \
+  pytest tests/test_leb/compare/test_compare_leb_planets.py -v
 ```
 
 Priority order (highest to lowest):
@@ -241,8 +247,9 @@ Priority order (highest to lowest):
 
 ### Current Tolerances
 
-All 31 bodies achieve <0.001 arcsecond geocentric position precision on both
-base and medium tiers.
+LEB verification covers independently sourced bodies on the base and medium
+tiers. Tolerances below are local JPL/runtime invariants, not persisted
+external-comparison measurements.
 
 #### Position
 
@@ -251,7 +258,7 @@ base and medium tiers.
 | `POSITION_ARCSEC` | 0.001 | 0.001 | arcsec | All planets including outer |
 | `ASTEROID_ARCSEC` | 0.001 | 0.001 | arcsec | |
 | `ECLIPTIC_ARCSEC` | 0.001 | 0.001 | arcsec | Nodes, Lilith |
-| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | arcsec | Uranians (error ~0) |
+| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | arcsec | IDs 40–58 use runtime models rather than persisted legacy channels |
 | `EQUATORIAL_ARCSEC` | 0.02 | 0.02 | arcsec | Heliocentric amplification |
 | `J2000_ARCSEC` | 0.001 | 0.001 | arcsec | |
 | `SIDEREAL_ARCSEC` | 0.001 | 0.001 | arcsec | |
@@ -331,19 +338,11 @@ base and medium tiers.
 | 21 | InterpApogee | |
 | 22 | InterpPerigee | |
 
-### Pipeline B — Hypothetical/Uranian (9 bodies)
+### Hypothetical bodies
 
-| ID | Name |
-|----|------|
-| 40 | Cupido |
-| 41 | Hades |
-| 42 | Zeus |
-| 43 | Kronos |
-| 44 | Apollon |
-| 45 | Admetos |
-| 46 | Vulkanus |
-| 47 | Poseidon |
-| 48 | Transpluto |
+Historical IDs 40–58 must remain calculable even with old LEB files. The LEB
+dispatcher bypasses persisted hypothetical channels and uses the current
+runtime models, whose provenance status is checked separately.
 
 ---
 
@@ -369,13 +368,16 @@ leph leb generate extended groups
 Each command runs in sequence:
 1. `planets` — Sun-Pluto, Earth (11 bodies)
 2. `asteroids` — Chiron, Ceres, Pallas, Juno, Vesta (5 bodies)
-3. `exotics` — Centaurs, TNOs, NEAs (31 bodies)
-4. `analytical` — Nodes, Lilith, Uranians (15 bodies)
+3. `exotics` — 31 registry bodies on base/medium; 23 non-NEAs on extended
+4. `analytical` — Independently derived nodes and apsides (6 bodies)
 5. `merge` — Merges the 4 partial files + verification
 
 ### Single-body generation (lowest memory)
 
-If group generation still uses too much memory, use single-body mode. Each of the 62 bodies is generated in its own subprocess (one at a time), then all partial files are merged:
+If group generation still uses too much memory, use single-body mode. Each
+eligible body is generated in its own subprocess (one at a time), then all
+partial files are merged. Base and medium have up to 53 independently sourced
+bodies; extended excludes eight chaotic NEAs and has up to 45:
 
 ```bash
 # Base tier (direct CLI)

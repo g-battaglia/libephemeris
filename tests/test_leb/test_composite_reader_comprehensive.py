@@ -47,7 +47,6 @@ LEB2_DIR = os.path.join(PROJECT_ROOT, "data", "leb2")
 LEB2_BASE_CORE = os.path.join(LEB2_DIR, "base_core.leb2")
 LEB2_BASE_ASTEROIDS = os.path.join(LEB2_DIR, "base_asteroids.leb2")
 LEB2_BASE_APOGEE = os.path.join(LEB2_DIR, "base_apogee.leb2")
-LEB2_BASE_URANIANS = os.path.join(LEB2_DIR, "base_uranians.leb2")
 
 SKIP_NO_LEB1 = pytest.mark.skipif(
     not os.path.exists(LEB1_BASE), reason="LEB1 base file not found"
@@ -67,8 +66,7 @@ def single_tier_dir(tmp_path_factory):
     """A directory holding exactly one tier's LEB2 group files.
 
     ``data/leb2`` mixes tiers (base/medium/extended), which ``from_directory``
-    now rejects. The medium set is the only complete single tier present
-    (medium_core/asteroids/apogee/uranians), so symlink those into a temp dir.
+    now rejects. Symlink one locally available tier into a temporary directory.
     """
     src = sorted(glob.glob(os.path.join(LEB2_DIR, "medium_*.leb2")))
     if not src:
@@ -101,8 +99,12 @@ class TestFromDirectory:
     @pytest.mark.unit
     def test_from_directory_mixed_tiers_raises(self):
         """from_directory refuses to merge files from different tiers."""
-        # data/leb2 holds base_*, medium_*, and extended_* files together;
-        # merging them first-wins would silently corrupt positions.
+        tiers = {
+            os.path.basename(path).split("_", maxsplit=1)[0]
+            for path in glob.glob(os.path.join(LEB2_DIR, "*.leb2"))
+        }
+        if len(tiers) < 2:
+            pytest.skip("local LEB2 directory contains only one reviewed tier")
         with pytest.raises(ValueError, match="mixed tiers"):
             CompositeLEBReader.from_directory(LEB2_DIR)
 

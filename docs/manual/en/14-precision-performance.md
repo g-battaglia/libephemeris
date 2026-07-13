@@ -223,15 +223,11 @@ Difference:       0.000000000"
 
 There are three ways to activate LEB mode:
 
-**1. Download the precomputed LEB file (recommended):**
+**1. Use a reviewed core.** The base core is bundled in the wheel; medium and
+extended cores are available through the SHA-256-pinned downloader:
 
-```python
-import libephemeris as ephem
-
-# Download the LEB file for the medium tier (~175 MB)
-ephem.download_leb_for_tier("medium")
-# The file is saved in ~/.libephemeris/leb/ephemeris_medium.leb
-# and automatically activated for this session
+```bash
+libephemeris download leb-medium
 ```
 
 **2. Set the path manually:**
@@ -250,7 +246,11 @@ export LIBEPHEMERIS_LEB=/path/to/file/ephemeris_medium.leb
 
 ### Auto-discovery
 
-If you have downloaded a LEB file with `download_leb_for_tier()`, the library automatically finds it in the standard location (`~/.libephemeris/leb/ephemeris_{tier}.leb`) without needing any configuration.
+Exact manifest-pinned tier cores under `~/.libephemeris/leb/` are
+auto-discovered first. For backward compatibility, the standard LEB1 names
+`{tier}_core.leb` and `ephemeris_{tier}.leb` are then discovered before the
+bundled base fallback. Other independently generated local files remain
+supported through `set_leb_file()` or `LIBEPHEMERIS_LEB`.
 
 ### Automatic Fallback
 
@@ -267,9 +267,9 @@ When you encounter one of these cases, the library automatically falls back to S
 
 Like the JPL ephemerides, LEB files also exist in three versions:
 
-- **`base`** (~53 MB) — covers 1850–2150
-- **`medium`** (~175 MB) — covers 1550–2650
-- **`extended`** (~1.6 GB) — covers -5000 to +5000
+- **`base` core** (~10.8 MB) — covers 1850–2150
+- **`medium` core** (~38.3 MB) — covers 1550–2650
+- **`extended` core** (~334.9 MB) — covers -5000 to +5000
 
 ---
 
@@ -316,7 +316,11 @@ Sun (Skyfield forced): 19.140437°
 
 ### `"leb"`
 
-Requires a valid LEB file. The library tries the configured file, then auto-discovery, then auto-download of LEB2 for the active tier. Raises `RuntimeError` only if no LEB can be resolved. Bodies not present in the LEB file still fall back to Skyfield:
+Requires a valid LEB file. The library tries the configured file, the active
+tier's installed pinned core, and the bundled range-limited base core. Core
+installation is explicit (`libephemeris download leb-medium`); calculation
+never starts a surprise download. Bodies not present in the selected file still
+fall back to Skyfield:
 
 ```python
 import libephemeris as ephem
@@ -333,7 +337,7 @@ Mode: leb
 
 ### `"horizons"`
 
-Always uses the NASA JPL Horizons REST API for calculations. This mode requires an internet connection and does not need any local ephemeris files. It supports planets, asteroids, Mean Node, Mean Apogee, and Uranians. Bodies or flags not supported by Horizons (e.g., `FLG_TOPOCTR`, fixed stars) fall back to Skyfield:
+Prefers the NASA JPL Horizons REST API for calculations. This mode requires an internet connection for supported requests and does not require a local ephemeris file for them. It supports planets, asteroids, Mean Node, and Mean Apogee. Bodies or flags not supported by Horizons (e.g., hypothetical bodies, `FLG_TOPOCTR`, fixed stars) fall back to an independent local implementation when available, or raise the documented error:
 
 ```python
 import libephemeris as ephem
@@ -394,18 +398,14 @@ Each context can have its own sidereal mode:
 import libephemeris as ephem
 from libephemeris import EphemerisContext
 from libephemeris.constants import SUN, FLG_SPEED, FLG_SIDEREAL
-from libephemeris.constants import SIDM_LAHIRI
+from libephemeris.constants import SIDM_TRUE_CITRA
 
 ctx = EphemerisContext()
-ctx.set_sid_mode(SIDM_LAHIRI)
+ctx.set_sid_mode(SIDM_TRUE_CITRA)
 
 jd = ephem.julday(2024, 4, 8, 12.0)
 pos, _ = ctx.calc_ut(jd, SUN, FLG_SPEED | FLG_SIDEREAL)
-print(f"Sidereal Sun (Lahiri): {pos[0]:.4f}°")
-```
-
-```
-Sidereal Sun (Lahiri): 354.9458°
+print(f"Sidereal Sun (True Citra): {pos[0]:.4f}°")
 ```
 
 ### Houses in Context
@@ -510,15 +510,12 @@ import libephemeris as ephem
 ephem.download_for_tier("medium")
 ```
 
-### Downloading the LEB File
+### Additional LEB files
 
-```python
-import libephemeris as ephem
-
-# Download the precomputed LEB ephemerides for the "medium" tier
-# (~175 MB, automatically activated after download)
-ephem.download_leb_for_tier("medium")
-```
+The wheel contains `base_core.leb2`; hash-pinned medium and extended cores are
+available through `download_leb_for_tier()` / `download_leb2_for_tier()`.
+Additional groups can be generated and verified locally. Historical `.leb`
+files remain readable when selected explicitly.
 
 ### Data Directory
 
@@ -537,12 +534,28 @@ print(f"Data directory: {ephem.get_library_path()}")
 ```
 
 ```
-Data directory: ~/.libephemeris
+Data directory: /home/user/.libephemeris
 ```
 
-### Complete Reset
+`get_library_path()` returns an absolute path; the home directory shown above
+is illustrative.
 
-The `close()` function closes all files and resets the global state. Useful for freeing resources or restarting with a clean configuration:
+### Session Reset and Resource Cleanup
+
+For independent calculations in the same process, prefer `reset_session()`.
+It resets topocentric and sidereal session state while preserving open file
+handles, the LEB reader, the Skyfield timescale, and reusable caches:
+
+```python
+import libephemeris as ephem
+
+ephem.reset_session()
+```
+
+Use `close()` when file handles and loaded kernels must actually be released.
+It clears per-session state and resources, but deliberately preserves
+process-level configuration selected with `set_calc_mode()`, `set_leb_file()`,
+and `set_strict_precision()`:
 
 ```python
 import libephemeris as ephem
@@ -583,11 +596,12 @@ Identical result: True
 
 - **Sub-arcsecond precision** for all bodies in the 1900–2100 range — no compromises for modern use
 - **Three precision tiers**: `base` (1849–2150, 31 MB), `medium` (1550–2650, 114 MB), `extended` (-13200 to +17191, 3.1 GB)
-- **LEB** (precomputed binary ephemerides): speeds up calculations maintaining precision identical to Skyfield; activated with `set_leb_file()` or `download_leb_for_tier()`
+- **LEB** (precomputed binary ephemerides): the wheel bundles a reviewed base core as the zero-configuration fast path; wider cores are accepted only through SHA-256-pinned manifest entries
 - **Four calculation modes**: `auto` (default — LEB, then Horizons, then Skyfield), `skyfield` (forces Skyfield), `leb` (requires LEB), `horizons` (NASA JPL Horizons API, requires internet)
 - **EphemerisContext**: thread-safe context for parallel calculations, with isolated state for observer, sidereal mode, and cache
-- **Automatic download** of data on first use; explicit management with `download_for_tier()` and `download_leb_for_tier()`
-- **`close()`** for complete reset of resources and state
+- **Automatic JPL/SPK data management** on first use; unpinned LEB assets remain rejected by auto-discovery
+- **`reset_session()`** for lightweight between-job state reset while keeping reusable resources open
+- **`close()`** to release files, kernels, and per-session state while preserving process-level configuration
 
 ## Functions Introduced
 
@@ -595,7 +609,7 @@ Identical result: True
 - `set_calc_mode(mode)` / `get_calc_mode()` — sets the calculation mode (`"auto"`, `"skyfield"`, `"leb"`, `"horizons"`)
 - `set_leb_file(filepath)` — activates the precomputed binary ephemerides
 - `download_for_tier(tier)` — downloads all data for a tier
-- `download_leb_for_tier(tier)` — downloads the precomputed LEB file
+- `download_leb_for_tier(tier)` / `download_leb2_for_tier(tier)` — install the tier's SHA-256-pinned LEB2 core and fail closed when no reviewed manifest entry exists
 - `EphemerisContext()` — isolated context for thread-safe calculations
 - `EphemerisContext.calc_ut(jd, body, flag)` — position calculation in context
 - `EphemerisContext.houses(jd, lat, lon, hsys)` — houses in context
@@ -603,5 +617,6 @@ Identical result: True
 - `EphemerisContext.set_sid_mode(mode)` — sidereal mode in context
 - `EphemerisContext.set_leb_file(filepath)` — LEB for context
 - `EphemerisContext.close()` — closes shared resources
-- `close()` — closes all resources and resets the global state
+- `reset_session()` — resets lightweight session state and preserves reusable resources
+- `close()` — closes resources and resets per-session global state
 - `get_library_path()` — path of the data directory

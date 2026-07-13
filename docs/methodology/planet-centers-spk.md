@@ -8,8 +8,8 @@ LibEphemeris generates a compact SPK (SPICE kernel) file containing planet cente
   - [Barycenters vs Planet Centers](#barycenters-vs-planet-centers)
   - [Barycenter Offsets](#barycenter-offsets)
 - [Method](#method)
-  - [Analytical COB Correction (Current Approach)](#analytical-cob-correction-current-approach)
-  - [Compact SPK Extraction (New Approach)](#compact-spk-extraction-new-approach)
+  - [JPL center segments](#jpl-center-segments)
+  - [Explicit system-barycenter fallback](#explicit-system-barycenter-fallback)
   - [SPK File Format](#spk-file-format)
   - [Chaining with DE Ephemerides](#chaining-with-de-ephemerides)
 - [SPK Generation Process](#spk-generation-process)
@@ -58,23 +58,22 @@ For high-precision work, these offsets matter.
 
 ## Method
 
-LibEphemeris employs a three-tier correction strategy to convert barycenter positions to planet center positions.
+LibEphemeris uses JPL state data when a physical planet-center segment covers
+the requested epoch. It does not synthesize a missing center from analytical
+satellite theories.
 
-### Analytical COB Correction (Current Approach)
+### JPL center segments
 
-The current approach uses analytical moon theories to compute the Center of Body (COB) offset from the barycenter:
+The generator extracts planet-center segments from JPL satellite SPK files and
+creates a compact file containing only those centers. At runtime the center is
+resolved at the retarded epoch, so heliocentric and barycentric light time uses
+the observer-to-body-center vector.
 
-- **Jupiter**: E5 theory (Galilean moons)
-- **Saturn**: TASS 1.7 (Titan-dominated)
-- **Neptune**: Triton Keplerian elements
-- **Pluto**: Charon two-body solution
-- **Uranus**: Keplerian elements for the 5 major moons (Titania/Oberon dominate)
+### Explicit system-barycenter fallback
 
-This approach requires no extra files but has limited precision (~0.02-0.15 arcsec).
-
-### Compact SPK Extraction (New Approach)
-
-The new approach extracts planet center segments from JPL's satellite SPK files and creates a compact file containing only the planet centers. This provides maximum precision (<0.001 arcsec) with minimal file size (~5-10 MB).
+When no JPL center segment covers the requested epoch, the stored planetary
+system barycenter is returned as the target. This is a deliberate, traceable
+fallback; no analytical COB correction is applied.
 
 ### SPK File Format
 
@@ -104,21 +103,41 @@ This chaining is transparent to the user. All segments use the J2000 reference f
 
 1. **spiceypy** >= 6.0.0 (Python wrapper for NAIF SPICE toolkit)
 2. **Internet connection** (to download source SPK files)
-3. **~500 MB temporary disk space** (source files are deleted after extraction)
+3. **~6.5 GB temporary disk space** for the medium/extended source cache
 
 ### Source Files
 
-The script downloads these satellite SPK files from JPL NAIF:
+`scripts/generate_planet_centers_spk.py` declares every input as an HTTPS URL
+under the official JPL NAIF generic-kernel archive and extracts only the
+listed barycenter-to-center segment with SPICE `spksub`. It never reads a
+compatibility distribution or reference-API output.
 
-| File | Planet | Size | URL |
-|------|--------|------|-----|
-| jup204.bsp | Jupiter | 89 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/jup204.bsp) |
-| sat319.bsp | Saturn | 52 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/sat319.bsp) |
-| ura083.bsp | Uranus | 80 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/ura083.bsp) |
-| nep050.bsp | Neptune | 201 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/nep050.bsp) |
-| plu017.bsp | Pluto | 19 MB | [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/plu017.bsp) |
+| Tier | Jupiter | Saturn | Uranus | Neptune | Pluto |
+|------|---------|--------|--------|---------|-------|
+| base | `jup204.bsp` | `sat319.bsp` | `ura083.bsp` | `nep050.bsp` | `plu017.bsp` |
+| medium | `jup365.bsp` | `sat441xl_part-1.bsp` + `sat441xl_part-2.bsp` | `ura111xl-799.bsp` | `nep097xl-899.bsp` | `plu060.bsp` |
+| extended | `jup365.bsp` | `sat441xl_part-1.bsp` + `sat441xl_part-2.bsp` | `ura111xl-799.bsp` | `nep097xl-899.bsp` | `plu060.bsp` |
 
-These are older, more compact versions of the satellite ephemerides. Newer versions (jup365.bsp, etc.) are much larger (500 MB-1 GB each) but offer higher precision for satellite positions, which is not needed for planet centers.
+The base files are in NAIF's `a_old_versions` satellite directory; the medium
+and extended files are in the current satellite directory. All downloads use
+certificate-verified TLS and require a structurally valid BSP; medium/extended
+inputs additionally require the reviewed source hashes recorded below. Every
+matching DAF descriptor is copied: JPL products can split one target into
+consecutive segments, so copying only the first descriptor truncates the
+published coverage. The output is checked by reopening it and enumerating its
+five expected targets.
+
+The reviewed medium build used these exact JPL source bytes:
+
+| Source | SHA-256 |
+|--------|---------|
+| `jup365.bsp` | `dbf016c01ba4d022154838000cf3f06962cf958ddc503a366f7fe8f81495c5cb` |
+| `sat441xl_part-1.bsp` | `45e6f6687cf9a4d7c94c206c13650d35583740019df939c19f2ee0f0f7d2750d` |
+| `sat441xl_part-2.bsp` | `d021819387e6045e2cd2819a7907ca62cc8cb3091ca925dfe894d2e0f4f7af1e` |
+| `ura111xl-799.bsp` | `fa55665eb129613574a5d029bf2cc7b521d3f0d2edc7de5790add3cf950714bf` |
+| `nep097xl-899.bsp` | `95e815cb8584e530d3c83f35e39af4bf67d0874f01b65538cbe9dbf279818df8` |
+| `plu060.bsp` | `dfbb102491a26ed41ae08ca3f8963f22f0219df1d8f265ab87b9ad825a826fc6` |
+| `naif0012.tls` | `678e32bdb5a744117a467cd9601cd6b373f0e9bc9bbde1371d5eee39600a039b` |
 
 ### Running the Script
 
@@ -144,8 +163,10 @@ default output directory):
 ```
 
 At runtime the loader looks for `planet_centers_{tier}.bsp` matching the
-active precision tier, falling back to the legacy single-file name
-`planet_centers.bsp`. Each file contains 5 segments:
+active precision tier. In the base tier only, it can fall back to the legacy
+single-file name `planet_centers.bsp` when that file matches the pinned base
+artifact. Each file contains five center targets; a target can have several
+time-partitioned SPK segments:
 
 | Center | Target | Description |
 |--------|--------|-------------|
@@ -155,17 +176,38 @@ active precision tier, falling back to the legacy single-file name
 | 8 | 899 | Neptune Barycenter -> Neptune Center |
 | 9 | 999 | Pluto Barycenter -> Pluto Center |
 
+### Distributed output pins
+
+The downloader accepts only these SHA-256-pinned outputs:
+
+| File | SHA-256 |
+|------|---------|
+| `planet_centers_base.bsp` | `a9ec744ff412b095129166587ea0814f81c850faebf92586a738cb5dc103c92a` |
+| `planet_centers_medium.bsp` | `d3c34f5efe9223ef588ec59a8c59c1bd6619b0eab5d5e0b35c353d675efe7b4d` |
+| `planet_centers_extended.bsp` | `a07b046b89a9992fc7fda445b00e656341a3bab66a035adb8108de7d4bd69edc` |
+
+For backward API compatibility, `download_planet_centers()` writes the pinned
+base-tier bytes under the legacy destination name `planet_centers.bsp`; it no
+longer accesses the former unverified legacy release object.
+
+For the medium output, 50 position/velocity evaluations spanning the endpoints
+and midpoints of all ten copied descriptors were compared directly with the
+pinned JPL inputs: the maximum difference was exactly `0 km` and `0 km/day`.
+
 ## Usage in LibEphemeris
 
-After generating the SPK file, LibEphemeris automatically loads it alongside the main ephemeris (DE440). The planet center positions are used instead of barycenter + COB correction.
+After generating the SPK file, LibEphemeris automatically loads it alongside
+the main ephemeris. Covered outer-planet requests use the JPL center segment;
+outside its coverage they use the explicit system-barycenter fallback.
 
 ### Automatic Loading
 
 ```python
 import libephemeris as eph
 
-# planet_centers.bsp is loaded automatically if present
-# Jupiter now returns planet center, not barycenter
+# The pinned tier-specific file is loaded automatically if present.
+# Base also accepts the pinned legacy planet_centers.bsp destination.
+# Jupiter uses its JPL center segment when the epoch is covered
 pos, _ = eph.calc_ut(jd, eph.JUPITER, 0)
 ```
 
@@ -195,15 +237,21 @@ ra, dec, distance = astrometric.radec()
 
 ### Time Coverage
 
-The coverage depends on the source SPK files, typically:
+The coverage depends on the source SPK files. A regenerated medium asset has:
 
 | Planet | Start | End |
 |--------|-------|-----|
-| Jupiter | ~1900 | ~2100 |
-| Saturn | ~1900 | ~2100 |
-| Uranus | ~1900 | ~2100 |
-| Neptune | ~1900 | ~2100 |
-| Pluto | ~1900 | ~2100 |
+| Jupiter | 1600 | 2200 |
+| Saturn | before 1550 | after 2650 |
+| Uranus | before 1550 | after 2650 |
+| Neptune | before 1550 | after 2650 |
+| Pluto | 1800 | 2200 |
+
+JPL's published `jup365` comments define its 1600--2200 interval; the XL
+products supply the wider Saturn/Uranus/Neptune intervals. See the official
+[JPL NAIF satellite-kernel archive](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/).
+No published JPL planet-center SPK currently fills the remaining Jupiter and
+Pluto gaps, so runtime uses the system barycenter there.
 
 ### Position Accuracy
 
@@ -221,7 +269,10 @@ If SSL errors occur when downloading from JPL:
 ssl.SSLError: certificate verify failed
 ```
 
-The script automatically falls back to unverified SSL for the trusted JPL servers. If this fails, the source files can be downloaded manually.
+The generator requires certificate-verified HTTPS through the certifi trust
+store and fails closed on TLS errors. Check the local CA/certifi installation
+or download the declared JPL sources manually, then verify their recorded
+SHA-256 values before generation.
 
 ### spiceypy Not Found
 
@@ -238,7 +289,10 @@ uv pip install "spiceypy>=6.0.0"
 
 ### Disk Space
 
-The script requires ~500 MB temporary space for downloading source files. These are automatically cleaned up after extraction.
+Base generation needs roughly 500 MB of temporary space. Medium and extended
+generation need about 6.5 GB for the full JPL satellite-kernel source set.
+Temporary inputs are cleaned up after extraction unless an explicit cache is
+requested.
 
 ## References
 

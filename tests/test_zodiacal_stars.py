@@ -401,9 +401,9 @@ class TestZodiacalConstellationCoverage:
 # positions propagated J1991.25 -> J2000.0.
 C9_CATALOG_PINS = [
     # name,           HIP,    RA_J2000_deg,   Dec_J2000_deg, nomenclature
-    ("Tarf",          40526, 124.128837533,  9.185543869,  "beCnc"),
-    ("Eta Piscium",    7097,  22.870876074, 15.345824593,  "etPsc"),
-    ("Alrescha",       9487,  30.511748813,  2.763761377,  "alPsc"),
+    ("Tarf", 40526, 124.128837533, 9.185543869, "beCnc"),
+    ("Eta Piscium", 7097, 22.870876074, 15.345824593, "etPsc"),
+    ("Alrescha", 9487, 30.511748813, 2.763761377, "alPsc"),
 ]
 
 

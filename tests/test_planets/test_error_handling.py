@@ -48,11 +48,14 @@ class TestInvalidBodyIds:
             swe.calc_ut(jd, 999999, 0)
 
     @pytest.mark.unit
-    def test_body_id_49_computes_nibiru(self):
-        """Body ID 49 (Nibiru) is a supported predicted planet since WS7."""
+    def test_body_id_49_returns_finite_result(self):
+        """Body ID 49 computes from the restored independently sourced orbit."""
         jd = 2451545.0
-        pos, _ = swe.calc_ut(jd, 49, 0)
-        assert 0 <= pos[0] < 360
+        result, _ = swe.calc_ut(jd, 49, 0)
+
+        assert len(result) == 6
+        assert all(type(value) is float for value in result)
+        assert all(math.isfinite(value) for value in result)
 
     @pytest.mark.unit
     def test_body_id_59_raises(self):

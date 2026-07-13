@@ -162,9 +162,7 @@ def example_tropical_vs_sidereal() -> None:
         pos_trop, _ = eph.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
 
         # Sidereal position
-        pos_sid, _ = eph.calc_ut(
-            jd, planet_id, FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL
-        )
+        pos_sid, _ = eph.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL)
 
         trop_str = format_zodiac(pos_trop[0])
         sid_str = format_zodiac(pos_sid[0], use_vedic_names=True)

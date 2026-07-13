@@ -12,13 +12,16 @@ To regenerate the golden file after an intentional change:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import warnings
+from pathlib import Path
 
 import pytest
 
 import libephemeris as swe
+from libephemeris.download import DATA_FILES
 
 warnings.filterwarnings("ignore")
 
@@ -47,32 +50,35 @@ def entries_by_type(entries: list[dict], entry_type: str) -> list[dict]:
 
 @pytest.fixture
 def production_leb_source(monkeypatch):
-    """Pin the production-default LEB source for 1e-8-tight comparisons.
-
-    The golden file is generated against the auto-discovered LEB source (the
-    LEB2 set a default install uses). Equivalent-but-distinct sources — e.g.
-    the merged LEB1 file the LEB test runner pins via LIBEPHEMERIS_LEB — are
-    only guaranteed to agree within the LEB2 error budget (<0.001"), which
-    exceeds the 1e-8 deg golden tolerance. So force auto-discovery here,
-    regardless of the runner's environment:
-
-    - drop the LIBEPHEMERIS_LEB pin (monkeypatch restores it afterwards);
-    - clear the cached reader/file so discovery re-resolves;
-    - set_calc_mode("auto") programmatically because
-      test_cross_validation_astropy.py poisons LIBEPHEMERIS_MODE at
-      module-import time (before xdist forks workers).
-    """
+    """Pin and isolate the exact source used by the golden generator."""
     from libephemeris import state
 
+    reviewed_core = (
+        Path(__file__).resolve().parents[1]
+        / "libephemeris"
+        / "data"
+        / "leb2"
+        / "base_core.leb2"
+    )
+    expected_hash = DATA_FILES["base_core.leb2"]["sha256"]
+    actual_hash = hashlib.sha256(reviewed_core.read_bytes()).hexdigest()
+    assert actual_hash == expected_hash
+
+    previous_mode = state.get_calc_mode()
+    previous_file = state._LEB_FILE
     monkeypatch.delenv("LIBEPHEMERIS_LEB", raising=False)
-    state.set_calc_mode("auto")
-    state._LEB_FILE = None
-    state._LEB_READER = None
-    yield
-    # Force re-resolution from the (restored) environment for later tests
-    # on this xdist worker.
-    state._LEB_FILE = None
-    state._LEB_READER = None
+    monkeypatch.setattr(
+        state,
+        "get_planet_center_segment",
+        lambda naif_id, jd=None: None,
+    )
+    state.set_leb_file(str(reviewed_core))
+    state.set_calc_mode("leb")
+    try:
+        yield
+    finally:
+        state.set_leb_file(previous_file)
+        state.set_calc_mode(previous_mode)
 
 
 class TestGoldenCalcUt:
@@ -187,7 +193,7 @@ class TestGoldenSidereal:
                     )
 
         # Reset
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        swe.set_sid_mode(swe.SIDM_J2000)
 
         assert not mismatches, (
             f"{len(mismatches)} sidereal regression(s):\n" + "\n".join(mismatches[:20])
@@ -298,6 +304,19 @@ class TestGoldenFileIntegrity:
     def test_golden_file_version(self, golden_data: dict) -> None:
         """Golden file must have expected version."""
         assert golden_data["version"] == 1
+
+    def test_golden_file_records_independent_provenance(
+        self, golden_data: dict
+    ) -> None:
+        """The regression baseline must identify its independent generator."""
+        assert golden_data["provenance"].endswith("no external-reference calls")
+        assert golden_data["source_artifact"] == (
+            "libephemeris/data/leb2/base_core.leb2"
+        )
+        assert golden_data["source_sha256"] == DATA_FILES["base_core.leb2"]["sha256"]
+        assert golden_data["optional_planet_centers"] == (
+            "disabled; base_core-only regression"
+        )
 
     def test_golden_file_entry_count(self, golden_data: dict) -> None:
         """Golden file must have >= 100 entries."""

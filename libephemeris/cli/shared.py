@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import click
 
+from ..constants import SPK_BODY_NAME_MAP
+
 # ---------------------------------------------------------------------------
 # Tier metadata — single source of truth for both CLIs
 # ---------------------------------------------------------------------------
@@ -39,11 +41,13 @@ TIER_INFO = {
 }
 
 TIERS = list(TIER_INFO.keys())
+SPK_BODY_COUNT = len(SPK_BODY_NAME_MAP)
 
 
 def tier_download_help(tier: str) -> str:
     """Build detailed help text for a download subcommand."""
     info = TIER_INFO[tier]
+    planet_center_sizes = {"base": 25.4, "medium": 191.25, "extended": 222.6}
     return f"""\
 Download all data files for the '{tier}' precision tier.
 
@@ -55,26 +59,25 @@ Download all data files for the '{tier}' precision tier.
 
 Downloads:
   1. The ephemeris file ({info["ephemeris"].split(" ")[0]})
-  2. planet_centers.bsp precision offsets (~25 MB)
-  3. SPK kernels for 21 minor bodies (asteroids, centaurs, TNOs)
+  2. Planet-center precision offsets (~{planet_center_sizes[tier]:g} MB)
+  3. SPK kernels for {SPK_BODY_COUNT} minor bodies (asteroids, centaurs, TNOs)
 """
 
 
 def leb_download_help(tier: str) -> str:
-    """Build detailed help text for a LEB download subcommand."""
+    """Build compatibility guidance for the historical LEB command name."""
     info = TIER_INFO[tier]
-    sizes = {"base": "~53 MB", "medium": "~175 MB", "extended": "(size varies)"}
     return f"""\
-Download the precomputed LEB binary ephemeris for the '{tier}' tier.
+Install the reviewed, SHA-256-pinned core LEB asset for the '{tier}' tier.
 
-LEB files contain Chebyshev polynomial approximations for all celestial bodies,
-providing ~14x speedup over the Skyfield/JPL pipeline.
+The historical command name is retained for automation compatibility. Current
+distribution assets use the auto-detected chunked LEB2 format; existing .leb
+files remain loadable through set_leb_file().
 
-  Tier:       {tier} ({info["range"]})
-  File:       ephemeris_{tier}.leb ({sizes.get(tier, "")})
-  Bodies:     31 (Sun, Moon, planets, nodes, apsides, asteroids)
+  Tier: {tier} ({info["range"]})
 
-Files are saved to ~/.libephemeris/leb/ by default.
+For all separately reviewed modular groups, use:
+  libephemeris download leb2-{tier}
 """
 
 
