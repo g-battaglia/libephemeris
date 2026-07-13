@@ -388,6 +388,17 @@ def _is_horizons_body(body_id: int) -> bool:
     )
 
 
+def _trace_source(body_id: int, iflag: int) -> str:
+    """Return the actual source used by a successful Horizons dispatch."""
+    from .constants import FLG_HELCTR
+
+    if body_id in _ANALYTICAL_BODIES or body_id in _URANIAN_BODIES:
+        return "Analytical"
+    if body_id == 0 and iflag & FLG_HELCTR:
+        return "Analytical"
+    return "Horizons"
+
+
 def horizons_calc_ut(
     client: HorizonsClient,
     jd_ut: float,

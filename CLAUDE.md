@@ -11,8 +11,7 @@ Uses `uv` for dependencies and `poe` (poethepoet) for task running.
 
 The `leph` dev CLI is repo tooling and is not shipped in wheels: from a
 source checkout use `./leph`, `python -m libephemeris.dev_cli`, or
-`poe leph -- <args>` (an installed editable venv may still expose a
-`leph` script).
+`poe leph -- <args>`. No `leph` console entry point is installed.
 
 ```bash
 uv pip install -e ".[dev]"        # Install with dev dependencies
@@ -28,24 +27,22 @@ poe typecheck                     # mypy
 ```bash
 pytest tests/test_file.py -v                          # Single file
 pytest tests/test_file.py::TestClass::test_method -v  # Single test
-pytest -k "pattern" -v                                # By keyword
+pytest tests/test_file.py -k "pattern" -v             # By keyword within one file
 
 # Skyfield backend (main unit test suite)
 poe test:skyfield:core       # Essential ~900 tests, ~20s (parallel)
 poe test:skyfield:fast       # All unit tests ~16,000, ~1 min (parallel, no @slow)
-poe test:skyfield:full       # ALL tests including @slow (parallel)
 
 # LEB backend (precomputed Chebyshev ephemeris, ~14x faster)
 poe test:leb:core            # LEB essential ~900 tests, ~20s (parallel)
 poe test:leb:fast            # LEB unit tests ~16,000, ~1 min (parallel, no @slow) [RECOMMENDED]
-poe test:leb:full            # LEB ALL unit tests including @slow (sequential)
 
 # Feature-specific suites (via leph CLI)
-leph test lunar all          # All lunar tests (nodes, Lilith, perigee, apogee), no @slow
-leph test lunar perigee      # Perigee tests only
-leph test lunar apogee       # Apogee tests only
-leph test lunar lilith       # Lilith tests only (7 files)
-leph test leb2-format all    # LEB2 format unit tests (compression + reader)
+./leph test lunar all          # All lunar tests (nodes, Lilith, perigee, apogee), no @slow
+./leph test lunar perigee      # Perigee tests only
+./leph test lunar apogee       # Apogee tests only
+./leph test lunar lilith       # Lilith tests only (7 files)
+./leph test leb2-format all    # LEB2 format unit tests (compression + reader)
 ```
 
 ## Code Style
@@ -74,8 +71,8 @@ LEB Chebyshev approximation error vs Skyfield reference, per body group and tier
 | **Planets** (Sun-Pluto, Earth) | <0.001" | <0.001" | <0.001" |
 | **Moon** | <0.001" (0.000332") | <0.001" (0.000325") | <0.001" |
 | **Asteroids** (Chiron-Vesta) | <0.001" (0.000045") | <0.001" (0.000036") | <0.001" |
-| **Ecliptic** (Nodes, Lilith) | <0.001" (0.000049") | <0.001" (0.000075") | <0.001" modern, <0.005" extreme dates |
-| **IntpApog/IntpPerig** | ~1-2° (pre-regen) | ~1-2° (pre-regen) | ~1-2° (pre-regen) |
+| **Ecliptic** (Nodes, Lilith) | <0.001" (0.000049") | <0.001" (0.000075") | <0.001" modern, up to 0.054" extreme dates |
+| **IntpApog/IntpPerig** | Covered by the ecliptic tolerance | Covered by the ecliptic tolerance | Covered by the 0.1" extreme-date tolerance |
 | **Uranians** | ~0.000000" | ~0.000000" | ~0.000000" |
 
 **Precession at extreme dates**: the apparent-place reduction uses the **Vondrák 2011** long-term precession (valid ±200,000 years), via pyerfa — see `libephemeris/precession_vondrak.py`. This replaced the IAU 2006 precession (only valid a few centuries from J2000, ~36" off for the Sun at year -3000) and improves independently measured black-box agreement at extreme dates. Modern results are unchanged (Vondrák ≡ IAU 2006 to <1 mas near J2000).
@@ -105,7 +102,12 @@ Runtime always uses a **single merged file** for LEB1. See `docs/leb/guide.md` f
 
 ## LEB2 Compressed Format
 
-LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major reorder + byte shuffle + zstd) to achieve 4-10x compression while maintaining <0.001" precision vs LEB1.
+LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major
+reorder + byte shuffle + zstd) to achieve 4-10x compression. The core
+end-to-end gate requires <0.001" angular agreement with LEB1; the direct
+verifier reports normalized per-component errors in native stored units
+(AU for Cartesian ICRS; degrees/degrees/AU for ecliptic data), after checking
+the declared inventory and per-body metadata against LEB1.
 
 ### Architecture
 
@@ -116,7 +118,7 @@ LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major reo
 | `libephemeris/leb_composite.py` | `CompositeLEBReader` — wraps multiple LEB files, dispatches by body_id |
 | `libephemeris/leb_reader.py` | `open_leb()` factory auto-detects LEB1/LEB2 via magic bytes |
 | `scripts/generate_leb2.py` | LEB2 conversion engine (invoked via `leph leb2`) |
-| `scripts/test_leb2_precision.py` | Fast precision test: all bodies x 6 flags x N dates per tier |
+| `scripts/test_leb2_precision.py` | Fast precision test: 14 core bodies x 6 flags x N dates per tier |
 
 ### Body Groups
 
@@ -136,11 +138,12 @@ Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amp
 
 ```bash
 poe leb2:convert:base              # Convert LEB1 -> LEB2 (all 5 groups)
-leph leb2 convert base-core        # Core group only (~10.6 MB)
-poe leb2:verify:base               # Verify against LEB1
-leph test leb2-format all          # Unit tests (compression + reader)
-leph test leb2-format precision-base   # Fast precision test (~15s)
-leph test leb2-format precision-all    # All tiers (~45s)
+./leph leb2 convert base-core      # Core group only (~10.6 MB)
+./leph leb2 convert base-exotics   # Exotic registry group only
+poe leb2:verify:base               # Verify base_core.leb2 against LEB1
+./leph test leb2-format all             # Unit tests (compression + reader)
+./leph test leb2-format precision-base  # Fast precision test
+./leph test leb2-format precision-all   # Core companions, all tiers
 ```
 
 ### Full documentation
@@ -191,6 +194,6 @@ not in this library. Workflow:
 2. Paste coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`
 3. From `validation/`: regenerate the residual table (`validation/calibrate/generate_lunar_apse_corrections.py --write`),
    which rewrites `lunar_apse_corrections.py` (the live residual table) in this repo
-4. `leph test lunar perigee` (the reference-free perigee tests in this repo)
+4. `./leph test lunar perigee` (the reference-free perigee tests in this repo)
 
 See `docs/methodology/interpolated-perigee.md` for the full methodology.

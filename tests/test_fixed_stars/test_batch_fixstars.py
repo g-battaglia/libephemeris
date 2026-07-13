@@ -60,6 +60,41 @@ def test_batch_fixstars_ut_matches_individual_sidereal_calls() -> None:
         swe.reset_session()
 
 
+@pytest.mark.parametrize(
+    "sidereal_mode", [swe.SIDM_J2000, swe.SIDM_J1900, swe.SIDM_B1950]
+)
+def test_batch_fixstars_ut_matches_fixed_epoch_calls(sidereal_mode: int) -> None:
+    """Fixed-frame sidereal modes use the same rewrite as single-star calls."""
+    swe.set_sid_mode(sidereal_mode)
+    try:
+        _assert_batch_matches_loop(STARS, swe.FLG_SIDEREAL | swe.FLG_SPEED)
+    finally:
+        swe.reset_session()
+
+
+def test_fixed_epoch_batch_traces_only_successful_public_star_ids() -> None:
+    """The single-call delegate keeps batch trace publication atomic."""
+    swe.set_sid_mode(swe.SIDM_J1900)
+    token = swe.start_tracing()
+    try:
+        result = swe.batch_fixstars_ut(
+            ("Regulus", "Not A Real Star", "Spica"),
+            JD,
+            swe.FLG_SIDEREAL | swe.FLG_SPEED,
+            skip_errors=True,
+        )
+        assert result[0] is not None
+        assert result[1] is None
+        assert result[2] is not None
+        traces = swe.get_trace_results()
+        assert traces[swe.REGULUS] in ("LEB", "Skyfield", "Mixed")
+        assert traces[swe.SPICA_STAR] in ("LEB", "Skyfield", "Mixed")
+        assert set(traces) == {swe.REGULUS, swe.SPICA_STAR}
+    finally:
+        token.var.reset(token)
+        swe.reset_session()
+
+
 def test_batch_fixstars_ut_preserves_input_slots_when_skipping_errors() -> None:
     batch = swe.batch_fixstars_ut(
         ("Regulus", "Not A Real Star", "Spica"), JD, 0, skip_errors=True

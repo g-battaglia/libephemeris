@@ -29,7 +29,13 @@ import warnings
 from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, overload
 
 from .constants import MEAN_NODE, TRUE_NODE
-from .tracing import _record
+from .tracing import (
+    _is_active,
+    _record,
+    _record_alias,
+    _restore_record,
+    _snapshot_record,
+)
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
@@ -585,6 +591,7 @@ class EphemerisContext:
         )
 
         _validate_barycentric_moseph(iflag, "calc_ut" if ut else "calc")
+        requested_ipl = ipl
 
         # Handle ECL_NUT (-1), like the module-level entry points.  This must
         # run on the raw flags because MOSEPH is kept and SPEED3 is not remapped
@@ -620,7 +627,14 @@ class EphemerisContext:
                 pos, retflag = _calc_nutation_obliquity(tjd, nut_flags)
             else:
                 pos, retflag = _calc_nutation_obliquity_tt(tjd, nut_flags)
-            return pos, retflag | _implied_retflag_bits(res_flags)
+            result = (pos, retflag | _implied_retflag_bits(res_flags))
+            from .logging_config import get_logger
+
+            get_logger().debug(
+                "body=%d jd=%.1f source=ERFA (context)", requested_ipl, tjd
+            )
+            _record(requested_ipl, "ERFA")
+            return result
 
         # Same normalization preamble as the module-level calc_ut()/calc(),
         # so the context entry points stay 1:1 with the reference API
@@ -652,15 +666,39 @@ class EphemerisContext:
             )
 
             if is_fixed_epoch_request(iflag, self.sidereal_mode):
-                sub_xx, sub_rf = self._calc_impl(
-                    tjd, ipl, fixed_epoch_request_flags(iflag), ut=ut
-                )
-                xx_t0 = transform_fixed_epoch_result(sub_xx, iflag, self.sidereal_mode)
-                from .planets import _to_native_floats
+                from .planets import _capture_source_logs, _log_successful_source
 
-                return _to_native_floats(xx_t0), _echo_retflag(
-                    fixed_epoch_retflag(sub_rf, iflag)
+                nested_trace = (
+                    _snapshot_record(requested_ipl) if _is_active() else (False, None)
                 )
+                try:
+                    with _capture_source_logs() as nested_sources:
+                        sub_xx, sub_rf = self._calc_impl(
+                            tjd, ipl, fixed_epoch_request_flags(iflag), ut=ut
+                        )
+                        xx_t0 = transform_fixed_epoch_result(
+                            sub_xx, iflag, self.sidereal_mode
+                        )
+                        from .planets import _to_native_floats
+
+                        result = (
+                            _to_native_floats(xx_t0),
+                            _echo_retflag(fixed_epoch_retflag(sub_rf, iflag)),
+                        )
+                except Exception:
+                    _restore_record(requested_ipl, nested_trace)
+                    raise
+                if nested_sources:
+                    from .logging_config import get_logger
+
+                    _log_successful_source(
+                        get_logger(),
+                        requested_ipl,
+                        tjd,
+                        nested_sources[-1],
+                        context=True,
+                    )
+                return result
 
         # Built-in asteroids by AST_OFFSET number (see module calc_ut)
         ipl = _remap_ast_offset(ipl)
@@ -671,14 +709,38 @@ class EphemerisContext:
         # no antipode branch), and the antipode is representation-dependent
         # (FLG_XYZ / FLG_RADIANS) — _south_node_from_north handles all three.
         if ipl in (-MEAN_NODE, -TRUE_NODE):
-            from .planets import _south_node_from_north
+            from .planets import (
+                _capture_source_logs,
+                _log_successful_source,
+                _south_node_from_north,
+            )
 
-            north_result, retflag = self._calc_impl(tjd, abs(ipl), iflag, ut=ut)
+            north_ipl = abs(ipl)
+            north_trace = _snapshot_record(north_ipl) if _is_active() else (False, None)
+            try:
+                with _capture_source_logs() as nested_sources:
+                    north_result, retflag = self._calc_impl(
+                        tjd, north_ipl, iflag, ut=ut
+                    )
+                    result = (
+                        _south_node_from_north(north_result, iflag),
+                        _echo_retflag(retflag),
+                    )
+            except Exception:
+                _restore_record(north_ipl, north_trace)
+                raise
+            _record_alias(requested_ipl, north_ipl, north_trace)
+            if nested_sources:
+                from .logging_config import get_logger
+
+                _log_successful_source(
+                    get_logger(), requested_ipl, tjd, nested_sources[-1], context=True
+                )
             # The recursion sees the already-normalized iflag (SPEED3 mapped
             # to SPEED), so its echoed retflag loses the caller's original
             # speed bit — re-echo against raw_iflag exactly like the
             # module-level south-node branch (planets.py _calc_body_south).
-            return _south_node_from_north(north_result, iflag), _echo_retflag(retflag)
+            return result
 
         # --- LEB fast path: try binary ephemeris first ---
         # A context-local LEB has priority over the global LEB configuration,
@@ -729,16 +791,17 @@ class EphemerisContext:
                     topo=_ctx_topo,
                 )
                 from .logging_config import get_logger
-
-                get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd)
-                _record(ipl, "LEB")
-                from .planets import _implied_retflag_bits
+                from .planets import _implied_retflag_bits, _log_successful_source
 
                 from .planets import _to_native_floats
 
-                return _to_native_floats(result[0]), _echo_retflag(
-                    result[1] | _implied_retflag_bits(iflag)
+                pos_out = _to_native_floats(result[0])
+                retflag_out = _echo_retflag(result[1] | _implied_retflag_bits(iflag))
+                _log_successful_source(
+                    get_logger(), requested_ipl, tjd, "LEB", context=True
                 )
+                _record(requested_ipl, "LEB")
+                return pos_out, retflag_out
             except (KeyError, ValueError) as _leb_err:
                 # missing body / out-of-range -> DEBUG, corruption -> WARNING
                 from .leb_reader import log_leb_fallback
@@ -778,17 +841,18 @@ class EphemerisContext:
                     result = horizons_backend.horizons_calc_ut(
                         h_client, jd_ut_approx, ipl, iflag, self.sidereal_mode
                     )
-                get_logger().debug(
-                    "body=%d jd=%.1f source=Horizons (context)", ipl, tjd
-                )
-                _record(ipl, "Horizons")
-                from .planets import _implied_retflag_bits
+                from .planets import _implied_retflag_bits, _log_successful_source
 
                 from .planets import _to_native_floats
 
-                return _to_native_floats(result[0]), _echo_retflag(
-                    result[1] | _implied_retflag_bits(iflag)
+                pos_out = _to_native_floats(result[0])
+                retflag_out = _echo_retflag(result[1] | _implied_retflag_bits(iflag))
+                trace_source = horizons_backend._trace_source(ipl, iflag)
+                _log_successful_source(
+                    get_logger(), requested_ipl, tjd, trace_source, context=True
                 )
+                _record(requested_ipl, trace_source)
+                return pos_out, retflag_out
             except KeyError as _hz_err:
                 get_logger().debug(
                     "body=%d jd=%.1f source=Horizons->fallback (context) reason=%s",
@@ -812,10 +876,12 @@ class EphemerisContext:
 
         from .exceptions import validate_jd_range
         from .planets import (
-            _PLANET_MAP,
             _body_uses_jpl_ephemeris,
             _calc_body_with_context,
+            _dispatch_source,
+            _fallback_trace_source,
             _finalize_output_flags,
+            _log_successful_source,
             _strip_output_flags,
             _wrap_ephemeris_range_error,
         )
@@ -829,8 +895,19 @@ class EphemerisContext:
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd) if ut else ts.tt_jd(tjd)
+        trace_active = _is_active()
+        requested_trace = (
+            _snapshot_record(requested_ipl) if trace_active else (False, None)
+        )
+        alias_trace = _snapshot_record(ipl) if trace_active else (False, None)
+
+        def _restore_failed_trace() -> None:
+            _restore_record(ipl, alias_trace)
+            _restore_record(requested_ipl, requested_trace)
+
         # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
         # the module-level entry points; _calc_body does not apply them.
+        source_token = _dispatch_source.set(None)
         try:
             try:
                 pos, retflag = _calc_body_with_context(
@@ -845,22 +922,39 @@ class EphemerisContext:
                 pos, retflag = _calc_body_with_context(
                     t, ipl, _strip_output_flags(iflag), self
                 )
+            source_hint = _dispatch_source.get()
+            pos_out, rf_out = _finalize_output_flags(pos, retflag, iflag)
+            retflag_out = _echo_retflag(rf_out)
         except SkyfieldRangeError as e:
+            _restore_failed_trace()
             raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
         except ValueError as e:
+            _restore_failed_trace()
             # SPK type 21 kernels raise ValueError for out-of-coverage dates
             # (same conversion as the module-level entry points).
             if "Invalid Time" in str(e) or "time" in str(e).lower():
                 raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
             raise
-        # Standard planets use Skyfield directly. Minor-body branches record
-        # their more specific source (SPK, ASSIST, or Keplerian) inside
-        # _calc_body; do not overwrite that trace here. This is the same
-        # distinction made by the module-level entry points.
-        if ipl in _PLANET_MAP:
-            _record(ipl, "Skyfield")
-        pos_out, rf_out = _finalize_output_flags(pos, retflag, iflag)
-        return pos_out, _echo_retflag(rf_out)
+        except Exception:
+            _restore_failed_trace()
+            raise
+        finally:
+            _dispatch_source.reset(source_token)
+        # Inner branches retain their precise source; other successful
+        # fallbacks are classified as Skyfield or Analytical.
+        from .logging_config import get_logger
+
+        logger = get_logger()
+        if trace_active or logger.isEnabledFor(10) or source_hint == "Keplerian":
+            fallback_source = _fallback_trace_source(ipl, source_hint)
+            if fallback_source is None:
+                _record_alias(requested_ipl, ipl, alias_trace)
+            else:
+                _log_successful_source(
+                    logger, requested_ipl, tjd, fallback_source, context=True
+                )
+                _record(requested_ipl, fallback_source)
+        return pos_out, retflag_out
 
     def houses(
         self, tjd_ut: float, lat: float, lon: float, hsys: int

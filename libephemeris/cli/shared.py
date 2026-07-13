@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import click
 
+from ..constants import SPK_BODY_NAME_MAP
+
 # ---------------------------------------------------------------------------
 # Tier metadata — single source of truth for both CLIs
 # ---------------------------------------------------------------------------
@@ -39,6 +41,7 @@ TIER_INFO = {
 }
 
 TIERS = list(TIER_INFO.keys())
+SPK_BODY_COUNT = len(SPK_BODY_NAME_MAP)
 
 
 def tier_download_help(tier: str) -> str:
@@ -56,7 +59,7 @@ Download all data files for the '{tier}' precision tier.
 Downloads:
   1. The ephemeris file ({info["ephemeris"].split(" ")[0]})
   2. planet_centers.bsp precision offsets (~25 MB)
-  3. SPK kernels for 21 minor bodies (asteroids, centaurs, TNOs)
+  3. SPK kernels for {SPK_BODY_COUNT} minor bodies (asteroids, centaurs, TNOs)
 """
 
 
@@ -67,8 +70,9 @@ def leb_download_help(tier: str) -> str:
     return f"""\
 Download the precomputed LEB binary ephemeris for the '{tier}' tier.
 
-LEB files contain Chebyshev polynomial approximations for all celestial bodies,
-providing ~14x speedup over the Skyfield/JPL pipeline.
+The published LEB1 files contain the 31-body core catalog and provide ~14x
+speedup over the Skyfield/JPL pipeline. Locally regenerated files may also
+include the exotic-body registry and are substantially larger.
 
   Tier:       {tier} ({info["range"]})
   File:       ephemeris_{tier}.leb ({sizes.get(tier, "")})

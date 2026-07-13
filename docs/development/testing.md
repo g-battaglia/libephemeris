@@ -12,7 +12,7 @@ Install the project and development dependencies in the active environment:
 uv pip install -e ".[dev]"
 ```
 
-Use `uv run leph ...` if the virtual environment is not activated. See the
+Use `uv run ./leph ...` if the virtual environment is not activated. See the
 [CLI reference](https://github.com/g-battaglia/libephemeris/blob/main/CLI.md)
 for shell completion and the complete command
 tree.
@@ -28,46 +28,46 @@ Recommended gates:
 
 | Purpose | Command |
 |---|---|
-| Fast Skyfield sanity check | `leph test skyfield essential` |
-| Recommended broad unit gate | `leph test leb-backend unit-fast` |
+| Fast Skyfield sanity check | `uv run ./leph test skyfield essential` |
+| Recommended broad unit gate | `uv run ./leph test leb-backend unit-fast` |
 | One file | `pytest tests/test_file.py -v` |
 | One test | `pytest tests/test_file.py::test_name -v` |
-| Static checks | `leph code lint`, `leph code format`, `leph code typecheck` |
+| Static checks | `uv run ./leph code lint`, `uv run ./leph code format`, `uv run ./leph code typecheck` |
 
 The LEB backend gate requires the configured LEB data described by
-`leph test leb-backend --help`. If that data is unavailable, use the Skyfield
+`uv run ./leph test leb-backend --help`. If that data is unavailable, use the Skyfield
 subgroup or a targeted file and report the limitation.
 
 ## Test groups
 
 The developer CLI is the source of truth for available subcommands. Inspect it
-with `leph test --help` and `leph test <group> --help`.
+with `uv run ./leph test --help` and `uv run ./leph test <group> --help`.
 
 ### Skyfield backend
 
 ```bash
-leph test skyfield essential    # quick, one representative test per module
-leph test skyfield smoke        # broader representative selection
-leph test skyfield unit-fast    # unit tests, parallel, excluding @slow
-leph test skyfield unit         # same scope, sequential and verbose
+uv run ./leph test skyfield essential    # quick, one representative test per module
+uv run ./leph test skyfield smoke        # broader representative selection
+uv run ./leph test skyfield unit-fast    # unit tests, parallel, excluding @slow
+uv run ./leph test skyfield unit         # same scope, sequential and verbose
 ```
 
 ### LEB backend
 
 ```bash
-leph test leb-backend essential
-leph test leb-backend unit-fast  # recommended broad development gate
-leph test leb-backend unit       # sequential and verbose
+uv run ./leph test leb-backend essential
+uv run ./leph test leb-backend unit-fast  # recommended broad development gate
+uv run ./leph test leb-backend unit       # sequential and verbose
 ```
 
 ### Targeted domains
 
 ```bash
-leph test lunar all
-leph test leb-format all
-leph test leb2-format all
-leph test horizons precision-quick  # requires network access
-leph test coverage run
+uv run ./leph test lunar all
+uv run ./leph test leb-format all
+uv run ./leph test leb2-format all
+uv run ./leph test horizons precision-quick  # requires network access
+uv run ./leph test coverage run
 ```
 
 Use the subgroup help before selecting a larger or data-dependent variant.

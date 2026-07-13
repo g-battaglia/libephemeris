@@ -413,14 +413,14 @@ def apogee() -> None:
 
 
 @lunar_group.command(
-    short_help="Test mean + true Lilith precision across 8 test files.",
+    short_help="Test mean + true Lilith precision across 7 test files.",
 )
 def lilith() -> None:
-    """Test mean Lilith and true Lilith precision across 8 test files.
+    """Test mean Lilith and true Lilith precision across 7 test files.
 
-    Covers: mean_lilith_enhanced, true_lilith_precision, annual_equation,
-    evection_secondary, parallactic_inequality, reduction_to_ecliptic,
-    solar_perturbation, variation.
+    Covers: mean_lilith_enhanced, annual_equation, evection_secondary,
+    parallactic_inequality, reduction_to_ecliptic, solar_perturbation,
+    and variation.
     """
     _pytest(["-v", *_LILITH_FILES])
 
@@ -640,8 +640,8 @@ test_group.add_command(leb_format_group)
     "LEB2 is a lossy-compressed version of LEB1 that achieves 4-10x smaller\n"
     'files while maintaining <0.001" precision. These tests verify the\n'
     "compression/decompression roundtrip and measure precision loss vs LEB1.\n\n"
-    "  leph test leb2-format all             # Compression + reader unit tests (27)\n"
-    "  leph test leb2-format precision-base  # 31 bodies x 6 flags x 200 dates (~15s)",
+    "  leph test leb2-format all             # Compression + reader unit tests\n"
+    "  leph test leb2-format precision-base  # Core companion x 6 flags x 200 dates",
 )
 def leb2_format_group() -> None:
     """Tests for the LEB2 compressed format."""
@@ -649,10 +649,10 @@ def leb2_format_group() -> None:
 
 @leb2_format_group.command(
     "all",
-    short_help="Run LEB2 compression and reader unit tests (27 tests).",
+    short_help="Run LEB2 compression and reader unit tests.",
 )
 def leb2_format_all() -> None:
-    """Run LEB2 compression and reader unit tests (27 tests).
+    """Run LEB2 compression and reader unit tests.
 
     Tests compress/decompress roundtrip, mantissa bit computation,
     LEB2Reader lazy decompression, and format auto-detection.
@@ -673,8 +673,9 @@ def leb2_format_all() -> None:
 def leb2_precision_base() -> None:
     """Measure LEB2 vs LEB1 precision for base tier (~15s).
 
-    Evaluates 31 bodies x 6 calculation flags x 200 random dates and
-    reports the maximum arcsecond difference between LEB2 and LEB1.
+    Evaluates every body in the tier's core LEB2 companion across 6 calculation
+    flags x 200 random dates and reports the maximum arcsecond difference
+    between LEB2 and LEB1.
     """
     _python(["scripts/test_leb2_precision.py", "base"])
 

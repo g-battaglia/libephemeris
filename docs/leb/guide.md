@@ -1,7 +1,7 @@
 # LEB (LibEphemeris Binary) — Complete Technical Guide
 
 > **Version:** 2.2 — March 2026
-> **Status:** Production-ready (LEB1 and LEB2 formats), **31 core bodies <0.001" precision (+ 31 exotic minor bodies)**
+> **Status:** Production-ready (LEB1 and LEB2 formats). The 31-body comparison set is below 0.001" on base/medium; extended ecliptic extremes use a measured 0.1" tolerance. The exotic registry has 31 bodies, of which 23 non-NEAs are eligible for extended.
 > **Source of truth:** This document. See also [Algorithms & Theory](algorithms.md) for detailed mathematical foundations.
 > **Quick reference:** [Generation Quickstart](quickstart.md) — step-by-step commands for generating LEB1 and LEB2 files.
 > LEB2 compressed format details: see `proposals/leb2-implementation-plan.md` and `release-notes/v1.0.0.md`.
@@ -80,9 +80,9 @@ scripts/
   generate_leb.py  CLI generator: Chebyshev fitting, vectorized evaluation, binary assembly
 
 data/leb/
-  ephemeris_base.leb      Base tier (de440s, 1850-2150, ~53 MB)
-  ephemeris_medium.leb    Medium tier (de440, 1550-2650, ~175 MB)
-  ephemeris_extended.leb  Extended tier (de441, -5000 to 5000, ~1.6 GB)
+  ephemeris_base.leb      Base tier (de440s, 1850-2150, ~375 MB full registry)
+  ephemeris_medium.leb    Medium tier (de440, 1550-2650, ~1.23 GB full registry)
+  ephemeris_extended.leb  Extended tier (de441, -5000 to 5000, ~7.64 GB / 54 bodies)
 
 tests/test_leb/
   test_leb_format.py      Format constants and serialization
@@ -409,8 +409,8 @@ regardless of file size.
 the page-aligned byte ranges of segments/chunks overlapping the given
 Julian Day range.  This allows pre-faulting only the date ranges that
 will be needed (e.g. 1800-2200 CE ≈ 11 MB for extended tier) without
-loading the entire file (~1.6 GB for the extended tier).  `CompositeLEBReader.warm()` delegates
-to all constituent readers.
+loading the entire file (about 7.64 GB for the current full-registry extended
+artifact). `CompositeLEBReader.warm()` delegates to all constituent readers.
 
 Automatic preloading can be enabled via TOML configuration:
 
@@ -814,11 +814,14 @@ python scripts/generate_leb.py --output custom.leb --start 1900 --end 2100
 
 ### 6.3 Tier Configurations
 
-| Tier | Ephemeris | Years | Output | Approx Size |
-|------|-----------|-------|--------|-------------|
-| `base` | de440s.bsp | 1850-2150 | `ephemeris_base.leb` | ~53 MB |
-| `medium` | de440.bsp | 1550-2650 | `ephemeris_medium.leb` | ~175 MB |
-| `extended` | de441.bsp | -5000 to 5000 | `ephemeris_extended.leb` | ~1.6 GB |
+| Tier | Ephemeris | Years | Output | Typical current inventory |
+|------|-----------|-------|--------|---------------------------|
+| `base` | de440s.bsp | 1850-2150 | `ephemeris_base.leb` | ~375 MB, up to 62 bodies |
+| `medium` | de440.bsp | 1550-2650 | `ephemeris_medium.leb` | ~1.23 GB, up to 62 bodies |
+| `extended` | de441.bsp | -5000 to 5000 | `ephemeris_extended.leb` | ~7.64 GB, 54 bodies |
+
+These locally generated full-registry sizes are distinct from the smaller
+published 31-body LEB1 download assets.
 
 ### 6.4 Chebyshev Fitting
 
@@ -1039,11 +1042,13 @@ The `assemble_leb()` function (line 1328):
 
 ### 6.15 Group Generation & Merge
 
-Generating all 62 bodies in a single process can be slow. The **group workflow**
-splits generation into four independent runs — one per body group (planets,
-asteroids, exotics, analytical) — then merges the partial files into a single
-`.leb`. This allows regenerating only the group that changed (e.g. after
-updating asteroid SPK files).
+Generating the full registry in a single process can be slow. The **group
+workflow** splits generation into four independent runs — one per body group
+(planets, asteroids, exotics, analytical) — then merges the partial files into
+a single `.leb`. Base and medium register up to 62 bodies. Extended generation
+deliberately excludes eight chaotic near-Earth asteroids and produces a
+54-body inventory. The split allows regenerating only the group that changed
+(e.g. after updating asteroid SPK files).
 
 #### Body Groups
 
@@ -1552,10 +1557,12 @@ Typical generation-time errors:
 The compare test suite (`tests/test_leb/compare/`) validates LEB output
 against Skyfield for all 31 core bodies across hundreds of dates per tier.
 
-**All 31 core bodies achieve <0.001 arcsecond geocentric position precision**
-on all three tiers (base, medium, and extended). (The 31 exotic minor bodies
-of §9.3 are SPK-derived and best-effort; NEAs in particular use looser
-targets.) This was accomplished through:
+The 31-body core follows the per-category tolerances below. Base and medium
+geocentric positions remain below 0.001 arcsecond. On the extended tier,
+analytical ecliptic bodies can reach 0.054 arcsecond at extreme dates and use
+the documented 0.1-arcsecond tolerance. (The exotic minor bodies of §9.3 are
+SPK-derived and best-effort; NEAs in particular use looser targets.) These
+results were accomplished through:
 
 1. `COORD_ICRS_BARY_SYSTEM` storage for outer planets (eliminates COB
    oscillation fitting errors)
@@ -1607,7 +1614,8 @@ body errors are <0.001".
 **Tests passed:** 261 comparison tests (planets, hypothetical, velocities,
 lunar, flags, ancient/future sub-ranges, boundary dates).
 
-**File size:** ~1.6 GB (de441.bsp, -5000 to 5000 CE, 10,000 years).
+**Current full-registry file size:** ~7.64 GB (54 bodies, de441.bsp,
+-5000 to 5000 CE). The published 31-body LEB1 asset is smaller.
 
 #### Test Tolerances (as configured in `conftest.py`)
 
@@ -1858,15 +1866,21 @@ download_leb_for_tier("medium")  # downloads + activates
 ### 13.1 Overview
 
 LEB2 is a compressed variant of the LEB format that uses error-bounded lossy
-compression to reduce file sizes by 4-10x while maintaining <0.001" precision.
-The compression is transparent: `open_leb()` auto-detects the format via magic
-bytes (`LEB1` vs `LEB2`), and the runtime API is identical.
+compression to reduce file sizes by roughly 4-10x. The core end-to-end gate
+requires angular agreement below 0.001 arcsecond against LEB1, while the direct
+coefficient verifier reports each stored component in its native unit and as a
+ratio to its bound (AU for Cartesian ICRS; degrees/degrees/AU for ecliptic
+data). When a group is declared it also requires its exact inventory, and each
+LEB2 body's frame, degree, component count, and coverage are authenticated
+against LEB1 before comparison. The compression is transparent: `open_leb()`
+auto-detects the format via
+magic bytes (`LEB1` vs `LEB2`), and the runtime API is identical.
 
-**Motivation:** LEB1 files are too large to bundle in a wheel: the base-tier
-core set totals ~102 MB across the separate group files (over PyPI's 100 MB
-limit), and even the merged base-tier file is ~53 MB. LEB2 compresses the core
-body set to ~10.6 MB, enabling `pip install libephemeris` to include precomputed
-ephemeris with zero additional downloads.
+**Motivation:** LEB1 files are too large to bundle in a wheel: the published
+31-body base asset is about 53 MB, while the current full-registry merged base
+artifact is about 375 MB. LEB2 compresses the 14-body core companion to about
+10.6 MB, enabling `pip install libephemeris` to include precomputed ephemeris
+with zero additional downloads.
 
 **Dependency:** `zstandard` (required, ~200 KB wheel).
 
@@ -2006,22 +2020,26 @@ handling at evaluation time.
 
 ### 13.5 Per-Body Precision Targets
 
-The default target is `5e-9 AU` (≈0.001"). Bodies with small geocentric
-distances use tighter targets because positional errors are amplified into
-angular errors by `1/distance`, and because Moon/Earth positions feed into
-light-time, deflection, and aberration corrections for **all** other bodies.
+The numeric default target is `5e-9` in each body's native stored component
+unit. For Cartesian ICRS data this is AU (≈0.001" at 1 AU); ecliptic data uses
+degrees for longitude/latitude and AU for distance. Bodies with small
+geocentric distances use tighter Cartesian targets because positional errors
+are amplified into angular errors by `1/distance`, and because Moon/Earth
+positions feed into light-time, deflection, and aberration corrections for
+**all** other bodies.
 
 **Source:** `BODY_TARGET_AU` in `leb_compression.py`
 
-| Body | Target (AU) | Reason |
-|------|-------------|--------|
-| Moon (1) | 1e-12 | d_geo ~0.002 AU, amplification ~500x |
-| Earth (14) | 1e-12 | Used in corrections for every body |
-| Sun (0) | 1e-10 | Deflector for all bodies |
-| Mercury (2) | 1e-10 | d_geo ~0.55 AU, fast orbit |
-| Venus (3) | 1e-10 | d_geo ~0.27 AU, closest to Earth |
-| Mars (4) | 1e-10 | d_geo ~0.37 AU |
-| All others | 5e-9 | Default (0.001" at 1 AU) |
+| Body/frame | Numeric target | Stored unit | Reason |
+|------------|----------------|-------------|--------|
+| Moon (1) | 1e-12 | AU | d_geo ~0.002 AU, amplification ~500x |
+| Earth (14) | 1e-12 | AU | Used in corrections for every body |
+| Sun (0) | 1e-10 | AU | Deflector for all bodies |
+| Mercury (2) | 1e-10 | AU | d_geo ~0.55 AU, fast orbit |
+| Venus (3) | 1e-10 | AU | d_geo ~0.27 AU, closest to Earth |
+| Mars (4) | 1e-10 | AU | d_geo ~0.37 AU |
+| Other Cartesian bodies | 5e-9 | AU | Default (0.001" at 1 AU) |
+| Ecliptic/heliocentric bodies | 5e-9 | deg/deg/AU | Native stored components |
 
 ### 13.6 Modular File Architecture
 
@@ -2034,6 +2052,9 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 | `exotics` | 31 | 59.0 MB | Centaurs, TNOs, main-belt & NEA minor bodies (Pholus, Eris, …) |
 | `apogee` | 3 | 11.4 MB | Oscu Apogee, Interp Apogee/Perigee |
 | `uranians` | 9 | 2.1 MB | Cupido-Transpluto |
+
+The table gives the base-tier inventory. Medium also has 31 exotics; extended
+contains exactly the 23 regular exotics and excludes all eight chaotic NEAs.
 
 The `exotics` group (`LEB2_GROUPS` in `libephemeris/leb_groups.py`) is by far
 the largest. It is a supported generated companion but is not currently a
@@ -2118,14 +2139,17 @@ under CPython's GIL; once populated, the `bytes` buffer is immutable.
 | `leb_composite.py` | `CompositeLEBReader` — wraps multiple readers, dispatches by body_id |
 | `leb_reader.py` | `open_leb()` factory — auto-detects LEB1/LEB2 via magic bytes |
 | `scripts/generate_leb2.py` | CLI: `convert`, `convert-all`, `generate`, `verify` |
-| `scripts/test_leb2_precision.py` | Fast precision test: all bodies × 6 flags × N dates per tier |
+| `scripts/test_leb2_precision.py` | Fast precision test: 14 core bodies × 6 flags × N dates per tier |
 
 ### 13.10 Generation Workflow
 
 LEB2 files are produced by **converting** existing LEB1 files. The conversion
 applies the compression pipeline (§13.4) to each body's raw coefficients.
 
-**Prerequisites:** a valid LEB1 file for the target tier must exist in `data/leb/`.
+**Prerequisites:** a locally generated full-registry LEB1 file for the target
+tier must exist in `data/leb/`. The smaller published 31-body LEB1 assets do
+not contain the exotic group, so `convert-all` rejects them instead of writing
+an empty or incomplete named companion.
 
 **Recommended workflow (base tier):**
 
@@ -2136,10 +2160,10 @@ leph leb generate base groups
 # Step 2: Convert LEB1 → LEB2 (all 5 groups)
 leph leb2 convert base
 
-# Step 3: Verify LEB2 against LEB1 reference
+# Step 3: Verify the core LEB2 companion against its LEB1 reference
 leph leb2 verify base
 
-# Step 4: Run precision tests
+# Step 4: Run the core end-to-end precision test
 leph test leb2-format precision-base
 ```
 
@@ -2160,15 +2184,15 @@ leph leb2 convert base              # Base tier → data/leb2/base_{core,asteroi
 leph leb2 convert medium            # Medium tier
 leph leb2 convert extended          # Extended tier
 
-# Verify against LEB1 reference
-leph leb2 verify base               # 500 samples per body, compare vs LEB1
+# Verify the core companion against its LEB1 reference
+leph leb2 verify base               # exact 14-body core, 500 samples per body
 
 # Unit tests
 leph test leb2-format all           # Compression round-trip + reader tests
 
-# Precision tests (end-to-end via calc_ut)
-leph test leb2-format precision-base       # Base tier (~15s)
-leph test leb2-format precision-all        # All tiers (~45s)
+# Core precision tests (end-to-end via calc_ut)
+leph test leb2-format precision-base       # Base core (~15s)
+leph test leb2-format precision-all        # Core companions, all tiers (~45s)
 ```
 
 **Direct CLI (`scripts/generate_leb2.py`):**
@@ -2176,7 +2200,7 @@ leph test leb2-format precision-all        # All tiers (~45s)
 ```bash
 # Convert a single group
 python scripts/generate_leb2.py convert data/leb/ephemeris_base.leb \
-  -o data/leb2/base_core.leb2 --group core
+  -o data/leb2/base_core.leb2 --group core --tier base
 
 # Convert all groups at once
 python scripts/generate_leb2.py convert-all data/leb/ephemeris_base.leb \
@@ -2186,14 +2210,16 @@ python scripts/generate_leb2.py convert-all data/leb/ephemeris_base.leb \
 python scripts/generate_leb2.py generate --tier base --group core \
   -o data/leb2/base_core.leb2
 
-# Verify against LEB1
+# Verify the core file against LEB1
 python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
-  --reference data/leb/ephemeris_base.leb --samples 500
+  --reference data/leb/ephemeris_base.leb --samples 500 --group core --tier base
 ```
 
 ### 13.12 Measured Compression Results (Base Tier)
 
-Measured from the shipped `data/leb2/base_*.leb2` files (chunk-index sums).
+Measured from locally generated `data/leb2/base_*.leb2` files (chunk-index
+sums). Only `libephemeris/data/leb2/base_core.leb2` is bundled in the wheel;
+the other rows describe generation artifacts, not packaged files.
 "Payload" is the Chebyshev coefficient data alone; the compression ratio is
 payload-to-payload. Each on-disk group file additionally carries ~1.9 MB of
 *uncompressed* auxiliary sections (nutation series, star catalog, ΔT table),
@@ -2216,8 +2242,11 @@ which is why a tiny group like Uranians produces a 2.1 MB file from a
 
 ### 14.1 "Body X not in LEB file"
 
-The body is not one of the 62 bodies in `BODY_PARAMS`. LEB silently falls
-back to Skyfield. This is expected behavior, not an error.
+The body is absent from the loaded file's inventory. Base and medium local
+generation can include up to 62 registered bodies; extended generation omits
+eight chaotic NEAs and contains 54. Published 31-body LEB1 assets and the
+bundled 14-body LEB2 core are intentionally smaller. The calculation pipeline
+falls back according to the selected mode when a body is absent.
 
 ### 14.2 "JD outside range"
 

@@ -1440,8 +1440,8 @@ def d2l(d: float) -> int:
 SPLIT_DEG_ROUND_SEC: int = 1  # Round to seconds
 SPLIT_DEG_ROUND_MIN: int = 2  # Round to minutes
 SPLIT_DEG_ROUND_DEG: int = 4  # Round to degrees
-SPLIT_DEG_ZODIACAL: int = 8  # Return zodiac sign number (0-11)
-SPLIT_DEG_NAKSHATRA: int = 1024  # Return nakshatra number (0-26)
+SPLIT_DEG_ZODIACAL: int = 8  # Return raw 30-degree zodiac segment
+SPLIT_DEG_NAKSHATRA: int = 1024  # Return raw nakshatra segment number
 SPLIT_DEG_KEEP_SIGN: int = 16  # Don't round to next zodiac sign/nakshatra
 SPLIT_DEG_KEEP_DEG: int = 32  # Don't round to next degree
 
@@ -1518,10 +1518,9 @@ def _split_deg_nakshatra(
     # API result is 35'23", not 35'24".
     ddeg += offset
     nak_idx = int(ddeg / nakshatra_span)
-    # Reference parity: only the exact 360 deg rollover (index 27, i.e.
-    # ddeg in [360, 373.33)) wraps to 0; a raw longitude >= 373.33 keeps its
-    # computed index (e.g. 476.58 -> 35), rather than collapsing every index
-    # >= 27 to 0.
+    # Compatibility parity: the entire raw segment 27 (360 <= ddeg < 373.33)
+    # wraps to 0; a raw longitude >= 373.33 keeps its computed index (e.g.
+    # 476.58 -> 35), rather than collapsing every index >= 27 to 0.
     if nak_idx == 27:
         nak_idx = 0
 
@@ -1559,27 +1558,37 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
             - SPLIT_DEG_ROUND_SEC (1): Round to nearest second
             - SPLIT_DEG_ROUND_MIN (2): Round to nearest minute
             - SPLIT_DEG_ROUND_DEG (4): Round to nearest degree
-            - SPLIT_DEG_ZODIACAL (8): Return zodiac sign number (0-11, each 30 deg)
-            - SPLIT_DEG_NAKSHATRA (1024): Return nakshatra number (0-26, each 13deg20')
+            - SPLIT_DEG_ZODIACAL (8): Return raw 30-degree zodiac segment index
+            - SPLIT_DEG_NAKSHATRA (1024): Return raw nakshatra segment index
             - SPLIT_DEG_KEEP_SIGN (16): Don't round to next zodiac sign/nakshatra
             - SPLIT_DEG_KEEP_DEG (32): Don't round to next degree
 
     Returns:
         Tuple of (deg, min, sec, secfr, sign) where:
-        - deg: Degrees within sign (0-29 with ZODIACAL, 0-13 with NAKSHATRA,
-               or total degrees without either flag)
+        - deg: Degrees within sign (0-29 with ZODIACAL, or 0-13 for a
+               non-negative NAKSHATRA split), otherwise total absolute degrees
         - min: Arc minutes (0-59)
         - sec: Arc seconds (0-59)
         - secfr: Fraction of arc second (0.0-0.999...), or the rounded seconds
                  value when rounding flags are used
-        - sign: Zodiac sign (0-11), nakshatra (0-26), or +1/-1 for positive/negative
+        - sign: Raw zodiac/nakshatra segment index, or +1/-1
+          for an ordinary positive/negative split
 
     Notes:
         - Without ZODIACAL or NAKSHATRA flag, sign returns +1 (positive) or -1 (negative)
-        - With ZODIACAL flag: uses absolute value, sign is 0-11
-          (0=Aries, 1=Taurus, ..., 11=Pisces)
-        - With NAKSHATRA flag: uses absolute value, sign is 0-26
-          (each nakshatra spans 13 deg 20 min = 13.333... degrees)
+        - With ZODIACAL flag: uses absolute value and returns a raw 30-degree
+          segment index. Inputs below 360 degrees return 0-11. The observed
+          compatibility rule maps raw segment 12 (360 through just below 390
+          degrees) to 0; subsequent segments retain their raw indices, so 390
+          returns 13 and 480 returns 16 rather than wrapping modulo 12.
+        - With NAKSHATRA flag, non-negative inputs use the raw longitude to
+          derive the segment index. Inputs in the conventional 0-360 degree
+          interval return 0-26; values beyond the first rollover can retain a
+          larger raw index for black-box compatibility.
+        - For negative input, NAKSHATRA alone follows the ordinary signed split
+          and returns ``-1``. If ZODIACAL is also set, the zodiacal split of the
+          absolute value applies instead. For non-negative input, NAKSHATRA
+          takes precedence when both format bits are set.
         - Rounding flags affect how values are truncated/rounded
         - KEEP_SIGN prevents rounding from advancing to the next sign
         - KEEP_DEG prevents rounding from advancing to the next degree
@@ -1632,7 +1641,9 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
     # --- Zodiacal sign extraction (after rounding) ---
     if roundflag & SPLIT_DEG_ZODIACAL:
         sign_out = int(ddeg / 30.0)
-        if sign_out == 12:  # exactly 360° maps back to sign 0
+        # Compatibility-visible exception: the entire raw segment 12
+        # (360 <= ddeg < 390), not only the exact 360-degree boundary, maps to 0.
+        if sign_out == 12:
             sign_out = 0
         ddeg = math.fmod(ddeg, 30.0)
 

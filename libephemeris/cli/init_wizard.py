@@ -39,8 +39,9 @@ _DE_KERNELS: Dict[str, tuple] = {
 _PC_SIZES: Dict[str, float] = {"base": 25.4, "medium": 72.6, "extended": 222.6}
 
 _LEB2_GROUPS = list(LEB2_GROUPS)
-# Compressed LEB2 sizes (MB) per tier/group. "exotics" base is measured;
-# medium/extended exotics are estimates pending regeneration (1600-2500 island).
+# Compressed LEB2 sizes (decimal MB) per tier/group. Exotic sizes are measured
+# from the current canonical rc8 generation artifacts; extended contains the
+# 23 regular exotics and excludes all eight chaotic NEAs.
 _LEB2_SIZES: Dict[str, Dict[str, float]] = {
     "base": {
         "core": 10.6,
@@ -52,14 +53,14 @@ _LEB2_SIZES: Dict[str, Dict[str, float]] = {
     "medium": {
         "core": 38.3,
         "asteroids": 29.2,
-        "exotics": 177.0,
+        "exotics": 194.8,
         "apogee": 42.1,
         "uranians": 9.3,
     },
     "extended": {
         "core": 334.9,
         "asteroids": 86.2,
-        "exotics": 177.0,
+        "exotics": 283.9,
         "apogee": 391.7,
         "uranians": 84.0,
     },
@@ -314,7 +315,9 @@ def _get_required_files(tier: str, mode: str) -> List[Dict[str, Any]]:
                     "filename": f"{tier}_{group}.leb2",
                     "size_mb": size,
                     "category": "LEB2",
-                    "status": "required",
+                    # The canonical exotics companion is supported locally but
+                    # has no published DATA_FILES artifact yet.
+                    "status": "optional" if group == "exotics" else "required",
                     "subdir": "leb",
                 }
             )
@@ -733,9 +736,8 @@ def run_wizard(
     click.echo(_w("Minor bodies"))
 
     if mode in ("auto", "leb"):
-        click.echo(_d("  LEB files already cover 31 bodies: Sun, Moon, 8 planets,"))
-        click.echo(_d("  nodes, apsides, and 5 major asteroids (Ceres, Chiron, etc.)."))
-        click.echo(_d("  Enable auto-download of SPK kernels for any *other* minor"))
+        click.echo(_d("  LEB files cover the body groups present in your installed"))
+        click.echo(_d("  tier companions. Enable auto-download for any *other* minor"))
         click.echo(_d("  body you request (e.g. Eros, Sedna)?"))
         auto_spk_default = mode == "auto"
     elif mode == "skyfield":

@@ -9,17 +9,19 @@ LibEphemeris is a pure-Python astronomical ephemeris library with a Swiss Epheme
 ```bash
 uv pip install -e ".[dev]"              # Install with dev deps
 
-leph code lint                          # Ruff linter with auto-fix
-leph code format                        # Ruff formatter
-leph code typecheck                     # mypy
+uv run ./leph code lint                 # Ruff linter with auto-fix
+uv run ./leph code format               # Ruff formatter
+uv run ./leph code typecheck            # mypy
 
-leph test skyfield essential            # ~900 tests, ~20s (fast sanity check)
-leph test leb-backend unit-fast         # ~16,000 tests, ~1 min [RECOMMENDED]
+uv run ./leph test skyfield essential   # ~900 tests, ~20s (fast sanity check)
+uv run ./leph test leb-backend unit-fast # ~16,000 tests, ~1 min [RECOMMENDED]
 pytest tests/test_file.py -v            # Single file
 pytest tests/test_file.py::test_name -v # Single test
 ```
 
-**Never run the full test suite.** Always use `leph test <subgroup>` or `pytest` on specific files. Full CLI reference (dev, prod, poe shortcuts, TAB completion setup): see `CLI.md`.
+**Never run the full test suite.** Always use `uv run ./leph test <subgroup>`
+or `pytest` on specific files. Full CLI reference (dev, prod, poe shortcuts,
+TAB completion setup): see `CLI.md`.
 
 ## Code Style
 

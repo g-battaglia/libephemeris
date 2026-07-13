@@ -34,6 +34,22 @@ public export surface. No breaking API changes.
 - **SPK test isolation.** SPK download and cache tests use the production HTTP
   path and synthetic fixtures without depending on an external catalog client
   or stale local data.
+- **Truthful traced-entry-point reporting.** Module and context `calc()` /
+  `calc_ut()` now overwrite stale traces for analytical/JPL lunar points,
+  `ECL_NUT`, south nodes, `AST_OFFSET+n` aliases, fixed stars, and registered
+  planetary moons.
+  Source tags distinguish Analytical, ERFA, LEB, Skyfield, SPK, and mixed
+  fixed-star stencils, and are recorded only after a successful calculation.
+- **Repo-local developer CLI.** The module launcher anchors subprocesses to the
+  checkout root, so generated shell functions work from any directory. Bash
+  and fish completion now strip Click's completion metadata correctly.
+- **LEB2 group workflow.** Per-group conversion covers all five canonical
+  groups for every tier. Tier verification explicitly checks the named core
+  companion against LEB1 and reports Cartesian position-component error in AU using
+  bounds derived from the compression targets. End-to-end core precision tests
+  now fail closed on missing inputs, calculation errors, or absent coverage.
+  The LEB1 developer CLI also exposes the previously omitted direct `exotics`
+  group command for every tier.
 
 ### Added
 
@@ -50,6 +66,13 @@ public export surface. No breaking API changes.
 - **Archive clean-room gate.** Wheel and source-distribution audits now apply
   the same case-insensitive forbidden filename and directory rules as the
   physical-worktree provenance check.
+- **Whole-worktree content gate.** Provenance scanning detects UTF-8 project
+  text regardless of suffix (including shell, lock, HTML/XML, validation, and
+  ignored files), limits cache/environment exclusions to exact infrastructure
+  paths, and checks safe symlink target names without dereferencing them.
+- **Archive metadata and payload gate.** Tar/ZIP directory types, unsafe or
+  special members, and text payload fingerprints are checked in addition to
+  member names; prohibited names fail before payloads are opened.
 
 ### Changed
 
@@ -62,6 +85,10 @@ public export surface. No breaking API changes.
   artifacts in source trees and packages.
 - Project-owned Python was normalized with the configured Ruff formatter;
   vendored sources remain excluded from project formatting.
+- `split_deg()` documentation now states the observable raw nakshatra-index
+  behavior for longitudes beyond one turn, the zodiacal raw-segment-12 rollover,
+  and the ordinary signed behavior of negative NAKSHATRA-only inputs; focused
+  tests lock these cases.
 
 ## [3.0.0rc7] - 2026-07-12
 
@@ -648,7 +675,7 @@ final **with no further code changes** if it proves clean.
   `moon_theories/tass17.py`, and `moon_theories/tass17_data.py`. Provenance is
   enforced by local gates (`license:check`, `provenance:sweep`,
   `provenance:hypothetical`, `wheel:audit`) extended to cover `docs/` and
-  `scripts/`, with a PyMeeus zero-hit class. The Uranian/Transpluto orbital
+  `scripts/`, with a PyMeeus zero-hit class. <!-- provenance-implementation-ok --> The Uranian/Transpluto orbital
   elements are gated to published sources.
 
 ### Added
@@ -1137,7 +1164,7 @@ Ephemeris reference or to correct measured errors.
   contains no copyleft code; the only third-party files are permissive
   (MIT): `vendor/spktype21.py`, `moon_theories/tass17.py`, and
   `moon_theories/tass17_data.py` (the last relabeled MIT to match its
-  Stellarium-derived data). The provenance CI gate gained a PyMeeus
+  Stellarium-derived data). The provenance CI gate gained a PyMeeus <!-- provenance-implementation-ok -->
   zero-hit class.
 
 ### Eclipse correctness (audit round v10)

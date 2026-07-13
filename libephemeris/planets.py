@@ -46,13 +46,21 @@ References:
 from __future__ import annotations
 
 from contextlib import contextmanager as _contextmanager
+from contextvars import ContextVar
 from functools import lru_cache
+from collections.abc import Iterator
 
 import math
 import warnings
 from typing import Tuple, TYPE_CHECKING
 
-from .tracing import _record
+from .tracing import (
+    _is_active,
+    _record,
+    _record_alias,
+    _restore_record,
+    _snapshot_record,
+)
 from jplephem.exceptions import OutOfRangeError
 from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
 from skyfield.api import Star
@@ -221,6 +229,80 @@ _PLANET_MAP = {
     PLUTO: "pluto",  # 999 if available, else barycenter 9
     EARTH: "earth",
 }
+
+_dispatch_source: ContextVar[str | None] = ContextVar(
+    "libephemeris_dispatch_source", default=None
+)
+_source_log_capture: ContextVar[list[str] | None] = ContextVar(
+    "libephemeris_source_log_capture", default=None
+)
+
+
+def _mark_dispatch_source(source: str) -> None:
+    """Capture a precise inner source for publication by the outer entry point."""
+    _dispatch_source.set(source)
+
+
+@_contextmanager
+def _capture_source_logs() -> Iterator[list[str]]:
+    """Defer nested success-source logs until the public caller succeeds."""
+    captured: list[str] = []
+    token = _source_log_capture.set(captured)
+    try:
+        yield captured
+    finally:
+        _source_log_capture.reset(token)
+
+
+def _fallback_trace_source(ipl: int, source_hint: str | None = None) -> str | None:
+    """Return the source tag for a successful ``_calc_body`` fallback.
+
+    Minor bodies and registered planetary moons record their specific source
+    inside their calculation branch. Fixed stars expose the source captured by
+    their calculation helper. Standard planets and
+    lunar points derived from JPL Moon states use the Skyfield pipeline; the
+    remaining supported bodies are computed by local analytical formulae
+    (some of which use JPL vectors for frame or observer reduction).
+    """
+    from . import fixed_stars, minor_bodies, planetary_moons
+
+    if source_hint is not None:
+        return source_hint
+
+    if (
+        ipl in minor_bodies.MINOR_BODY_ELEMENTS
+        or AST_OFFSET < ipl < FIXSTAR_OFFSET
+        or planetary_moons.is_planetary_moon(ipl)
+    ):
+        return None
+    if ipl in fixed_stars.FIXED_STARS:
+        return fixed_stars._get_fixed_star_source()
+    if ipl in (TRUE_NODE, OSCU_APOG) or ipl in _PLANET_MAP:
+        return "Skyfield"
+    return "Analytical"
+
+
+def _log_successful_source(
+    logger, body_id: int, jd: float, source: str, *, context: bool = False
+) -> None:
+    """Log one source only after all public output processing has succeeded."""
+    captured = _source_log_capture.get()
+    if captured is not None:
+        captured.append(source)
+        return
+    suffix = " (context)" if context else ""
+    if source == "Keplerian":
+        logger.warning(
+            "body=%d jd=%.1f source=Keplerian (fallback)%s. "
+            "Precision is degraded (~1-2 degrees; unperturbed two-body). "
+            "Install SPK kernels or enable auto-download for higher accuracy.",
+            body_id,
+            jd,
+            suffix,
+        )
+    else:
+        logger.debug("body=%d jd=%.1f source=%s%s", body_id, jd, source, suffix)
+
 
 # Fallback mapping when planet center not available in ephemeris
 # DE430/440/441 only contain barycenters for Mars and outer planets
@@ -1340,6 +1422,7 @@ def calc_ut(
     from .constants import ECL_NUT
 
     _validate_barycentric_moseph(flags, "calc_ut")
+    requested_planet = planet
 
     # Handle ECL_NUT (-1) - returns nutation and obliquity.
     # The reference normalizes ECL_NUT flags to exactly one
@@ -1359,7 +1442,12 @@ def calc_ut(
         pos_nut, rf_nut = _calc_nutation_obliquity(
             tjdut, _exclusive_ephemeris_bit(res_flags)
         )
-        return pos_nut, rf_nut | _implied_retflag_bits(res_flags)
+        result = (pos_nut, rf_nut | _implied_retflag_bits(res_flags))
+        from .logging_config import get_logger
+
+        get_logger().debug("body=%d jd=%.1f source=ERFA", requested_planet, tjdut)
+        _record(requested_planet, "ERFA")
+        return result
 
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
@@ -1379,11 +1467,31 @@ def calc_ut(
 
         _sidm = get_sid_mode()
         if is_fixed_epoch_request(flags, _sidm):
-            sub_xx, sub_rf = calc_ut(tjdut, planet, fixed_epoch_request_flags(flags))
-            xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm)
-            return _to_native_floats(xx_t0), _echo_request_bits(
-                fixed_epoch_retflag(sub_rf, flags), raw_flags
+            nested_trace = (
+                _snapshot_record(requested_planet) if _is_active() else (False, None)
             )
+            try:
+                with _capture_source_logs() as nested_sources:
+                    sub_xx, sub_rf = calc_ut(
+                        tjdut, planet, fixed_epoch_request_flags(flags)
+                    )
+                    xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm)
+                    result = (
+                        _to_native_floats(xx_t0),
+                        _echo_request_bits(
+                            fixed_epoch_retflag(sub_rf, flags), raw_flags
+                        ),
+                    )
+            except Exception:
+                _restore_record(requested_planet, nested_trace)
+                raise
+            if nested_sources:
+                from .logging_config import get_logger
+
+                _log_successful_source(
+                    get_logger(), requested_planet, tjdut, nested_sources[-1]
+                )
+            return result
 
     # Built-in asteroids by AST_OFFSET number: remap before LEB/Horizons
     # dispatch so both id forms are served by the same backend.
@@ -1401,10 +1509,25 @@ def calc_ut(
 
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_ipl = abs(planet)
-        north_result, retflag = calc_ut(tjdut, north_ipl, flags)
-        return _south_node_from_north(north_result, flags), _echo_request_bits(
-            retflag, raw_flags
-        )
+        north_trace = _snapshot_record(north_ipl) if _is_active() else (False, None)
+        try:
+            with _capture_source_logs() as nested_sources:
+                north_result, retflag = calc_ut(tjdut, north_ipl, flags)
+                result = (
+                    _south_node_from_north(north_result, flags),
+                    _echo_request_bits(retflag, raw_flags),
+                )
+        except Exception:
+            _restore_record(north_ipl, north_trace)
+            raise
+        _record_alias(requested_planet, north_ipl, north_trace)
+        if nested_sources:
+            from .logging_config import get_logger
+
+            _log_successful_source(
+                get_logger(), requested_planet, tjdut, nested_sources[-1]
+            )
+        return result
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -1423,11 +1546,13 @@ def calc_ut(
             from . import fast_calc
 
             result = fast_calc.fast_calc_ut(reader, tjdut, planet, flags)
-            get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdut)
-            _record(planet, "LEB")
-            return _to_native_floats(result[0]), _echo_request_bits(
+            pos_out = _to_native_floats(result[0])
+            retflag_out = _echo_request_bits(
                 result[1] | _implied_retflag_bits(flags), raw_flags
             )
+            _log_successful_source(get_logger(), requested_planet, tjdut, "LEB")
+            _record(requested_planet, "LEB")
+            return pos_out, retflag_out
         except (KeyError, ValueError) as _leb_err:
             # missing body / out-of-range -> DEBUG, corruption -> WARNING
             from .leb_reader import log_leb_fallback
@@ -1444,11 +1569,14 @@ def calc_ut(
             from . import horizons_backend
 
             result = horizons_backend.horizons_calc_ut(h_client, tjdut, planet, flags)
-            get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdut)
-            _record(planet, "Horizons")
-            return _to_native_floats(result[0]), _echo_request_bits(
+            pos_out = _to_native_floats(result[0])
+            retflag_out = _echo_request_bits(
                 result[1] | _implied_retflag_bits(flags), raw_flags
             )
+            trace_source = horizons_backend._trace_source(planet, flags)
+            _log_successful_source(get_logger(), requested_planet, tjdut, trace_source)
+            _record(requested_planet, trace_source)
+            return pos_out, retflag_out
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
@@ -1477,10 +1605,20 @@ def calc_ut(
     # since they are output format flags, not calculation flags.
     # We apply them after the calculation is complete.
     calc_iflag = _strip_output_flags(flags)
+    trace_active = _is_active()
+    requested_trace = (
+        _snapshot_record(requested_planet) if trace_active else (False, None)
+    )
+    alias_trace = _snapshot_record(planet) if trace_active else (False, None)
+
+    def _restore_failed_trace() -> None:
+        _restore_record(planet, alias_trace)
+        _restore_record(requested_planet, requested_trace)
 
     from .cache import get_cached_time_ut1
 
     t = get_cached_time_ut1(tjdut)
+    source_token = _dispatch_source.set(None)
     try:
         try:
             pos, retflag = _calc_body(t, planet, calc_iflag)
@@ -1491,22 +1629,33 @@ def calc_ut(
             if "closed file" not in str(_closed_err):
                 raise
             pos, retflag = _calc_body(t, planet, calc_iflag)
-        # _calc_body logs the specific source (SPK, ASSIST, Keplerian)
-        # for minor bodies; for standard planets it's always Skyfield
-        if planet in _PLANET_MAP:
-            get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdut)
-            _record(planet, "Skyfield")
-        # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
+        source_hint = _dispatch_source.get()
         pos_out, rf_out = _finalize_output_flags(pos, retflag, flags)
-        return pos_out, _echo_request_bits(rf_out, raw_flags)
+        retflag_out = _echo_request_bits(rf_out, raw_flags)
+        logger = get_logger()
+        if trace_active or logger.isEnabledFor(10) or source_hint == "Keplerian":
+            fallback_source = _fallback_trace_source(planet, source_hint)
+            if fallback_source is None:
+                _record_alias(requested_planet, planet, alias_trace)
+            else:
+                _log_successful_source(logger, requested_planet, tjdut, fallback_source)
+                _record(requested_planet, fallback_source)
+        return pos_out, retflag_out
     except SkyfieldRangeError as e:
+        _restore_failed_trace()
         raise _wrap_ephemeris_range_error(e, tjdut, planet) from e
     except ValueError as e:
+        _restore_failed_trace()
         # SPK type 21 kernels (asteroids) raise ValueError when date is
         # outside the kernel's coverage. Convert to EphemerisRangeError.
         if "Invalid Time" in str(e) or "time" in str(e).lower():
             raise _wrap_ephemeris_range_error(e, tjdut, planet) from e
         raise
+    except Exception:
+        _restore_failed_trace()
+        raise
+    finally:
+        _dispatch_source.reset(source_token)
 
 
 def calc(
@@ -1545,6 +1694,7 @@ def calc(
     from .constants import ECL_NUT
 
     _validate_barycentric_moseph(flags, "calc")
+    requested_planet = planet
 
     # Handle ECL_NUT (-1) — nutation and obliquity. The input is already
     # TT, so compute directly (calc_ut converts UT first; this mirror was
@@ -1568,7 +1718,12 @@ def calc(
         else:
             nut_flags = res_flags
         pos_nut, rf_nut = _calc_nutation_obliquity_tt(tjdet, nut_flags)
-        return pos_nut, rf_nut | _implied_retflag_bits(res_flags)
+        result = (pos_nut, rf_nut | _implied_retflag_bits(res_flags))
+        from .logging_config import get_logger
+
+        get_logger().debug("body=%d jd=%.1f source=ERFA", requested_planet, tjdet)
+        _record(requested_planet, "ERFA")
+        return result
 
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
@@ -1584,12 +1739,34 @@ def calc(
 
         _sidm = get_sid_mode()
         if is_fixed_epoch_request(flags, _sidm):
-            sub_xx, sub_rf = calc(tjdet, planet, fixed_epoch_request_flags(flags))
-            xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm)
-            return _to_native_floats(xx_t0), _calc_tt_epheflag_echo(
-                _echo_request_bits(fixed_epoch_retflag(sub_rf, flags), raw_flags),
-                raw_flags,
+            nested_trace = (
+                _snapshot_record(requested_planet) if _is_active() else (False, None)
             )
+            try:
+                with _capture_source_logs() as nested_sources:
+                    sub_xx, sub_rf = calc(
+                        tjdet, planet, fixed_epoch_request_flags(flags)
+                    )
+                    xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm)
+                    result = (
+                        _to_native_floats(xx_t0),
+                        _calc_tt_epheflag_echo(
+                            _echo_request_bits(
+                                fixed_epoch_retflag(sub_rf, flags), raw_flags
+                            ),
+                            raw_flags,
+                        ),
+                    )
+            except Exception:
+                _restore_record(requested_planet, nested_trace)
+                raise
+            if nested_sources:
+                from .logging_config import get_logger
+
+                _log_successful_source(
+                    get_logger(), requested_planet, tjdet, nested_sources[-1]
+                )
+            return result
 
     # Built-in asteroids by AST_OFFSET number (see calc_ut)
     planet = _remap_ast_offset(planet)
@@ -1599,10 +1776,28 @@ def calc(
     from .constants import MEAN_NODE, TRUE_NODE
 
     if planet in (-MEAN_NODE, -TRUE_NODE):
-        north_result, retflag = calc(tjdet, abs(planet), flags)
-        return _south_node_from_north(north_result, flags), _calc_tt_epheflag_echo(
-            _echo_request_bits(retflag, raw_flags), raw_flags
-        )
+        north_ipl = abs(planet)
+        north_trace = _snapshot_record(north_ipl) if _is_active() else (False, None)
+        try:
+            with _capture_source_logs() as nested_sources:
+                north_result, retflag = calc(tjdet, north_ipl, flags)
+                result = (
+                    _south_node_from_north(north_result, flags),
+                    _calc_tt_epheflag_echo(
+                        _echo_request_bits(retflag, raw_flags), raw_flags
+                    ),
+                )
+        except Exception:
+            _restore_record(north_ipl, north_trace)
+            raise
+        _record_alias(requested_planet, north_ipl, north_trace)
+        if nested_sources:
+            from .logging_config import get_logger
+
+            _log_successful_source(
+                get_logger(), requested_planet, tjdet, nested_sources[-1]
+            )
+        return result
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -1618,12 +1813,14 @@ def calc(
             from . import fast_calc
 
             result = fast_calc.fast_calc_tt(reader, tjdet, planet, flags)
-            get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdet)
-            _record(planet, "LEB")
-            return _to_native_floats(result[0]), _calc_tt_epheflag_echo(
+            pos_out = _to_native_floats(result[0])
+            retflag_out = _calc_tt_epheflag_echo(
                 _echo_request_bits(result[1] | _implied_retflag_bits(flags), raw_flags),
                 raw_flags,
             )
+            _log_successful_source(get_logger(), requested_planet, tjdet, "LEB")
+            _record(requested_planet, "LEB")
+            return pos_out, retflag_out
         except (KeyError, ValueError) as _leb_err:
             # missing body / out-of-range -> DEBUG, corruption -> WARNING
             from .leb_reader import log_leb_fallback
@@ -1645,12 +1842,15 @@ def calc(
             result = horizons_backend.horizons_calc_ut(
                 h_client, jd_ut_approx, planet, flags
             )
-            get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdet)
-            _record(planet, "Horizons")
-            return _to_native_floats(result[0]), _calc_tt_epheflag_echo(
+            pos_out = _to_native_floats(result[0])
+            retflag_out = _calc_tt_epheflag_echo(
                 _echo_request_bits(result[1] | _implied_retflag_bits(flags), raw_flags),
                 raw_flags,
             )
+            trace_source = horizons_backend._trace_source(planet, flags)
+            _log_successful_source(get_logger(), requested_planet, tjdet, trace_source)
+            _record(requested_planet, trace_source)
+            return pos_out, retflag_out
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
@@ -1678,10 +1878,20 @@ def calc(
     # Strip FLG_XYZ and FLG_RADIANS from the flags passed to _calc_body
     # since they are output format flags, not calculation flags.
     calc_iflag = _strip_output_flags(flags)
+    trace_active = _is_active()
+    requested_trace = (
+        _snapshot_record(requested_planet) if trace_active else (False, None)
+    )
+    alias_trace = _snapshot_record(planet) if trace_active else (False, None)
+
+    def _restore_failed_trace() -> None:
+        _restore_record(planet, alias_trace)
+        _restore_record(requested_planet, requested_trace)
 
     from .cache import get_cached_time_tt
 
     t = get_cached_time_tt(tjdet)
+    source_token = _dispatch_source.set(None)
     try:
         try:
             pos, retflag = _calc_body(t, planet, calc_iflag)
@@ -1690,20 +1900,33 @@ def calc(
             if "closed file" not in str(_closed_err):
                 raise
             pos, retflag = _calc_body(t, planet, calc_iflag)
-        if planet in _PLANET_MAP:
-            get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdet)
-            _record(planet, "Skyfield")
-        # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
+        source_hint = _dispatch_source.get()
         pos_out, rf_out = _finalize_output_flags(pos, retflag, flags)
-        return pos_out, _calc_tt_epheflag_echo(
+        retflag_out = _calc_tt_epheflag_echo(
             _echo_request_bits(rf_out, raw_flags), raw_flags
         )
+        logger = get_logger()
+        if trace_active or logger.isEnabledFor(10) or source_hint == "Keplerian":
+            fallback_source = _fallback_trace_source(planet, source_hint)
+            if fallback_source is None:
+                _record_alias(requested_planet, planet, alias_trace)
+            else:
+                _log_successful_source(logger, requested_planet, tjdet, fallback_source)
+                _record(requested_planet, fallback_source)
+        return pos_out, retflag_out
     except SkyfieldRangeError as e:
+        _restore_failed_trace()
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
     except ValueError as e:
+        _restore_failed_trace()
         if "Invalid Time" in str(e) or "time" in str(e).lower():
             raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
         raise
+    except Exception:
+        _restore_failed_trace()
+        raise
+    finally:
+        _dispatch_source.reset(source_token)
 
 
 def calc_pctr(
@@ -2868,8 +3091,9 @@ def _calc_body(
 
     # Sun heliocentric = Sun from Sun = trivially (0,0,0). A sidereal ecliptic
     # request still subtracts the ayanamsha (see _degenerate_origin_result) so
-    # this Skyfield path agrees with the LEB backend at the origin.
+    # this fallback path agrees with the LEB backend at the origin.
     if ipl == SUN and (iflag & FLG_HELCTR):
+        _mark_dispatch_source("Analytical")
         return _to_native_floats(_degenerate_origin_result(t, iflag)), iflag
 
     # Remap AST_OFFSET + N to dedicated body IDs for built-in asteroids
@@ -2881,6 +3105,7 @@ def _calc_body(
         result = planetary_moons.calc_moon_position(t, ipl, iflag)
         if result is not None:
             result = _maybe_equatorial_convert(result, t.tt, iflag)
+            _mark_dispatch_source("SPK")
             return result, iflag
         # No registered satellite SPK covers this moon.  The reference
         # API raises here too (a missing-ephemeris-file error).
@@ -2899,6 +3124,7 @@ def _calc_body(
     if ipl in (MEAN_NODE, TRUE_NODE, MEAN_APOG, OSCU_APOG, INTP_APOG, INTP_PERG) and (
         iflag & (FLG_HELCTR | FLG_BARYCTR)
     ):
+        _mark_dispatch_source("Analytical")
         return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
 
     # Handle lunar nodes (Mean/True North/South)
@@ -3648,8 +3874,6 @@ def _calc_body(
                 # the Keplerian path (documented out-of-coverage behavior).
                 spk_result = None
             if spk_result is not None:
-                get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
-                _record(ipl, "SPK")
                 # _calc_type21_position performs the full frame reduction
                 # internally (precession/nutation per FLG_J2000/FLG_NONUT),
                 # so a type-21 result under FLG_J2000 is ALREADY J2000
@@ -3663,7 +3887,9 @@ def _calc_body(
                 spk_result = _maybe_equatorial_convert(
                     spk_result, t.tt, iflag, already_j2000=_already_j2000
                 )
-                return _to_native_floats(spk_result), iflag
+                result = _to_native_floats(spk_result)
+                _mark_dispatch_source("SPK")
+                return result, iflag
 
             # In strict precision mode, require an SPK-grade source for all
             # downloadable bodies. Bodies blocked from auto-download are exempt
@@ -3749,17 +3975,15 @@ def _calc_body(
                             lon, speed_lon, t.ut1, iflag
                         )
 
-                    get_logger().debug(
-                        "body=%d jd=%.1f source=ASSIST (n-body)", ipl, jd_tt
-                    )
-                    _record(ipl, "ASSIST")
-                    return _to_native_floats(
+                    result = _to_native_floats(
                         _maybe_equatorial_convert(
                             (lon, lat, dist, speed_lon, speed_lat, speed_dist),
                             jd_tt,
                             iflag,
                         )
-                    ), iflag
+                    )
+                    _mark_dispatch_source("ASSIST")
+                    return result, iflag
             except (ImportError, RuntimeError, ValueError, FileNotFoundError):
                 pass
 
@@ -3767,14 +3991,6 @@ def _calc_body(
             # Measured vs JPL: the unperturbed two-body fit drifts to ~1-2 deg
             # outside the SPK window (it omits planetary perturbations), not
             # arcminutes — state that honestly so callers don't trust it.
-            get_logger().warning(
-                "body=%d jd=%.1f source=Keplerian (fallback). "
-                "Precision is degraded (~1-2 degrees; unperturbed two-body). "
-                "Install SPK kernels or enable auto-download for higher accuracy.",
-                ipl,
-                jd_tt,
-            )
-            _record(ipl, "Keplerian")
             lon, lat, dist = _keplerian_position_at(jd_tt, ipl, iflag, planets)
 
             speed_lon = 0.0
@@ -3804,11 +4020,13 @@ def _calc_body(
                     lon, speed_lon, t.ut1, iflag
                 )
 
-            return _to_native_floats(
+            result = _to_native_floats(
                 _maybe_equatorial_convert(
                     (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
                 )
-            ), iflag
+            )
+            _mark_dispatch_source("Keplerian")
+            return result, iflag
 
     # Handle fixed stars — delegate to the fixstar_ut() computation so every
     # flag (FLG_SIDEREAL, FLG_EQUATORIAL, FLG_SPEED, ...) gets the exact same
@@ -3818,9 +4036,11 @@ def _calc_body(
     if ipl in fixed_stars.FIXED_STARS:
         star_name = fixed_stars.get_canonical_star_name(ipl)
         pos, _star, _retflag = fixed_stars._fixstar_ut_by_id(
-            ipl, star_name, t.ut1, iflag
+            ipl, star_name, t.ut1, iflag, record_trace=False
         )
-        return _to_native_floats(pos), iflag
+        result = _to_native_floats(pos)
+        _mark_dispatch_source(fixed_stars._get_fixed_star_source())
+        return result, iflag
 
     # Handle astrological angles (requires observer location)
     if ANGLE_OFFSET <= ipl < ARABIC_OFFSET:
@@ -3886,10 +4106,6 @@ def _calc_body(
     # Handle standard planets (and type21 asteroids routed through planet pipeline)
     if _spk_type21_target is not None:
         # Type21 asteroid: use the VectorFunction wrapper for Skyfield pipeline
-        from .logging_config import get_logger
-
-        get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
-        _record(ipl, "SPK")
         target = _spk_type21_target
     elif ipl in _PLANET_MAP:
         target_name = _PLANET_MAP[ipl]
@@ -3919,8 +4135,9 @@ def _calc_body(
     # Return early to avoid division-by-zero in J2000/ICRS coordinate transforms
     # where dist=0 would cause NaN from asin(ze/dist). A sidereal ecliptic
     # request still subtracts the ayanamsha (see _degenerate_origin_result) so
-    # this Skyfield path agrees with the LEB backend at the origin.
+    # this fallback path agrees with the LEB backend at the origin.
     if ipl == EARTH and not (iflag & FLG_HELCTR) and not is_barycentric:
+        _mark_dispatch_source("Analytical")
         return _to_native_floats(_degenerate_origin_result(t, iflag)), iflag
 
     if iflag & FLG_HELCTR:
@@ -4357,7 +4574,10 @@ def _calc_body(
             da = (ayanamsa_next - ayanamsa_prev + 180.0) % 360.0 - 180.0
             dp1 -= da / (2.0 * dt)
 
-    return _to_native_floats((p1, p2, p3, dp1, dp2, dp3)), iflag
+    result = _to_native_floats((p1, p2, p3, dp1, dp2, dp3))
+    if _spk_type21_target is not None:
+        _mark_dispatch_source("SPK")
+    return result, iflag
 
 
 @_contextmanager

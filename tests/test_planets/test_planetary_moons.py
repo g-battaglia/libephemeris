@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import os
+from types import SimpleNamespace
 
 import pytest
 
@@ -25,6 +26,8 @@ from libephemeris.constants import (
     FLG_SPEED,
     FLG_TRUEPOS,
 )
+from libephemeris.tracing import get_trace_results, start_tracing
+from libephemeris.tracing import _record
 
 
 # Legacy alias ids (deprecated) and canonical ids (PLMOON_OFFSET + NAIF)
@@ -86,6 +89,36 @@ class TestUnregisteredMoonsRaise:
             swe.calc_ut(jd, canonical_id, FLG_SPEED)
 
 
+@pytest.mark.unit
+def test_failed_registered_moon_conversion_does_not_record_success(monkeypatch):
+    """A failed post-SPK conversion must not overwrite the previous trace."""
+    from libephemeris import planets
+
+    monkeypatch.setattr(planets, "get_planets", lambda: {})
+    monkeypatch.setattr(
+        planetary_moons, "is_planetary_moon", lambda body: body == MOON_IO
+    )
+    monkeypatch.setattr(
+        planetary_moons,
+        "calc_moon_position",
+        lambda *args, **kwargs: (1.0, 2.0, 3.0, 0.0, 0.0, 0.0),
+    )
+    monkeypatch.setattr(
+        planets,
+        "_maybe_equatorial_convert",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("conversion")),
+    )
+
+    token = start_tracing()
+    try:
+        _record(MOON_IO, "STALE")
+        with pytest.raises(RuntimeError, match="conversion"):
+            planets._calc_body(SimpleNamespace(tt=JD_EXCERPT), MOON_IO, 0)
+        assert get_trace_results()[MOON_IO] == "STALE"
+    finally:
+        token.var.reset(token)
+
+
 class TestGalileanMoonPositions:
     """Real positions from the Skyfield test excerpt kernel."""
 
@@ -104,6 +137,17 @@ class TestGalileanMoonPositions:
             assert math.isfinite(val)
         # Jupiter system was ~4.4 AU from Earth in March 2015
         assert 3.5 < result[2] < 7.0, f"{name} distance {result[2]:.2f} AU"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body_id", [MOON_IO, 9501])
+    def test_registered_moon_trace_reports_spk(self, jupiter_kernel, body_id: int):
+        """Both planetary-moon ID forms record their actual SPK source."""
+        token = start_tracing()
+        try:
+            swe.calc_ut(JD_EXCERPT, body_id, 0)
+            assert get_trace_results()[body_id] == "SPK"
+        finally:
+            token.var.reset(token)
 
     @pytest.mark.unit
     @pytest.mark.parametrize("legacy_id,canonical_id,name", GALILEAN_MOONS)

@@ -3,8 +3,8 @@
 """Lightweight computation tracing for libephemeris.
 
 Allows callers to discover which sub-backend (LEB, Skyfield, Horizons,
-SPK, ASSIST, Keplerian) computed each celestial body, with effectively
-zero overhead when tracing is not active.
+SPK, ASSIST, Keplerian, Analytical, ERFA, Mixed) computed each celestial body,
+with minimal overhead when tracing is not active.
 
 Usage::
 
@@ -46,3 +46,43 @@ def _record(body_id: int, source: str) -> None:
     d = _trace_data.get(None)
     if d is not None:
         d[body_id] = source
+
+
+def _is_active() -> bool:
+    """Return whether programmatic tracing is active in this context."""
+    return _trace_data.get(None) is not None
+
+
+def _snapshot_record(body_id: int) -> tuple[bool, str | None]:
+    """Capture a trace entry so an internal alias calculation can restore it."""
+    d = _trace_data.get(None)
+    if d is None or body_id not in d:
+        return False, None
+    return True, d[body_id]
+
+
+def _restore_record(body_id: int, previous: tuple[bool, str | None]) -> None:
+    """Restore or remove one entry after a failed nested calculation."""
+    d = _trace_data.get(None)
+    if d is None:
+        return
+    existed, source = previous
+    if existed and source is not None:
+        d[body_id] = source
+    else:
+        d.pop(body_id, None)
+
+
+def _record_alias(
+    body_id: int,
+    source_body_id: int,
+    previous_source: tuple[bool, str | None] = (False, None),
+) -> None:
+    """Transfer an internal body's source to the public caller ID."""
+    d = _trace_data.get(None)
+    if d is None or source_body_id not in d:
+        return
+    d[body_id] = d[source_body_id]
+    if body_id == source_body_id:
+        return
+    _restore_record(source_body_id, previous_source)

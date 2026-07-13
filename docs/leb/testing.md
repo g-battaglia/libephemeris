@@ -1,6 +1,6 @@
 # LEB vs Skyfield — Comparison Test Guide
 
-> **Updated:** March 2026 — reflects <0.001" precision achieved for all 31 bodies.
+> **Updated:** July 2026 — the 31-body comparison set is below 0.001" on base/medium; extended ecliptic extremes use the measured 0.1" tolerance.
 
 This guide explains how to run and interpret the tests that compare LEB (LibEphemeris Binary) calculation results with Skyfield (direct calculation from NASA JPL ephemerides).
 
@@ -25,11 +25,14 @@ If the LEB file is not found, tests are **skipped** (they don't fail).
 
 ### Available Tiers
 
-| Tier | Ephemeris | Range | File |
-|------|-----------|-------|------|
-| `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (~53 MB) |
-| `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (~175 MB) |
-| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` (~1.6 GB) |
+Tests accept either the smaller published 31-body LEB1 files or locally
+generated full-registry files. Typical current local sizes are shown here.
+
+| Tier | Ephemeris | Range | Local file |
+|------|-----------|-------|------------|
+| `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (~375 MB, up to 62 bodies) |
+| `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (~1.23 GB, up to 62 bodies) |
+| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` (~7.64 GB, 54 bodies) |
 
 ### Dependencies
 
@@ -369,13 +372,16 @@ leph leb generate extended groups
 Each command runs in sequence:
 1. `planets` — Sun-Pluto, Earth (11 bodies)
 2. `asteroids` — Chiron, Ceres, Pallas, Juno, Vesta (5 bodies)
-3. `exotics` — Centaurs, TNOs, NEAs (31 bodies)
+3. `exotics` — 31 registry bodies on base/medium; 23 non-NEAs on extended
 4. `analytical` — Nodes, Lilith, Uranians (15 bodies)
 5. `merge` — Merges the 4 partial files + verification
 
 ### Single-body generation (lowest memory)
 
-If group generation still uses too much memory, use single-body mode. Each of the 62 bodies is generated in its own subprocess (one at a time), then all partial files are merged:
+If group generation still uses too much memory, use single-body mode. Each
+eligible body is generated in its own subprocess (one at a time), then all
+partial files are merged. Base and medium have up to 62 bodies; extended
+excludes eight chaotic NEAs and has 54:
 
 ```bash
 # Base tier (direct CLI)

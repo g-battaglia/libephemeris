@@ -334,6 +334,20 @@ def chebyshev_nodes(n: int) -> np.ndarray:
     return np.cos(np.pi * (np.arange(n) + 0.5) / n)
 
 
+def _validated_finite_array(
+    values: object,
+    expected_shape: tuple[int, ...],
+    label: str,
+) -> np.ndarray:
+    """Return a float array only when its shape and values are valid."""
+    array = np.asarray(values, dtype=float)
+    if array.shape != expected_shape:
+        raise ValueError(f"{label} has shape {array.shape}, expected {expected_shape}")
+    if not np.all(np.isfinite(array)):
+        raise ValueError(f"{label} contains NaN or infinite values")
+    return array
+
+
 def fit_segment(
     func: Callable[[float], np.ndarray],
     jd_start: float,
@@ -359,12 +373,19 @@ def fit_segment(
     jd_nodes = 0.5 * (jd_end - jd_start) * nodes + 0.5 * (jd_start + jd_end)
 
     # Evaluate function at nodes
-    values = np.array([func(jd) for jd in jd_nodes])  # shape: (degree+1, components)
+    values = _validated_finite_array(
+        [func(jd) for jd in jd_nodes],
+        (degree + 1, components),
+        "Chebyshev fitting values",
+    )
 
     # Fit each component independently
     coeffs = np.zeros((components, degree + 1))
     for c in range(components):
         coeffs[c] = chebfit(nodes, values[:, c], degree)
+
+    if not np.all(np.isfinite(coeffs)):
+        raise ValueError("Chebyshev fitting produced NaN or infinite coefficients")
 
     return coeffs
 
@@ -390,6 +411,16 @@ def verify_segment(
 
     Returns the maximum error across all components and test points.
     """
+    if n_test < 1:
+        raise ValueError("n_test must be at least 1")
+    coeff_array = np.asarray(coeffs, dtype=float)
+    if coeff_array.ndim != 2 or coeff_array.shape[0] != components:
+        raise ValueError(
+            "Chebyshev coefficients have shape "
+            f"{coeff_array.shape}, expected ({components}, degree + 1)"
+        )
+    if not np.all(np.isfinite(coeff_array)):
+        raise ValueError("Chebyshev coefficients contain NaN or infinite values")
     if verify_end is None:
         verify_end = seg_end
     mid = 0.5 * (seg_start + seg_end)
@@ -401,10 +432,18 @@ def verify_segment(
         jd = seg_start + frac * (verify_end - seg_start)
         tau = (jd - mid) / half
 
-        reference = func(jd)
+        reference = _validated_finite_array(
+            func(jd), (components,), "Chebyshev verification reference"
+        )
         for c in range(components):
-            fitted = chebval(tau, coeffs[c])
+            fitted = float(chebval(tau, coeff_array[c]))
+            if not math.isfinite(fitted):
+                raise ValueError(
+                    "Chebyshev verification produced a non-finite fitted value"
+                )
             error = abs(fitted - reference[c])
+            if not math.isfinite(error):
+                raise ValueError("Chebyshev verification produced a non-finite error")
             if error > max_error:
                 max_error = error
 
@@ -482,6 +521,13 @@ def _fit_and_verify_from_values(
     Returns:
         (list_of_coefficient_arrays, max_error)
     """
+    if n_verify < 1:
+        raise ValueError("n_verify must be at least 1")
+    all_values = _validated_finite_array(
+        all_values,
+        (n_segments * pts_per_seg, components),
+        "Vectorized Chebyshev values",
+    )
     nodes_01 = chebyshev_nodes(degree + 1)
     all_coeffs: List[np.ndarray] = []
     max_error = 0.0
@@ -499,6 +545,10 @@ def _fit_and_verify_from_values(
         coeffs = np.zeros((components, degree + 1))
         for c in range(components):
             coeffs[c] = chebfit(nodes_01, fit_values[:, c], degree)
+        if not np.all(np.isfinite(coeffs)):
+            raise ValueError(
+                "Vectorized Chebyshev fitting produced NaN or infinite coefficients"
+            )
 
         # Verify using pre-computed verification points
         verify_end = min(seg_end, jd_end)
@@ -514,6 +564,10 @@ def _fit_and_verify_from_values(
             for c in range(components):
                 fitted = float(chebval(tau, coeffs[c]))
                 error = abs(fitted - ref[c])
+                if not math.isfinite(fitted) or not math.isfinite(error):
+                    raise ValueError(
+                        "Vectorized Chebyshev verification produced a non-finite value"
+                    )
                 if error > max_error:
                     max_error = error
 
@@ -551,6 +605,13 @@ def _fit_and_verify_from_values_unwrap(
     Returns:
         (list_of_coefficient_arrays, max_error)
     """
+    if n_verify < 1:
+        raise ValueError("n_verify must be at least 1")
+    all_values = _validated_finite_array(
+        all_values,
+        (n_segments * pts_per_seg, components),
+        "Vectorized unwrapped Chebyshev values",
+    )
     nodes_01 = chebyshev_nodes(degree + 1)
     all_coeffs: List[np.ndarray] = []
     max_error = 0.0
@@ -572,6 +633,10 @@ def _fit_and_verify_from_values_unwrap(
         coeffs = np.zeros((components, degree + 1))
         for c in range(components):
             coeffs[c] = chebfit(nodes_01, fit_values[:, c], degree)
+        if not np.all(np.isfinite(coeffs)):
+            raise ValueError(
+                "Unwrapped Chebyshev fitting produced NaN or infinite coefficients"
+            )
 
         # Verify using pre-computed verification points (with re-wrapping)
         verify_end = min(seg_end, jd_end)
@@ -595,6 +660,10 @@ def _fit_and_verify_from_values_unwrap(
                         error = 360.0 - error
                 else:
                     error = abs(fitted - ref[c])
+                if not math.isfinite(fitted) or not math.isfinite(error):
+                    raise ValueError(
+                        "Unwrapped Chebyshev verification produced a non-finite value"
+                    )
                 if error > max_error:
                     max_error = error
 
@@ -2139,6 +2208,16 @@ def _verify_segment_unwrapped(
         verify_end: If given, only sample verification points up to this JD.
             Tau is always computed relative to [seg_start, seg_end].
     """
+    if n_test < 1:
+        raise ValueError("n_test must be at least 1")
+    coeff_array = np.asarray(coeffs, dtype=float)
+    if coeff_array.ndim != 2 or coeff_array.shape[0] != components:
+        raise ValueError(
+            "Chebyshev coefficients have shape "
+            f"{coeff_array.shape}, expected ({components}, degree + 1)"
+        )
+    if not np.all(np.isfinite(coeff_array)):
+        raise ValueError("Chebyshev coefficients contain NaN or infinite values")
     if verify_end is None:
         verify_end = seg_end
     mid = 0.5 * (seg_start + seg_end)
@@ -2149,9 +2228,11 @@ def _verify_segment_unwrapped(
         jd = seg_start + frac * (verify_end - seg_start)
         tau = (jd - mid) / half
 
-        reference = func(jd)
+        reference = _validated_finite_array(
+            func(jd), (components,), "Unwrapped verification reference"
+        )
         for c in range(components):
-            fitted = chebval(tau, coeffs[c])
+            fitted = float(chebval(tau, coeff_array[c]))
             if c == 0:
                 # Re-wrap longitude
                 fitted = fitted % 360.0
@@ -2162,6 +2243,10 @@ def _verify_segment_unwrapped(
                     error = 360.0 - error
             else:
                 error = abs(fitted - reference[c])
+            if not math.isfinite(fitted) or not math.isfinite(error):
+                raise ValueError(
+                    "Unwrapped Chebyshev verification produced a non-finite value"
+                )
             if error > max_error:
                 max_error = error
 
@@ -3300,12 +3385,20 @@ def verify_leb(
     """
     from libephemeris.leb_reader import LEBReader
 
+    if n_samples < 1:
+        raise ValueError("n_samples must be at least 1")
+
     # Enable auto-download for asteroid SPK acquisition during verification
     import libephemeris as _ephem
 
     _ephem.set_auto_spk_download(True)
 
     reader = LEBReader(leb_path)
+    if not reader._bodies:
+        reader.close()
+        if verbose:
+            print(f"Verifying {leb_path}: FAIL - no bodies found")
+        return False
     jd_start, jd_end = reader.jd_range
 
     # Ensure asteroid SPKs cover each asteroid's actual date range in the LEB
@@ -3344,8 +3437,14 @@ def verify_leb(
         body = reader._bodies[body_id]
         name = BODY_NAMES.get(body_id, f"Body {body_id}")
         max_error = 0.0
+        max_distance_error = 0.0
         worst_dist = 1.0  # distance (AU) at sample with worst error
-        error_unit = "AU"  # tracking what unit max_error is in
+        if body.coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
+            error_unit = "AU"
+        elif body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL):
+            error_unit = "deg"
+        else:
+            error_unit = "unknown"
 
         # Use body-specific JD range if available
         body_jd_start = body.jd_start if hasattr(body, "jd_start") else jd_start
@@ -3359,53 +3458,71 @@ def verify_leb(
             )
 
         for jd in body_test_jds:
-            pos, vel = reader.eval_body(body_id, jd)
+            try:
+                pos, vel = reader.eval_body(body_id, jd)
+                _validated_finite_array(pos, (3,), f"LEB body {body_id} position")
+                _validated_finite_array(vel, (3,), f"LEB body {body_id} velocity")
 
-            if body.coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
-                if body_id in _PLANET_MAP:
-                    # Planet: direct ICRS comparison with Skyfield
-                    # For COORD_ICRS_BARY_SYSTEM, stored data is system
-                    # barycenter — verification compares raw fit accuracy
-                    # (COB correction is applied at runtime, not stored).
-                    sample_err, dist = _verify_icrs_planet(body_id, jd, pos)
-                    if sample_err > max_error:
-                        max_error = sample_err
-                        worst_dist = dist
-                    error_unit = "AU"
-                elif body_id in _ASTEROID_NAIF:
-                    # Asteroid: ICRS comparison via spktype21
-                    sample_err, dist = _verify_icrs_asteroid(body_id, jd, pos)
-                    if sample_err > max_error:
-                        max_error = sample_err
-                        worst_dist = dist
-                    error_unit = "AU"
+                if body.coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
+                    if body_id in _PLANET_MAP:
+                        # Planet: direct ICRS comparison with Skyfield.
+                        # System barycenters are compared before runtime COB.
+                        sample_err, dist = _verify_icrs_planet(body_id, jd, pos)
+                        if not math.isfinite(sample_err) or not math.isfinite(dist):
+                            raise ValueError("non-finite ICRS verification error")
+                        if sample_err > max_error:
+                            max_error = sample_err
+                            worst_dist = dist
+                        error_unit = "AU"
+                    elif body_id in _ASTEROID_NAIF:
+                        # Asteroid: ICRS comparison via spktype21.
+                        sample_err, dist = _verify_icrs_asteroid(body_id, jd, pos)
+                        if not math.isfinite(sample_err) or not math.isfinite(dist):
+                            raise ValueError("non-finite asteroid verification error")
+                        if sample_err > max_error:
+                            max_error = sample_err
+                            worst_dist = dist
+                        error_unit = "AU"
+                    else:
+                        raise ValueError(
+                            f"no ICRS verification source for body {body_id}"
+                        )
 
-            elif body.coord_type == COORD_ECLIPTIC:
-                # Ecliptic body: compare with analytical function
-                eval_func = ecliptic_eval_funcs.get(body_id)
-                if eval_func is not None:
-                    sample_err = _verify_ecliptic_body(eval_func, jd, pos)
-                    if sample_err > max_error:
-                        max_error = sample_err
+                elif body.coord_type == COORD_ECLIPTIC:
+                    # Ecliptic body: compare with analytical function.
+                    eval_func = ecliptic_eval_funcs.get(body_id)
+                    if eval_func is None:
+                        raise ValueError(
+                            f"no ecliptic verification source for body {body_id}"
+                        )
+                    sample_err, distance_err = _verify_ecliptic_body(eval_func, jd, pos)
+                    if not math.isfinite(sample_err) or not math.isfinite(distance_err):
+                        raise ValueError("non-finite ecliptic verification error")
+                    max_error = max(max_error, sample_err)
+                    max_distance_error = max(max_distance_error, distance_err)
+                    error_unit = "deg"
+
+                elif body.coord_type == COORD_HELIO_ECL:
+                    # Heliocentric body: compare with analytical function.
+                    eval_func = helio_eval_funcs.get(body_id)
+                    if eval_func is None:
+                        raise ValueError(
+                            f"no heliocentric verification source for body {body_id}"
+                        )
+                    sample_err, distance_err = _verify_ecliptic_body(eval_func, jd, pos)
+                    if not math.isfinite(sample_err) or not math.isfinite(distance_err):
+                        raise ValueError("non-finite heliocentric verification error")
+                    max_error = max(max_error, sample_err)
+                    max_distance_error = max(max_distance_error, distance_err)
                     error_unit = "deg"
                 else:
-                    # No eval function — just check range
-                    if not (0.0 <= pos[0] < 360.0 or pos[0] == 0.0):
-                        max_error = 999.0
-                    error_unit = "deg"
-
-            elif body.coord_type == COORD_HELIO_ECL:
-                # Heliocentric body: compare with analytical function
-                eval_func = helio_eval_funcs.get(body_id)
-                if eval_func is not None:
-                    sample_err = _verify_ecliptic_body(eval_func, jd, pos)
-                    if sample_err > max_error:
-                        max_error = sample_err
-                    error_unit = "deg"
-                else:
-                    if not (0.0 <= pos[0] < 360.0 or pos[0] == 0.0):
-                        max_error = 999.0
-                    error_unit = "deg"
+                    raise ValueError(
+                        f"unsupported LEB coordinate type {body.coord_type}"
+                    )
+            except Exception:
+                max_error = float("inf")
+                max_distance_error = float("inf")
+                break
 
         # Convert to arcseconds and determine pass/fail
         if error_unit == "AU":
@@ -3415,10 +3532,13 @@ def verify_leb(
             else:
                 arcsec = max_error * 206265.0
             passed = arcsec < 1.0
-        else:
-            # Error is in degrees
+        elif error_unit == "deg":
+            # Angular components are degrees; distance remains AU.
             arcsec = max_error * 3600.0
-            passed = arcsec < 1.0
+            passed = arcsec < 1.0 and max_distance_error <= 5e-6
+        else:
+            arcsec = float("inf")
+            passed = False
 
         status = "PASS" if passed else "FAIL"
         if not passed:
@@ -3431,9 +3551,20 @@ def verify_leb(
                 yr_s = 2000.0 + (body.jd_start - 2451545.0) / 365.25
                 yr_e = 2000.0 + (body.jd_end - 2451545.0) / 365.25
                 range_note = f" [~{yr_s:.0f}-{yr_e:.0f}]"
-            print(
-                f'  {name:20s}: max error = {max_error:.2e} ({arcsec:.4f}") [{status}]{range_note}'
-            )
+            if error_unit == "AU":
+                detail = (
+                    f"max Cartesian component = {max_error:.2e} AU "
+                    f'({arcsec:.4f}" angular estimate)'
+                )
+            elif error_unit == "deg":
+                detail = (
+                    f"max angular component = {max_error:.2e} deg "
+                    f'({arcsec:.4f}"), max distance = '
+                    f"{max_distance_error:.2e} AU"
+                )
+            else:
+                detail = "unsupported coordinate metadata"
+            print(f"  {name:20s}: {detail} [{status}]{range_note}")
 
     reader.close()
 
@@ -3493,15 +3624,20 @@ def _verify_icrs_planet(body_id: int, jd: float, leb_pos: tuple) -> Tuple[float,
     target_name = _PLANET_MAP[body_id]
     target = get_planet_target(planets, target_name)
     t = ts.tt_jd(jd)
-    ref_pos = target.at(t).position.au
+    ref_pos = _validated_finite_array(
+        target.at(t).position.au, (3,), f"ICRS reference for body {body_id}"
+    )
+    leb_pos_array = _validated_finite_array(
+        leb_pos, (3,), f"LEB ICRS position for body {body_id}"
+    )
     sample_err = 0.0
     for c in range(3):
-        err = abs(leb_pos[c] - float(ref_pos[c]))
+        err = abs(leb_pos_array[c] - ref_pos[c])
         if err > sample_err:
             sample_err = err
-    dist = math.sqrt(
-        float(ref_pos[0]) ** 2 + float(ref_pos[1]) ** 2 + float(ref_pos[2]) ** 2
-    )
+    dist = math.sqrt(sum(component**2 for component in ref_pos))
+    if not math.isfinite(sample_err) or not math.isfinite(dist):
+        raise ValueError(f"non-finite ICRS verification result for body {body_id}")
     return sample_err, dist
 
 
@@ -3511,6 +3647,9 @@ def _verify_icrs_asteroid(
     """Verify an ICRS asteroid against spktype21. Returns (max_err_au, dist_au)."""
     from libephemeris.state import get_planets, get_timescale, _SPK_BODY_MAP
 
+    leb_pos_array = _validated_finite_array(
+        leb_pos, (3,), f"LEB asteroid position for body {body_id}"
+    )
     planets = get_planets()
     ts = get_timescale()
 
@@ -3544,11 +3683,18 @@ def _verify_icrs_asteroid(
         ref_y = pos_km[1] / AU_KM + float(sun_bary[1])
         ref_z = pos_km[2] / AU_KM + float(sun_bary[2])
 
-        err_x = abs(leb_pos[0] - ref_x)
-        err_y = abs(leb_pos[1] - ref_y)
-        err_z = abs(leb_pos[2] - ref_z)
+        reference = _validated_finite_array(
+            (ref_x, ref_y, ref_z), (3,), f"asteroid reference for body {body_id}"
+        )
+        err_x = abs(leb_pos_array[0] - reference[0])
+        err_y = abs(leb_pos_array[1] - reference[1])
+        err_z = abs(leb_pos_array[2] - reference[2])
         sample_err = max(err_x, err_y, err_z)
-        dist = math.sqrt(ref_x**2 + ref_y**2 + ref_z**2)
+        dist = math.sqrt(sum(component**2 for component in reference))
+        if not math.isfinite(sample_err) or not math.isfinite(dist):
+            raise ValueError(
+                f"non-finite asteroid verification result for body {body_id}"
+            )
         return sample_err, dist
     except Exception:
         return 1.0, 1.0
@@ -3558,24 +3704,26 @@ def _verify_icrs_asteroid(
 
 def _verify_ecliptic_body(
     eval_func: Callable[[float], np.ndarray], jd: float, leb_pos: tuple
-) -> float:
+) -> tuple[float, float]:
     """Verify an ecliptic/helio body against its analytical function.
 
-    Returns max error in degrees.
+    Returns:
+        ``(max_angular_error_deg, distance_error_au)``.
     """
-    ref = eval_func(jd)
+    ref = _validated_finite_array(
+        eval_func(jd), (3,), "ecliptic verification reference"
+    )
+    leb = _validated_finite_array(leb_pos, (3,), "LEB ecliptic position")
 
     # Longitude comparison (handle 0/360 wrap)
-    dlon = abs(float(leb_pos[0]) - float(ref[0]))
-    if dlon > 180.0:
-        dlon = 360.0 - dlon
+    dlon = abs((leb[0] - ref[0] + 180.0) % 360.0 - 180.0)
 
     # Latitude comparison (no wrapping)
-    dlat = abs(float(leb_pos[1]) - float(ref[1]))
+    dlat = abs(leb[1] - ref[1])
 
-    # Distance comparison (if available, convert to angular equivalent)
-    # For ecliptic bodies, distance is typically small or zero
-    return max(dlon, dlat)
+    # The third stored component is a distance in AU, not an angle.
+    distance_error = abs(leb[2] - ref[2])
+    return max(dlon, dlat), distance_error
 
 
 # =============================================================================
@@ -3633,6 +3781,7 @@ def main():
             "Body groups for --group:\n"
             "  planets    : Sun, Moon, Mercury-Pluto, Earth (vectorized Skyfield)\n"
             "  asteroids  : Chiron, Ceres, Pallas, Juno, Vesta (spktype21)\n"
+            "  exotics    : Centaurs, TNOs, main-belt bodies, and NEAs\n"
             "  analytical : Lunar nodes, Lilith variants, Uranians, Transpluto\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -3703,7 +3852,7 @@ def main():
         default=None,
         help="Merge multiple partial .leb files into one. "
         "Requires --output (or --tier for auto path). "
-        "Example: --merge planets.leb asteroids.leb analytical.leb",
+        "Example: --merge planets.leb asteroids.leb exotics.leb analytical.leb",
     )
     parser.add_argument(
         "--single",

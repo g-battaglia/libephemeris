@@ -30,9 +30,15 @@ Highlights:
 - The documented top-level export surface now includes all intentionally public
   performance helpers, eclipse extensions, moon identifiers, and constants.
 - Clean-room and packaging checks cover ignored/untracked worktree artifacts,
-  data namespaces, optional dependencies, wheels, and source distributions.
+  suffix-independent UTF-8 content, archive metadata/payloads, data namespaces,
+  optional dependencies, wheels, and source distributions.
 - API documentation is generated from the live public exports and validated by
   strict Sphinx and focused contract tests.
+- Traced `calc()` / `calc_ut()` and fixed-star entry points now cover aliases,
+  early returns, analytical/JPL lunar points, fixed stars, and planetary moons
+  with success-only source updates.
+- The repo-only developer CLI works from outside the checkout, parses bash/fish
+  completion metadata, and keeps all LEB2 tier/group workflows synchronized.
 
 For the complete rc8 fixes and upgrade details, see
 [`release-notes/v3.0.0rc8.md`](release-notes/v3.0.0rc8.md),

@@ -1281,7 +1281,7 @@ def download_for_tier(
     Sets the precision tier, then downloads:
     1. The tier's ephemeris file (de440s / de440 / de441)
     2. planet_centers.bsp precision offsets
-    3. SPK kernels for all 21 minor bodies (full tier date range)
+    3. SPK kernels for all bodies in ``SPK_BODY_NAME_MAP`` (full tier range)
 
     For the 'extended' tier, SPK files are downloaded as single max-range
     files (1600-2500) rather than chunked, since that's the full Horizons

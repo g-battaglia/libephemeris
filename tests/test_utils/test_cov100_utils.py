@@ -407,6 +407,31 @@ class TestSplitDegNakshatra:
         result = split_deg(373.3333333333333, SPLIT_DEG_NAKSHATRA)
         assert result[4] == 28
 
+    @pytest.mark.unit
+    def test_negative_nakshatra_flag_uses_ordinary_signed_split(self):
+        """Negative input bypasses nakshatra segmentation by contract."""
+        assert split_deg(-30.5, SPLIT_DEG_NAKSHATRA) == (30, 30, 0, 0.0, -1)
+
+    @pytest.mark.unit
+    def test_raw_zodiac_indices_and_combined_negative_flag_precedence(self):
+        """Docs expose raw zodiac indices and negative combined-bit behavior."""
+        assert split_deg(370.0, SPLIT_DEG_ZODIACAL)[4] == 0
+        assert split_deg(390.0, SPLIT_DEG_ZODIACAL)[4] == 13
+        assert split_deg(480.0, SPLIT_DEG_ZODIACAL)[4] == 16
+        assert split_deg(-370.0, SPLIT_DEG_ZODIACAL)[4] == 0
+        assert split_deg(-720.0, SPLIT_DEG_ZODIACAL)[4] == 24
+        assert split_deg(-30.5, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ZODIACAL)[4] == 1
+
+    @pytest.mark.unit
+    def test_nakshatra_docstring_documents_raw_and_negative_indices(self):
+        """The public docs must describe compatibility-visible index semantics."""
+        doc = split_deg.__doc__ or ""
+        assert "larger raw index" in doc
+        assert "NAKSHATRA alone follows the ordinary signed split" in doc
+        assert "maps raw segment 12" in doc
+        assert "non-negative NAKSHATRA split" in doc
+        assert "Return nakshatra number (0-26" not in doc
+
 
 class TestSplitDegMain:
     """Cover the main split_deg path (lines 1604-1645)."""

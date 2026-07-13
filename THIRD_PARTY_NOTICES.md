@@ -13,13 +13,20 @@ process — see [LICENSING.md](LICENSING.md) and [NOTICE.md](NOTICE.md).
 | spktype21 0.1.0 | `libephemeris/vendor/spktype21.py` | Shushi Uetsuki (whiskie14142) | MIT |
 | TASS 1.7 port | `libephemeris/moon_theories/tass17.py`, `libephemeris/moon_theories/tass17_data.py` (generated periodic-term tables) | Johannes Gajdosik's Stellarium implementation of Vienne & Duriez TASS 1.7 | MIT |
 
+Retained upstream copyright notices:
+
+- spktype21 license: Copyright (c) 2018 The Python Packaging Authority
+  ([upstream license](https://github.com/whiskie14142/spktype21/blob/master/LICENSE.txt)).
+- Stellarium TASS 1.7 implementation: Copyright (c) 2005 Johannes Gajdosik
+  ([upstream file header](https://github.com/Stellarium/stellarium/blob/master/src/core/planetsephems/tass17.c)).
+
 Each of these files carries its own `SPDX-License-Identifier` header and
 documents its upstream provenance in the module docstring. They are **not**
 covered by the project's Apache-2.0 license, but they are all permissively
 (MIT) licensed; the package contains no copyleft code.
 
 The Galilean satellite module (`libephemeris/moon_theories/galilean.py`)
-was, through v2.1.0, adapted from PyMeeus and licensed LGPL-3.0. It was
+was, through v2.1.0, adapted from PyMeeus and licensed LGPL-3.0. <!-- provenance-implementation-ok --> It was
 rewritten in June 2026 as an independent implementation of the published
 theory (Lieske, J.H. 1998, "Galilean satellite ephemerides E5", A&AS 129,
 205; Meeus 1998, *Astronomical Algorithms*, ch. 44) and is now owned by

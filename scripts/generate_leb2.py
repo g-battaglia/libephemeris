@@ -5,18 +5,20 @@ LEB2 compressed ephemeris file generator.
 Two modes of operation:
 
 1. Convert: Read an existing LEB1 file and produce a compressed LEB2 file.
-   python scripts/generate_leb2.py convert data/leb/ephemeris_base.leb -o core_base.leb --group core
+   python scripts/generate_leb2.py convert data/leb/ephemeris_base.leb -o core_base.leb --group core --tier base
 
 2. Generate: Generate from scratch via Skyfield + Chebyshev fitting, then compress.
    python scripts/generate_leb2.py generate --tier base --group core -o core_base.leb
 
 The LEB2 format uses error-bounded lossy compression (mantissa truncation +
 coefficient-major reorder + byte shuffle + zstd) achieving 5-15x compression
-per body while maintaining <0.001" precision.
+per body. Coefficient targets use each body's native stored units: AU for ICRS
+Cartesian data and degrees/degrees/AU for ecliptic data.
 
 Body groups:
   core       : Sun, Moon, Mercury-Pluto, Earth, Mean/True Node, Mean Apogee (14 bodies)
   asteroids  : Chiron, Ceres, Pallas, Juno, Vesta (5 bodies)
+  exotics    : Centaurs, TNOs, and NEAs from the canonical exotic registry
   apogee     : Osculating Apogee, Interpolated Apogee/Perigee (3 bodies)
   uranians   : Cupido-Transpluto (9 bodies)
 """
@@ -28,7 +30,7 @@ import mmap
 import os
 import sys
 import time
-from typing import Optional
+from typing import Iterable, Optional
 
 import numpy as np
 
@@ -48,6 +50,11 @@ from libephemeris.leb_format import (
     CHUNK_INTERVAL_DAYS,
     COMPRESSED_BODY_ENTRY_SIZE,
     COMPRESSION_ZSTD_TRUNC_SHUFFLE,
+    COORD_ECLIPTIC,
+    COORD_GEO_ECLIPTIC,
+    COORD_HELIO_ECL,
+    COORD_ICRS_BARY,
+    COORD_ICRS_BARY_SYSTEM,
     HEADER_SIZE,
     LEB2_MAGIC,
     LEB2_VERSION,
@@ -73,7 +80,9 @@ from libephemeris.leb_format import (
     write_header,
     write_section_dir,
 )
+from libephemeris.leb_groups import LEB2_GROUPS as CANONICAL_LEB2_GROUPS
 from libephemeris.exotic_bodies import (
+    EXOTIC_EXTENDED_IDS,
     EXOTIC_IDS,
     name_map as _exotic_names,
 )
@@ -85,10 +94,49 @@ from libephemeris.exotic_bodies import (
 LEB2_GROUPS = {
     "core": sorted([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 10, 11, 12]),
     "asteroids": sorted([15, 17, 18, 19, 20]),
+    "exotics": list(EXOTIC_IDS),  # centaurs/TNOs/NEAs — registry source of truth
     "apogee": sorted([13, 21, 22]),
     "uranians": sorted([40, 41, 42, 43, 44, 45, 46, 47, 48]),
-    "exotics": list(EXOTIC_IDS),  # centaurs/TNOs/NEAs — registry source of truth
 }
+assert tuple(LEB2_GROUPS) == CANONICAL_LEB2_GROUPS
+
+_ALLOWED_GROUP_INVENTORIES: dict[str, tuple[frozenset[int], ...]] = {
+    "core": (frozenset(LEB2_GROUPS["core"]),),
+    "asteroids": (frozenset(LEB2_GROUPS["asteroids"]),),
+    "exotics": (frozenset(EXOTIC_IDS),),
+    "apogee": (frozenset(LEB2_GROUPS["apogee"]),),
+    "uranians": (frozenset(LEB2_GROUPS["uranians"]),),
+}
+_ANGULAR_COORD_TYPES = {COORD_ECLIPTIC, COORD_HELIO_ECL, COORD_GEO_ECLIPTIC}
+_CARTESIAN_COORD_TYPES = {COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM}
+
+
+def _group_inventory_error(
+    group: str,
+    body_ids: Iterable[int],
+    expected_tier: Optional[str] = None,
+) -> Optional[str]:
+    """Return an error for a non-canonical named-group body inventory.
+
+    The generic and base/medium exotic inventories contain all 31 registered
+    bodies. Only the explicitly declared extended tier may use the 23-body
+    non-NEA subset.
+    """
+    if expected_tier not in (None, "base", "medium", "extended"):
+        raise ValueError(f"unknown LEB tier {expected_tier!r}")
+    actual = frozenset(body_ids)
+    if group == "exotics" and expected_tier == "extended":
+        allowed = (frozenset(EXOTIC_EXTENDED_IDS),)
+    else:
+        allowed = _ALLOWED_GROUP_INVENTORIES[group]
+    if actual in allowed:
+        return None
+    expected = " or ".join(str(sorted(inventory)) for inventory in allowed)
+    return (
+        f"invalid {group!r} body inventory: got {sorted(actual)}; "
+        f"expected exactly {expected}"
+    )
+
 
 BODY_NAMES = {
     0: "Sun",
@@ -497,6 +545,7 @@ def convert_leb1_to_leb2(
     input_path: str,
     output_path: str,
     group: Optional[str] = None,
+    expected_tier: Optional[str] = None,
     target_precision: float = DEFAULT_TARGET_AU,
     verbose: bool = True,
 ) -> None:
@@ -505,8 +554,9 @@ def convert_leb1_to_leb2(
     Args:
         input_path: Path to source LEB1 file.
         output_path: Path to output LEB2 file.
-        group: Optional body group filter (core/asteroids/apogee/uranians).
-        target_precision: Precision target in AU for mantissa truncation.
+        group: Optional body group filter (core/asteroids/exotics/apogee/uranians).
+        expected_tier: Optional tier used to authenticate tier-specific inventory.
+        target_precision: Numeric coefficient target in native stored units.
         verbose: Print progress.
     """
     if verbose:
@@ -515,7 +565,7 @@ def convert_leb1_to_leb2(
             f"Converting {input_path} -> {output_path} (v2, {chunk_years:.0f}-year chunks)"
         )
         if group:
-            print(f"  Group: {group} ({len(LEB2_GROUPS[group])} bodies)")
+            print(f"  Group: {group}")
 
     t0 = time.time()
     src = LEB1Source(input_path)
@@ -525,6 +575,16 @@ def convert_leb1_to_leb2(
         body_ids = [bid for bid in LEB2_GROUPS[group] if bid in src.bodies]
     else:
         body_ids = sorted(src.bodies.keys())
+    if group and not body_ids:
+        src.close()
+        raise ValueError(
+            f"source LEB1 contains no bodies for requested group {group!r}"
+        )
+    if group and (
+        inventory_error := _group_inventory_error(group, body_ids, expected_tier)
+    ):
+        src.close()
+        raise ValueError(f"source LEB1 has {inventory_error}")
 
     if verbose:
         print(f"  Bodies: {len(body_ids)}")
@@ -667,7 +727,7 @@ def generate_and_compress(
         start_year: Override start year.
         end_year: Override end year.
         workers: Parallel workers for Chebyshev fitting.
-        target_precision: Precision target in AU.
+        target_precision: Numeric coefficient target in native stored units.
         verbose: Print progress.
     """
     import subprocess
@@ -736,62 +796,231 @@ def generate_and_compress(
 # =============================================================================
 
 
+VERIFY_DEFAULT_COEFFICIENT_TARGET = DEFAULT_TARGET_AU
+
+
+def _verification_tolerance(body_id: int, degree: int) -> float:
+    """Return the numeric native-component error bound for a compressed body.
+
+    Compression bounds the absolute error of each Chebyshev coefficient. Since
+    ``abs(T_k(x)) <= 1`` on an encoded segment, summing ``degree + 1`` terms
+    gives a conservative component bound. The unit follows the stored frame:
+    AU for Cartesian ICRS components and degrees/degrees/AU for ecliptic
+    longitude, latitude, and distance. Per-body coefficient targets match
+    those used by the converter; all other bodies use the named default.
+    """
+    coefficient_target = BODY_TARGET_AU.get(body_id, VERIFY_DEFAULT_COEFFICIENT_TARGET)
+    return coefficient_target * (degree + 1)
+
+
+def _native_component_errors(
+    coord_type: int,
+    reference: tuple[float, ...],
+    candidate: tuple[float, ...],
+) -> tuple[tuple[float, float, float], tuple[str, str, str]]:
+    """Return component errors and units without mixing coordinate frames."""
+    if coord_type in _ANGULAR_COORD_TYPES:
+        longitude = abs((candidate[0] - reference[0] + 180.0) % 360.0 - 180.0)
+        return (
+            (
+                longitude,
+                abs(candidate[1] - reference[1]),
+                abs(candidate[2] - reference[2]),
+            ),
+            ("deg", "deg", "AU"),
+        )
+    if coord_type in _CARTESIAN_COORD_TYPES:
+        return (
+            (
+                abs(candidate[0] - reference[0]),
+                abs(candidate[1] - reference[1]),
+                abs(candidate[2] - reference[2]),
+            ),
+            ("AU", "AU", "AU"),
+        )
+    raise ValueError(f"unsupported LEB coordinate type {coord_type}")
+
+
 def verify_leb2(
     leb2_path: str,
     reference_leb1: Optional[str] = None,
     n_samples: int = 200,
     verbose: bool = True,
+    expected_group: Optional[str] = None,
+    expected_tier: Optional[str] = None,
 ) -> bool:
-    """Verify a LEB2 file against a LEB1 reference or Skyfield.
+    """Verify a LEB2 file against a LEB1 reference or run a smoke test.
 
     Args:
         leb2_path: Path to LEB2 file to verify.
         reference_leb1: Optional LEB1 reference file. If provided, compares
-            LEB2 eval_body results against LEB1. Otherwise uses Skyfield.
+            LEB2 position results against LEB1. If omitted, performs a reader
+            smoke test only.
         n_samples: Number of random JDs to sample per body.
         verbose: Print results.
+        expected_group: Optional canonical group whose exact inventory is required.
+        expected_tier: Optional tier used to authenticate tier-specific inventory.
 
     Returns:
-        True if all bodies pass precision checks.
+        True if the inventory and all native stored components pass their bounds.
     """
     from libephemeris.leb2_reader import LEB2Reader
 
+    if n_samples < 1:
+        raise ValueError("n_samples must be at least 1")
+
     reader2 = LEB2Reader(leb2_path)
     all_pass = True
+
+    if not reader2._bodies:
+        if verbose:
+            print(f"Verifying {leb2_path}: FAIL - no bodies found")
+        reader2.close()
+        return False
+    if expected_group:
+        inventory_error = _group_inventory_error(
+            expected_group, reader2._bodies, expected_tier
+        )
+        if inventory_error:
+            if verbose:
+                print(f"Verifying {leb2_path}: FAIL - {inventory_error}")
+            reader2.close()
+            return False
 
     if reference_leb1:
         from libephemeris.leb_reader import LEBReader
 
         reader1 = LEBReader(reference_leb1)
 
+        leb2_range = reader2.jd_range
+        leb1_range = reader1.jd_range
+        if not np.all(np.isfinite((*leb2_range, *leb1_range))):
+            if verbose:
+                print("  File coverage metadata is non-finite: FAIL")
+            all_pass = False
+        elif leb2_range != leb1_range:
+            if verbose:
+                print(f"  File coverage {leb2_range} != LEB1 {leb1_range}: FAIL")
+            all_pass = False
+
         if verbose:
             print(f"Verifying {leb2_path} against {reference_leb1}")
             print(f"  Samples per body: {n_samples}")
-            arcsec_hdr = 'Max err (")'
             print(
-                f"\n  {'Body':<16s}  {'Max err (AU)':>14s}  {arcsec_hdr:>12s}  {'Status':>8s}"
+                f"\n  {'Body':<16s}  {'Worst component':>18s}  {'Unit':>5s}  "
+                f"{'Bound':>10s}  {'Ratio':>9s}  {'Status':>8s}"
             )
-            print(f"  {'-' * 56}")
+            print(f"  {'-' * 78}")
 
         rng = np.random.default_rng(42)
 
         for bid in sorted(reader2._bodies.keys()):
             if not reader1.has_body(bid):
+                if verbose:
+                    name = BODY_NAMES.get(bid, f"Body {bid}")
+                    print(f"  {name:<16s}  {'missing from LEB1':>36s}  {'FAIL':>8s}")
+                all_pass = False
                 continue
 
             body = reader2._bodies[bid]
+            reference_body = reader1._bodies[bid]
+            metadata_errors = []
+            if body.coord_type != reference_body.coord_type:
+                metadata_errors.append(
+                    f"coord_type {body.coord_type} != {reference_body.coord_type}"
+                )
+            if body.degree != reference_body.degree:
+                metadata_errors.append(
+                    f"degree {body.degree} != {reference_body.degree}"
+                )
+            if body.segment_count != reference_body.segment_count:
+                metadata_errors.append(
+                    "segment_count "
+                    f"{body.segment_count} != {reference_body.segment_count}"
+                )
+            if body.interval_days != reference_body.interval_days:
+                metadata_errors.append(
+                    "interval_days "
+                    f"{body.interval_days} != {reference_body.interval_days}"
+                )
+            if body.components != reference_body.components:
+                metadata_errors.append(
+                    f"components {body.components} != {reference_body.components}"
+                )
+            coverage_values = (
+                body.jd_start,
+                body.jd_end,
+                reference_body.jd_start,
+                reference_body.jd_end,
+            )
+            if not np.all(np.isfinite(coverage_values)):
+                metadata_errors.append("non-finite coverage metadata")
+            elif expected_group and (
+                body.jd_start != reference_body.jd_start
+                or body.jd_end != reference_body.jd_end
+            ):
+                metadata_errors.append(
+                    "declared-group coverage "
+                    f"[{body.jd_start}, {body.jd_end}] != LEB1 "
+                    f"[{reference_body.jd_start}, {reference_body.jd_end}]"
+                )
+            elif (
+                body.jd_start < reference_body.jd_start
+                or body.jd_end > reference_body.jd_end
+                or body.jd_start >= body.jd_end
+            ):
+                metadata_errors.append(
+                    "coverage "
+                    f"[{body.jd_start}, {body.jd_end}] is not contained in LEB1 "
+                    f"[{reference_body.jd_start}, {reference_body.jd_end}]"
+                )
+            if metadata_errors:
+                if verbose:
+                    name = BODY_NAMES.get(bid, f"Body {bid}")
+                    detail = "; ".join(metadata_errors)
+                    print(f"  {name:<16s}  metadata mismatch: {detail}  {'FAIL':>8s}")
+                all_pass = False
+                continue
+
             jds = rng.uniform(body.jd_start + 0.01, body.jd_end - 0.01, n_samples)
 
-            max_err = 0.0
+            max_errors = [0.0, 0.0, 0.0]
+            component_units = ("?", "?", "?")
             for jd in jds:
-                pos1, _ = reader1.eval_body(bid, float(jd))
-                pos2, _ = reader2.eval_body(bid, float(jd))
-                err = max(abs(a - b) for a, b in zip(pos1, pos2))
-                max_err = max(max_err, err)
+                try:
+                    pos1, _ = reader1.eval_body(bid, float(jd))
+                    pos2, _ = reader2.eval_body(bid, float(jd))
+                except Exception:
+                    max_errors = [float("inf")] * 3
+                    break
+                if len(pos1) != 3 or len(pos2) != 3:
+                    max_errors = [float("inf")] * 3
+                    break
+                if not np.all(np.isfinite((*pos1, *pos2))):
+                    max_errors = [float("inf")] * 3
+                    break
+                try:
+                    errors, component_units = _native_component_errors(
+                        body.coord_type, pos1, pos2
+                    )
+                except ValueError:
+                    max_errors = [float("inf")] * 3
+                    break
+                if not np.all(np.isfinite(errors)):
+                    max_errors = [float("inf")] * 3
+                    break
+                max_errors = [
+                    max(previous, current)
+                    for previous, current in zip(max_errors, errors)
+                ]
 
-            # Convert to arcsec (rough: 1 AU ≈ 206265")
-            err_arcsec = max_err * 206265
-            passed = err_arcsec < 1.0  # generous threshold
+            tolerance = _verification_tolerance(bid, body.degree)
+            ratios = [error / tolerance for error in max_errors]
+            worst_component = max(range(3), key=ratios.__getitem__)
+            max_err = max_errors[worst_component]
+            ratio = ratios[worst_component]
+            unit = component_units[worst_component]
+            passed = all(error <= tolerance for error in max_errors)
             status = "PASS" if passed else "FAIL"
             if not passed:
                 all_pass = False
@@ -799,7 +1028,8 @@ def verify_leb2(
             if verbose:
                 name = BODY_NAMES.get(bid, f"Body {bid}")
                 print(
-                    f"  {name:<16s}  {max_err:>14.2e}  {err_arcsec:>12.4f}  {status:>8s}"
+                    f"  {name:<16s}  {max_err:>18.2e}  "
+                    f"{unit:>5s}  {tolerance:>10.2e}  {ratio:>9.2f}  {status:>8s}"
                 )
 
         reader1.close()
@@ -811,8 +1041,10 @@ def verify_leb2(
         for bid in sorted(reader2._bodies.keys()):
             try:
                 pos, vel = reader2.eval_body(bid, jd_mid)
-                assert len(pos) == 3
-                assert len(vel) == 3
+                if len(pos) != 3 or len(vel) != 3:
+                    raise ValueError("expected three position and velocity components")
+                if not np.all(np.isfinite((*pos, *vel))):
+                    raise ValueError("non-finite position or velocity")
             except Exception as e:
                 if verbose:
                     name = BODY_NAMES.get(bid, f"Body {bid}")
@@ -847,6 +1079,7 @@ def convert_all_groups(
     Produces:
       {output_dir}/{tier_name}_core.leb2
       {output_dir}/{tier_name}_asteroids.leb2
+      {output_dir}/{tier_name}_exotics.leb2
       {output_dir}/{tier_name}_apogee.leb2
       {output_dir}/{tier_name}_uranians.leb2
 
@@ -854,7 +1087,7 @@ def convert_all_groups(
         input_path: Source LEB1 file.
         output_dir: Output directory.
         tier_name: Tier name for file naming (e.g. "base", "medium").
-        target_precision: Precision target in AU.
+        target_precision: Numeric coefficient target in native stored units.
         verbose: Print progress.
     """
     os.makedirs(output_dir, exist_ok=True)
@@ -864,16 +1097,17 @@ def convert_all_groups(
 
     total_size = 0
 
-    for group_name, body_ids in LEB2_GROUPS.items():
+    for group_name in LEB2_GROUPS:
         output_path = os.path.join(output_dir, f"{tier_name}_{group_name}.leb2")
 
         if verbose:
-            print(f"\n--- Group: {group_name} ({len(body_ids)} bodies) ---")
+            print(f"\n--- Group: {group_name} ---")
 
         convert_leb1_to_leb2(
             input_path=input_path,
             output_path=output_path,
             group=group_name,
+            expected_tier=tier_name,
             target_precision=target_precision,
             verbose=verbose,
         )
@@ -901,11 +1135,12 @@ def main():
             "Body groups:\n"
             "  core       : Sun-Pluto, Earth, Mean/True Node, Mean Apogee (14 bodies)\n"
             "  asteroids  : Chiron, Ceres, Pallas, Juno, Vesta (5 bodies)\n"
+            "  exotics    : Centaurs, TNOs, and NEAs from the canonical registry\n"
             "  apogee     : Oscu Apogee, Interp Apogee/Perigee (3 bodies)\n"
             "  uranians   : Cupido-Transpluto (9 bodies)\n"
             "\nExamples:\n"
             "  # Convert base tier, core group only:\n"
-            "  python generate_leb2.py convert data/leb/ephemeris_base.leb -o core_base.leb --group core\n"
+            "  python generate_leb2.py convert data/leb/ephemeris_base.leb -o core_base.leb --group core --tier base\n"
             "\n"
             "  # Convert all groups from base tier:\n"
             "  python generate_leb2.py convert-all data/leb/ephemeris_base.leb -o data/leb2/ --tier-name base\n"
@@ -914,7 +1149,7 @@ def main():
             "  python generate_leb2.py generate --tier base --group core -o core_base.leb\n"
             "\n"
             "  # Verify against LEB1 reference:\n"
-            "  python generate_leb2.py verify core_base.leb --reference data/leb/ephemeris_base.leb\n"
+            "  python generate_leb2.py verify core_base.leb --reference data/leb/ephemeris_base.leb --group core --tier base\n"
         ),
     )
 
@@ -930,10 +1165,18 @@ def main():
         help="Only include bodies from this group",
     )
     p_conv.add_argument(
+        "--tier",
+        choices=["base", "medium", "extended"],
+        help="Authenticate tier-specific body inventories",
+    )
+    p_conv.add_argument(
         "--precision",
         type=float,
         default=DEFAULT_TARGET_AU,
-        help=f"Precision target in AU (default: {DEFAULT_TARGET_AU})",
+        help=(
+            "Numeric coefficient target in native stored units "
+            f"(default: {DEFAULT_TARGET_AU})"
+        ),
     )
     p_conv.add_argument("-q", "--quiet", action="store_true")
 
@@ -945,6 +1188,7 @@ def main():
     p_all.add_argument("-o", "--output-dir", required=True, help="Output directory")
     p_all.add_argument(
         "--tier-name",
+        choices=["base", "medium", "extended"],
         required=True,
         help="Tier name for file naming (base/medium/extended)",
     )
@@ -952,7 +1196,10 @@ def main():
         "--precision",
         type=float,
         default=DEFAULT_TARGET_AU,
-        help=f"Precision target in AU (default: {DEFAULT_TARGET_AU})",
+        help=(
+            "Numeric coefficient target in native stored units "
+            f"(default: {DEFAULT_TARGET_AU})"
+        ),
     )
     p_all.add_argument("-q", "--quiet", action="store_true")
 
@@ -980,7 +1227,10 @@ def main():
         "--precision",
         type=float,
         default=DEFAULT_TARGET_AU,
-        help=f"Precision target in AU (default: {DEFAULT_TARGET_AU})",
+        help=(
+            "Numeric coefficient target in native stored units "
+            f"(default: {DEFAULT_TARGET_AU})"
+        ),
     )
     p_gen.add_argument("-q", "--quiet", action="store_true")
 
@@ -990,6 +1240,16 @@ def main():
     p_ver.add_argument(
         "--reference",
         help="LEB1 reference file for comparison",
+    )
+    p_ver.add_argument(
+        "--group",
+        choices=list(LEB2_GROUPS),
+        help="Require the exact canonical inventory for this named group",
+    )
+    p_ver.add_argument(
+        "--tier",
+        choices=["base", "medium", "extended"],
+        help="Authenticate tier-specific body inventories",
     )
     p_ver.add_argument("--samples", type=int, default=200, help="Samples per body")
     p_ver.add_argument("-q", "--quiet", action="store_true")
@@ -1005,6 +1265,7 @@ def main():
             input_path=args.input,
             output_path=args.output,
             group=args.group,
+            expected_tier=args.tier,
             target_precision=args.precision,
             verbose=not args.quiet,
         )
@@ -1036,6 +1297,8 @@ def main():
             reference_leb1=args.reference,
             n_samples=args.samples,
             verbose=not args.quiet,
+            expected_group=args.group,
+            expected_tier=args.tier,
         )
         sys.exit(0 if ok else 1)
 

@@ -37,7 +37,7 @@ import sys
 import click
 
 from .. import __version__
-from .shared import TIER_INFO, leb_download_help, tier_download_help
+from .shared import SPK_BODY_COUNT, TIER_INFO, leb_download_help, tier_download_help
 
 
 # ---------------------------------------------------------------------------
@@ -224,8 +224,10 @@ def _make_leb2_download(tier: str) -> click.Command:
         short_help=f"Download LEB2 compressed ephemeris for '{tier}' tier ({_LEB2_SIZES.get(tier, '')}).",
         help=f"Download LEB2 compressed modular ephemeris for '{tier}' tier.\n\n"
         f"LEB2 uses error-bounded lossy compression (mantissa truncation + zstd)\n"
-        f'to achieve 4-10x smaller files while maintaining <0.001" precision vs LEB1.\n\n'
-        f"Downloads 4 group files: core, asteroids, apogee, uranians.\n"
+        f"to achieve 4-10x smaller files.\n\n"
+        f"Downloads the 4 currently published groups: core, asteroids, apogee,\n"
+        f"uranians. The canonical exotics group is recognized and skipped until\n"
+        f"its release artifact is published.\n"
         f"Total size: {_LEB2_SIZES.get(tier, 'varies')}.\n\n"
         f"Files are saved to ~/.libephemeris/leb/ by default.",
     )
@@ -399,10 +401,33 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
 
 # --- download all: download everything for all tiers/modes ---
 
+_DOWNLOAD_ALL_HELP = f"""Download every data file for complete offline readiness.
+
+Downloads LEB2 files, DE kernels, planet centers, SPK kernels, and IERS
+Earth orientation data for ALL three tiers (base, medium, extended).
+
+\b
+WARNING: This will download approximately 5-6 GB of data.
+
+\b
+Files downloaded:
+  - LEB2 ephemeris for base, medium, extended  (~1050 MB)
+  - DE kernels: de440s, de440, de441            (~3.2 GB)
+  - Planet centers for all tiers                (~320 MB)
+  - SPK kernels for {SPK_BODY_COUNT} minor bodies             (~varies)
+  - IERS data: finals, leap seconds, delta T    (~3 MB)
+
+\b
+Examples:
+  libephemeris download all            Download everything
+  libephemeris download all --force    Re-download everything
+"""
+
 
 @download_group.command(
     "all",
     short_help="Download ALL data files for every tier and mode (~5 GB + IERS).",
+    help=_DOWNLOAD_ALL_HELP,
 )
 @_download_options
 @click.option(
@@ -412,29 +437,7 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
     help="Skip the ~5 GB download confirmation prompt",
 )
 def download_all(force: bool, no_progress: bool, quiet: bool, yes: bool) -> None:
-    """Download every data file for complete offline readiness.
-
-    Downloads LEB2 files, DE kernels, planet centers, SPK kernels, and IERS
-    Earth orientation data for ALL three tiers (base, medium, extended).
-    This lets you switch between any configuration without needing to
-    download anything later.
-
-    \b
-    WARNING: This will download approximately 5-6 GB of data.
-
-    \b
-    Files downloaded:
-      - LEB2 ephemeris for base, medium, extended  (~1050 MB)
-      - DE kernels: de440s, de440, de441            (~3.2 GB)
-      - Planet centers for all tiers                (~320 MB)
-      - SPK kernels for 21 minor bodies             (~varies)
-      - IERS data: finals, leap seconds, delta T    (~3 MB)
-
-    \b
-    Examples:
-      libephemeris download all            Download everything
-      libephemeris download all --force    Re-download everything
-    """
+    """Download every data file for complete offline readiness."""
     from .init_wizard import _d, _g, _w, _y
 
     tiers = ["base", "medium", "extended"]
@@ -667,14 +670,17 @@ def config() -> None:
     click.echo("  Python:   set_leb_file('path/to/ephemeris_medium.leb')")
     click.echo(f"  Location: {data_dir}/leb/")
     click.echo()
-    click.echo("  LEB1 files (full precision, larger):")
+    click.echo("  Published LEB1 download assets (full precision, 31 bodies):")
     click.echo("    ephemeris_base.leb     ~53 MB    1849-2150")
     click.echo("    ephemeris_medium.leb   ~175 MB   1549-2650")
     click.echo("    ephemeris_extended.leb ~1.6 GB   -5000 to +5000")
     click.echo()
-    click.echo("  LEB2 files (compressed, modular, 4 groups per tier):")
+    click.echo("  LEB2 files (compressed, modular, 5 canonical groups per tier):")
     click.echo("    {tier}_core.leb2       core 14 bodies")
     click.echo("    {tier}_asteroids.leb2  Chiron, Ceres, Pallas, Juno, Vesta")
+    click.echo(
+        "    {tier}_exotics.leb2    31 registry bodies; extended has 23 (no NEAs)"
+    )
     click.echo("    {tier}_apogee.leb2     OscuApog, IntpApog, IntpPerig")
     click.echo("    {tier}_uranians.leb2   Cupido-Transpluto (9 bodies)")
     click.echo()

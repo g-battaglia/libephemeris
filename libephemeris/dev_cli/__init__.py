@@ -7,13 +7,16 @@ LEB generation, diagnostics, data downloads, release management, and more.
 
 Shell completion + shell function (works with uv, no venv activation needed):
 
-    eval "$(uv run leph completion zsh)"      # zsh — test it now
-    uv run leph completion zsh >> ~/.zshrc     # zsh — make permanent
-    uv run leph completion bash >> ~/.bashrc   # bash
-    uv run leph completion fish > ~/.config/fish/conf.d/leph.fish  # fish
+    eval "$(uv run ./leph completion zsh)"      # zsh — test it now
+    uv run ./leph completion zsh >> ~/.zshrc     # zsh — make permanent
+    uv run ./leph completion bash >> ~/.bashrc   # bash
+    uv run ./leph completion fish > ~/.config/fish/conf.d/leph.fish  # fish
 """
 
 from __future__ import annotations
+
+import os
+from pathlib import Path
 
 import click
 
@@ -33,7 +36,7 @@ from .cmd_test import test_group
 @click.group(
     name="leph",
     help="""\
-libephemeris developer CLI — ~120 commands for testing, data generation,
+libephemeris developer CLI — over 100 commands for testing, data generation,
 code quality, LEB binary ephemeris management, and release workflows.
 
 \b
@@ -58,8 +61,8 @@ Subgroups at a glance:
 
 \b
 TAB completion setup (works with uv, no venv activation needed):
-  eval "$(uv run leph completion zsh)"      # try it now
-  uv run leph completion zsh >> ~/.zshrc    # make permanent
+  eval "$(uv run ./leph completion zsh)"      # try it now
+  uv run ./leph completion zsh >> ~/.zshrc    # make permanent
 
 Use -h on any subcommand for details:  leph test -h, leph test skyfield -h, etc.
 """,
@@ -85,5 +88,12 @@ cli.add_command(status)
 
 
 def main() -> None:
-    """Entry point for the ``leph`` console script."""
-    cli()
+    """Run the repo-local ``leph`` developer CLI."""
+    # Every command targets files in this checkout. ``uv run --project``
+    # selects the environment but deliberately preserves the caller's cwd, so
+    # anchor relative tests/scripts/data paths here for shell functions invoked
+    # from another directory.
+    os.chdir(Path(__file__).resolve().parents[2])
+    # A stable program name is required for Click's ``_LEPH_COMPLETE``
+    # protocol when the CLI is launched through ``python -m``.
+    cli(prog_name="leph")

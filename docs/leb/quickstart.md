@@ -86,11 +86,14 @@ python scripts/generate_leb.py --tier base --merge \
 
 ### Output files
 
-| Tier | File | Size | Coverage |
-|------|------|------|----------|
-| Base | `data/leb/ephemeris_base.leb` | ~53 MB | 1850-2150 |
-| Medium | `data/leb/ephemeris_medium.leb` | ~175 MB | 1550-2650 |
-| Extended | `data/leb/ephemeris_extended.leb` | ~1.6 GB | -5000 / +5000 |
+Typical sizes below are for the current locally generated rc8 inventories;
+they are not the smaller, published 31-body LEB1 download assets.
+
+| Tier | File | Typical size | Bodies | Coverage |
+|------|------|--------------|--------|----------|
+| Base | `data/leb/ephemeris_base.leb` | ~375 MB | up to 62 | 1850-2150 |
+| Medium | `data/leb/ephemeris_medium.leb` | ~1.23 GB | up to 62 | 1550-2650 |
+| Extended | `data/leb/ephemeris_extended.leb` | ~7.64 GB | 54 | -5000 / +5000 |
 
 ### LEB1 body groups
 
@@ -101,14 +104,18 @@ python scripts/generate_leb.py --tier base --merge \
 | `exotics` | Centaurs, TNOs, NEAs (31) | spktype21 scalar | ~2-5min |
 | `analytical` | Nodes, Lilith, Uranians, Apogees (15) | Scalar Python | ~2-3min |
 
-The four groups total 62 bodies.
+The four groups total 62 registered bodies for base and medium. Extended
+generation deliberately excludes eight chaotic near-Earth asteroids, so its
+merged inventory contains 54 bodies.
 
 ---
 
 ## 2. Convert LEB1 → LEB2
 
 > LEB2 requires an existing LEB1 file as input. Generate one first
-> (section 1) if you don't have one.
+> (section 1) if you don't have one. `convert-all` requires the full local
+> 62-body base/medium or 54-body extended inventory; the published 31-body
+> LEB1 download assets intentionally lack the exotic group.
 
 ### Via leph
 
@@ -126,7 +133,7 @@ leph leb2 convert extended
 ```bash
 # Single group
 python scripts/generate_leb2.py convert data/leb/ephemeris_base.leb \
-  -o data/leb2/base_core.leb2 --group core
+  -o data/leb2/base_core.leb2 --group core --tier base
 
 # All groups at once
 python scripts/generate_leb2.py convert-all data/leb/ephemeris_base.leb \
@@ -161,7 +168,7 @@ LEB2 groups differ from LEB1 groups:
 |------|------|------------|
 | `planets` (11) | `core` (14) | Core also includes Mean/True Node and Mean Apogee |
 | `asteroids` (5) | `asteroids` (5) | Identical |
-| `exotics` (31) | `exotics` (31) | Identical |
+| `exotics` (31) | `exotics` (31 base/medium; 23 extended) | Extended excludes all 8 NEAs |
 | `analytical` (15) | `apogee` (3) + `uranians` (9) | Analytical split into 2 groups |
 
 ---
@@ -187,12 +194,12 @@ reader.close()
 ### Verify LEB2
 
 ```bash
-# Against LEB1 reference
+# Core companion against its LEB1 reference
 leph leb2 verify base
 
 # Direct CLI
 python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
-  --reference data/leb/ephemeris_base.leb --samples 500
+  --reference data/leb/ephemeris_base.leb --samples 500 --group core --tier base
 ```
 
 ### Test suites
@@ -204,8 +211,8 @@ leph test leb-format precision     # Full precision suite
 
 # LEB2
 leph test leb2-format all          # Compression round-trip + reader tests
-leph test leb2-format precision-base  # End-to-end precision, base (~15s)
-leph test leb2-format precision-all   # All tiers (~45s)
+leph test leb2-format precision-base  # Core end-to-end precision, base (~15s)
+leph test leb2-format precision-all   # Core companions, all tiers (~45s)
 
 # With LEB active (any format)
 leph test leb-backend unit         # Unit tests in LEB mode
@@ -264,7 +271,7 @@ set_calc_mode("leb")
 Auto-discovery: files in `~/.libephemeris/leb/` are found automatically.
 
 ```bash
-# End-user download (published groups only; exotics is currently skipped)
+# End-user download (published 31-body LEB1 assets; exotics are not included)
 libephemeris download leb-base       # ~53 MB
 libephemeris download leb-medium     # ~175 MB
 libephemeris download leb-extended   # ~1.6 GB
@@ -281,8 +288,8 @@ libephemeris download leb-extended   # ~1.6 GB
 | **LEB1 extended** | `leph leb generate extended groups` |
 | **LEB2 base (all groups)** | `leph leb2 convert base` |
 | **LEB2 medium** | `leph leb2 convert medium` |
-| **Verify LEB2** | `leph leb2 verify base` |
+| **Verify LEB2 core** | `leph leb2 verify base` |
 | **Test LEB1** | `leph test leb-format all` |
 | **Test LEB2** | `leph test leb2-format all` |
-| **Test LEB2 precision** | `leph test leb2-format precision-base` |
+| **Test LEB2 core precision** | `leph test leb2-format precision-base` |
 | **Release** | `leph release leb 1.0.0` |

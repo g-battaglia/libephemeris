@@ -53,6 +53,7 @@ References:
 from __future__ import annotations
 
 import math
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
@@ -60,6 +61,7 @@ from skyfield.api import Star
 from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
 from skyfield.framelib import ecliptic_frame
 
+from .tracing import _record
 from .constants import (
     REGULUS,
     SPICA_STAR,
@@ -200,6 +202,13 @@ from .utils import cotrans
 from .cache import get_true_obliquity, get_mean_obliquity
 from .exceptions import Error
 from .planets import _wrap_ephemeris_range_error
+
+_fixed_star_source: ContextVar[str | None] = ContextVar(
+    "libephemeris_fixed_star_source", default=None
+)
+_fixed_star_record_suppressed: ContextVar[bool] = ContextVar(
+    "libephemeris_fixed_star_record_suppressed", default=False
+)
 
 
 @dataclass
@@ -2486,15 +2495,39 @@ def calc_fixed_star_position(
         IAU 2006 precession (Capitaine et al.)
         Skyfield library for apparent position calculation
     """
+    position, _source = _calc_fixed_star_position_with_source(
+        star_id,
+        jd_tt,
+        noaberr,
+        nogdefl,
+        j2000_frame,
+        topo=topo,
+        center=center,
+    )
+    _fixed_star_source.set(_source)
+    return position
+
+
+def _calc_fixed_star_position_with_source(
+    star_id: int,
+    jd_tt: float,
+    noaberr: bool = False,
+    nogdefl: bool = False,
+    j2000_frame: bool = False,
+    topo: "tuple | None" = None,
+    center: int = 0,
+) -> tuple[Tuple[float, float, float], str]:
+    """Return a fixed-star position together with its actual backend tag."""
     from .state import get_leb_reader
 
     # The LEB star path is geocentric; topocentric requests go through
     # Skyfield (same convention as the planet pipeline).
     if topo is None and get_leb_reader() is not None:
         try:
-            return _calc_star_position_leb(
+            position = _calc_star_position_leb(
                 star_id, jd_tt, noaberr, nogdefl, j2000_frame, center
             )
+            return position, "LEB"
         except (KeyError, ValueError) as _leb_err:
             # Fall back to Skyfield for missing bodies, out-of-range dates
             # AND corrupted/truncated LEB data, mirroring the planet path.
@@ -2503,9 +2536,10 @@ def calc_fixed_star_position(
 
             log_leb_fallback("star", _leb_err)
     try:
-        return _calc_star_position_skyfield(
+        position = _calc_star_position_skyfield(
             star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo, center=center
         )
+        return position, "Skyfield"
     except SkyfieldRangeError as e:
         # Wrap once here: every star entry point (fixstar_ut, fixstar,
         # fixstar2*, velocity, calc_ut dispatch) funnels through this
@@ -2565,18 +2599,43 @@ def calc_fixed_star_velocity(
     # value.
     h = 0.005 if topo is not None else 0.5
 
-    # Calculate position at current time (for return value)
-    lon, lat, dist = calc_fixed_star_position(
-        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo, center=center
-    )
+    source_token = _fixed_star_source.set(None)
+    try:
+        # Calculate position at current time (for return value)
+        lon, lat, dist = calc_fixed_star_position(
+            star_id,
+            jd_tt,
+            noaberr,
+            nogdefl,
+            j2000_frame,
+            topo=topo,
+            center=center,
+        )
+        source_now = _fixed_star_source.get() or "Skyfield"
 
-    # Calculate positions at t-0.5 and t+0.5 for central difference
-    lon_prev, lat_prev, dist_prev = calc_fixed_star_position(
-        star_id, jd_tt - h, noaberr, nogdefl, j2000_frame, topo=topo, center=center
-    )
-    lon_next, lat_next, dist_next = calc_fixed_star_position(
-        star_id, jd_tt + h, noaberr, nogdefl, j2000_frame, topo=topo, center=center
-    )
+        # Calculate positions at t-h and t+h for central difference.
+        lon_prev, lat_prev, dist_prev = calc_fixed_star_position(
+            star_id,
+            jd_tt - h,
+            noaberr,
+            nogdefl,
+            j2000_frame,
+            topo=topo,
+            center=center,
+        )
+        source_prev = _fixed_star_source.get() or "Skyfield"
+        lon_next, lat_next, dist_next = calc_fixed_star_position(
+            star_id,
+            jd_tt + h,
+            noaberr,
+            nogdefl,
+            j2000_frame,
+            topo=topo,
+            center=center,
+        )
+        source_next = _fixed_star_source.get() or "Skyfield"
+    finally:
+        _fixed_star_source.reset(source_token)
 
     # Central difference: (f(t+h) - f(t-h)) / (2h)
     speed_lon = lon_next - lon_prev
@@ -2595,6 +2654,9 @@ def calc_fixed_star_velocity(
     # Earth's orbital radial component) - the reference reports it.
     speed_dist = (dist_next - dist_prev) / (2.0 * h)
 
+    sources = {source_now, source_prev, source_next}
+    source = sources.pop() if len(sources) == 1 else "Mixed"
+    _fixed_star_source.set(source)
     return lon, lat, dist, speed_lon, speed_lat, speed_dist
 
 
@@ -3086,7 +3148,25 @@ def _apply_fixstar_flags(
     return result
 
 
-def _fixed_epoch_star_call(entry_fn, star, tjd, flags, *, verbatim_echo=False):
+def _record_fixed_star_success(star_id: int, jd: float, source: str) -> None:
+    """Publish a fixed-star source only after the public call has succeeded."""
+    if _fixed_star_record_suppressed.get():
+        return
+    from .logging_config import get_logger
+
+    get_logger().debug("body=%d jd=%.1f source=%s", star_id, jd, source)
+    _record(star_id, source)
+
+
+def _fixed_epoch_star_call(
+    entry_fn,
+    star,
+    tjd,
+    flags,
+    *,
+    verbatim_echo=False,
+    flexible_lookup=False,
+):
     """Fixed-epoch sidereal modes (SIDM_J2000/J1900/B1950) for stars.
 
     These modes are frame requests, not ayanamsha offsets: the reference
@@ -3120,13 +3200,28 @@ def _fixed_epoch_star_call(entry_fn, star, tjd, flags, *, verbatim_echo=False):
     sidm = get_sid_mode()
     if not is_fixed_epoch_request(flags, sidm):
         return None
-    xx, name, rf = entry_fn(star, tjd, fixed_epoch_request_flags(flags))
+    suppress_token = _fixed_star_record_suppressed.set(True)
+    try:
+        xx, name, rf = entry_fn(star, tjd, fixed_epoch_request_flags(flags))
+    finally:
+        _fixed_star_record_suppressed.reset(suppress_token)
     xx_t0 = transform_fixed_epoch_result(xx, flags, sidm)
-    return (
+    result = (
         tuple(float(v) for v in xx_t0),
         name,
         flags if verbatim_echo else fixed_epoch_retflag(rf, flags),
     )
+    if flexible_lookup:
+        entry, error = _resolve_star2(star)
+        if error or entry is None:
+            raise Error(error or "could not find star name")
+        star_id = entry.id
+    else:
+        star_id, error, _canonical_name = _resolve_star_id(star)
+        if error:
+            raise Error(error)
+    _record_fixed_star_success(star_id, tjd, _get_fixed_star_source())
+    return result
 
 
 def fixstar_ut(
@@ -3170,11 +3265,67 @@ def fixstar_ut(
     return _fixstar_ut_by_id(star_id, canonical_name, tjdut, flags)
 
 
+def _fixed_star_result_with_source(
+    star_id: int,
+    jd_tt: float,
+    flags: int,
+    noaberr: bool,
+    nogdefl: bool,
+    use_j2000: bool,
+    topo: "tuple | None",
+    center: int,
+    *,
+    legacy_sidereal: bool,
+) -> tuple[Tuple[float, float, float, float, float, float], str]:
+    """Compute and post-process a fixed star, returning its actual source."""
+    source_token = _fixed_star_source.set(None)
+    try:
+        if flags & FLG_SPEED:
+            result = calc_fixed_star_velocity(
+                star_id,
+                jd_tt,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
+                center=center,
+            )
+        else:
+            lon, lat, dist = calc_fixed_star_position(
+                star_id,
+                jd_tt,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
+                center=center,
+            )
+            result = (lon, lat, dist, 0.0, 0.0, 0.0)
+        source = _fixed_star_source.get() or "Skyfield"
+        result = _apply_fixstar_flags(
+            result,
+            jd_tt,
+            flags,
+            j2000_native=use_j2000,
+            legacy_sidereal=legacy_sidereal,
+        )
+        return result, source
+    finally:
+        _fixed_star_source.reset(source_token)
+
+
+def _get_fixed_star_source() -> str:
+    """Return the source of the most recent successful fixed-star calculation."""
+    return _fixed_star_source.get() or "Skyfield"
+
+
 def _fixstar_ut_by_id(
     star_id: int,
     canonical_name: str | None,
     tjdut: float,
     flags: int,
+    *,
+    record_trace: bool = True,
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """fixstar_ut() computation for an already-resolved catalog id.
 
@@ -3209,38 +3360,61 @@ def _fixstar_ut_by_id(
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
-        if flags & FLG_SPEED:
-            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id,
-                t.tt,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        else:
-            lon, lat, dist = calc_fixed_star_position(
-                star_id,
-                t.tt,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, 0.0, 0.0, 0.0)
-
-        result = _apply_fixstar_flags(
-            result, t.tt, flags, j2000_native=use_j2000, legacy_sidereal=True
+        result, trace_source = _fixed_star_result_with_source(
+            star_id,
+            t.tt,
+            flags,
+            noaberr,
+            nogdefl,
+            use_j2000,
+            topo,
+            center,
+            legacy_sidereal=True,
         )
+        _fixed_star_source.set(trace_source)
 
+        if record_trace:
+            _record_fixed_star_success(star_id, t.tt, trace_source)
         return (result, canonical_name or "", ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
+
+
+def _batch_fixstars_via_single(
+    stars: Sequence[str],
+    tjdut: float,
+    flags: int,
+    *,
+    skip_errors: bool,
+) -> Tuple[
+    Tuple[Tuple[float, float, float, float, float, float], str, int] | None, ...
+]:
+    """Delegate a batch while publishing traces only after batch success."""
+    results: list[
+        Tuple[Tuple[float, float, float, float, float, float], str, int] | None
+    ] = []
+    traces: list[tuple[int, str]] = []
+    suppress_token = _fixed_star_record_suppressed.set(True)
+    try:
+        for star_name in stars:
+            try:
+                results.append(fixstar_ut(star_name, tjdut, flags))
+                star_id, error, _canonical_name = _resolve_star_id(star_name)
+                if error:
+                    raise Error(error)
+                traces.append((star_id, _get_fixed_star_source()))
+            except Error:
+                if skip_errors:
+                    results.append(None)
+                    continue
+                raise
+    finally:
+        _fixed_star_record_suppressed.reset(suppress_token)
+    for star_id, source in traces:
+        _record_fixed_star_success(star_id, tjdut, source)
+    return tuple(results)
 
 
 def batch_fixstars_ut(
@@ -3269,23 +3443,21 @@ def batch_fixstars_ut(
         geocentric batch path below — otherwise a name like "29Psc" would
         resolve to a different star with and without ``FLG_TOPOCTR``.
     """
+    if flags & FLG_SIDEREAL:
+        from .sidereal_epoch import is_fixed_epoch_request
+        from .state import get_sid_mode
+
+        if is_fixed_epoch_request(flags, get_sid_mode()):
+            return _batch_fixstars_via_single(
+                stars, tjdut, flags, skip_errors=skip_errors
+            )
+
     # FLG_TOPOCTR is unsupported by the geocentric LEB/Skyfield batch paths
     # below; rather than silently return geocentric positions that disagree
     # with the single-star path, delegate per star to the topocentric
     # single-star path (fixstar_ut — same resolver as the geocentric branch).
     if flags & FLG_TOPOCTR:
-        topo_results: list[
-            Tuple[Tuple[float, float, float, float, float, float], str, int] | None
-        ] = []
-        for star_name in stars:
-            try:
-                topo_results.append(fixstar_ut(star_name, tjdut, flags))
-            except Error:
-                if skip_errors:
-                    topo_results.append(None)
-                    continue
-                raise
-        return tuple(topo_results)
+        return _batch_fixstars_via_single(stars, tjdut, flags, skip_errors=skip_errors)
 
     ret_flags = _fixstar_ret_flags(flags, implied=True)
     flags = _preprocess_flags(flags)
@@ -3367,6 +3539,8 @@ def batch_fixstars_ut(
             log_leb_fallback("star batch", _leb_err)
 
     if _leb_ok:
+        for _index, star_id, _canonical_name in resolved:
+            _record_fixed_star_success(star_id, jd_tt, "LEB")
         return tuple(results)
 
     # Skyfield fallback path. Heliocentric/barycentric requests observe from
@@ -3435,6 +3609,9 @@ def batch_fixstars_ut(
                 continue
             raise Error(str(e)) from e
 
+    for index, star_id, _canonical_name in resolved:
+        if results[index] is not None:
+            _record_fixed_star_success(star_id, jd_tt, "Skyfield")
     return tuple(results)
 
 
@@ -3496,33 +3673,19 @@ def fixstar(
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
-        if flags & FLG_SPEED:
-            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id,
-                tjdet,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        else:
-            lon, lat, dist = calc_fixed_star_position(
-                star_id,
-                tjdet,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, 0.0, 0.0, 0.0)
-
-        result = _apply_fixstar_flags(
-            result, tjdet, flags, j2000_native=use_j2000, legacy_sidereal=True
+        result, trace_source = _fixed_star_result_with_source(
+            star_id,
+            tjdet,
+            flags,
+            noaberr,
+            nogdefl,
+            use_j2000,
+            topo,
+            center,
+            legacy_sidereal=True,
         )
-
+        _fixed_star_source.set(trace_source)
+        _record_fixed_star_success(star_id, tjdet, trace_source)
         return (result, canonical_name or "", ret_flags)
     except Error:
         raise
@@ -3757,7 +3920,7 @@ def fixstar2_ut(
         >>> pos, name, retflag = fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
-    _fe = _fixed_epoch_star_call(fixstar2_ut, star, tjdut, flags)
+    _fe = _fixed_epoch_star_call(fixstar2_ut, star, tjdut, flags, flexible_lookup=True)
     if _fe is not None:
         return _fe
 
@@ -3785,32 +3948,20 @@ def fixstar2_ut(
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
-        if flags & FLG_SPEED:
-            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id,
-                t.tt,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        else:
-            lon, lat, dist = calc_fixed_star_position(
-                entry.id,
-                t.tt,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, 0.0, 0.0, 0.0)
-
+        result, trace_source = _fixed_star_result_with_source(
+            entry.id,
+            t.tt,
+            flags,
+            noaberr,
+            nogdefl,
+            use_j2000,
+            topo,
+            center,
+            legacy_sidereal=False,
+        )
         star_name_out = _format_star_name(entry)
-        result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
-
+        _fixed_star_source.set(trace_source)
+        _record_fixed_star_success(entry.id, t.tt, trace_source)
         return (result, star_name_out, ret_flags)
     except Error:
         raise
@@ -3859,7 +4010,14 @@ def fixstar2(
         >>> pos, name, retflag = fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
-    _fe = _fixed_epoch_star_call(fixstar2, star, tjdet, flags, verbatim_echo=True)
+    _fe = _fixed_epoch_star_call(
+        fixstar2,
+        star,
+        tjdet,
+        flags,
+        verbatim_echo=True,
+        flexible_lookup=True,
+    )
     if _fe is not None:
         return _fe
 
@@ -3882,32 +4040,20 @@ def fixstar2(
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
-        if flags & FLG_SPEED:
-            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id,
-                tjdet,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        else:
-            lon, lat, dist = calc_fixed_star_position(
-                entry.id,
-                tjdet,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, 0.0, 0.0, 0.0)
-
+        result, trace_source = _fixed_star_result_with_source(
+            entry.id,
+            tjdet,
+            flags,
+            noaberr,
+            nogdefl,
+            use_j2000,
+            topo,
+            center,
+            legacy_sidereal=False,
+        )
         star_name_out = _format_star_name(entry)
-        result = _apply_fixstar_flags(result, tjdet, flags, j2000_native=use_j2000)
-
+        _fixed_star_source.set(trace_source)
+        _record_fixed_star_success(entry.id, tjdet, trace_source)
         return (result, star_name_out, ret_flags)
     except Error:
         raise
