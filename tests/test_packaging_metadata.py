@@ -35,6 +35,7 @@ from scripts.check_wheel_contents import (
     _zip_info_is_special,
     audit,
     forbidden_in,
+    main as wheel_audit_main,
 )
 from scripts.check_spdx_headers import THIRD_PARTY_COPYRIGHT_LINES
 
@@ -86,6 +87,17 @@ def test_astroquery_is_optional_catalog_tooling() -> None:
     assert not _has_requirement(config["dependencies"], "astroquery")
     assert _has_requirement(extras["stars"], "astroquery")
     assert _has_requirement(extras["dev"], "astroquery")
+
+
+def test_wheel_audit_help_is_a_successful_cli_action(capsys) -> None:
+    """The release gate must not interpret ``--help`` as a wheel filename."""
+    with pytest.raises(SystemExit) as exc_info:
+        wheel_audit_main(["--help"])
+
+    assert exc_info.value.code == 0
+    output = capsys.readouterr().out
+    assert "Build and audit rc8 distribution artifacts." in output
+    assert "wheel" in output
 
 
 def test_bundled_data_namespaces_are_explicit_packages() -> None:

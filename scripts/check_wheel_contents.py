@@ -17,6 +17,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import base64
 import configparser
 import csv
@@ -822,9 +823,20 @@ def audit(sdist: Path | None, wheel: Path) -> int:
     return 1 if problems else 0
 
 
-def main() -> int:
-    if len(sys.argv) > 1:
-        return audit(None, Path(sys.argv[1]))
+def main(argv: list[str] | None = None) -> int:
+    """Build and audit release artifacts, or audit one existing wheel."""
+    parser = argparse.ArgumentParser(
+        description="Build and audit rc8 distribution artifacts."
+    )
+    parser.add_argument(
+        "wheel",
+        nargs="?",
+        type=Path,
+        help="existing wheel to audit instead of building fresh artifacts",
+    )
+    args = parser.parse_args(argv)
+    if args.wheel is not None:
+        return audit(None, args.wheel)
     with tempfile.TemporaryDirectory() as tmp:
         sdist, wheel = build_artifacts(Path(tmp))
         return audit(sdist, wheel)
