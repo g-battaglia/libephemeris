@@ -61,12 +61,15 @@ Because house cusps derive from the long-term Vondrák 2011 model (valid ±200,0
 
 Methodology: [Long-term sidereal time, precession & cusp speeds](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/sidereal-time-longterm.md). Full head-to-head with Swiss Ephemeris: [Swiss Ephemeris Comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md).
 
-### Precision choices
+### Intentional divergences from the reference API
 
-LibEphemeris is 1:1 API-compatible (function names, flags, slot semantics).
-In a few areas it uses a stricter numerical definition or a more precise
-model — these are stable, documented, and affect only edge channels.
-Full details: [Intentional Divergences](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/intentional-divergences.md).
+LibEphemeris aims for 1:1 API compatibility at the level of function names,
+flags, and slot semantics. A small number of behaviors are deliberately
+different because reproducing them would mean shipping data fitted to an
+external implementation's output or introducing a known physical
+inconsistency. Every divergence is documented with its rationale in
+[Intentional Divergences](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/intentional-divergences.md);
+the headline items are:
 
 | Area | What LibEphemeris does | Why |
 |------|----------------------|-----|
