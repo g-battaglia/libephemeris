@@ -61,6 +61,31 @@ Because house cusps derive from the long-term Vondrák 2011 model (valid ±200,0
 
 Methodology: [Long-term sidereal time, precession & cusp speeds](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/sidereal-time-longterm.md). Full head-to-head with Swiss Ephemeris: [Swiss Ephemeris Comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md).
 
+### Intentional divergences from the reference API
+
+LibEphemeris aims for 1:1 API compatibility at the level of function names,
+flags, and slot semantics. A small number of behaviors are deliberately
+different because reproducing them would mean shipping data fitted to an
+external implementation's output or introducing a known physical
+inconsistency. Every divergence is documented with its rationale in
+[Intentional Divergences](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/intentional-divergences.md);
+the headline items are:
+
+| Area | What LibEphemeris does | Why |
+|------|----------------------|-----|
+| **`SIDEREAL \| J2000` on lunar points** | Honors the flag uniformly for every lunar point (mean, true, osculating, interpolated). | Without it \|TrueNode − MeanNode\| grows without bound away from J2000 — far beyond the ±1.5° physical oscillation. |
+| **Of-date mean obliquity** | Angle between the Vondrák ecliptic and equator poles (self-consistent frame). | A direction on the ecliptic (the Sun) stays at ~0° ecliptic latitude at every epoch; the separately fitted series drifts ~6″ at −3000. |
+| **`deltat_ex` purity** | `deltat_ex()` never mutates `get_tid_acc()`. | Delta-T queries should not have side effects on library state. |
+| **Total-eclipse obscuration** | `attr[2]` reports 1.0 during totality (bounded fraction). | Obscuration is a covered-area fraction \[0, 1\] by its published definition; the disc-area ratio stays derivable as `attr[1] ** 2`. |
+| **Published-source ayanamshas** | Every mode derives from its author's published defining statement (IAE for Lahiri, Burgess/Clark for the Siddhantic modes, etc.). | No value is fitted to another implementation's output. Sub-arcsecond agreement for most modes; documented offsets for historical-pair modes (e.g. Yukteshwar ~5.5′ from the book value, De Luce ~22″). |
+| **House-cusp speeds** | The derivative of the reported cusp position (centered finite difference). Whole Sign cusps report 0.0. | The speed slot is the derivative of the position slot, not a convention-dependent analytic approximation. |
+| **Phase angle** | Light-time-consistent geometry. | Bounded 15–40″ difference on inner planets; elongation identical. |
+
+Modern-era planetary and lunar positions, house cusps, eclipses, rise/set,
+and the majority of sidereal modes agree with the reference API at the
+sub-arcsecond level. The full comparison methodology and per-channel bounds
+are in [Known Differences](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/known-differences.md).
+
 ---
 
 ## Quick Start
@@ -125,10 +150,10 @@ pip install libephemeris
 
 Out of the box, the wheel includes a bundled LEB2 base-tier core for the 14
 core bodies (1850–2150). Mean lunar points come from ERFA/IERS arguments;
-interpolated apsides use the versioned compatibility series documented in the
-lunar methodology. Reviewed, SHA-256-pinned medium and extended LEB2 cores are
-available through the normal tier download commands, while local LEB1 files
-remain supported.
+interpolated apsides are anchored to the actual JPL DE440 apsis passages
+(documented in the [lunar methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/interpolated-perigee.md)).
+Reviewed, SHA-256-pinned medium and extended LEB2 cores are available through
+the normal tier download commands, while local LEB1 files remain supported.
 
 Recommended first-time setup:
 
