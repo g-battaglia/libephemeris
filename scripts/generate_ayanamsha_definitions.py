@@ -101,6 +101,12 @@ def mean_march_equinox_jd(year: float) -> float:
     )
 
 
+def sun_mean_longitude_deg(jd_tt: float) -> float:
+    """Geometric mean longitude of the Sun, equinox of date (Meeus 25.2)."""
+    t = (jd_tt - 2451545.0) / 36525.0
+    return (280.46646 + 36000.76983 * t + 0.0003032 * t * t) % 360.0
+
+
 def mean_september_equinox_jd(year: float) -> float:
     """Mean September-equinox instant (TT JD), Meeus ch. 27 (27.B)."""
     y = (year - 2000.0) / 1000.0
@@ -196,20 +202,44 @@ def _stars():
 E_499 = mean_march_equinox_jd(499.0)  # Kali 3600 elapsed: 21 March 499 CE
 
 # Kali-yuga epoch and Siddhantic year lengths (published constants):
-# - Ardharatrika (midnight) Kali epoch: JD 588465.75, Ujjain midnight,
-#   18 February 3102 BCE (Burgess; standard in the history-of-astronomy
-#   literature).
-# - Audayika (sunrise) Kali epoch: JD 588466.00, Ujjain sunrise.
+# - The Kali era begins at midnight (Ardharatrika school) or sunrise
+#   (Audayika school) of 18 February 3102 BCE proleptic-Julian at
+#   Ujjayini, longitude 75\N{DEGREE SIGN}47' E (Burgess; standard in the
+#   history-of-astronomy literature). Greenwich midnight of that date is
+#   JD 588465.5, so Ujjayini local mean midnight is 75.7833\N{DEGREE SIGN}/360
+#   of a day earlier and sunrise is a quarter day after local midnight.
 # - Surya Siddhanta sidereal year: 1,577,917,828 civil days per 4,320,000
 #   solar revolutions (Burgess, ch. I).
 # - Aryabhatiya sidereal year: 1,577,917,500 days per 4,320,000 revolutions
 #   (Clark, Gitikapada 3).
-KALI_EPOCH_MIDNIGHT = 588465.75
-KALI_EPOCH_SUNRISE = 588466.00
+# The "mean Sun" modes place the sidereal zero at the mean Sun of the
+# Kali + 3600-year instant: the Siddhantic mean Sun starts at the zero
+# point at the Kali epoch and completes exactly 3600 revolutions by that
+# moment. Day counts (ahargana) are civil days, so the instants are UT;
+# they are converted to TT with the project's Delta-T model before the
+# mean solar longitude (Meeus 25.2) is evaluated.
+UJJAYINI_LON_DEG = 75.0 + 47.0 / 60.0
+KALI_EPOCH_MIDNIGHT_UT = 588465.5 - UJJAYINI_LON_DEG / 360.0
+KALI_EPOCH_SUNRISE_UT = KALI_EPOCH_MIDNIGHT_UT + 0.25
 SS_YEAR_DAYS = 1_577_917_828 / 4_320_000
 ARYABHATA_YEAR_DAYS = 1_577_917_500 / 4_320_000
-E_SS_MSUN = KALI_EPOCH_MIDNIGHT + 3600 * SS_YEAR_DAYS
-E_ARYABHATA_MSUN = KALI_EPOCH_SUNRISE + 3600 * ARYABHATA_YEAR_DAYS
+
+
+def _kali_3600_msun_pair(kali_epoch_ut: float, year_days: float) -> tuple[float, float]:
+    """Defining (value, epoch_tt) for a Siddhantic mean-Sun ayanamsha."""
+    from libephemeris import deltat
+
+    epoch_ut = kali_epoch_ut + 3600.0 * year_days
+    epoch_tt = epoch_ut + deltat(epoch_ut)
+    lon = sun_mean_longitude_deg(epoch_tt)
+    value = (lon + 180.0) % 360.0 - 180.0
+    return value, epoch_tt
+
+
+V_SS_MSUN, E_SS_MSUN = _kali_3600_msun_pair(KALI_EPOCH_MIDNIGHT_UT, SS_YEAR_DAYS)
+V_ARYABHATA_MSUN, E_ARYABHATA_MSUN = _kali_3600_msun_pair(
+    KALI_EPOCH_SUNRISE_UT, ARYABHATA_YEAR_DAYS
+)
 
 # Raman's published rule is linear: (year - 397) x 50 1/3 arcsec. The pair
 # form anchors the rule in the era of his own tables (1900.0, Julian-epoch
@@ -228,9 +258,10 @@ DEFINITIONS: list[tuple[int, str, float, float, str]] = [
     (
         1,
         "LAHIRI",
-        dms(23, 15, 0.658),
-        julday_jd(1956, 3, 21, 0.0, julian=False),
-        "Indian Astronomical Ephemeris: 23\N{DEGREE SIGN}15'00\".658 at 1956-03-21 00:00 ET",
+        dms(23, 51, 25.53),
+        2451545.0,
+        "Indian Astronomical Ephemeris (Positional Astronomy Centre, Kolkata):"
+        " ayanamsa 23\N{DEGREE SIGN}51'25\".53 at 2000 Jan 1.5 TT (J2000.0)",
     ),
     (
         2,
@@ -349,9 +380,10 @@ DEFINITIONS: list[tuple[int, str, float, float, str]] = [
     (
         22,
         "SURYASIDDHANTA_MSUN",
-        0.0,
+        V_SS_MSUN,
         E_SS_MSUN,
-        "Surya Siddhanta mean Sun: Ardharatrika Kali epoch JD 588465.75 + 3600 SS years (Burgess)",
+        "Surya Siddhanta mean Sun (Burgess): mean Sun at the sidereal zero,"
+        " Ardharatrika Kali epoch (Ujjayini midnight) + 3600 SS years",
     ),
     (
         23,
@@ -363,9 +395,10 @@ DEFINITIONS: list[tuple[int, str, float, float, str]] = [
     (
         24,
         "ARYABHATA_MSUN",
-        0.0,
+        V_ARYABHATA_MSUN,
         E_ARYABHATA_MSUN,
-        "Aryabhatiya mean Sun: Audayika Kali epoch JD 588466.0 + 3600 Aryabhata years (Clark)",
+        "Aryabhatiya mean Sun (Clark): mean Sun at the sidereal zero,"
+        " Audayika Kali epoch (Ujjayini sunrise) + 3600 Aryabhata years",
     ),
     (
         25,

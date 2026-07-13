@@ -39,10 +39,10 @@ class TestPhenoBasic:
         result = swe.pheno_ut(JD_J2000, body, FLG_SWIEPH)
         assert len(result) >= 5, f"Not enough values for {name}"
 
-    def test_pheno_sun_illumination_full(self):
-        """The apparent solar disc is fully illuminated."""
+    def test_pheno_sun_illumination_inapplicable(self):
+        """Illuminated fraction is inapplicable to the Sun: reported as 0.0."""
         result = swe.pheno_ut(JD_J2000, SUN, FLG_SWIEPH)
-        assert result[1] == 1.0
+        assert result[1] == 0.0
 
     def test_pheno_moon_phase_angle(self):
         """Moon phase angle should be in [0, 180]."""

@@ -88,7 +88,56 @@ finite-difference scheme when an analytical derivative is unavailable.
 
 If an external implementation exposes a position-like quantity in a speed
 slot, LibEphemeris does not reproduce that defect. No correction or special
-value is derived from compatibility output.
+value is derived from compatibility output. The same principle applies when
+an external speed slot is not the derivative of that implementation's own
+reported position: measured externally, MEAN `nod_aps*` speed slots can
+deviate from the numerical derivative of the same implementation's position
+series by degrees per day, while every LibEphemeris speed slot integrates
+back to its position slot exactly.
+
+## House-cusp speeds are the derivative of the reported cusps
+
+The `houses_ex2` / `houses_armc_ex2` speed tuples are the total time
+derivative of the reported cusp and angle functions — a centered
+finite difference of the full house solution (ARMC rate, obliquity rate,
+nutation, and the sidereal ayanamsha all included). Two consequences are
+not reproduced from external implementations:
+
+- For intermediate cusps of iteratively solved systems (Placidus, Koch),
+  an external analytic speed approximation can deviate from the derivative
+  of that implementation's own reported cusps by ~0.1–0.7°/day even when
+  the cusps themselves agree to sub-arcsecond level. LibEphemeris reports
+  the genuine derivative: integrating it reproduces the cusp motion.
+- Whole Sign cusps are pinned to sign boundaries, so their time derivative
+  is exactly 0.0 and LibEphemeris reports 0.0. An external convention that
+  exposes the ascendant's speed in the cusp-1/7 slots (and the MC's in
+  4/10) for pinned cusps is not reproduced; those rates remain available
+  in the `ascmc_speed` tuple.
+
+## Phase-angle geometry in `pheno`
+
+`pheno` / `pheno_ut` compute the phase angle from the light-time-consistent
+Sun–body–observer geometry, and the illuminated fraction follows from that
+angle; the elongation channel agrees with external implementations at the
+0.01″ level. The phase-angle channel differs from at least one external
+implementation by a bounded 15–40″ for the inner planets and Mars (a
+geometry-convention difference, not an ephemeris difference — no public
+combination of apparent/geometric distances reproduces the external value
+exactly). The difference in the illuminated fraction is below 1e-4.
+
+The Sun itself reports 0.0 in all three phase channels (phase angle,
+illuminated fraction, elongation): phase quantities are inapplicable to the
+self-luminous disc.
+
+## Rise/set events immediately after the search start
+
+`rise_trans` returns the first event strictly following the start instant,
+even when that event falls within minutes of it. At high latitudes near the
+solstices (e.g. Reykjavík, where the midsummer sunset falls ~2 minutes
+after local midnight) an external implementation can skip such an event and
+report the following day's; LibEphemeris returns the real next event. When
+comparing rise/set series externally, either start the search a few minutes
+before the expected event or tolerate a one-day offset in this edge case.
 
 ## Fixed-star radial channels
 
@@ -138,13 +187,15 @@ and the interpolated lunar apsides are anchored to the actual DE440 apsis
 passages ([methodology](../methodology/interpolated-perigee.md)). Because
 these values are derived from the published sources rather than tuned to any
 external implementation, small numeric offsets from other engines are
-expected: sub-arcsecond for many modes (Fagan/Bradley, Krishnamurti, the
-galactic-center family on the Reid & Brunthaler 2004 Sgr A* position, the
-vernal-point and frame modes), of order 10″–20″ where the official defining
-pair is propagated with the project's precession model (the Lahiri family),
-up to a few arcminutes for modes anchored directly to their author's book
-value (e.g. Yukteshwar's published 20°54′36″ at the 1894 equinox), and of
-order 0.01°–0.05° for `INTP_APOG` / `INTP_PERG` between apsis passages.
+expected: sub-arcsecond for many modes (Lahiri on the Indian Astronomical
+Ephemeris J2000 constant, Fagan/Bradley, Krishnamurti, the galactic-center
+family on the Reid & Brunthaler 2004 Sgr A* position, the vernal-point and
+frame modes), of order 10″–25″ where a historical defining pair is
+propagated with the project's precession model (De Luce, the Babylonian
+solutions), up to a few arcminutes for modes anchored directly to their
+author's book value (e.g. Yukteshwar's published 20°54′36″ at the 1894
+equinox), and of order 0.01°–0.05° for `INTP_APOG` / `INTP_PERG` between
+apsis passages.
 These offsets are properties of the independent derivation, not defects, and
 they are stable and documented.
 

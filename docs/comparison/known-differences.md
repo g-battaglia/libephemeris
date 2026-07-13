@@ -49,7 +49,10 @@ LibEphemeris uses observed IERS values where available and the independently
 published Stephenson–Morrison–Hohenkerk model outside that interval. Delta T
 affects every UT-to-TT conversion, so two legitimate models can shift event
 times and apparent positions. No sampled external Delta-T series is retained or
-used to tune the implementation.
+used to tune the implementation. Measured against one external implementation,
+the difference is ~0.1–0.15 s across 2024–2025 (more recent IERS data on the
+LibEphemeris side) and of order 20 s near 1582 (different historical models);
+both are bounded model differences, not defects.
 
 See [Delta T](../methodology/delta-t.md).
 

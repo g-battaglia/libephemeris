@@ -5,7 +5,7 @@
   "source_artifact": "libephemeris/data/leb2/base_core.leb2",
   "source_sha256": "a02b15344de946f8d0945c30c3ad47c3c1ce69f335af99e545c777fe9ec1bcfd",
   "optional_planet_centers": "disabled; base_core-only regression",
-  "generated_at": "2026-07-13T16:53:43Z",
+  "generated_at": "2026-07-13T20:12:36Z",
   "entry_count": 133,
   "entries": [
     {

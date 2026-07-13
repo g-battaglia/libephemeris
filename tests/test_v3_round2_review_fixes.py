@@ -19,11 +19,11 @@ from libephemeris.state import _resolve_data_dir
 
 
 class TestParityOneLiners:
-    def test_pheno_sun_disc_is_fully_illuminated(self) -> None:
-        """The emitting solar disc has zero phase angle and full illumination."""
+    def test_pheno_sun_phase_channels_inapplicable(self) -> None:
+        """Phase quantities are inapplicable to the self-luminous Sun: 0.0."""
         attr = le.pheno_ut(2451545.0, SUN, 0)
         assert attr[0] == 0.0  # phase angle
-        assert attr[1] == 1.0
+        assert attr[1] == 0.0  # illuminated fraction (inapplicable)
 
     def test_context_set_topo_alt_defaults_to_zero(self) -> None:
         """Context.set_topo parity with the module-level set_topo(alt=0.0)."""

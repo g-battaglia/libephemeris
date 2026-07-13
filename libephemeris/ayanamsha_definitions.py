@@ -24,8 +24,8 @@ from __future__ import annotations
 AYANAMSHA_DEFINING: dict[int, tuple[float, float]] = {
     # FAGAN_BRADLEY: Fagan & Firebrace, Primer of Sidereal Astrology: SVP 335°57'28.64" at B1950.0
     0: (24.042044444444457, 2433282.42345905),
-    # LAHIRI: Indian Astronomical Ephemeris: 23°15'00".658 at 1956-03-21 00:00 ET
-    1: (23.250182777777777, 2435553.5),
+    # LAHIRI: Indian Astronomical Ephemeris (Positional Astronomy Centre, Kolkata): ayanamsa 23°51'25".53 at 2000 Jan 1.5 TT (J2000.0)
+    1: (23.85709166666667, 2451545.0),
     # DELUCE: De Luce, Constellational Astrology (1963) p.5: 26°24'47" in 1900
     2: (26.413055555555555, 2415020.31352),
     # RAMAN: Raman, Hindu Predictive Astrology App. A: (year-397) x 50 1/3", anchored at 1900.0
@@ -62,12 +62,12 @@ AYANAMSHA_DEFINING: dict[int, tuple[float, float]] = {
     20: (0.0, 2433282.42345905),
     # SURYASIDDHANTA: Surya Siddhanta (Burgess): zero at the Kali-3600 equinox, 21 March 499 CE
     21: (0.0, 1903395.1338202194),
-    # SURYASIDDHANTA_MSUN: Surya Siddhanta mean Sun: Ardharatrika Kali epoch JD 588465.75 + 3600 SS years (Burgess)
-    22: (0.0, 1903397.2733333334),
+    # SURYASIDDHANTA_MSUN: Surya Siddhanta mean Sun (Burgess): mean Sun at the sidereal zero, Ardharatrika Kali epoch (Ujjayini midnight) + 3600 SS years
+    22: (-0.21510829031467438, 1903396.8775657457),
     # ARYABHATA: Aryabhatiya (Clark): zero at the Kali-3600 equinox, 21 March 499 CE
     23: (0.0, 1903395.1338202194),
-    # ARYABHATA_MSUN: Aryabhatiya mean Sun: Audayika Kali epoch JD 588466.0 + 3600 Aryabhata years (Clark)
-    24: (0.0, 1903397.25),
+    # ARYABHATA_MSUN: Aryabhatiya mean Sun (Clark): mean Sun at the sidereal zero, Audayika Kali epoch (Ujjayini sunrise) + 3600 Aryabhata years
+    24: (-0.23810671619139612, 1903396.8542324193),
     # SS_REVATI: Surya Siddhanta VIII: Revati (zeta Psc) at polar longitude 359°50' at the Kali-3600 epoch
     25: (-0.7922573227712064, 1903395.1338202194),
     # SS_CITRA: Surya Siddhanta VIII: Citra (Spica) at polar longitude 180° at the Kali-3600 epoch

@@ -39,7 +39,7 @@ value derives from any external ephemeris implementation.
 | ID | Constant | Defining statement | Audit |
 |---:|---|---|---|
 | 0 | `SIDM_FAGAN_BRADLEY` | SVP 335°57'28.64" at B1950.0 (Fagan & Firebrace) | Published |
-| 1 | `SIDM_LAHIRI` | 23°15'00".658 at 1956-03-21 00:00 ET (Indian Astronomical Ephemeris) | Published |
+| 1 | `SIDM_LAHIRI` | 23°51'25".53 at 2000 Jan 1.5 TT (Indian Astronomical Ephemeris) | Published |
 | 2 | `SIDM_DELUCE` | 26°24'47" in 1900 (De Luce 1963, p. 5) | Published |
 | 3 | `SIDM_RAMAN` | (year − 397) × 50⅓", anchored at 1900.0 (Raman, App. A) | Published |
 | 4 | `SIDM_USHASHASHI` | zero epoch 559 CE (Usha & Shashi 1978) | Secondary |
@@ -60,9 +60,9 @@ value derives from any external ephemeris implementation.
 | 19 | `SIDM_J1900` | mean ecliptic/equinox of 1900 January 0.5 (frame epoch) | Published |
 | 20 | `SIDM_B1950` | mean ecliptic/equinox of B1950.0 (frame epoch) | Published |
 | 21 | `SIDM_SURYASIDDHANTA` | zero at the Kali-3600 equinox, 21 March 499 CE (Burgess) | Published |
-| 22 | `SIDM_SURYASIDDHANTA_MSUN` | Ardharatrika Kali epoch JD 588465.75 + 3600 SS years (Burgess) | Published |
+| 22 | `SIDM_SURYASIDDHANTA_MSUN` | mean Sun at the sidereal zero, Ardharatrika Kali epoch (Ujjayinī midnight) + 3600 SS years (Burgess) | Published |
 | 23 | `SIDM_ARYABHATA` | zero at the Kali-3600 equinox, 21 March 499 CE (Clark) | Published |
-| 24 | `SIDM_ARYABHATA_MSUN` | Audayika Kali epoch JD 588466.0 + 3600 Aryabhata years (Clark) | Published |
+| 24 | `SIDM_ARYABHATA_MSUN` | mean Sun at the sidereal zero, Audayika Kali epoch (Ujjayinī sunrise) + 3600 Aryabhata years (Clark) | Published |
 | 25 | `SIDM_SS_REVATI` | Revati (ζ Psc) at SS polar longitude 359°50' at Kali 3600 | Published/Geometry |
 | 26 | `SIDM_SS_CITRA` | Citra (Spica) at SS polar longitude 180° at Kali 3600 | Published/Geometry |
 | 27 | `SIDM_TRUE_CITRA` | live Spica held at 180° | Geometry |
@@ -120,6 +120,9 @@ Skyfield, and LEB calculations all use the same dispatcher.
 - Government of India, Calendar Reform Committee. *Report of the Calendar
   Reform Committee* (1955), Part A, and the Positional Astronomy Centre's
   annual *Indian Astronomical Ephemeris* for the Lahiri/ICRC definition.
+  `SIDM_LAHIRI` anchors to the IAE's own modern constant — ayanamsa
+  23°51'25".53 on 2000 January 1.5 TT — the official continuation of the
+  Lahiri system; `SIDM_LAHIRI_ICRC` keeps the original 1955 committee value.
 - De Luce, Robert. *Constellational Astrology* (1963), p. 5: 26 degrees
   24 minutes 47 seconds in 1900 with 50.25 arcseconds added per year.
 - Raman, B. V. *Hindu Predictive Astrology*, Appendix A and Table IV: subtract
@@ -142,7 +145,11 @@ Skyfield, and LEB calculations all use the same dispatcher.
   and Sassanian sidereal norms (zero epochs 545 CE and 18 March 564 CE).
 - Burgess, Ebenezer, trans. *Translation of the Surya-Siddhanta* (1860), and
   Clark, Walter Eugene, trans. *The Aryabhatiya of Aryabhata* (1930): Kali
-  epoch, Siddhantic year lengths, and the polar longitudes of Citra/Revati.
+  epoch (18 February 3102 BCE at Ujjayinī, 75°47′ E; midnight and sunrise
+  schools), Siddhantic year lengths, and the polar longitudes of
+  Citra/Revati. The mean-Sun modes place the sidereal zero at the mean Sun
+  of the Kali + 3600-year instant (Meeus 25.2 mean solar longitude, day
+  counts converted to TT with the project's Delta-T model).
 - Sheoran, Sunil. *The Science of Time* : ayanamsha -60 degrees at the winter
   solstice of 4174 BCE (start of the last Manvantara).
 - Mardyks, Raymond. *Sacred Astronomy* (1991): ayanamsha exactly 30 degrees at

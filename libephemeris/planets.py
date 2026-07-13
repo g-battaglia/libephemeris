@@ -7820,8 +7820,9 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
             -26.86 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.86
         )
 
-        # The apparent solar disc is the emitting surface and is fully lit.
-        return (0.0, 1.0, 0.0, diameter, magnitude) + (0.0,) * 15
+        # Phase quantities are inapplicable to the self-luminous Sun: the
+        # phase triplet (angle, fraction, elongation) reports 0.0.
+        return (0.0, 0.0, 0.0, diameter, magnitude) + (0.0,) * 15
 
     # ------------------------------------------------------------------
     # Geocentric ecliptic positions of target and Sun
@@ -8173,7 +8174,9 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
     # Special case: Sun
     if ipl == SUN:
-        # Sun is always "full" from Earth's perspective
+        # Phase quantities are inapplicable to the self-luminous Sun: every
+        # slot of the phase triplet reports 0.0 (phase angle, illuminated
+        # fraction, elongation).
         # Get Sun distance
         earth = planets["earth"]
         sun = planets["sun"]
@@ -8181,11 +8184,11 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         _, _, sun_dist = sun_pos.radec()
 
         phase_angle = 0.0
-        phase = 1.0
+        phase = 0.0
         elongation = 0.0
 
         # Apparent diameter of Sun based on physical radius
-        sun_dist_au = sun_dist.au
+        sun_dist_au = float(sun_dist.au)
         sun_radius_km = _BODY_RADIUS_KM.get(SUN, 695700.0)
         diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
 

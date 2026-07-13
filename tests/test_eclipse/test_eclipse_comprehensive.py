@@ -148,6 +148,24 @@ class TestLunarEclipse:
         for i in range(4):
             assert eclipses[i + 1][0] > eclipses[i][0]
 
+    @pytest.mark.unit
+    def test_lun_eclipse_backward_returns_most_recent(self):
+        """Backward search returns the eclipse immediately before the start.
+
+        Anchors: NASA Five Millennium Canon of Lunar Eclipses — greatest
+        eclipse 2024 Sep 18 02:45 TD (partial) and 2024 Mar 25 07:13 TD
+        (penumbral). Searching backward from 2024 Oct 17 must yield the
+        September event first, then the March event.
+        """
+        jd_start = 2460600.5  # 2024-10-17 00:00 UT
+        retflag, tret = swe.lun_eclipse_when(jd_start, 0, 0, True)
+        assert abs(tret[0] - 2460571.615) < 0.01  # 2024-09-18 02:45 TD
+        assert tret[0] < jd_start
+
+        retflag2, tret2 = swe.lun_eclipse_when(tret[0] - 0.1, 0, 0, True)
+        assert abs(tret2[0] - 2460394.801) < 0.01  # 2024-03-25 07:13 TD
+        assert tret2[0] < tret[0]
+
 
 class TestSolarEclipseLocal:
     """Tests for sol_eclipse_when_loc."""
