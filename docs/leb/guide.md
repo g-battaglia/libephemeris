@@ -1738,9 +1738,9 @@ pytest tests/test_leb/test_generate_leb.py -v
 pytest tests/test_leb/test_leb_precision.py -v
 pytest tests/test_leb/test_context_leb.py -v
 
-# By marker
-pytest tests/test_leb/ -v -m "not slow"
-pytest tests/test_leb/ -v -m "precision"
+# Grouped runs go through the repository CLI
+leph test leb-format all
+leph test leb-format precision
 ```
 
 ### 12.3 Manual Generation

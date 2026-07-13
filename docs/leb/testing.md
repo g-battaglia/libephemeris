@@ -52,9 +52,9 @@ Asteroid tests require network access to automatically download SPK21 files from
 # All medium comparison tests (full, ~90 seconds with -n 4)
 leph test leb-format vs-skyfield medium
 
-# With parallelism (direct pytest)
+# The subgroup already applies the registered marker and parallelism policy.
 LIBEPHEMERIS_LEB=/path/to/ephemeris_medium.leb \
-  pytest tests/test_leb/compare/ -m "leb_compare" -v --tb=short -n 4
+  leph test leb-format vs-skyfield medium
 ```
 
 ### Base tier
@@ -63,8 +63,9 @@ LIBEPHEMERIS_LEB=/path/to/ephemeris_medium.leb \
 # All base tests (~90 seconds with -n 4)
 leph test leb-format vs-skyfield base
 
-# With parallelism (direct pytest)
-pytest tests/test_leb/compare/base/ -m "leb_compare_base" -v --tb=short -n 4
+# Override the discovered file while retaining the registered subgroup.
+LIBEPHEMERIS_LEB=/path/to/ephemeris_base.leb \
+  leph test leb-format vs-skyfield base
 ```
 
 ### Extended tier
@@ -82,8 +83,8 @@ pytest tests/test_leb/compare/test_compare_leb_planets.py -v -n 4
 # A specific test
 pytest "tests/test_leb/compare/test_compare_leb_planets.py::TestPlanetPrecision::test_all_components" -v
 
-# By keyword
-pytest tests/test_leb/compare/ -m "leb_compare" -k "asteroid" -v -n 4
+# By keyword within one explicit file
+pytest tests/test_leb/compare/test_compare_leb_asteroids.py -k "asteroid" -v -n 4
 ```
 
 ---
@@ -229,10 +230,12 @@ TOLS = TierTolerances.for_tier("medium")  # Loads medium tier defaults
 
 ```bash
 # Override for a specific tier
-LEB_TOL_BASE_POSITION_ARCSEC=10.0 pytest ...
+LEB_TOL_BASE_POSITION_ARCSEC=10.0 \
+  pytest tests/test_leb/compare/test_compare_leb_planets.py -v
 
 # Global override (fallback for all tiers)
-LEB_TOL_POSITION_ARCSEC=10.0 pytest ...
+LEB_TOL_POSITION_ARCSEC=10.0 \
+  pytest tests/test_leb/compare/test_compare_leb_planets.py -v
 ```
 
 Priority order (highest to lowest):

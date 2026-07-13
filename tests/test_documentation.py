@@ -9,6 +9,8 @@ Verifies that:
 """
 
 import os
+import re
+from pathlib import Path
 
 import libephemeris
 
@@ -182,6 +184,33 @@ class TestDocumentationFiles:
 
             assert "libephemeris.__all__" in content
             assert "reset_session" in content
+
+    def test_documented_pytest_commands_target_specific_files(self):
+        """Multi-file test instructions must use a registered ``leph`` subgroup."""
+        project_root = Path(__file__).resolve().parents[1]
+        documentation = [
+            project_root / "AGENTS.md",
+            project_root / "CLAUDE.md",
+            project_root / "CLI.md",
+            *(project_root / "docs").rglob("*.md"),
+            *(project_root / "docs").rglob("*.rst"),
+        ]
+        directory_target = re.compile(
+            r"(?m)^\s*(?:[A-Z][A-Z0-9_]*=\S+\s+)*"
+            r"(?:uv run )?(?:python -m )?pytest\s+"
+            r"[\"']?tests/[^\s\"']*/[\"']?(?:\s|$)"
+        )
+        offenders = []
+        for path in documentation:
+            content = path.read_text(encoding="utf-8")
+            for match in directory_target.finditer(content):
+                line = content.count("\n", 0, match.start()) + 1
+                offenders.append(f"{path.relative_to(project_root)}:{line}")
+
+        assert offenders == [], (
+            "direct pytest commands must name a specific file or node: "
+            + ", ".join(offenders)
+        )
 
 
 class TestExceptionClass:
