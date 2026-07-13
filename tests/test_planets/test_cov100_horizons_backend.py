@@ -157,9 +157,9 @@ class TestStateVector:
 
 
 class TestSSLContext:
-    def test_builds_once_and_caches(self):
+    def test_builds_once_and_caches(self, monkeypatch):
         # Reset module-level cache so the build branch is exercised.
-        hb._SSL_CTX = None
+        monkeypatch.setattr(hb, "_SSL_CTX", None)
         sentinel = object()
         fake_ssl = mock.MagicMock()
         fake_ssl.create_default_context.return_value = sentinel
@@ -173,12 +173,12 @@ class TestSSLContext:
             assert ctx2 is sentinel
         fake_ssl.create_default_context.assert_called_once()
 
-    def test_double_checked_lock_already_built(self):
+    def test_double_checked_lock_already_built(self, monkeypatch):
         # Exercise the inner "already built" branch (122->128): the outer
         # check sees None, but by the time the lock is acquired another
         # thread has populated _SSL_CTX. Simulate with a fake lock whose
         # __enter__ sets the module global.
-        hb._SSL_CTX = None
+        monkeypatch.setattr(hb, "_SSL_CTX", None)
         sentinel = object()
 
         class _SettingLock:
@@ -192,6 +192,11 @@ class TestSSLContext:
         with mock.patch.object(hb, "_SSL_CTX_LOCK", _SettingLock()):
             ctx = _get_ssl_context()
         assert ctx is sentinel
+
+
+def test_ssl_context_unit_tests_leave_a_runtime_compatible_cache() -> None:
+    """Mock sentinels must not leak into later live Horizons calculations."""
+    assert hb._SSL_CTX is None or callable(getattr(hb._SSL_CTX, "wrap_socket", None))
 
 
 # ===========================================================================
