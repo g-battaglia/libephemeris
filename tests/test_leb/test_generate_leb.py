@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import sys
 
+import numpy as np
 import pytest
 
 # Ensure scripts directory is importable
@@ -22,6 +23,7 @@ from libephemeris.leb_format import (
 )
 from libephemeris.leb_reader import LEBReader
 from libephemeris.time_utils import julday
+from scripts import generate_leb
 
 
 class TestAssembleLeb:
@@ -205,3 +207,134 @@ class TestChebyshevFitting:
 
             max_err_arcsec = max(lon_err_arcsec, lat_err_arcsec)
             assert max_err_arcsec < 5.0, f"Moon fit error = {max_err_arcsec:.4f} arcsec"
+
+
+class TestGeneratorValidation:
+    """Malformed generator inputs and verification results fail closed."""
+
+    def test_fit_segment_rejects_non_finite_and_wrong_shape(self) -> None:
+        with pytest.raises(ValueError, match="NaN or infinite"):
+            generate_leb.fit_segment(
+                lambda _jd: np.array([float("nan"), 0.0, 0.0]),
+                0.0,
+                1.0,
+                2,
+                3,
+            )
+        with pytest.raises(ValueError, match="shape"):
+            generate_leb.fit_segment(lambda _jd: np.array([0.0, 0.0]), 0.0, 1.0, 2, 3)
+
+    def test_segment_verifiers_reject_zero_samples_and_nan(self) -> None:
+        coeffs = np.zeros((3, 2))
+
+        def finite(_jd: float) -> np.ndarray:
+            return np.zeros(3)
+
+        def non_finite(_jd: float) -> np.ndarray:
+            return np.array([0.0, float("nan"), 0.0])
+
+        with pytest.raises(ValueError, match="n_test must be at least 1"):
+            generate_leb.verify_segment(finite, coeffs, 0.0, 1.0, 3, n_test=0)
+        with pytest.raises(ValueError, match="NaN or infinite"):
+            generate_leb.verify_segment(non_finite, coeffs, 0.0, 1.0, 3, n_test=1)
+        with pytest.raises(ValueError, match="n_test must be at least 1"):
+            generate_leb._verify_segment_unwrapped(
+                finite, coeffs, 0.0, 1.0, 3, n_test=0
+            )
+
+    def test_vectorized_verifier_rejects_zero_samples_and_nan(self) -> None:
+        values = np.zeros((3, 3))
+        with pytest.raises(ValueError, match="n_verify must be at least 1"):
+            generate_leb._fit_and_verify_from_values(
+                values, 0.0, 1.0, 1.0, 1, 3, 1, 3, n_verify=0
+            )
+
+        values[2, 0] = float("nan")
+        with pytest.raises(ValueError, match="NaN or infinite"):
+            generate_leb._fit_and_verify_from_values(
+                values, 0.0, 1.0, 1.0, 1, 3, 1, 3, n_verify=1
+            )
+
+    def test_ecliptic_verifier_compares_distance_and_rejects_nan(self) -> None:
+        angular, distance = generate_leb._verify_ecliptic_body(
+            lambda _jd: np.array([359.99999999, 2.0, 1.25]),
+            0.0,
+            (0.00000001, 2.0, 1.5),
+        )
+        assert angular == pytest.approx(2e-8)
+        assert distance == pytest.approx(0.25)
+
+        with pytest.raises(ValueError, match="NaN or infinite"):
+            generate_leb._verify_ecliptic_body(
+                lambda _jd: np.array([0.0, 0.0, float("nan")]),
+                0.0,
+                (0.0, 0.0, 1.0),
+            )
+
+    def test_post_verifier_rejects_zero_samples(self) -> None:
+        with pytest.raises(ValueError, match="n_samples must be at least 1"):
+            generate_leb.verify_leb("unused.leb", n_samples=0, verbose=False)
+
+    def test_post_verifier_rejects_non_finite_reader_output(self, monkeypatch) -> None:
+        import libephemeris
+        from libephemeris import leb_reader
+
+        class Body:
+            coord_type = generate_leb.COORD_ICRS_BARY
+            jd_start = 0.0
+            jd_end = 10.0
+
+        class Reader:
+            _bodies = {SUN: Body()}
+            jd_range = (0.0, 10.0)
+
+            def __init__(self, _path: str) -> None:
+                pass
+
+            def eval_body(self, _body_id: int, _jd: float):
+                return (float("nan"), 0.0, 0.0), (0.0, 0.0, 0.0)
+
+            def close(self) -> None:
+                pass
+
+        monkeypatch.setattr(leb_reader, "LEBReader", Reader)
+        monkeypatch.setattr(libephemeris, "set_auto_spk_download", lambda _on: None)
+        monkeypatch.setattr(generate_leb, "_build_ecliptic_eval_funcs", lambda: {})
+        monkeypatch.setattr(generate_leb, "_build_helio_eval_funcs", lambda: {})
+
+        assert not generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)
+
+    def test_post_verifier_rejects_ecliptic_distance_error(self, monkeypatch) -> None:
+        import libephemeris
+        from libephemeris import leb_reader
+
+        body_id = 10
+
+        class Body:
+            coord_type = generate_leb.COORD_ECLIPTIC
+            jd_start = 0.0
+            jd_end = 10.0
+
+        class Reader:
+            _bodies = {body_id: Body()}
+            jd_range = (0.0, 10.0)
+
+            def __init__(self, _path: str) -> None:
+                pass
+
+            def eval_body(self, _body_id: int, _jd: float):
+                return (0.0, 0.0, 1.0), (0.0, 0.0, 0.0)
+
+            def close(self) -> None:
+                pass
+
+        monkeypatch.setattr(leb_reader, "LEBReader", Reader)
+        monkeypatch.setattr(libephemeris, "set_auto_spk_download", lambda _on: None)
+        monkeypatch.setattr(
+            generate_leb,
+            "_build_ecliptic_eval_funcs",
+            lambda: {body_id: lambda _jd: np.zeros(3)},
+        )
+        monkeypatch.setattr(generate_leb, "_build_helio_eval_funcs", lambda: {})
+
+        assert not generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)

@@ -337,9 +337,7 @@ def test_resolve_star_ref_empty():
 
 
 def test_resolve_star_ref_comma_forms():
-    """Comma-form semantics measured on the reference's v1 family:
-    'name,' and 'name,nomen' key on the NAME (nomenclature ignored);
-    ',nomen' keys on the nomenclature; ',' alone errors."""
+    """v1 comma forms key on name, or nomenclature after a leading comma."""
     star_id, error, name = fs._resolve_star_ref("Regulus,")
     assert error is None and name.startswith("Regulus")
     star_id, error, name = fs._resolve_star_ref("Regulus,zzZzz")
@@ -375,8 +373,7 @@ def test_resolve_star_ref_rejects_wildcard():
 
 
 def test_resolve_star2_wildcard_prefix():
-    """Trailing '%' prefix wildcard resolves on the v2 family (measured
-    black-box against the reference API)."""
+    """Trailing '%' performs a catalog-prefix lookup on the v2 family."""
     for q, expected in (
         ("Spica%", "Spica"),
         ("Sir%", "Sirius"),
@@ -846,9 +843,8 @@ def test_fixstar_mag_fallback_name(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# v1 implicit prefix matching (measured black-box: the reference's v1 family
-# resolves partial traditional names by case-insensitive prefix, first
-# catalog-order hit; the v2 oracle instead requires the explicit '%' form).
+# v1 implicit prefix matching: partial traditional names are resolved by a
+# case-insensitive catalog prefix, while v2 uses an explicit '%' suffix.
 # ---------------------------------------------------------------------------
 
 
@@ -884,37 +880,35 @@ def test_v1_unknown_name_still_errors():
         le.fixstar_ut("nosuchstar", 2451545.0, 0)
 
 
-def test_galalign_mardyks_no_legacy_speed_addback():
-    """Measured black-box across modes 0-47: SIDM_GALALIGN_MARDYKS (34) is
-    the one non-fixed-epoch mode whose legacy star speed equals the modern
-    one (no ayanamsha-rate add-back); every other mode keeps the add-back."""
+def test_fixed_star_families_share_sidereal_position_derivative():
+    """Both star APIs report the derivative of their sidereal longitude."""
     import libephemeris as le
 
-    le.set_sid_mode(le.SIDM_GALALIGN_MARDYKS, 0, 0)
+    le.set_sid_mode(le.SIDM_TRUE_CITRA, 0, 0)
     try:
-        v1 = le.fixstar_ut("Spica", 2451545.0, le.FLG_SIDEREAL | le.FLG_SPEED)[0][3]
-        v2 = le.fixstar2_ut("Spica", 2451545.0, le.FLG_SIDEREAL | le.FLG_SPEED)[0][3]
-        assert abs(v1 - v2) < 1e-9, (v1, v2)
-    finally:
-        le.set_sid_mode(0)
+        flags = le.FLG_SIDEREAL | le.FLG_SPEED
+        h = 0.5
+        for function in (le.fixstar_ut, le.fixstar2_ut):
+            speed = function("Spica", le.J2000, flags)[0][3]
+            before = function("Spica", le.J2000 - h, le.FLG_SIDEREAL)[0][0]
+            after = function("Spica", le.J2000 + h, le.FLG_SIDEREAL)[0][0]
+            expected = ((after - before + 180.0) % 360.0 - 180.0) / (2.0 * h)
+            assert speed == pytest.approx(expected, abs=5e-8)
 
-    # Control: an ordinary mode keeps the legacy add-back (~3.8e-5 deg/day).
-    le.set_sid_mode(1)
-    try:
-        w1 = le.fixstar_ut("Spica", 2451545.0, le.FLG_SIDEREAL | le.FLG_SPEED)[0][3]
-        w2 = le.fixstar2_ut("Spica", 2451545.0, le.FLG_SIDEREAL | le.FLG_SPEED)[0][3]
-        assert abs((w1 - w2) - 3.82e-5) < 5e-6, (w1, w2)
+        legacy = le.fixstar_ut("Spica", le.J2000, flags)[0][3]
+        modern = le.fixstar2_ut("Spica", le.J2000, flags)[0][3]
+        assert legacy == pytest.approx(modern, abs=5e-8)
     finally:
         le.set_sid_mode(0)
 
 
 def test_spica_radial_velocity_distance_evolution():
-    """Spica's catalog RV is +1.0 km/s (SIMBAD; also recovered from the
-    reference's own distance evolution). The old -22.85 doubled speed_dist
-    and drifted the distance ~2500 AU by year 2600 (oracle: 15793735.809)."""
+    """Spica distance speed is the derivative of its SIMBAD-based space motion."""
     import libephemeris as le
 
-    d2600 = le.fixstar_ut("Spica", 2634167.0, le.FLG_TRUEPOS)[0][2]
-    assert abs(d2600 - 15793735.809) < 1.0
-    sd = le.fixstar_ut("Spica", 2451545.0, le.FLG_SPEED)[0][5]
-    assert -0.020 < sd < -0.012  # oracle -0.015998; was -0.030199
+    h = 0.5
+    before = le.fixstar_ut("Spica", le.J2000 - h, le.FLG_TRUEPOS)[0][2]
+    after = le.fixstar_ut("Spica", le.J2000 + h, le.FLG_TRUEPOS)[0][2]
+    expected = (after - before) / (2.0 * h)
+    speed = le.fixstar_ut("Spica", le.J2000, le.FLG_SPEED)[0][5]
+    assert speed == pytest.approx(expected, abs=1e-7)

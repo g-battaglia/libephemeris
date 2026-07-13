@@ -29,7 +29,13 @@ import warnings
 from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, overload
 
 from .constants import MEAN_NODE, TRUE_NODE
-from .tracing import _record
+from .tracing import (
+    _is_active,
+    _record,
+    _record_alias,
+    _restore_record,
+    _snapshot_record,
+)
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
@@ -64,15 +70,15 @@ class EphemerisContext:
     Attributes:
         topo: Observer topocentric location (or None for geocentric)
         sidereal_mode: Active sidereal mode ID (0 = Fagan/Bradley by default,
-            matching the module-level API's default when set_sid_mode is never
-            called)
+            matching the module-level API's default ID; calculations warn and
+            use J2000 while that mode has no independent zero point)
         sidereal_t0: Reference epoch for custom ayanamsha (JD)
         sidereal_ayan_t0: Ayanamsha value at reference epoch (degrees)
 
     Example:
         >>> ctx = EphemerisContext()
         >>> ctx.set_topo(12.5, 41.9, 0)  # Rome coordinates
-        >>> ctx.set_sid_mode(1)  # Lahiri ayanamsha
+        >>> ctx.set_sid_mode(19)  # J1900 fixed-epoch frame
         >>> pos, flags = ctx.calc_ut(2451545.0, MARS, FLG_SIDEREAL)
         >>> print(f"Mars at {pos[0]:.2f}° sidereal longitude")
 
@@ -298,7 +304,8 @@ class EphemerisContext:
 
         Note:
             Affects all position calculations when FLG_SIDEREAL is set.
-            Default is Fagan/Bradley (SIDM_FAGAN_BRADLEY = 0) if never set.
+            The default public ID is Fagan/Bradley (SIDM_FAGAN_BRADLEY = 0).
+            Every predefined base mode 0--46 has a runtime definition.
         """
         # Apply the same SIDBIT guard as the global setter (state.set_sid_mode):
         # strip the SIDBIT_* projection flags (>= 256: ECL_T0, SSY_PLANE,
@@ -578,22 +585,46 @@ class EphemerisContext:
             ``((lon, lat, dist, dlon, dlat, ddist), retflag)``.
         """
         from .constants import ECL_NUT
-        from .planets import _normalize_calc_flags, _remap_ast_offset
+        from .planets import (
+            _normalize_calc_flags,
+            _remap_ast_offset,
+            _validate_barycentric_moseph,
+        )
 
-        # Handle ECL_NUT (-1), like the module-level entry points: the
-        # reference applies its exclusive-ephemeris-bit handling here (MOSEPH kept,
-        # SPEED3 not remapped), so it runs on the raw flags.
+        _validate_barycentric_moseph(iflag, "calc_ut" if ut else "calc")
+        requested_ipl = ipl
+
+        # Handle ECL_NUT (-1), like the module-level entry points. This must run
+        # on the raw flags because MOSEPH is kept and SPEED3 is not remapped
+        # unless SPEED is present. TT and UT share the ordinary default-
+        # ephemeris-bit contract; only their input time scales differ.
         if ipl == ECL_NUT:
+            from .constants import FLG_SPEED, FLG_SPEED3
             from .planets import (
                 _calc_nutation_obliquity,
                 _calc_nutation_obliquity_tt,
                 _exclusive_ephemeris_bit,
+                _implied_retflag_bits,
+                _resolve_center_flags,
             )
 
-            iflag = _exclusive_ephemeris_bit(iflag)
+            res_flags = _resolve_center_flags(iflag)
+            if res_flags & FLG_SPEED:
+                res_flags &= ~FLG_SPEED3
+
+            nut_flags = _exclusive_ephemeris_bit(res_flags)
             if ut:
-                return _calc_nutation_obliquity(tjd, iflag)
-            return _calc_nutation_obliquity_tt(tjd, iflag)
+                pos, retflag = _calc_nutation_obliquity(tjd, nut_flags)
+            else:
+                pos, retflag = _calc_nutation_obliquity_tt(tjd, nut_flags)
+            result = (pos, retflag | _implied_retflag_bits(res_flags))
+            from .logging_config import get_logger
+
+            get_logger().debug(
+                "body=%d jd=%.1f source=ERFA (context)", requested_ipl, tjd
+            )
+            _record(requested_ipl, "ERFA")
+            return result
 
         # Same normalization preamble as the module-level calc_ut()/calc(),
         # so the context entry points stay 1:1 with the reference API
@@ -601,6 +632,14 @@ class EphemerisContext:
         # every path, including the LEB fast path.
         raw_iflag = iflag
         iflag = _normalize_calc_flags(iflag)
+        from .planets import _calc_tt_epheflag_echo, _echo_request_bits
+
+        def _echo_retflag(retflag: int) -> int:
+            """Apply the entry point's raw-request echo conventions."""
+            retflag = _echo_request_bits(retflag, raw_iflag)
+            if not ut:
+                retflag = _calc_tt_epheflag_echo(retflag, raw_iflag)
+            return retflag
 
         # --- Fixed-epoch sidereal modes (SIDM_J2000/J1900/B1950): frame
         # requests, not ayanamsha offsets — mirror the module-level
@@ -609,7 +648,6 @@ class EphemerisContext:
         from .constants import FLG_SIDEREAL
 
         if iflag & FLG_SIDEREAL:
-            from .planets import _echo_request_bits
             from .sidereal_epoch import (
                 fixed_epoch_request_flags,
                 fixed_epoch_retflag,
@@ -618,15 +656,39 @@ class EphemerisContext:
             )
 
             if is_fixed_epoch_request(iflag, self.sidereal_mode):
-                sub_xx, sub_rf = self._calc_impl(
-                    tjd, ipl, fixed_epoch_request_flags(iflag), ut=ut
-                )
-                xx_t0 = transform_fixed_epoch_result(sub_xx, iflag, self.sidereal_mode)
-                from .planets import _to_native_floats
+                from .planets import _capture_source_logs, _log_successful_source
 
-                return _to_native_floats(xx_t0), _echo_request_bits(
-                    fixed_epoch_retflag(sub_rf, iflag), raw_iflag
+                nested_trace = (
+                    _snapshot_record(requested_ipl) if _is_active() else (False, None)
                 )
+                try:
+                    with _capture_source_logs() as nested_sources:
+                        sub_xx, sub_rf = self._calc_impl(
+                            tjd, ipl, fixed_epoch_request_flags(iflag), ut=ut
+                        )
+                        xx_t0 = transform_fixed_epoch_result(
+                            sub_xx, iflag, self.sidereal_mode
+                        )
+                        from .planets import _to_native_floats
+
+                        result = (
+                            _to_native_floats(xx_t0),
+                            _echo_retflag(fixed_epoch_retflag(sub_rf, iflag)),
+                        )
+                except Exception:
+                    _restore_record(requested_ipl, nested_trace)
+                    raise
+                if nested_sources:
+                    from .logging_config import get_logger
+
+                    _log_successful_source(
+                        get_logger(),
+                        requested_ipl,
+                        tjd,
+                        nested_sources[-1],
+                        context=True,
+                    )
+                return result
 
         # Built-in asteroids by AST_OFFSET number (see module calc_ut)
         ipl = _remap_ast_offset(ipl)
@@ -637,24 +699,63 @@ class EphemerisContext:
         # no antipode branch), and the antipode is representation-dependent
         # (FLG_XYZ / FLG_RADIANS) — _south_node_from_north handles all three.
         if ipl in (-MEAN_NODE, -TRUE_NODE):
-            from .planets import _echo_request_bits, _south_node_from_north
+            from .planets import (
+                _capture_source_logs,
+                _log_successful_source,
+                _south_node_from_north,
+            )
 
-            north_result, retflag = self._calc_impl(tjd, abs(ipl), iflag, ut=ut)
+            north_ipl = abs(ipl)
+            north_trace = _snapshot_record(north_ipl) if _is_active() else (False, None)
+            try:
+                with _capture_source_logs() as nested_sources:
+                    north_result, retflag = self._calc_impl(
+                        tjd, north_ipl, iflag, ut=ut
+                    )
+                    result = (
+                        _south_node_from_north(north_result, iflag),
+                        _echo_retflag(retflag),
+                    )
+            except Exception:
+                _restore_record(north_ipl, north_trace)
+                raise
+            _record_alias(requested_ipl, north_ipl, north_trace)
+            if nested_sources:
+                from .logging_config import get_logger
+
+                _log_successful_source(
+                    get_logger(), requested_ipl, tjd, nested_sources[-1], context=True
+                )
             # The recursion sees the already-normalized iflag (SPEED3 mapped
             # to SPEED), so its echoed retflag loses the caller's original
             # speed bit — re-echo against raw_iflag exactly like the
             # module-level south-node branch (planets.py _calc_body_south).
-            return _south_node_from_north(north_result, iflag), _echo_request_bits(
-                retflag, raw_iflag
-            )
+            return result
 
         # --- LEB fast path: try binary ephemeris first ---
-        reader = self.get_leb_reader()
+        # A context-local LEB has priority over the global LEB configuration,
+        # but it must still respect the process-wide backend mode.  In
+        # particular, ``skyfield`` is used for backend validation and
+        # ``horizons`` explicitly selects the remote backend; opening or using
+        # a local reader in either mode would make context calculations ignore
+        # set_calc_mode() while the module entry points honor it.
+        from . import state
+
+        mode = state.get_calc_mode()
+        reader = self.get_leb_reader() if mode in ("auto", "leb") else None
         if reader is None:
             # Fall back to global reader if context has no .leb
-            from . import state
-
             reader = state.get_leb_reader()
+
+        # The reference treats Earth as the exact coordinate origin even for
+        # a topocentric request.  The LEB topocentric reducer would otherwise
+        # expose the geocentre-from-observer offset, so use the shared
+        # Skyfield path for this degenerate case (as the module entry points
+        # do).
+        from .constants import EARTH, FLG_TOPOCTR
+
+        if ipl == EARTH and (iflag & FLG_TOPOCTR):
+            reader = None
 
         if reader is not None:
             try:
@@ -680,16 +781,17 @@ class EphemerisContext:
                     topo=_ctx_topo,
                 )
                 from .logging_config import get_logger
-
-                get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd)
-                _record(ipl, "LEB")
-                from .planets import _implied_retflag_bits, _echo_request_bits
+                from .planets import _implied_retflag_bits, _log_successful_source
 
                 from .planets import _to_native_floats
 
-                return _to_native_floats(result[0]), _echo_request_bits(
-                    result[1] | _implied_retflag_bits(iflag), raw_iflag
+                pos_out = _to_native_floats(result[0])
+                retflag_out = _echo_retflag(result[1] | _implied_retflag_bits(iflag))
+                _log_successful_source(
+                    get_logger(), requested_ipl, tjd, "LEB", context=True
                 )
+                _record(requested_ipl, "LEB")
+                return pos_out, retflag_out
             except (KeyError, ValueError) as _leb_err:
                 # missing body / out-of-range -> DEBUG, corruption -> WARNING
                 from .leb_reader import log_leb_fallback
@@ -729,17 +831,18 @@ class EphemerisContext:
                     result = horizons_backend.horizons_calc_ut(
                         h_client, jd_ut_approx, ipl, iflag, self.sidereal_mode
                     )
-                get_logger().debug(
-                    "body=%d jd=%.1f source=Horizons (context)", ipl, tjd
-                )
-                _record(ipl, "Horizons")
-                from .planets import _implied_retflag_bits, _echo_request_bits
+                from .planets import _implied_retflag_bits, _log_successful_source
 
                 from .planets import _to_native_floats
 
-                return _to_native_floats(result[0]), _echo_request_bits(
-                    result[1] | _implied_retflag_bits(iflag), raw_iflag
+                pos_out = _to_native_floats(result[0])
+                retflag_out = _echo_retflag(result[1] | _implied_retflag_bits(iflag))
+                trace_source = horizons_backend._trace_source(ipl, iflag)
+                _log_successful_source(
+                    get_logger(), requested_ipl, tjd, trace_source, context=True
                 )
+                _record(requested_ipl, trace_source)
+                return pos_out, retflag_out
             except KeyError as _hz_err:
                 get_logger().debug(
                     "body=%d jd=%.1f source=Horizons->fallback (context) reason=%s",
@@ -765,7 +868,11 @@ class EphemerisContext:
         from .planets import (
             _body_uses_jpl_ephemeris,
             _calc_body_with_context,
+            _dispatch_source,
+            _fallback_trace_source,
             _finalize_output_flags,
+            _log_successful_source,
+            _rebuild_mean_point_speed3,
             _strip_output_flags,
             _wrap_ephemeris_range_error,
         )
@@ -779,8 +886,19 @@ class EphemerisContext:
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd) if ut else ts.tt_jd(tjd)
+        trace_active = _is_active()
+        requested_trace = (
+            _snapshot_record(requested_ipl) if trace_active else (False, None)
+        )
+        alias_trace = _snapshot_record(ipl) if trace_active else (False, None)
+
+        def _restore_failed_trace() -> None:
+            _restore_record(ipl, alias_trace)
+            _restore_record(requested_ipl, requested_trace)
+
         # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
         # the module-level entry points; _calc_body does not apply them.
+        source_token = _dispatch_source.set(None)
         try:
             try:
                 pos, retflag = _calc_body_with_context(
@@ -795,22 +913,49 @@ class EphemerisContext:
                 pos, retflag = _calc_body_with_context(
                     t, ipl, _strip_output_flags(iflag), self
                 )
+            source_hint = _dispatch_source.get()
+            pos_out, rf_out = _finalize_output_flags(pos, retflag, iflag)
+            pos_out = _rebuild_mean_point_speed3(
+                pos_out,
+                t,
+                ipl,
+                iflag,
+                lambda sample_t, sample_ipl, sample_iflag: _calc_body_with_context(
+                    sample_t, sample_ipl, sample_iflag, self
+                ),
+                timescale=ts,
+            )
+            retflag_out = _echo_retflag(rf_out)
         except SkyfieldRangeError as e:
+            _restore_failed_trace()
             raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
         except ValueError as e:
+            _restore_failed_trace()
             # SPK type 21 kernels raise ValueError for out-of-coverage dates
             # (same conversion as the module-level entry points).
             if "Invalid Time" in str(e) or "time" in str(e).lower():
                 raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
             raise
-        # Record dispatch source, like the LEB/Horizons branches above and
-        # the module-level entry points (the context LEB/Horizons paths call
-        # _record; the Skyfield fallback must too for telemetry parity).
-        _record(ipl, "Skyfield")
-        from .planets import _echo_request_bits
+        except Exception:
+            _restore_failed_trace()
+            raise
+        finally:
+            _dispatch_source.reset(source_token)
+        # Inner branches retain their precise source; other successful
+        # fallbacks are classified as Skyfield or Analytical.
+        from .logging_config import get_logger
 
-        pos_out, rf_out = _finalize_output_flags(pos, retflag, iflag)
-        return pos_out, _echo_request_bits(rf_out, raw_iflag)
+        logger = get_logger()
+        if trace_active or logger.isEnabledFor(10) or source_hint == "Keplerian":
+            fallback_source = _fallback_trace_source(ipl, source_hint)
+            if fallback_source is None:
+                _record_alias(requested_ipl, ipl, alias_trace)
+            else:
+                _log_successful_source(
+                    logger, requested_ipl, tjd, fallback_source, context=True
+                )
+                _record(requested_ipl, fallback_source)
+        return pos_out, retflag_out
 
     def houses(
         self, tjd_ut: float, lat: float, lon: float, hsys: int

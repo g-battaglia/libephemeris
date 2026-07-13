@@ -39,9 +39,7 @@ class TestCallWithLebSkyfieldFallback:
             received.append(reader)
             return "ok"
 
-        with patch(
-            "libephemeris.eclipse._get_leb_reader_safe", return_value=None
-        ):
+        with patch("libephemeris.eclipse._get_leb_reader_safe", return_value=None):
             result = _call_with_leb_skyfield_fallback(fake_impl, 1, 2, 3)
 
         assert result == "ok"
@@ -148,9 +146,7 @@ class TestCallWithLebSkyfieldFallback:
 
 def _raising_topo_ecliptic(reader, jd_tt, jd_ut1, ipl, geopos, iflag=0):
     """Stub for fast_calc._topo_ecliptic that always raises out-of-range."""
-    raise ValueError(
-        f"JD {jd_tt:.4f} outside range [0.0, 0.0] for body {ipl}"
-    )
+    raise ValueError(f"JD {jd_tt:.4f} outside range [0.0, 0.0] for body {ipl}")
 
 
 class TestEclipseFallback:
@@ -181,8 +177,7 @@ class TestEclipseFallback:
         # (LEB and Skyfield agree to <1 arcsec, so eclipse timing matches well)
         if expected[1][0] > 0 and fallback[1][0] > 0:
             assert abs(fallback[1][0] - expected[1][0]) < 1.0 / 24, (
-                f"Max eclipse times differ by >1h: "
-                f"{fallback[1][0]} vs {expected[1][0]}"
+                f"Max eclipse times differ by >1h: {fallback[1][0]} vs {expected[1][0]}"
             )
 
     def test_rise_trans_falls_back_to_skyfield(self):
@@ -206,8 +201,7 @@ class TestEclipseFallback:
         # Rise time within 5 minutes
         if expected[1][0] > 0 and fallback[1][0] > 0:
             assert abs(fallback[1][0] - expected[1][0]) < 5.0 / (24 * 60), (
-                f"Sun rise times differ by >5min: "
-                f"{fallback[1][0]} vs {expected[1][0]}"
+                f"Sun rise times differ by >5min: {fallback[1][0]} vs {expected[1][0]}"
             )
 
     def test_lun_eclipse_when_loc_falls_back_to_skyfield(self):

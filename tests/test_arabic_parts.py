@@ -111,10 +111,25 @@ class TestIsDayChart:
         )
 
     @pytest.mark.parametrize(
-        "asc", [0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0]
+        "asc",
+        [0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0],
     )
     @pytest.mark.parametrize(
-        "offset", [10.0, 45.0, 80.0, 100.0, 135.0, 170.0, 190.0, 225.0, 260.0, 280.0, 315.0, 350.0]
+        "offset",
+        [
+            10.0,
+            45.0,
+            80.0,
+            100.0,
+            135.0,
+            170.0,
+            190.0,
+            225.0,
+            260.0,
+            280.0,
+            315.0,
+            350.0,
+        ],
     )
     def test_symmetry_180_rotation(self, asc, offset):
         """Rotating both Sun and ASC by 180° preserves the day/night result."""
@@ -124,10 +139,25 @@ class TestIsDayChart:
         assert is_day_chart(sun, asc) == is_day_chart(sun_rot, asc_rot)
 
     @pytest.mark.parametrize(
-        "asc", [0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0]
+        "asc",
+        [0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0],
     )
     @pytest.mark.parametrize(
-        "offset", [10.0, 45.0, 80.0, 100.0, 135.0, 170.0, 190.0, 225.0, 260.0, 280.0, 315.0, 350.0]
+        "offset",
+        [
+            10.0,
+            45.0,
+            80.0,
+            100.0,
+            135.0,
+            170.0,
+            190.0,
+            225.0,
+            260.0,
+            280.0,
+            315.0,
+            350.0,
+        ],
     )
     def test_complementary_offsets_opposite_sect(self, asc, offset):
         """Sun at offset X and at 360-X from ASC are in opposite hemispheres.
@@ -140,7 +170,7 @@ class TestIsDayChart:
         sun_a = (asc + offset) % 360.0
         sun_b = (asc + (360.0 - offset)) % 360.0
         assert is_day_chart(sun_a, asc) != is_day_chart(sun_b, asc), (
-            f"ASC={asc}, offsets {offset} and {360-offset} should be opposite"
+            f"ASC={asc}, offsets {offset} and {360 - offset} should be opposite"
         )
 
 

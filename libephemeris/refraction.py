@@ -1,13 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """
-Atmospheric refraction via Gauss-Legendre quadrature of the refraction
-integral through the ICAO Standard Atmosphere (ISO 2533:1975).
+Atmospheric-refraction models for the public and physical APIs.
 
-Instead of relying on empirical curve-fits (Bennett 1982, Saemundsson 1986,
-etc.), this module computes refraction from first principles by evaluating
-the exact refraction integral through a continuously varying model
-atmosphere.
+Plain :func:`libephemeris.refrac` uses independently published closed-form
+approximations. :func:`libephemeris.refrac_extended` and
+:func:`libephemeris.azalt` use the ICAO Standard Atmosphere ray tracer in this
+module.
+
+The physical model does not rely on empirical curve fits. It computes
+refraction from first principles by evaluating the exact refraction integral
+through a continuously varying model atmosphere.
 
 Physical model
 --------------
@@ -60,39 +63,18 @@ References
 - Smart, W.M. (1977) "Textbook on Spherical Astronomy", Ch. VI
 - Bomford, G. (1980) "Geodesy", 4th ed., Clarendon Press, §2.17-2.20
 
-Deviation from the reference implementation
--------------------------------------------
-The reference ephemeris computes refraction from empirical curve fits:
-Sinclair's formula (quoted in Bennett 1982) inside its azimuth/altitude
-and extended-refraction paths and the Saemundsson/Bennett pair in its
-plain refraction path.
+Closed-form public API
+----------------------
+The compact ``refrac()`` implementation uses the independently published
+Saemundsson true-to-apparent and Bennett apparent-to-true approximations, with
+the conventional pressure and temperature scaling. These formulas remain
+separate from the ray tracer because callers may depend on their historical
+closed-form behavior.
 
-Plain ``refrac()`` deliberately keeps the ray-traced model above
-(owner decision, 2026-06): it is physically grounded and at least as
-accurate against rigorous benchmarks. Measured envelope of the plain
-``refrac()`` difference vs. the reference's fits at p=1013.25 hPa, T=10 C:
-
-- above ~15 deg altitude:           < 0.1 arcsec
-- 5 .. 15 deg:                      < 1 arcsec
-- 0 .. 5 deg (incl. horizon):       up to ~15 arcsec
-- below the horizon dip:            up to ~0.18 deg (the fits are
-                                    extrapolations there; neither model
-                                    is observationally constrained)
-
-``refrac_extended()`` and ``azalt()`` must instead be 1:1 with the
-reference, so they use the reference-matched analytic model further down
-(see calc_refraction_ref_app_to_true / calc_refraction_ref_true_to_app),
-which reproduces the reference to < 30" across observer elevation,
-pressure and temperature -- both above and below the dip.
-
-Consequences: apparent altitudes from plain ``refrac()`` can differ from
-the reference by the envelope above, which can flip near-horizon
-visibility bits (eclipse/occultation *_VISIBLE flags) within a few
-seconds of an event's horizon crossing. Rise/set times are NOT affected:
-eclipse.rise_trans and everything built on it use the reference's own
-Sinclair model (see eclipse._rise_true_to_apparent) so that rise/set,
-twilight and eclipse timing agree with the reference to fractions of a
-second.
+References
+----------
+- Bennett, G.G. (1982), *Journal of Navigation*, 35, 255-259
+- Meeus, J. (1998), *Astronomical Algorithms*, 2nd ed., chapter 16
 """
 
 from __future__ import annotations
@@ -106,7 +88,7 @@ from typing import Tuple
 _R_EARTH: float = 6_371_000.0  # Mean Earth radius [m]
 _G0: float = 9.80665  # Standard gravity [m/s^2]
 _M_AIR: float = 0.028_964_4  # Molar mass of dry air [kg/mol]
-_R_GAS: float = 8.314_462_618  # Universal gas constant [J/(mol*K)]
+_R_GAS: float = 8.314_462_618  # Universal gas constant, CODATA [J/(mol*K)]
 _EXPONENT: float = _G0 * _M_AIR / _R_GAS  # g*M/R ≈ 0.03416 K/m
 
 # Refractive index coefficient.  Derived from Barrell & Sears (1939)
@@ -133,6 +115,15 @@ _ATMO_TOP: float = 84_852.0  # Top of modeled atmosphere [m]
 # Standard sea-level conditions
 _P0: float = 1013.25  # Standard pressure [mbar]
 _T0: float = 288.15  # Standard temperature [K]
+
+# Conventional pressure/temperature scaling used with the independently
+# published Saemundsson and Bennett closed forms (Meeus 1998, chapter 16).
+_COMPAT_PRESSURE_REF: float = 1010.0
+_COMPAT_TEMPERATURE_NUMERATOR: float = 283.0
+_COMPAT_TEMPERATURE_OFFSET: float = 273.0
+_COMPAT_TRUE_LOW_LIMIT: float = -5.0
+_COMPAT_TRUE_BRANCH: float = 15.0
+_COMPAT_REVERSE_ZENITH_LIMIT: float = 90.0 - 1e-10
 
 
 # ---------------------------------------------------------------------------
@@ -527,7 +518,91 @@ def _trace_ray(
 
 
 # ---------------------------------------------------------------------------
-# Public functions (used internally by utils.py)
+# Plain refrac() clean-room compatibility model
+# ---------------------------------------------------------------------------
+
+
+def _compat_atmosphere_scale(pressure: float, temperature_C: float) -> float:
+    """Return the conventional pressure/temperature refraction scale.
+
+    The explicit zero-denominator handling keeps physically invalid edge
+    inputs deterministic instead of raising Python's ``ZeroDivisionError``.
+    """
+    numerator = pressure / _COMPAT_PRESSURE_REF * _COMPAT_TEMPERATURE_NUMERATOR
+    denominator = _COMPAT_TEMPERATURE_OFFSET + temperature_C
+    if denominator != 0.0:
+        return numerator / denominator
+    if numerator == 0.0 or math.isnan(numerator):
+        return math.nan
+    return math.copysign(math.inf, numerator)
+
+
+def calc_refrac_compat_true_to_app(
+    true_alt: float, pressure: float = _P0, temperature_C: float = 15.0
+) -> float:
+    """Return plain-API apparent altitude for a true altitude.
+
+    This uses the independently published Saemundsson approximation below 15
+    degrees and the standard high-altitude tangent series above it. It is not
+    the ICAO ray tracer. Values at or below -5 degrees, and candidates that do
+    not rise strictly above zero, are returned unchanged.
+    """
+    true_alt = float(true_alt)
+    pressure = float(pressure)
+    temperature_C = float(temperature_C)
+
+    if not math.isfinite(true_alt) or true_alt <= _COMPAT_TRUE_LOW_LIMIT:
+        return true_alt
+
+    scale = _compat_atmosphere_scale(pressure, temperature_C)
+    if true_alt <= _COMPAT_TRUE_BRANCH:
+        angle = true_alt + 10.3 / (true_alt + 5.11)
+        correction = 1.02 / math.tan(math.radians(angle)) * scale / 60.0
+    else:
+        tangent = math.tan(math.radians(90.0 - true_alt))
+        correction = (
+            (58.276 * tangent - 0.0824 * tangent * tangent * tangent) * scale / 3600.0
+        )
+
+    apparent_alt = true_alt + correction
+    return float(apparent_alt) if apparent_alt > 0.0 else true_alt
+
+
+def calc_refrac_compat_app_to_true(
+    apparent_alt: float, pressure: float = _P0, temperature_C: float = 15.0
+) -> float:
+    """Return plain-API true altitude for an apparent altitude.
+
+    The reverse direction uses Bennett's independently published closed form
+    rather than numerically inverting :func:`calc_refrac_compat_true_to_app`.
+    """
+    apparent_alt = float(apparent_alt)
+    pressure = float(pressure)
+    temperature_C = float(temperature_C)
+
+    if not math.isfinite(apparent_alt):
+        return apparent_alt
+
+    try:
+        angle = apparent_alt + 7.31 / (apparent_alt + 4.4)
+    except ZeroDivisionError:
+        return apparent_alt
+    if not math.isfinite(angle) or angle >= _COMPAT_REVERSE_ZENITH_LIMIT:
+        return apparent_alt
+
+    tangent = math.tan(math.radians(angle))
+    if tangent == 0.0:
+        return apparent_alt
+    correction_arcmin = 1.0 / tangent
+    correction = (
+        correction_arcmin * _compat_atmosphere_scale(pressure, temperature_C) / 60.0
+    )
+    true_alt = apparent_alt - correction
+    return float(true_alt) if true_alt > 0.0 else apparent_alt
+
+
+# ---------------------------------------------------------------------------
+# Independent ICAO ray-traced functions
 # ---------------------------------------------------------------------------
 
 
@@ -622,184 +697,46 @@ def calc_refraction_app_to_true(
 
 
 # ---------------------------------------------------------------------------
-# Reference-matched analytic refraction (used by refrac_extended / azalt only)
+# Legacy internal aliases
 # ---------------------------------------------------------------------------
 #
-# The ray-traced model above is the library's default refraction (plain
-# refrac(), via calc_refraction_true_to_app). refrac_extended() and azalt(),
-# however, must be 1:1 with the reference API. Black-box probing of the
-# reference's refrac_extended over a dense grid (input altitude x observer
-# elevation x pressure x temperature) establishes its behaviour exactly:
-#
-#   * Refraction is a pure function of the *input* altitude, pressure and
-#     temperature; it does NOT depend on the observer's elevation (that only
-#     enters through the horizon dip -- see calc_dip below).
-#   * The *apparent* altitude is the natural argument. As a function of the
-#     apparent altitude the pressure scaling is separable and exactly linear at
-#     every temperature: gP(P) = (P - 80) / 933.25. The app->true refraction is
-#     therefore taken as the primitive here, and true->app is obtained by
-#     inverting it. (The reference's own true->app and app->true agree to
-#     <0.2" wherever its internal iteration is well-conditioned; below roughly
-#     3 deg under the dipped horizon at strong cold that iteration diverges and
-#     the reference returns non-physical values -- we return the physically
-#     sensible clamped input there instead.)
-#   * Base curve R0(app) at 1013.25 mbar, 15 C: a Bennett-family fit above the
-#     horizon with a small rational correction, and a quartic continuation
-#     below it (with a bounded linear tail past -2.3 deg). Matches the
-#     reference to <2" over app in [-2.3, 90] deg.
-#   * Temperature enters as (288.15 / (273.15 + T)) ** q(app, T). The exponent
-#     q rises from ~0.88 at the zenith to ~1.75 at the horizon and ~2.9 a
-#     couple of degrees below it -- an altitude-dependent sensitivity that no
-#     single fixed exponent can capture (the previous model used a constant
-#     1.31, correct only near the horizon). q is fit as a low-order polynomial
-#     in the compressed altitude variable 1/(app + 5), quadratic in T.
-#
-# Measured agreement of refrac_extended vs the reference across observer
-# elevation {0, 1000, 3000, 4000} m, T {-30 .. 35} C, P {900 .. 1100} mbar and
-# input altitude from 4 deg below the dip to 1 deg above it: <30" everywhere
-# (median <0.001"), excluding the divergent deep-below-horizon cold sliver
-# noted above. See docs/comparison/known-differences.md section 13.
-#
-# All constants below were obtained purely by black-box probing (no reference
-# source was consulted).
-
-# Pressure scaling of the app->true refraction: exactly linear and separable.
-_REFR_P_OFFSET: float = 80.0
-_REFR_P_SPAN: float = 933.25  # = 1013.25 - 80
-
-# Base curve R0(app) at 1013.25 mbar, 15 C, in degrees.
-# Above the horizon: Bennett-family a/tan(app + b/(app+c)) plus a rational
-# correction in w = 1/(app + 4) that pulls the fit under ~2".
-_REFR_A: float = 0.9816287048243229
-_REFR_B: float = 7.14
-_REFR_C: float = 4.259
-_REFR_CORR: tuple[float, float, float, float, float] = (
-    0.007823842467183916,
-    -1.3476822600397333,
-    23.536935131196312,
-    -134.2730344731844,
-    245.7190217075024,
-)
-# Below the horizon: quartic in x = -app anchored at R0(0) for continuity,
-# with a bounded linear tail past _REFR_APP_FLOOR.
-_REFR_R0: float = 0.5599364492656921  # R0(app=0), degrees
-_REFR_BELOW: tuple[float, float, float, float] = (
-    0.22587654986933237,
-    0.003876311801010285,
-    0.07344146759158594,
-    -0.021829746046986398,
-)
-_REFR_APP_FLOOR: float = -2.3
-
-# Temperature exponent q(app, T): poly (deg 4) in v = 1/(app + _REFR_Q_K),
-# quadratic in (T - 15).
-_REFR_Q_K: float = 5.0
-_REFR_Q0: tuple[float, float, float, float, float] = (
-    0.863680955334398,
-    2.2469424220791145,
-    -10.346282707448633,
-    146.4522078339461,
-    -266.5962203788882,
-)
-_REFR_Q1: tuple[float, float, float, float] = (
-    0.00022751617874395972,
-    -0.003480924267185901,
-    0.012420640141742743,
-    -0.2297500939232252,
-)
-_REFR_Q2: tuple[float, float, float] = (
-    2.343191507573941e-06,
-    -0.00011627105492982002,
-    0.0008754665131731234,
-)
-
-
-def _refr_base_curve(app: float) -> float:
-    """Base app->true refraction R0(app) at 1013.25 mbar, 15 C, in degrees."""
-    if app >= 0.0:
-        w = 1.0 / (app + 4.0)
-        r = _REFR_A / math.tan(math.radians(app + _REFR_B / (app + _REFR_C))) / 60.0
-        c = _REFR_CORR
-        return r + w * (c[0] + w * (c[1] + w * (c[2] + w * (c[3] + w * c[4]))))
-    # below the horizon: quartic in x = -app, anchored at R0(0)
-    p = _REFR_BELOW
-
-    def _below(x: float) -> float:
-        return _REFR_R0 + x * (p[0] + x * (p[1] + x * (p[2] + x * p[3])))
-
-    if app >= _REFR_APP_FLOOR:
-        return _below(-app)
-    # bounded linear tail so the fit never blows up far below the horizon
-    xf = -_REFR_APP_FLOOR
-    val = _below(xf)
-    slope = p[0] + xf * (2.0 * p[1] + xf * (3.0 * p[2] + xf * 4.0 * p[3]))
-    return val + slope * (-app - xf)
-
-
-def _refr_temp_exponent(app: float, temp_C: float) -> float:
-    """Temperature exponent q(app, T) for the (288.15/(273.15+T))**q scaling."""
-    v = 1.0 / (max(app, _REFR_APP_FLOOR) + _REFR_Q_K)
-    s = temp_C - 15.0
-    a = _REFR_Q0
-    q0 = a[0] + v * (a[1] + v * (a[2] + v * (a[3] + v * a[4])))
-    b = _REFR_Q1
-    q1 = b[0] + v * (b[1] + v * (b[2] + v * b[3]))
-    d = _REFR_Q2
-    q2 = d[0] + v * (d[1] + v * d[2])
-    return q0 + s * q1 + s * s * q2
+# Older internal callers used ``calc_refraction_ref_*`` for the extended API.
+# Keep those names as thin aliases to the independently implemented ICAO ray
+# tracer.
 
 
 def calc_refraction_ref_app_to_true(
-    apparent_alt: float, pressure: float = _P0, temperature_C: float = 15.0
+    apparent_alt: float,
+    pressure: float = _P0,
+    temperature_C: float = 15.0,
+    obs_alt: float = 0.0,
+    lapse_rate: float = 0.0065,
 ) -> float:
-    """Reference-matched refraction (degrees) for an apparent altitude.
+    """Return ICAO ray-traced refraction for an apparent altitude.
 
-    This is the primitive of the reference-matched pair: as a function of the
-    *apparent* altitude the pressure/temperature dependence is separable
-    (see the module notes above). Valid above and below the geometric horizon.
-    Used by refrac_extended()/azalt().
+    This compatibility alias is retained for internal callers; it delegates
+    directly to :func:`calc_refraction_app_to_true`.
     """
-    if pressure <= 0 or 273.15 + temperature_C <= 0:
-        return 0.0
-    scale_p = (pressure - _REFR_P_OFFSET) / _REFR_P_SPAN
-    ratio_t = 288.15 / (273.15 + temperature_C)
-    r = (
-        scale_p
-        * _refr_base_curve(apparent_alt)
-        * ratio_t ** _refr_temp_exponent(apparent_alt, temperature_C)
+    return calc_refraction_app_to_true(
+        apparent_alt, pressure, temperature_C, obs_alt, lapse_rate
     )
-    return max(0.0, r)
 
 
 def calc_refraction_ref_true_to_app(
-    true_alt: float, pressure: float = _P0, temperature_C: float = 15.0
+    true_alt: float,
+    pressure: float = _P0,
+    temperature_C: float = 15.0,
+    obs_alt: float = 0.0,
+    lapse_rate: float = 0.0065,
 ) -> float:
-    """Reference-matched refraction (degrees) for a true altitude.
+    """Return ICAO ray-traced refraction for a true altitude.
 
-    Inverts calc_refraction_ref_app_to_true: finds the apparent altitude *app*
-    with ``app - R_app_to_true(app) == true_alt`` and returns ``app - true_alt``.
-    The mapping ``app - R(app)`` is strictly increasing, so a bracketed
-    bisection on ``[true_alt, true_alt + 8]`` converges to the unique root.
-    Valid above and below the geometric horizon; used by refrac_extended().
+    This compatibility alias is retained for internal callers; it delegates
+    directly to :func:`calc_refraction_true_to_app`.
     """
-    if pressure <= 0 or 273.15 + temperature_C <= 0:
-        return 0.0
-    lo = true_alt
-    hi = true_alt + 8.0
-    for _ in range(60):
-        mid = 0.5 * (lo + hi)
-        f = (
-            mid
-            - calc_refraction_ref_app_to_true(mid, pressure, temperature_C)
-            - true_alt
-        )
-        if f < 0.0:
-            lo = mid
-        else:
-            hi = mid
-        if hi - lo < 1e-12:
-            break
-    return 0.5 * (lo + hi) - true_alt
+    return calc_refraction_true_to_app(
+        true_alt, pressure, temperature_C, obs_alt, lapse_rate
+    )
 
 
 def calc_dip(

@@ -8,7 +8,7 @@ Auxiliary data (nutation, delta-T, stars) is served from the first reader
 that has it.
 
 This enables the modular packaging strategy where bodies are split across
-multiple files (e.g., core.leb, asteroids.leb, apogee.leb, uranians.leb).
+multiple files (for example, core.leb, asteroids.leb, and apogee.leb).
 """
 
 from __future__ import annotations
@@ -106,6 +106,8 @@ class CompositeLEBReader:
         # (group-file scheme), as {custom}_{tier}_{group}, or as a bare
         # known-tier token (e.g. ephemeris_base.leb); files with no recognizable
         # tier are not constrained by the guard below.
+        # ``uranians`` is recognized only as a legacy filename for tier-safety;
+        # fictitious-body channels are rejected by the public calculation path.
         _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians", "exotics"}
         _KNOWN_TIERS = {"base", "medium", "extended"}
 
@@ -163,7 +165,7 @@ class CompositeLEBReader:
 
         Companion files share a common tier prefix. For example, if the primary
         file is ``base_core.leb2``, companions would be ``base_asteroids.leb2``,
-        ``base_apogee.leb2``, ``base_uranians.leb2``.
+        ``base_apogee.leb2``, and ``base_exotics.leb2``.
 
         If no companions are found, returns a composite with a single reader.
 
@@ -189,6 +191,8 @@ class CompositeLEBReader:
         # is complete on its own — a bare first-token prefix match would
         # pull in other tiers ("ephemeris_medium.leb", ...) and stale
         # partials, silently mixing tiers in one composite.
+        # Keep recognizing the retired suffix so a legacy file cannot evade the
+        # mixed-tier guard. Public calculations reject its fictitious channels.
         _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians", "exotics"}
 
         if len(parts) >= 2 and parts[-1] in _GROUP_SUFFIXES:

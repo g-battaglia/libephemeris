@@ -1,195 +1,121 @@
 # API compatibility and validation
 
-libephemeris aims for 1:1 API compatibility with pyswisseph: same function names,
-same flag and body constants, same return-value structures. This page documents the
-few signature differences, the validation methodology behind the precision figures,
-and the bugs found in libephemeris during that validation.
+LibEphemeris targets the public PySwissEphemeris interface: canonical function
+and constant names, parameter order, tuple structure, flag encoding, state
+transitions, and documented exceptions. Numerical calculations are independently
+implemented from JPL, IAU/ERFA, primary literature, and permissively licensed
+catalogues.
 
----
+## Public interface
 
-## 1. API signature differences
+Most migration is an import change:
 
-Developers migrating from pyswisseph should be aware of these.
+```python
+import libephemeris as swe
 
-### Return-value differences
+position, retflag = swe.calc_ut(jd_ut, swe.SUN, swe.FLG_SPEED)
+```
 
-| Function | pyswisseph returns | libephemeris returns |
-|----------|-------------------|---------------------|
-| `get_ayanamsa_ex_ut` | `(flags, ayanamsa)` | `(retflag, ayanamsa)` |
-| `orbit_max_min_true_distance` | `(max, min, true)` | `(max, min, true)` |
+Compatibility tests cover:
 
-(`deltat_ex` returns a plain `float` — ΔT in days — in **both** engines;
-an earlier revision of this table wrongly listed a `(float, str)` tuple
-for the reference binding.)
+- positional and keyword parameters
+- native Python return types and tuple lengths
+- flag implication, exclusivity, and return-flag echo behavior
+- global state setters/getters and `close()`/`reset_session()` behavior
+- body, star, house-system, and event acceptance
+- exception class and unsupported-input behavior
 
-### Parameter differences
+`deltat_ex()` returns Delta T as a plain float. Eclipse, occultation,
+`get_orbital_elements()`, `houses*()`, and `fixstar*()` entry points use the
+canonical public tuple layouts documented in the API reference.
 
-| Function | pyswisseph signature | libephemeris signature |
-|----------|---------------------|----------------------|
-| `heliacal_ut` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` | same signature |
-| `lun_occult_when_loc` | body can be `int` or `str` | same |
+## LibEphemeris-only extensions
 
-> `heliacal_ut` / `heliacal_pheno_ut` share the reference's signature, return
-> shape, body/event acceptance rules and output encodings. The visibility model
-> is now Schaefer's VISLIMIT: `vis_limit_mag` limiting magnitude matches to
-> ≈0.14 mag median / ≈0.23 mag max in the 3–9° object-altitude regime where
-> heliacal events are actually decided (the disagreement is larger at low
-> altitude or in daylight, where both sides sit far below the visibility
-> threshold anyway); `kact`/`minTAV` and window widths track the reference, and
-> 9 of 17 reference matrix event dates match exactly (the rest ±1 day at the
-> marginal visibility transition) — see
-> [Known differences §13](known-differences.md#13-heliacal-events).
+The following convenience/performance APIs are outside the compatible surface:
 
-### Structural differences
+| Function | Purpose |
+|---|---|
+| `reset_session` | Reset lightweight mutable state while preserving expensive readers and caches |
+| `houses_with_fallback` | Apply an explicit polar-latitude house fallback |
+| `houses_armc_with_fallback` | ARMC variant with explicit fallback |
+| `sol_eclipse_max_time` | Refine maximum eclipse timing |
+| `sol_eclipse_how_details` | Return named eclipse circumstances |
+| `sol_eclipse_obscuration_at_loc` | Return a bounded covered-area fraction |
+| `planet_occult_when_glob` | Search global planet–planet occultations |
+| `planet_occult_when_loc` | Search local planet–planet occultations |
+| `calc_angles` | Precompute angles used by Arabic-part calculations |
+| `calc_eclipse_path_width` | Compute a path width from physical shadow geometry |
+| `calc_eclipse_central_line` | Compute central-line coordinates |
+| `calc_eclipse_northern_limit` | Compute northern-limit coordinates |
+| `calc_eclipse_southern_limit` | Compute southern-limit coordinates |
 
-| Function | pyswisseph | libephemeris |
-|----------|-----------|-------------|
-| `get_orbital_elements` | Returns flat tuple (50 floats) | Returns flat tuple (50 floats) — identical shape |
-| `houses_armc` | `ascmc[3]` = Vertex | `ascmc[3]` = Vertex — identical layout |
-| `houses_ex2` | Returns cusp speeds (analytical for some systems) | Returns cusp speeds (numerical true derivative, always computed) |
+These functions have LibEphemeris-defined contracts and should not be treated as
+reference-compatible entry points.
 
-### libephemeris-only extensions
+## Validation methodology
 
-These functions have no pyswisseph equivalent:
+PySwissEphemeris may be called only as an external reference API for behavioral
+comparison. A validation process can compare public values in memory and retain
+a pass/fail status or non-reconstructive aggregate statement. It must not save
+raw rows, per-date deltas, golden outputs, fitted tolerances, recovered
+constants, plots that encode the values, or generated model artifacts.
 
-| Function | Description |
-|----------|-------------|
-| `houses_with_fallback` | Houses with automatic polar-latitude fallback |
-| `houses_armc_with_fallback` | ARMC houses with automatic polar-latitude fallback |
-| `sol_eclipse_max_time` | Precise maximum eclipse timing |
-| `sol_eclipse_how_details` | Comprehensive eclipse circumstances (dict) |
-| `sol_eclipse_obscuration_at_loc` | Eclipse obscuration at a geographic location |
-| `planet_occult_when_glob` | Planet–planet occultation search (global) |
-| `planet_occult_when_loc` | Planet–planet occultation search (local) |
-| `calc_angles` | Pre-calculated angles for Arabic parts |
-| `calc_eclipse_path_width` | Eclipse path width at a point |
-| `calc_eclipse_central_line` | Eclipse central-line coordinates |
-| `calc_eclipse_northern_limit` | Eclipse northern-limit coordinates |
-| `calc_eclipse_southern_limit` | Eclipse southern-limit coordinates |
+The reference API's source, documentation prose, algorithms, data files, and
+internal model choices are out of scope and must never enter this repository or
+a validation worktree.
 
----
+### Independent validation layers
 
-## 2. Validation methodology
+Numerical correctness is established primarily through:
 
-The precision figures in [Measured precision](precision.md) come from a comparison
-suite of **1,619 automated tests** across five suites:
+1. local DE-kernel results versus NASA JPL Horizons or direct SPK evaluation;
+2. frame/time transforms versus ERFA/SOFA conventions;
+3. LEB results versus the direct JPL/Skyfield path from which they are generated;
+4. geometric identities for vectors, orbital elements, houses, eclipses, and
+   coordinate transformations;
+5. primary literature for Delta T, atmosphere, photometry, and historical
+   hypothetical-body elements.
 
-| Suite | File | Tests | Focus |
-|-------|------|-------|-------|
-| 1 | `test_deep_validation.py` | 514 | Planetary positions (10 planets × 12 flag combos × 210 dates), houses, fixed stars, crossings, eclipses, rise/set, coordinates, utilities |
-| 2 | `test_deep_validation_2.py` | 444 | Sidereal modes, topocentric, TT variants, nodal/apsides, orbital elements, phenomena, combined flags, eclipse details |
-| 3 | `test_deep_validation_3.py` | 95 | Eclipse geography, occultations, Gauquelin sectors, heliacal events, ARMC ex2, orbit distances, cross_ut, helio_cross_ut |
-| 4 | `test_deep_validation_4.py` | 63 | Polar fallback houses, eclipse max time/details/obscuration, planet occultations, heliacal_pheno_ut, calc_angles, state functions |
-| 5 | `test_compare_helio_bary.py` | 503 | Heliocentric, barycentric, equatorial, XYZ modes (10 bodies × 10 dates × 4 modes), combined flags, return flag verification |
+Compatibility observations then check the API contract without becoming a
+source of shipped numerical behavior.
 
-### Parameters
+### Coverage strategy
 
-- **Mode:** Skyfield (LEB mode is validated separately).
-- **Date range:** 1550–2650 CE (full DE440 range), concentrated around 1900–2100.
-- **Sample density:** 100–210 dates per test (equinoxes, solstices, eclipses, random dates).
-- **Locations:** 11 global locations including equator, tropics, mid-latitudes, Arctic, Antarctic.
-- **Flags:** all individual flags and common combinations.
-- **House systems:** all 25 supported systems.
+Targeted suites sample:
 
-### Tolerances
+- modern and remote epochs within the selected JPL tier;
+- equatorial, tropical, temperate, and polar observers;
+- individual flags and meaningful combined-flag grids;
+- all supported house systems and sidereal-mode classifications;
+- planets, lunar points, major asteroids, fixed stars, eclipses, crossings,
+  rise/set, and time utilities;
+- Skyfield, Horizons, and LEB paths where each is applicable.
 
-| Quantity | Tolerance | Notes |
-|----------|-----------|-------|
-| Ecliptic longitude (planets) | < 0.001° (3.6") | Sub-arcsecond for outer planets |
-| Ecliptic longitude (Moon) | < 0.04° (135") | Model difference (see [known differences §2.2](known-differences.md#22-moon-precision)) |
-| Ecliptic latitude | < 0.001° | Sub-arcsecond for all bodies |
-| Equatorial RA/Dec | < 0.001° | Sub-arcsecond |
-| Distance (AU) | 0.0001 AU | |
-| Angular velocity | 0.003°/day | Lon speed; lat speed < 0.004°/day |
-| True Node/Lilith longitude | < 0.001° (< 0.5") | Verified vs JPL Horizons |
-| House cusps | < 0.02" | All 25 systems |
-| Fixed star positions | < 0.51" | van Leeuwen 2007, verified vs SIMBAD |
-| Eclipse/crossing times | < 8 seconds | Lunar eclipses; solar < 6 sec |
-| Sidereal time | < 2 seconds | |
-| Heliocentric/Barycentric | < 0.001° | Sub-arcsecond (except bary Sun) |
-| XYZ Cartesian | < 0.00005 AU | Sub-arcsecond angular |
+Exact tolerances belong in reference-free tests and are justified by the
+independent source's published uncertainty, numerical conditioning, or the LEB
+approximation budget. They are not fitted from external residuals.
 
-These tolerances were determined empirically and independently verified against JPL
-Horizons, astropy/ERFA, and SIMBAD (see [Measured precision §2](precision.md#2-independent-verification)).
+## Defects found through validation
 
-### Results
+Past validation exposed ordinary implementation defects including ignored output
+flags, mixed coordinate frames, unstable phase-angle geometry, incomplete star
+catalogue resolution, incorrect return ordering, polar house singularities,
+eclipse classification inconsistencies, and crossing searches that failed near
+stations. Fixes were derived from the public contract plus independent geometry
+or published standards.
 
-| Result | Count |
-|--------|-------|
-| Passed | 1,614 |
-| Failed | 0 |
-| Skipped | 5 (convergence-dependent tests) |
-| Total | 1,619 |
+Historical per-case reference measurements were removed during review; they
+are neither required to understand the fix nor permitted as persisted
+validation data.
 
-All 87 public swe-compatible functions are covered by at least one test suite.
+## References
 
----
-
-## 3. Bugs found and fixed in libephemeris
-
-The validation effort uncovered 12 bugs in libephemeris, all since fixed and
-verified. They are documented here as evidence of the validation's thoroughness.
-
-### Output flag handling
-
-| # | Bug | Fix | Commit |
-|---|-----|-----|--------|
-| 1 | `FLG_RADIANS` (8192) silently ignored — positions always in degrees | `_apply_output_flags()` in `planets.py` converts degrees→radians | `ef29a08` |
-| 2 | `FLG_XYZ` (4096) silently ignored — positions always spherical | Same helper converts spherical→Cartesian (AU), incl. velocity Jacobian | `ef29a08` |
-
-### Unit and threshold errors
-
-| # | Bug | Fix | Commit |
-|---|-----|-----|--------|
-| 3 | `pheno_ut` returned apparent diameter in arcseconds; pyswisseph returns degrees | Divide by 3600.0 in `_calc_apparent_diameter()` | `ef29a08` |
-| 4 | Lunar eclipse penumbral detection missed eclipses 12–18° from node | `ECLIPSE_LIMIT_LUNAR` 12.0° → 18.5° | `ef29a08` |
-
-### House system
-
-| # | Bug | Fix | Commit |
-|---|-----|-----|--------|
-| 5 | Sunshine house system (`'I'`) crashed/wrong at latitudes ≥ 67°N where MC falls below horizon | MC-under-horizon detection: flip MC 180°, compute, shift intermediate cusps 180° | `ef29a08` |
-
-### Fixed stars
-
-| # | Bug | Fix | Commit |
-|---|-----|-----|--------|
-| 6 | `fixstar_mag` returned 0.0 for most stars (only 2 magnitude entries) | Build from full `STAR_CATALOG` | `ef29a08` |
-| 7 | 11 stars missing from catalog | Added all 11 from ESA Hipparcos via SIMBAD/CDS; fixed Tejat HIP + duplicate alias | `ef29a08` |
-| 8 | `resolve_star_name()` substring matching caused false positives ("Al" → "Aldebaran") | Prefix matching | `ef29a08` |
-
-Separately, fixed-star **flag handling** was hardened: `fixed_stars.py` previously
-honored only 4 of 19 SEFLG flags and silently returned tropical coordinates for
-`FLG_SIDEREAL`. All meaningful flags are now handled (`FLG_SIDEREAL`, `FLG_J2000`,
-`FLG_NONUT`, `FLG_XYZ`, `FLG_RADIANS`, `FLG_TRUEPOS`, `FLG_MOSEPH`, `FLG_SPEED3`,
-`FLG_TOPOCTR`).
-
-### Lunar eclipse classification
-
-| # | Bug | Fix | Commit |
-|---|-----|-----|--------|
-| 9 | Eclipse type misclassification — missing Danjon atmospheric shadow enlargement | `_SHADOW_ENLARGEMENT = 1 + 1/85 ≈ 1.0118` on umbra and penumbra radii | `e082ee5` |
-| 10 | P1/P4 contact times inconsistent with `lun_eclipse_when` | Same Danjon factor in `_calc_lunar_eclipse_penumbral_separation()` | `e082ee5` |
-
-The Danjon enlargement is a well-established correction (Earth's atmosphere refracts
-sunlight around the limb, making the geometric shadow ~1.2% larger); the factor 1/85
-is used by the Astronomical Almanac.
-
-### Algorithmic improvements
-
-| # | Bug | Fix | Commit |
-|---|-----|-----|--------|
-| 11 | `swe_cross_ut` diverged for slow outer planets near stations | Widened `STATION_SPEED_THRESHOLD` 0.001→0.01°/day; larger Brent windows; `dt_guess * 1.5` scaling; antipodal-point filter | `d39aaf8` |
-| 12 | `swe_orbit_max_min_true_distance` returned 2 values in wrong order | Return 3-tuple `(max, min, true)` with true distance from `calc_ut` | `d39aaf8` |
-
----
-
-## 4. References
-
-1. Park, R.S. et al. (2021). "The JPL Planetary and Lunar Ephemerides DE440 and DE441." *Astronomical Journal*, 161(3), 105.
-2. Folkner, W.M. et al. (2014). "The Planetary and Lunar Ephemerides DE430 and DE431." *Interplanetary Network Progress Report*, 196, 1–81.
-3. Stephenson, F.R., Morrison, L.V. & Hohenkerk, C.Y. (2016). "Measurement of the Earth's rotation: 720 BC to AD 2015." *Proceedings of the Royal Society A*, 472, 20160404.
-4. Espenak, F. & Meeus, J. (2006). "Five Millennium Canon of Solar Eclipses: −1999 to +3000." NASA/TP-2006-214141.
-5. Danjon, A. (1951). "Les éclipses de Lune par la pénombre en 1951." *L'Astronomie*, 65, 51–53.
-6. Chapront, J. et al. (2002). "A new determination of lunar orbital parameters." *Astronomy & Astrophysics*, 387, 700–709.
-7. ESA (1997). *The Hipparcos and Tycho Catalogues*. ESA SP-1200.
+1. Park, R. S. et al. (2021), “The JPL Planetary and Lunar Ephemerides DE440
+   and DE441,” *Astronomical Journal* 161, 105.
+2. Stephenson, F. R., Morrison, L. V. & Hohenkerk, C. Y. (2016), “Measurement
+   of the Earth's rotation: 720 BC to AD 2015,” *Proceedings of the Royal
+   Society A* 472, 20160404.
+3. Vondrák, J., Capitaine, N. & Wallace, P. T. (2011), “New precession
+   expressions, valid for long time intervals,” *A&A* 534, A22.
+4. ESA (1997), *The Hipparcos and Tycho Catalogues*, ESA SP-1200.
+5. IAU SOFA and ERFA documentation for standard frame and time routines.

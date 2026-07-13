@@ -83,11 +83,10 @@ POSEIDON: int = FICT_OFFSET + 7  # 47 - Eighth Uranian planet (Poseidon)
 ISIS: int = FICT_OFFSET + 8  # 48 - Transpluto/Isis
 TRANSPLUTO: int = ISIS  # Alias for ISIS
 
-# Vulcan - hypothetical intramercurial planet
+# Public reference constants without built-in element sets.  They remain
+# available for API compatibility; position requests raise UnknownBodyError.
 VULCAN: int = FICT_OFFSET + 15  # 55 - Intramercurial hypothetical planet
 
-# Waldemath - Dr. Waldemath's hypothetical second moon of Earth
-# Note: This is different from Mean Lilith and True Lilith which are lunar apogee points
 WALDEMATH: int = FICT_OFFSET + 18  # 58 - Waldemath's hypothetical Dark Moon
 
 # Planet X Leverrier - Leverrier's calculated "Planet X" that led to Neptune's discovery
@@ -122,18 +121,10 @@ PLANET_X_LOWELL: int = FICT_OFFSET + 13  # 53 - Lowell's Planet X (Pluto predict
 # This uses Pickering's orbital elements prediction (FICT_OFFSET + 14 = 54).
 PLANET_X_PICKERING: int = FICT_OFFSET + 14  # 54 - Pickering's Planet O/X prediction
 
-# White Moon (Selena) - Point opposite to Black Moon Lilith (lunar perigee = apogee + 180°)
-# Calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
-# Note: Some systems use True Lilith + 180° instead; libephemeris supports both via calc_white_moon_position()
-WHITE_MOON: int = (
-    FICT_OFFSET + 16
-)  # 56 - White Moon Selena (opposite to Black Moon Lilith)
+WHITE_MOON: int = FICT_OFFSET + 16  # 56 - White Moon Selena
 
 SELENA: int = WHITE_MOON  # Alias - Selena is another name for White Moon
 
-# Proserpina - hypothetical trans-Plutonian planet used by some astrologers
-# This is a hypothetical body not in the standard fictitious bodies set
-# Orbital elements are based on traditional astrological sources
 PROSERPINA: int = FICT_OFFSET + 17  # 57 - Hypothetical trans-Plutonian planet
 
 _NALL_NAT_POINTS_INTERNAL: int = NPLANETS + NFICT_ELEM + AST_OFFSET + COMET_OFFSET
@@ -896,26 +887,29 @@ SPLIT_DEG_KEEP_DEG: int = 32  # Don't round to next degree
 # TIDAL ACCELERATION CONSTANTS
 # =============================================================================
 # Tidal acceleration of the Moon in arcsec/century^2, for Delta T calculations.
-# Different JPL ephemeris files use different tidal acceleration values.
-# These affect the polynomial extrapolation of Delta T for historical dates.
+# Different JPL ephemeris files use different values for the tidal secular
+# acceleration of the Moon's mean longitude (arcsec/century^2). These affect
+# the polynomial extrapolation of Delta T for historical dates. Published
+# sources: Standish, JPL IOM 314.6-891 (1982) for DE200; Standish, A&A 336,
+# 381 (1998) for DE403-DE406; Folkner et al., IPN Progress Report 42-178
+# (2009) for DE421; Folkner et al., IPN Progress Report 42-196 (2014) for
+# DE430/DE431; Park et al., AJ 161:105 (2021) for DE440/DE441.
 
-TIDAL_DE200: float = -23.8946  # DE200 (older ephemeris)
-TIDAL_DE403: float = -25.580  # DE403
-TIDAL_DE404: float = -25.580  # DE404
-TIDAL_DE405: float = -25.826  # DE405
-TIDAL_DE406: float = -25.826  # DE406
-TIDAL_DE421: float = -25.85  # DE421 (legacy default)
+TIDAL_DE200: float = -23.8946  # DE200 (Standish 1982)
+TIDAL_DE403: float = -25.580  # DE403 (Standish 1998)
+TIDAL_DE404: float = -25.580  # DE404 (Standish 1998)
+TIDAL_DE405: float = -25.826  # DE405 (Standish 1998)
+TIDAL_DE406: float = -25.826  # DE406 (Standish 1998)
+TIDAL_DE421: float = -25.85  # DE421 (Folkner et al. 2009)
 TIDAL_DE422: float = -25.85  # DE422
-TIDAL_DE430: float = -25.82  # DE430
-TIDAL_DE431: float = -25.80  # DE431
-TIDAL_DE440: float = -25.936  # DE440 (current default)
+TIDAL_DE430: float = -25.82  # DE430 (Folkner et al. 2014)
+TIDAL_DE431: float = -25.80  # DE431 (Folkner et al. 2014)
+TIDAL_DE440: float = -25.936  # DE440 (Park et al. 2021)
 TIDAL_DE441: float = -25.936  # DE441 (latest, same as DE440)
-# Named-constant parity: the reference API's TIDAL_DEFAULT constant aliases
-# its DE431 value (-25.80) — measured black-box on the binding. This is a
-# COMPILE-TIME name only: the library's runtime automatic default (what
-# get_tid_acc() returns out of the box) stays the DE440/DE441 value
-# -25.936, matching both our ephemeris and the reference's own runtime
-# behavior with modern data.
+# The named automatic default uses the published DE431 tidal convention (the
+# long-history JPL ephemeris, whose extended time span matches historical
+# Delta-T use). Callers that need the DE440 convention can select
+# TIDAL_DE440 explicitly.
 TIDAL_DEFAULT: float = TIDAL_DE431
 TIDAL_AUTOMATIC: int = 999999  # Let library choose based on ephemeris file
 
@@ -1078,7 +1072,7 @@ NALL_NAT_POINTS: int = 38
 PLMOON_OFFSET: int = 9000
 
 # Canonical planetary-moon ids (PLMOON_OFFSET + NAIF satellite id).
-# These match the ipl numbers the reference API uses for its sepm* files.
+# Their public-call behavior matches the corresponding reference API body ids.
 PLMOON_IO: int = PLMOON_OFFSET + NAIF_IO  # 9501
 PLMOON_EUROPA: int = PLMOON_OFFSET + NAIF_EUROPA  # 9502
 PLMOON_GANYMEDE: int = PLMOON_OFFSET + NAIF_GANYMEDE  # 9503

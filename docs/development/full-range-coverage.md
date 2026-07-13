@@ -1,7 +1,16 @@
 # Full Range Coverage
 
-Plan for extending minor body coverage across the full DE441 ephemeris range
-(-13200 to +17191 CE).
+> **Status: implemented; retained as a historical design record.** The
+> future-tense sections below describe the work as originally planned, not the
+> current implementation. Local SPK discovery now prefers the widest kernel,
+> the extended tier requests the supported 1600-2500 Horizons SPK interval,
+> `scripts/download_max_range_spk.py` and `leph download spk-extended` are
+> available, and ASSIST configuration is documented. The major-planet DE441
+> range remains about -13200 to +17191. All former published LEB downloads are
+> retired; the bundled base core and locally generated LEB1/LEB2 files are the
+> supported accelerated paths.
+
+Historical plan for extending minor-body coverage across the DE441 range.
 
 ## Table of Contents
 

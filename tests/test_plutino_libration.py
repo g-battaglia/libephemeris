@@ -86,7 +86,7 @@ class TestNeptuneMeanLongitude:
     """Test Neptune mean longitude calculation."""
 
     def test_neptune_longitude_at_j2000(self):
-        """Neptune longitude at J2000.0 should match reference value."""
+        """The linear model starts at its independently defined epoch value."""
         lon = calc_neptune_mean_longitude(J2000_EPOCH)
         assert abs(lon - NEPTUNE_MEAN_LONGITUDE_J2000) < 0.001
 
@@ -154,9 +154,7 @@ class TestResonantArgument:
 
         elements = MINOR_BODY_ELEMENTS[IXION]
         jd = elements.epoch
-        phi0 = calc_resonant_argument_plutino(
-            elements, jd, elements.omega, elements.M0
-        )
+        phi0 = calc_resonant_argument_plutino(elements, jd, elements.omega, elements.M0)
         delta = 37.0
         rotated = dataclasses.replace(elements, Omega=elements.Omega + delta)
         phi1 = calc_resonant_argument_plutino(

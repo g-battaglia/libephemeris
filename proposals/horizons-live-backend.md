@@ -56,7 +56,7 @@ swe_calc_ut()                          # planets.py:760
           │   ├── Fixed stars → fixed_stars.py + Skyfield Earth position
           │   ├── Angles → houses.py (pure GAST + obliquity, no ephemeris)
           │   ├── Arabic parts → arithmetic on cached values
-          │   └── Uranians → Keplerian propagation (analytical)
+          │   └── Harrington → independently sourced Keplerian propagation
           └── Post-processing: equatorial convert, sidereal, XYZ, radians
 ```
 
@@ -100,18 +100,16 @@ Each body type in `_calc_body()` has been classified by its data dependency:
 | Body | IDs | Classification | What It Needs |
 |------|-----|----------------|---------------|
 | Standard planets | 0-9, 14 | **ephemeris-dependent** | DE440 planet positions via Skyfield |
-| SE_MEAN_NODE | 10 | **analytical** | Meeus polynomial (zero file deps) |
+| SE_MEAN_NODE | 10 | **analytical** | ERFA/IERS lunar arguments and independent geometry |
 | SE_TRUE_NODE | 11 | **ephemeris-dependent** | Moon state vectors (r, v) for angular momentum |
-| SE_MEAN_APOG (Lilith) | 12 | **analytical** | Simon/Chapront polynomial (zero file deps) |
+| SE_MEAN_APOG (Lilith) | 12 | **analytical** | ERFA/IERS lunar arguments and independent geometry |
 | SE_OSCU_APOG (True Lilith) | 13 | **ephemeris-dependent** | Moon state vectors for eccentricity vector |
-| SE_INTP_APOG | 21 | **mixed** | Lon: ELP2000 analytical; Lat/Dist: Moon vectors |
-| SE_INTP_PERG | 22 | **mixed** | Lon: ELP2000 analytical; Lat/Dist: Moon vectors |
+| SE_INTP_APOG | 21 | **analytical** | Versioned Delaunay compatibility series and pinned refinement |
+| SE_INTP_PERG | 22 | **analytical** | Separate Delaunay compatibility series and pinned refinement |
 | SE_CHIRON, SE_PHOLUS | 15-16 | **ephemeris-dependent** | Minor body positions |
 | SE_CERES..SE_VESTA | 17-20 | **ephemeris-dependent** | Minor body positions |
 | Asteroids | SE_AST_OFFSET+N | **ephemeris-dependent** | Minor body positions |
-| Uranians (helio only) | 40-47 | **analytical** | Keplerian propagation (zero file deps) |
-| Transpluto (helio) | 48 | **analytical** | Keplerian propagation (zero file deps) |
-| Transpluto (geo) | 48 | **mixed** | Orbit: analytical; geocentric conversion: Earth position |
+| Historical hypothetical bodies | 40–58 | **analytical** | Runtime element/convention registry with per-body provenance status |
 | Fixed stars | FIXSTAR_OFFSET+N | **ephemeris-dependent** | Earth position for parallax/aberration |
 | Angles (ASC, MC, Vertex) | ANGLE_OFFSET+N | **analytical** | GAST + obliquity from pyerfa (zero file deps) |
 | Arabic parts | ARABIC_OFFSET+N | **analytical** | Arithmetic on cached longitudes |
@@ -179,7 +177,7 @@ Note: Horizons planet center IDs (199, 299, 599, etc.) return the **physical cen
 
 These must be handled analytically or trigger fallback:
 
-- **Analytical (no HTTP needed):** Mean Node, Mean Apogee/Lilith, Angles, Arabic Parts, Uranian hypotheticals (helio)
+- **Analytical (no HTTP needed):** Mean Node, Mean Apogee/Lilith, Harrington, Angles, Arabic Parts
 - **Computed from Moon vectors (1 HTTP fetch):** True Node, Osculating Apogee, Interpolated Apogee/Perigee
 - **Fallback to Skyfield (triggers DE440 download):** Fixed stars, Planetary moons, SEFLG_TOPOCTR
 
@@ -341,11 +339,10 @@ This way a full chart (Sun through Pluto + nodes + Lilith + angles) completes in
 | SE_MEAN_APOG | **Analytical** | 0 | `lunar.calc_mean_lilith_with_latitude()` + nutation |
 | SE_TRUE_NODE | Horizons (Moon) | 1 Moon geometric (+ cached Earth) | Angular momentum r×v → node longitude |
 | SE_OSCU_APOG | Horizons (Moon) | 1 Moon geometric (+ cached Earth) | Eccentricity vector → apogee |
-| SE_INTP_APOG | Mixed | 1 Moon geometric (+ cached Earth) | Lon: ELP2000 analytical; Lat/Dist: eccentricity vector |
-| SE_INTP_PERG | Mixed | 1 Moon geometric (+ cached Earth) | Lon: ELP2000 analytical; Lat/Dist: eccentricity vector |
-| Uranians (helio) | **Analytical** | 0 | `hypothetical.calc_uranian_planet()` |
-| Transpluto (helio) | **Analytical** | 0 | `hypothetical.calc_transpluto()` |
-| Transpluto (geo) | Horizons (Earth) | 1 Earth (cached) | Keplerian orbit + geocentric conversion |
+| SE_INTP_APOG | Mixed | Moon-state samples (+ cached Earth) | Symmetric JPL-state smoothing |
+| SE_INTP_PERG | Mixed | Moon-state samples (+ cached Earth) | Symmetric JPL-state smoothing |
+| Harrington | **Analytical** | 0 | Published Harrington (1988) elements |
+| Unsupported compatibility IDs | **Unsupported** | 0 | `UnknownBodyError` |
 | Angles (ASC, MC, etc.) | **Analytical** | 0 | `houses.py` (GAST + obliquity via pyerfa) |
 | Arabic parts | **Analytical** | 0 | Arithmetic on cached longitudes |
 | Fixed stars | **raise KeyError** | — | Fallback → Skyfield (triggers DE440 download) |
@@ -433,7 +430,9 @@ New module containing:
 
 **f) Calculation pipeline** — `horizons_calc_ut()` and `horizons_calc_tt()` implement the full pipeline from section 4.2, reusing math functions from `fast_calc.py`.
 
-**g) Body routing** — dispatches to analytical functions for Mean Node, Mean Apogee, Angles, Arabic Parts, Uranians (no HTTP). Fetches Moon vectors for True Node / Osculating Apogee. Raises `KeyError` for unsupported bodies.
+**g) Body routing** — dispatches to independent analytical functions for Mean
+Node, Mean Apogee, Harrington, Angles, and Arabic Parts. It fetches Moon vectors
+for state-derived lunar points and rejects unsupported hypothetical IDs.
 
 **h) Flag dispatch** — `_resolve_horizons_params()` maps SEFLG flags to Horizons API parameters and local pipeline options. See section 4.5.
 

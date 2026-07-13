@@ -176,9 +176,7 @@ class TestVenusRise:
         date_name: str,
     ):
         """Venus rise timing matches within tolerance."""
-        ref_result = compare.skyfield(
-            ephem.rise_trans, jd, VENUS, 1, (lon, lat, alt)
-        )
+        ref_result = compare.skyfield(ephem.rise_trans, jd, VENUS, 1, (lon, lat, alt))
         leb_result = compare.leb(ephem.rise_trans, jd, VENUS, 1, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:

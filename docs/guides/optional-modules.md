@@ -135,17 +135,19 @@ technical details and precision benchmarks.
 pip install libephemeris[stars]
 ```
 
-Installs [Astropy](https://www.astropy.org/) for building and querying
-star catalogs. Required for fixed star calculations beyond the built-in
-named stars.
+Installs [Astropy](https://www.astropy.org/) and Astroquery for star-catalog
+building and related developer tooling. Runtime fixed-star calculations use the
+catalog shipped by LibEphemeris and do not require this extra.
 
-### `all` -- All permissive-licensed extras
+### `all` -- Permissive optional runtime features
 
 ```bash
 pip install libephemeris[all]        # permissive-only; add ,nbody for the GPL extra (provenance-ok)
 ```
 
-Installs the permissive-licensed optional runtime dependencies (`stars`); the GPL-licensed `nbody` extra is a separate explicit opt-in. <!-- provenance-ok -->
+Installs the permissive optional runtime features (currently Astropy
+integration). It does not include the Astroquery-based catalog tooling from
+`stars`. The GPL-licensed `nbody` extra is a separate explicit opt-in. <!-- provenance-ok -->
 
 ### `dev` -- Development tools
 
@@ -156,8 +158,8 @@ pip install libephemeris[dev]
 For contributors only. Includes testing tools (pytest and plugins), code
 quality (ruff, mypy), SPK generation (spiceypy), and manual building
 (ebooklib). Not needed for using the library. (Reference-comparison
-tooling — including the black-box oracle binding — lives in the separate
-`validation/` repository, not in any extra of this package.)
+tooling lives in the separate `validation/` repository, not in any extra
+of this package.)
 
 ---
 
@@ -167,11 +169,11 @@ Different setups require different data downloads:
 
 | Setup | What to download | Total size | Command |
 |-------|-----------------|------------|---------|
-| **Minimal** | Nothing (LEB2 auto-downloaded on first use) | 0 up front | -- |
-| **Recommended** | Medium tier DE440 + planet centers + SPKs | ~200 MB | `libephemeris download medium` |
+| **Minimal** | Nothing (uses the bundled LEB2 base core where covered) | 0 up front | -- |
+| **Recommended** | Medium tier DE440 + planet centers + SPKs | >300 MB plus minor-body SPKs | `libephemeris download medium` |
 | **High precision asteroids** | Above + ASSIST data | ~900 MB | Above + `libephemeris download assist` |
-| **Binary ephemeris (fast)** | LEB2 compressed | ~33-897 MB | `libephemeris download leb2-medium` |
-| **Offline everything** | All tiers + LEB2 + DE + SPKs + IERS | ~5-6 GB | `libephemeris download all` |
+| **Binary ephemeris (fast)** | Reviewed pinned LEB2 core | ~38 MB (medium) | `libephemeris download leb-medium` |
+| **Offline everything** | DE + SPKs + IERS; generate optional LEB locally | depends on tiers | `libephemeris download all` |
 | **Offline + n-body** | Above + ASSIST data | ~6-7 GB | Above + `libephemeris download assist` |
 
 ---
@@ -252,10 +254,11 @@ Download everything upfront:
 libephemeris download all
 ```
 
-Or for fastest calculations, use the precomputed LEB binary ephemeris:
+For fastest calculations beyond the bundled base core, generate a local LEB
+from the selected JPL kernel:
 
 ```bash
-libephemeris download leb2-medium
+leph leb generate medium groups
 ```
 
 ```python

@@ -363,6 +363,7 @@ class TestParseFinalsData:
         # 2) empty MJD field -> continue (line 515): cols 0-6 date, 7-15 mjd blank
         #    Provide a line long enough (>=68) but with blank MJD slice.
         empty_mjd = "730101 " + " " * 8 + " " * 60
+
         # 3) full observed row with UT1-UTC and a valid error -> stored,
         #    is_prediction False (flag 'I'), error parsed (lines 533-535, store).
         # Column layout (Python slices):
@@ -882,12 +883,15 @@ class TestObservedDeltaT:
         loop leaves left/right pointing at the two equal-MJD points.
         """
         table = [
-            iers_data.DeltaTDataPoint(mjd=51500.0, year=2000, month=1, day=1,
-                                      delta_t=62.0),
-            iers_data.DeltaTDataPoint(mjd=51544.0, year=2000, month=2, day=14,
-                                      delta_t=63.0),
-            iers_data.DeltaTDataPoint(mjd=51544.0, year=2000, month=2, day=14,
-                                      delta_t=63.0),
+            iers_data.DeltaTDataPoint(
+                mjd=51500.0, year=2000, month=1, day=1, delta_t=62.0
+            ),
+            iers_data.DeltaTDataPoint(
+                mjd=51544.0, year=2000, month=2, day=14, delta_t=63.0
+            ),
+            iers_data.DeltaTDataPoint(
+                mjd=51544.0, year=2000, month=2, day=14, delta_t=63.0
+            ),
         ]
         monkeypatch.setattr(iers_data, "_DELTA_T_DATA", table)
         monkeypatch.setattr(iers_data, "_ensure_data_loaded", lambda: None)
@@ -897,8 +901,10 @@ class TestObservedDeltaT:
     def test_interpolation(self, monkeypatch):
         """Normal interpolation between two distinct points."""
         _install_delta_t(monkeypatch, [(2000, 1, 1, 63.0), (2000, 2, 1, 64.0)])
-        mjd_mid = (iers_data._calendar_to_mjd(2000, 1, 1)
-                   + iers_data._calendar_to_mjd(2000, 2, 1)) / 2
+        mjd_mid = (
+            iers_data._calendar_to_mjd(2000, 1, 1)
+            + iers_data._calendar_to_mjd(2000, 2, 1)
+        ) / 2
         jd = iers_data._mjd_to_jd(mjd_mid)
         val = iers_data.get_observed_delta_t(jd)
         assert 63.0 < val < 64.0
@@ -1068,9 +1074,7 @@ class TestCacheInfo:
         """No cache files and no ranges -> skip-branches (1298->1302, 1308->1312)."""
         # Cache dir exists (created by _get_cache_dir) but contains no files.
         monkeypatch.setattr(iers_data, "get_iers_data_range", lambda: None)
-        monkeypatch.setattr(
-            iers_data, "get_observed_delta_t_data_range", lambda: None
-        )
+        monkeypatch.setattr(iers_data, "get_observed_delta_t_data_range", lambda: None)
         info = iers_data.get_iers_cache_info()
         assert info["finals_exists"] is False
         assert info["finals_age_days"] is None

@@ -11,7 +11,6 @@ References:
     - Rozenberg, G.V. (1966) "Twilight: A Study in Atmospheric Optics"
 """
 
-
 from libephemeris import (
     # Main twilight functions
     get_twilight_phase,

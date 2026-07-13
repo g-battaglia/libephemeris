@@ -18,7 +18,9 @@ from libephemeris.constants import (
     FLG_SIDEREAL,
     SIDM_LAHIRI,
     SIDM_FAGAN_BRADLEY,
-    SIDM_RAMAN,
+    SIDM_J2000,
+    SIDM_J1900,
+    SIDM_B1950,
 )
 
 
@@ -150,26 +152,26 @@ class TestSiderealModeState:
 
     @pytest.mark.unit
     def test_sid_mode_affects_results(self):
-        """Different sidereal modes should produce different longitudes."""
+        """Independently defined sidereal frames produce different longitudes."""
         jd = 2451545.0
 
-        swe.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_J2000)
         r1, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
 
-        swe.set_sid_mode(SIDM_FAGAN_BRADLEY)
+        swe.set_sid_mode(SIDM_J1900)
         r2, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         diff = abs(r1[0] - r2[0])
         if diff > 180:
             diff = 360 - diff
-        assert diff > 0.01, f"Lahiri vs Fagan same result: diff={diff:.4f}°"
+        assert diff > 0.01, f"J2000 vs J1900 same result: diff={diff:.4f}°"
 
     @pytest.mark.unit
     def test_three_sid_modes_different(self):
-        """Three sidereal modes should all differ."""
+        """Three independently defined sidereal frames should all differ."""
         jd = 2451545.0
         results = []
-        for mode in [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN]:
+        for mode in [SIDM_J2000, SIDM_J1900, SIDM_B1950]:
             swe.set_sid_mode(mode)
             r, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
             results.append(r[0])
@@ -189,28 +191,29 @@ class TestAyanamsaState:
     @pytest.mark.unit
     def test_get_ayanamsa_ut_returns_float(self):
         """get_ayanamsa_ut returns a float."""
-        swe.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_J2000)
         ayan = swe.get_ayanamsa_ut(2451545.0)
         assert type(ayan) is float
 
     @pytest.mark.unit
     def test_ayanamsa_positive(self):
         """Ayanamsa should be positive for modern dates."""
-        swe.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_J1900)
         ayan = swe.get_ayanamsa_ut(2451545.0)
         assert ayan > 0, f"Ayanamsa {ayan} not positive"
 
     @pytest.mark.unit
-    def test_ayanamsa_lahiri_approx(self):
-        """Lahiri ayanamsa at J2000 should be ~23.85°."""
-        swe.set_sid_mode(SIDM_LAHIRI)
-        ayan = swe.get_ayanamsa_ut(2451545.0)
-        assert 23 < ayan < 25, f"Lahiri ayanamsa {ayan}° (expected ~23.85)"
+    def test_j2000_ayanamsa_is_zero_at_defining_tt_epoch(self):
+        """The independently defined J2000 frame is zero at J2000 TT."""
+        swe.set_sid_mode(SIDM_J2000)
+        ayan = swe.get_ayanamsa(2451545.0)
+        wrapped = (ayan + 180.0) % 360.0 - 180.0
+        assert abs(wrapped) < 5e-12
 
     @pytest.mark.unit
     def test_ayanamsa_increases_over_time(self):
         """Ayanamsa should increase over centuries (precession)."""
-        swe.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_J2000)
         ayan_2000 = swe.get_ayanamsa_ut(2451545.0)
         ayan_2100 = swe.get_ayanamsa_ut(2451545.0 + 36525.0)
         assert ayan_2100 > ayan_2000, (
@@ -220,7 +223,7 @@ class TestAyanamsaState:
     @pytest.mark.unit
     def test_get_ayanamsa_ex_ut_returns_tuple(self):
         """get_ayanamsa_ex_ut returns (retflag, ayanamsa)."""
-        swe.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_J2000)
         result = swe.get_ayanamsa_ex_ut(2451545.0, 0)
         assert len(result) == 2
         retflag, ayan = result

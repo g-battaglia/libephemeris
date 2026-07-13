@@ -220,15 +220,6 @@ BODY_NAMES = {
     20: "Vesta",
     21: "Interp Apogee",
     22: "Interp Perigee",
-    40: "Cupido",
-    41: "Hades",
-    42: "Zeus",
-    43: "Kronos",
-    44: "Apollon",
-    45: "Admetos",
-    46: "Vulkanus",
-    47: "Poseidon",
-    48: "Transpluto",
 }
 # Exotic minor bodies (centaurs/TNOs/NEAs) — labels from the registry.
 BODY_NAMES.update(_exotic_names())
@@ -319,7 +310,7 @@ BODY_GROUPS: dict[str, List[int]] = {
     "analytical": sorted(
         bid
         for bid in BODY_PARAMS
-        if bid not in _PLANET_MAP and bid not in _ASTEROID_NAIF
+        if bid not in _PLANET_MAP and bid not in _ASTEROID_NAIF and not 40 <= bid <= 49
     ),  # ecliptic/helio analytical bodies
 }
 
@@ -332,6 +323,20 @@ BODY_GROUPS: dict[str, List[int]] = {
 def chebyshev_nodes(n: int) -> np.ndarray:
     """Compute n Chebyshev nodes (Type I) on [-1, 1]."""
     return np.cos(np.pi * (np.arange(n) + 0.5) / n)
+
+
+def _validated_finite_array(
+    values: object,
+    expected_shape: tuple[int, ...],
+    label: str,
+) -> np.ndarray:
+    """Return a float array only when its shape and values are valid."""
+    array = np.asarray(values, dtype=float)
+    if array.shape != expected_shape:
+        raise ValueError(f"{label} has shape {array.shape}, expected {expected_shape}")
+    if not np.all(np.isfinite(array)):
+        raise ValueError(f"{label} contains NaN or infinite values")
+    return array
 
 
 def fit_segment(
@@ -359,12 +364,19 @@ def fit_segment(
     jd_nodes = 0.5 * (jd_end - jd_start) * nodes + 0.5 * (jd_start + jd_end)
 
     # Evaluate function at nodes
-    values = np.array([func(jd) for jd in jd_nodes])  # shape: (degree+1, components)
+    values = _validated_finite_array(
+        [func(jd) for jd in jd_nodes],
+        (degree + 1, components),
+        "Chebyshev fitting values",
+    )
 
     # Fit each component independently
     coeffs = np.zeros((components, degree + 1))
     for c in range(components):
         coeffs[c] = chebfit(nodes, values[:, c], degree)
+
+    if not np.all(np.isfinite(coeffs)):
+        raise ValueError("Chebyshev fitting produced NaN or infinite coefficients")
 
     return coeffs
 
@@ -390,6 +402,16 @@ def verify_segment(
 
     Returns the maximum error across all components and test points.
     """
+    if n_test < 1:
+        raise ValueError("n_test must be at least 1")
+    coeff_array = np.asarray(coeffs, dtype=float)
+    if coeff_array.ndim != 2 or coeff_array.shape[0] != components:
+        raise ValueError(
+            "Chebyshev coefficients have shape "
+            f"{coeff_array.shape}, expected ({components}, degree + 1)"
+        )
+    if not np.all(np.isfinite(coeff_array)):
+        raise ValueError("Chebyshev coefficients contain NaN or infinite values")
     if verify_end is None:
         verify_end = seg_end
     mid = 0.5 * (seg_start + seg_end)
@@ -401,10 +423,18 @@ def verify_segment(
         jd = seg_start + frac * (verify_end - seg_start)
         tau = (jd - mid) / half
 
-        reference = func(jd)
+        reference = _validated_finite_array(
+            func(jd), (components,), "Chebyshev verification reference"
+        )
         for c in range(components):
-            fitted = chebval(tau, coeffs[c])
+            fitted = float(chebval(tau, coeff_array[c]))
+            if not math.isfinite(fitted):
+                raise ValueError(
+                    "Chebyshev verification produced a non-finite fitted value"
+                )
             error = abs(fitted - reference[c])
+            if not math.isfinite(error):
+                raise ValueError("Chebyshev verification produced a non-finite error")
             if error > max_error:
                 max_error = error
 
@@ -482,6 +512,13 @@ def _fit_and_verify_from_values(
     Returns:
         (list_of_coefficient_arrays, max_error)
     """
+    if n_verify < 1:
+        raise ValueError("n_verify must be at least 1")
+    all_values = _validated_finite_array(
+        all_values,
+        (n_segments * pts_per_seg, components),
+        "Vectorized Chebyshev values",
+    )
     nodes_01 = chebyshev_nodes(degree + 1)
     all_coeffs: List[np.ndarray] = []
     max_error = 0.0
@@ -499,6 +536,10 @@ def _fit_and_verify_from_values(
         coeffs = np.zeros((components, degree + 1))
         for c in range(components):
             coeffs[c] = chebfit(nodes_01, fit_values[:, c], degree)
+        if not np.all(np.isfinite(coeffs)):
+            raise ValueError(
+                "Vectorized Chebyshev fitting produced NaN or infinite coefficients"
+            )
 
         # Verify using pre-computed verification points
         verify_end = min(seg_end, jd_end)
@@ -514,6 +555,10 @@ def _fit_and_verify_from_values(
             for c in range(components):
                 fitted = float(chebval(tau, coeffs[c]))
                 error = abs(fitted - ref[c])
+                if not math.isfinite(fitted) or not math.isfinite(error):
+                    raise ValueError(
+                        "Vectorized Chebyshev verification produced a non-finite value"
+                    )
                 if error > max_error:
                     max_error = error
 
@@ -551,6 +596,13 @@ def _fit_and_verify_from_values_unwrap(
     Returns:
         (list_of_coefficient_arrays, max_error)
     """
+    if n_verify < 1:
+        raise ValueError("n_verify must be at least 1")
+    all_values = _validated_finite_array(
+        all_values,
+        (n_segments * pts_per_seg, components),
+        "Vectorized unwrapped Chebyshev values",
+    )
     nodes_01 = chebyshev_nodes(degree + 1)
     all_coeffs: List[np.ndarray] = []
     max_error = 0.0
@@ -572,6 +624,10 @@ def _fit_and_verify_from_values_unwrap(
         coeffs = np.zeros((components, degree + 1))
         for c in range(components):
             coeffs[c] = chebfit(nodes_01, fit_values[:, c], degree)
+        if not np.all(np.isfinite(coeffs)):
+            raise ValueError(
+                "Unwrapped Chebyshev fitting produced NaN or infinite coefficients"
+            )
 
         # Verify using pre-computed verification points (with re-wrapping)
         verify_end = min(seg_end, jd_end)
@@ -595,6 +651,10 @@ def _fit_and_verify_from_values_unwrap(
                         error = 360.0 - error
                 else:
                     error = abs(fitted - ref[c])
+                if not math.isfinite(fitted) or not math.isfinite(error):
+                    raise ValueError(
+                        "Unwrapped Chebyshev verification produced a non-finite value"
+                    )
                 if error > max_error:
                     max_error = error
 
@@ -610,306 +670,6 @@ def _fit_and_verify_from_values_unwrap(
 # =============================================================================
 
 
-def _calc_mean_lilith_batch(all_jds: np.ndarray, T: np.ndarray) -> np.ndarray:
-    """Vectorized version of calc_mean_lilith / _calc_mean_apse_analytical.
-
-    Args:
-        all_jds: Array of Julian Days (TT).
-        T: Array of Julian centuries from J2000 (pre-computed).
-
-    Returns:
-        Array of mean apogee longitudes in degrees [0, 360).
-    """
-    T2 = T * T
-    fracT = T % 1.0
-
-    z_F_T2 = -1.312045233711e01
-    z_F_T3 = -1.138215912580e-03
-    z_F_T4 = -9.646018347184e-06
-    z_MP_T2 = 3.146734198839e01
-    z_MP_T3 = 4.768357585780e-02
-    z_MP_T4 = -3.421689790404e-04
-    z_LP_T2 = -5.663161722088e00
-    z_LP_T3 = 5.722859298199e-03
-    z_LP_T4 = -8.466472828815e-05
-
-    NF = 1739232000.0 * fracT + 295263.0983 * T - 0.2079419901760 * T + 335779.55755
-    NF = NF % 1296000.0
-    NF += ((z_F_T4 * T + z_F_T3) * T + z_F_T2) * T2
-
-    MP = 1717200000.0 * fracT + 715923.4728 * T - 0.2035946368532 * T + 485868.28096
-    MP = MP % 1296000.0
-    MP += ((z_MP_T4 * T + z_MP_T3) * T + z_MP_T2) * T2
-
-    LP = 1731456000.0 * fracT + 1108372.83264 * T - 0.6784914260953 * T + 785939.95571
-    LP = LP % 1296000.0
-    LP += ((z_LP_T4 * T + z_LP_T3) * T + z_LP_T2) * T2
-
-    STR = np.pi / (180.0 * 3600.0)
-
-    apogee_rad = (LP - MP) * STR + np.pi
-    apogee_rad = apogee_rad % (2.0 * np.pi)
-
-    node_rad = (LP - NF) * STR
-    node_rad = node_rad % (2.0 * np.pi)
-
-    MOON_MEAN_INCL = 5.1453964
-    lon_from_node = apogee_rad - node_rad
-
-    x = np.cos(lon_from_node)
-    y = np.sin(lon_from_node)
-
-    incl_rad = -np.radians(MOON_MEAN_INCL)
-    cos_incl = np.cos(incl_rad)
-    # z=0 so y_new = y * cos_incl, x stays the same
-    y_new = y * cos_incl
-
-    lon_from_node_proj = np.arctan2(y_new, x)
-
-    apogee_projected = (lon_from_node_proj + node_rad) % (2.0 * np.pi)
-    return np.degrees(apogee_projected)
-
-
-def _calc_lunar_fundamental_arguments_batch(
-    all_jds: np.ndarray, T: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Vectorized version of _calc_lunar_fundamental_arguments.
-
-    Args:
-        all_jds: Array of Julian Days (TT).
-        T: Array of Julian centuries from J2000.
-
-    Returns:
-        (D, M, M_prime, F) arrays in radians.
-    """
-    T2 = T * T
-    T3 = T2 * T
-    T4 = T3 * T
-    T5 = T4 * T
-
-    D = (
-        297.8501921
-        + 445267.1114034 * T
-        - 0.0018819 * T2
-        + T3 / 545868.0
-        - T4 / 113065000.0
-        + T5 / 18999000000.0
-    )
-
-    M = (
-        357.5291092
-        + 35999.0502909 * T
-        - 0.0001536 * T2
-        + T3 / 24490000.0
-        - T4 / 992300000.0
-        + T5 / 189900000000.0
-    )
-
-    M_prime = (
-        134.9633964
-        + 477198.8675055 * T
-        + 0.0087414 * T2
-        + T3 / 69699.0
-        - T4 / 14712000.0
-        + T5 / 2520410000.0
-    )
-
-    F = (
-        93.2720950
-        + 483202.0175233 * T
-        - 0.0036539 * T2
-        - T3 / 3526000.0
-        + T4 / 863310000.0
-        - T5 / 142650000000.0
-    )
-
-    D = np.radians(D % 360.0)
-    M = np.radians(M % 360.0)
-    M_prime = np.radians(M_prime % 360.0)
-    F = np.radians(F % 360.0)
-
-    return D, M, M_prime, F
-
-
-def _calc_elp2000_apogee_perturbations_batch(
-    all_jds: np.ndarray, T: np.ndarray
-) -> np.ndarray:
-    """Vectorized version of _calc_elp2000_apogee_perturbations.
-
-    Returns array of perturbation corrections in degrees.
-    """
-    D, M, M_prime, F = _calc_lunar_fundamental_arguments_batch(all_jds, T)
-
-    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
-    E2 = E * E
-
-    p = np.zeros_like(T)
-
-    # Primary evection harmonics
-    p += 0.1892 * np.sin(D - M_prime)
-    p += 4.6921 * np.sin(2.0 * D - 2.0 * M_prime)
-    p += -0.0127 * np.sin(3.0 * D - 3.0 * M_prime)
-    p += 0.7854 * np.sin(4.0 * D - 4.0 * M_prime)
-    p += 0.0089 * np.sin(5.0 * D - 5.0 * M_prime)
-    p += 0.1634 * np.sin(6.0 * D - 6.0 * M_prime)
-    p += -0.0056 * np.sin(7.0 * D - 7.0 * M_prime)
-    p += 0.0412 * np.sin(8.0 * D - 8.0 * M_prime)
-    p += 0.0023 * np.sin(9.0 * D - 9.0 * M_prime)
-    p += 0.0108 * np.sin(10.0 * D - 10.0 * M_prime)
-
-    # Solar anomaly coupling
-    p += 0.3847 * E * np.sin(M)
-    p += 0.0198 * E2 * np.sin(2.0 * M)
-    p += 0.5123 * E * np.sin(2.0 * D - 2.0 * M_prime - M)
-    p += 0.1287 * E * np.sin(2.0 * D - 2.0 * M_prime + M)
-    p += -0.0523 * E * np.sin(D - M_prime - M)
-    p += 0.0412 * E * np.sin(D - M_prime + M)
-    p += 0.0876 * E * np.sin(4.0 * D - 4.0 * M_prime - M)
-    p += 0.0234 * E * np.sin(4.0 * D - 4.0 * M_prime + M)
-    p += 0.0187 * E * np.sin(6.0 * D - 6.0 * M_prime - M)
-
-    # Double solar anomaly coupling
-    p += 0.0312 * E2 * np.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
-    p += 0.0156 * E2 * np.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
-
-    # Lunar anomaly harmonics
-    p += -0.0234 * np.sin(M_prime)
-    p += 0.0087 * np.sin(2.0 * M_prime)
-    p += -0.0034 * np.sin(3.0 * M_prime)
-
-    # Latitude coupling
-    p += 0.2634 * np.sin(2.0 * F - 2.0 * M_prime)
-    p += 0.0423 * np.sin(2.0 * F - 2.0 * D)
-    p += -0.0289 * np.sin(2.0 * F)
-    p += 0.0156 * np.sin(2.0 * F - 4.0 * M_prime + 2.0 * D)
-    p += -0.0098 * np.sin(2.0 * F + 2.0 * M_prime - 2.0 * D)
-
-    # Cross-coupling
-    p += 0.0723 * np.sin(2.0 * D - M_prime)
-    p += -0.0567 * np.sin(2.0 * D - 3.0 * M_prime)
-    p += 0.0234 * np.sin(4.0 * D - 3.0 * M_prime)
-    p += -0.0178 * np.sin(4.0 * D - 5.0 * M_prime)
-    p += 0.0112 * np.sin(2.0 * D)
-    p += -0.0089 * np.sin(4.0 * D)
-
-    # Solar-lunar-latitude coupling
-    p += 0.0178 * E * np.sin(2.0 * F - 2.0 * M_prime + M)
-    p += -0.0134 * E * np.sin(2.0 * F - 2.0 * M_prime - M)
-    p += 0.0089 * E * np.sin(2.0 * F - 2.0 * D + M)
-    p += -0.0067 * E * np.sin(2.0 * F - 2.0 * D - M)
-
-    # Secular corrections
-    p += 0.0012 * T * np.sin(2.0 * D - 2.0 * M_prime)
-    p += -0.0008 * T * np.sin(M)
-
-    return p
-
-
-def _calc_elp2000_perigee_perturbations_batch(
-    all_jds: np.ndarray, T: np.ndarray
-) -> np.ndarray:
-    """Vectorized version of _calc_elp2000_perigee_perturbations.
-
-    Returns array of perturbation corrections in degrees.
-    """
-    D, M, M_prime, F = _calc_lunar_fundamental_arguments_batch(all_jds, T)
-
-    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
-    E2 = E * E
-
-    p = np.zeros_like(T)
-
-    # Polynomial mean perigee corrections
-    p += -0.1749
-    p += -0.1411 * T
-    p += -0.0140 * T * T
-    p += +0.0168 * T * T * T
-
-    # Primary evection harmonics sin(kD - kM')
-    p += +0.3002 * np.sin(D - M_prime)
-    p += -22.2062 * np.sin(2.0 * D - 2.0 * M_prime)
-    p += -0.1594 * np.sin(3.0 * D - 3.0 * M_prime)
-    p += +6.4536 * np.sin(4.0 * D - 4.0 * M_prime)
-    p += +0.0938 * np.sin(5.0 * D - 5.0 * M_prime)
-    p += -2.2814 * np.sin(6.0 * D - 6.0 * M_prime)
-    p += -0.0375 * np.sin(7.0 * D - 7.0 * M_prime)
-    p += +0.4792 * np.sin(8.0 * D - 8.0 * M_prime)
-    p += +0.0075 * np.sin(9.0 * D - 9.0 * M_prime)
-    p += -0.0598 * np.sin(10.0 * D - 10.0 * M_prime)
-    p += +0.0114 * np.sin(12.0 * D - 12.0 * M_prime)
-    p += -0.0031 * np.sin(14.0 * D - 14.0 * M_prime)
-    p += +0.0011 * np.sin(16.0 * D - 16.0 * M_prime)
-
-    # Evection phase corrections cos(kD - kM')
-    p += -0.0750 * np.cos(2.0 * D - 2.0 * M_prime)
-    p += -0.0013 * np.cos(3.0 * D - 3.0 * M_prime)
-    p += +0.0393 * np.cos(4.0 * D - 4.0 * M_prime)
-    p += -0.0061 * np.cos(8.0 * D - 8.0 * M_prime)
-    p += +0.0039 * np.cos(10.0 * D - 10.0 * M_prime)
-    p += -0.0023 * np.cos(6.0 * D - 6.0 * M_prime)
-    p += -0.0011 * np.cos(9.0 * D - 9.0 * M_prime)
-
-    # Solar anomaly coupling
-    p += +0.4684 * E * np.sin(M)
-    p += -0.9747 * E * np.sin(2.0 * D - 2.0 * M_prime - M)
-    p += +0.0935 * E * np.sin(2.0 * D - 2.0 * M_prime + M)
-    p += -0.0266 * E * np.sin(D - M_prime - M)
-    p += -0.0580 * E * np.sin(D - M_prime + M)
-    p += +0.5348 * E * np.sin(4.0 * D - 4.0 * M_prime - M)
-    p += -0.0829 * E * np.sin(4.0 * D - 4.0 * M_prime + M)
-    p += -0.2059 * E * np.sin(6.0 * D - 6.0 * M_prime - M)
-    p += +0.0586 * E * np.sin(6.0 * D - 6.0 * M_prime + M)
-
-    # Solar double coupling (E² terms)
-    p += +0.0016 * E2 * np.sin(2.0 * M)
-    p += -0.0390 * E2 * np.sin(2.0 * D - 2.0 * M_prime - 2.0 * M)
-    p += +0.0707 * E2 * np.sin(2.0 * D - 2.0 * M_prime + 2.0 * M)
-    p += +0.0284 * E2 * np.sin(4.0 * D - 4.0 * M_prime - 2.0 * M)
-
-    # Lunar anomaly harmonics
-    p += +0.0106 * np.sin(M_prime)
-    p += +0.0013 * np.sin(2.0 * M_prime)
-
-    # Latitude coupling
-    p += +0.1695 * np.sin(2.0 * F - 2.0 * M_prime)
-    p += -0.0539 * np.sin(2.0 * F - 2.0 * D)
-    p += -0.0258 * np.sin(2.0 * F - 4.0 * M_prime + 2.0 * D)
-
-    # Cross-coupling
-    p += -0.0354 * np.sin(2.0 * D - M_prime)
-    p += +0.0039 * np.sin(2.0 * D - 3.0 * M_prime)
-    p += +0.1551 * np.sin(4.0 * D - 3.0 * M_prime)
-    p += +0.0067 * np.sin(4.0 * D - 5.0 * M_prime)
-    p += -0.0024 * np.sin(2.0 * D)
-    p += -0.4541 * np.sin(6.0 * D - 5.0 * M_prime)
-    p += -0.0010 * np.sin(3.0 * D - 2.0 * M_prime)
-
-    # Solar-latitude cross-coupling
-    p += -0.0017 * E * np.sin(2.0 * F - 2.0 * M_prime + M)
-    p += -0.0098 * E * np.sin(2.0 * F - 2.0 * M_prime - M)
-    p += +0.0095 * E * np.sin(2.0 * F - 2.0 * D - M)
-
-    # Higher-order evection-solar coupling
-    p += +0.0376 * E * np.sin(8.0 * D - 8.0 * M_prime - M)
-    p += -0.0209 * E * np.sin(8.0 * D - 8.0 * M_prime + M)
-    p += -0.0066 * E * np.sin(10.0 * D - 10.0 * M_prime - M)
-
-    # Secular and long-period corrections
-    p += +0.0013 * T * np.sin(M)
-    p += -0.0014 * T * np.sin(D - M_prime)
-    p += -0.0042 * T * np.cos(2.0 * D - 2.0 * M_prime)
-
-    # Cosine phase corrections
-    p += +0.0168 * np.cos(M)
-    p += +0.0217 * np.cos(2.0 * F - 2.0 * M_prime)
-
-    # Sun-Moon anomaly coupling
-    p += -0.0021 * E * np.sin(M - M_prime)
-    p += -0.0012 * E * np.sin(2.0 * D + M - M_prime)
-
-    return p
-
-
 def _eval_ecliptic_bodies_batch(
     all_jds: np.ndarray,
     body_ids: List[int],
@@ -917,8 +677,8 @@ def _eval_ecliptic_bodies_batch(
 ) -> dict:
     """Evaluate all ecliptic bodies at all JDs in a single vectorized pass.
 
-    Uses ONE Skyfield call for all bodies that need Moon ephemeris data,
-    then computes each body's values vectorially with numpy.
+    Mean and interpolated bodies use the packaged clean-room evaluators.
+    A single Skyfield call supplies the JPL-derived osculating bodies.
 
     Args:
         all_jds: Array of Julian Days (TT) for evaluation.
@@ -928,17 +688,11 @@ def _eval_ecliptic_bodies_batch(
     Returns:
         dict mapping body_id -> (N, 3) array of [lon, lat, dist].
     """
-    N = len(all_jds)
-    T = (all_jds - 2451545.0) / 36525.0
-    T2 = T * T
-    T3 = T2 * T
-    T4 = T3 * T
-
+    sample_count = len(all_jds)
     results: dict[int, np.ndarray] = {}
 
-    # Bodies needing Skyfield: 11 (true node), 13 (oscu apogee),
-    # 21 (interp apogee lat/dist), 22 (interp perigee lat/dist)
-    skyfield_bodies = {11, 13, 21, 22}
+    # Only the genuinely osculating bodies need the active JPL ephemeris.
+    skyfield_bodies = {11, 13}
     need_skyfield = bool(skyfield_bodies.intersection(body_ids))
 
     if need_skyfield:
@@ -986,40 +740,32 @@ def _eval_ecliptic_bodies_batch(
         # Semi-latus rectum
         p = h_mag**2 / mu
 
-    # --- Body 10: Mean Node (pure polynomial) ---
+    # The output-model calls are intentionally scalar here: their readers are
+    # lazy and bounded, and this keeps LEB generation on exactly the same
+    # implementation as runtime evaluation.
     if 10 in body_ids:
-        Omega = (
-            125.0445479
-            - 1934.1362891 * T
-            + 0.0020754 * T2
-            + T3 / 467441.0
-            - T4 / 60616000.0
-        ) % 360.0
-        results[10] = np.column_stack([Omega, np.zeros(N), np.zeros(N)])
+        from libephemeris.mean_lunar_apse import mean_lunar_node_position
+
+        results[10] = np.asarray(
+            [mean_lunar_node_position(float(jd)) for jd in all_jds], dtype=float
+        )
 
     # --- Body 11: True Node (from angular momentum) ---
     if 11 in body_ids:
         node_lon = np.degrees(np.arctan2(h_x, -h_y)) % 360.0
-        node_dist = h_mag * 1000.0
-        results[11] = np.column_stack([node_lon, np.zeros(N), node_dist])
+        node_x = -h_y
+        node_y = h_x
+        node_norm = np.hypot(node_x, node_y)
+        cos_true_anomaly = (node_x * e_x + node_y * e_y) / (node_norm * e_mag)
+        node_dist = p / (1.0 + e_mag * np.clip(cos_true_anomaly, -1.0, 1.0))
+        results[11] = np.column_stack([node_lon, np.zeros(sample_count), node_dist])
 
-    # --- Body 12: Mean Lilith with latitude ---
     if 12 in body_ids:
-        mean_lilith = _calc_mean_lilith_batch(all_jds, T)
-        # Mean node (same formula as body 10)
-        mean_node = (
-            125.0445479
-            - 1934.1362891 * T
-            + 0.0020754 * T2
-            + T3 / 467441.0
-            - T4 / 60616000.0
-        ) % 360.0
-        omega = (mean_lilith - mean_node) % 360.0
-        mean_lilith_lat = 5.145 * np.sin(np.radians(omega))
-        results[12] = np.column_stack([mean_lilith, mean_lilith_lat, np.zeros(N)])
-    else:
-        # Still need mean_lilith for bodies 21 and 22
-        mean_lilith = None
+        from libephemeris.mean_lunar_apse import mean_lunar_apogee_position
+
+        results[12] = np.asarray(
+            [mean_lunar_apogee_position(float(jd)) for jd in all_jds], dtype=float
+        )
 
     # --- Body 13: Oscu Apogee / True Lilith (from eccentricity vector) ---
     if 13 in body_ids:
@@ -1028,28 +774,18 @@ def _eval_ecliptic_bodies_batch(
         apogee_dist = p / (1.0 - e_mag)
         results[13] = np.column_stack([apogee_lon, apogee_lat, apogee_dist])
 
-    # --- Body 21: Interpolated Apogee ---
-    if 21 in body_ids:
-        if mean_lilith is None:
-            mean_lilith = _calc_mean_lilith_batch(all_jds, T)
-        apogee_pert = _calc_elp2000_apogee_perturbations_batch(all_jds, T)
-        interp_apogee_lon = (mean_lilith + apogee_pert) % 360.0
-        # Lat/dist from osculating apogee (True Lilith)
-        ia_lat = np.degrees(np.arcsin(-e_z / e_mag))
-        ia_dist = p / (1.0 - e_mag)
-        results[21] = np.column_stack([interp_apogee_lon, ia_lat, ia_dist])
+    if any(body_id in body_ids for body_id in (21, 22)):
+        from libephemeris.lunar import calc_interpolated_apse_state
 
-    # --- Body 22: Interpolated Perigee ---
-    if 22 in body_ids:
-        if mean_lilith is None:
-            mean_lilith = _calc_mean_lilith_batch(all_jds, T)
-        mean_perigee = (mean_lilith + 180.0) % 360.0
-        perigee_pert = _calc_elp2000_perigee_perturbations_batch(all_jds, T)
-        interp_perigee_lon = (mean_perigee + perigee_pert) % 360.0
-        # Lat/dist from osculating perigee (+e direction)
-        ip_lat = np.degrees(np.arcsin(e_z / e_mag))
-        ip_dist = p / (1.0 + e_mag)
-        results[22] = np.column_stack([interp_perigee_lon, ip_lat, ip_dist])
+        for body_id in (21, 22):
+            if body_id in body_ids:
+                results[body_id] = np.asarray(
+                    [
+                        calc_interpolated_apse_state(float(jd), body_id)[:3]
+                        for jd in all_jds
+                    ],
+                    dtype=float,
+                )
 
     return results
 
@@ -1856,17 +1592,19 @@ def generate_body_icrs_asteroid_nbody(
                 f"N-body seed expects a heliocentric SPK (center=10) for body "
                 f"{body_id}; got center={center_id}."
             )
-        pos_km, vel_km_s = kernel.compute_type21(
-            center_id, target_id, _NBODY_ANCHOR_JD
-        )
+        pos_km, vel_km_s = kernel.compute_type21(center_id, target_id, _NBODY_ANCHOR_JD)
     finally:
         kernel.close()
     pos_au = np.asarray(pos_km, dtype=float) / AU_KM
     vel_au_d = np.asarray(vel_km_s, dtype=float) * 86400.0 / AU_KM
     sun0 = ephem.get_particle("sun", _NBODY_ANCHOR_JD - ephem.jd_ref)
     seed = dict(
-        x=pos_au[0] + sun0.x, y=pos_au[1] + sun0.y, z=pos_au[2] + sun0.z,
-        vx=vel_au_d[0] + sun0.vx, vy=vel_au_d[1] + sun0.vy, vz=vel_au_d[2] + sun0.vz,
+        x=pos_au[0] + sun0.x,
+        y=pos_au[1] + sun0.y,
+        z=pos_au[2] + sun0.z,
+        vx=vel_au_d[0] + sun0.vx,
+        vy=vel_au_d[1] + sun0.vy,
+        vz=vel_au_d[2] + sun0.vz,
     )
 
     # --- sample grid: exactly the nodes/verify points the fitter reads back ---
@@ -1885,7 +1623,11 @@ def generate_body_icrs_asteroid_nbody(
         # Disable the ASTEROIDS force when the body IS one of the sb441-n16
         # perturbers (Hygiea etc.) to avoid the self-singularity.
         _assist_disable_self_perturber(
-            extras, ephem, seed["x"], seed["y"], seed["z"],
+            extras,
+            ephem,
+            seed["x"],
+            seed["y"],
+            seed["z"],
             _NBODY_ANCHOR_JD - ephem.jd_ref,
         )
         sim.t = _NBODY_ANCHOR_JD - ephem.jd_ref
@@ -1938,10 +1680,12 @@ def generate_body_ecliptic(
 
     Handles longitude unwrapping before fitting.
     """
+    from libephemeris.mean_lunar_apse import (
+        mean_lunar_apogee_position,
+        mean_lunar_node_position,
+    )
     from libephemeris.lunar import (
-        calc_mean_lunar_node,
         calc_true_lunar_node,
-        calc_mean_lilith_with_latitude,
         calc_true_lilith,
         calc_interpolated_apogee,
         calc_interpolated_perigee,
@@ -1949,9 +1693,9 @@ def generate_body_ecliptic(
 
     # Map body_id to evaluation function
     eval_funcs = {
-        10: lambda jd: np.array([calc_mean_lunar_node(jd), 0.0, 0.0]),
+        10: lambda jd: np.array(mean_lunar_node_position(jd)),
         11: lambda jd: np.array(calc_true_lunar_node(jd)),
-        12: lambda jd: np.array([*calc_mean_lilith_with_latitude(jd), 0.0]),
+        12: lambda jd: np.array(mean_lunar_apogee_position(jd)),
         13: lambda jd: np.array(calc_true_lilith(jd)),
         21: lambda jd: np.array(calc_interpolated_apogee(jd)),
         22: lambda jd: np.array(calc_interpolated_perigee(jd)),
@@ -1984,35 +1728,11 @@ def generate_body_helio(
     label: str = "",
     verbose: bool = False,
 ) -> Tuple[List[np.ndarray], float]:
-    """Generate Chebyshev coefficients for a heliocentric ecliptic body.
-
-    Handles Uranian hypotheticals and Transpluto.
-    """
-    from libephemeris.hypothetical import calc_uranian_planet, calc_transpluto
-
-    if body_id == 48:  # ISIS / Transpluto
-
-        def eval_func(jd: float) -> np.ndarray:
-            result = calc_transpluto(jd)
-            return np.array([result[0], result[1], result[2]])
-    elif 40 <= body_id <= 47:  # Uranian planets
-
-        def eval_func(jd: float) -> np.ndarray:
-            result = calc_uranian_planet(body_id, jd)
-            return np.array([result[0], result[1], result[2]])
-    else:
-        raise ValueError(f"No heliocentric eval function for body_id={body_id}")
-
-    # Generate with longitude unwrapping
-    return _generate_segments_unwrap(
-        eval_func,
-        jd_start,
-        jd_end,
-        interval_days,
-        degree,
-        3,
-        label=label,
-        verbose=verbose,
+    """Reject retired hypothetical-body coefficient generation."""
+    del jd_start, jd_end, interval_days, degree, label, verbose
+    raise ValueError(
+        f"No independently sourced heliocentric model is available for body "
+        f"{body_id}; hypothetical LEB generation is retired"
     )
 
 
@@ -2133,6 +1853,16 @@ def _verify_segment_unwrapped(
         verify_end: If given, only sample verification points up to this JD.
             Tau is always computed relative to [seg_start, seg_end].
     """
+    if n_test < 1:
+        raise ValueError("n_test must be at least 1")
+    coeff_array = np.asarray(coeffs, dtype=float)
+    if coeff_array.ndim != 2 or coeff_array.shape[0] != components:
+        raise ValueError(
+            "Chebyshev coefficients have shape "
+            f"{coeff_array.shape}, expected ({components}, degree + 1)"
+        )
+    if not np.all(np.isfinite(coeff_array)):
+        raise ValueError("Chebyshev coefficients contain NaN or infinite values")
     if verify_end is None:
         verify_end = seg_end
     mid = 0.5 * (seg_start + seg_end)
@@ -2143,9 +1873,11 @@ def _verify_segment_unwrapped(
         jd = seg_start + frac * (verify_end - seg_start)
         tau = (jd - mid) / half
 
-        reference = func(jd)
+        reference = _validated_finite_array(
+            func(jd), (components,), "Unwrapped verification reference"
+        )
         for c in range(components):
-            fitted = chebval(tau, coeffs[c])
+            fitted = float(chebval(tau, coeff_array[c]))
             if c == 0:
                 # Re-wrap longitude
                 fitted = fitted % 360.0
@@ -2156,6 +1888,10 @@ def _verify_segment_unwrapped(
                     error = 360.0 - error
             else:
                 error = abs(fitted - reference[c])
+            if not math.isfinite(fitted) or not math.isfinite(error):
+                raise ValueError(
+                    "Unwrapped Chebyshev verification produced a non-finite value"
+                )
             if error > max_error:
                 max_error = error
 
@@ -2422,8 +2158,8 @@ def assemble_leb(
         bodies = sorted(BODY_PARAMS.keys())
 
     # Extended tier: route the 23 regular exotics through the N-body worker and
-    # drop the 8 chaotic NEA exotics (no Swiss long-file reference; integration
-    # diverges over millennia).
+    # drop the 8 chaotic NEA exotics. Their short-arc SPKs do not cover the
+    # extended interval, and unconstrained integration diverges over millennia.
     nbody_ids: set[int] = set()
     if tier == "extended":
         nbody_ids = set(EXOTIC_EXTENDED_IDS)
@@ -2461,6 +2197,26 @@ def assemble_leb(
     # Non-asteroids use the global range; asteroids use their SPK range.
     body_jd_ranges: dict[int, Tuple[float, float]] = {}
 
+    # Smoothed lunar apsides require active JPL Moon-state coverage. Clamp only
+    # these body records to that independently sourced range rather than
+    # extrapolating the derived geometry into unsupported deep time.
+    interpolated_ids = set(bodies).intersection({21, 22})
+    if interpolated_ids:
+        from libephemeris.interpolated_lunar_apsides import (
+            open_interpolated_lunar_apsides,
+        )
+
+        with open_interpolated_lunar_apsides() as apsides_reader:
+            apsides_start = max(jd_start, apsides_reader.jd_start)
+            apsides_end = min(jd_end, apsides_reader.jd_end)
+        if apsides_start >= apsides_end:
+            raise ValueError(
+                "Requested LEB range does not overlap the interpolated "
+                "lunar-apsides model range"
+            )
+        for body_id in interpolated_ids:
+            body_jd_ranges[body_id] = (apsides_start, apsides_end)
+
     # Minimum useful SPK coverage (years). Asteroids with less than this
     # are excluded — too narrow to be worth including.
     MIN_ASTEROID_COVERAGE_DAYS = 365.25 * 20  # 20 years
@@ -2490,11 +2246,14 @@ def assemble_leb(
             # Register such a kernel, then claim the FULL extended range.
             if bid in nbody_ids:
                 a_lo, a_hi = _NBODY_ANCHOR_JD - 400.0, _NBODY_ANCHOR_JD + 400.0
-                if not (bid in _SPK_BODY_MAP
-                        and _spk_covers_range(_SPK_BODY_MAP[bid][0], bid, a_lo, a_hi)):
+                if not (
+                    bid in _SPK_BODY_MAP
+                    and _spk_covers_range(_SPK_BODY_MAP[bid][0], bid, a_lo, a_hi)
+                ):
                     covering = _find_covering_cached_spk(bid, a_lo, a_hi)
                     if covering is not None:
                         from libephemeris import spk as _spk
+
                         _spk.register_spk_body(bid, covering, _ASTEROID_NAIF[bid])
                     else:
                         try:
@@ -2548,7 +2307,9 @@ def assemble_leb(
                     else:
                         need_force = True
                         if verbose:
-                            print(f"    {name}: cached SPK too narrow, re-downloading...")
+                            print(
+                                f"    {name}: cached SPK too narrow, re-downloading..."
+                            )
 
             try:
                 auto_download_asteroid_spk(
@@ -2722,13 +2483,15 @@ def assemble_leb(
                 f"  --- Ecliptic bodies ({len(ecliptic_body_ids_scalar)} bodies, scalar) ---"
             )
         for bid in ecliptic_body_ids_scalar:
+            body_start, body_end = body_jd_ranges.get(bid, (jd_start, jd_end))
             bid, coeffs, error = generate_single_body(
-                bid, jd_start, jd_end, verbose=verbose
+                bid, body_start, body_end, verbose=verbose
             )
             body_data[bid] = coeffs
             body_errors[bid] = error
 
-    # Heliocentric bodies (Uranians 40-48, Transpluto): scalar but pure math, fast
+    # Heliocentric analytical bodies use the scalar path. The current reviewed
+    # group contains none; the branch remains generic for future sourced models.
     if helio_body_ids:
         if verbose:
             print(
@@ -3289,12 +3052,20 @@ def verify_leb(
     """
     from libephemeris.leb_reader import LEBReader
 
+    if n_samples < 1:
+        raise ValueError("n_samples must be at least 1")
+
     # Enable auto-download for asteroid SPK acquisition during verification
     import libephemeris as _ephem
 
     _ephem.set_auto_spk_download(True)
 
     reader = LEBReader(leb_path)
+    if not reader._bodies:
+        reader.close()
+        if verbose:
+            print(f"Verifying {leb_path}: FAIL - no bodies found")
+        return False
     jd_start, jd_end = reader.jd_range
 
     # Ensure asteroid SPKs cover each asteroid's actual date range in the LEB
@@ -3333,8 +3104,14 @@ def verify_leb(
         body = reader._bodies[body_id]
         name = BODY_NAMES.get(body_id, f"Body {body_id}")
         max_error = 0.0
+        max_distance_error = 0.0
         worst_dist = 1.0  # distance (AU) at sample with worst error
-        error_unit = "AU"  # tracking what unit max_error is in
+        if body.coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
+            error_unit = "AU"
+        elif body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL):
+            error_unit = "deg"
+        else:
+            error_unit = "unknown"
 
         # Use body-specific JD range if available
         body_jd_start = body.jd_start if hasattr(body, "jd_start") else jd_start
@@ -3348,53 +3125,71 @@ def verify_leb(
             )
 
         for jd in body_test_jds:
-            pos, vel = reader.eval_body(body_id, jd)
+            try:
+                pos, vel = reader.eval_body(body_id, jd)
+                _validated_finite_array(pos, (3,), f"LEB body {body_id} position")
+                _validated_finite_array(vel, (3,), f"LEB body {body_id} velocity")
 
-            if body.coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
-                if body_id in _PLANET_MAP:
-                    # Planet: direct ICRS comparison with Skyfield
-                    # For COORD_ICRS_BARY_SYSTEM, stored data is system
-                    # barycenter — verification compares raw fit accuracy
-                    # (COB correction is applied at runtime, not stored).
-                    sample_err, dist = _verify_icrs_planet(body_id, jd, pos)
-                    if sample_err > max_error:
-                        max_error = sample_err
-                        worst_dist = dist
-                    error_unit = "AU"
-                elif body_id in _ASTEROID_NAIF:
-                    # Asteroid: ICRS comparison via spktype21
-                    sample_err, dist = _verify_icrs_asteroid(body_id, jd, pos)
-                    if sample_err > max_error:
-                        max_error = sample_err
-                        worst_dist = dist
-                    error_unit = "AU"
+                if body.coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
+                    if body_id in _PLANET_MAP:
+                        # Planet: direct ICRS comparison with Skyfield.
+                        # System barycenters are compared before runtime COB.
+                        sample_err, dist = _verify_icrs_planet(body_id, jd, pos)
+                        if not math.isfinite(sample_err) or not math.isfinite(dist):
+                            raise ValueError("non-finite ICRS verification error")
+                        if sample_err > max_error:
+                            max_error = sample_err
+                            worst_dist = dist
+                        error_unit = "AU"
+                    elif body_id in _ASTEROID_NAIF:
+                        # Asteroid: ICRS comparison via spktype21.
+                        sample_err, dist = _verify_icrs_asteroid(body_id, jd, pos)
+                        if not math.isfinite(sample_err) or not math.isfinite(dist):
+                            raise ValueError("non-finite asteroid verification error")
+                        if sample_err > max_error:
+                            max_error = sample_err
+                            worst_dist = dist
+                        error_unit = "AU"
+                    else:
+                        raise ValueError(
+                            f"no ICRS verification source for body {body_id}"
+                        )
 
-            elif body.coord_type == COORD_ECLIPTIC:
-                # Ecliptic body: compare with analytical function
-                eval_func = ecliptic_eval_funcs.get(body_id)
-                if eval_func is not None:
-                    sample_err = _verify_ecliptic_body(eval_func, jd, pos)
-                    if sample_err > max_error:
-                        max_error = sample_err
+                elif body.coord_type == COORD_ECLIPTIC:
+                    # Ecliptic body: compare with analytical function.
+                    eval_func = ecliptic_eval_funcs.get(body_id)
+                    if eval_func is None:
+                        raise ValueError(
+                            f"no ecliptic verification source for body {body_id}"
+                        )
+                    sample_err, distance_err = _verify_ecliptic_body(eval_func, jd, pos)
+                    if not math.isfinite(sample_err) or not math.isfinite(distance_err):
+                        raise ValueError("non-finite ecliptic verification error")
+                    max_error = max(max_error, sample_err)
+                    max_distance_error = max(max_distance_error, distance_err)
+                    error_unit = "deg"
+
+                elif body.coord_type == COORD_HELIO_ECL:
+                    # Heliocentric body: compare with analytical function.
+                    eval_func = helio_eval_funcs.get(body_id)
+                    if eval_func is None:
+                        raise ValueError(
+                            f"no heliocentric verification source for body {body_id}"
+                        )
+                    sample_err, distance_err = _verify_ecliptic_body(eval_func, jd, pos)
+                    if not math.isfinite(sample_err) or not math.isfinite(distance_err):
+                        raise ValueError("non-finite heliocentric verification error")
+                    max_error = max(max_error, sample_err)
+                    max_distance_error = max(max_distance_error, distance_err)
                     error_unit = "deg"
                 else:
-                    # No eval function — just check range
-                    if not (0.0 <= pos[0] < 360.0 or pos[0] == 0.0):
-                        max_error = 999.0
-                    error_unit = "deg"
-
-            elif body.coord_type == COORD_HELIO_ECL:
-                # Heliocentric body: compare with analytical function
-                eval_func = helio_eval_funcs.get(body_id)
-                if eval_func is not None:
-                    sample_err = _verify_ecliptic_body(eval_func, jd, pos)
-                    if sample_err > max_error:
-                        max_error = sample_err
-                    error_unit = "deg"
-                else:
-                    if not (0.0 <= pos[0] < 360.0 or pos[0] == 0.0):
-                        max_error = 999.0
-                    error_unit = "deg"
+                    raise ValueError(
+                        f"unsupported LEB coordinate type {body.coord_type}"
+                    )
+            except Exception:
+                max_error = float("inf")
+                max_distance_error = float("inf")
+                break
 
         # Convert to arcseconds and determine pass/fail
         if error_unit == "AU":
@@ -3404,10 +3199,13 @@ def verify_leb(
             else:
                 arcsec = max_error * 206265.0
             passed = arcsec < 1.0
-        else:
-            # Error is in degrees
+        elif error_unit == "deg":
+            # Angular components are degrees; distance remains AU.
             arcsec = max_error * 3600.0
-            passed = arcsec < 1.0
+            passed = arcsec < 1.0 and max_distance_error <= 5e-6
+        else:
+            arcsec = float("inf")
+            passed = False
 
         status = "PASS" if passed else "FAIL"
         if not passed:
@@ -3420,9 +3218,20 @@ def verify_leb(
                 yr_s = 2000.0 + (body.jd_start - 2451545.0) / 365.25
                 yr_e = 2000.0 + (body.jd_end - 2451545.0) / 365.25
                 range_note = f" [~{yr_s:.0f}-{yr_e:.0f}]"
-            print(
-                f'  {name:20s}: max error = {max_error:.2e} ({arcsec:.4f}") [{status}]{range_note}'
-            )
+            if error_unit == "AU":
+                detail = (
+                    f"max Cartesian component = {max_error:.2e} AU "
+                    f'({arcsec:.4f}" angular estimate)'
+                )
+            elif error_unit == "deg":
+                detail = (
+                    f"max angular component = {max_error:.2e} deg "
+                    f'({arcsec:.4f}"), max distance = '
+                    f"{max_distance_error:.2e} AU"
+                )
+            else:
+                detail = "unsupported coordinate metadata"
+            print(f"  {name:20s}: {detail} [{status}]{range_note}")
 
     reader.close()
 
@@ -3438,19 +3247,21 @@ def verify_leb(
 
 def _build_ecliptic_eval_funcs() -> dict:
     """Build evaluation functions for ecliptic bodies (used by verify_leb)."""
+    from libephemeris.mean_lunar_apse import (
+        mean_lunar_apogee_position,
+        mean_lunar_node_position,
+    )
     from libephemeris.lunar import (
-        calc_mean_lunar_node,
         calc_true_lunar_node,
-        calc_mean_lilith_with_latitude,
         calc_true_lilith,
         calc_interpolated_apogee,
         calc_interpolated_perigee,
     )
 
     return {
-        10: lambda jd: np.array([calc_mean_lunar_node(jd), 0.0, 0.0]),
+        10: lambda jd: np.array(mean_lunar_node_position(jd)),
         11: lambda jd: np.array(calc_true_lunar_node(jd)),
-        12: lambda jd: np.array([*calc_mean_lilith_with_latitude(jd), 0.0]),
+        12: lambda jd: np.array(mean_lunar_apogee_position(jd)),
         13: lambda jd: np.array(calc_true_lilith(jd)),
         21: lambda jd: np.array(calc_interpolated_apogee(jd)),
         22: lambda jd: np.array(calc_interpolated_perigee(jd)),
@@ -3458,17 +3269,8 @@ def _build_ecliptic_eval_funcs() -> dict:
 
 
 def _build_helio_eval_funcs() -> dict:
-    """Build evaluation functions for heliocentric bodies (used by verify_leb)."""
-    from libephemeris.hypothetical import calc_uranian_planet, calc_transpluto
-
-    funcs: dict = {}
-    # Uranian planets (body IDs 40-47)
-    for bid in range(40, 48):
-        _bid = bid  # capture for closure
-        funcs[_bid] = lambda jd, b=_bid: np.array(calc_uranian_planet(b, jd)[:3])
-    # Transpluto (body ID 48)
-    funcs[48] = lambda jd: np.array(calc_transpluto(jd)[:3])
-    return funcs
+    """Return no hypothetical evaluators after clean-room retirement."""
+    return {}
 
 
 def _verify_icrs_planet(body_id: int, jd: float, leb_pos: tuple) -> Tuple[float, float]:
@@ -3482,15 +3284,20 @@ def _verify_icrs_planet(body_id: int, jd: float, leb_pos: tuple) -> Tuple[float,
     target_name = _PLANET_MAP[body_id]
     target = get_planet_target(planets, target_name)
     t = ts.tt_jd(jd)
-    ref_pos = target.at(t).position.au
+    ref_pos = _validated_finite_array(
+        target.at(t).position.au, (3,), f"ICRS reference for body {body_id}"
+    )
+    leb_pos_array = _validated_finite_array(
+        leb_pos, (3,), f"LEB ICRS position for body {body_id}"
+    )
     sample_err = 0.0
     for c in range(3):
-        err = abs(leb_pos[c] - float(ref_pos[c]))
+        err = abs(leb_pos_array[c] - ref_pos[c])
         if err > sample_err:
             sample_err = err
-    dist = math.sqrt(
-        float(ref_pos[0]) ** 2 + float(ref_pos[1]) ** 2 + float(ref_pos[2]) ** 2
-    )
+    dist = math.sqrt(sum(component**2 for component in ref_pos))
+    if not math.isfinite(sample_err) or not math.isfinite(dist):
+        raise ValueError(f"non-finite ICRS verification result for body {body_id}")
     return sample_err, dist
 
 
@@ -3500,6 +3307,9 @@ def _verify_icrs_asteroid(
     """Verify an ICRS asteroid against spktype21. Returns (max_err_au, dist_au)."""
     from libephemeris.state import get_planets, get_timescale, _SPK_BODY_MAP
 
+    leb_pos_array = _validated_finite_array(
+        leb_pos, (3,), f"LEB asteroid position for body {body_id}"
+    )
     planets = get_planets()
     ts = get_timescale()
 
@@ -3533,11 +3343,18 @@ def _verify_icrs_asteroid(
         ref_y = pos_km[1] / AU_KM + float(sun_bary[1])
         ref_z = pos_km[2] / AU_KM + float(sun_bary[2])
 
-        err_x = abs(leb_pos[0] - ref_x)
-        err_y = abs(leb_pos[1] - ref_y)
-        err_z = abs(leb_pos[2] - ref_z)
+        reference = _validated_finite_array(
+            (ref_x, ref_y, ref_z), (3,), f"asteroid reference for body {body_id}"
+        )
+        err_x = abs(leb_pos_array[0] - reference[0])
+        err_y = abs(leb_pos_array[1] - reference[1])
+        err_z = abs(leb_pos_array[2] - reference[2])
         sample_err = max(err_x, err_y, err_z)
-        dist = math.sqrt(ref_x**2 + ref_y**2 + ref_z**2)
+        dist = math.sqrt(sum(component**2 for component in reference))
+        if not math.isfinite(sample_err) or not math.isfinite(dist):
+            raise ValueError(
+                f"non-finite asteroid verification result for body {body_id}"
+            )
         return sample_err, dist
     except Exception:
         return 1.0, 1.0
@@ -3547,24 +3364,26 @@ def _verify_icrs_asteroid(
 
 def _verify_ecliptic_body(
     eval_func: Callable[[float], np.ndarray], jd: float, leb_pos: tuple
-) -> float:
+) -> tuple[float, float]:
     """Verify an ecliptic/helio body against its analytical function.
 
-    Returns max error in degrees.
+    Returns:
+        ``(max_angular_error_deg, distance_error_au)``.
     """
-    ref = eval_func(jd)
+    ref = _validated_finite_array(
+        eval_func(jd), (3,), "ecliptic verification reference"
+    )
+    leb = _validated_finite_array(leb_pos, (3,), "LEB ecliptic position")
 
     # Longitude comparison (handle 0/360 wrap)
-    dlon = abs(float(leb_pos[0]) - float(ref[0]))
-    if dlon > 180.0:
-        dlon = 360.0 - dlon
+    dlon = abs((leb[0] - ref[0] + 180.0) % 360.0 - 180.0)
 
     # Latitude comparison (no wrapping)
-    dlat = abs(float(leb_pos[1]) - float(ref[1]))
+    dlat = abs(leb[1] - ref[1])
 
-    # Distance comparison (if available, convert to angular equivalent)
-    # For ecliptic bodies, distance is typically small or zero
-    return max(dlon, dlat)
+    # The third stored component is a distance in AU, not an angle.
+    distance_error = abs(leb[2] - ref[2])
+    return max(dlon, dlat), distance_error
 
 
 # =============================================================================
@@ -3622,7 +3441,8 @@ def main():
             "Body groups for --group:\n"
             "  planets    : Sun, Moon, Mercury-Pluto, Earth (vectorized Skyfield)\n"
             "  asteroids  : Chiron, Ceres, Pallas, Juno, Vesta (spktype21)\n"
-            "  analytical : Lunar nodes, Lilith variants, Uranians, Transpluto\n"
+            "  exotics    : Centaurs, TNOs, main-belt bodies, and NEAs\n"
+            "  analytical : Independently sourced lunar nodes and apsides\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -3692,7 +3512,7 @@ def main():
         default=None,
         help="Merge multiple partial .leb files into one. "
         "Requires --output (or --tier for auto path). "
-        "Example: --merge planets.leb asteroids.leb analytical.leb",
+        "Example: --merge planets.leb asteroids.leb exotics.leb analytical.leb",
     )
     parser.add_argument(
         "--single",

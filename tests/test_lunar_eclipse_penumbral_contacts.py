@@ -82,9 +82,7 @@ class TestLunarEclipsePenumbralContactsBasic:
         _, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
-        result = calc_lunar_eclipse_penumbral_first_contact_p1(
-            jd_max, flags=FLG_SWIEPH
-        )
+        result = calc_lunar_eclipse_penumbral_first_contact_p1(jd_max, flags=FLG_SWIEPH)
 
         assert isinstance(result, float)
         assert result > 0

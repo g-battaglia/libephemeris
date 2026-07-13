@@ -41,23 +41,12 @@ while agreeing with IAU 2006 to sub-milliarcsecond near J2000.0. Adopting it:
 * leaves modern results **unchanged** (sub-mas agreement near J2000.0).
 
 The precession rotation is built from the Vondrák ecliptic-pole and equator-pole
-series (``PQ*`` and ``XY*``), and the of-date mean obliquity is the **angle
-between those same two poles**, so precession and obliquity are one
-self-consistent realization: a direction lying in the mean ecliptic of date
-(e.g. the Sun) reduces to zero mean-ecliptic latitude, and cusps and bodies in
-one chart share a single frame. See :func:`mean_obliquity_rad`.
-
-Vondrák 2011 also publishes a *direct* obliquity series (the ``p_A``/``ε_A``
-polynomial+periodic terms, transcribed in ``_PEPOL``/``_PEPER`` below and
-evaluated by :func:`mean_obliquity_series_rad`). That direct series is a very
-good obliquity fit on its own (it tracks the IAU 2006 polynomial to < 1 mas near
-J2000, better than the pole angle) and is the of-date obliquity the reference
-engine reports. It is **not** used for the of-date ecliptic rotation, because it
-is a *separate* fit from the pole series: pairing it with the pole-based
-precession matrix tilts the of-date ecliptic away from the pole-defined ecliptic
-by up to ~6.5″ at −3000 (~17.6″ at −5000), which shows up as a spurious ecliptic
-latitude on the Sun. The pole-angle obliquity removes that inconsistency; the
-two realizations agree to < 0.001″ across 1900-2100 (identically 0 at J2000).
+series (``PQ*`` and ``XY*``). The public of-date mean obliquity is the angle
+between those same two poles, so the precession matrix and every
+equator/ecliptic rotation share one self-consistent frame. Vondrák 2011 also
+publishes the direct ``p_A``/``ε_A`` obliquity series, transcribed in
+``_PEPOL``/``_PEPER`` below and exposed as a reference realization
+(:func:`mean_obliquity_series_rad`).
 
 How sidereal time is computed (the geometric method)
 ----------------------------------------------------
@@ -95,23 +84,9 @@ All coefficients are transcribed from the cited peer-reviewed papers (Vondrák
 is used. The series and the geometric construction are standard published
 astronomy.
 
-Comparison vs the reference ephemeris (matched ΔT)
---------------------------------------------------
-Inside 1850-2050 the ARMC matches the reference ephemeris to ~0.002" (identical
-IAU-2006 GMST branch). Outside that window the two engines use *different*
-long-term sidereal-time realizations, so house cusps (ASC/MC) diverge by a
-secular, sign-changing amount even at equal ΔT (ASC ≈ +1.5" at 2050, +0.9" at
-2100, -1.3" at 2200, -5.6" at 2300, ~0.1-1° at ±3000-5000 yr). This is a benign
-*model* difference: obliquity and nutation match the reference to < 0.002" at
-every epoch, so the residual is entirely the long-term ARMC model, and
-libephemeris's geometric Vondrák construction is the more physically correct of
-the two (the reference continues an IAU-2006-style precession-in-RA polynomial
-that itself diverges at remote epochs). NB: the ~1.9" step seen near 2050 is a
-discontinuity on the reference side (its sidereal time has a one-time ~1.908"
-jump exactly at JD 2469807.5); libephemeris's two branches join to 0.000000"
-there, i.e. it is self-continuous. See
-``docs/methodology/sidereal-time-longterm.md`` and
-``docs/comparison/known-differences.md`` for the full analysis.
+The two internal branches are joined continuously at the modern-window
+boundaries. See ``docs/methodology/sidereal-time-longterm.md`` for the complete
+independent construction and references.
 """
 
 from __future__ import annotations
@@ -158,60 +133,198 @@ _PEPOL = (
 # General precession / obliquity — periodic part: [period, p_cos, q_cos, p_sin, q_sin].
 _PEPER = (
     (409.90, 396.15, 537.22, 402.90, 417.15, 288.92, 4043.00, 306.00, 277.00, 203.00),
-    (-6908.287473, -3198.706291, 1453.674527, -857.748557, 1173.231614,
-     -156.981465, 371.836550, -216.619040, 193.691479, 11.891524),
-    (753.872780, -247.805823, 379.471484, -53.880558, -90.109153,
-     -353.600190, -63.115353, -28.248187, 17.703387, 38.911307),
-    (-2845.175469, 449.844989, -1255.915323, 886.736783, 418.887514,
-     997.912441, -240.979710, 76.541307, -36.788069, -170.964086),
-    (-1704.720302, -862.308358, 447.832178, -889.571909, 190.402846,
-     -56.564991, -296.222622, -75.859952, 67.473503, 3.014055),
+    (
+        -6908.287473,
+        -3198.706291,
+        1453.674527,
+        -857.748557,
+        1173.231614,
+        -156.981465,
+        371.836550,
+        -216.619040,
+        193.691479,
+        11.891524,
+    ),
+    (
+        753.872780,
+        -247.805823,
+        379.471484,
+        -53.880558,
+        -90.109153,
+        -353.600190,
+        -63.115353,
+        -28.248187,
+        17.703387,
+        38.911307,
+    ),
+    (
+        -2845.175469,
+        449.844989,
+        -1255.915323,
+        886.736783,
+        418.887514,
+        997.912441,
+        -240.979710,
+        76.541307,
+        -36.788069,
+        -170.964086,
+    ),
+    (
+        -1704.720302,
+        -862.308358,
+        447.832178,
+        -889.571909,
+        190.402846,
+        -56.564991,
+        -296.222622,
+        -75.859952,
+        67.473503,
+        3.014055,
+    ),
 )
 
-# Ecliptic pole P, Q — polynomial part.
+# Ecliptic pole P, Q — polynomial part (Vondrák et al. 2011, Table 1).
 _PQPOL = (
     (5851.607687, -1600.886300),
     (-0.1189000, 1.1689818),
     (-0.00028913, -0.00000020),
     (0.000000101, -0.000000437),
 )
-# Ecliptic pole P, Q — periodic part. Index 6 of the q_cos row carries the
+# Ecliptic pole P, Q — periodic part (Vondrák et al. 2011, Table 1). Index 6 of the q_cos row carries the
 # A&A 541, C1 (2012) corrigendum value 198.296701 (the original printing had a typo).
 _PQPER = (
     (708.15, 2309.0, 1620.0, 492.2, 1183.0, 622.0, 882.0, 547.0),
-    (-5486.751211, -17.127623, -617.517403, 413.44294, 78.614193,
-     -180.732815, -87.676083, 46.140315),
-    (-684.66156, 2446.28388, 399.671049, -356.652376, -186.387003,
-     -316.80007, 198.296701, 101.135679),
-    (667.66673, -2354.886252, -428.152441, 376.202861, 184.778874,
-     335.321713, -185.138669, -120.97283),
-    (-5523.863691, -549.74745, -310.998056, 421.535876, -36.776172,
-     -145.278396, -34.74445, 22.885731),
+    (
+        -5486.751211,
+        -17.127623,
+        -617.517403,
+        413.44294,
+        78.614193,
+        -180.732815,
+        -87.676083,
+        46.140315,
+    ),
+    (
+        -684.66156,
+        2446.28388,
+        399.671049,
+        -356.652376,
+        -186.387003,
+        -316.80007,
+        198.296701,
+        101.135679,
+    ),
+    (
+        667.66673,
+        -2354.886252,
+        -428.152441,
+        376.202861,
+        184.778874,
+        335.321713,
+        -185.138669,
+        -120.97283,
+    ),
+    (
+        -5523.863691,
+        -549.74745,
+        -310.998056,
+        421.535876,
+        -36.776172,
+        -145.278396,
+        -34.74445,
+        22.885731,
+    ),
 )
 
-# Equator pole X, Y — polynomial part.
+# Equator pole X, Y — polynomial part (Vondrák et al. 2011, Table 2).
 _XYPOL = (
     (5453.282155, -73750.930350),
     (0.4252841, -0.7675452),
     (-0.00037173, -0.00018725),
     (-0.000000152, 0.000000231),
 )
-# Equator pole X, Y — periodic part.
+# Equator pole X, Y — periodic part (Vondrák et al. 2011, Table 2).
 _XYPER = (
-    (256.75, 708.15, 274.2, 241.45, 2309.0, 492.2, 396.1, 288.9, 231.1,
-     1610.0, 620.0, 157.87, 220.3, 1200.0),
-    (-819.940624, -8444.676815, 2600.009459, 2755.17563, -167.659835,
-     871.855056, 44.769698, -512.313065, -819.415595, -538.071099,
-     -189.793622, -402.922932, 179.516345, -9.814756),
-    (75004.344875, 624.033993, 1251.136893, -1102.212834, -2660.66498,
-     699.291817, 153.16722, -950.865637, 499.754645, -145.18821,
-     558.116553, -23.923029, -165.405086, 9.344131),
-    (81491.287984, 787.163481, 1251.296102, -1257.950837, -2966.79973,
-     639.744522, 131.600209, -445.040117, 584.522874, -89.756563,
-     524.42963, -13.549067, -210.157124, -44.919798),
-    (1558.515853, 7774.939698, -2219.534038, -2523.969396, 247.850422,
-     -846.485643, -1393.124055, 368.526116, 749.045012, 444.704518,
-     235.934465, 374.049623, -171.33018, -22.899655),
+    (
+        256.75,
+        708.15,
+        274.2,
+        241.45,
+        2309.0,
+        492.2,
+        396.1,
+        288.9,
+        231.1,
+        1610.0,
+        620.0,
+        157.87,
+        220.3,
+        1200.0,
+    ),
+    (
+        -819.940624,
+        -8444.676815,
+        2600.009459,
+        2755.17563,
+        -167.659835,
+        871.855056,
+        44.769698,
+        -512.313065,
+        -819.415595,
+        -538.071099,
+        -189.793622,
+        -402.922932,
+        179.516345,
+        -9.814756,
+    ),
+    (
+        75004.344875,
+        624.033993,
+        1251.136893,
+        -1102.212834,
+        -2660.66498,
+        699.291817,
+        153.16722,
+        -950.865637,
+        499.754645,
+        -145.18821,
+        558.116553,
+        -23.923029,
+        -165.405086,
+        9.344131,
+    ),
+    (
+        81491.287984,
+        787.163481,
+        1251.296102,
+        -1257.950837,
+        -2966.79973,
+        639.744522,
+        131.600209,
+        -445.040117,
+        584.522874,
+        -89.756563,
+        524.42963,
+        -13.549067,
+        -210.157124,
+        -44.919798,
+    ),
+    (
+        1558.515853,
+        7774.939698,
+        -2219.534038,
+        -2523.969396,
+        247.850422,
+        -846.485643,
+        -1393.124055,
+        368.526116,
+        749.045012,
+        444.704518,
+        235.934465,
+        374.049623,
+        -171.33018,
+        -22.899655,
+    ),
 )
 
 
@@ -223,16 +336,11 @@ def mean_obliquity_series_rad(jd_tt: float) -> float:
     """Direct Vondrák 2011 obliquity series (``p_A``/``ε_A``) in radians.
 
     Evaluates the published ``_PEPOL``/``_PEPER`` obliquity polynomial+periodic
-    terms directly. This is an independent Vondrák-2011 fit of the of-date mean
-    obliquity, and it is the value the reference engine reports for the of-date
-    obliquity (it also tracks the IAU 2006 obliquity to < 1 mas near J2000).
-
-    It is retained for provenance and reference-parity comparisons, but is NOT
-    used for the of-date ecliptic rotation: because it is a separate fit from the
-    equator/ecliptic pole series that build the precession matrix, pairing it
-    with that matrix is frame-inconsistent and puts a spurious latitude on the
-    Sun at remote epochs. Use :func:`mean_obliquity_rad` (the pole angle) for any
-    equator↔ecliptic-of-date transform.
+    terms directly. It tracks IAU 2006 closely near J2000 while retaining the
+    long-term validity of Vondrák's published series. It is a *separate* fit
+    from the pole series that build the precession matrix, so it is kept as a
+    reference/diagnostic value; the public pipeline uses the pole-angle
+    obliquity (:func:`mean_obliquity_rad`) for frame self-consistency.
 
     Args:
         jd_tt: Julian Date in TT.
@@ -255,30 +363,26 @@ def mean_obliquity_series_rad(jd_tt: float) -> float:
 
 @lru_cache(maxsize=4096)
 def mean_obliquity_rad(jd_tt: float) -> float:
-    """Of-date mean obliquity of the ecliptic in radians (Vondrák 2011).
+    """Return the public of-date mean obliquity in radians.
 
-    Long-term-valid replacement for the IAU 2006 obliquity polynomial; this is
-    the single obliquity realization used by both the houses path and the
-    position pipeline.
-
-    It is the **angle between the of-date ecliptic pole and equator pole**
-    (:func:`_ecliptic_pole`, :func:`_equator_pole`) — the same two Vondrák pole
-    vectors that build :func:`precession_matrix` (and ``erfa.ltp``/``ltpb`` on the
-    position pipeline). Deriving the obliquity from those poles guarantees the
-    equator-of-date → ecliptic-of-date rotation is frame-consistent with the
-    precession: a direction lying in the mean ecliptic of date reduces to zero
-    mean-ecliptic latitude. Using the independently-fitted direct series
-    (:func:`mean_obliquity_series_rad`) here instead would tilt the of-date
-    ecliptic by up to ~6.5″ at −3000 and put a spurious latitude on the Sun.
-
-    Near J2000 the pole angle and the direct series agree to < 0.001″ (identically
-    0 at J2000), so modern obliquity/positions/houses are unchanged.
+    The canonical value is the angle between the Vondrák ecliptic-pole and
+    equator-pole series — the same two poles that build the long-term
+    precession matrix. Deriving the obliquity from those poles makes the
+    precession and every equator↔ecliptic-of-date rotation one self-consistent
+    frame: a direction lying in the mean ecliptic of date (the Sun, by
+    definition) reduces to ~0 ecliptic latitude at every epoch. Pairing the
+    pole-based precession with the separately fitted direct ``ε_A`` series
+    would tilt the of-date ecliptic away from its own pole by up to ~6.5″ at
+    −3000, surfacing as a spurious ecliptic latitude on the Sun. The two
+    realizations agree to <0.001″ across 1900–2100 (identically 0 at J2000);
+    the direct series remains available as
+    :func:`mean_obliquity_series_rad`.
 
     Args:
         jd_tt: Julian Date in TT.
 
     Returns:
-        The of-date mean obliquity in radians (pole angle).
+        The of-date mean obliquity in radians.
     """
     ex, ey, ez = _ecliptic_pole(jd_tt)
     qx, qy, qz = _equator_pole(jd_tt)
@@ -374,9 +478,15 @@ def precession_matrix(jd_tt: float) -> tuple:
     eqx = (v[0] / w, v[1] / w, v[2] / w)
     mid = _cross(peqr, eqx)
     return (
-        eqx[0], eqx[1], eqx[2],
-        mid[0], mid[1], mid[2],
-        peqr[0], peqr[1], peqr[2],
+        eqx[0],
+        eqx[1],
+        eqx[2],
+        mid[0],
+        mid[1],
+        mid[2],
+        peqr[0],
+        peqr[1],
+        peqr[2],
     )
 
 
@@ -421,13 +531,9 @@ def _gmst_iau2006_deg(jd_ut1: float, jd_tt: float) -> float:
     du = jd_ut1 - _J2000
     era = _D2PI * (0.7790572732640 + 1.00273781191135448 * du)
     t = (jd_tt - _J2000) / 36525.0
-    p = (
-        0.014506
-        + t * (4612.156534
-               + t * (1.3915817
-                      + t * (-0.00000044
-                             + t * (-0.000029956
-                                    + t * -0.0000000368))))
+    p = 0.014506 + t * (
+        4612.156534
+        + t * (1.3915817 + t * (-0.00000044 + t * (-0.000029956 + t * -0.0000000368)))
     )
     return math.degrees(era) + p / 3600.0
 

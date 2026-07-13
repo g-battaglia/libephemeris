@@ -3,17 +3,16 @@ the canonical lun_eclipse_how() shadow model and with NASA's published values.
 
 Background (audit round v10): lun_eclipse_umbral_magnitude() and
 lun_eclipse_penumbral_magnitude() used to route through a *second* shadow model
-(_calculate_lunar_eclipse_type_and_magnitude, with a 1/85 atmospheric
-enlargement and a small-angle approximation) that disagreed with the canonical
-lun_eclipse_how() / lun_eclipse_when() path (AA-1998 1/50 enlargement +
-empirical deflators) by up to ~0.011 in magnitude. The canonical path
-reproduces the umbral/penumbral magnitudes published in NASA's Five Millennium
-Canon of Lunar Eclipses to ~0.001, so the convenience functions were the less
-accurate of the two. They now delegate to the same core, so:
+(_calculate_lunar_eclipse_type_and_magnitude, with a small-angle Danjon
+approximation) that disagreed with the canonical exact-cone path. The canonical
+path now implements the independently published Danjon equations used in
+NASA/TP-2009-214173, without output-fitted shadow factors. The convenience
+functions delegate to that same core, so:
 
   (1) lun_eclipse_umbral_magnitude(jd)   == lun_eclipse_how(jd, geo)[1][0]   (exact)
   (2) lun_eclipse_penumbral_magnitude(jd)== max(0, lun_eclipse_how(jd,geo)[1][1]) (exact)
-  (3) the umbral magnitude reproduces NASA's catalog to <0.003.
+  (3) the umbral magnitude reproduces NASA's independently published catalog
+      to <0.003.
 
 These are independent-reference checks (NASA values + cross-API identity), not
 type/range guards. Reference: https://eclipse.gsfc.nasa.gov/lunar.html
@@ -43,7 +42,7 @@ _GEO = (0.0, 0.0, 0.0)  # lunar-eclipse magnitude is observer-independent
 # NASA Five Millennium Canon of Lunar Eclipses: umbral magnitude at greatest
 # eclipse. (year, month, umbral_magnitude, kind)
 _NASA_UMBRAL = [
-    (2018, 7, 1.6087, "total"),    # longest total eclipse of the 21st century
+    (2018, 7, 1.6087, "total"),  # longest total eclipse of the 21st century
     (2019, 1, 1.1956, "total"),
     (2021, 5, 1.0095, "total"),
     (2022, 5, 1.4141, "total"),

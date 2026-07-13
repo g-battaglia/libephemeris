@@ -7,6 +7,7 @@ minimum independently (golden-section on the library's own apparent positions)
 and require the reported time to coincide to a few seconds, with the separation
 at a genuine local minimum.
 """
+
 from __future__ import annotations
 
 import math
@@ -21,8 +22,7 @@ def _sep(jd_ut, sid):
     m, _ = L.calc_ut(jd_ut, MOON, FLG_SWIEPH | FLG_EQUATORIAL)
     b, _ = L.calc_ut(jd_ut, sid, FLG_SWIEPH | FLG_EQUATORIAL)
     ra1, d1, ra2, d2 = map(math.radians, (m[0], m[1], b[0], b[1]))
-    c = (math.sin(d1) * math.sin(d2)
-         + math.cos(d1) * math.cos(d2) * math.cos(ra1 - ra2))
+    c = math.sin(d1) * math.sin(d2) + math.cos(d1) * math.cos(d2) * math.cos(ra1 - ra2)
     return math.degrees(math.acos(max(-1.0, min(1.0, c))))
 
 
@@ -59,7 +59,7 @@ def test_lun_occult_time_is_separation_minimum(body):
     jdmax = tret[0]
     jm, minsep = _golden_min(jdmax, body)
     # Reported max == independent geocentric separation minimum (within ~30 s).
-    assert abs(jdmax - jm) * 86400.0 < 30.0, f"body {body}: {(jdmax-jm)*86400:.1f}s"
+    assert abs(jdmax - jm) * 86400.0 < 30.0, f"body {body}: {(jdmax - jm) * 86400:.1f}s"
     # It is a genuine minimum: the separation grows on both sides.
     assert _sep(jdmax - 0.02, body) > minsep
     assert _sep(jdmax + 0.02, body) > minsep

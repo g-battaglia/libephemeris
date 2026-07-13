@@ -62,12 +62,12 @@ class TestZodiacalConversions:
     @pytest.mark.parametrize(
         "deg,rasi",
         [
-            (0.0, 0),    # 0° Aries
-            (29.9, 0),   # still Aries
-            (30.0, 1),   # exactly Taurus
-            (35.0, 1),   # Taurus
+            (0.0, 0),  # 0° Aries
+            (29.9, 0),  # still Aries
+            (30.0, 1),  # exactly Taurus
+            (35.0, 1),  # Taurus
             (180.0, 6),  # Libra
-            (359.0, 11), # Pisces
+            (359.0, 11),  # Pisces
         ],
     )
     def test_long2rasi(self, deg, rasi):
@@ -76,8 +76,8 @@ class TestZodiacalConversions:
     @pytest.mark.parametrize(
         "deg,nak,pada",
         [
-            (0.0, 0, 0),      # 0° → Aswini, pada 1 (0-indexed 0)
-            (13.5, 1, 0),     # 13.5° → Bharani
+            (0.0, 0, 0),  # 0° → Aswini, pada 1 (0-indexed 0)
+            (13.5, 1, 0),  # 13.5° → Bharani
             (360 / 27 - 0.01, 0, 3),  # last pada of Aswini
         ],
     )
@@ -87,7 +87,7 @@ class TestZodiacalConversions:
     @pytest.mark.parametrize(
         "deg,navamsa",
         [
-            (0.0, 0),   # Aries 0° → navamsa Aries
+            (0.0, 0),  # Aries 0° → navamsa Aries
             (15.0, 4),  # Aries mid → navamsa Leo
             (30.0, 9),  # Taurus 0° → navamsa Capricorn
         ],
@@ -114,9 +114,9 @@ class TestVedicDignities:
     @pytest.mark.parametrize(
         "rasi,lord_id",
         [
-            (c.ARIES, c.KUJA),    # Mars rules Aries
+            (c.ARIES, c.KUJA),  # Mars rules Aries
             (c.TAURUS, c.SUKRA),  # Venus rules Taurus
-            (c.LEO, c.SURYA),     # Sun rules Leo
+            (c.LEO, c.SURYA),  # Sun rules Leo
             (c.SCORPIO, c.KUJA),  # Mars also rules Scorpio
             (c.CAPRICORN, c.SANI),
             (c.PISCES, c.GURU),
@@ -211,9 +211,9 @@ class TestRasiDistance:
 
     def test_rasi_dif2_signed(self):
         # Signed distance in (-6, 6] — opposite signs go the short way
-        assert c.rasi_dif2(c.ARIES, c.LIBRA) == 6     # ± exactly 6
-        assert c.rasi_dif2(c.ARIES, c.GEMINI) == 2    # forward 2
-        assert c.rasi_dif2(c.GEMINI, c.ARIES) == -2   # backward 2
+        assert c.rasi_dif2(c.ARIES, c.LIBRA) == 6  # ± exactly 6
+        assert c.rasi_dif2(c.ARIES, c.GEMINI) == 2  # forward 2
+        assert c.rasi_dif2(c.GEMINI, c.ARIES) == -2  # backward 2
 
 
 class TestNotImplementedStubs:
@@ -221,9 +221,16 @@ class TestNotImplementedStubs:
 
     @pytest.mark.parametrize(
         "name",
-        ["atlas_connect", "atlas_close", "atlas_search",
-         "atlas_countries_list", "db_connect", "db_close",
-         "tzabbr_find", "tzabbr_list"],
+        [
+            "atlas_connect",
+            "atlas_close",
+            "atlas_search",
+            "atlas_countries_list",
+            "db_connect",
+            "db_close",
+            "tzabbr_find",
+            "tzabbr_list",
+        ],
     )
     def test_stub_raises(self, name):
         fn = getattr(c, name)

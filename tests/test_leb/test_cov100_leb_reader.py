@@ -424,9 +424,7 @@ class TestEvalNutationBranches:
         reader = LEBReader(path)
         try:
             nut = reader._nutation
-            nut.jd_end = (
-                nut.jd_start + nut.segment_count * nut.interval_days + 100.0
-            )
+            nut.jd_end = nut.jd_start + nut.segment_count * nut.interval_days + 100.0
             dpsi, deps = reader.eval_nutation(nut.jd_end - 1.0)
             assert isinstance(dpsi, float) and isinstance(deps, float)
         finally:

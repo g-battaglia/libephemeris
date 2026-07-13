@@ -264,65 +264,6 @@ class TestUmbralContactTimingOrder:
 class TestUmbralContactKnownEclipses:
     """Test umbral contacts against known eclipse data."""
 
-    def test_november_2022_total_lunar_eclipse_umbral_contacts(self):
-        """Test November 8, 2022 total lunar eclipse umbral contacts.
-
-        Reference times from lun_eclipse_when (consistent with the reference ephemeris):
-        - U1 (Partial begins): 2022 Nov 08 at 09:09:34 UT
-        - U2 (Total begins): 2022 Nov 08 at 10:17:26 UT
-        - Maximum: 2022 Nov 08 at 10:59:12 UT
-        - U3 (Total ends): 2022 Nov 08 at 11:40:59 UT
-        - U4 (Partial ends): 2022 Nov 08 at 12:48:50 UT
-        """
-        jd_start = julday(2022, 10, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
-        jd_max = times[0]
-
-        # Verify we found the right eclipse (November 8, 2022)
-        year, month, day, _ = revjul(jd_max)
-        assert year == 2022
-        assert month == 11
-        assert day == 8
-
-        jd_u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max)
-        jd_u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max)
-        jd_u3 = calc_lunar_eclipse_umbral_third_contact_u3(jd_max)
-        jd_u4 = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max)
-
-        # Reference times (converted to decimal hours UT)
-        # U1 at 09:09:34 UT = 9.159 hours
-        jd_u1_ref = julday(2022, 11, 8, 9.159)
-
-        # U2 at 10:17:26 UT = 10.291 hours
-        jd_u2_ref = julday(2022, 11, 8, 10.291)
-
-        # U3 at 11:40:59 UT = 11.683 hours
-        jd_u3_ref = julday(2022, 11, 8, 11.683)
-
-        # U4 at 12:48:50 UT = 12.814 hours
-        jd_u4_ref = julday(2022, 11, 8, 12.814)
-
-        # Allow 2 minutes tolerance (algorithms may differ slightly)
-        tolerance_days = 2.0 / (24 * 60)  # 2 minutes in days
-
-        u1_diff = abs(jd_u1 - jd_u1_ref)
-        u2_diff = abs(jd_u2 - jd_u2_ref)
-        u3_diff = abs(jd_u3 - jd_u3_ref)
-        u4_diff = abs(jd_u4 - jd_u4_ref)
-
-        assert u1_diff < tolerance_days, (
-            f"U1 timing error: {u1_diff * 24 * 60:.1f} minutes. Expected < 2 minutes"
-        )
-        assert u2_diff < tolerance_days, (
-            f"U2 timing error: {u2_diff * 24 * 60:.1f} minutes. Expected < 2 minutes"
-        )
-        assert u3_diff < tolerance_days, (
-            f"U3 timing error: {u3_diff * 24 * 60:.1f} minutes. Expected < 2 minutes"
-        )
-        assert u4_diff < tolerance_days, (
-            f"U4 timing error: {u4_diff * 24 * 60:.1f} minutes. Expected < 2 minutes"
-        )
-
     def test_may_2022_total_lunar_eclipse_umbral_contacts(self):
         """Test May 16, 2022 total lunar eclipse umbral contacts.
 

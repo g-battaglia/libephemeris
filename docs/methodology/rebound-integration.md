@@ -1,6 +1,11 @@
 # REBOUND Integration
 
-LibEphemeris integrates REBOUND (an N-body integrator for orbital dynamics) with ASSIST (a small-body ephemeris extension) to provide high-precision orbit propagation for asteroids and other minor bodies, replacing the default Keplerian approximation with full N-body dynamics.
+LibEphemeris integrates REBOUND (an N-body integrator for orbital dynamics)
+with ASSIST (a small-body ephemeris extension) to provide high-precision orbit
+propagation for asteroids and other minor bodies when an SPK does not cover the
+requested epoch. It replaces the last-resort Keplerian approximation with full
+N-body dynamics; strict precision and JPL SPKs remain the default path for
+mapped bodies.
 
 ## Table of Contents
 

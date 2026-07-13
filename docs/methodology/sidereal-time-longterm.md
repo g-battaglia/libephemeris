@@ -162,24 +162,15 @@ missing obliquity-rate term is ~0.01 °/day). Callers that have the time should 
 
 ## Validation
 
-The model is exhaustively validated in the separate `validation/` repository:
+Validation is source-based and reproducible in this repository:
 
-* `validation/compare_scripts/rounds/houses/lt*.py` (run with `sh run.sh houses`) —
-  covering, across −13200…+17191: mean-obliquity model-purity (< 0.001″),
-  sidereal-time model-purity at matched ΔT (< 0.05″), every house system at many
-  latitudes (matched-ΔT cusps < 0.05″), vertex / auxiliary points, high latitudes,
-  a dense modern no-regression sweep, sidereal (ayanamsha) cusps, internal
-  consistency, DE441 edges, round-trips, `house_pos`, a massive
-  systems×latitudes×epochs grid, and the **cusp speeds** under the ground-truth
-  criterion (the reported speed must reproduce the real cusp motion).
-* `validation/compare_scripts/rounds/positions/lt*.py` (run with
-  `sh run.sh positions`) — confirms the shared obliquity leaves modern positions
-  unchanged, bounds the (smooth, expected) of-date obliquity shift at remote
-  epochs, and validates the full −8000…+8000 range with the DE441 extended tier
-  against an **independent DE441 oracle** (jplephem + erfa) that shares the
-  ephemeris but not the code path.
+- `tests/test_precession_vondrak.py` checks the published Vondrák/ERFA defining
+  conditions and frame consistency.
+- Sidereal and house tests verify periodicity, round trips, continuity,
+  derivative consistency, finite behavior at high latitudes, and tier edges.
+- Independent DE441 state vectors and ERFA frame routines provide a second
+  implementation path without sharing LibEphemeris reduction code.
 
----
-
-*For how the remote-epoch ARMC residual compares against Swiss Ephemeris at matched
-ΔT, see [Swiss Ephemeris Comparison](../comparison/known-differences.md#26-house-cusps-and-ascendant-at-remote-epochs).*
+Public reference-API calls may be used ephemerally to check API behavior, but
+their numerical outputs are not stored as baselines, tables, or fitted
+parameters.

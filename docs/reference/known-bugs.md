@@ -5,7 +5,9 @@ in future releases where possible.
 
 ## Active Bugs
 
-No active bugs at this time.
+No confirmed active defects are listed here. See
+[Known Differences](../comparison/known-differences.md) for measured backend,
+model, range, and compatibility limitations.
 
 ## Fixed Bugs (v1.0.0)
 
@@ -20,10 +22,12 @@ Error reduced from 3.25e-4 AU to ~1.5e-7 AU (2000x improvement).
 Previously, `calc(jd, SUN, FLG_HELCTR)` returned ~126° longitude
 (garbage from `arctan2` of near-zero values). Now correctly returns (0,0,0,0,0,0).
 
-### Uranian geocentric bodies (FIXED)
+### Historical hypothetical-body regression (FIXED)
 
-Previously, `calc(jd, 40, FLG_SPEED)` without `FLG_HELCTR` raised
-`UnknownBodyError`. Geocentric conversion path added for all 8 Uranians (40-47).
+An rc8 regression temporarily made IDs 40–49 and 51–58 raise
+`UnknownBodyError`. Calculations for all historical IDs 40–58 are available
+again. Each model carries an explicit source status; see
+[Hypothetical bodies](../methodology/hypothetical-bodies.md).
 
 ## Horizons Backend Limitations
 

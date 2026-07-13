@@ -26,7 +26,7 @@ _J2000 = 2451545.0
 
 
 def _julian_epoch_ref(jd_tt: float) -> float:
-    """Independent Julian-epoch reference for the oracle.
+    """Independent Julian-epoch conversion for the ERFA cross-check.
 
     Computed locally (not imported from the module under test) so a bug in the
     production ``_julian_epoch`` cannot hide behind a shared conversion.
@@ -73,38 +73,31 @@ def test_precession_matrix_matches_erfa_ltpb(jd: float) -> None:
 
 
 @pytest.mark.parametrize("jd", _JD_GRID)
-def test_obliquity_is_pole_angle_everywhere(jd: float) -> None:
-    """Of-date mean obliquity IS the ERFA equator/ecliptic pole angle, everywhere.
+def test_production_obliquity_is_pole_angle(jd: float) -> None:
+    """Every public rotation uses the angle between the Vondrák pole vectors.
 
-    The production of-date mean obliquity is the angle between the Vondrák 2011
-    ecliptic pole and equator pole — the same two poles that build the precession
-    matrix — so precession and obliquity are one self-consistent frame (a
-    direction in the mean ecliptic of date reduces to zero mean-ecliptic
-    latitude). ``sidereal_longterm`` builds those poles from its own series; here
-    the oracle is ERFA's independent ``ltpecl``/``ltpequ`` implementation, so the
-    match is a genuine cross-check, not a tautology. It holds across the whole
-    supported range (modern through deep-BCE and far future).
+    The pole-angle obliquity keeps the precession matrix and every
+    equator↔ecliptic-of-date rotation one self-consistent frame: a direction
+    lying in the mean ecliptic of date reduces to ~0 ecliptic latitude at
+    every epoch.
     """
     epj = _julian_epoch_ref(jd)
     ecl = erfa.ltpecl(epj)
     equ = erfa.ltpequ(epj)
-    expected = math.acos(max(-1.0, min(1.0, float(np.dot(equ, ecl)))))
-    # exact (both are the same pole-angle, from independent pole implementations)
-    assert abs(vondrak_mean_obliquity_rad(jd) - expected) < math.radians(1e-8 / 3600.0)
+    pole_angle = math.acos(max(-1.0, min(1.0, float(np.dot(equ, ecl)))))
+    assert abs(vondrak_mean_obliquity_rad(jd) - pole_angle) < 1e-12
 
 
 @pytest.mark.parametrize("jd", _JD_GRID)
-def test_direct_series_is_not_used_for_the_rotation(jd: float) -> None:
-    """The published direct ε_A series is a *distinct* Vondrák realization.
+def test_direct_series_and_pole_angle_are_distinct_realizations(jd: float) -> None:
+    """The direct ε_A series remains bounded relative to the pole angle.
 
     ``mean_obliquity_series_rad`` evaluates Vondrák's direct ``p_A``/``ε_A``
-    obliquity series (retained for provenance and reference parity). It is a
-    separate fit from the pole series, so it differs from the production
-    pole-angle obliquity by a smooth, bounded amount — ≈0 in the modern era,
-    growing to ~6.5″ at −3000. This pins *why* the direct series is not used for
-    the equator↔ecliptic-of-date rotation: pairing it with the pole-based
-    precession would tilt the of-date ecliptic and put a spurious latitude on
-    the Sun.
+    obliquity series. It is a separate fit from the pole series, so the two
+    differ by a smooth, bounded amount—approximately zero in the modern era and
+    about 6.5″ at −3000. Production follows the pole angle so the of-date
+    ecliptic stays consistent with the pole-based precession; the direct
+    series stays available as a reference realization.
     """
     epj = _julian_epoch_ref(jd)
     ecl = erfa.ltpecl(epj)
@@ -116,13 +109,11 @@ def test_direct_series_is_not_used_for_the_rotation(jd: float) -> None:
     diff = abs(mean_obliquity_series_rad(jd) - pole_angle)
     assert diff < bound
     # At deep-BCE epochs the separation is real and resolvable (≥1″ by −1000),
-    # and production tracks the pole angle, NOT the direct series.
+    # while production continues to track the pole angle.
     yr = 2000.0 + (jd - _J2000) / 365.25
     if yr <= -1000.0:
         assert diff > math.radians(0.5 / 3600.0)
-        assert abs(vondrak_mean_obliquity_rad(jd) - mean_obliquity_series_rad(jd)) > (
-            math.radians(0.5 / 3600.0)
-        )
+        assert abs(vondrak_mean_obliquity_rad(jd) - pole_angle) < 1e-12
 
 
 @pytest.mark.parametrize("jd", _JD_GRID)

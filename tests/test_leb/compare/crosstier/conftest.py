@@ -43,7 +43,6 @@ TOLS_CROSS = TierTolerances.for_tier(
     "medium",
     POSITION_ARCSEC=0.5,
     ECLIPTIC_ARCSEC=0.5,
-    HYPOTHETICAL_ARCSEC=0.5,
     SPEED_LON_DEG_DAY=0.05,
     DISTANCE_AU=1e-4,
 )

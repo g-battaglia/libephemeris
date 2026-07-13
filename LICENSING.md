@@ -9,13 +9,18 @@ closed-source and commercial products — subject to the terms of the Apache
 License 2.0, most notably preservation of copyright, license, and attribution
 notices and the [NOTICE](NOTICE.md) file.
 
-The packages published on PyPI are Apache-2.0.
+The current source tree is Apache-2.0. Published distributions beginning with
+`3.0.0rc3` declare Apache-2.0; distributions through `3.0.0rc1` retain the
+license terms under which they were originally released. PyPI distributions
+are immutable, so consult the metadata and bundled license for the exact
+version you use.
 
 ## Copyright
 
 Copyright (c) 2025-2026 Giacomo Battaglia.
 
-Every owned source file carries the SPDX expression `Apache-2.0`.
+Every project-owned Python source file in the shipped `libephemeris` package
+carries the SPDX expression `Apache-2.0`.
 Attribution and data-source details are in [NOTICE.md](NOTICE.md).
 
 ## Third-party components
@@ -45,9 +50,9 @@ agreement is required.
 LibEphemeris is an **independent implementation** with an API that is
 signature-compatible with the reference ephemeris API (see
 [NOTICE.md](NOTICE.md)). "Swiss Ephemeris" is a product of Astrodienst AG;
-the name is used here nominatively only. Its Python binding is used only as
-a black-box test oracle in separate validation tooling and is never a
-dependency of this package.
+the name is used here nominatively only. The reference API's Python binding
+may be used for ephemeral compatibility comparisons in a separate validation
+environment, and is never a dependency of this package.
 
 ---
 

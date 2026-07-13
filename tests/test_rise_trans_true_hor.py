@@ -110,13 +110,7 @@ class TestRiseTransTrueHorBasic:
         assert 20 < diff_minutes < 120
 
     def test_negative_horizon_gives_earlier_rise(self):
-        """Negative horizon_altitude is honored, not clamped.
-
-        The reference accepts negative horizon altitudes (an elevated
-        observer sees below the geometric horizon); the Sun then rises
-        earlier than over a 0-degree horizon. Verified live against
-        the reference ephemeris 2.10.03 (horhgt=-1.5 reproduced within 0.01 s).
-        """
+        """A negative horizon is honored and produces an earlier rise."""
         jd_start = julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964  # Rome
 

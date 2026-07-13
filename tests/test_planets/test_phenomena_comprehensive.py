@@ -89,13 +89,10 @@ class TestPhenoIllumination:
         assert 0 <= phase <= 1.01, f"{name}: illumination {phase}"
 
     @pytest.mark.unit
-    def test_sun_illumination_defined(self):
-        """Sun illumination is 0 (undefined — Sun doesn't illuminate itself)."""
+    def test_sun_illumination_inapplicable(self):
+        """Illuminated fraction is inapplicable to the Sun: reported as 0.0."""
         result = swe.pheno_ut(2451545.0, SUN, 0)
-        # Sun illumination is 0.0 in libephemeris (undefined/not applicable)
-        assert result[1] == 0.0 or abs(result[1] - 1.0) < 0.01, (
-            f"Sun illumination: {result[1]} (expected 0.0 or 1.0)"
-        )
+        assert result[1] == 0.0
 
     @pytest.mark.unit
     def test_outer_planet_mostly_illuminated(self):

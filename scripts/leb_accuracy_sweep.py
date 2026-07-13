@@ -82,22 +82,12 @@ BODY_NAMES = {
     20: "Vesta",
     21: "IntpApog",
     22: "IntpPerg",
-    40: "Cupido",
-    41: "Hades",
-    42: "Zeus",
-    43: "Kronos",
-    44: "Apollon",
-    45: "Admetos",
-    46: "Vulkanus",
-    47: "Poseidon",
-    48: "Isis",
 }
 
 # Tolerance categories (arcseconds)
 PLANET_IDS = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 14}
 ECLIPTIC_IDS = {10, 11, 12, 13, 21, 22}
 ASTEROID_IDS = {15, 17, 18, 19, 20}
-HELIO_IDS = {40, 41, 42, 43, 44, 45, 46, 47, 48}
 
 # From validation-plan-v2.md: < 1" planets, < 5" ecliptic
 TOLERANCE_PLANET = 1.0
@@ -253,8 +243,7 @@ def sweep_flag_combinations(reader) -> dict:
         5,
         10,
         15,
-        40,
-    ]  # Sun, Moon, Mars, Jupiter, MeanNode, Chiron, Cupido
+    ]  # Sun, Moon, Mars, Jupiter, MeanNode, Chiron
 
     # Flags that LEB should handle natively
     native_flags = {
@@ -531,7 +520,7 @@ def sweep_performance(reader) -> dict:
     # Speedup targets:
     # - JPL-backed bodies (planets) require BSP file reads in Skyfield,
     #   so LEB's Chebyshev lookup gives ≥8x speedup.
-    # - Polynomial/analytical bodies (MeanNode, Uranians) are already
+    # - Polynomial/analytical bodies (MeanNode) are already
     #   sub-100µs in Skyfield, so LEB may not be faster.
     SPEEDUP_TARGETS = {
         0: 8.0,
@@ -539,10 +528,9 @@ def sweep_performance(reader) -> dict:
         4: 8.0,
         5: 8.0,  # planets: ≥8x
         10: 0.1,  # MeanNode: polynomial body, Skyfield ~50µs (no speedup expected)
-        40: 1.0,  # Cupido: Uranian hypothetical
     }
 
-    for body_id in [0, 1, 4, 5, 10, 40]:
+    for body_id in [0, 1, 4, 5, 10]:
         name = BODY_NAMES.get(body_id, f"body_{body_id}")
         if not reader.has_body(body_id):
             continue

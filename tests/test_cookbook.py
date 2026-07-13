@@ -230,12 +230,12 @@ class TestNatalChart:
             2000, 1, 1, 12.0, 41.9028, 12.4964, sidereal=True
         )
 
-        # Sidereal positions should be different (about 23-24 degrees less)
+        # True Citra is independently anchored to Spica, so its positions
+        # differ from tropical positions by an ordinary ayanamsha-sized angle.
         sun_tropical = chart_tropical["planets"]["Sun"]["longitude"]
         sun_sidereal = chart_sidereal["planets"]["Sun"]["longitude"]
 
         diff = abs(sun_tropical - sun_sidereal)
-        # Lahiri ayanamsha is about 23-24 degrees
         assert 20 < diff < 28, f"Ayanamsha difference unexpected: {diff}"
 
 

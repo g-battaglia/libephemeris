@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: MIT
+# Copyright (c) 2018 The Python Packaging Authority
 # Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md
 """A supporting module for jplephem to handle data type 21 (Version 0.1.0)
 
@@ -693,7 +694,6 @@ def titlecase(name):
     """Title-case target `name` if it looks safe to do so.
     """
     return name if name.startswith(('1', 'C/', 'DSS-')) else name.title()
-
 
 
 

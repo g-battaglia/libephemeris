@@ -167,9 +167,7 @@ class TestHeliacalNoKernel:
         from libephemeris.time_utils import julday
 
         jd = julday(2024, 6, 15, 12.0)
-        _result, _retflag = _heliacal_pheno_ut_pythonic(
-            jd, 41.9, 12.5, body=VENUS
-        )
+        _result, _retflag = _heliacal_pheno_ut_pythonic(jd, 41.9, 12.5, body=VENUS)
         assert state._PLANETS is None
 
 
@@ -217,6 +215,7 @@ class TestEclipseNoKernel:
         pos_sph, _ = calc_ut(jd, SUN, 0)
         # XYZ distance should be ~1 AU (not degrees-sized values)
         import math
+
         r = math.sqrt(pos_xyz[0] ** 2 + pos_xyz[1] ** 2 + pos_xyz[2] ** 2)
         assert 0.98 < r < 1.02, f"r={r} not ~1 AU"
         # dist (spherical) should be ~1 AU
@@ -232,6 +231,7 @@ class TestEclipseNoKernel:
         pos_xyz, _ = calc_ut(jd, MEAN_NODE, FLG_XYZ)
         # Mean Node distance ~0.00257 AU, Cartesian components should be small
         import math
+
         r = math.sqrt(pos_xyz[0] ** 2 + pos_xyz[1] ** 2 + pos_xyz[2] ** 2)
         assert 0.001 < r < 0.01, f"r={r} unexpected for Mean Node"
 

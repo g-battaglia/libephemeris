@@ -9866,10 +9866,7 @@ STAR_ROWS = (
         -6.31,
         2.23,
     ),
-    # Spica RV corrected to the astrophysical value (+1.0 km/s, SIMBAD;
-    # backing the RV out of reference-API distance evolution gives the same
-    # +1.0). The previous -22.85 doubled speed_dist and drifted the distance
-    # by ~2500 AU at year 2600.
+    # Spica radial velocity: independently sourced SIMBAD value (+1.0 km/s).
     (
         1000002,
         "Spica",

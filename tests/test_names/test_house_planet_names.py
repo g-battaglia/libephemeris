@@ -164,10 +164,10 @@ class TestGetPlanetName:
 
     @pytest.mark.unit
     def test_unknown_body_returns_string(self):
-        """Unknown body ID should return some string (not crash)."""
+        """Unknown body IDs return the compatibility API's empty string."""
         result = swe.get_planet_name(8888)
         assert isinstance(result, str)
-        assert len(result) > 0
+        assert result == ""
 
     @pytest.mark.unit
     def test_unknown_asteroid_returns_empty(self):

@@ -113,11 +113,15 @@ But there is a complication: due to the perturbations of the Sun, the position o
 
 Because of this, LibEphemeris offers three different versions of the apogee (and similarly for the perigee):
 
-**Mean apogee** — the position calculated with a regular polynomial, which advances uniformly along the zodiac. It is the most used in astrology under the name "Black Moon Lilith" (we will talk about this in the next section).
+**Mean apogee** — a smooth mean curve built from ERFA/IERS Delaunay arguments
+and conventional inclined-orbit geometry. It is widely used in
+astrology under the name "Black Moon Lilith".
 
 **Osculating apogee** — the instantaneous position of the apogee, calculated from the true orbit of the Moon at that exact moment. It includes all perturbations and can oscillate by 20°–30° relative to the mean position. "Osculating" comes from the Latin *osculari* (to kiss) — the osculating orbit is the ellipse that "kisses" the true trajectory at a given instant.
 
-**Interpolated apogee** — a middle ground: overly rapid oscillations (mathematical artifacts of the osculating orbit) are removed, retaining the physically significant variations. It is the most astronomically accurate version.
+**Interpolated apogee** — a compatibility-oriented analytical curve formed
+from lunar Delaunay arguments and periodic perturbation terms. It is not an
+observed body or a claim of greater physical accuracy.
 
 ```python
 import libephemeris as ephem
@@ -140,13 +144,6 @@ print(f"Interpolated apogee: {lon_int:.4f}°")
 print(f"Mean-osculating difference: {oscu[0] - mean[0]:.1f}°")
 ```
 
-```
-Mean apogee:       170.9201°
-Osculating apogee:   182.7118°
-Interpolated apogee: 166.3793°
-Mean-osculating difference: 11.8°
-```
-
 ---
 
 ## 6.4 Lilith: the Black Moon
@@ -161,7 +158,9 @@ There are three versions of Lilith, which correspond to the three versions of th
 
 **True (osculating) Lilith** is the true instantaneous position of the apogee. It can differ from the mean Lilith by 20°–30° and has irregular movements, including brief retrogradations. Some astrologers prefer it for its adherence to astronomical reality.
 
-**Interpolated Lilith** is the smoothed version — it removes the artificial oscillations of the osculating orbit but retains the physically real variations. It is the most astronomically accurate.
+**Interpolated Lilith** is the versioned compatibility curve built from lunar
+Delaunay arguments and a reviewed, hash-pinned refinement. For physical
+Moon-distance events, calculate the Moon's distance directly.
 
 ```python
 import libephemeris as ephem
@@ -186,45 +185,28 @@ print(f"True Lilith:  {sign(true_lon)}")
 print(f"Difference:   {true_lon - mean_lilith:.1f}°")
 ```
 
-```
-Mean Lilith: 20.9° Vir
-True Lilith:  2.7° Lib
-Difference:   11.8°
-```
-
 ### The White Moon (Selena)
 
-The point opposite to Lilith — that is, the mean **perigee** of the lunar orbit — is called the **White Moon** or **Selena** in some astrological traditions. If Lilith represents the shadow side, Selena represents the light side.
+Some astrological traditions use a distinct point called the **White Moon** or
+**Selena**. Body ID 56 retains the rc7 seven-year circular compatibility
+convention; it is not defined as the point opposite Lilith and is not a physical
+lunar apsis.
 
 ```python
-import libephemeris as ephem
-
-jd_tt = ephem.julday(2024, 4, 8, 12.0) + ephem.deltat(
-    ephem.julday(2024, 4, 8, 12.0)
-)
-
-# Selena: the point opposite to Lilith
-selena = ephem.calc_white_moon_position(jd_tt)
-# Returns a 6-value tuple like calc_ut:
-# (lon, lat, dist, lon_vel, lat_vel, dist_vel)
-
-lilith = ephem.calc_mean_lilith(jd_tt)
-print(f"Lilith:  {lilith:.4f}°")
-print(f"Selena:  {selena[0]:.4f}°")
-print(f"Difference: {abs(selena[0] - lilith):.1f}°")  # ~180°
+white_moon, _ = ephem.calc_ut(jd, ephem.WHITE_MOON)
 ```
 
-```
-Lilith:  170.9216°
-Selena:  350.9216°
-Difference: 180.0°
-```
+Use the documented mean, osculating, or interpolated lunar-apsis APIs when an
+astronomical apsis is required.
 
 ---
 
-## 6.5 Interpolated perigee and calibration
+## 6.5 Interpolated perigee
 
-Just as there is an interpolated apogee, there is also an **interpolated perigee** — the smoothed version of the Moon's point of closest approach. It is useful for precision calculations, such as predicting tides or determining true "supermoons" (a full Moon within a few hours of perigee).
+Just as there is an interpolated apogee, there is also an **interpolated
+perigee**: a smoothed coordinate defined by LibEphemeris. Do not use
+this abstract point as a shortcut for tides or "supermoon" timing. For those
+questions, search the actual geocentric Moon-distance curve for a minimum.
 
 ```python
 import libephemeris as ephem
@@ -242,12 +224,12 @@ print(f"Interpolated perigee: {lon:.4f}°")
 print(f"Distance: {dist_km:.0f} km")
 ```
 
-```
-Interpolated perigee: 4.1030°
-Distance: 358786 km
-```
-
-The accuracy of the interpolated perigee in LibEphemeris has been improved through a calibration process: passage geometry from high-precision JPL ephemerides, with the fitted series and residual table calibrated against the reference API's output used as a black-box oracle (see NOTICE.md and the methodology documentation).
+LibEphemeris evaluates interpolated apogee and perigee with separate analytical
+Delaunay series and a versioned compatibility refinement. The refinement is
+hash-pinned and cannot be modified without an explicit review. The returned
+distances are conventional radii, not measurements of the Moon's instantaneous
+distance. See
+[Lunar Nodes and Apsides](../../methodology/lunar-apsides.md).
 
 ---
 
@@ -291,7 +273,6 @@ The Moon crosses a node about **twice a month** — once at the ascending node (
 - The **lunar nodes** are the points where the lunar orbit intersects the ecliptic. They exist in mean (regular) and true (with oscillations) versions. Eclipses occur only near the nodes.
 - **Apogee** (farthest point) and **perigee** (closest point) exist in three versions: mean, osculating, and interpolated. The mean apogee is the "Black Moon Lilith" of astrology.
 - **Lilith** (Black Moon) is the apogee of the lunar orbit — a geometric point, not a physical body. Mean Lilith is the most used; the true version can differ by 20°–30°.
-- The **White Moon** (Selena) is the point opposite to Lilith, corresponding to the perigee.
 - `mooncross_node_ut` finds the exact moment when the Moon crosses the ecliptic.
 
 ### Functions introduced
@@ -302,7 +283,6 @@ The Moon crosses a node about **twice a month** — once at the ascending node (
 - `calc_true_lilith(jd_tt)` — longitude, latitude, and distance of true Lilith (osculating apogee)
 - `calc_interpolated_apogee(jd_tt)` — interpolated (smoothed) lunar apogee
 - `calc_interpolated_perigee(jd_tt)` — interpolated lunar perigee
-- `calc_white_moon_position(jd_tt)` — White Moon (Selena), opposite to Lilith
 - `mooncross_node_ut(jd_ut)` — next lunar node crossing
 - `MEAN_NODE`, `TRUE_NODE` — lunar nodes via `calc_ut`
 - `MEAN_APOG`, `OSCU_APOG` — lunar apogee via `calc_ut`

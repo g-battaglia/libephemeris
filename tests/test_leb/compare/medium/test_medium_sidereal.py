@@ -1,7 +1,7 @@
 """
 LEB vs Skyfield Comparison: Sidereal Mode (Medium Tier).
 
-Validates sidereal positions for formula-based ayanamsha modes
+Validates sidereal positions across predefined and custom ayanamsha modes
 across the medium tier range (1560-2640).
 """
 
@@ -20,7 +20,7 @@ from libephemeris.constants import (
 )
 
 from tests.test_leb.compare.conftest import (
-    FORMULA_SIDEREAL_MODES,
+    SIDEREAL_MODE_SWEEP,
     CompareHelper,
     generate_test_dates,
     lon_error_arcsec,
@@ -44,12 +44,12 @@ def medium_sidereal_dates() -> list[float]:
 
 
 class TestMediumSiderealPosition:
-    """Sidereal position precision for formula-based modes."""
+    """Sidereal position precision across the public mode sweep."""
 
     @pytest.mark.leb_compare_medium
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", SIDEREAL_BODIES)
-    @pytest.mark.parametrize("sid_mode", FORMULA_SIDEREAL_MODES)
+    @pytest.mark.parametrize("sid_mode", SIDEREAL_MODE_SWEEP)
     def test_sidereal_position(
         self,
         compare: CompareHelper,

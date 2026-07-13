@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Data generation commands: planet centers SPK, lunar corrections, Keplerian elements.
+"""Data generation commands for planet-center SPKs and Keplerian elements.
 
-Replaces 8 poe tasks: generate-planet-centers:*, generate-lunar-corrections,
-keplerian:generate-multi-epoch*.
+Replaces the planet-center and multi-epoch Keplerian poe tasks.
 """
 
 from __future__ import annotations
@@ -21,13 +20,12 @@ def _python(args: list[str]) -> None:
 
 @click.group(
     "generate",
-    short_help="Generate planet-center SPKs, lunar corrections, Keplerian elements.",
+    short_help="Generate planet-center SPKs and Keplerian elements.",
     help="Generate derived data files from raw SPK kernels.\n\n"
     "These are one-time generation steps that produce data files used by\n"
     "the library at runtime. Most developers never need to run these unless\n"
     "they are updating the underlying data or adding new bodies.\n\n"
     "  planet-centers   COB-corrected SPKs for sub-arcsecond gas giant positions\n"
-    "  lunar-corrections  [legacy] Mean lunar element correction tables\n"
     "  keplerian-elements Multi-epoch orbital elements for Keplerian fallback",
 )
 def generate_group() -> None:
@@ -98,24 +96,6 @@ def planet_centers_all() -> None:
 def planet_centers_spk() -> None:
     """(Legacy alias) Same as planet-centers-medium."""
     _python(["scripts/generate_planet_centers_spk.py", "--tier", "medium"])
-
-
-# ===========================================================================
-# Lunar corrections
-# ===========================================================================
-
-
-@generate_group.command(
-    "lunar-corrections",
-    short_help="[legacy] Regenerate mean lunar element correction tables.",
-)
-def lunar_corrections() -> None:
-    """[legacy] Regenerate libephemeris/lunar_corrections.py.
-
-    The tables this writes are not consumed by any runtime path (see
-    CLEAN.md).  Kept for reference.
-    """
-    _python(["scripts/generate_lunar_corrections.py", "--force"])
 
 
 # ===========================================================================

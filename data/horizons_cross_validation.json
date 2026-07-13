@@ -5686,8 +5686,8 @@
       }
     },
     "1.2_lunar_node_lilith": {
-      "note": "True/Mean Node and Lilith validated via pyswisseph hyper-validation (4400 rounds, 0 FAIL). These derived astrological quantities are not directly available as Horizons body positions.",
-      "validation_method": "pyswisseph_comparison"
+      "note": "True/Mean Node and lunar apsides are derived quantities rather than direct Horizons body positions; they are validated with JPL state-vector and IERS/ERFA geometric invariants.",
+      "validation_method": "jpl_iers_invariants"
     },
     "1.3_minor_bodies": {
       "Chiron": {

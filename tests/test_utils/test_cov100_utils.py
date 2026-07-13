@@ -144,7 +144,7 @@ class TestAzaltAndAzaltRevDegenerate:
 
 
 class TestRefracEarlyReturns:
-    """Cover refrac() early-return guards (lines 542 and 552)."""
+    """Cover plain refrac() compatibility clamps."""
 
     @pytest.mark.unit
     def test_true_to_app_below_horizon_returns_input(self):
@@ -155,9 +155,7 @@ class TestRefracEarlyReturns:
 
     @pytest.mark.unit
     def test_app_to_true_below_horizon_threshold_returns_input(self):
-        """Apparent altitude below the horizon refraction threshold is unchanged."""
-        # A clearly negative apparent altitude is below the horizon refraction
-        # value, so the object is geometrically below the horizon.
+        """A reverse candidate that is not positive leaves the input unchanged."""
         alt = -1.0
         out = refrac(alt, 1013.25, 15.0, APP_TO_TRUE)
         assert out == alt
@@ -394,6 +392,42 @@ class TestSplitDegNakshatra:
         """An offset pushing the index to 27 wraps it back to 0 (lines 1537-1538)."""
         result = split_deg(359.9, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ROUND_DEG)
         assert result[4] == 0
+
+    @pytest.mark.unit
+    def test_nakshatra_round_deg_uses_exact_segment_geometry(self):
+        """Rounding follows the exact 360/27 segment geometry."""
+        result = split_deg(0.09, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ROUND_DEG)
+        assert result[4] == 0
+        assert result[:2] == (0, 35)
+
+    @pytest.mark.unit
+    def test_nakshatra_decimal_boundary_normalizes(self):
+        """A longitude beyond one turn is normalized before segmentation."""
+        result = split_deg(373.3333333333333, SPLIT_DEG_NAKSHATRA)
+        assert result[4] == 0
+
+    @pytest.mark.unit
+    def test_negative_nakshatra_flag_uses_ordinary_signed_split(self):
+        """Negative input bypasses nakshatra segmentation by contract."""
+        assert split_deg(-30.5, SPLIT_DEG_NAKSHATRA) == (30, 30, 0, 0.0, -1)
+
+    @pytest.mark.unit
+    def test_zodiac_indices_normalize_and_combined_negative_flag_precedence(self):
+        """Zodiac indices normalize and negative combined flags stay defined."""
+        assert split_deg(370.0, SPLIT_DEG_ZODIACAL)[4] == 0
+        assert split_deg(390.0, SPLIT_DEG_ZODIACAL)[4] == 1
+        assert split_deg(480.0, SPLIT_DEG_ZODIACAL)[4] == 4
+        assert split_deg(-370.0, SPLIT_DEG_ZODIACAL)[4] == 0
+        assert split_deg(-720.0, SPLIT_DEG_ZODIACAL)[4] == 0
+        assert split_deg(-30.5, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ZODIACAL)[4] == 1
+
+    @pytest.mark.unit
+    def test_nakshatra_docstring_documents_normalized_indices(self):
+        """The public docs describe the independent normalized semantics."""
+        doc = split_deg.__doc__ or ""
+        assert "27 exact equal segments" in doc
+        assert "NAKSHATRA alone follows the ordinary signed split" in doc
+        assert "non-negative NAKSHATRA split" in doc
 
 
 class TestSplitDegMain:

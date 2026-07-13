@@ -10,7 +10,7 @@ the IAU 2006 models (``erfa.obl06`` / ``erfa.gmst06``), which are internally
 inconsistent with the library's own frame at deep-time epochs (~5.7" of
 obliquity and ~0.66° of GMST at year -3000).
 
-The IAU 2006 models are used here only as the pre-fix oracle: inside the modern
+The IAU 2006 models are used here only as the pre-fix baseline: inside the modern
 window (1850-2050) the fixes are, by design, a no-op, so the modern result must
 still match them to < 1e-6.
 """
@@ -142,7 +142,7 @@ def test_azalt_roundtrip_self_consistent_at_3000bce():
     assert abs(lat2 - _ECL[1]) * 3600.0 < 1e-3
 
 
-def _azalt_iau2006_oracle(jd_ut1, jd_tt, ecl, geopos):
+def _azalt_iau2006_baseline(jd_ut1, jd_tt, ecl, geopos):
     """Pre-fix azalt (true altitude, azimuth) via IAU 2006 obliquity + GMST."""
     lon, lat, _ = geopos
     eps0 = _obl06_deg(jd_tt)
@@ -169,15 +169,15 @@ def _azalt_iau2006_oracle(jd_ut1, jd_tt, ecl, geopos):
 
 
 def test_azalt_modern_unchanged():
-    """At a modern date azalt matches a from-scratch IAU 2006 (pre-fix) oracle.
+    """At a modern date azalt matches a from-scratch IAU 2006 (pre-fix) baseline.
 
     Near J2000 Vondrák ≡ IAU 2006 to sub-mas, so the fix must not move the
-    modern result. The oracle reproduces the pre-fix algorithm (obl06 mean
+    modern result. The baseline reproduces the pre-fix algorithm (obl06 mean
     obliquity + IAU 2006 GMST) for the true altitude and azimuth.
     """
     jd = _jd_modern()
     az, alt_true, _ = azalt(jd, ECL2HOR, _GEOPOS, 1013.25, 15.0, _ECL)
-    az_ref, alt_ref = _azalt_iau2006_oracle(jd, _jd_tt(jd), _ECL, _GEOPOS)
+    az_ref, alt_ref = _azalt_iau2006_baseline(jd, _jd_tt(jd), _ECL, _GEOPOS)
     assert abs(_wrap180(az - az_ref)) < 1e-6
     assert abs(alt_true - alt_ref) < 1e-6
 

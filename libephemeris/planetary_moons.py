@@ -550,12 +550,10 @@ def calc_moon_position(
     # parent barycenter again would double-count it (~5-30 AU error).
     from .astrometry import apply_aberration_to_position
 
-    C_AU_DAY = 173.144632674240
-    # Light-time retardation applies to EVERY observation center unless
-    # FLG_TRUEPOS — the planet and SPK paths retard helio/bary positions
-    # (measured: Jupiter HELCTR apparent vs TRUEPOS differs ~8.7" in both
-    # this library and the reference); a former helio/bary exemption here
-    # left moon positions geometric, ~10-25" off that convention.
+    C_AU_DAY = 173.144632674240  # speed of light in AU/day (IAU)
+    # Light-time retardation applies to every observation center unless
+    # FLG_TRUEPOS.  The iteration below always uses the physical
+    # satellite-minus-observer distance, including Sun and SSB observers.
     apply_light_time = not (iflag & FLG_TRUEPOS)
     apply_aberr = (
         not (iflag & FLG_TRUEPOS)

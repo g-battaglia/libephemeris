@@ -24,6 +24,7 @@ from libephemeris.leb_groups import LEB1_GROUPS
 # ---------------------------------------------------------------------------
 
 _TIERS = ["base", "medium", "extended"]
+_GROUP_WORKFLOW = "/".join(LEB1_GROUPS)
 
 _TIER_INFO = {
     "base": "de440s, 1850-2150",
@@ -34,8 +35,7 @@ _TIER_INFO = {
 # Partial files merged into the final {tier}.leb — derived from the canonical
 # group partition so a new group (e.g. exotics) is never silently omitted.
 _MERGE_FILES = {
-    tier: [f"data/leb/ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS]
-    for tier in _TIERS
+    tier: [f"data/leb/ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS] for tier in _TIERS
 }
 
 
@@ -52,17 +52,23 @@ def _gen(args: list[str]) -> None:
 @click.group(
     "leb",
     short_help="Generate and verify LEB1 binary ephemeris files (Chebyshev polynomials).",
-    help="Generate and verify LEB1 binary ephemeris files.\n\n"
-    "LEB files store precomputed Chebyshev polynomial approximations of\n"
-    "planetary positions. At runtime they provide ~14x speedup over computing\n"
-    "positions from DE440 kernels via Skyfield.\n\n"
-    "Three precision tiers are available:\n\n"
-    "  base      de440s, 1850-2150    (~53 MB)\n"
-    "  medium    de440,  1550-2650    (~175 MB, default)\n"
-    "  extended  de441, -5000 to 5000 (~1.6 GB)\n\n"
-    "Recommended workflow (avoids macOS multiprocessing deadlocks):\n\n"
-    "  leph leb generate medium groups   # all body groups + merge\n"
-    "  leph leb verify medium            # verify the generated file",
+    help="""Generate and verify LEB1 binary ephemeris files.
+
+LEB files store precomputed Chebyshev polynomial approximations of planetary
+positions. At runtime they provide ~14x speedup over computing positions from
+DE kernels via Skyfield.
+
+\b
+Current full-registry generation presets:
+  base      de440s, 1850-2150       53 independently sourced bodies
+  medium    de440,  1550-2650       53 independently sourced bodies (default)
+  extended  de441, -5000 to +5000  45 bodies (8 NEAs excluded)
+
+\b
+Recommended workflow (avoids macOS multiprocessing deadlocks):
+  leph leb generate medium groups   # all body groups + merge
+  leph leb verify medium            # verify the generated file
+""",
 )
 def leb_group() -> None:
     """LEB1 binary ephemeris management."""
@@ -76,13 +82,18 @@ def leb_group() -> None:
 @click.group(
     "generate",
     short_help="Generate LEB1 files from Skyfield/DE440 (groups, full, single, body).",
-    help="Generate LEB1 binary ephemeris files from Skyfield/DE440 reference data.\n\n"
-    "Each tier has multiple generation modes:\n\n"
-    "  groups      RECOMMENDED: generate planets/asteroids/analytical separately then merge\n"
-    "  full        Generate all bodies at once (may deadlock on macOS)\n"
-    "  single      One body at a time (lowest memory, slowest)\n"
-    "  body <name> Generate specific body(ies) by name or ID\n\n"
-    "Example: leph leb generate medium groups",
+    help=f"""Generate LEB1 binary ephemeris files from Skyfield/DE440 reference data.
+
+\b
+Each tier has multiple generation modes:
+  groups      RECOMMENDED: generate {_GROUP_WORKFLOW} separately, then merge
+  full        Generate all eligible bodies at once (may deadlock on macOS)
+  single      One eligible body at a time (lowest memory, slowest)
+  body <name> Generate specific body(ies) by name or ID
+
+\b
+Example: leph leb generate medium groups
+""",
 )
 def generate_group() -> None:
     """LEB generation commands."""
@@ -121,13 +132,16 @@ def _make_tier_group(tier: str) -> click.Group:
 
     @tier_group.command(
         "full",
-        short_help=f"Generate {tier} tier, all bodies at once + verify.",
+        short_help=f"Generate {tier} tier, all eligible bodies at once + verify.",
     )
     def full() -> None:
-        """Generate all bodies at once + verify."""
+        """Generate all eligible bodies at once + verify."""
         _gen(["--tier", tier, "--verify"])
 
-    full.__doc__ = f"Generate {tier} tier LEB file ({_TIER_INFO[tier]}), all bodies at once + verify."
+    full.__doc__ = (
+        f"Generate {tier} tier LEB file ({_TIER_INFO[tier]}), "
+        "all eligible bodies at once + verify."
+    )
 
     @tier_group.command(
         short_help=f"Generate {tier} tier planets group (Sun-Pluto, Earth).",
@@ -148,15 +162,22 @@ def _make_tier_group(tier: str) -> click.Group:
     asteroids.__doc__ = f"Generate {tier} tier asteroids group (Chiron, Ceres-Vesta)."
 
     @tier_group.command(
-        short_help=f"Generate {tier} tier analytical group (nodes, Lilith, Uranians).",
+        short_help=f"Generate {tier} tier exotic registry group.",
+    )
+    def exotics() -> None:
+        """Generate the centaur, TNO, and near-Earth asteroid registry group."""
+        _gen(["--tier", tier, "--group", "exotics"])
+
+    exotics.__doc__ = f"Generate {tier} tier exotic registry group."
+
+    @tier_group.command(
+        short_help=f"Generate {tier} tier analytical lunar-points group.",
     )
     def analytical() -> None:
-        """Generate analytical group (nodes, Lilith, Uranians)."""
+        """Generate the independently sourced analytical lunar points."""
         _gen(["--tier", tier, "--group", "analytical"])
 
-    analytical.__doc__ = (
-        f"Generate {tier} tier analytical group (nodes, Lilith, Uranians)."
-    )
+    analytical.__doc__ = f"Generate {tier} tier analytical lunar-points group."
 
     @tier_group.command(
         short_help=f"Merge {tier} tier partial files into one .leb + verify.",
@@ -177,9 +198,7 @@ def _make_tier_group(tier: str) -> click.Group:
 
         Recommended over 'full' to avoid macOS multiprocessing deadlocks.
         """
-        steps = [
-            (g, ["--tier", tier, "--group", g]) for g in LEB1_GROUPS
-        ]
+        steps = [(g, ["--tier", tier, "--group", g]) for g in LEB1_GROUPS]
         steps.append(
             ("merge", ["--tier", tier, "--merge", *_MERGE_FILES[tier], "--verify"])
         )
@@ -191,16 +210,20 @@ def _make_tier_group(tier: str) -> click.Group:
             if ret != 0:
                 sys.exit(ret)
 
-    groups.__doc__ = f"Generate {tier} tier via groups ({' + '.join(LEB1_GROUPS)}) then merge."
+    groups.__doc__ = (
+        f"Generate {tier} tier via groups ({' + '.join(LEB1_GROUPS)}) then merge."
+    )
 
     @tier_group.command(
-        short_help=f"Generate {tier} tier one body at a time (lowest memory).",
+        short_help=f"Generate {tier} tier one eligible body at a time (lowest memory).",
     )
     def single() -> None:
-        """Generate one body at a time (lowest memory usage) + verify."""
+        """Generate one eligible body at a time (lowest memory usage) + verify."""
         _gen(["--tier", tier, "--single", "--verify"])
 
-    single.__doc__ = f"Generate {tier} tier one body at a time (lowest memory usage)."
+    single.__doc__ = (
+        f"Generate {tier} tier one eligible body at a time (lowest memory usage)."
+    )
 
     @tier_group.command(
         short_help=f"Generate {tier} tier for specific body(ies) by name/ID.",

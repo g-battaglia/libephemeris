@@ -9,6 +9,8 @@ Verifies that:
 """
 
 import os
+import re
+from pathlib import Path
 
 import libephemeris
 
@@ -37,6 +39,10 @@ class TestDocstringPresence:
         assert len(missing_docstrings) == 0, (
             f"The following public functions are missing docstrings: {missing_docstrings}"
         )
+
+    def test_performance_reset_is_exported(self):
+        """The documented reset_session performance API belongs to __all__."""
+        assert "reset_session" in libephemeris.__all__
 
     def test_core_functions_have_detailed_docstrings(self):
         """Core functions should have detailed docstrings with Args/Returns."""
@@ -113,6 +119,14 @@ class TestDocstringContent:
             "calc_ut should mention Universal Time"
         )
 
+    def test_set_sid_mode_docstring_discloses_predefined_mode_policy(self):
+        """The public docs state that every predefined base mode computes."""
+        docstring = libephemeris.set_sid_mode.__doc__
+        assert docstring is not None
+        normalized = " ".join(docstring.split())
+        assert "base IDs 0--46 are accepted and computed" in normalized
+        assert "SIDBIT projection flags" in normalized
+
     def test_houses_docstring_mentions_house_systems(self):
         """houses docstring should explain house systems."""
         docstring = libephemeris.houses.__doc__
@@ -148,8 +162,8 @@ class TestDocumentationFiles:
         index_path = os.path.join(docs_dir, "index.rst")
         assert os.path.exists(index_path), f"index.rst not found at {index_path}"
 
-    def test_api_reference_has_content(self):
-        """API reference should have substantial content."""
+    def test_api_reference_generates_public_api(self):
+        """API reference should generate content from the runtime public surface."""
         docs_dir = os.path.join(os.path.dirname(__file__), "..", "docs")
         api_ref_path = os.path.join(docs_dir, "api_reference.rst")
 
@@ -157,18 +171,18 @@ class TestDocumentationFiles:
             with open(api_ref_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # Should have at least 10KB of documentation
-            assert len(content) > 10000, (
-                f"API reference seems too short: {len(content)} bytes"
-            )
+            assert ".. automodule:: libephemeris" in content
+            assert ":members:" in content
+            assert ":imported-members:" in content
+            assert ":undoc-members:" in content
+            assert ".. public-data::" in content
 
-            # Should document key functions
+            # The introductory example should exercise key entry points.
             assert "calc_ut" in content, "API reference should document calc_ut"
             assert "julday" in content, "API reference should document julday"
-            assert "houses" in content, "API reference should document houses"
 
-    def test_api_reference_has_sections(self):
-        """API reference should be organized in sections."""
+    def test_api_reference_explains_generated_contract(self):
+        """API reference should state how it stays synchronized with the package."""
         docs_dir = os.path.join(os.path.dirname(__file__), "..", "docs")
         api_ref_path = os.path.join(docs_dir, "api_reference.rst")
 
@@ -176,19 +190,55 @@ class TestDocumentationFiles:
             with open(api_ref_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # Check for major sections
-            expected_sections = [
-                "Time Functions",
-                "Planet",
-                "House",
-                "Ayanamsha",
-                "Constants",
-            ]
+            assert "libephemeris.__all__" in content
+            assert "reset_session" in content
 
-            for section in expected_sections:
-                assert section in content, (
-                    f"API reference should have '{section}' section"
-                )
+    def test_documented_pytest_commands_target_specific_files(self):
+        """Multi-file test instructions must use a registered ``leph`` subgroup."""
+        project_root = Path(__file__).resolve().parents[1]
+        documentation = [
+            project_root / "AGENTS.md",
+            project_root / "CLAUDE.md",
+            project_root / "CLI.md",
+            *(project_root / "docs").rglob("*.md"),
+            *(project_root / "docs").rglob("*.rst"),
+        ]
+        directory_target = re.compile(
+            r"(?m)^\s*(?:[A-Z][A-Z0-9_]*=\S+\s+)*"
+            r"(?:uv run )?(?:python -m )?pytest\s+"
+            r"[\"']?tests/[^\s\"']*/[\"']?(?:\s|$)"
+        )
+        offenders = []
+        for path in documentation:
+            content = path.read_text(encoding="utf-8")
+            for match in directory_target.finditer(content):
+                line = content.count("\n", 0, match.start()) + 1
+                offenders.append(f"{path.relative_to(project_root)}:{line}")
+
+        assert offenders == [], (
+            "direct pytest commands must name a specific file or node: "
+            + ", ".join(offenders)
+        )
+
+    def test_precision_tuning_describes_strict_spk_default(self):
+        """The tuning guide must match the runtime minor-body default."""
+        project_root = Path(__file__).resolve().parents[1]
+        content = (project_root / "docs/guides/precision-tuning.md").read_text(
+            encoding="utf-8"
+        )
+
+        assert "Strict precision is enabled by default" in content
+        assert "SPKRequiredError" in content
+        assert "Keplerian (default)" not in content
+
+    def test_contributor_guides_require_independence_section(self):
+        """Both agent guides must state the project's independence."""
+        project_root = Path(__file__).resolve().parents[1]
+
+        for filename in ("AGENTS.md", "CLAUDE.md"):
+            content = (project_root / filename).read_text(encoding="utf-8")
+            assert "reference API" in content or "## Independence" in content
+            assert "Never inspect, retrieve, possess, read" in content
 
 
 class TestExceptionClass:

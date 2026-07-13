@@ -3,8 +3,8 @@
 """
 ERFA Nutation Integration Module.
 
-This module provides pyerfa-based nutation functions as an optional enhancement
-to the Skyfield-based IAU 2000A/B implementations.
+This module provides the required pyerfa-based nutation functions used by the
+runtime reduction pipeline.
 
 Key functions:
     - erfa.nut00a(): IAU 2000A nutation (equivalent to Skyfield's iau2000a_radians)
@@ -12,8 +12,8 @@ Key functions:
     - erfa.pnm06a(): Combined bias-precession-nutation matrix (IAU 2006/2000A)
 
 Precision comparison:
-    - IAU 2000B (Skyfield default): ~1 milliarcsecond precision (77 terms)
-    - IAU 2000A (Skyfield high-precision): ~0.1 milliarcsecond precision (1365 terms)
+    - IAU 2000B: ~1 milliarcsecond precision (77 terms; comparison only)
+    - IAU 2000A (also Skyfield's default): ~0.1 milliarcsecond precision (1365 terms)
     - IAU 2006/2000A (ERFA nut06a): ~0.01-0.05 milliarcsecond precision
       (IAU 2000A + J2 secular variation + obliquity frame correction)
 

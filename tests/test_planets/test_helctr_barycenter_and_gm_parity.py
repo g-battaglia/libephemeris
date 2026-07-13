@@ -1,27 +1,13 @@
-"""Heliocentric/barycentric barycentre reports and osculating-element GM parity.
+"""Independent invariants for heliocentric and barycentric calculations.
 
-FIX B — heliocentric planet places:
-  * the light-time is retarded over the BARYCENTRIC distance |planet - SSB|/c
-    (not the heliocentric |planet - Sun|/c), which removes a ~0.5" longitude
-    error for the inner planets (and the matching speed bias);
-  * the outer planets are reported as their system BARYCENTRE (no
-    centre-of-body offset), which removes a ~0.05" error (Pluto).
-  The pinned longitudes are parity values (they match the reference to
-  <0.001"). A regression of either half shifts them well beyond the tolerance.
-
-FIX B2 — barycentric (FLG_BARYCTR) giant places:
-  * the giants are likewise reported as their raw system BARYCENTRE (no COB)
-    under FLG_BARYCTR, which removes up to ~0.09" (Pluto) / ~0.05" (Saturn).
-    The BARYCTR light-time already runs on the barycentric distance, so only
-    the COB is skipped. The pinned longitudes are parity values (<0.001").
-
-FIX C — osculating orbital elements:
-  * the two-body mu is G(M_sun + M_planet_system) (not GM_sun alone), which
-    tightens the giants' semi-major axis / aphelion from ~1e-2 AU to <=~2.5e-5;
-  * Earth's heliocentric orbit is derived from the Earth-Moon barycentre.
+These regressions intentionally contain no positions or orbital elements
+captured from another ephemeris.  Expected values are mathematical identities
+or are derived at runtime from the library's independently sourced JPL state.
 """
 
 from __future__ import annotations
+
+import math
 
 import pytest
 
@@ -29,118 +15,157 @@ import libephemeris as lib
 
 _J2000 = 2451545.0
 
-# FIX B: heliocentric ecliptic (lon, lat) in degrees at J2000 — the
-# barycentre place with barycentric light-time (parity to <0.001").
-_HELCTR_LONLAT = {
-    "MERCURY": (253.7715869, -3.0219453),
-    "JUPITER": (36.2881236, -1.1746124),
-    "SATURN": (45.7164531, -2.3032261),
-    "PLUTO": (250.5412181, 11.1617071),
-}
-
-# FIX B2: barycentric ecliptic (lon, lat) in degrees at J2000 — the giants
-# reported as their raw system barycentre (no COB), parity to <0.001".
-_BARYCTR_LONLAT = {
-    "JUPITER": (36.3109046, -1.1739836),
-    "SATURN": (45.7361844, -2.3036915),
-    "URANUS": (316.3935418, -0.6843648),
-    "NEPTUNE": (303.9097217, 0.2424320),
-    "PLUTO": (250.5300157, 11.1602509),
-}
-
-# FIX C: osculating (a, q, Q) in AU at J2000 (parity values).
-_ELEMENTS = {
-    "JUPITER": (5.204266630, 4.950429163, 5.458104098),
-    "SATURN": (9.582017171, 9.048074649, 10.115959693),
-    "NEPTUNE": (30.103639649, 29.766023027, 30.441256271),
-    "EARTH": (0.999996427, 0.983294125, 1.016698730),
-}
-
 
 def _ipl(name: str) -> int:
     return getattr(lib, name)
 
 
-@pytest.mark.parametrize(("name", "lonlat"), list(_HELCTR_LONLAT.items()))
-def test_helctr_position_is_barycentre_with_barycentric_lighttime(name, lonlat) -> None:
+def _signed_angle_delta(after: float, before: float) -> float:
+    return (after - before + 180.0) % 360.0 - 180.0
+
+
+def _norm(vector) -> float:
+    return math.sqrt(sum(float(component) ** 2 for component in vector))
+
+
+@pytest.mark.parametrize("name", ["MERCURY", "JUPITER", "SATURN", "PLUTO"])
+def test_helctr_position_is_finite_spherical_state(name: str) -> None:
     pos, _ret = lib.calc(_J2000, _ipl(name), lib.FLG_SWIEPH | lib.FLG_HELCTR)
-    # 5e-6 deg = 0.018": below it the Mercury barycentric-LT shift (~0.28")
-    # and the outer-planet COB shift (~0.05" Pluto/Saturn, ~0.025" Jupiter)
-    # would all fail, while the LEB/Skyfield floor (~0.003") stays inside.
-    assert pos[0] == pytest.approx(lonlat[0], abs=5e-6)
-    assert pos[1] == pytest.approx(lonlat[1], abs=5e-6)
+    assert all(math.isfinite(value) for value in pos)
+    assert 0.0 <= pos[0] < 360.0
+    assert -90.0 <= pos[1] <= 90.0
+    assert pos[2] > 0.0
 
 
 @pytest.mark.parametrize("name", ["MERCURY", "JUPITER", "PLUTO"])
-def test_helctr_speed_is_derivative_of_position(name) -> None:
-    # The reported HELCTR longitude speed must be the exact derivative of the
-    # reported HELCTR longitude (the barycentric light-time rate fix). The
-    # reference's own speed is self-inconsistent here, so we compare against a
-    # finite difference of the library's position, not the reference.
+def test_helctr_speed_is_derivative_of_position(name: str) -> None:
     flags = lib.FLG_SWIEPH | lib.FLG_HELCTR | lib.FLG_SPEED
     pos, _ret = lib.calc(_J2000, _ipl(name), flags)
     h = 1e-3
     p_lo, _ = lib.calc(_J2000 - h, _ipl(name), flags)
     p_hi, _ = lib.calc(_J2000 + h, _ipl(name), flags)
-    fd = (p_hi[0] - p_lo[0]) / (2.0 * h)
-    # 0.02"/day: finite-difference noise floor; a wrong light-time rate would
-    # leave a ~0.5"/day Mercury bias.
-    assert pos[3] * 3600.0 == pytest.approx(fd * 3600.0, abs=0.02)
+    fd = _signed_angle_delta(p_hi[0], p_lo[0]) / (2.0 * h)
+    assert pos[3] == pytest.approx(fd, abs=0.02 / 3600.0)
 
 
-@pytest.mark.parametrize(("name", "lonlat"), list(_BARYCTR_LONLAT.items()))
-def test_baryctr_position_is_barycentre(name, lonlat) -> None:
-    # The giants' FLG_BARYCTR place is their raw system barycentre (no COB).
+@pytest.mark.parametrize("name", ["JUPITER", "SATURN", "URANUS", "NEPTUNE", "PLUTO"])
+def test_baryctr_position_is_finite_spherical_state(name: str) -> None:
     pos, _ret = lib.calc(_J2000, _ipl(name), lib.FLG_SWIEPH | lib.FLG_BARYCTR)
-    # 5e-6 deg = 0.018": below it the skipped-COB shift (~0.09" Pluto,
-    # ~0.05" Saturn, ~0.02" Jupiter) fails, while the LEB/Skyfield floor
-    # (~0.003") stays inside.
-    assert pos[0] == pytest.approx(lonlat[0], abs=5e-6)
-    assert pos[1] == pytest.approx(lonlat[1], abs=5e-6)
+    assert all(math.isfinite(value) for value in pos)
+    assert 0.0 <= pos[0] < 360.0
+    assert -90.0 <= pos[1] <= 90.0
+    assert pos[2] > 0.0
 
 
-def test_baryctr_truepos_matches_apparent_position() -> None:
-    # The COB is skipped on both the TRUEPOS (no light-time) and apparent
-    # BARYCTR paths, so Pluto's barycentre place differs only by the small
-    # light-time shift — a stray COB on either path would open a ~0.09" gap.
-    tp, _ = lib.calc(_J2000, lib.PLUTO, lib.FLG_SWIEPH | lib.FLG_BARYCTR | lib.FLG_TRUEPOS)
-    ap, _ = lib.calc(_J2000, lib.PLUTO, lib.FLG_SWIEPH | lib.FLG_BARYCTR)
-    # Light-time over ~32 AU moves Pluto's barycentric longitude by ~0.02 deg;
-    # a COB left on only one path would add a further ~0.09" (2.5e-5 deg).
-    assert abs(tp[0] - ap[0]) < 0.03
+def test_baryctr_light_time_is_small_and_nonzero() -> None:
+    true_pos, _ = lib.calc(
+        _J2000, lib.PLUTO, lib.FLG_SWIEPH | lib.FLG_BARYCTR | lib.FLG_TRUEPOS
+    )
+    apparent, _ = lib.calc(_J2000, lib.PLUTO, lib.FLG_SWIEPH | lib.FLG_BARYCTR)
+    delta = abs(_signed_angle_delta(true_pos[0], apparent[0]))
+    assert 0.0 < delta < 1.0
+
+
+def test_jupiter_true_positions_use_a_covered_planet_center() -> None:
+    """HELCTR and BARYCTR retain a covered JPL physical center state."""
+    from libephemeris.planets import get_planet_target
+    from libephemeris.state import (
+        get_planet_center_segment,
+        get_planets,
+        get_timescale,
+    )
+
+    previous_mode = lib.get_calc_mode()
+    lib.set_calc_mode("skyfield")
+    try:
+        planets = get_planets()
+        segment = get_planet_center_segment(599)
+        if segment is None:
+            pytest.skip("Jupiter planet-center SPK is not installed")
+        spk_segment = segment.spk_segment
+        jd_tt = 0.5 * (spk_segment.start_jd + spk_segment.end_jd)
+        epoch = get_timescale().tt_jd(jd_tt)
+        center = get_planet_target(planets, "jupiter").at(epoch).position.au
+        barycenter = planets["jupiter barycenter"].at(epoch).position.au
+        sun = planets["sun"].at(epoch).position.au
+
+        helio_expected = _norm(center - sun)
+        helio_barycenter = _norm(barycenter - sun)
+        bary_expected = _norm(center)
+        bary_barycenter = _norm(barycenter)
+
+        helio, _ = lib.calc(
+            jd_tt,
+            lib.JUPITER,
+            lib.FLG_SWIEPH | lib.FLG_HELCTR | lib.FLG_TRUEPOS,
+        )
+        bary, _ = lib.calc(
+            jd_tt,
+            lib.JUPITER,
+            lib.FLG_SWIEPH | lib.FLG_BARYCTR | lib.FLG_TRUEPOS,
+        )
+        assert helio[2] == pytest.approx(helio_expected, abs=2e-12)
+        assert bary[2] == pytest.approx(bary_expected, abs=2e-12)
+        assert abs(helio[2] - helio_barycenter) > 1e-10
+        assert abs(bary[2] - bary_barycenter) > 1e-10
+    finally:
+        lib.set_calc_mode(previous_mode)
+
+
+def test_mercury_helctr_light_time_uses_sun_to_target_distance() -> None:
+    """The retarded epoch solves |Mercury(t-lt)-Sun(t)| = c*lt."""
+    from libephemeris.fast_calc import C_LIGHT_AU_DAY
+    from libephemeris.planets import get_planet_target
+    from libephemeris.state import get_planets, get_timescale
+
+    previous_mode = lib.get_calc_mode()
+    lib.set_calc_mode("skyfield")
+    try:
+        planets = get_planets()
+        timescale = get_timescale()
+        epoch = timescale.tt_jd(_J2000)
+        target = get_planet_target(planets, "mercury")
+        observer = planets["sun"].at(epoch).position.au
+        relative = target.at(epoch).position.au - observer
+        for _ in range(3):
+            light_time = _norm(relative) / C_LIGHT_AU_DAY
+            emission = timescale.tdb_jd(epoch.whole, epoch.tdb_fraction - light_time)
+            relative = target.at(emission).position.au - observer
+
+        apparent, _ = lib.calc(_J2000, lib.MERCURY, lib.FLG_SWIEPH | lib.FLG_HELCTR)
+        assert apparent[2] == pytest.approx(_norm(relative), abs=2e-12)
+    finally:
+        lib.set_calc_mode(previous_mode)
 
 
 @pytest.mark.parametrize("name", ["JUPITER", "SATURN", "PLUTO"])
-def test_baryctr_speed_is_derivative_of_position(name) -> None:
-    # The reported BARYCTR longitude speed must be the exact derivative of the
-    # reported (barycentre) longitude: skipping the position COB must also skip
-    # the COB velocity rate so the two stay mutually consistent.
+def test_baryctr_speed_is_derivative_of_position(name: str) -> None:
     flags = lib.FLG_SWIEPH | lib.FLG_BARYCTR | lib.FLG_SPEED
     pos, _ret = lib.calc(_J2000, _ipl(name), flags)
     h = 1e-3
     p_lo, _ = lib.calc(_J2000 - h, _ipl(name), flags)
     p_hi, _ = lib.calc(_J2000 + h, _ipl(name), flags)
-    fd = (p_hi[0] - p_lo[0]) / (2.0 * h)
-    # 0.02"/day: finite-difference noise floor; a stray COB velocity rate would
-    # leave a ~0.07"/day Pluto bias.
-    assert pos[3] * 3600.0 == pytest.approx(fd * 3600.0, abs=0.02)
+    fd = _signed_angle_delta(p_hi[0], p_lo[0]) / (2.0 * h)
+    assert pos[3] == pytest.approx(fd, abs=0.02 / 3600.0)
 
 
 def test_sun_heliocentric_stays_origin() -> None:
-    # The Sun is excluded from the barycentric-LT set; its heliocentric place
-    # must remain the origin (a regression would light-time-retard it away).
     pos, _ret = lib.calc(_J2000, lib.SUN, lib.FLG_SWIEPH | lib.FLG_HELCTR)
-    assert pos[2] == pytest.approx(0.0, abs=1e-9)
+    assert pos[2] == pytest.approx(0.0, abs=1e-12)
 
 
-@pytest.mark.parametrize(("name", "aqQ"), list(_ELEMENTS.items()))
-def test_orbital_elements_gm_and_emb(name, aqQ) -> None:
-    el = lib.get_orbital_elements(_J2000, _ipl(name), lib.FLG_SWIEPH | lib.FLG_HELCTR)
-    a, q, Q = el[0], el[15], el[16]
-    # Giants: GM = G(M_sun+M_planet) holds a/Q to ~2.5e-5; a GM_sun-only
-    # regression biases them by ~1e-3..1e-2 AU. Earth: EMB target holds a/Q to
-    # ~5e-7; the Earth-centre orbit wobbles by ~2..9e-4 AU.
-    tol = 3e-5 if name != "EARTH" else 5e-6
-    assert a == pytest.approx(aqQ[0], abs=tol)
-    assert q == pytest.approx(aqQ[1], abs=tol)
-    assert Q == pytest.approx(aqQ[2], abs=tol)
+@pytest.mark.parametrize("name", ["JUPITER", "SATURN", "NEPTUNE", "EARTH"])
+def test_osculating_distance_identities(name: str) -> None:
+    elements = lib.get_orbital_elements(
+        _J2000, _ipl(name), lib.FLG_SWIEPH | lib.FLG_HELCTR
+    )
+    a, eccentricity, perihelion, aphelion = (
+        elements[0],
+        elements[1],
+        elements[15],
+        elements[16],
+    )
+    assert 0.0 <= eccentricity < 1.0
+    assert perihelion == pytest.approx(a * (1.0 - eccentricity), rel=1e-12)
+    assert aphelion == pytest.approx(a * (1.0 + eccentricity), rel=1e-12)
+    assert perihelion < a < aphelion

@@ -300,7 +300,8 @@ def calc_all_arabic_parts(
         Only 'Sun_lat' is optional (defaults to 0.0); the five longitude keys
         above are required.
 
-        For accurate day/night determination at extreme latitudes (|lat| > 60°),
+        For accurate day/night determination at extreme latitudes
+        (``abs(lat) > 60°``),
         provide jd, geo_lat, and geo_lon parameters. This enables 3D horizontal
         coordinate calculation instead of the simplified 2D ecliptic method.
     """
@@ -308,8 +309,7 @@ def calc_all_arabic_parts(
     missing = [k for k in required if k not in positions]
     if missing:
         raise KeyError(
-            "calc_all_arabic_parts missing required position(s): "
-            + ", ".join(missing)
+            "calc_all_arabic_parts missing required position(s): " + ", ".join(missing)
         )
 
     asc = positions["Asc"]

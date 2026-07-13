@@ -153,14 +153,14 @@ class TestObscurationCalculation:
     def test_complete_overlap_moon_larger(self):
         """Test obscuration when Moon completely covers Sun.
 
-        For total eclipses, obscuration = (r_moon/r_sun)^2 which exceeds 1.0,
-        matching reference API behavior.
+        The Sun is fully covered, so the obscured fraction is exactly 1.0:
+        the published definition (fraction of the solar disc area occulted)
+        is bounded by construction.
         """
         r_sun = 0.5
         r_moon = 0.6
         d = 0.0  # same center
-        expected = (r_moon / r_sun) ** 2  # 1.44
-        assert abs(_calculate_obscuration_safe(r_sun, r_moon, d) - expected) < 1e-10
+        assert abs(_calculate_obscuration_safe(r_sun, r_moon, d) - 1.0) < 1e-10
 
     def test_complete_overlap_moon_smaller(self):
         """Test obscuration when Moon is inside Sun (annular)."""

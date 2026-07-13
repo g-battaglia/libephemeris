@@ -75,9 +75,7 @@ class TestErrorMessageFormat:
 
         # Test houses_armc with high latitude
         with pytest.raises(PolarCircleError) as excinfo:
-            ephem.houses_armc(
-                0.0, 85.0, 23.44, ord("P")
-            )  # Placidus at 85° latitude
+            ephem.houses_armc(0.0, 85.0, 23.44, ord("P"))  # Placidus at 85° latitude
 
         error_msg = str(excinfo.value)
         assert "polar circle" in error_msg

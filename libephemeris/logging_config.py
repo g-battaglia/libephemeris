@@ -22,25 +22,28 @@ Log Level Configuration:
     Default is WARNING for quiet production operation.
 
     Examples:
-        LIBEPHEMERIS_LOG_LEVEL=DEBUG pytest -s    # Show all debug messages
+        LIBEPHEMERIS_LOG_LEVEL=DEBUG uv run pytest -s tests/test_tracing.py
         LIBEPHEMERIS_LOG_LEVEL=INFO python app.py # Show download progress
         LIBEPHEMERIS_LOG_LEVEL=ERROR              # Only errors
 
     Programmatic configuration:
         import logging
-        logging.getLogger("libephemeris").setLevel(logging.DEBUG)
+        from libephemeris.logging_config import set_log_level
+        set_log_level(logging.DEBUG)
 
     Or disable logging entirely:
-        logging.getLogger("libephemeris").setLevel(logging.CRITICAL + 1)
+        from libephemeris.logging_config import disable_logging
+        disable_logging()
 
 DEBUG-Level Source Tracing:
-    At DEBUG level, libephemeris logs which calculation backend was used for
-    every celestial body at every dispatch point. The log format is:
+    At DEBUG level, traced calculation and fixed-star entry points log which
+    backend produced each successful caller-facing result. The log format is:
 
         body=<id> jd=<julian_day> source=<SOURCE>
 
     Possible source values: LEB, Skyfield, Horizons, SPK, ASSIST (n-body),
-    Keplerian (fallback). See docs/development/testing.md for details.
+    Keplerian (fallback), Analytical, ERFA, and Mixed. See the computation
+    tracing guide for details.
 """
 
 from __future__ import annotations

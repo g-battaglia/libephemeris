@@ -33,6 +33,15 @@ EXCEPTIONS: dict[str, str] = {
     "libephemeris/moon_theories/tass17.py": "MIT",
     "libephemeris/moon_theories/tass17_data.py": "MIT",
 }
+THIRD_PARTY_COPYRIGHT_LINES: dict[str, str] = {
+    "libephemeris/vendor/spktype21.py": (
+        "# Copyright (c) 2018 The Python Packaging Authority"
+    ),
+    "libephemeris/moon_theories/tass17.py": ("# Copyright (c) 2005 Johannes Gajdosik"),
+    "libephemeris/moon_theories/tass17_data.py": (
+        "# Copyright (c) 2005 Johannes Gajdosik"
+    ),
+}
 THIRD_PARTY_NOTE = (
     "# Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md"
 )
@@ -61,6 +70,8 @@ def header_lines(path: Path) -> list[str]:
     if expr == PROJECT_LICENSE:
         lines.append(COPYRIGHT_LINE)
     else:
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        lines.append(THIRD_PARTY_COPYRIGHT_LINES[rel])
         lines.append(THIRD_PARTY_NOTE)
     return lines
 
@@ -98,6 +109,7 @@ def main() -> int:
 
     missing: list[Path] = []
     mismatched: list[tuple[Path, str, str]] = []
+    missing_copyrights: list[tuple[Path, str]] = []
     files = sorted(
         p for p in PACKAGE_ROOT.rglob("*.py") if "__pycache__" not in p.parts
     )
@@ -105,16 +117,24 @@ def main() -> int:
         head = path.read_text(encoding="utf-8").splitlines()[:HEAD_LINES]
         found = find_spdx(head)
         expected = expected_expression(path)
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        expected_copyright = THIRD_PARTY_COPYRIGHT_LINES.get(rel, COPYRIGHT_LINE)
         if found is None:
             missing.append(path)
         elif found != expected:
             mismatched.append((path, found, expected))
+        if expected_copyright not in head:
+            missing_copyrights.append((path, expected_copyright))
 
     if args.fix:
+        stamped = set(missing)
         for path in missing:
             stamp(path)
             print(f"stamped: {path.relative_to(REPO_ROOT)}")
         missing = []
+        missing_copyrights = [
+            item for item in missing_copyrights if item[0] not in stamped
+        ]
 
     for path in missing:
         print(f"MISSING SPDX header: {path.relative_to(REPO_ROOT)}")
@@ -123,8 +143,13 @@ def main() -> int:
             f"MISMATCHED SPDX header: {path.relative_to(REPO_ROOT)}\n"
             f"  found:    {found}\n  expected: {expected}"
         )
+    for path, expected in missing_copyrights:
+        print(
+            f"MISSING copyright notice: {path.relative_to(REPO_ROOT)}\n"
+            f"  expected: {expected}"
+        )
 
-    problems = len(missing) + len(mismatched)
+    problems = len(missing) + len(mismatched) + len(missing_copyrights)
     print(f"{len(files)} files scanned, {problems} problem(s)")
     return 1 if problems else 0
 

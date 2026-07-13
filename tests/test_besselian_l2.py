@@ -64,7 +64,9 @@ class TestBesselianL2DuringEclipses:
         l2 = calc_besselian_l2(jd_max)
 
         # For a total eclipse, l2 should be positive
-        assert l2 < 0, f"l2 = {l2} should be negative for a total eclipse (NASA convention: the umbral vertex lies beyond the fundamental plane)"
+        assert l2 < 0, (
+            f"l2 = {l2} should be negative for a total eclipse (NASA convention: the umbral vertex lies beyond the fundamental plane)"
+        )
         # l2 should be small (umbral shadow is much smaller than penumbral)
         assert abs(l2) < 0.1, f"l2 = {l2} Earth radii, expected small value"
 
@@ -99,7 +101,9 @@ class TestBesselianL2DuringEclipses:
         l2 = calc_besselian_l2(jd_max)
 
         # For an annular eclipse, l2 should be negative
-        assert l2 > 0, f"l2 = {l2} should be positive for an annular eclipse (NASA convention: the antumbra opens past the vertex)"
+        assert l2 > 0, (
+            f"l2 = {l2} should be positive for an annular eclipse (NASA convention: the antumbra opens past the vertex)"
+        )
         # Absolute value should be small
         assert abs(l2) < 0.1, f"|l2| = {abs(l2)} Earth radii, expected small value"
 
@@ -110,7 +114,9 @@ class TestBesselianL2DuringEclipses:
         l2 = calc_besselian_l2(jd_max)
 
         # For a total eclipse, l2 should be positive
-        assert l2 < 0, f"l2 = {l2} should be negative for the December 2021 total eclipse (NASA convention)"
+        assert l2 < 0, (
+            f"l2 = {l2} should be negative for the December 2021 total eclipse (NASA convention)"
+        )
         assert abs(l2) < 0.1, f"|l2| = {abs(l2)} Earth radii"
 
     def test_june_2021_annular_eclipse(self):
@@ -120,7 +126,9 @@ class TestBesselianL2DuringEclipses:
         l2 = calc_besselian_l2(jd_max)
 
         # For an annular eclipse, l2 should be negative
-        assert l2 > 0, f"l2 = {l2} should be positive for the June 2021 annular eclipse (NASA convention)"
+        assert l2 > 0, (
+            f"l2 = {l2} should be positive for the June 2021 annular eclipse (NASA convention)"
+        )
         assert abs(l2) < 0.1, f"|l2| = {abs(l2)} Earth radii"
 
 
@@ -229,7 +237,9 @@ class TestBesselianL2Validation:
         l2 = calc_besselian_l2(jd_eclipse)
 
         # For total eclipse: positive and small
-        assert l2 < 0, f"l2 = {l2}, should be negative for a total eclipse (NASA convention)"
+        assert l2 < 0, (
+            f"l2 = {l2}, should be negative for a total eclipse (NASA convention)"
+        )
         assert l2 < 0.1, f"l2 = {l2}, expected small umbral radius"
 
     def test_l2_typical_value_during_annular_eclipse(self):
@@ -238,7 +248,9 @@ class TestBesselianL2Validation:
         l2 = calc_besselian_l2(jd_eclipse)
 
         # For annular eclipse: negative (antumbral)
-        assert l2 > 0, f"l2 = {l2}, should be positive for an annular eclipse (NASA convention)"
+        assert l2 > 0, (
+            f"l2 = {l2}, should be positive for an annular eclipse (NASA convention)"
+        )
         assert abs(l2) < 0.1, f"|l2| = {abs(l2)}, expected small antumbral radius"
 
     def test_l2_rate_of_change(self):
@@ -267,7 +279,9 @@ class TestBesselianL2EdgeCases:
         l2 = calc_besselian_l2(jd)
 
         # Should be positive (it was a total eclipse)
-        assert l2 < 0, f"l2 = {l2} for the 1999 total eclipse (negative per the NASA convention)"
+        assert l2 < 0, (
+            f"l2 = {l2} for the 1999 total eclipse (negative per the NASA convention)"
+        )
         assert abs(l2) < 0.2, f"|l2| = {abs(l2)} for 1999 eclipse"
         assert math.isfinite(l2)
 
@@ -340,7 +354,9 @@ class TestBesselianL2VsL1Relationship:
         l2 = calc_besselian_l2(jd)
 
         assert l1 > 0, f"l1 = {l1} should be positive"
-        assert l2 < 0, f"l2 = {l2} should be negative for a total eclipse (NASA convention: the umbral vertex lies beyond the fundamental plane)"
+        assert l2 < 0, (
+            f"l2 = {l2} should be negative for a total eclipse (NASA convention: the umbral vertex lies beyond the fundamental plane)"
+        )
         assert l1 > l2, f"l1 = {l1} should be greater than l2 = {l2}"
 
     def test_sign_consistency_annular_eclipse(self):
@@ -352,4 +368,6 @@ class TestBesselianL2VsL1Relationship:
         l2 = calc_besselian_l2(jd)
 
         assert l1 > 0, f"l1 = {l1} should always be positive"
-        assert l2 > 0, f"l2 = {l2} should be positive for an annular eclipse (NASA convention: the antumbra opens past the vertex)"
+        assert l2 > 0, (
+            f"l2 = {l2} should be positive for an annular eclipse (NASA convention: the antumbra opens past the vertex)"
+        )

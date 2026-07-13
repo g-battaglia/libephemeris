@@ -39,10 +39,10 @@ class TestPhenoBasic:
         result = swe.pheno_ut(JD_J2000, body, FLG_SWIEPH)
         assert len(result) >= 5, f"Not enough values for {name}"
 
-    def test_pheno_sun_illumination_zero(self):
-        """Sun illumination should be 0 (undefined)."""
+    def test_pheno_sun_illumination_inapplicable(self):
+        """Illuminated fraction is inapplicable to the Sun: reported as 0.0."""
         result = swe.pheno_ut(JD_J2000, SUN, FLG_SWIEPH)
-        assert result[1] == 0.0 or math.isnan(result[1])
+        assert result[1] == 0.0
 
     def test_pheno_moon_phase_angle(self):
         """Moon phase angle should be in [0, 180]."""
@@ -122,9 +122,7 @@ class TestPhenoMoonPhases:
 class TestPhenoInnerPlanets:
     """Phenomena for inner planets (Mercury, Venus)."""
 
-    @pytest.mark.parametrize(
-        "body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")]
-    )
+    @pytest.mark.parametrize("body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")])
     def test_max_elongation_bounded(self, body, name):
         """Inner planet elongation should be bounded (< 90°)."""
         max_elong = 0
@@ -137,9 +135,7 @@ class TestPhenoInnerPlanets:
         else:
             assert max_elong < 50, f"Venus max elongation {max_elong}° > 50"
 
-    @pytest.mark.parametrize(
-        "body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")]
-    )
+    @pytest.mark.parametrize("body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")])
     def test_illumination_varies_with_elongation(self, body, name):
         """Inner planet illumination should correlate with elongation."""
         # At small elongation (near Sun), can be nearly full or nearly new

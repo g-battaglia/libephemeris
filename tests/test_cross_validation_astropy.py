@@ -255,14 +255,6 @@ class TestIlluminatedFraction:
             phase = float(result[1])
             assert 0.0 <= phase <= 1.0, f"Body {body_id}: phase {phase} not in [0, 1]"
 
-    def test_sun_fully_illuminated(self):
-        """Sun illuminated fraction is 0.0 in the reference ephemeris (phase angle = 0, special case)."""
-        jd = 2451545.0
-        result = ephem.pheno_ut(jd, SUN, 256)
-        phase = float(result[1])
-        # the reference ephemeris returns phase=0.0 for Sun (not 1.0) — it's a special case
-        assert abs(phase) < 0.001, f"Sun phase {phase} != 0.0"
-
     def test_phase_consistent_with_phase_angle(self):
         """Phase = (1 + cos(phase_angle)) / 2 for all bodies."""
         jd = 2451545.0

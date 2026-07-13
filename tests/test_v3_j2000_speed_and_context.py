@@ -1,7 +1,7 @@
-"""Regression tests for two v3 parity fixes.
+"""Independent invariants for two v3 frame/context fixes.
 
 Fix 1 — FLG_J2000 velocity is precessed consistently with the position for
-analytic bodies (lunar nodes, Lilith, apsides, Uranians/Transpluto). Before the
+analytic bodies (lunar nodes, Lilith, apsides, and Harrington). Before the
 fix, ``calc_ut(jd, MEAN_NODE, FLG_SPEED | FLG_J2000)`` returned the *of-date*
 longitude speed (the velocity was left in the of-date frame while only the
 position was precessed), and ``FLG_J2000 | FLG_EQUATORIAL`` rotated an of-date
@@ -15,8 +15,7 @@ sidereal *mode* and ran the call without swapping in the context's sidereal
 state, so ``get_ayanamsa`` read the reference epoch and offset from the module
 globals instead of the context, and the read was unlocked.
 
-The reference oracle values below are hardcoded so the tests do not depend on an
-external ephemeris/oracle being installed.
+No output from the reference API is stored in this module.
 """
 
 from __future__ import annotations
@@ -26,7 +25,6 @@ import pytest
 import libephemeris as le
 from libephemeris import state
 from libephemeris.constants import (
-    CUPIDO,
     FLG_EQUATORIAL,
     FLG_J2000,
     FLG_SIDEREAL,
@@ -42,14 +40,6 @@ from libephemeris.context import EphemerisContext
 # --------------------------------------------------------------------------- #
 
 JD = 2451545.0  # J2000.0 epoch (UT); a stable, well-conditioned test date.
-
-# Oracle values from the reference API at JD, MEAN_NODE, calc_ut:
-#   FLG_SPEED                          -> of-date longitude speed (deg/day)
-#   FLG_SPEED|FLG_J2000                -> J2000 ecliptic longitude speed
-#   FLG_SPEED|FLG_J2000|FLG_EQUATORIAL -> J2000 equatorial RA speed
-OFDATE_DLON_ORACLE = -0.05295180120390604
-J2000_DLON_ORACLE = -0.05299201972488722
-J2000_EQ_DRA_ORACLE = -0.05438733708789955
 
 ARCSEC_PER_DEG = 3600.0
 
@@ -107,33 +97,6 @@ class TestJ2000NodeSpeed:
             f'expected ~0.1377"/day (general precession)'
         )
 
-    def test_j2000_speed_matches_oracle(self, skyfield_backend):
-        """J2000 node longitude speed matches the hardcoded oracle value."""
-        j2000 = le.calc_ut(JD, MEAN_NODE, FLG_SPEED | FLG_J2000)[0][3]
-        err_arcsec = abs(j2000 - J2000_DLON_ORACLE) * ARCSEC_PER_DEG
-        assert err_arcsec < 0.03, (
-            f"J2000 node speed {j2000:.10f} vs oracle {J2000_DLON_ORACLE:.10f}: "
-            f'{err_arcsec:.4f}"/day'
-        )
-
-    def test_ofdate_speed_unchanged_and_matches_oracle(self, skyfield_backend):
-        """Regression guard: the correct of-date speed must NOT change."""
-        ofdate = le.calc_ut(JD, MEAN_NODE, FLG_SPEED)[0][3]
-        err_arcsec = abs(ofdate - OFDATE_DLON_ORACLE) * ARCSEC_PER_DEG
-        assert err_arcsec < 0.01, (
-            f"of-date node speed {ofdate:.10f} vs oracle "
-            f'{OFDATE_DLON_ORACLE:.10f}: {err_arcsec:.4f}"/day'
-        )
-
-    def test_j2000_equatorial_dra_matches_oracle(self, skyfield_backend):
-        """J2000 + EQUATORIAL RA speed matches the oracle (was frame-mixed)."""
-        dra = le.calc_ut(JD, MEAN_NODE, FLG_SPEED | FLG_J2000 | FLG_EQUATORIAL)[0][3]
-        err_arcsec = abs(dra - J2000_EQ_DRA_ORACLE) * ARCSEC_PER_DEG
-        assert err_arcsec < 0.03, (
-            f"J2000 equatorial node dRA {dra:.10f} vs oracle "
-            f'{J2000_EQ_DRA_ORACLE:.10f}: {err_arcsec:.4f}"/day'
-        )
-
     @pytest.mark.parametrize("ipl", [MEAN_NODE, MEAN_APOG])
     @pytest.mark.parametrize(
         "flags",
@@ -145,7 +108,7 @@ class TestJ2000NodeSpeed:
         """Reference-free: the returned J2000 speed is d(J2000 position)/dt.
 
         This is the frame-consistency invariant the fix restores and does not
-        depend on the oracle.
+        depend on any external reference.
         """
         dt = 0.05
         pos_m = le.calc_ut(JD - dt, ipl, flags)[0][0]
@@ -157,33 +120,6 @@ class TestJ2000NodeSpeed:
             f"body {ipl} flags {flags}: returned speed {returned:.10f} vs "
             f'numerical {numerical:.10f}: {err_arcsec:.4f}"/day'
         )
-
-
-class TestUranianOfDateSpeed:
-    def test_ofdate_speed_is_derivative_of_ofdate_position(self, skyfield_backend):
-        """Uranian of-date speed is now the derivative of the of-date position.
-
-        Before the fix the velocity was left in the J2000 frame while the
-        position was precessed to date, so it was off by the precession rate.
-        """
-        dt = 0.5  # match the analytic velocity smoothing window
-        flags = FLG_SPEED
-        pos_m = le.calc_ut(JD - dt, CUPIDO, flags)[0][0]
-        pos_p = le.calc_ut(JD + dt, CUPIDO, flags)[0][0]
-        numerical = _lon_diff_deg(pos_p, pos_m) / (2.0 * dt)
-        returned = le.calc_ut(JD, CUPIDO, flags)[0][3]
-        err_arcsec = abs(returned - numerical) * ARCSEC_PER_DEG
-        assert err_arcsec < 0.05, (
-            f"Uranian of-date speed {returned:.10f} vs numerical "
-            f'{numerical:.10f}: {err_arcsec:.4f}"/day'
-        )
-
-    def test_j2000_output_unchanged(self, skyfield_backend):
-        """The J2000 Uranian output (its natural frame) is left untouched."""
-        r = le.calc_ut(JD, CUPIDO, FLG_SPEED | FLG_J2000)[0]
-        # Natural heliocentric-orbit J2000 frame; sanity bounds only.
-        assert 0.0 <= r[0] < 360.0
-        assert abs(r[3]) < 1.0
 
 
 # --------------------------------------------------------------------------- #

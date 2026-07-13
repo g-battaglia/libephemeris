@@ -102,7 +102,9 @@ def _raw_segments(n_seg: int, degree: int = DEGREE, components: int = COMPONENTS
     return arr.tobytes()
 
 
-def _compress(raw: bytes, n_seg: int, degree: int = DEGREE, components: int = COMPONENTS):
+def _compress(
+    raw: bytes, n_seg: int, degree: int = DEGREE, components: int = COMPONENTS
+):
     """Compress raw coefficients with the zstd-truncate-shuffle pipeline."""
     deg1 = degree + 1
     bits = [52] * deg1  # keep all mantissa bits — lossless round trip
@@ -178,7 +180,7 @@ def _build_v2_file(
     # Lay out blob offsets.
     blob_layout = []  # (blob_offset, blob)
     cursor = blobs_off
-    for (_ss, _cnt, blob, _u) in chunk_specs:
+    for _ss, _cnt, blob, _u in chunk_specs:
         blob_layout.append((cursor, blob))
         cursor += len(blob)
 
@@ -275,7 +277,7 @@ def _build_v2_file(
                 segment_count=cnt,
             ),
         )
-    for (boff, blob) in blob_layout:
+    for boff, blob in blob_layout:
         buf[boff : boff + len(blob)] = blob
 
     if with_nutation:
@@ -376,9 +378,7 @@ def _build_v1_file(
     write_section_dir(
         buf,
         sec_dir_off,
-        SectionEntry(
-            SECTION_BODY_INDEX, body_idx_off, COMPRESSED_BODY_ENTRY_SIZE
-        ),
+        SectionEntry(SECTION_BODY_INDEX, body_idx_off, COMPRESSED_BODY_ENTRY_SIZE),
     )
     write_compressed_body_entry(
         buf,
@@ -719,9 +719,7 @@ class TestEvalBodyChunked:
         contain ``seg_idx``; the +/-1 neighbour scan recovers the correct
         chunk instead of raising.
         """
-        path = _build_v2_file(
-            tmp_path / "neigh.leb2", n_seg=30, chunk_segments=10
-        )
+        path = _build_v2_file(tmp_path / "neigh.leb2", n_seg=30, chunk_segments=10)
         reader = LEB2Reader(path)
         try:
             chunks = reader._chunk_index[SUN]
@@ -742,9 +740,7 @@ class TestEvalBodyChunked:
     @pytest.mark.unit
     def test_neighbour_chunk_search_not_found(self, tmp_path):
         """No covering neighbour chunk -> corrupted-index ValueError (line 376)."""
-        path = _build_v2_file(
-            tmp_path / "notfound.leb2", n_seg=30, chunk_segments=10
-        )
+        path = _build_v2_file(tmp_path / "notfound.leb2", n_seg=30, chunk_segments=10)
         reader = LEB2Reader(path)
         try:
             chunks = reader._chunk_index[SUN]
@@ -810,9 +806,7 @@ class TestEvalBodyChunked:
     @pytest.mark.unit
     def test_longitude_wrap_for_ecliptic(self, tmp_path):
         """Ecliptic-frame bodies wrap longitude into [0, 360) (line 418)."""
-        path = _build_v2_file(
-            tmp_path / "ecl.leb2", coord_type=COORD_ECLIPTIC
-        )
+        path = _build_v2_file(tmp_path / "ecl.leb2", coord_type=COORD_ECLIPTIC)
         reader = LEB2Reader(path)
         try:
             pos, _vel = reader.eval_body(SUN, JD0 + 5.0)

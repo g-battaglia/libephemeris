@@ -13,7 +13,7 @@ from libephemeris.constants import (
 )
 
 from tests.test_leb.compare.conftest import (
-    FORMULA_SIDEREAL_MODES,
+    SIDEREAL_MODE_SWEEP,
     CompareHelper,
     generate_test_dates,
     lon_error_arcsec,
@@ -39,7 +39,7 @@ class TestBaseSiderealPrecision:
     @pytest.mark.leb_compare_base
     @pytest.mark.slow
     @pytest.mark.parametrize("body_id,body_name", SIDEREAL_BODIES)
-    @pytest.mark.parametrize("sid_mode", FORMULA_SIDEREAL_MODES)
+    @pytest.mark.parametrize("sid_mode", SIDEREAL_MODE_SWEEP)
     def test_sidereal_all(
         self,
         compare: CompareHelper,

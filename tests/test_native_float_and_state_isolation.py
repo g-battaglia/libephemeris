@@ -10,6 +10,7 @@ setting only shows as a wrong number in an unrelated later call):
     effect — a geocentric call is unaffected by a topo change, a tropical call by
     a sidereal mode, and switching backend/ayanamsha and back is reproducible.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -17,9 +18,21 @@ import pytest
 
 import libephemeris as L
 from libephemeris.constants import (
-    SUN, MOON, MARS, PLUTO, MEAN_NODE, TRUE_NODE, MEAN_APOG,
-    FLG_SWIEPH, FLG_SPEED, FLG_EQUATORIAL, FLG_XYZ, FLG_HELCTR, FLG_J2000,
-    FLG_SIDEREAL, FLG_TOPOCTR,
+    SUN,
+    MOON,
+    MARS,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_XYZ,
+    FLG_HELCTR,
+    FLG_J2000,
+    FLG_SIDEREAL,
+    FLG_TOPOCTR,
 )
 
 JD = 2451545.0
@@ -27,8 +40,14 @@ CERES = 10000 + 1
 CHIRON = 10000 + 2060
 
 _BODIES = [SUN, MOON, MARS, PLUTO, MEAN_NODE, TRUE_NODE, MEAN_APOG, CERES, CHIRON]
-_FLAGS = [FLG_SWIEPH, FLG_SWIEPH | FLG_SPEED, FLG_SWIEPH | FLG_EQUATORIAL,
-          FLG_SWIEPH | FLG_XYZ, FLG_SWIEPH | FLG_HELCTR, FLG_SWIEPH | FLG_J2000]
+_FLAGS = [
+    FLG_SWIEPH,
+    FLG_SWIEPH | FLG_SPEED,
+    FLG_SWIEPH | FLG_EQUATORIAL,
+    FLG_SWIEPH | FLG_XYZ,
+    FLG_SWIEPH | FLG_HELCTR,
+    FLG_SWIEPH | FLG_J2000,
+]
 
 
 @pytest.fixture(autouse=True)
@@ -71,14 +90,16 @@ def test_topocentric_actually_differs():
 
 
 def test_sidereal_mode_isolation():
-    L.set_sid_mode(0, 0.0, 0.0)  # Fagan-Bradley
-    fb = L.calc_ut(JD, MOON, FLG_SWIEPH | FLG_SIDEREAL)[0][0]
-    L.set_sid_mode(1, 0.0, 0.0)  # Lahiri
-    lah = L.calc_ut(JD, MOON, FLG_SWIEPH | FLG_SIDEREAL)[0][0]
-    L.set_sid_mode(0, 0.0, 0.0)  # back to Fagan-Bradley
-    fb2 = L.calc_ut(JD, MOON, FLG_SWIEPH | FLG_SIDEREAL)[0][0]
-    assert abs(fb - fb2) < 1e-9, "stale ayanamsha state after switching modes"
-    assert abs((fb - lah + 180) % 360 - 180) * 3600.0 > 100.0  # modes differ
+    L.set_sid_mode(L.SIDM_J2000)
+    j2000 = L.calc_ut(JD, MOON, FLG_SWIEPH | FLG_SIDEREAL)[0][0]
+    L.set_sid_mode(L.SIDM_J1900)
+    j1900 = L.calc_ut(JD, MOON, FLG_SWIEPH | FLG_SIDEREAL)[0][0]
+    L.set_sid_mode(L.SIDM_J2000)
+    j2000_again = L.calc_ut(JD, MOON, FLG_SWIEPH | FLG_SIDEREAL)[0][0]
+    assert abs(j2000 - j2000_again) < 1e-9, (
+        "stale ayanamsha state after switching modes"
+    )
+    assert abs((j2000 - j1900 + 180) % 360 - 180) * 3600.0 > 100.0
 
 
 def test_tropical_not_polluted_by_sidereal_mode():

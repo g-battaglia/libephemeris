@@ -41,9 +41,7 @@ class TestOrbitMaxMinTrueDistanceBasic:
     def test_min_less_than_max(self):
         """Minimum distance should be less than maximum distance."""
         jd = 2451545.0
-        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(
-            jd, MARS, 0
-        )
+        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(jd, MARS, 0)
 
         assert min_dist < max_dist
 
@@ -79,9 +77,7 @@ class TestOrbitMaxMinTrueDistanceMoon:
     def test_moon_min_is_perigee(self):
         """Moon minimum distance should be approximately perigee (~0.0024 AU)."""
         jd = 2451545.0
-        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(
-            jd, MOON, 0
-        )
+        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(jd, MOON, 0)
 
         # Moon perigee is about 356,500 km = 0.00238 AU
         assert 0.0020 < min_dist < 0.0026
@@ -90,9 +86,7 @@ class TestOrbitMaxMinTrueDistanceMoon:
     def test_moon_max_is_apogee(self):
         """Moon maximum distance should be approximately apogee (~0.0027 AU)."""
         jd = 2451545.0
-        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(
-            jd, MOON, 0
-        )
+        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(jd, MOON, 0)
 
         # Moon apogee is about 406,700 km = 0.00272 AU
         assert 0.0025 < max_dist < 0.0030
@@ -117,9 +111,7 @@ class TestOrbitMaxMinTrueDistanceInnerPlanets:
     def test_venus_distance_range(self):
         """Venus min/max distances should be reasonable."""
         jd = 2451545.0
-        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(
-            jd, VENUS, 0
-        )
+        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(jd, VENUS, 0)
 
         # Venus: min ~0.26 AU (inferior conjunction), max ~1.74 AU (superior conjunction)
         assert 0.2 < min_dist < 0.4
@@ -133,9 +125,7 @@ class TestOrbitMaxMinTrueDistanceOuterPlanets:
     def test_mars_distance_range(self):
         """Mars min/max distances should be reasonable."""
         jd = 2451545.0
-        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(
-            jd, MARS, 0
-        )
+        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(jd, MARS, 0)
 
         # Mars: min ~0.37 AU (opposition at perihelion), max ~2.68 AU (conjunction at aphelion)
         assert 0.3 < min_dist < 0.6
@@ -157,9 +147,7 @@ class TestOrbitMaxMinTrueDistanceOuterPlanets:
     def test_saturn_distance_range(self):
         """Saturn min/max distances should be reasonable."""
         jd = 2451545.0
-        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(
-            jd, SATURN, 0
-        )
+        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(jd, SATURN, 0)
 
         # Saturn: min ~8.0 AU, max ~11.1 AU
         assert 7.5 < min_dist < 9.0
@@ -169,9 +157,7 @@ class TestOrbitMaxMinTrueDistanceOuterPlanets:
     def test_uranus_distance_range(self):
         """Uranus min/max distances should be reasonable."""
         jd = 2451545.0
-        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(
-            jd, URANUS, 0
-        )
+        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(jd, URANUS, 0)
 
         # Uranus: min ~17.3 AU, max ~21.1 AU
         assert 16.5 < min_dist < 19.0
@@ -193,9 +179,7 @@ class TestOrbitMaxMinTrueDistanceOuterPlanets:
     def test_pluto_distance_range(self):
         """Pluto min/max distances should be reasonable."""
         jd = 2451545.0
-        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(
-            jd, PLUTO, 0
-        )
+        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(jd, PLUTO, 0)
 
         # Pluto: min ~28.8 AU (at perihelion opposition), max ~50.3 AU (at aphelion conjunction)
         assert 28.0 < min_dist < 32.0

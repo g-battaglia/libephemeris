@@ -19,25 +19,30 @@ This guide explains how to achieve maximum precision in LibEphemeris using optio
 
 LibEphemeris offers different precision levels depending on your requirements:
 
-| Feature | Default Precision | Enhanced Precision | How to Enable |
-|---------|-------------------|-------------------|---------------|
-| Planets | Sub-arcsecond | Sub-arcsecond | Built-in with DE440 |
-| Minor Bodies | ~1-10 arcminutes | ~1-5 arcseconds | SPK kernels |
-| Delta T | Skyfield model | IERS observed | IERS data download |
-| Historical dates | DE440 (1550-2650) | Extended range | DE441/DE431 |
+| Feature | Default behavior | Alternative | How to configure |
+|---------|------------------|-------------|------------------|
+| Planets | Sub-arcsecond with DE440 | Extended time range | Select DE441/DE431 |
+| Minor bodies | Require or auto-download sub-arcsecond SPK data for mapped bodies | Permit lower-precision N-body/Keplerian fallbacks | `set_strict_precision(False)` |
+| Delta T | Skyfield model | IERS observed | Download IERS data |
+| Historical dates | DE440 (1550-2650) | Extended range | Select DE441/DE431 |
 
 ---
 
 ## SPK Kernels for Minor Bodies
 
-By default, minor bodies (asteroids, centaurs, TNOs) are calculated using Keplerian orbital elements with secular perturbations. For significantly higher precision, you can use SPK kernels from JPL.
+Strict precision is enabled by default. For mapped minor bodies (asteroids,
+centaurs, and TNOs), LibEphemeris uses an already registered JPL SPK kernel or
+attempts to download one; if neither is available, it raises
+`SPKRequiredError` instead of silently returning a low-precision result.
+Keplerian and optional N-body fallbacks remain available when strict precision
+is explicitly disabled, and for bodies outside the SPK map.
 
 ### Precision Comparison
 
 | Method | Typical Accuracy | Use Case |
 |--------|------------------|----------|
-| Keplerian (default) | ~1-10 arcminutes | Quick estimates, historical charts |
-| SPK kernel | ~1-5 arcseconds | Precise calculations, transit timing |
+| SPK kernel (default requirement for mapped bodies) | Sub-arcsecond | Precise calculations, transit timing |
+| Keplerian (explicit fallback) | Arcminutes near the element epoch; potentially degrees over decades | Quick estimates when lower precision is acceptable |
 
 ### Manual SPK Download and Registration
 
@@ -299,25 +304,24 @@ from libephemeris.constants import TIDAL_AUTOMATIC, TIDAL_DE440
 set_tid_acc(TIDAL_DE440)  # When using de440.bsp (default)
 print(f"Tidal acceleration: {get_tid_acc()}")
 
-# Restore the automatic default (DE440-based, -25.936)
+# Restore the public-API automatic default (-25.80)
 set_tid_acc(TIDAL_AUTOMATIC)
 ```
 
 Note: `set_tid_acc(0.0)` sets a literal tidal acceleration of zero — use
 the `TIDAL_AUTOMATIC` sentinel (999999) to return to the automatic
-default.
+default. Delta-T queries are pure: `deltat_ex()` applies its flag-selected
+acceleration to the returned value only, and `get_tid_acc()` changes
+exclusively through `set_tid_acc()`. A user-defined Delta T is a hard
+override and is never tidally adjusted.
 
 ---
 
 ## Automatic SPK Download
 
-For convenience, LibEphemeris can automatically download SPK kernels on demand using `astroquery`.
-
-### Installation
-
-```bash
-pip install astroquery
-```
+For convenience, LibEphemeris can automatically download SPK kernels on demand
+with its built-in direct HTTPS client for NASA JPL Horizons. No optional Python
+package is required for this runtime path.
 
 ### Enabling Automatic SPK Download
 

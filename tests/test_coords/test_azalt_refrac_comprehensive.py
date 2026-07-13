@@ -191,11 +191,11 @@ class TestRefrac:
     """Test refrac atmospheric refraction."""
 
     def test_horizon_refraction(self):
-        """Refraction at the horizon should be ~34 arcminutes."""
+        """Default plain-API refraction at the horizon is about 28.6'."""
         app_alt = swe.refrac(0.0, 1013.25, 15.0, TRUE_TO_APP)
         refraction = app_alt  # true alt = 0, so refraction = apparent alt
-        assert 0.4 < refraction < 0.7, (
-            f"Horizon refraction {refraction}° (expected ~0.57° = 34')"
+        assert 0.45 < refraction < 0.5, (
+            f"Horizon refraction {refraction}° (expected ~0.48° = 28.6')"
         )
 
     def test_refrac_true_to_app_positive(self):
@@ -227,9 +227,9 @@ class TestRefrac:
             f"Round-trip error: {true_alt} -> {app_alt} -> {recovered}"
         )
 
-    @pytest.mark.parametrize("true_alt", [0.0, 5.0, 15.0, 30.0, 60.0, 85.0])
+    @pytest.mark.parametrize("true_alt", [0.1, 5.0, 15.0, 30.0, 60.0, 85.0])
     def test_refrac_round_trip_various(self, true_alt):
-        """Round-trip should work for various altitudes."""
+        """Away from the horizon clamp, round trips remain close."""
         app_alt = swe.refrac(true_alt, 1013.25, 15.0, TRUE_TO_APP)
         recovered = swe.refrac(app_alt, 1013.25, 15.0, APP_TO_TRUE)
         assert abs(recovered - true_alt) < 0.02, (
@@ -264,9 +264,7 @@ class TestRefracExtended:
 
     def test_details_all_finite(self):
         """All detail values should be finite."""
-        _, details = swe.refrac_extended(
-            10.0, 0.0, 1013.25, 15.0, 0.0065, TRUE_TO_APP
-        )
+        _, details = swe.refrac_extended(10.0, 0.0, 1013.25, 15.0, 0.0065, TRUE_TO_APP)
         for i, val in enumerate(details):
             assert math.isfinite(val), f"Detail[{i}] = {val} not finite"
 
@@ -280,9 +278,7 @@ class TestRefracExtended:
 
     def test_sea_level_minimal_dip(self):
         """At sea level, dip should be ~0."""
-        _, details = swe.refrac_extended(
-            10.0, 0.0, 1013.25, 15.0, 0.0065, TRUE_TO_APP
-        )
+        _, details = swe.refrac_extended(10.0, 0.0, 1013.25, 15.0, 0.0065, TRUE_TO_APP)
         dip = details[3]
         assert abs(dip) < 0.1, f"Sea level dip: {dip}° (expected ~0)"
 

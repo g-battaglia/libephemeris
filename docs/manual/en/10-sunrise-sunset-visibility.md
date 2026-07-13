@@ -239,7 +239,7 @@ At the summer solstice in Milan (45° N), astronomical twilight never completely
 
 **Refraction** is the bending of light caused by the Earth's atmosphere. The atmosphere is denser at the bottom and more rarefied at the top, and light follows a curve instead of a straight line. The effect is greatest at the horizon and decreases as you look higher up:
 
-- At the horizon (0°): **~34'** of refraction — almost the diameter of the Sun!
+- At the horizon (0°): **~29'** with the API defaults — almost the diameter of the Sun!
 - At 10° of altitude: ~5'
 - At 45°: ~1'
 - At the zenith (90°): 0' (light arrives vertically, no bending)
@@ -251,13 +251,13 @@ import libephemeris as ephem
 
 # From true to apparent altitude
 true_alt = 0.0  # object exactly at the geometric horizon
-apparent_alt = ephem.refrac(true_alt, calc_flag=ephem.TRUE_TO_APP)
+apparent_alt = ephem.refrac(true_alt, flag=ephem.TRUE_TO_APP)
 print(f"True altitude: {true_alt:.2f}° → apparent: {apparent_alt:.2f}°")
-# → about 0.57° (34 arcminutes above the horizon)
+# → about 0.48° (29 arcminutes above the horizon)
 
 # From apparent to true
 app_alt = 5.0
-true_alt2 = ephem.refrac(app_alt, calc_flag=ephem.APP_TO_TRUE)
+true_alt2 = ephem.refrac(app_alt, flag=ephem.APP_TO_TRUE)
 print(f"Apparent altitude: {app_alt:.2f}° → true: {true_alt2:.2f}°")
 ```
 
@@ -266,6 +266,11 @@ True altitude: 0.00° → apparent: 0.48°
 Apparent altitude: 5.00° → true: 4.84°
 ```
 
+The two directions use the published Sæmundsson and Bennett closed forms
+rather than being exact numerical inverses. Near the horizon, a conversion
+that would produce a non-positive output returns the input altitude unchanged.
+Set `atpress=0` to disable refraction.
+
 Refraction depends on atmospheric conditions — pressure and temperature:
 
 ```python
@@ -273,20 +278,26 @@ import libephemeris as ephem
 
 # Refraction at different temperatures (at the horizon)
 for temp in [-20, 0, 15, 35]:
-    r = ephem.refrac(0.0, pressure=1013.25, temperature=temp)
+    r = ephem.refrac(0.0, atpress=1013.25, attemp=temp)
     print(f"T = {temp:+3d}°C → refraction at the horizon: {r:.2f}°")
 ```
 
 ```
-T = -20°C → refraction at the horizon: 0.54°
-T =  +0°C → refraction at the horizon: 0.50°
+T = -20°C → refraction at the horizon: 0.56°
+T =  +0°C → refraction at the horizon: 0.51°
 T = +15°C → refraction at the horizon: 0.48°
-T = +35°C → refraction at the horizon: 0.45°
+T = +35°C → refraction at the horizon: 0.43°
 ```
 
 ### Extended refraction: observers at high altitudes
 
 If you observe from a mountain or an airplane, the horizon is lower than normal (the "dip of the horizon" or simply "dip"). The `refrac_extended` function takes this into account:
+
+Unlike the compact `refrac` approximations, the extended function traces the
+ray through an ICAO Standard Atmosphere profile and applies the geometric
+horizon dip. Results therefore depend on the chosen physical atmosphere and
+need not match software that uses a different continuation near or below the
+horizon.
 
 ```python
 import libephemeris as ephem
@@ -296,9 +307,9 @@ alt_obj = 0.5  # object half a degree above the geometric horizon
 
 alt_result, details = ephem.refrac_extended(
     alt_obj,
-    altitude_geo=4810.0,  # observer's altitude in meters
-    pressure=550.0,       # reduced pressure at high altitude
-    temperature=-10.0     # cold!
+    geoalt=4810.0,   # observer's altitude in meters
+    atpress=550.0,   # reduced pressure at high altitude
+    attemp=-10.0,    # cold!
 )
 
 true_alt, app_alt, refraction, dip = details
@@ -311,9 +322,9 @@ print(f"Dip of the horizon:  {dip:.3f}°")
 
 ```
 True altitude:       0.500°
-Apparent altitude:   0.744°
-Refraction:          0.244°
-Dip of the horizon:  -1.926°
+Apparent altitude:   0.748°
+Refraction:          0.248°
+Dip of the horizon:  -2.035°
 ```
 
 ### Custom horizon
@@ -366,10 +377,10 @@ lat, lon = 30.0, 31.2  # Cairo (where the Egyptians observed it)
 jd_event, *_ = ephem.heliacal_ut(
     jd,
     geopos=(31.2, 30.0, 0.0),      # Cairo (lon, lat, alt)
-    datm=(1013.25, 25.0, 30.0, 0.0),  # pressure, temp, humidity%, lapse
-    dobs=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-    object_name="Sirius",
-    event_type=ephem.HELIACAL_RISING
+    atmo=(1013.25, 25.0, 30.0, 0.0),  # pressure, temp, humidity%, visibility
+    observer=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    objname="Sirius",
+    eventtype=ephem.HELIACAL_RISING,
 )
 
 if jd_event > 0:

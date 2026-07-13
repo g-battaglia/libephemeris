@@ -53,6 +53,7 @@ References:
 from __future__ import annotations
 
 import math
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
@@ -60,6 +61,7 @@ from skyfield.api import Star
 from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
 from skyfield.framelib import ecliptic_frame
 
+from .tracing import _record
 from .constants import (
     REGULUS,
     SPICA_STAR,
@@ -201,6 +203,13 @@ from .cache import get_true_obliquity, get_mean_obliquity
 from .exceptions import Error
 from .planets import _wrap_ephemeris_range_error
 
+_fixed_star_source: ContextVar[str | None] = ContextVar(
+    "libephemeris_fixed_star_source", default=None
+)
+_fixed_star_record_suppressed: ContextVar[bool] = ContextVar(
+    "libephemeris_fixed_star_record_suppressed", default=False
+)
+
 
 @dataclass
 class StarData:
@@ -316,7 +325,7 @@ def propagate_proper_motion(
           standard in the Hipparcos catalog (column "pmRA" or mu_alpha*).
           This represents actual angular motion on the sky in the RA direction.
 
-        - For stars near the poles (|dec| > 89.9 degrees), numerical precision
+        - For stars near the poles (``abs(dec) > 89.9`` degrees), numerical precision
           may degrade due to the 1/cos(dec) factor. However, proper motion
           values are also smaller in the RA direction for polar stars.
 
@@ -417,7 +426,11 @@ _HIP_TO_ENTRY = {entry.hip_number: entry for entry in STAR_CATALOG}
 # Kept separate from the larger STAR_NAME_TO_HIP map, which is the name->HIP
 # lookup for get_hip_from_star_name (not the fixstar resolver path). HIP is
 # stable across catalog regeneration, unlike the generated row ids. Each entry
-# verified against the reference ephemeris + IAU/WGSN:
+# verified from independent name authorities, then joined to the ESA Hipparcos
+# catalogue by Bayer designation:
+#   IAU Working Group on Star Names, IAU Catalog of Star Names (current)
+#   RASC World Asterisms Project Handbook, version 2024.4 (Atri)
+#   R. H. Allen, Star-Names and Their Meanings (1899; Nash and Deli)
 #   Alaraph = beta Vir (Zavijava) -- not Spica
 #   Gienah Corvi = gamma Crv (Gienah) -- not delta Crv (Algorab)
 #   Atri = delta UMa (Megrez) -- Hindu Saptarishi name
@@ -2148,9 +2161,10 @@ def _calc_star_position_from_observer(
         dec_degrees=star_data.dec_j2000,
         ra_mas_per_year=star_data.pm_ra * 1000.0,  # arcsec/yr to mas/yr
         dec_mas_per_year=star_data.pm_dec * 1000.0,
-        # Stars without a measured parallax get the reference default
-        # (0.0001249 arcsec = 0.1249 mas).
-        parallax_mas=star_data.parallax_mas if star_data.parallax_mas > 0.0 else 0.1249,
+        # Skyfield treats non-positive parallax as a direction at an
+        # effectively infinite distance (one gigaparsec).  Pass the catalog
+        # value through and use that documented, MIT-licensed convention.
+        parallax_mas=star_data.parallax_mas,
         radial_km_per_s=star_data.radial_km_per_s,  # Radial velocity for distance change
     )
 
@@ -2161,12 +2175,12 @@ def _calc_star_position_from_observer(
     def _ecl(position) -> Tuple[float, float, float]:
         # frame_latlon returns (latitude, longitude, distance) as Skyfield
         # Angle/Distance objects. Distance from parallax (AU): stars without a
-        # measured parallax already received the reference default of
-        # 0.0001249 arcsec, so it stays finite and consistent.
+        # measured parallax use Skyfield's one-gigaparsec direction-at-infinity
+        # convention, so the distance remains finite.
         if j2000_frame:
-            # Reference J2000 ecliptic: ICRS rotated by the IAU 2006 J2000
-            # obliquity (84381.406"), no frame bias — measured convention of
-            # the reference API and identical to the LEB star path
+            # J2000 mean ecliptic: ICRS rotated by the IAU 2006 J2000
+            # obliquity (ERFA ``obl06`` at J2000), with no frame bias, and
+            # identical to the LEB star path
             # (_rotate_icrs_to_ecliptic_j2000). Skyfield's ecliptic_J2000_frame
             # (SPICE ECLIPJ2000) instead uses the IAU 1976 value 84381.448"
             # plus frame bias, ~0.04" off in latitude.
@@ -2290,9 +2304,11 @@ def _calc_star_position_leb(
     _ASEC2RAD = math.pi / 180.0 / 3600.0
     _C_M_PER_S = 299792458.0
     _AU_KM = 149597870.7
-    # Reference default parallax 0.1249 mas for stars without a measured value
-    # (the same value Skyfield receives in the reference path).
-    px_mas = star_data.parallax_mas if star_data.parallax_mas > 0.0 else 0.1249
+    # A non-positive measured parallax has no physical inverse distance.
+    # Skyfield (MIT licensed) represents this case at one gigaparsec, which by
+    # the parsec definition is 1 microarcsecond = 1e-6 mas.  Mirror that public
+    # convention so the LEB and Skyfield paths remain backend-identical.
+    px_mas = star_data.parallax_mas if star_data.parallax_mas > 0.0 else 1.0e-6
     ra_rad = math.radians(star_data.ra_j2000)
     dec_rad = math.radians(star_data.dec_j2000)
     cra = math.cos(ra_rad)
@@ -2327,13 +2343,9 @@ def _calc_star_position_leb(
     # 4. Geocentric vector
     geo = _vec3_sub(star_icrs, earth_pos)
 
-    # 5. Light-time. dist_internal above is always finite (zero-parallax stars
-    # use the clamped 0.1249 mas default), so the geocentric distance is finite
-    # too — compute light-time from it for every star, matching the Skyfield
-    # reference path, which feeds the same clamped default into observe() and
-    # always retards. (Gating on the raw parallax instead would leave the one
-    # zero-parallax catalog star on the lt=0 / first-order-aberration branch
-    # while the reference used the relativistic, light-retarded one.)
+    # 5. Light-time. dist_internal is finite because non-positive catalog
+    # parallaxes use the one-gigaparsec convention above.  Compute light-time
+    # for every star so both backends follow the same geometric model.
     # Note: for finite-distance stars, proper motion is not re-evaluated
     # at the retarded epoch (jd_tt - lt).  The error is < 0.001" for all
     # catalog stars because lt is at most ~few years and pm is < 10"/yr.
@@ -2375,12 +2387,8 @@ def _calc_star_position_leb(
         )
         lon, lat, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
 
-    # Zero-parallax stars keep the finite distance from the clamped 0.1249 mas
-    # default (~1.65e9 AU) computed above — the same value the Skyfield backend
-    # and the reference ephemeris return for them (verified: the reference
-    # gives 1.650118e9 AU for a zero-parallax star). The previous override to
-    # 100000.0 AU diverged from both backends and from this path's own
-    # light-time, which was already computed from the finite distance.
+    # Non-positive-parallax entries keep the finite one-gigaparsec distance
+    # computed above; no catalog distance is invented from another engine.
     return lon, lat, dist
 
 
@@ -2486,15 +2494,39 @@ def calc_fixed_star_position(
         IAU 2006 precession (Capitaine et al.)
         Skyfield library for apparent position calculation
     """
+    position, _source = _calc_fixed_star_position_with_source(
+        star_id,
+        jd_tt,
+        noaberr,
+        nogdefl,
+        j2000_frame,
+        topo=topo,
+        center=center,
+    )
+    _fixed_star_source.set(_source)
+    return position
+
+
+def _calc_fixed_star_position_with_source(
+    star_id: int,
+    jd_tt: float,
+    noaberr: bool = False,
+    nogdefl: bool = False,
+    j2000_frame: bool = False,
+    topo: "tuple | None" = None,
+    center: int = 0,
+) -> tuple[Tuple[float, float, float], str]:
+    """Return a fixed-star position together with its actual backend tag."""
     from .state import get_leb_reader
 
     # The LEB star path is geocentric; topocentric requests go through
     # Skyfield (same convention as the planet pipeline).
     if topo is None and get_leb_reader() is not None:
         try:
-            return _calc_star_position_leb(
+            position = _calc_star_position_leb(
                 star_id, jd_tt, noaberr, nogdefl, j2000_frame, center
             )
+            return position, "LEB"
         except (KeyError, ValueError) as _leb_err:
             # Fall back to Skyfield for missing bodies, out-of-range dates
             # AND corrupted/truncated LEB data, mirroring the planet path.
@@ -2503,9 +2535,10 @@ def calc_fixed_star_position(
 
             log_leb_fallback("star", _leb_err)
     try:
-        return _calc_star_position_skyfield(
+        position = _calc_star_position_skyfield(
             star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo, center=center
         )
+        return position, "Skyfield"
     except SkyfieldRangeError as e:
         # Wrap once here: every star entry point (fixstar_ut, fixstar,
         # fixstar2*, velocity, calc_ut dispatch) funnels through this
@@ -2558,25 +2591,48 @@ def calc_fixed_star_velocity(
     # Half-day step for central difference. Topocentric requests need a much
     # smaller step: the observer's diurnal motion has a ~0.997-day period, so
     # sampling at t±0.5 day lands on nearly the same rotational phase and the
-    # diurnal term cancels out of the difference — while the reference
-    # reports the instantaneous diurnal-inclusive derivative (sign and
-    # magnitude differ). h=0.005 is converged (halving it again changes dlon
-    # by <1e-7 deg/day); the geocentric step stays 0.5, its oracle-verified
-    # value.
+    # diurnal term cancels out of the difference. h=0.005 is converged
+    # (halving it again changes dlon by <1e-7 deg/day); the smoother
+    # geocentric calculation uses a half-day step.
     h = 0.005 if topo is not None else 0.5
 
-    # Calculate position at current time (for return value)
-    lon, lat, dist = calc_fixed_star_position(
-        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo, center=center
-    )
+    source_token = _fixed_star_source.set(None)
+    try:
+        # Calculate position at current time (for return value)
+        lon, lat, dist = calc_fixed_star_position(
+            star_id,
+            jd_tt,
+            noaberr,
+            nogdefl,
+            j2000_frame,
+            topo=topo,
+            center=center,
+        )
+        source_now = _fixed_star_source.get() or "Skyfield"
 
-    # Calculate positions at t-0.5 and t+0.5 for central difference
-    lon_prev, lat_prev, dist_prev = calc_fixed_star_position(
-        star_id, jd_tt - h, noaberr, nogdefl, j2000_frame, topo=topo, center=center
-    )
-    lon_next, lat_next, dist_next = calc_fixed_star_position(
-        star_id, jd_tt + h, noaberr, nogdefl, j2000_frame, topo=topo, center=center
-    )
+        # Calculate positions at t-h and t+h for central difference.
+        lon_prev, lat_prev, dist_prev = calc_fixed_star_position(
+            star_id,
+            jd_tt - h,
+            noaberr,
+            nogdefl,
+            j2000_frame,
+            topo=topo,
+            center=center,
+        )
+        source_prev = _fixed_star_source.get() or "Skyfield"
+        lon_next, lat_next, dist_next = calc_fixed_star_position(
+            star_id,
+            jd_tt + h,
+            noaberr,
+            nogdefl,
+            j2000_frame,
+            topo=topo,
+            center=center,
+        )
+        source_next = _fixed_star_source.get() or "Skyfield"
+    finally:
+        _fixed_star_source.reset(source_token)
 
     # Central difference: (f(t+h) - f(t-h)) / (2h)
     speed_lon = lon_next - lon_prev
@@ -2591,10 +2647,14 @@ def calc_fixed_star_velocity(
     # Latitude speed: pure finite difference (no wraparound needed for latitude)
     speed_lat = (lat_next - lat_prev) / (2.0 * h)
 
-    # Distance speed: radial motion (the star's radial velocity plus the
-    # Earth's orbital radial component) - the reference reports it.
+    # Distance speed is the centered derivative of the same observer-relative
+    # distance, so it includes stellar radial motion and the observer's orbital
+    # radial component.
     speed_dist = (dist_next - dist_prev) / (2.0 * h)
 
+    sources = {source_now, source_prev, source_next}
+    source = sources.pop() if len(sources) == 1 else "Mixed"
+    _fixed_star_source.set(source)
     return lon, lat, dist, speed_lon, speed_lat, speed_dist
 
 
@@ -2614,12 +2674,10 @@ _REF_SORTED_CATALOG: "list | None" = None
 
 
 def _ref_sorted_catalog():
-    """Catalog entries sorted by their reference search key.
+    """Catalog entries sorted by their compatibility search key.
 
-    Sequential star numbers ("1", "2", ...) index this order — measured on
-    reference-API output, its v2 sequential numbering follows the sorted
-    catalog order (the sequence here is specific to the catalog shipped
-    with this library).
+    Sequential star numbers index this deterministic order, which is specific
+    to the independently sourced catalog shipped with this library.
     """
     global _REF_SORTED_CATALOG
     if _REF_SORTED_CATALOG is None:
@@ -2638,9 +2696,8 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     - leading digit: 1-based sequential number in the sorted catalog;
     - otherwise: traditional-name match (whitespace removed,
       case-insensitive) — exact first, then implicit PREFIX match in
-      catalog order (measured black-box on the v1 family: 'Reg' ->
-      Regulus, 'A' -> Aldebaran, 'B' -> Bazak — first catalog-order hit,
-      not alphabetical). A '%' is NOT special here: the reference's v1
+      catalog order (first catalog-order hit, not alphabetical). A '%' is
+      NOT special here: the compatibility v1
       family (fixstar/fixstar_ut/fixstar_mag) rejects wildcard strings
       as unknown star names — the trailing-'%' explicit wildcard belongs
       to the v2 family only (see _resolve_star2).
@@ -2660,7 +2717,7 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     def _found(entry) -> tuple[int, None, str]:
         return entry.id, None, f"{entry.name},{entry.nomenclature}"
 
-    # Comma forms (measured black-box on the v1 family):
+    # Compatibility comma forms for the v1 family:
     # - "name,nomenclature": keys on the NAME before the comma; the
     #   nomenclature part is ignored entirely ('Regulus,zzZzz' resolves to
     #   Regulus, 'Nosuch,alTau' fails).
@@ -2701,8 +2758,7 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     # No wildcard handling: the reference's v1 family treats '%' strings
     # as plain (unmatched) names — they fall through to the exact-match
     # loop below and fail with "could not find star name". The prefix
-    # wildcard is a v2-only feature (measured black-box: v1 rejects
-    # 'Sir%', v2 resolves it).
+    # wildcard is a v2-only feature.
 
     # Exact traditional-name match. The alias table plays the role of
     # the reference catalog's additional name lines per star, so exact
@@ -2716,9 +2772,8 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
                 if entry.id == star_id:
                     return _found(entry)
 
-    # Implicit prefix match (measured black-box): a partial traditional
-    # name resolves to the first catalog-order star whose name starts
-    # with it, case-insensitively ('Reg' -> Regulus, 'Sir' -> Sirius).
+    # Implicit prefix match: a partial traditional name resolves to the first
+    # catalog-order star whose name starts with it, case-insensitively.
     # First catalog hit wins — the reference walks its file in order, so
     # ambiguous prefixes are a file-order/coverage question of the same
     # class documented in known-differences.md §14.0.
@@ -2783,12 +2838,9 @@ def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
     output. Pass implied=True there. These bits ride only on the ECHOED flags
     — the computation flags are untouched.
 
-    The TT entry points (fixstar / fixstar2) echo the request VERBATIM —
-    including the missing-ephemeris-bit case: the reference's ET calls return
-    0 for flags=0, 32 for FLG_J2000, 256 for FLG_SPEED, with no SWIEPH
-    auto-add. They leave implied=False. Verified behaviourally against the
-    reference oracle (UT: 0 -> 2, 32 -> 98, 256 -> 258; ET: 0 -> 0,
-    32 -> 32, 256 -> 256, 8 -> 8, 16 -> 16, 65536 -> 65536).
+    The TT entry points (fixstar / fixstar2) echo the request verbatim and do
+    not auto-add an ephemeris selector or implied correction bits. They leave
+    ``implied=False``.
     """
     from .constants import FLG_JPLEPH
 
@@ -2856,23 +2908,11 @@ def _apply_fixstar_flags(
     jd_tt: float,
     iflag: int,
     j2000_native: bool = False,
-    *,
-    legacy_sidereal: bool = False,
 ) -> tuple:
     """Apply post-calculation flag transformations to fixed star results.
 
     Handles frame transformations (J2000, NONUT, ICRS), coordinate system
     changes (EQUATORIAL, SIDEREAL), and output format conversions (XYZ, RADIANS).
-
-    ``legacy_sidereal`` selects the legacy fixed-star sidereal speed convention
-    used by the fixstar/fixstar_ut entry points: the ayanamsha drift rate
-    d(ayanamsha)/dt is NOT removed from the first-coordinate speed (ecliptic
-    longitude, or right ascension under FLG_EQUATORIAL). The modern
-    fixstar2/fixstar2_ut entry points leave it False and report the true
-    sidereal derivative (ayanamsha rate removed). Verified against the
-    reference oracle across stars/ayanamshas/epochs: the offset rides on the
-    first coordinate only and equals the (epoch- and ayanamsha-dependent)
-    ayanamsha rate.
 
     Applied in order:
     1. J2000 / NONUT frame selection (ecliptic longitude adjustment)
@@ -2945,8 +2985,8 @@ def _apply_fixstar_flags(
         # ---- 2. Equatorial coordinate transformation ----
         if is_equatorial:
             if iflag & FLG_J2000:
-                # J2000 obliquity for J2000 equatorial frame: IAU 2006 value
-                # 84381.406", the reference's measured J2000 ecliptic plane.
+                # J2000 obliquity for the J2000 equatorial frame: the IAU 2006
+                # value returned by ERFA ``obl06`` at J2000.
                 # Exactly inverts the J2000-ecliptic rotation above, so the
                 # equatorial J2000 output stays on the ICRS equator, matching
                 # the planet J2000-equatorial path (planets.py).
@@ -2970,9 +3010,9 @@ def _apply_fixstar_flags(
         # their equatorial output.) The frame is the mean equinox of date:
         # steps 1-2 already reduced the position onto the mean ecliptic / mean
         # equator, so the value removed here is the MEAN ayanamsha
-        # (get_ayanamsa_ut reports the mean value). This reproduces the
-        # reference to <0.001": sidereal = mean_position - mean_ayanamsha,
-        # equivalently true_position - (mean + dpsi) ayanamsha.
+        # (get_ayanamsa_ut reports the mean value): sidereal equals mean
+        # position minus mean ayanamsha, equivalently true position minus the
+        # sum of mean ayanamsha and dpsi.
         if iflag & FLG_SIDEREAL:
             from .state import get_timescale
 
@@ -3015,40 +3055,6 @@ def _apply_fixstar_flags(
         speed_lat = (p_lat - m_lat) / (2.0 * h)
         speed_dist = (p_dist - m_dist) / (2.0 * h)
 
-        # Legacy sidereal speed convention (fixstar / fixstar_ut): the
-        # ayanamsha drift removed by the differenced position above is added
-        # back to the first-coordinate speed, so the legacy speed carries the
-        # full mean-equinox motion (ayanamsha-rate-independent). Uses the same
-        # UT epochs and ayanamsha source the transform differenced, so the two
-        # cancel exactly. speed_lat / speed_dist are untouched.
-        # (The fixed-epoch frame modes SIDM_J2000/J1900/B1950 never reach
-        # this branch: they are rewritten to a FLG_J2000|FLG_NONUT request
-        # at the top of this function, and in a fixed frame the reference
-        # reports the frame derivative on BOTH star families.)
-        # Measured black-box across every sidereal mode (0..47, legacy vs
-        # modern speed): the reference makes NO legacy add-back for
-        # SIDM_GALALIGN_MARDYKS (34) either — its legacy speed equals the
-        # modern one, exactly like the fixed-epoch trio. All other modes
-        # (including the other star-anchored ones) do get the add-back.
-        from .constants import SIDM_GALALIGN_MARDYKS
-        from .state import get_sid_mode as _get_sidm
-
-        if (
-            legacy_sidereal
-            and (iflag & FLG_SIDEREAL)
-            and _get_sidm() != SIDM_GALALIGN_MARDYKS
-        ):
-            from .state import get_timescale
-            from .planets import get_ayanamsa_ut
-
-            ts_ayan = get_timescale()
-            ayan_p = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt + h).ut1)
-            ayan_m = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt - h).ut1)
-            # Shortest-arc delta: the ayanamsha is mod 360 and can
-            # straddle the 0/360 wrap (star-anchored modes cross 0 on
-            # supported dates).
-            d_ayan = (ayan_p - ayan_m + 180.0) % 360.0 - 180.0
-            speed_lon += d_ayan / (2.0 * h)
     else:
         speed_lon = 0.0
         speed_lat = 0.0
@@ -3086,23 +3092,39 @@ def _apply_fixstar_flags(
     return result
 
 
-def _fixed_epoch_star_call(entry_fn, star, tjd, flags, *, verbatim_echo=False):
+def _record_fixed_star_success(star_id: int, jd: float, source: str) -> None:
+    """Publish a fixed-star source only after the public call has succeeded."""
+    if _fixed_star_record_suppressed.get():
+        return
+    from .logging_config import get_logger
+
+    get_logger().debug("body=%d jd=%.1f source=%s", star_id, jd, source)
+    _record(star_id, source)
+
+
+def _fixed_epoch_star_call(
+    entry_fn,
+    star,
+    tjd,
+    flags,
+    *,
+    verbatim_echo=False,
+    flexible_lookup=False,
+):
     """Fixed-epoch sidereal modes (SIDM_J2000/J1900/B1950) for stars.
 
-    These modes are frame requests, not ayanamsha offsets: the reference
-    projects the star onto the mean ecliptic/equator of the mode's reference
-    epoch t0 — bit-identical to its FLG_J2000|FLG_NONUT reduction, precessed
-    to t0 for J1900/B1950 (measured black-box; see sidereal_epoch.py). The
+    These modes are frame requests, not ayanamsha offsets.  The star is
+    projected onto the mean ecliptic/equator of the mode's reference epoch t0:
+    the FLG_J2000|FLG_NONUT reduction precessed to t0 for J1900/B1950 (see
+    sidereal_epoch.py). The
     rewrite must happen at the entry level so the pipeline computes the
     J2000-native position (the of-date raw position still carries nutation,
-    which the mean-frame back-precession would not remove). In a fixed frame
-    the legacy speed convention collapses onto the modern one, so the same
-    rewrite serves both star families.
+    which the mean-frame back-precession would not remove). The same physical
+    frame derivative is used by both fixed-star entry-point families.
 
     The UT entry points echo the fixed-epoch flags (input | FLG_NONUT, no
     internal FLG_J2000); the TT entry points echo the input verbatim, like
-    every other TT star call (measured: ET SIDEREAL mode-18 echoes 65536,
-    UT echoes 65602) — pass verbatim_echo=True there.
+    every other TT star call. Pass ``verbatim_echo=True`` there.
 
     Returns the (xx, name, retflag) result, or None when this is not a
     fixed-epoch sidereal request.
@@ -3120,13 +3142,28 @@ def _fixed_epoch_star_call(entry_fn, star, tjd, flags, *, verbatim_echo=False):
     sidm = get_sid_mode()
     if not is_fixed_epoch_request(flags, sidm):
         return None
-    xx, name, rf = entry_fn(star, tjd, fixed_epoch_request_flags(flags))
+    suppress_token = _fixed_star_record_suppressed.set(True)
+    try:
+        xx, name, rf = entry_fn(star, tjd, fixed_epoch_request_flags(flags))
+    finally:
+        _fixed_star_record_suppressed.reset(suppress_token)
     xx_t0 = transform_fixed_epoch_result(xx, flags, sidm)
-    return (
+    result = (
         tuple(float(v) for v in xx_t0),
         name,
         flags if verbatim_echo else fixed_epoch_retflag(rf, flags),
     )
+    if flexible_lookup:
+        entry, error = _resolve_star2(star)
+        if error or entry is None:
+            raise Error(error or "could not find star name")
+        star_id = entry.id
+    else:
+        star_id, error, _canonical_name = _resolve_star_id(star)
+        if error:
+            raise Error(error)
+    _record_fixed_star_success(star_id, tjd, _get_fixed_star_source())
+    return result
 
 
 def fixstar_ut(
@@ -3170,11 +3207,64 @@ def fixstar_ut(
     return _fixstar_ut_by_id(star_id, canonical_name, tjdut, flags)
 
 
+def _fixed_star_result_with_source(
+    star_id: int,
+    jd_tt: float,
+    flags: int,
+    noaberr: bool,
+    nogdefl: bool,
+    use_j2000: bool,
+    topo: "tuple | None",
+    center: int,
+) -> tuple[Tuple[float, float, float, float, float, float], str]:
+    """Compute and post-process a fixed star, returning its actual source."""
+    source_token = _fixed_star_source.set(None)
+    try:
+        if flags & FLG_SPEED:
+            result = calc_fixed_star_velocity(
+                star_id,
+                jd_tt,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
+                center=center,
+            )
+        else:
+            lon, lat, dist = calc_fixed_star_position(
+                star_id,
+                jd_tt,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
+                center=center,
+            )
+            result = (lon, lat, dist, 0.0, 0.0, 0.0)
+        source = _fixed_star_source.get() or "Skyfield"
+        result = _apply_fixstar_flags(
+            result,
+            jd_tt,
+            flags,
+            j2000_native=use_j2000,
+        )
+        return result, source
+    finally:
+        _fixed_star_source.reset(source_token)
+
+
+def _get_fixed_star_source() -> str:
+    """Return the source of the most recent successful fixed-star calculation."""
+    return _fixed_star_source.get() or "Skyfield"
+
+
 def _fixstar_ut_by_id(
     star_id: int,
     canonical_name: str | None,
     tjdut: float,
     flags: int,
+    *,
+    record_trace: bool = True,
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """fixstar_ut() computation for an already-resolved catalog id.
 
@@ -3209,38 +3299,60 @@ def _fixstar_ut_by_id(
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
-        if flags & FLG_SPEED:
-            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id,
-                t.tt,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        else:
-            lon, lat, dist = calc_fixed_star_position(
-                star_id,
-                t.tt,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, 0.0, 0.0, 0.0)
-
-        result = _apply_fixstar_flags(
-            result, t.tt, flags, j2000_native=use_j2000, legacy_sidereal=True
+        result, trace_source = _fixed_star_result_with_source(
+            star_id,
+            t.tt,
+            flags,
+            noaberr,
+            nogdefl,
+            use_j2000,
+            topo,
+            center,
         )
+        _fixed_star_source.set(trace_source)
 
+        if record_trace:
+            _record_fixed_star_success(star_id, t.tt, trace_source)
         return (result, canonical_name or "", ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
+
+
+def _batch_fixstars_via_single(
+    stars: Sequence[str],
+    tjdut: float,
+    flags: int,
+    *,
+    skip_errors: bool,
+) -> Tuple[
+    Tuple[Tuple[float, float, float, float, float, float], str, int] | None, ...
+]:
+    """Delegate a batch while publishing traces only after batch success."""
+    results: list[
+        Tuple[Tuple[float, float, float, float, float, float], str, int] | None
+    ] = []
+    traces: list[tuple[int, str]] = []
+    suppress_token = _fixed_star_record_suppressed.set(True)
+    try:
+        for star_name in stars:
+            try:
+                results.append(fixstar_ut(star_name, tjdut, flags))
+                star_id, error, _canonical_name = _resolve_star_id(star_name)
+                if error:
+                    raise Error(error)
+                traces.append((star_id, _get_fixed_star_source()))
+            except Error:
+                if skip_errors:
+                    results.append(None)
+                    continue
+                raise
+    finally:
+        _fixed_star_record_suppressed.reset(suppress_token)
+    for star_id, source in traces:
+        _record_fixed_star_success(star_id, tjdut, source)
+    return tuple(results)
 
 
 def batch_fixstars_ut(
@@ -3269,23 +3381,21 @@ def batch_fixstars_ut(
         geocentric batch path below — otherwise a name like "29Psc" would
         resolve to a different star with and without ``FLG_TOPOCTR``.
     """
+    if flags & FLG_SIDEREAL:
+        from .sidereal_epoch import is_fixed_epoch_request
+        from .state import get_sid_mode
+
+        if is_fixed_epoch_request(flags, get_sid_mode()):
+            return _batch_fixstars_via_single(
+                stars, tjdut, flags, skip_errors=skip_errors
+            )
+
     # FLG_TOPOCTR is unsupported by the geocentric LEB/Skyfield batch paths
     # below; rather than silently return geocentric positions that disagree
     # with the single-star path, delegate per star to the topocentric
     # single-star path (fixstar_ut — same resolver as the geocentric branch).
     if flags & FLG_TOPOCTR:
-        topo_results: list[
-            Tuple[Tuple[float, float, float, float, float, float], str, int] | None
-        ] = []
-        for star_name in stars:
-            try:
-                topo_results.append(fixstar_ut(star_name, tjdut, flags))
-            except Error:
-                if skip_errors:
-                    topo_results.append(None)
-                    continue
-                raise
-        return tuple(topo_results)
+        return _batch_fixstars_via_single(stars, tjdut, flags, skip_errors=skip_errors)
 
     ret_flags = _fixstar_ret_flags(flags, implied=True)
     flags = _preprocess_flags(flags)
@@ -3355,7 +3465,6 @@ def batch_fixstars_ut(
                     jd_tt,
                     flags,
                     j2000_native=use_j2000,
-                    legacy_sidereal=True,
                 )
                 results[index] = (result, canonical_name, ret_flags)
             _leb_ok = True
@@ -3367,6 +3476,8 @@ def batch_fixstars_ut(
             log_leb_fallback("star batch", _leb_err)
 
     if _leb_ok:
+        for _index, star_id, _canonical_name in resolved:
+            _record_fixed_star_success(star_id, jd_tt, "LEB")
         return tuple(results)
 
     # Skyfield fallback path. Heliocentric/barycentric requests observe from
@@ -3422,9 +3533,7 @@ def batch_fixstars_ut(
                 speed_dist = 0.0
 
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-            result = _apply_fixstar_flags(
-                result, jd_tt, flags, j2000_native=use_j2000, legacy_sidereal=True
-            )
+            result = _apply_fixstar_flags(result, jd_tt, flags, j2000_native=use_j2000)
             results[index] = (result, canonical_name, ret_flags)
         except Error:
             if skip_errors:
@@ -3435,6 +3544,9 @@ def batch_fixstars_ut(
                 continue
             raise Error(str(e)) from e
 
+    for index, star_id, _canonical_name in resolved:
+        if results[index] is not None:
+            _record_fixed_star_success(star_id, jd_tt, "Skyfield")
     return tuple(results)
 
 
@@ -3496,33 +3608,18 @@ def fixstar(
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
-        if flags & FLG_SPEED:
-            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id,
-                tjdet,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        else:
-            lon, lat, dist = calc_fixed_star_position(
-                star_id,
-                tjdet,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, 0.0, 0.0, 0.0)
-
-        result = _apply_fixstar_flags(
-            result, tjdet, flags, j2000_native=use_j2000, legacy_sidereal=True
+        result, trace_source = _fixed_star_result_with_source(
+            star_id,
+            tjdet,
+            flags,
+            noaberr,
+            nogdefl,
+            use_j2000,
+            topo,
+            center,
         )
-
+        _fixed_star_source.set(trace_source)
+        _record_fixed_star_success(star_id, tjdet, trace_source)
         return (result, canonical_name or "", ret_flags)
     except Error:
         raise
@@ -3618,9 +3715,8 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
 
     # Handle comma-separated format (e.g., "Regulus,alLeo").
     # The v2 family keys EVERY comma form on the Bayer/Flamsteed
-    # nomenclature after the comma (measured black-box: 'Nosuch,alTau'
-    # resolves to Aldebaran, 'Regulus,zzZzz' fails, 'Aldebaran,' fails) —
-    # the name part is ignored entirely. Matched exactly and
+    # nomenclature after the comma; the name part is ignored entirely.
+    # Matched exactly and
     # case-sensitively (",alTau" -> Aldebaran; ",ALTAU" -> not found).
     # (The v1 family is the mirror image: it keys on the name — see
     # _resolve_star_ref.)
@@ -3757,7 +3853,7 @@ def fixstar2_ut(
         >>> pos, name, retflag = fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
-    _fe = _fixed_epoch_star_call(fixstar2_ut, star, tjdut, flags)
+    _fe = _fixed_epoch_star_call(fixstar2_ut, star, tjdut, flags, flexible_lookup=True)
     if _fe is not None:
         return _fe
 
@@ -3785,32 +3881,19 @@ def fixstar2_ut(
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
-        if flags & FLG_SPEED:
-            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id,
-                t.tt,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        else:
-            lon, lat, dist = calc_fixed_star_position(
-                entry.id,
-                t.tt,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, 0.0, 0.0, 0.0)
-
+        result, trace_source = _fixed_star_result_with_source(
+            entry.id,
+            t.tt,
+            flags,
+            noaberr,
+            nogdefl,
+            use_j2000,
+            topo,
+            center,
+        )
         star_name_out = _format_star_name(entry)
-        result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
-
+        _fixed_star_source.set(trace_source)
+        _record_fixed_star_success(entry.id, t.tt, trace_source)
         return (result, star_name_out, ret_flags)
     except Error:
         raise
@@ -3859,7 +3942,14 @@ def fixstar2(
         >>> pos, name, retflag = fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
-    _fe = _fixed_epoch_star_call(fixstar2, star, tjdet, flags, verbatim_echo=True)
+    _fe = _fixed_epoch_star_call(
+        fixstar2,
+        star,
+        tjdet,
+        flags,
+        verbatim_echo=True,
+        flexible_lookup=True,
+    )
     if _fe is not None:
         return _fe
 
@@ -3882,32 +3972,19 @@ def fixstar2(
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
-        if flags & FLG_SPEED:
-            lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id,
-                tjdet,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        else:
-            lon, lat, dist = calc_fixed_star_position(
-                entry.id,
-                tjdet,
-                noaberr,
-                nogdefl,
-                j2000_frame=use_j2000,
-                topo=topo,
-                center=center,
-            )
-            result = (lon, lat, dist, 0.0, 0.0, 0.0)
-
+        result, trace_source = _fixed_star_result_with_source(
+            entry.id,
+            tjdet,
+            flags,
+            noaberr,
+            nogdefl,
+            use_j2000,
+            topo,
+            center,
+        )
         star_name_out = _format_star_name(entry)
-        result = _apply_fixstar_flags(result, tjdet, flags, j2000_native=use_j2000)
-
+        _fixed_star_source.set(trace_source)
+        _record_fixed_star_success(entry.id, tjdet, trace_source)
         return (result, star_name_out, ret_flags)
     except Error:
         raise

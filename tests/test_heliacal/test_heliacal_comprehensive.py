@@ -42,9 +42,7 @@ class TestHeliacalRisingBasic:
     def test_venus_heliacal_rising_returns_3(self):
         """heliacal_ut for Venus returns 3 JD values."""
         jd = 2451545.0
-        result = swe.heliacal_ut(
-            jd, ROME, ATMO, OBSERVER, "Venus", HELIACAL_RISING
-        )
+        result = swe.heliacal_ut(jd, ROME, ATMO, OBSERVER, "Venus", HELIACAL_RISING)
         assert len(result) == 3, f"Expected 3 values, got {len(result)}"
 
     @pytest.mark.unit
@@ -52,9 +50,7 @@ class TestHeliacalRisingBasic:
     def test_venus_heliacal_rising_after_start(self):
         """Heliacal rising should be after search start."""
         jd = 2451545.0
-        result = swe.heliacal_ut(
-            jd, ROME, ATMO, OBSERVER, "Venus", HELIACAL_RISING
-        )
+        result = swe.heliacal_ut(jd, ROME, ATMO, OBSERVER, "Venus", HELIACAL_RISING)
         assert result[0] > jd, f"Rising JD {result[0]} not after start {jd}"
 
     @pytest.mark.unit
@@ -62,9 +58,7 @@ class TestHeliacalRisingBasic:
     def test_venus_heliacal_rising_within_2_years(self):
         """Venus heliacal rising should be within ~2 years."""
         jd = 2451545.0
-        result = swe.heliacal_ut(
-            jd, ROME, ATMO, OBSERVER, "Venus", HELIACAL_RISING
-        )
+        result = swe.heliacal_ut(jd, ROME, ATMO, OBSERVER, "Venus", HELIACAL_RISING)
         gap = result[0] - jd
         assert gap < 800, f"Venus rising {gap:.1f} days after start"
 
@@ -73,9 +67,7 @@ class TestHeliacalRisingBasic:
     def test_all_result_values_finite(self):
         """All 3 returned JD values should be finite."""
         jd = 2451545.0
-        result = swe.heliacal_ut(
-            jd, ROME, ATMO, OBSERVER, "Venus", HELIACAL_RISING
-        )
+        result = swe.heliacal_ut(jd, ROME, ATMO, OBSERVER, "Venus", HELIACAL_RISING)
         for i, val in enumerate(result):
             assert math.isfinite(val), f"result[{i}] = {val}"
 
@@ -92,9 +84,7 @@ class TestHeliacalPlanets:
     def test_planet_heliacal_rising(self, planet: str):
         """Heliacal rising works for visible planets."""
         jd = 2451545.0
-        result = swe.heliacal_ut(
-            jd, ROME, ATMO, OBSERVER, planet, HELIACAL_RISING
-        )
+        result = swe.heliacal_ut(jd, ROME, ATMO, OBSERVER, planet, HELIACAL_RISING)
         assert len(result) == 3
         assert result[0] > jd
 
@@ -107,9 +97,7 @@ class TestHeliacalPlanets:
     def test_planet_heliacal_setting(self, planet: str):
         """Heliacal setting works for visible planets."""
         jd = 2451545.0
-        result = swe.heliacal_ut(
-            jd, ROME, ATMO, OBSERVER, planet, HELIACAL_SETTING
-        )
+        result = swe.heliacal_ut(jd, ROME, ATMO, OBSERVER, planet, HELIACAL_SETTING)
         assert len(result) == 3
         assert result[0] > jd
 
@@ -122,9 +110,7 @@ class TestHeliacalInnerPlanets:
     def test_venus_evening_first(self):
         """Evening first visibility for Venus."""
         jd = 2451545.0
-        result = swe.heliacal_ut(
-            jd, ROME, ATMO, OBSERVER, "Venus", EVENING_FIRST
-        )
+        result = swe.heliacal_ut(jd, ROME, ATMO, OBSERVER, "Venus", EVENING_FIRST)
         assert len(result) == 3
         assert result[0] > jd
 

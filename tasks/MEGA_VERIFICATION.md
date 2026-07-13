@@ -2,6 +2,12 @@
 
 Last updated: 2026-03-27
 
+> Clean-room note (2026-07): any `swe_ref` comparison named in this historical
+> plan must be executed as an ephemeral public-API comparison. Numeric results
+> must not be captured as fixtures, golden files, coefficients, tables, or
+> generated artifacts. Current regression coverage should prefer independent
+> JPL/ERFA/catalog truth, defining conditions, and metamorphic invariants.
+
 ## Status Summary
 
 | Group | Script | Checks | Pass | Fail | Status |

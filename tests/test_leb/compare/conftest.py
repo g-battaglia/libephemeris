@@ -55,7 +55,6 @@ class TierTolerances:
     # Core position
     POSITION_ARCSEC: float = 5.0
     ECLIPTIC_ARCSEC: float = 0.5
-    HYPOTHETICAL_ARCSEC: float = 0.5
     ASTEROID_ARCSEC: float = 5.0
     EQUATORIAL_ARCSEC: float = 5.0
     J2000_ARCSEC: float = 5.0
@@ -152,14 +151,12 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
         #   Pluto 0.000000", Earth 0.000000"
         #   Asteroids: max 0.000045" (Juno)
         #   Ecliptic: max 0.000049" (OscuApog)
-        #   Hypothetical: ~0.000000"
         "POSITION_ARCSEC": 0.001,  # Moon 0.000332" (3x margin)
         "ASTEROID_ARCSEC": 0.001,  # Juno 0.000045" (22x margin)
         "EQUATORIAL_ARCSEC": 0.02,  # Moon heliocentric 0.0103" (2x margin)
         "J2000_ARCSEC": 0.001,  # Same pipeline, J2000 ecliptic output
         "SIDEREAL_ARCSEC": 0.001,  # = position error (ayanamsha is formula-exact)
         "ECLIPTIC_ARCSEC": 0.001,  # OscuApog 0.000049" (20x margin)
-        "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
         "DISTANCE_AU": 5e-6,  # Uranus helio 1.04e-6 AU (5x margin)
         "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.035 (1.3x margin)
         "SPEED_LAT_DEG_DAY": 0.004,  # OscuApogee ~0.003, planets 0.000082
@@ -178,14 +175,12 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
         #   Pluto 0.000000", Earth 0.000000"
         #   Asteroids: max 0.000036" (Vesta)
         #   Ecliptic: max 0.000075" (OscuApog)
-        #   Hypothetical: ~0.000000"
         "POSITION_ARCSEC": 0.001,  # Moon 0.000325" (3x margin)
         "ASTEROID_ARCSEC": 0.001,  # Vesta 0.000036" (28x margin)
         "EQUATORIAL_ARCSEC": 0.02,  # Moon heliocentric amplification
         "J2000_ARCSEC": 0.001,  # Same pipeline, J2000 ecliptic output
         "SIDEREAL_ARCSEC": 0.001,  # = position error (ayanamsha is formula-exact)
         "ECLIPTIC_ARCSEC": 0.001,  # OscuApog 0.000075" (13x margin)
-        "HYPOTHETICAL_ARCSEC": 0.001,  # Essentially zero error
         "DISTANCE_AU": 5e-6,  # Uranus 1.36e-08 AU (helio amplification margin)
         # Velocity — OscuApogee dominates lon (0.043 deg/day).
         "SPEED_LON_DEG_DAY": 0.045,  # OscuApogee 0.043
@@ -208,7 +203,6 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
         "J2000_ARCSEC": 0.001,  # Same pipeline
         "SIDEREAL_ARCSEC": 0.001,  # POSITION + ayanamsha
         "ECLIPTIC_ARCSEC": 0.1,  # OscuApogee at extreme dates (Meeus limit)
-        "HYPOTHETICAL_ARCSEC": 0.001,  # Measured ~0.000000"
         "ASTEROID_ARCSEC": 0.001,  # Measured <0.000018"
         "DISTANCE_AU": 5e-6,  # Matching base/medium
         "SPEED_LON_DEG_DAY": 0.05,  # OscuApogee 0.035 (1.4x margin)
@@ -474,19 +468,7 @@ ASTEROID_BODIES = [
     (20, "Vesta"),
 ]
 
-HYPOTHETICAL_BODIES = [
-    (40, "Cupido"),
-    (41, "Hades"),
-    (42, "Zeus"),
-    (43, "Kronos"),
-    (44, "Apollon"),
-    (45, "Admetos"),
-    (46, "Vulkanus"),
-    (47, "Poseidon"),
-    (48, "Transpluto"),
-]
-
-ALL_LEB_BODIES = MAIN_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES + HYPOTHETICAL_BODIES
+ALL_LEB_BODIES = MAIN_PLANETS + ECLIPTIC_BODIES + ASTEROID_BODIES
 
 # Asteroid SPK coverage (same for all tiers — JPL Horizons limitation).
 # Outside this range, both LEB and Skyfield fall back to Keplerian orbits
@@ -549,8 +531,10 @@ ECLIPTIC_TOLERANCES = {
     },  # Interp Perigee (pre-regen)
 }
 
-# Formula-based sidereal modes (27 modes + user-defined)
-FORMULA_SIDEREAL_MODES = [
+# Broad predefined-mode sweep plus the caller-defined mode. Catalog-direction
+# modes are kept in the additional sweep below because they exercise a
+# different dependency path.
+SIDEREAL_MODE_SWEEP = [
     0,
     1,
     2,
@@ -580,8 +564,12 @@ FORMULA_SIDEREAL_MODES = [
     37,
     38,
     41,
+    43,
+    44,
+    45,
+    46,
     255,  # user-defined
 ]
 
-# Star-based sidereal modes (fallback to Skyfield)
-STAR_BASED_SIDEREAL_MODES = [17, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 42]
+# Additional public modes, including the catalog-direction implementations.
+ADDITIONAL_SIDEREAL_MODES = [17, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 42]

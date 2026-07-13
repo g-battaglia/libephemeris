@@ -20,18 +20,17 @@ _LEB2_DIR = _PROJECT_ROOT / "data" / "leb2"
 _LEB2_GROUPS = list(LEB2_GROUPS)
 # Per-tier LEB1 partial paths — derived from the canonical group partition.
 _LEB1_PARTIALS = {
-    tier: {
-        g: _LEB1_DIR / f"ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS
-    }
+    tier: {g: _LEB1_DIR / f"ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS}
     for tier in ("base", "medium", "extended")
 }
 _PLANET_CENTER_SOURCE_FILES = {
     "base": ["jup204.bsp", "sat319.bsp", "ura083.bsp", "nep050.bsp", "plu017.bsp"],
     "medium": [
         "jup365.bsp",
-        "sat441.bsp",
-        "ura184_part-3.bsp",
-        "nep105.bsp",
+        "sat441xl_part-1.bsp",
+        "sat441xl_part-2.bsp",
+        "ura111xl-799.bsp",
+        "nep097xl-899.bsp",
         "plu060.bsp",
     ],
     "extended": [

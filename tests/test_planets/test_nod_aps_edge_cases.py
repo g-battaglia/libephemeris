@@ -42,9 +42,7 @@ class TestNodApsOscuBar:
     """Test OSCU_BAR (barycentric osculating) method."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize(
-        "planet", [MARS, JUPITER, SATURN, URANUS, NEPTUNE]
-    )
+    @pytest.mark.parametrize("planet", [MARS, JUPITER, SATURN, URANUS, NEPTUNE])
     def test_oscu_bar_returns_valid(self, planet):
         """OSCU_BAR returns valid 4-tuple of 6-tuples."""
         result = swe.nod_aps_ut(JD_J2000, planet, NODBIT_OSCU_BAR)
@@ -92,9 +90,7 @@ class TestNodApsFopoint:
     def test_fopoint_perihelion_unchanged(self):
         """FOPOINT should not change perihelion — only aphelion."""
         normal = swe.nod_aps_ut(JD_J2000, JUPITER, NODBIT_OSCU)
-        fopoint = swe.nod_aps_ut(
-            JD_J2000, JUPITER, NODBIT_OSCU | NODBIT_FOPOINT
-        )
+        fopoint = swe.nod_aps_ut(JD_J2000, JUPITER, NODBIT_OSCU | NODBIT_FOPOINT)
         # Perihelion (index 2) should be the same
         assert normal[2][0] == pytest.approx(fopoint[2][0], abs=0.01)
         # Nodes (index 0, 1) should be the same

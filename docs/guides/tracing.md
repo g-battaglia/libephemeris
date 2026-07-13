@@ -10,13 +10,19 @@ LibEphemeris offers two complementary ways to trace computation sources:
 
 | Mechanism | API | Overhead | Output | Best for |
 |-----------|-----|----------|--------|----------|
-| **Programmatic tracing** | `start_tracing()` / `get_trace_results()` | ~50 ns when inactive | `{body_id: "source"}` dict | Application code, automated checks |
+| **Programmatic tracing** | `start_tracing()` / `get_trace_results()` | A few context-local operations on fallback paths | `{body_id: "source"}` dict | Application code, automated checks |
 | **DEBUG logging** | `LIBEPHEMERIS_LOG_LEVEL=DEBUG` | Log I/O per call | Structured log lines | Manual debugging, test runs |
 
 ## Programmatic Tracing (ContextVar-based)
 
 The recommended approach for application code. Uses Python `ContextVar` for
-thread-safe, zero-overhead-when-inactive tracing.
+thread-safe, low-overhead tracing.
+
+The trace contract covers module-level and `EphemerisContext` `calc()` /
+`calc_ut()` calls, the four `fixstar*()` entry points, and
+`batch_fixstars_ut()`. Planetary moons are traced when calculated through
+`calc()` or `calc_ut()`. It does not currently promise a direct entry for
+`calc_pctr()` or for every utility that performs internal calculations.
 
 ### Basic Usage
 
@@ -43,16 +49,20 @@ token.var.reset(token)
 
 ### Traced Backends
 
-Each successful computation records one of these source tags:
+Each successfully returned body on the traced API surface records one of these
+source tags:
 
 | Source | Description |
 |--------|-------------|
 | `"LEB"` | Precomputed Chebyshev polynomials (fastest path) |
-| `"Skyfield"` | NASA JPL DE440/DE441 via Skyfield |
+| `"Skyfield"` | Skyfield/JPL pipeline for major bodies, fixed stars, or JPL-derived lunar points |
 | `"Horizons"` | NASA JPL Horizons REST API |
 | `"SPK"` | Direct SPK kernel evaluation (minor bodies) |
 | `"ASSIST"` | N-body integration via REBOUND/ASSIST |
 | `"Keplerian"` | Analytical Keplerian orbit (last-resort fallback) |
+| `"Analytical"` | Local formula or zero-origin convention for lunar points, hypothetical bodies, angles, Arabic parts, heliocentric Sun, or geocentric Earth |
+| `"ERFA"` | IAU 2006/2000A nutation used for the `ECL_NUT` pseudo-body |
+| `"Mixed"` | A fixed-star velocity stencil that crossed from LEB to Skyfield fallback |
 
 ### Thread Safety
 
@@ -120,10 +130,17 @@ Mutating the returned dict does not affect the tracing session.
 
 ### Performance
 
-When tracing is **not active**, the overhead is a single
-`ContextVar.get(None)` check per computation (~50 ns). When active, each
-dispatch point adds one dict assignment (~100 ns). In both cases the cost
-is negligible compared to ephemeris calculations (~5-120 us).
+When tracing is **not active**, a normal `calc()` / `calc_ut()` fallback checks
+the trace `ContextVar` once. It also opens a short-lived context-local source
+hint scope (one set/get/reset); precise inner branches may update that hint with
+SPK, ASSIST, Keplerian, planetary-moon, or fixed-star metadata. This defers
+publication until public output processing has succeeded. Direct LEB/Horizons
+branches instead check the nested-log capture context once and call the inactive
+recorder once. Fixed-star calculations additionally keep lightweight
+context-local metadata to distinguish LEB, Skyfield, and mixed velocity
+stencils. When tracing is active, successful public dispatch adds a dictionary
+assignment. No universal nanosecond figure is claimed because it depends on the
+entry point, backend, Python version, and platform.
 
 ## DEBUG Log Tracing
 
@@ -131,26 +148,28 @@ For manual debugging and test runs, enable DEBUG-level logging to see
 per-call source information in structured log lines:
 
 ```bash
-LIBEPHEMERIS_LOG_LEVEL=DEBUG pytest -s tests/
+LIBEPHEMERIS_LOG_LEVEL=DEBUG uv run pytest -s tests/test_tracing.py
 ```
 
 Or programmatically:
 
 ```python
 import logging
-logging.getLogger("libephemeris").setLevel(logging.DEBUG)
+import libephemeris as swe
+
+swe.set_log_level(logging.DEBUG)
 ```
 
 Log output format:
 
 ```
-[libephemeris] DEBUG: body=0 jd=2448045.9167 source=LEB
-[libephemeris] DEBUG: body=15 jd=2448045.9167 source=SPK
-[libephemeris] DEBUG: body=146199 jd=2448045.9167 source=ASSIST (n-body)
+[libephemeris] DEBUG: body=0 jd=2448045.9 source=LEB
+[libephemeris] DEBUG: body=15 jd=2448045.9 source=SPK
+[libephemeris] DEBUG: body=146199 jd=2448045.9 source=ASSIST
 ```
 
-See [Testing -- Source Tracing](../development/testing.md#source-tracing-debug-logs)
-for the full list of log-level source tags.
+See [Testing -- Backend Isolation](../development/testing.md#backend-isolation)
+for guidance on source-selection assertions.
 
 ## When to Use Which
 
@@ -162,5 +181,6 @@ for the full list of log-level source tags.
   or CI test runs. More verbose (includes Julian Day per call), but requires
   log parsing to extract structured data.
 
-Both mechanisms track the same dispatch points (`_record()` call sites in
-`planets.py` and `context.py`).
+For the traced API surface, both mechanisms publish the same final source under
+the caller-facing body ID. Recursive alias and fixed-epoch work is held private
+until the outer call's transformations and output conversion have succeeded.

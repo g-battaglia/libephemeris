@@ -15,7 +15,7 @@ from libephemeris.fixed_stars import (
     StarData,
     FIXED_STARS,
 )
-from libephemeris.constants import REGULUS, SPICA_STAR
+from libephemeris.constants import FLG_BARYCTR, REGULUS, SPICA_STAR
 
 
 def _linear_proper_motion(star: StarData, t_years: float) -> tuple[float, float]:
@@ -343,6 +343,27 @@ class TestCalcFixedStarPositionIntegration:
             assert 0 <= lon < 360, f"Star {star_id}: lon out of range"
             assert -90 <= lat <= 90, f"Star {star_id}: lat out of range"
             assert dist > 0, f"Star {star_id}: distance should be positive"
+
+    def test_nonpositive_parallax_uses_direction_at_one_gigaparsec(self):
+        """Unknown inverse distance follows Skyfield's public convention.
+
+        One gigaparsec has parallax one microarcsecond by the definition of a
+        parsec.  This neutral direction-at-infinity representation avoids
+        inventing a distance from another ephemeris.
+        """
+        star_id = 1001303  # 9 Cep; catalog parallax is unavailable.
+        assert FIXED_STARS[star_id].parallax_mas <= 0.0
+        _lon, _lat, dist = calc_fixed_star_position(
+            star_id,
+            2451545.0,
+            noaberr=True,
+            nogdefl=True,
+            j2000_frame=True,
+            center=FLG_BARYCTR,
+        )
+        microarcsecond_rad = math.radians(1.0e-6 / 1000.0 / 3600.0)
+        expected_au = 1.0 / math.sin(microarcsecond_rad)
+        assert dist == pytest.approx(expected_au, rel=1e-12)
 
 
 @pytest.mark.unit

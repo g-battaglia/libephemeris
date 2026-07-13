@@ -71,9 +71,7 @@ class TestPhenoHeliocentric:
     @pytest.mark.unit
     def test_helio_pheno_truepos(self):
         """Heliocentric + TRUEPOS works."""
-        result = swe.pheno_ut(
-            JD_J2000, JUPITER, FLG_SWIEPH | FLG_HELCTR | FLG_TRUEPOS
-        )
+        result = swe.pheno_ut(JD_J2000, JUPITER, FLG_SWIEPH | FLG_HELCTR | FLG_TRUEPOS)
         assert len(result) == 20
 
 
@@ -159,9 +157,7 @@ class TestGauquelinSectorMethods:
     def test_gauquelin_sector_default_flags(self):
         """Default flags include TOPOCTR."""
         # Default: FLG_SWIEPH | FLG_TOPOCTR (32770)
-        sector = swe.gauquelin_sector(
-            JD_J2000, MARS, 0, self.GEOPOS, 1013.25, 15.0
-        )
+        sector = swe.gauquelin_sector(JD_J2000, MARS, 0, self.GEOPOS, 1013.25, 15.0)
         assert 1.0 <= sector < 37.0
 
     @pytest.mark.unit

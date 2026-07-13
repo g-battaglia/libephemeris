@@ -1,9 +1,10 @@
 # LEB (LibEphemeris Binary) — Complete Technical Guide
 
-> **Version:** 2.2 — March 2026
-> **Status:** Production-ready (LEB1 and LEB2 formats), **31 core bodies <0.001" precision (+ 31 exotic minor bodies)**
+> **Last verified:** July 2026
+> **Status:** Production-ready (LEB1 and LEB2 formats). The bundled base core and manifest-pinned medium/extended cores are distributable; additional groups are generated and verified locally from provenance-approved sources.
 > **Source of truth:** This document. See also [Algorithms & Theory](algorithms.md) for detailed mathematical foundations.
 > **Quick reference:** [Generation Quickstart](quickstart.md) — step-by-step commands for generating LEB1 and LEB2 files.
+> **Bundled artifact:** [Base-core build provenance](base-core-provenance.md).
 > LEB2 compressed format details: see `proposals/leb2-implementation-plan.md` and `release-notes/v1.0.0.md`.
 
 ---
@@ -34,34 +35,39 @@
 ### What is LEB?
 
 LEB is a precomputed binary ephemeris format that stores Chebyshev polynomial
-approximations of celestial body positions. When activated, it replaces the
-default Skyfield/JPL pipeline as the primary data source for `calc_ut()`
-and `calc()`, providing approximately **14x speedup** for typical
+approximations of celestial body positions. In the default `auto` mode it is
+the first backend attempted for `calc_ut()` and `calc()`, providing
+approximately **14x speedup** over the local Skyfield/JPL path for typical
 astrological chart calculations.
 
 ### Design Principles
 
-- **Zero new runtime dependencies.** The reader uses only `mmap`, `struct`,
-  `math`, and `dataclasses` (all stdlib). `numpy`, `erfa`, and `spktype21`
-  are only needed at generation time.
+- **Small required runtime stack.** LEB1 parsing is based on `mmap` and
+  `struct`; LEB2 decompression uses the package's required `numpy` and
+  `zstandard` dependencies.
 - **Silent transparent fallback.** If a body is not in the `.leb` file, or
   the Julian Day is out of range, or an unsupported flag combination is
-  requested, the system silently falls back to the full Skyfield pipeline.
-  Callers never need to know whether LEB is active.
+  requested, the request continues through the configured fallback chain:
+  Horizons when `auto` mode has no local DE kernel, then Skyfield. Callers
+  never need to know whether LEB is active.
 - **API-transparent.** The public API (`calc_ut`, `calc`, `calc_ut`,
   `calc`, `EphemerisContext.calc_ut`, etc.) remains unchanged. LEB is
   activated by setting a file path; no code changes are needed.
-- **Immutable after init.** Once a `LEBReader` is constructed, all its data
-  structures are read-only. This makes it inherently thread-safe.
+- **Locked mutable caches.** Memory-mapped coefficient data is read-only.
+  Reader evaluation/decompression caches are mutable and protected by the
+  reader's locks; the LEB2 chunk cache is bounded.
 
-### Two Data Paths
+### Three Data Paths
 
 | Path | Data Source | Activation | Speed |
 |------|------------|------------|-------|
-| **Skyfield path** | JPL DE440/DE441 via Skyfield | Always available as fallback | ~120 µs/eval |
-| **LEB path** | Precomputed `.leb` / `.leb2` file | `set_leb_file()`, auto-discovery, or auto-download | ~5-8 µs/eval |
+| **Horizons path** | NASA JPL Horizons API | `auto` without a local DE kernel, or forced `horizons` mode | Network-bound |
+| **Skyfield path** | JPL DE440/DE441 via Skyfield | Final fallback | ~120 µs/eval |
+| **LEB path** | Locally generated `.leb` or reviewed `.leb2` file | `set_leb_file()` or auto-discovery | ~5-8 µs/eval |
 
-The default `auto` mode uses the LEB path when available (including auto-download), falling back to Skyfield otherwise.
+The default `auto` mode uses the bundled, configured, or locally generated LEB
+path when available, then Horizons when no local DE kernel exists, and finally
+Skyfield.
 
 ---
 
@@ -73,6 +79,10 @@ The default `auto` mode uses the LEB path when available (including auto-downloa
 libephemeris/
   leb_format.py    Format constants, struct layouts, dataclasses, serialization helpers
   leb_reader.py    LEBReader class: mmap, Clenshaw evaluation, delta-T, star catalog
+  leb2_reader.py   LEB2 v1/v2 reader: lazy chunk decompression and bounded caches
+  leb_compression.py  Error-bounded compression and chunk codecs
+  leb_composite.py Dispatch across core/companion LEB files
+  leb_groups.py    Canonical group inventories
   fast_calc.py     Four calculation pipelines (A/A'/B/C), flag dispatch, sidereal/ayanamsa,
                    gravitational deflection, COB corrections
 
@@ -80,9 +90,9 @@ scripts/
   generate_leb.py  CLI generator: Chebyshev fitting, vectorized evaluation, binary assembly
 
 data/leb/
-  ephemeris_base.leb      Base tier (de440s, 1850-2150, ~53 MB)
-  ephemeris_medium.leb    Medium tier (de440, 1550-2650, ~175 MB)
-  ephemeris_extended.leb  Extended tier (de441, -5000 to 5000, ~1.6 GB)
+  ephemeris_base.leb      Locally generated base tier (de440s, 1850-2150)
+  ephemeris_medium.leb    Locally generated medium tier (de440, 1550-2650)
+  ephemeris_extended.leb  Locally generated extended tier (de441, -5000 to 5000)
 
 tests/test_leb/
   test_leb_format.py      Format constants and serialization
@@ -128,32 +138,39 @@ planets.py: calc_ut()
 
 ### Activation
 
-```bash
-# Method 0: Download pre-generated LEB file (easiest)
-libephemeris download leb-base       # ~53 MB, 1850-2150
-libephemeris download leb-medium     # ~175 MB, 1550-2650
-# Auto-discovered from ~/.libephemeris/leb/ — no further configuration needed
-```
+The wheel's reviewed `base_core.leb2` is available automatically, including as
+a range-limited fast path for the default medium tier. A reviewed downloaded
+`{tier}_core.leb2` takes priority when present. Every implicitly selected file
+must match its SHA-256 entry in the distribution manifest.
 
 ```python
-# Method 1: Programmatic
-from libephemeris import set_leb_file
+# Method 1: Programmatic or per-context
+from libephemeris import EphemerisContext, set_leb_file
+
 set_leb_file("/path/to/ephemeris.leb")   # enable
 set_leb_file(None)                        # disable
 
-# Method 2: Environment variable
-export LIBEPHEMERIS_LEB=/path/to/ephemeris.leb
-
-# Method 3: Per-context (thread-safe)
+# Method 2: Per-context (thread-safe)
 ctx = EphemerisContext()
 ctx.set_leb_file("/path/to/ephemeris.leb")
+```
+
+```bash
+# Method 3: Environment variable
+export LIBEPHEMERIS_LEB=/path/to/ephemeris.leb
 ```
 
 **Resolution priority** (highest to lowest):
 1. `EphemerisContext._leb_file` (per-context)
 2. Global `set_leb_file()` call
 3. `LIBEPHEMERIS_LEB` environment variable
-4. Auto-discovery: `~/.libephemeris/leb/{tier}_core.leb2` (LEB2) or `~/.libephemeris/leb/ephemeris_{tier}.leb` (LEB1)
+4. Auto-discovery of the active tier's reviewed, SHA-256-pinned core
+5. Standard local LEB1 names (`{tier}_core.leb`, `ephemeris_{tier}.leb`)
+6. The bundled, SHA-256-pinned `base_core.leb2` as a range-limited fallback
+
+Other cached filenames are never selected implicitly. Independently generated
+files remain fully supported through the standard LEB1 names or one of the
+three explicit configuration methods above.
 
 ### Calculation Mode (`LIBEPHEMERIS_MODE`)
 
@@ -165,7 +182,7 @@ variable.
 |------|----------|
 | `auto` (default) | LEB if configured, then Horizons (if no local DE440), then Skyfield |
 | `skyfield` | Always use Skyfield, even if a `.leb` file is configured |
-| `leb` | Require LEB (auto-discovered or auto-downloaded if needed); unsupported bodies/flags fall back to Skyfield |
+| `leb` | Require the bundled, configured, or locally generated LEB; unsupported bodies/flags fall back to Skyfield |
 | `horizons` | Prefer Horizons API; unsupported bodies/flags fall back to Skyfield |
 
 ```python
@@ -353,7 +370,7 @@ struct StarEntry {
 |-------|----------|---------|--------|
 | 0 | `COORD_ICRS_BARY` | ICRS barycentric planet center (x, y, z) in AU | Sun, Moon, Mercury, Venus, Mars, Earth, Chiron, Ceres-Vesta |
 | 1 | `COORD_ECLIPTIC` | Ecliptic of date (lon, lat, dist) in deg/deg/AU | Mean/True Node, Mean/Oscu Apogee, Interp Apogee/Perigee |
-| 2 | `COORD_HELIO_ECL` | Heliocentric ecliptic (lon, lat, dist) | Cupido-Poseidon, Transpluto |
+| 2 | `COORD_HELIO_ECL` | Heliocentric ecliptic (lon, lat, dist) | Format capability for locally sourced custom models |
 | 3 | `COORD_GEO_ECLIPTIC` | Geocentric ecliptic of date — **reserved, not used** | None |
 | 4 | `COORD_ICRS_BARY_SYSTEM` | ICRS system barycenter (x, y, z) in AU, COB at runtime | Jupiter, Saturn, Uranus, Neptune, Pluto |
 
@@ -362,10 +379,10 @@ gravitational influence creates high-frequency oscillations in the planet center
 position relative to the system barycenter (the Center-of-Body or COB correction).
 These oscillations are difficult to fit with Chebyshev polynomials — they require
 very short intervals and high degree, producing large files and residual fitting
-errors. The solution is to store the smooth system barycenter in the `.leb` file
-and apply the COB correction at runtime. The COB correction uses either
-`planet_centers.bsp` (SPK segments, <0.001" precision) or analytical moon theory
-corrections as fallback (<0.01"). See [Algorithms & Theory](algorithms.md) for details.
+errors. The solution is to store the smooth system barycenter in the `.leb`
+file and use the pinned tier-specific JPL center segment at runtime when it
+covers the retarded epoch. Outside segment coverage the system barycenter is
+retained unchanged. See [Algorithms & Theory](algorithms.md) for details.
 
 ---
 
@@ -386,6 +403,7 @@ class LEBReader:
     def delta_t(self, jd: float) -> float
     def get_star(self, star_id: int) -> StarEntry
     def warm(self, jd_start: float, jd_end: float) -> None
+    def cool(self) -> None
     def close(self) -> None
 
     # Properties
@@ -409,8 +427,8 @@ regardless of file size.
 the page-aligned byte ranges of segments/chunks overlapping the given
 Julian Day range.  This allows pre-faulting only the date ranges that
 will be needed (e.g. 1800-2200 CE ≈ 11 MB for extended tier) without
-loading the entire file (~1.6 GB for the extended tier).  `CompositeLEBReader.warm()` delegates
-to all constituent readers.
+loading the entire file (about 7.64 GB for the current full-registry extended
+artifact). `CompositeLEBReader.warm()` delegates to all constituent readers.
 
 Automatic preloading can be enabled via TOML configuration:
 
@@ -584,7 +602,7 @@ Both functions:
 | `FLG_XYZ` | Cartesian output |
 | `FLG_RADIANS` | Radian output |
 | `FLG_NONUT` | No-nutation frame (mean ecliptic/equator of date) |
-| `FLG_MOSEPH` | Silently stripped (always uses JPL data) |
+| `FLG_MOSEPH` | Does not activate a Moshier path; the selected LEB or analytical body model is unchanged |
 
 Individual body classes may still fall back per body when the loaded
 file lacks the data they need.
@@ -679,14 +697,13 @@ barycenter and applies the Center-of-Body (COB) correction at runtime.
 
 Same as Pipeline A, with one critical addition:
 
-- **COB correction** is applied via `_apply_cob_correction()` at **observer time**
-  (`jd_tt`), not at retarded time (`jd_tt - lt`). This matches Skyfield's
-  `_SpkCenterTarget._observe_from_bcrs()` behavior.
-- The light-time iteration operates on the raw barycenter position (smooth),
-  then COB is applied after convergence.
-- COB uses `planet_centers.bsp` (SPK segments for NAIF IDs 599, 699, 799, 899, 999)
-  when available (<0.001" precision), with analytical moon theory corrections
-  as fallback (<0.01").
+- **Center correction** is evaluated at every light-time iteration's retarded
+  emission epoch (`jd_tt - lt`), so the observer-to-physical-center vector
+  drives convergence whenever a JPL segment covers that epoch.
+- Runtime data comes from the pinned tier-specific planet-center SPK (NAIF IDs
+  599, 699, 799, 899, 999). If no segment covers the epoch, the stored system
+  barycenter is retained unchanged; there is no analytical moon-theory
+  fallback.
 
 **Architectural limitation:** For nearby asteroids (Ceres, Pallas, Juno,
 Vesta), the ICRS->ecliptic pipeline amplifies errors by `1/geocentric_distance`.
@@ -718,20 +735,17 @@ Interpolated Apogee, Interpolated Perigee (6 bodies)
 **No light-time or aberration** is applied to these bodies (they are
 Earth-relative analytical quantities).
 
-### 5.5 Pipeline C: Heliocentric Bodies
+### 5.5 Pipeline C: Heliocentric-format data
 
-**Bodies:** Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus,
-Poseidon, Transpluto (9 bodies)
+The format can represent a heliocentric J2000 ecliptic channel and transform a
+lawfully generated custom model to geocentric output. Built-in historical IDs
+40–58 are evaluated from their current runtime models instead of persisted LEB
+channels, so old files remain readable without reviving embedded legacy data.
 
-**Stored as:** (lon, lat, dist) in degrees/degrees/AU, heliocentric J2000
-ecliptic
-
-**Algorithm:** `_pipeline_helio()`, a distinct pipeline. For `FLG_HELCTR`
-requests the stored heliocentric coordinates are evaluated directly; for the
-default geocentric output the pipeline performs a real heliocentric ->
-geocentric conversion — it subtracts the Earth's position (with the
-light-time correction, matching the Skyfield path) and then applies the
-same of-date frame transforms as Pipeline B.
+Readers retain structural compatibility with legacy files that contain the
+retired hypothetical group. That decode-only compatibility does not extend to
+generation, conversion, or publication: active tools reject the group and do
+not emit its coefficients.
 
 ### 5.6 Sidereal Correction
 
@@ -814,11 +828,15 @@ python scripts/generate_leb.py --output custom.leb --start 1900 --end 2100
 
 ### 6.3 Tier Configurations
 
-| Tier | Ephemeris | Years | Output | Approx Size |
-|------|-----------|-------|--------|-------------|
-| `base` | de440s.bsp | 1850-2150 | `ephemeris_base.leb` | ~53 MB |
-| `medium` | de440.bsp | 1550-2650 | `ephemeris_medium.leb` | ~175 MB |
-| `extended` | de441.bsp | -5000 to 5000 | `ephemeris_extended.leb` | ~1.6 GB |
+| Tier | Ephemeris | Years | Output | Typical current inventory |
+|------|-----------|-------|--------|---------------------------|
+| `base` | de440s.bsp | 1850-2150 | `ephemeris_base.leb` | up to 53 bodies |
+| `medium` | de440.bsp | 1550-2650 | `ephemeris_medium.leb` | up to 53 bodies |
+| `extended` | de441.bsp | -5000 to 5000 | `ephemeris_extended.leb` | up to 45 bodies |
+
+File size is measured from the selected artifact. LEB1 files are generated
+locally; reviewed SHA-256-pinned LEB2 cores are published for base, medium, and
+extended tiers.
 
 ### 6.4 Chebyshev Fitting
 
@@ -950,11 +968,11 @@ through to Skyfield. This is transparent to the caller.
 
 **Coverage by tier:**
 
-| Tier | Planets | Asteroids | Analytical |
+| Tier | Planets | Asteroids | Lunar/model-backed points |
 |------|---------|-----------|------------|
 | Base (1850-2150) | Full | Full (SPK covers) | Full |
 | Medium (1550-2650) | Full | ~1600-2500 (per-body) | Full |
-| Extended (-5000 to 5000) | Full | ~1600-2500 (per-body) | Full |
+| Extended (-5000 to 5000) | Full | ~1600-2500 (per-body) | Active JPL-kernel range |
 
 ### 6.9 Ecliptic Body Generation
 
@@ -970,7 +988,7 @@ Solution:
 3. Convert back to degrees and fit
 4. Verification re-wraps with `% 360`
 
-### 6.10 Analytical Body Functions
+### 6.10 Ecliptic and model-backed body functions
 
 | Body ID | Function | Source |
 |---------|----------|--------|
@@ -980,11 +998,12 @@ Solution:
 | 13 (Oscu Apogee) | `calc_true_lilith(jd)` | `lunar.py` |
 | 21 (Interp Apogee) | `calc_interpolated_apogee(jd)` | `lunar.py` |
 | 22 (Interp Perigee) | `calc_interpolated_perigee(jd)` | `lunar.py` |
-| 40-47 (Uranians) | `calc_uranian_planet(body_id, jd)` | `hypothetical.py` |
-| 48 (Transpluto) | `calc_transpluto(jd)` | `hypothetical.py` |
 
-These are pure-Python analytical functions (~315 us/eval). They are evaluated
-**sequentially** — one body at a time with per-body progress bars.
+True/osculating points use JPL state-vector geometry. Mean node/apogee use
+ERFA/IERS Delaunay arguments; interpolated apogee/perigee use
+separate Delaunay perturbation series and a versioned, hash-pinned refinement.
+The generator evaluates the public body functions and records their resulting
+Chebyshev channels.
 
 ### 6.11 Nutation Generation
 
@@ -1039,11 +1058,13 @@ The `assemble_leb()` function (line 1328):
 
 ### 6.15 Group Generation & Merge
 
-Generating all 62 bodies in a single process can be slow. The **group workflow**
-splits generation into four independent runs — one per body group (planets,
-asteroids, exotics, analytical) — then merges the partial files into a single
-`.leb`. This allows regenerating only the group that changed (e.g. after
-updating asteroid SPK files).
+Generating the full registry in a single process can be slow. The **group
+workflow** splits generation into four independent runs — one per body group
+(planets, asteroids, exotics, analytical) — then merges the partial files into
+a single `.leb`. Base and medium register up to 53 bodies. Extended generation
+deliberately excludes eight chaotic near-Earth asteroids and produces a
+45-body inventory. The split allows regenerating only the group that changed
+(e.g. after updating asteroid SPK files).
 
 #### Body Groups
 
@@ -1069,7 +1090,7 @@ BODY_GROUPS: dict[str, List[int]] = {
 | `planets` | Sun, Moon, Mercury–Pluto, Earth | Vectorized Skyfield | ~1 s |
 | `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta | spktype21 (scalar) | ~15–60 s |
 | `exotics` | 31 centaurs / TNOs / main-belt / NEAs (Pholus, Eris, Chariklo, Apophis, …) | spktype21 (scalar) | ~several min |
-| `analytical` | Mean/true nodes, mean/true Lilith, 8 Uranians, mean apogee/perigee, osc. apogee | Sequential (scalar) | ~2–3 min |
+| `analytical` | Model-backed/true lunar points | ERFA/IERS plus JPL state geometry | Depends on active JPL range |
 
 #### CLI: `--group`
 
@@ -1253,13 +1274,19 @@ All four are accessible as `libephemeris.set_leb_file()`,
 
 ### 8.1 LEBReader Thread Safety
 
-`LEBReader` is **inherently thread-safe** because:
-- All data structures are populated at construction time and never mutated
-- `mmap` read access is safe from multiple threads
-- `struct.unpack_from()` is a pure function
-- Clenshaw evaluation uses only local variables
-- `warm()` only calls `madvise()` (a read-only advisory hint) and is safe
-  to call from any thread
+Concurrent evaluation is designed to be safe:
+
+- Parsed coefficient metadata and the memory map are read-only after
+  construction; `struct.unpack_from()` and Clenshaw evaluation use local data.
+- The bounded evaluation caches store immutable result tuples. Concurrent
+  cache hits, inserts, or an occasional redundant calculation do not change
+  numeric results.
+- `LEB2Reader` protects decompression and chunk-cache mutations with its
+  decompression lock, so concurrent requests cannot decompress the same chunk
+  twice or mutate that cache during close.
+- `warm()` and `cool()` provide advisory page-cache hints. Coordinate
+  lifecycle calls such as `close()` with application threads instead of
+  closing a reader while another thread is using it.
 
 ### 8.2 EphemerisContext LEB Integration (`context.py`)
 
@@ -1270,7 +1297,7 @@ class EphemerisContext:
     def __init__(self):
         self._leb_file: Optional[str] = None
         self._leb_reader: Optional["LEBReader"] = None
-        self.sidereal_mode: int = 1   # Lahiri
+        self.sidereal_mode: int = 0   # API default: Fagan/Bradley
         self.sidereal_t0: float = 2451545.0
         self.sidereal_ayan_t0: float = 0.0
 
@@ -1339,20 +1366,10 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
 | 20 | Vesta | 8 | 13 | ICRS_BARY | 3 |
 | 21 | Interp Apogee | **1** | **17** | ECLIPTIC | 3 |
 | 22 | Interp Perigee | **1** | **17** | ECLIPTIC | 3 |
-| 40 | Cupido | 256 | 7 | HELIO_ECL | 3 |
-| 41 | Hades | 256 | 7 | HELIO_ECL | 3 |
-| 42 | Zeus | 256 | 7 | HELIO_ECL | 3 |
-| 43 | Kronos | 256 | 7 | HELIO_ECL | 3 |
-| 44 | Apollon | 256 | 7 | HELIO_ECL | 3 |
-| 45 | Admetos | 256 | 7 | HELIO_ECL | 3 |
-| 46 | Vulkanus | 256 | 7 | HELIO_ECL | 3 |
-| 47 | Poseidon | 256 | 7 | HELIO_ECL | 3 |
-| 48 | Transpluto | 256 | 7 | HELIO_ECL | 3 |
-
-**Total: 31 core bodies** (listed above). `BODY_PARAMS` additionally
+**Total: 22 generated bodies** (listed above). `BODY_PARAMS` additionally
 registers **31 exotic minor bodies** (`EXOTIC_IDS`, see §9.3) — Pholus
 (id 16), the TNOs, and extra centaur / main-belt / NEA asteroids (ids
-10010–235088) — for **62 bodies** in all.
+10010–235088) — for **53 bodies** in all.
 
 Bodies marked **bold** differ from the original design document:
 - **Jupiter-Pluto (5-9):** Use `COORD_ICRS_BARY_SYSTEM` (4) instead of
@@ -1414,12 +1431,13 @@ The same fallback is triggered by:
   back; `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS` and `FLG_NONUT` are
   handled on the LEB path — see §5.2)
 - **JD out of range:** Julian Day outside the body's coverage in the file
-- **Star-based sidereal modes:** e.g., `SIDM_TRUE_REVATI` (requires
-  fixed star position not available in LEB fast path)
+- **Live catalog sidereal modes:** these delegate only the ayanamsha geometry
+  to the direct catalogue pipeline; the body itself remains on LEB. Epoch and
+  formula modes use the same shared defining table on both backends.
 
 #### Exotic minor bodies (served from LEB when present)
 
-The LEB catalog is **not** limited to the 31 core bodies. `BODY_PARAMS`
+The LEB catalog is **not** limited to the standard planetary/lunar set. `BODY_PARAMS`
 also registers **31 exotic minor bodies** (`EXOTIC_IDS` in
 `libephemeris/exotic_bodies.py`) — centaurs, trans-Neptunian objects,
 large main-belt asteroids, and near-Earth asteroids — generated into the
@@ -1442,13 +1460,13 @@ outside the object's SPK window, or on the extended tier, where the 8
 chaotic NEAs are intentionally excluded from generation
 (`EXOTIC_EXTENDED_IDS` keeps the 23 regular exotics only).
 
-#### Bodies that always fall back to Skyfield
+#### Bodies not stored as LEB coefficients
 
 These are never stored as LEB Chebyshev data:
 
 | Category | Bodies | IDs | Count | How computed |
 |----------|--------|-----|-------|--------------|
-| Additional hypotheticals | Nibiru, Harrington, Leverrier, Adams, Lowell, Pickering, Vulcan, Selena, Proserpina, Waldemath | 49–58 | 10 | Keplerian from `hypothetical.py` |
+| Historical hypothetical | Cupido through Waldemath | 40–58 | 19 | Current runtime models from `hypothetical.py`; per-ID provenance status is separately gated |
 | Fixed stars | full star catalog (Regulus, Spica, Aldebaran, …) | FIXSTAR_OFFSET + n | 1447 | `fixed_stars.py` (see §9.4) |
 | Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | MOON_OFFSET + n | 21 | SPK via `planetary_moons.py` |
 | Astrological angles | Ascendant, MC, Descendant, IC, Vertex, Antivertex | 9000–9005 | 6 | `angles.py` (house-based) |
@@ -1458,14 +1476,18 @@ These are never stored as LEB Chebyshev data:
 Any minor body outside the `exotics` registry (e.g. Bennu) likewise falls
 back to the SPK → Skyfield pipeline.
 
-**Total bodies NOT in LEB Chebyshev data:** ~1489 (10 hypotheticals + 1447
+IDs 40–58 do not require LEB coefficients; the dispatcher bypasses any legacy
+hypothetical channel and uses the current runtime model.
+
+**Total bodies NOT in LEB Chebyshev data:** ~1498 (19 hypothetical + 1447
 stars + 21 moons + 10 angles/parts + 1 nutation).
 
-**Why the core/exotics split:** the 31 **core** bodies are used in nearly
-every chart; their compressed LEB2 `core` group is small enough (~10.6 MB)
-to bundle with the wheel. The 31 **exotic** bodies are SPK-derived and much
-larger on disk (the base `exotics` group is ~59 MB compressed), so they ship
-as a separate optional group served from LEB once downloaded. Fixed stars,
+**Why the core/exotics split:** the frequently used compressed LEB2 `core`
+group is small enough (~10.7 MB for the bundled base artifact). The 31
+**exotic** bodies are SPK-derived and much larger on disk (a generated base
+`exotics` group is ~59 MB compressed). The format and generator support that
+separate companion, but no exotics file is currently published in the release
+download manifest; users must generate or provide it themselves. Fixed stars,
 planetary moons, and chart angles/parts stay on the Skyfield pipeline — they
 are cheap to compute analytically or vary with observer/house settings, so
 precomputing them would add size with little benefit. The Skyfield fallback
@@ -1546,20 +1568,18 @@ Typical generation-time errors:
 | True Node | <1e-9 | degrees (~4e-6") |
 | Interp Apogee | <1e-7 | degrees (~4e-4") |
 
-### 10.2 End-to-End Precision (vs Skyfield Reference)
+### 10.2 End-to-End verification
 
 The compare test suite (`tests/test_leb/compare/`) validates LEB output
-against Skyfield for all 31 core bodies across hundreds of dates per tier.
-
-**All 31 core bodies achieve <0.001 arcsecond geocentric position precision**
-on all three tiers (base, medium, and extended). (The 31 exotic minor bodies
-of §9.3 are SPK-derived and best-effort; NEAs in particular use looser
-targets.) This was accomplished through:
+against the direct JPL/independent runtime path for every covered body. The
+table below records engineering bounds configured by category; it is not a
+persisted residual table from an external implementation. Exotic minor bodies are
+SPK-derived and best-effort, with source-appropriate bounds. Verification uses:
 
 1. `COORD_ICRS_BARY_SYSTEM` storage for outer planets (eliminates COB
    oscillation fitting errors)
 2. PPN gravitational deflection (Sun, Jupiter, Saturn)
-3. Runtime COB correction at observer time (not retarded time)
+3. Runtime planet-center correction at the retarded emission epoch
 4. `deltat()` for UT->TT conversion (not reader's sparse table)
 5. Asteroid pipeline via `_SpkType21Target` VectorFunction wrapper
 6. Tightened Chebyshev parameters for bodies 13, 21, 22
@@ -1571,10 +1591,9 @@ targets.) This was accomplished through:
 | Planets (11) | Sun-Pluto, Earth | Moon | 0.000332" |
 | Asteroids (5) | Chiron, Ceres-Vesta | Juno | 0.000045" |
 | Ecliptic (6) | Nodes, Lilith | OscuApog | 0.000049" |
-| Hypothetical (9) | Uranians, Transpluto | all | ~0.000000" |
 
-**Tests passed:** 404 comparison tests (planets, asteroids, hypothetical,
-lunar, velocities, distances, flags, sidereal).
+Verification covers planets, asteroids, lunar geometry, velocities, distances,
+flags, and native sidereal modes against the direct independent pipeline.
 
 #### Medium Tier (1550-2650, verified)
 
@@ -1583,11 +1602,9 @@ lunar, velocities, distances, flags, sidereal).
 | Planets (11) | Sun-Pluto, Earth | Moon | 0.000325" |
 | Asteroids (5) | Chiron, Ceres-Vesta | Vesta | 0.000036" |
 | Ecliptic (6) | Nodes, Lilith | OscuApog | 0.000075" |
-| Hypothetical (9) | Uranians, Transpluto | all | ~0.000000" |
 
-**Tests passed:** 904 comparison tests (all planet/asteroid/hypothetical/lunar
-tests plus eclipses, crossings, stations, rise/transit, elongation, ayanamsha,
-nutation, houses, gauquelin).
+Verification covers the generated planet/asteroid/lunar channels and their
+reference-free downstream invariants.
 
 #### Extended Tier (-5000 to 5000 CE, verified)
 
@@ -1596,17 +1613,16 @@ nutation, houses, gauquelin).
 | Planets (11) | Sun-Pluto, Earth | Mars | 0.000010" |
 | Asteroids (5) | Chiron, Ceres-Vesta | Pallas | 0.000018" |
 | Ecliptic (6) | Nodes, Lilith | OscuApog | 0.054" * |
-| Hypothetical (9) | Uranians, Transpluto | all | ~0.000000" |
 
-\* Ecliptic body precision is limited by Meeus polynomial degradation
-beyond ±20 centuries from J2000.0. OscuApogee uses analytical lunar
-formulas that lose accuracy at extreme dates. Within ±1000 CE, ecliptic
-body errors are <0.001".
+\* This historical extended-file measurement predates the current lunar model.
+Mean points use ERFA/IERS arguments; smoothed and osculating points are limited
+by active JPL state coverage.
 
-**Tests passed:** 261 comparison tests (planets, hypothetical, velocities,
-lunar, flags, ancient/future sub-ranges, boundary dates).
+Verification includes velocities, lunar channels, flags, ancient/future
+sub-ranges, and boundary dates against the direct independent pipeline.
 
-**File size:** ~1.6 GB (de441.bsp, -5000 to 5000 CE, 10,000 years).
+The extended full-registry size is reported by the local generator/verifier.
+Historical monolithic size claims and downloads are retired.
 
 #### Test Tolerances (as configured in `conftest.py`)
 
@@ -1618,7 +1634,7 @@ lunar, flags, ancient/future sub-ranges, boundary dates).
 | `EQUATORIAL_ARCSEC` | 0.02 | 0.02 | 0.02 | Heliocentric amplification |
 | `J2000_ARCSEC` | 0.001 | 0.001 | 0.001 | |
 | `SIDEREAL_ARCSEC` | 0.001 | 0.001 | 0.001 | |
-| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | 0.001 | |
+| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | 0.001 | Historical IDs 40–58 use runtime models, including with legacy LEB files |
 | `DISTANCE_AU` | 5e-6 | 5e-6 | 5e-6 | |
 
 ### 10.3 Architectural Limitations
@@ -1685,8 +1701,8 @@ generating. Use `_spk_covers_range()` to verify.
 | Skyfield `target.at(t)` (Moon) | 121 us | 0.7 us | **170x** |
 | `erfa.nut06a()` (nutation) | 32 us | ~0.5 us | **~50x** |
 | `spktype21.compute_type21()` | 65 us | N/A (scalar) | 36x vs calc |
-| True lunar node (pure Python) | 315 us | N/A | not vectorizable |
-| Interp perigee (pure Python) | 329 us | N/A | not vectorizable |
+| True lunar node (JPL state geometry) | backend-dependent | N/A | state-vector calculation |
+| Mean IERS / interpolated compatibility lunar points | backend/cache-dependent | N/A | direct standards/series evaluation |
 
 ---
 
@@ -1704,14 +1720,9 @@ leph leb generate extended groups  # Extended tier
 leph leb verify base               # Verify base tier
 leph leb verify medium             # Verify medium tier
 
-# Download (convenience wrappers for libephemeris CLI)
-libephemeris download leb-base       # Download base tier LEB (~53 MB)
-libephemeris download leb-medium     # Download medium tier LEB (~175 MB)
-libephemeris download leb-extended   # Download extended tier LEB (~1.6 GB)
-
-# Release — upload to GitHub Releases (requires: gh auth login)
-leph release leb 1.0.0             # Upload all tiers + update hashes in download.py
-leph release leb-dry-run 1.0.0     # Show what would be uploaded (no changes)
+# The wheel contains reviewed base_core.leb2. Pinned medium/extended cores are
+# available through the tier download commands; generate custom LEB1/LEB2
+# groups locally from the configured JPL kernel.
 
 # Testing
 leph test leb-format all           # All LEB format tests (excludes @slow)
@@ -1729,9 +1740,9 @@ pytest tests/test_leb/test_generate_leb.py -v
 pytest tests/test_leb/test_leb_precision.py -v
 pytest tests/test_leb/test_context_leb.py -v
 
-# By marker
-pytest tests/test_leb/ -v -m "not slow"
-pytest tests/test_leb/ -v -m "precision"
+# Grouped runs go through the repository CLI
+leph test leb-format all
+leph test leb-format precision
 ```
 
 ### 12.3 Manual Generation
@@ -1782,73 +1793,21 @@ reader.close()
 "
 ```
 
-### 12.4 Release Workflow
+### 12.4 Distribution policy
 
-LEB files are hosted as assets on the GitHub release tagged `data-v1`.
-The release script (`scripts/release_leb.py`) handles upload and hash updates.
+The wheel contains the reviewed `libephemeris/data/leb2/base_core.leb2` file.
+The downloader also supports artifact-specific remote entries only when the
+manifest supplies both a reviewed URL and SHA-256. Former release objects that
+lack the current clean-room build attestation remain retired.
 
-**Prerequisites:**
+LEB1 and LEB2 remain supported as local generation formats. Generate the desired
+tier from the configured NASA JPL kernel, verify it against the direct JPL path,
+and activate it with `set_leb_file()`. Locally generated files can be placed in
+`~/.libephemeris/leb/`; only manifest-pinned tier cores are auto-discovered.
 
-- `gh` CLI installed and authenticated (`gh auth login`)
-- LEB files generated locally (in `data/leb/` or `~/.libephemeris/leb/`)
-
-**Full workflow (generate + release):**
-
-```bash
-# 1. Generate LEB file(s)
-leph leb generate medium groups    # recommended group workflow
-
-# 2. Dry run — verify what would be uploaded
-leph release leb-dry-run 1.0.0
-
-# 3. Upload to GitHub Releases + auto-update hashes in download.py
-leph release leb 1.0.0
-
-# 4. Commit the updated download.py
-git add libephemeris/download.py
-git commit -m "update LEB medium tier hash after regeneration"
-```
-
-**What the release script does:**
-
-1. Searches for `.leb` files in `data/leb/` (repo) and `~/.libephemeris/leb/`
-2. Computes SHA256 hash and file size for each file
-3. Uploads to GitHub release `data-v1` via `gh release upload --clobber`
-4. With `--update-hashes`: updates `DATA_FILES` in `libephemeris/download.py`
-   with the new SHA256 and size_mb values
-
-**Direct script usage (without leph):**
-
-```bash
-python scripts/release_leb.py --version 1.0.0 --tier medium --update-hashes
-python scripts/release_leb.py --version 1.0.0 --dry-run
-python scripts/release_leb.py --version 1.0.0 --tier base --tag data-v1
-```
-
-### 12.5 User Download
-
-End users download pre-generated LEB files via the library CLI (no `leph` needed):
-
-```bash
-# Install the library
-pip install libephemeris
-
-# Download LEB for the desired tier
-libephemeris download leb-base       # ~53 MB, 1850-2150
-libephemeris download leb-medium     # ~175 MB, 1550-2650
-libephemeris download leb-extended   # ~1.6 GB, -5000 to +5000
-```
-
-Files are saved to `~/.libephemeris/leb/` and auto-discovered at runtime
-based on the active precision tier — no further configuration needed.
-
-Programmatic download is also available:
-
-```python
-from libephemeris import download_leb_for_tier
-
-download_leb_for_tier("medium")  # downloads + activates
-```
+Legacy files may still be decoded for format compatibility, but the retired
+hypothetical group is excluded from active LEB1 generation and LEB2 conversion
+and must not be published.
 
 ---
 
@@ -1857,15 +1816,21 @@ download_leb_for_tier("medium")  # downloads + activates
 ### 13.1 Overview
 
 LEB2 is a compressed variant of the LEB format that uses error-bounded lossy
-compression to reduce file sizes by 4-10x while maintaining <0.001" precision.
-The compression is transparent: `open_leb()` auto-detects the format via magic
-bytes (`LEB1` vs `LEB2`), and the runtime API is identical.
+compression to reduce file sizes by roughly 4-10x. The core end-to-end gate
+requires angular agreement below 0.001 arcsecond against LEB1, while the direct
+coefficient verifier reports each stored component in its native unit and as a
+ratio to its bound (AU for Cartesian ICRS; degrees/degrees/AU for ecliptic
+data). When a group is declared it also requires its exact inventory, and each
+LEB2 body's frame, degree, component count, and coverage are authenticated
+against LEB1 before comparison. The compression is transparent: `open_leb()`
+auto-detects the format via
+magic bytes (`LEB1` vs `LEB2`), and the runtime API is identical.
 
-**Motivation:** LEB1 files are too large to bundle in a wheel: the base-tier
-core set totals ~102 MB across the separate group files (over PyPI's 100 MB
-limit), and even the merged base-tier file is ~53 MB. LEB2 compresses the core
-body set to ~10.6 MB, enabling `pip install libephemeris` to include precomputed
-ephemeris with zero additional downloads.
+**Motivation:** LEB1 files are too large to bundle in a wheel: the retired
+historical base asset was about 53 MB, while the current full-registry merged base
+artifact is about 375 MB. LEB2 compresses the 14-body core companion to about
+10.7 MB, enabling `pip install libephemeris` to include precomputed ephemeris
+with zero additional downloads.
 
 **Dependency:** `zstandard` (required, ~200 KB wheel).
 
@@ -1899,7 +1864,7 @@ Offset      Content                          Size
 0x0000      File Header                      64 bytes (same struct as LEB1)
 0x0040      Section Directory                N × 24 bytes
 variable    Section 0: Body Index            body_count × 68 bytes (CompressedBodyEntry)
-variable    Section 6: Compressed Chebyshev  per-body compressed blobs (contiguous)
+variable    Section 6: Compressed Chebyshev  per-body chunk indexes and compressed chunks
 variable    Section 2: Nutation Data         uncompressed (same as LEB1)
 variable    Section 3: Delta-T Table         uncompressed (same as LEB1)
 variable    Section 4: Star Catalog          uncompressed (same as LEB1)
@@ -1927,10 +1892,10 @@ struct CompressedBodyEntry {
     float64  interval_days;
     uint32_t degree;
     uint32_t components;
-    uint64_t data_offset;        // offset to COMPRESSED blob
+    uint64_t data_offset;        // v2: offset to per-body chunk index; v1: blob
 
     // Additional 16 bytes (LEB2-specific)
-    uint64_t compressed_size;    // size of compressed blob in bytes
+    uint64_t compressed_size;    // total compressed/indexed body bytes
     uint64_t uncompressed_size;  // size of raw coefficients in bytes
 };
 ```
@@ -1938,8 +1903,11 @@ struct CompressedBodyEntry {
 **Python dataclass:** `leb_format.CompressedBodyEntry`
 **Constant:** `COMPRESSED_BODY_ENTRY_SIZE = 68`
 
-Each body's compressed blob is independently decompressible. Only the bodies
-actually queried at runtime get decompressed.
+In v2, `data_offset` points to a 16-byte chunk-index header followed by
+48-byte chunk entries. Each entry records the first segment, segment count,
+payload offset, compressed and uncompressed sizes, and checksum metadata for
+one independently decompressible temporal chunk. In legacy v1 it points
+directly to one monolithic body blob.
 
 ### 13.4 Compression Pipeline
 
@@ -2005,22 +1973,26 @@ handling at evaluation time.
 
 ### 13.5 Per-Body Precision Targets
 
-The default target is `5e-9 AU` (≈0.001"). Bodies with small geocentric
-distances use tighter targets because positional errors are amplified into
-angular errors by `1/distance`, and because Moon/Earth positions feed into
-light-time, deflection, and aberration corrections for **all** other bodies.
+The numeric default target is `5e-9` in each body's native stored component
+unit. For Cartesian ICRS data this is AU (≈0.001" at 1 AU); ecliptic data uses
+degrees for longitude/latitude and AU for distance. Bodies with small
+geocentric distances use tighter Cartesian targets because positional errors
+are amplified into angular errors by `1/distance`, and because Moon/Earth
+positions feed into light-time, deflection, and aberration corrections for
+**all** other bodies.
 
 **Source:** `BODY_TARGET_AU` in `leb_compression.py`
 
-| Body | Target (AU) | Reason |
-|------|-------------|--------|
-| Moon (1) | 1e-12 | d_geo ~0.002 AU, amplification ~500x |
-| Earth (14) | 1e-12 | Used in corrections for every body |
-| Sun (0) | 1e-10 | Deflector for all bodies |
-| Mercury (2) | 1e-10 | d_geo ~0.55 AU, fast orbit |
-| Venus (3) | 1e-10 | d_geo ~0.27 AU, closest to Earth |
-| Mars (4) | 1e-10 | d_geo ~0.37 AU |
-| All others | 5e-9 | Default (0.001" at 1 AU) |
+| Body/frame | Numeric target | Stored unit | Reason |
+|------------|----------------|-------------|--------|
+| Moon (1) | 1e-12 | AU | d_geo ~0.002 AU, amplification ~500x |
+| Earth (14) | 1e-12 | AU | Used in corrections for every body |
+| Sun (0) | 1e-10 | AU | Deflector for all bodies |
+| Mercury (2) | 1e-10 | AU | d_geo ~0.55 AU, fast orbit |
+| Venus (3) | 1e-10 | AU | d_geo ~0.27 AU, closest to Earth |
+| Mars (4) | 1e-10 | AU | d_geo ~0.37 AU |
+| Other Cartesian bodies | 5e-9 | AU | Default (0.001" at 1 AU) |
+| Ecliptic/heliocentric bodies | 5e-9 | deg/deg/AU | Native stored components |
 
 ### 13.6 Modular File Architecture
 
@@ -2028,15 +2000,21 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 
 | Group | Bodies | Base size | Description |
 |-------|--------|-----------|-------------|
-| `core` | 14 | 10.6 MB | Sun-Pluto, Earth, Mean/True Node, Mean Apogee |
+| `core` | 14 | 10.7 MB | Sun-Pluto, Earth, Mean/True Node, Mean Apogee |
 | `asteroids` | 5 | 8.7 MB | Chiron, Ceres, Pallas, Juno, Vesta |
 | `exotics` | 31 | 59.0 MB | Centaurs, TNOs, main-belt & NEA minor bodies (Pholus, Eris, …) |
 | `apogee` | 3 | 11.4 MB | Oscu Apogee, Interp Apogee/Perigee |
-| `uranians` | 9 | 2.1 MB | Cupido-Transpluto |
+
+The table gives the base-tier inventory. Medium also has 31 exotics; extended
+contains exactly the 23 regular exotics and excludes all eight chaotic NEAs.
 
 The `exotics` group (`LEB2_GROUPS` in `libephemeris/leb_groups.py`) is by far
-the largest and ships as a separate optional download; the pip wheel bundles
-only the `core` group.
+the largest. It is a supported generated companion but is not currently a
+published download. The wheel bundles the independently generated
+`base_core.leb2`; mean lunar points and smoothed apsides require no standalone
+lunar model binary. Wider cores are accepted only through artifact-specific
+URL and SHA-256 manifest entries; companion groups without such entries remain
+local-generation only.
 
 **File naming convention:** `{tier}_{group}.leb2` (e.g. `base_core.leb2`,
 `medium_asteroids.leb2`).
@@ -2048,20 +2026,21 @@ only the `core` group.
 The `CompositeLEBReader` (`leb_composite.py`) wraps multiple LEB readers
 and dispatches `eval_body()` to the reader containing the requested body.
 
-**Auto-discovery:** when `set_leb_file()` is called with a group file
-(e.g. `base_core.leb2`), companion files in the same directory with the
-same tier prefix are automatically loaded.
+**Companion discovery:** when `set_leb_file()` explicitly selects a locally
+generated group file (for example, `local_base_core.leb2`), companion files in
+the same directory with the same prefix are loaded. The exact hash-pinned
+manifest-pinned tier core is deliberately opened alone, so stale cache files
+cannot silently extend its trust boundary.
 
 ```python
 import libephemeris as swe
 
-swe.set_leb_file("data/leb2/base_core.leb2")  # companions auto-discovered
+swe.set_leb_file("data/leb2/local_base_core.leb2")  # local companions discovered
 swe.set_calc_mode("leb")
 
 # Bodies from different files work transparently
 swe.calc_ut(2451545.0, swe.SUN, swe.FLG_SPEED)     # from core
 swe.calc_ut(2451545.0, swe.CHIRON, swe.FLG_SPEED)   # from asteroids
-swe.calc_ut(2451545.0, 40, swe.FLG_SPEED)              # from uranians
 ```
 
 **How it works:**
@@ -2088,42 +2067,47 @@ reader = CompositeLEBReader.from_file_with_companions("data/leb2/base_core.leb2"
 
 **Source:** `libephemeris/leb2_reader.py`
 
-`LEB2Reader` provides the same interface as `LEBReader` with one key
-difference: coefficients are decompressed **lazily** on first access
-per body, then cached in memory.
+`LEB2Reader` provides the same interface as `LEBReader`. Current v2 files
+decompress coefficients **lazily per body/date chunk**; legacy v1 files still
+decompress one complete body on first access.
 
 ```
 LEB1 hot path:  jd → O(1) index → struct.unpack_from(mmap, offset) → Clenshaw
-LEB2 hot path:  jd → O(1) index → struct.unpack_from(cache[body_id], offset) → Clenshaw
-                                    └── bytes buffer, populated once per body
+LEB2 v2 hot path: jd → segment → chunk index → cache[(body_id, chunk_idx)] → Clenshaw
+                                              └── populated per requested chunk
 ```
 
-After first access, performance is identical to LEB1 (~1.5 µs/eval).
-First-access cost per body: ~0.2-1 ms (zstd decompression at ~5 GB/s).
+Repeated evaluations in a cached chunk avoid decompression. A cold access
+decompresses only the approximately ten-year chunk containing the requested
+date, rather than a complete centuries-long body stream.
 
 The Clenshaw evaluation functions (`_clenshaw`, `_clenshaw_with_derivative`,
 `_deriv_coeffs`) are imported from `leb_reader.py` — zero code duplication.
 
-**Thread safety:** same as LEBReader. The `_cache` dict assignment is atomic
-under CPython's GIL; once populated, the `bytes` buffer is immutable.
+**Thread safety:** decompression and cache mutation are protected by
+`_decomp_lock`. The v2 chunk cache is keyed by `(body_id, chunk_index)` and is
+bounded to 64 entries; evaluation caches are cleared when chunk eviction or
+reader shutdown requires it. Correctness does not rely on GIL atomicity.
 
 ### 13.9 Key Modules
 
 | Module | Purpose |
 |--------|---------|
-| `leb_compression.py` | `compress_body()`, `decompress_body()`, `compute_mantissa_bits()`, shuffle/unshuffle |
-| `leb2_reader.py` | `LEB2Reader` — lazy per-body decompression, same interface as `LEBReader` |
+| `leb_compression.py` | Monolithic and chunked compression/decompression, mantissa targets, shuffle/unshuffle |
+| `leb2_reader.py` | `LEB2Reader` — v1 full-body and v2 lazy per-chunk decompression |
 | `leb_composite.py` | `CompositeLEBReader` — wraps multiple readers, dispatches by body_id |
 | `leb_reader.py` | `open_leb()` factory — auto-detects LEB1/LEB2 via magic bytes |
 | `scripts/generate_leb2.py` | CLI: `convert`, `convert-all`, `generate`, `verify` |
-| `scripts/test_leb2_precision.py` | Fast precision test: all bodies × 6 flags × N dates per tier |
+| `scripts/test_leb2_precision.py` | Fast precision test: 14 core bodies × 6 flags × N dates per tier |
 
 ### 13.10 Generation Workflow
 
 LEB2 files are produced by **converting** existing LEB1 files. The conversion
 applies the compression pipeline (§13.4) to each body's raw coefficients.
 
-**Prerequisites:** a valid LEB1 file for the target tier must exist in `data/leb/`.
+**Prerequisites:** a locally generated full-registry LEB1 file for the target
+tier must exist in `data/leb/`. Historical smaller monolithic release assets
+are retired and must not be used as conversion inputs.
 
 **Recommended workflow (base tier):**
 
@@ -2134,10 +2118,10 @@ leph leb generate base groups
 # Step 2: Convert LEB1 → LEB2 (all 5 groups)
 leph leb2 convert base
 
-# Step 3: Verify LEB2 against LEB1 reference
+# Step 3: Verify the core LEB2 companion against its LEB1 reference
 leph leb2 verify base
 
-# Step 4: Run precision tests
+# Step 4: Run the core end-to-end precision test
 leph test leb2-format precision-base
 ```
 
@@ -2154,19 +2138,19 @@ python scripts/generate_leb2.py generate --tier base --group core -o data/leb2/b
 
 ```bash
 # Convert LEB1 → LEB2 (all groups for a tier)
-leph leb2 convert base              # Base tier → data/leb2/base_{core,asteroids,exotics,apogee,uranians}.leb2
+leph leb2 convert base              # Base tier → core, asteroids, exotics, apogee
 leph leb2 convert medium            # Medium tier
 leph leb2 convert extended          # Extended tier
 
-# Verify against LEB1 reference
-leph leb2 verify base               # 500 samples per body, compare vs LEB1
+# Verify the core companion against its LEB1 reference
+leph leb2 verify base               # exact 14-body core, 500 samples per body
 
 # Unit tests
 leph test leb2-format all           # Compression round-trip + reader tests
 
-# Precision tests (end-to-end via calc_ut)
-leph test leb2-format precision-base       # Base tier (~15s)
-leph test leb2-format precision-all        # All tiers (~45s)
+# Core precision tests (end-to-end via calc_ut)
+leph test leb2-format precision-base       # Base core (~15s)
+leph test leb2-format precision-all        # Core companions, all tiers (~45s)
 ```
 
 **Direct CLI (`scripts/generate_leb2.py`):**
@@ -2174,7 +2158,7 @@ leph test leb2-format precision-all        # All tiers (~45s)
 ```bash
 # Convert a single group
 python scripts/generate_leb2.py convert data/leb/ephemeris_base.leb \
-  -o data/leb2/base_core.leb2 --group core
+  -o data/leb2/base_core.leb2 --group core --tier base
 
 # Convert all groups at once
 python scripts/generate_leb2.py convert-all data/leb/ephemeris_base.leb \
@@ -2184,29 +2168,18 @@ python scripts/generate_leb2.py convert-all data/leb/ephemeris_base.leb \
 python scripts/generate_leb2.py generate --tier base --group core \
   -o data/leb2/base_core.leb2
 
-# Verify against LEB1
+# Verify the core file against LEB1
 python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
-  --reference data/leb/ephemeris_base.leb --samples 500
+  --reference data/leb/ephemeris_base.leb --samples 500 --group core --tier base
 ```
 
-### 13.12 Measured Compression Results (Base Tier)
+### 13.12 Compression measurement
 
-Measured from the shipped `data/leb2/base_*.leb2` files (chunk-index sums).
-"Payload" is the Chebyshev coefficient data alone; the compression ratio is
-payload-to-payload. Each on-disk group file additionally carries ~1.9 MB of
-*uncompressed* auxiliary sections (nutation series, star catalog, ΔT table),
-which is why a tiny group like Uranians produces a 2.1 MB file from a
-0.7 MB payload: the auxiliary sections dominate.
-
-| Group | Bodies | Payload (raw) | Payload (compressed) | Ratio | File on disk |
-|-------|--------|---------------|----------------------|-------|--------------|
-| Core | 14 | 44.5 MB | 8.7 MB | 5.1x | 10.6 MB |
-| Asteroids | 5 | 23.0 MB | 6.7 MB | 3.4x | 8.7 MB |
-| Apogee | 3 | 31.6 MB | 9.5 MB | 3.3x | 11.4 MB |
-| Uranians | 9 | 0.7 MB | 0.1 MB | 6.2x | 2.1 MB |
-| **Core-set subtotal** | **31** | **99.8 MB** | **25.0 MB** | **4.0x** | **32.8 MB** |
-| Exotics | 31 | 199.7 MB | 56.9 MB | 3.5x | 59.0 MB |
-| **All groups** | **62** | **299.5 MB** | **81.9 MB** | **3.7x** | **91.8 MB** |
+Only `base_core.leb2` is bundled in the wheel; reviewed medium and extended
+cores are published as hash-pinned downloads. Historical modular group-size
+tables included an unsupported hypothetical model and are retired. For a
+locally generated file, use the verifier to report its current coefficient
+payload, error bounds, and on-disk size from that file itself.
 
 ---
 
@@ -2214,8 +2187,11 @@ which is why a tiny group like Uranians produces a 2.1 MB file from a
 
 ### 14.1 "Body X not in LEB file"
 
-The body is not one of the 62 bodies in `BODY_PARAMS`. LEB silently falls
-back to Skyfield. This is expected behavior, not an error.
+The body is absent from the loaded file's inventory. Base and medium local
+generation can include up to 53 registered bodies; extended generation omits
+eight chaotic NEAs and contains 45. The published pinned core assets contain a
+smaller core inventory. The calculation pipeline falls back according to the
+selected mode when a body is absent.
 
 ### 14.2 "JD outside range"
 
@@ -2237,7 +2213,7 @@ leph leb generate base groups
 ### 14.4 "Failed to open LEB file"
 
 - Check the file path exists and is readable
-- Check the file is a valid LEB file (magic bytes = `b"LEB1"`)
+- Check the file is a valid LEB1 or LEB2 file (magic `b"LEB1"` or `b"LEB2"`)
 - Check the file was not truncated during generation
 
 ### 14.5 Performance Not Improved
@@ -2255,7 +2231,7 @@ leph leb generate base groups
 
 ### 15.1 Outer Planet Position Computation
 
-LibEphemeris supports three strategies for outer planet centers:
+LibEphemeris uses three explicit target strategies:
 
 1. **Direct target** — Inner planets (Sun, Moon, Mercury, Venus, Earth) have
    direct segments in DE440. `planets["sun"]` works directly.
@@ -2265,15 +2241,13 @@ LibEphemeris supports three strategies for outer planet centers:
    (Neptune), 999 (Pluto). Position = barycenter + center offset from SPK.
    Precision: <0.001".
 
-3. **CobCorrectedTarget** — Analytical Center-of-Body corrections from
-   moon theory. Position = barycenter + analytical offset. Precision: <0.01".
-   Used as fallback when `planet_centers.bsp` is unavailable.
+3. **System-barycenter fallback** — if no JPL center segment covers the epoch,
+   the stored system barycenter is used directly. No analytical COB correction
+   is synthesized.
 
-The generator uses strategy 2 or 3 transparently via
-`_eval_body_icrs_vectorized()`. For vectorized evaluation, the COB path
-requires a scalar loop for `get_cob_offset()` (the offset function is
-pure Python and not vectorizable), but the expensive barycenter evaluation
-is still vectorized.
+The generator and runtime select the physical JPL center when available and the
+system barycenter otherwise. Light time is based on the observer-to-selected-
+target vector on geocentric, heliocentric, and barycentric paths.
 
 ### 15.2 _PLANET_FALLBACK Map
 
@@ -2364,9 +2338,9 @@ u' = u + v - u*(u.v)            # aberrated unit vector
 result = normalize(u') * |geo|   # scale back to original distance
 ```
 
-This matches the pyswisseph implementation and provides ~0.01" accuracy
-(sufficient for astrological purposes; the rigorous formula differs by
-<1 milliarcsecond).
+This is the standard independently published first-order stellar-aberration
+formula. Use the direct Skyfield/ERFA path when a rigorous apparent-place
+reduction is required.
 
 ### 15.8 Full Segment Width Invariant
 

@@ -210,9 +210,7 @@ class TestJdut1ToUtcCalendars:
     def test_julian_calendar_differs(self):
         """Julian calendar should give different date for modern dates."""
         jd_tt, jd_ut1 = ephem.utc_to_jd(2000, 1, 1, 12, 0, 0.0)
-        year_greg, month_greg, day_greg, _, _, _ = ephem.jdut1_to_utc(
-            jd_ut1, GREG_CAL
-        )
+        year_greg, month_greg, day_greg, _, _, _ = ephem.jdut1_to_utc(jd_ut1, GREG_CAL)
         year_jul, month_jul, day_jul, _, _, _ = ephem.jdut1_to_utc(jd_ut1, JUL_CAL)
 
         # In 2000, Julian calendar is 13 days behind Gregorian

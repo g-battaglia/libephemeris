@@ -561,10 +561,9 @@ wheels = [
 
 [[package]]
 name = "libephemeris"
-version = "3.0.0rc7"
+version = "3.0.0rc8"
 source = { editable = "." }
 dependencies = [
-    { name = "astroquery" },
     { name = "certifi" },
     { name = "click" },
     { name = "pyerfa" },
@@ -579,6 +578,7 @@ all = [
 ]
 dev = [
     { name = "astropy" },
+    { name = "astroquery" },
     { name = "black" },
     { name = "build" },
     { name = "ebooklib" },
@@ -606,6 +606,7 @@ nbody = [
 ]
 stars = [
     { name = "astropy" },
+    { name = "astroquery" },
 ]
 
 [package.metadata]
@@ -614,7 +615,8 @@ requires-dist = [
     { name = "astropy", marker = "extra == 'all'", specifier = ">=5.0.0" },
     { name = "astropy", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "astropy", marker = "extra == 'stars'", specifier = ">=5.0.0" },
-    { name = "astroquery", specifier = ">=0.4.7" },
+    { name = "astroquery", marker = "extra == 'dev'", specifier = ">=0.4.7" },
+    { name = "astroquery", marker = "extra == 'stars'", specifier = ">=0.4.7" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=25.1.0" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "certifi" },

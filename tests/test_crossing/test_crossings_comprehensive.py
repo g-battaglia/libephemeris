@@ -147,9 +147,7 @@ class TestStationsExtended:
         """SR followed by SD should define a retrograde period."""
         jd_sr, stype_sr = swe.find_station_ut(MERCURY, JD_J2000, "SR", FLG_SWIEPH)
         assert stype_sr == "SR"
-        jd_sd, stype_sd = swe.find_station_ut(
-            MERCURY, jd_sr + 1.0, "SD", FLG_SWIEPH
-        )
+        jd_sd, stype_sd = swe.find_station_ut(MERCURY, jd_sr + 1.0, "SD", FLG_SWIEPH)
         assert stype_sd == "SD"
         assert jd_sd > jd_sr
         # Mercury retrogrades last ~21 days

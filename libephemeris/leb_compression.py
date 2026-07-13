@@ -266,7 +266,7 @@ def compress_body_chunked(
 
     while remaining > 0:
         n = min(chunk_segments, remaining)
-        chunk_raw = raw_coeffs[offset: offset + n * seg_bytes]
+        chunk_raw = raw_coeffs[offset : offset + n * seg_bytes]
         compressed = compress_body(chunk_raw, n, degree, components, bits_per_order)
         chunks.append((compressed, n * seg_bytes))
         offset += n * seg_bytes

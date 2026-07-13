@@ -19,6 +19,10 @@ from libephemeris import (
     MEAN_APOG,
     OSCU_APOG,
     EARTH,
+    VULCAN,
+    WHITE_MOON,
+    PROSERPINA,
+    WALDEMATH,
 )
 
 
@@ -61,14 +65,19 @@ class TestGetPlanetName:
         assert get_planet_name(OSCU_APOG) == "osc. Apogee"
 
     def test_unknown_planet_id(self):
-        """Test unknown planet ID returns descriptive string."""
+        """Unknown IDs return the compatibility API's empty string."""
         result = get_planet_name(9999)
-        assert result == "Unknown (9999)"
+        assert result == ""
 
     def test_negative_planet_id(self):
         """Test negative planet ID returns descriptive string."""
         result = get_planet_name(-1)
-        assert result == "Unknown (-1)"
+        assert result == ""
+
+    def test_constants_without_builtin_elements_have_no_name(self):
+        """IDs 55-58 are constants only and have no built-in names."""
+        for body_id in (VULCAN, WHITE_MOON, PROSERPINA, WALDEMATH):
+            assert get_planet_name(body_id) == ""
 
     def test_return_type(self):
         """Test that get_planet_name always returns a string."""

@@ -4,7 +4,7 @@
     <img src="https://static.pepy.tech/badge/libephemeris/month" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/badge/libephemeris/week" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/personalized-badge/libephemeris?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads/total" alt="PyPI Downloads">
-    <img src="https://img.shields.io/badge/pypi-v3.0.0rc7-blue" alt="PyPI Version">
+    <img src="https://img.shields.io/pypi/v/libephemeris.svg" alt="PyPI Version">
     <img src="https://img.shields.io/pypi/pyversions/libephemeris.svg" alt="Python Versions">
     <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
 </div>
@@ -13,7 +13,12 @@ A high-precision astronomical ephemeris library for Python, powered by NASA JPL 
 
 **Drop-in replacement for PySwissEph** - readable Python algorithms, standard debugging, easy deployment on the scientific Python stack (NumPy, Skyfield, pyerfa).
 
-**100% independent of the Swiss Ephemeris.** Permissively **Apache-2.0** licensed, with no Swiss Ephemeris code, data, or runtime dependency — [how the stack differs](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/independence.md). See [NOTICE.md](NOTICE.md) / [LICENSING.md](LICENSING.md).
+**100% independent of the Swiss Ephemeris.** Permissively **Apache-2.0**
+licensed, with no Swiss Ephemeris source code, source comments, documentation
+prose, algorithms, distribution data files, or runtime dependency.
+Compatibility validation uses only public API inputs and outputs as a black
+box — [how the stack differs](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/independence.md).
+See [NOTICE.md](NOTICE.md) / [LICENSING.md](LICENSING.md).
 
 ---
 
@@ -21,11 +26,12 @@ A high-precision astronomical ephemeris library for Python, powered by NASA JPL 
 
 - **NASA JPL DE440/DE441** - modern planetary ephemerides via Skyfield, with full-range DE441 support for deep-history and far-future work
 - **IAU + Vondrák 2011 standards** - long-term precession and of-date mean obliquity (Vondrák 2011, valid ±200,000 years), nutation (IAU 2006/2000A) via the official ERFA library
-- **Latest-reconstruction Delta T (TT−UT1)** - IERS-observed values for the atomic-clock era and the most recent published reconstruction of Earth's rotation from ancient eclipse records (Stephenson, Morrison & Hohenkerk 2016 with the Morrison et al. 2021 update) for historical dates; one consistent ΔT drives positions *and* house angles on every backend, so a chart stays accurate and self-consistent from antiquity to the far future ([details](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/delta-t.md))
-- **Validated high precision** - planetary differences typically measured in fractions of an arcsecond, house cusps < 0.02", benchmarked across 4,400+ comparison rounds ([full report](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/precision.md))
+- **Latest-reconstruction Delta T (TT−UT1)** - IERS-observed values for the atomic-clock era and the most recent published reconstruction of Earth's rotation from ancient eclipse records (Stephenson, Morrison & Hohenkerk 2016 with the Morrison et al. 2021 update) for historical dates; the default realization keeps positions and house angles consistent, while explicit ΔT overrides have a documented Skyfield-mode exception ([details](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/delta-t.md))
+- **Source-based validation** - numerical checks use NASA JPL states, ERFA/IAU standards, cited literature, and mathematical invariants ([methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/independence.md))
 - **Four backends, one API** - Skyfield, LEB (~14x speedup), Horizons API, and adaptive auto mode through the same `calc_ut()` interface
-- **25 house systems (26 codes), 47 ayanamsha modes**
-- **Physical planet centers** - outer planets corrected from barycenters using JPL satellite ephemerides
+- **25 house systems (26 codes); all 47 predefined sidereal modes operational,
+  plus the user-defined mode, with per-mode source/audit status**
+- **Physical planet centers when covered** - outer planets use JPL center segments when available and the explicit system barycenter otherwise
 - **Thread-safe contexts when you need them** - SwissEph-compatible globals for drop-in migration, `EphemerisContext` for concurrent workloads
 - **15,000+ years of coverage** - `base`, `medium`, and `extended` precision tiers from modern use to -13200 / +17191 CE
 - **Readable Python 3.12+** - the ephemeris algorithms are plain, inspectable Python; clean installs across CI, containers, and serverless from prebuilt scientific wheels
@@ -40,8 +46,11 @@ LibEphemeris provides the **same API** with a modern foundation:
 
 - **NASA JPL ephemerides** instead of semi-analytical theory - DE440/DE441 are the latest planetary ephemerides from the Jet Propulsion Laboratory, the same data used for spacecraft navigation.
 - **IAU + Vondrák 2011 standards** - long-term precession and of-date mean obliquity (Vondrák, Capitaine & Wallace 2011, valid ±200,000 years instead of the IAU 2006 polynomial's few centuries), nutation (IAU 2006/2000A), all computed via the official ERFA library (the open-source implementation of IAU SOFA), not custom routines.
-- **Up-to-date Earth-rotation timeline (ΔT)** - the TT↔UT1 conversion uses the *latest* published reconstruction of Earth's rotation from historical eclipse records (Stephenson-Morrison-Hohenkerk 2016 with the Morrison et al. 2021 revision), blended with IERS observations - so ancient and historical charts sit on the most current scientific ΔT, the same time argument shared by positions and house angles.
-- **Physical planet centers** - Jupiter, Saturn, Uranus, Neptune corrected from system barycenters to actual body centers using JPL satellite ephemerides. Most libraries skip this.
+- **Up-to-date Earth-rotation timeline (ΔT)** - the TT↔UT1 conversion uses the *latest* published reconstruction of Earth's rotation from historical eclipse records (Stephenson-Morrison-Hohenkerk 2016 with the Morrison et al. 2021 revision), blended with IERS observations. The default realization is shared by positions and house angles; explicit model/user/IERS overrides affect LEB and Horizons positions but not forced Skyfield-mode positions.
+- **Physical planet centers** - Jupiter, Saturn, Uranus, Neptune, and Pluto use
+  JPL body-center segments where the published satellite kernels cover the
+  requested epoch, with an explicit system-barycenter fallback outside those
+  ranges.
 - **Readable Python algorithms** - plain, inspectable source and standard debugging instead of an opaque C library. Installs from prebuilt wheels (NumPy/Skyfield/pyerfa) across any platform, CI, or serverless environment.
 
 **Switching from pyswisseph?** Your existing code works with minimal changes. [Migration guide](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/migration-guide.md).
@@ -85,16 +94,8 @@ More examples: [Getting Started](https://github.com/g-battaglia/libephemeris/blo
 
 [Precision report](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/precision.md) · [full comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md).
 
-| Category | Typical | Max | Scope |
-|----------|---------|-----|-------|
-| Sun-Pluto | 0.04-0.26" | 1.17" | Pluto max 0.75"; Neptune is the widest observed planetary delta |
-| Moon | 0.70" | 3.32" | Different underlying lunar models |
-| House cusps | < 0.01" | 0.02" | All 25 systems (modern); long-term model holds to ±13,000 yr |
-| House cusp speeds | < 0.005°/day | — | True dλ/dt; more accurate than analytic approximations on Placidus/Koch |
-| Fixed stars | < 0.1" | 0.51" | 1,447-entry Hipparcos catalog; 116 cross-checked vs SIMBAD |
-| Solar eclipses | - | < 6s | Timing accuracy |
-| Lunar eclipses | - | < 8s | Timing accuracy |
-| Ayanamsha | < 0.001 deg | 0.006 deg | All 47 sidereal modes |
+Numerical correctness is established from independent NASA JPL/ERFA sources,
+published defining conditions, and reference-free invariants.
 
 ---
 
@@ -122,7 +123,12 @@ set_calc_mode("leb")  # or via env: LIBEPHEMERIS_MODE=leb
 pip install libephemeris
 ```
 
-Out of the box, the wheel includes a bundled LEB2 base-tier core for the 14 core bodies (1850-2150). With the default `medium` tier, the library can auto-download the additional LEB2 data it needs on first use.
+Out of the box, the wheel includes a bundled LEB2 base-tier core for the 14
+core bodies (1850–2150). Mean lunar points come from ERFA/IERS arguments;
+interpolated apsides use the versioned compatibility series documented in the
+lunar methodology. Reviewed, SHA-256-pinned medium and extended LEB2 cores are
+available through the normal tier download commands, while local LEB1 files
+remain supported.
 
 Recommended first-time setup:
 
@@ -140,7 +146,7 @@ libephemeris download medium       # 1550-2650, ~200 MB (recommended)
 libephemeris download extended     # -13200 to +17191 CE, full range
 ```
 
-**Optional extras:** `pip install libephemeris[stars]` for star-catalog tooling, `[nbody]` for REBOUND/ASSIST n-body integration (GPL-3.0-or-later components — explicit opt-in), `[all]` for every permissive-licensed extra. [Details](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md#optional-extras).
+**Optional extras:** `pip install libephemeris[stars]` for star-catalog tooling, `[nbody]` for REBOUND/ASSIST n-body integration (GPL-3.0-or-later components — explicit opt-in), `[all]` for every permissive-licensed runtime extra. [Details](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md#optional-extras).
 
 ---
 
@@ -153,12 +159,12 @@ libephemeris download extended     # -13200 to +17191 CE, full range
 - [Computation Tracing](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/tracing.md) - discover which backend computed each body
 - [Complete API Reference](https://github.com/g-battaglia/libephemeris/blob/main/docs/api_reference.rst) - every public function, class, and constant with signatures and examples
 - [Precision Report](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/precision.md) - models chosen and measured accuracy for every calculation
-- [Swiss Ephemeris Comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md) - the centralized head-to-head: precision tables, known differences, intentional divergences, API compatibility
+- [Compatibility Comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md) - API semantics, known differences, intentional divergences, and clean-room validation policy
 - [Long-term sidereal time, precession & cusp speeds](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/sidereal-time-longterm.md) - why houses and cusp speeds stay correct over ±13,000 years
 - [Delta T (ΔT)](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/delta-t.md) - the multi-era ΔT model (IERS + Stephenson-Morrison-Hohenkerk 2016 / Morrison 2021), why it is piecewise, and the model selector
 - [Flag Reference](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/flags.md) - all supported flags with examples
 - [House Systems](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/house-systems.md) - all 25 systems (26 codes) with full methodology
-- [Ayanamsha Modes](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/ayanamsha.md) - 47 predefined sidereal modes
+- [Ayanamsha Modes](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/ayanamsha.md) - all predefined modes, source-audit status, and user mode
 - [Known Bugs & Limitations](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/known-bugs.md) - active issues and backend limitations
 - [LEB Binary Ephemeris](https://github.com/g-battaglia/libephemeris/blob/main/docs/leb/guide.md) - format, generation, LEB2 compression
 - [Horizons Backend](https://github.com/g-battaglia/libephemeris/blob/main/docs/architecture/horizons-backend.md) - HTTP client, pipeline, precision
@@ -198,7 +204,9 @@ Learn more at [kerykeion.net](https://kerykeion.net).
 Licensed under the **[Apache License 2.0](LICENSE)** — a permissive license
 free for any use, including closed-source and commercial products, subject to
 preservation of copyright, license, and attribution notices. See
-[LICENSING.md](LICENSING.md) for details. PyPI releases carry this license.
+[LICENSING.md](LICENSING.md) for details. Published distributions beginning
+with `3.0.0rc3` carry this license; older distributions retain their original
+terms.
 
 > **Note:** the optional `libephemeris[nbody]` extra pulls in `rebound` and
 > `assist` (GPL-3.0-or-later), which are not part of the core install and are

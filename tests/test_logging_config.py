@@ -17,7 +17,6 @@ import sys
 from unittest.mock import patch
 
 
-
 class TestGetLogger:
     """Tests for get_logger() function."""
 
@@ -370,8 +369,10 @@ class TestGetPlanetsLogging:
             with patch.object(state, "get_loader", return_value=mock_loader):
                 # Mock os.path.exists to return False for all paths (force download path)
                 # Force non-LEB calc mode so we hit the standard download branch
-                with patch("os.path.exists", return_value=False), \
-                     patch.object(state, "get_calc_mode", return_value="auto"):
+                with (
+                    patch("os.path.exists", return_value=False),
+                    patch.object(state, "get_calc_mode", return_value="auto"),
+                ):
                     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
                         state.get_planets()
 
@@ -412,8 +413,10 @@ class TestGetPlanetsLogging:
             with patch.object(state, "get_loader", return_value=mock_loader):
                 # Mock os.path.exists to return False (force download path)
                 # Force non-LEB calc mode so we hit the standard download branch
-                with patch("os.path.exists", return_value=False), \
-                     patch.object(state, "get_calc_mode", return_value="auto"):
+                with (
+                    patch("os.path.exists", return_value=False),
+                    patch.object(state, "get_calc_mode", return_value="auto"),
+                ):
                     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
                         state.get_planets()
 

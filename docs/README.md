@@ -12,7 +12,7 @@
 
 - **[Calculation Backends](architecture/horizons-backend.md#calculation-modes)** -- Auto/LEB/Horizons/Skyfield mode selection
 - **[Horizons API Backend](architecture/horizons-backend.md)** -- Zero-install ephemeris via NASA JPL Horizons REST API
-- **[Architecture Overview](development/architecture-overview.md)** -- Codebase metrics, module structure, performance analysis
+- **[Architecture Overview](development/architecture-overview.md)** -- Module structure, data flow, backends, and state ownership
 
 ## API Reference
 
@@ -23,7 +23,7 @@
 - **[Precision Report](reference/precision.md)** -- Measured accuracy across all body categories
 - **[Flag Reference](reference/flags.md)** -- Complete calculation flag documentation with examples
 - **[House Systems](reference/house-systems.md)** -- Mathematical documentation for all 25 house systems (26 codes with A/E alias)
-- **[Ayanamsha Modes](reference/ayanamsha.md)** -- Complete reference for all 47 predefined sidereal modes (+ user-defined)
+- **[Ayanamsha Modes](reference/ayanamsha.md)** -- All predefined modes, source-audit status, and user mode
 - **[Known Bugs](reference/known-bugs.md)** -- Active issues and Horizons limitations
 
 ## Methodology
@@ -34,10 +34,10 @@
 - **[Long-term sidereal time & precession](methodology/sidereal-time-longterm.md)** -- Vondrák 2011, house cusps over ±13,000 years
 - **[Planet Centers](methodology/planet-centers-spk.md)** -- Barycenter vs body center corrections for outer planets
 - **[Lunar Apsides](methodology/lunar-apsides.md)** -- Perigee and apogee computation
-- **[Interpolated Apogee](methodology/interpolated-apogee.md)** -- INTP_APOG and INTP_PERG
-- **[Interpolated Perigee](methodology/interpolated-perigee.md)** -- Passage-interpolated harmonic fitting
+- **[Interpolated Apogee](methodology/interpolated-apogee.md)** -- INTP_APOG analytical compatibility curve
+- **[Interpolated Perigee](methodology/interpolated-perigee.md)** -- INTP_PERG analytical compatibility curve
 - **[True Lilith](methodology/true-lilith.md)** -- Osculating lunar apogee calculation
-- **[Hypothetical Bodies](methodology/hypothetical-bodies.md)** -- Hamburg-school Uranian planets and trans-Plutonian bodies
+- **[Hypothetical Bodies](methodology/hypothetical-bodies.md)** -- per-ID provenance status and restored runtime models for IDs 40–58
 - **[pyerfa Integration](methodology/pyerfa-integration.md)** -- IAU standard nutation, precession, obliquity
 - **[REBOUND Integration](methodology/rebound-integration.md)** -- N-body minor body orbit propagation
 
@@ -61,15 +61,15 @@ The single, centralized place for the head-to-head with Swiss Ephemeris (pyswiss
 ## Development
 
 - **[Testing](development/testing.md)** -- Test suites, commands, expected failures
-- **[Roadmap](development/roadmap.md)** -- Project status and open tasks
+- **[Roadmap](development/roadmap.md)** -- Historical March 2026 planning snapshot
 - **[Precision History](development/precision-history.md)** -- Record of precision fixes and investigations
 - **[Keplerian Improvements](development/keplerian-improvements.md)** -- Fallback orbit propagation improvements
-- **[Full Range Coverage](development/full-range-coverage.md)** -- Extending minor body coverage
+- **[Full Range Coverage](development/full-range-coverage.md)** -- Historical plan for the now-implemented minor-body coverage work
 
 ## Manuals
 
 Beginner-friendly introductions to astronomical and astrological calculations.
 No prior knowledge of astronomy or programming required.
 
-- **[Manuale (Italiano)](manual/it/)** -- 15 capitoli
-- **[Manual (English)](manual/en/)** -- 15 chapters
+- **[Manuale (Italiano)](manual/it/README.md)** -- prefazione + 15 capitoli
+- **[Manual (English)](manual/en/README.md)** -- preface + 15 chapters

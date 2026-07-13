@@ -28,12 +28,15 @@ from libephemeris import (
     SUN,
     MOON,
     MARS,
+    FLG_J2000,
     FLG_SPEED,
+    FLG_TRUEPOS,
 )
 from libephemeris.planets import (
     get_planet_target,
     _PLANET_CENTER_NAIF_IDS,
     _CobCorrectedTarget,
+    _SpkCenterTarget,
 )
 from libephemeris.state import get_planets
 
@@ -226,16 +229,23 @@ class TestPlanetCenterPrecision:
     """Tests for precision of planet center calculations vs barycenter."""
 
     def test_jupiter_center_vs_barycenter_offset(self):
-        """Verify that using planet center produces different result than raw barycenter.
+        """Verify a covered JPL center differs from the system barycenter.
 
-        This test ensures the COB correction is actually being applied.
-        The offset should typically be on the order of arcseconds for Jupiter.
+        Select the midpoint of the installed physical center segment instead
+        of assuming that a fixed civil date is covered by every tier.
         """
-        from libephemeris.state import get_timescale
+        import pytest
+
+        from libephemeris.state import get_planet_center_segment, get_timescale
 
         planets = get_planets()
         ts = get_timescale()
-        t = ts.tt_jd(2451545.0)
+        segment = get_planet_center_segment(599)
+        if segment is None:
+            pytest.skip("Jupiter planet-center SPK is not installed")
+        spk_segment = segment.spk_segment
+        jd = 0.5 * (spk_segment.start_jd + spk_segment.end_jd)
+        t = ts.tt_jd(jd)
 
         # Get raw barycenter position
         barycenter = planets["jupiter barycenter"]
@@ -254,11 +264,89 @@ class TestPlanetCenterPrecision:
             + (center_pos[2] - bary_pos[2]) ** 2
         )
 
-        # The offset should be non-zero (COB correction is being applied)
-        # Jupiter's barycenter offset from center is typically a few thousand km
-        # which is on the order of 1e-5 to 1e-4 AU
-        assert offset > 0, "COB correction should produce non-zero offset"
+        assert offset > 0, "JPL planet-center segment should produce an offset"
 
         # The offset should be reasonable (not too large)
         # Maximum possible offset is roughly 0.001 AU (~150,000 km)
         assert offset < 0.01, f"COB offset too large: {offset} AU"
+
+    def test_jupiter_outside_center_coverage_uses_system_barycenter(self):
+        """An uncovered epoch retains the independently sourced JPL barycenter."""
+        import pytest
+
+        from libephemeris.state import get_planet_center_segment, get_timescale
+
+        planets = get_planets()
+        segment = get_planet_center_segment(599)
+        if segment is None:
+            pytest.skip("Jupiter planet-center SPK is not installed")
+
+        spk_segment = segment.spk_segment
+        jd = spk_segment.end_jd + 2.0
+        ts = get_timescale()
+        t = ts.tt_jd(jd)
+        barycenter = planets["jupiter barycenter"]
+        bary_pos = barycenter.at(t).position.au
+        target_pos = get_planet_target(planets, "jupiter").at(t).position.au
+
+        assert tuple(float(value) for value in target_pos) == tuple(
+            float(value) for value in bary_pos
+        )
+
+    def test_speed_stencil_does_not_mix_center_and_barycenter_at_edge(
+        self, monkeypatch
+    ):
+        """A one-second stencil straddling SPK coverage stays finite."""
+        import numpy as np
+        from skyfield.positionlib import ICRF
+
+        import libephemeris as eph
+        import libephemeris.planets as planet_module
+
+        boundary = 2451545.0
+
+        class _SyntheticCenterSegment:
+            start_jd = boundary - 1.0
+            end_jd = boundary
+            spk_segment = None
+
+            def __init__(self):
+                self.spk_segment = self
+
+            def at(self, t):
+                # A deliberately visible, constant center/barycenter offset.
+                # The physical value is irrelevant; a mixed stencil would
+                # divide it by two seconds and produce an enormous velocity.
+                return ICRF(
+                    np.array([0.0, 0.001, 0.0]),
+                    np.zeros(3),
+                    t=t,
+                    center=5,
+                )
+
+        original_get_target = planet_module.get_planet_target
+
+        def _synthetic_get_target(planets, target_name):
+            if target_name == "jupiter":
+                return _SpkCenterTarget(
+                    planets["jupiter barycenter"],
+                    _SyntheticCenterSegment(),
+                    "jupiter",
+                    "jupiter barycenter",
+                )
+            return original_get_target(planets, target_name)
+
+        monkeypatch.setattr(planet_module, "get_planet_target", _synthetic_get_target)
+        old_mode = eph.get_calc_mode()
+        try:
+            eph.set_calc_mode("skyfield")
+            half_step = planet_module._BODY_SPEED_HALF_STEP_DAYS
+            flags = FLG_SPEED | FLG_TRUEPOS | FLG_J2000
+            inside, _ = eph.calc(boundary - 0.25 * half_step, JUPITER, flags)
+            outside, _ = eph.calc(boundary + 0.25 * half_step, JUPITER, flags)
+        finally:
+            eph.set_calc_mode(old_mode)
+
+        assert abs(inside[3]) < 1.0
+        assert abs(outside[3]) < 1.0
+        assert abs(inside[3] - outside[3]) < 0.1

@@ -7,7 +7,6 @@ across wide date ranges for each ephemeris tier. Tests cover:
 - All major planets (Sun through Pluto + Earth)
 - Ecliptic bodies (mean/true node, mean/osculating apogee, interpolated apogee/perigee)
 - Asteroids (Chiron, Ceres, Pallas, Juno, Vesta)
-- Heliocentric bodies (Uranians, Transpluto)
 - Multiple flag combinations (ecliptic, equatorial, J2000, helio, bary)
 - Velocity precision
 - Distance precision
@@ -104,9 +103,6 @@ ASTEROID_BODIES = [CHIRON, CERES, PALLAS]
 # JUNO (19) and VESTA (20) may not have SPK coverage for all tiers;
 # include them conditionally
 
-# Uranian hypotheticals (40-48) are heliocentric analytical, always available
-URANIAN_BODIES = [40, 41, 42, 43, 44, 45, 46, 47, 48]
-
 # Tolerance thresholds
 POSITION_TOLERANCE_ARCSEC = 0.1  # 0.1 arcsec for position (lon/lat)
 ECLIPTIC_TOLERANCE_ARCSEC = 0.5  # Ecliptic bodies can have slightly larger error
@@ -197,7 +193,6 @@ def _make_leb_fixture(tier_name: str):
                 ICRS_PLANETS
                 + [MEAN_NODE, TRUE_NODE, MEAN_APOG, INTP_APOG, INTP_PERG]
                 + [CHIRON, CERES]
-                + [40, 48]  # Cupido + Transpluto (helio pipeline)
             )
         )
 
@@ -589,28 +584,6 @@ class TestMediumTierPrecision:
             assert max_err < POSITION_TOLERANCE_ARCSEC, (
                 f"Body {ipl} max error = {max_err:.4f} arcsec at JD {worst_jd:.1f}"
             )
-
-    @pytest.mark.slow
-    @pytest.mark.precision
-    def test_helio_bodies(self, reader_medium, dates):
-        """Heliocentric bodies (Uranians, Transpluto) match within tolerance."""
-        ephem.set_jpl_file("de440.bsp")
-        helio_in_leb = _bodies_in_leb(reader_medium, [40, 48])
-        if not helio_in_leb:
-            pytest.skip("No heliocentric bodies in LEB file")
-
-        for ipl in helio_in_leb:
-            max_err = 0.0
-            for jd in dates:
-                fast, _ = fast_calc_ut(reader_medium, jd, ipl, FLG_SPEED)
-                ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
-
-                lon_err = _lon_error_arcsec(fast[0], ref[0])
-                if lon_err > max_err:
-                    max_err = lon_err
-
-            tol = _ECLIPTIC_BODY_TOLERANCE.get(ipl, ECLIPTIC_TOLERANCE_ARCSEC)
-            assert max_err < tol, f"Body {ipl} max error = {max_err:.4f} arcsec"
 
 
 # =============================================================================

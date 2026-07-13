@@ -68,9 +68,7 @@ class TestSolarEclipseLocal:
         ref_result = compare.skyfield(
             ephem.sol_eclipse_when_loc, jd_start, geopos, 0, False
         )
-        leb_result = compare.leb(
-            ephem.sol_eclipse_when_loc, jd_start, geopos, 0, False
-        )
+        leb_result = compare.leb(ephem.sol_eclipse_when_loc, jd_start, geopos, 0, False)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_jd = ref_result[1][0]

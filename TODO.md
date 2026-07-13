@@ -30,9 +30,8 @@ examples). Everything below is low-impact and can be batched later.
 
 ### Hygiene / style
 
-- Add `from __future__ import annotations` to the data modules that omit it
-  (`lunar_corrections.py`, `true_node_terms.py`, and the two `planetary_moons`
-  helpers flagged).
+- Add `from __future__ import annotations` to the two `planetary_moons` data
+  helpers that omit it.
 - `astropy_integration.py:~222` — `parse_time_string` shadows the builtin
   `format`; rename the local.
 - `astropy_integration.py:~364-380` — `compare_coordinate_transforms` /

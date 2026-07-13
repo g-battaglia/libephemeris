@@ -171,61 +171,61 @@ class TestGlobalStateIsolation:
     """§6.2 Verify that per-context state is truly isolated between threads."""
 
     def test_sidereal_mode_isolation(self) -> None:
-        """Thread A (LAHIRI) and Thread B (FAGAN_BRADLEY) get different results."""
+        """Threads using J2000 and J1900 get distinct, stable results."""
         jd = J2000
         body = swe.SUN
         flags = swe.FLG_SIDEREAL | swe.FLG_SPEED
 
-        results_lahiri: list[tuple[float, ...]] = []
-        results_fagan: list[tuple[float, ...]] = []
+        results_j2000: list[tuple[float, ...]] = []
+        results_j1900: list[tuple[float, ...]] = []
         lock = threading.Lock()
         barrier = threading.Barrier(2)
 
-        def worker_lahiri() -> None:
+        def worker_j2000() -> None:
             ctx = EphemerisContext()
-            ctx.set_sid_mode(swe.SIDM_LAHIRI)
+            ctx.set_sid_mode(swe.SIDM_J2000)
             barrier.wait(timeout=10)
             for _ in range(50):
                 pos, _ = ctx.calc_ut(jd, body, flags)
                 with lock:
-                    results_lahiri.append(pos)
+                    results_j2000.append(pos)
 
-        def worker_fagan() -> None:
+        def worker_j1900() -> None:
             ctx = EphemerisContext()
-            ctx.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
+            ctx.set_sid_mode(swe.SIDM_J1900)
             barrier.wait(timeout=10)
             for _ in range(50):
                 pos, _ = ctx.calc_ut(jd, body, flags)
                 with lock:
-                    results_fagan.append(pos)
+                    results_j1900.append(pos)
 
-        t1 = threading.Thread(target=worker_lahiri)
-        t2 = threading.Thread(target=worker_fagan)
+        t1 = threading.Thread(target=worker_j2000)
+        t2 = threading.Thread(target=worker_j1900)
         t1.start()
         t2.start()
         t1.join(timeout=30)
         t2.join(timeout=30)
 
-        assert len(results_lahiri) == 50, "Lahiri thread did not complete"
-        assert len(results_fagan) == 50, "Fagan thread did not complete"
+        assert len(results_j2000) == 50, "J2000 thread did not complete"
+        assert len(results_j1900) == 50, "J1900 thread did not complete"
 
         # The two modes must produce DIFFERENT longitudes
-        lahiri_lon = results_lahiri[0][0]
-        fagan_lon = results_fagan[0][0]
-        diff = abs(lahiri_lon - fagan_lon)
+        j2000_lon = results_j2000[0][0]
+        j1900_lon = results_j1900[0][0]
+        diff = abs(j2000_lon - j1900_lon)
         assert diff > 0.1, (
-            f"Lahiri and Fagan should differ: Lahiri={lahiri_lon:.6f}, "
-            f"Fagan={fagan_lon:.6f}, diff={diff:.6f}"
+            f"J2000 and J1900 should differ: J2000={j2000_lon:.6f}, "
+            f"J1900={j1900_lon:.6f}, diff={diff:.6f}"
         )
 
         # All results within each thread must be consistent
-        for i, pos in enumerate(results_lahiri):
-            assert abs(pos[0] - lahiri_lon) < 1e-10, (
-                f"Lahiri result {i} inconsistent: {pos[0]} vs {lahiri_lon}"
+        for i, pos in enumerate(results_j2000):
+            assert abs(pos[0] - j2000_lon) < 1e-10, (
+                f"J2000 result {i} inconsistent: {pos[0]} vs {j2000_lon}"
             )
-        for i, pos in enumerate(results_fagan):
-            assert abs(pos[0] - fagan_lon) < 1e-10, (
-                f"Fagan result {i} inconsistent: {pos[0]} vs {fagan_lon}"
+        for i, pos in enumerate(results_j1900):
+            assert abs(pos[0] - j1900_lon) < 1e-10, (
+                f"J1900 result {i} inconsistent: {pos[0]} vs {j1900_lon}"
             )
 
     @pytest.mark.xfail(

@@ -22,36 +22,27 @@ class TestTidAccBasicFunctionality:
 
     @pytest.mark.unit
     def test_get_tid_acc_default(self):
-        """get_tid_acc should return the DE440 default when not explicitly set.
-
-        -25.936 (TIDAL_DE440) is both the reference API's default and the
-        value consistent with the DE440/DE441 ephemeris used by this
-        library; it is the zero point of the Delta T adjustment.
-        """
+        """get_tid_acc returns the named automatic zero point."""
         value = ephem.get_tid_acc()
-        assert value == ephem.TIDAL_DE440
-        assert value == -25.936
+        assert value == ephem.TIDAL_DEFAULT
 
     @pytest.mark.unit
     def test_set_tid_acc_de421(self):
         """set_tid_acc should accept DE421 tidal acceleration."""
         ephem.set_tid_acc(ephem.TIDAL_DE421)
         assert ephem.get_tid_acc() == ephem.TIDAL_DE421
-        assert ephem.get_tid_acc() == -25.85
 
     @pytest.mark.unit
     def test_set_tid_acc_de431(self):
         """set_tid_acc should accept DE431 tidal acceleration."""
         ephem.set_tid_acc(ephem.TIDAL_DE431)
         assert ephem.get_tid_acc() == ephem.TIDAL_DE431
-        assert ephem.get_tid_acc() == -25.80
 
     @pytest.mark.unit
     def test_set_tid_acc_de441(self):
         """set_tid_acc should accept DE441 tidal acceleration."""
         ephem.set_tid_acc(ephem.TIDAL_DE441)
         assert ephem.get_tid_acc() == ephem.TIDAL_DE441
-        assert ephem.get_tid_acc() == -25.936
 
     @pytest.mark.unit
     def test_set_tid_acc_custom_value(self):
@@ -62,14 +53,14 @@ class TestTidAccBasicFunctionality:
 
     @pytest.mark.unit
     def test_set_tid_acc_automatic_resets_to_default(self):
-        """set_tid_acc with TIDAL_AUTOMATIC should reset to the DE440 default."""
+        """TIDAL_AUTOMATIC resets to the public automatic default."""
         # First set a custom value
         ephem.set_tid_acc(ephem.TIDAL_DE421)
         assert ephem.get_tid_acc() == ephem.TIDAL_DE421
 
         # Reset with automatic
         ephem.set_tid_acc(ephem.TIDAL_AUTOMATIC)
-        assert ephem.get_tid_acc() == ephem.TIDAL_DE440
+        assert ephem.get_tid_acc() == ephem.TIDAL_DEFAULT
 
     @pytest.mark.unit
     def test_set_tid_acc_zero_stores_zero(self):
@@ -121,20 +112,15 @@ class TestTidAccConstants:
         assert ephem.TIDAL_DE441 < 0
 
     @pytest.mark.unit
-    def test_tidal_automatic_is_999999(self):
-        """TIDAL_AUTOMATIC should be 999999 (reference-API compat)."""
-        assert ephem.TIDAL_AUTOMATIC == 999999
+    def test_tidal_automatic_is_nonphysical_sentinel(self):
+        """TIDAL_AUTOMATIC is a nonphysical sentinel, not an acceleration."""
+        assert isinstance(ephem.TIDAL_AUTOMATIC, int)
+        assert ephem.TIDAL_AUTOMATIC > 0
 
     @pytest.mark.unit
     def test_tidal_default_is_de431(self):
-        """TIDAL_DEFAULT (the named constant) is the DE431 value (-25.80).
-
-        Measured black-box: the reference API's TIDAL_DEFAULT constant is
-        -25.8 while its runtime get_tid_acc() returns -25.936 with modern
-        data — the two are decoupled there and here alike (our runtime
-        automatic default stays -25.936, see get_tid_acc tests).
-        """
-        assert ephem.TIDAL_DEFAULT == ephem.TIDAL_DE431 == -25.80
+        """The named historical default uses the published DE431 solution."""
+        assert ephem.TIDAL_DEFAULT == ephem.TIDAL_DE431
 
 
 class TestTidAccFunctionAliases:
@@ -193,20 +179,15 @@ class TestTidAccReturnTypes:
 # ---------------------------------------------------------------------------
 # Delta T adjustment for a non-default tidal acceleration
 # ---------------------------------------------------------------------------
-# The adjustment applied by deltat()/deltat_ex() was characterized against
-# the reference API as a black box (see time_utils._tid_acc_adjustment_seconds):
-#
-#     deltat(tid_acc) - deltat(default) =
-#         -0.9100373728 * (tid_acc - TIDAL_DE440) * u**2   [seconds]
-#
-# with u = (tjdut - 2435109.0875) / 36525.0 for dates before the 1955.0
-# epoch, and exactly zero from 1955.0 onwards.
+# The conversion is derived independently from the IERS Conventions (2010)
+# mean-lunar-longitude rate.  A secular-acceleration difference accumulates
+# 0.5*dacc*T**2 arcseconds; dividing by lunar mean motion converts that phase
+# displacement into seconds of time.  Historical reductions use epoch 1955.5
+# (Morrison & Stephenson 2004; LUNAR97).
 
-# Sample dates before the 1955.0 epoch (years -3000 .. 1950)
+# Sample dates before the 1955.5 reference epoch (years -3000 .. 1950)
 _PRE_1955_YEARS = [-3000, -1000, 0, 1000, 1600, 1800, 1900, 1950]
-# Sample dates after the 1955.0 epoch. Note: Jan 1, 1955 0h (JD 2435108.5)
-# is still 0.59 days BEFORE the Gregorian-year epoch 1955.0 (JD 2435109.0875),
-# so the post-epoch grid starts at 1956.
+# Sample dates after the 1955.5 epoch.
 _POST_1955_YEARS = [1956, 1980, 2000, 2020, 2100, 3000]
 
 
@@ -216,7 +197,7 @@ def _jd(year):
 
 
 class TestTidAccDeltaTAdjustment:
-    """Delta T rescaling for non-default tidal accelerations (FIX parity)."""
+    """Physical Delta T rescaling for non-default tidal accelerations."""
 
     @pytest.fixture(autouse=True)
     def reset_state(self):
@@ -241,19 +222,22 @@ class TestTidAccDeltaTAdjustment:
             jd = _jd(year)
             assert _tid_acc_adjustment_seconds(jd, ephem.get_tid_acc()) == 0.0
             base = ephem.deltat(jd)
-            ephem.set_tid_acc(ephem.TIDAL_DE440)  # explicit default value
+            ephem.set_tid_acc(ephem.TIDAL_DEFAULT)  # explicit default value
             assert ephem.deltat(jd) == base
             ephem.set_tid_acc(ephem.TIDAL_AUTOMATIC)
             assert ephem.deltat(jd) == base
 
     @pytest.mark.unit
-    def test_adjustment_matches_measured_reference_formula(self):
-        """deltat deltas must follow the empirically measured formula.
+    def test_adjustment_follows_iers_lunar_motion_conversion(self):
+        """Delta T deltas follow phase acceleration divided by mean motion."""
+        from libephemeris.time_utils import _TID_ACC_REFERENCE_JD
 
-        Verified black-box against the reference API to < 1e-7 s over
-        tid_acc in [-26.5, -22.0] and years -3000..+3000.
-        """
-        from libephemeris.time_utils import _TID_ACC_COEF, _TID_ACC_EPOCH_JD
+        # IERS TN 36, Eq. 5.43 linear terms for F=L-Omega and Omega,
+        # arcseconds per Julian century.
+        f_rate = 1739527262.8478
+        omega_rate = -6962890.5431
+        lunar_motion_arcsec_day = (f_rate + omega_rate) / 36525.0
+        seconds_per_arcsec = 86400.0 / lunar_motion_arcsec_day
 
         for tid_acc in (-25.58, -26.5, -22.0):
             for year in _PRE_1955_YEARS:
@@ -262,15 +246,17 @@ class TestTidAccDeltaTAdjustment:
                 base = ephem.deltat(jd) * 86400.0
                 ephem.set_tid_acc(tid_acc)
                 delta = ephem.deltat(jd) * 86400.0 - base
-                u = (jd - _TID_ACC_EPOCH_JD) / 36525.0
-                expected = _TID_ACC_COEF * (tid_acc - ephem.TIDAL_DE440) * u * u
+                u = (jd - _TID_ACC_REFERENCE_JD) / 36525.0
+                expected = (
+                    -0.5 * seconds_per_arcsec * (tid_acc - ephem.TIDAL_DEFAULT) * u * u
+                )
                 assert delta == pytest.approx(expected, abs=1e-6), (
                     f"tid_acc={tid_acc}, year={year}"
                 )
 
     @pytest.mark.unit
-    def test_adjustment_zero_from_1955_onwards(self):
-        """From 1955.0 on, Delta T must not depend on the tidal acceleration."""
+    def test_adjustment_zero_from_reference_epoch_onwards(self):
+        """Modern Delta T does not depend on the historical adjustment."""
         for year in _POST_1955_YEARS:
             jd = _jd(year)
             ephem.set_tid_acc(ephem.TIDAL_AUTOMATIC)
@@ -321,15 +307,15 @@ class TestDeltatExEphemerisFlag:
             assert ephem.deltat_ex(jd, ephem.FLG_MOSEPH) == ephem.deltat(jd)
 
     @pytest.mark.unit
-    def test_swieph_wins_over_moseph(self):
-        """FLG_SWIEPH takes precedence when both bits are set (measured)."""
+    def test_moseph_wins_over_swieph(self):
+        """FLG_MOSEPH takes precedence when both bits are set."""
         jd = _jd(-1000)
         both = ephem.FLG_MOSEPH | ephem.FLG_SWIEPH
-        assert ephem.deltat_ex(jd, both) == ephem.deltat(jd)
+        assert ephem.deltat_ex(jd, both) == ephem.deltat_ex(jd, ephem.FLG_MOSEPH)
 
     @pytest.mark.unit
     def test_moseph_wins_over_jpleph(self):
-        """FLG_MOSEPH takes precedence over FLG_JPLEPH (measured)."""
+        """FLG_MOSEPH takes precedence over FLG_JPLEPH."""
         jd = _jd(-1000)
         both = ephem.FLG_MOSEPH | ephem.FLG_JPLEPH
         assert ephem.deltat_ex(jd, both) == ephem.deltat_ex(jd, ephem.FLG_MOSEPH)
@@ -349,3 +335,55 @@ class TestDeltatExEphemerisFlag:
             base = ephem.deltat(jd)
             assert ephem.deltat_ex(jd, ephem.FLG_SWIEPH) == base
             assert ephem.deltat_ex(jd, ephem.FLG_JPLEPH) == base
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("year", [-1000, 1900, 2000])
+    def test_moseph_query_does_not_mutate_tid_acc(self, year):
+        """deltat_ex is pure: a MOSEPH query never leaks into get_tid_acc().
+
+        The MOSEPH-implied acceleration is applied functionally to the
+        returned Delta T only; the exposed state changes exclusively through
+        set_tid_acc().
+        """
+        ephem.deltat_ex(_jd(year), ephem.FLG_MOSEPH)
+        assert ephem.get_tid_acc() == ephem.TIDAL_DEFAULT
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("flag", [0, ephem.FLG_SWIEPH, ephem.FLG_JPLEPH])
+    def test_no_deltat_query_mutates_tid_acc(self, flag):
+        """Neither deltat_ex (any flag) nor deltat touches get_tid_acc()."""
+        jd = _jd(1900)
+        ephem.deltat_ex(jd, ephem.FLG_MOSEPH)
+        ephem.deltat_ex(jd, flag)
+        ephem.deltat(jd)
+        assert ephem.get_tid_acc() == ephem.TIDAL_DEFAULT
+
+    @pytest.mark.unit
+    def test_moseph_adjustment_is_functional_only(self):
+        """The MOSEPH acceleration adjusts the returned value, not the state."""
+        jd = _jd(1900)
+        via_flag = ephem.deltat_ex(jd, ephem.FLG_MOSEPH)
+        assert ephem.get_tid_acc() == ephem.TIDAL_DEFAULT
+        ephem.set_tid_acc(ephem.TIDAL_MOSEPH)
+        assert via_flag == ephem.deltat(jd)
+
+    @pytest.mark.unit
+    def test_user_defined_delta_t_wins_and_state_is_untouched(self):
+        """A hard Delta-T override wins; the exposed acceleration is stable."""
+        jd = _jd(1900)
+        ephem.deltat_ex(jd, ephem.FLG_MOSEPH)
+        ephem.set_delta_t_userdef(0.123)
+
+        assert ephem.deltat_ex(jd, ephem.FLG_SWIEPH) == 0.123
+        assert ephem.deltat(jd) == 0.123
+        assert ephem.get_tid_acc() == ephem.TIDAL_DEFAULT
+
+    @pytest.mark.unit
+    def test_explicit_tid_acc_is_not_reselected(self):
+        """An explicit tidal acceleration wins over every ephemeris flag."""
+        jd = _jd(1900)
+        ephem.set_tid_acc(-22.0)
+
+        for flag in (ephem.FLG_MOSEPH, ephem.FLG_SWIEPH, ephem.FLG_JPLEPH):
+            ephem.deltat_ex(jd, flag)
+            assert ephem.get_tid_acc() == -22.0

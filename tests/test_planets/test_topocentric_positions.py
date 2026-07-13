@@ -205,9 +205,7 @@ class TestTopoFlagCombinations:
         swe.set_topo(12.5, 41.9, 50.0)
         swe.set_sid_mode(SIDM_LAHIRI)
         jd = 2451545.0
-        result, _ = swe.calc_ut(
-            jd, MOON, FLG_TOPOCTR | FLG_SIDEREAL | FLG_SPEED
-        )
+        result, _ = swe.calc_ut(jd, MOON, FLG_TOPOCTR | FLG_SIDEREAL | FLG_SPEED)
         assert 0 <= result[0] < 360
 
 

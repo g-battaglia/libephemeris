@@ -428,7 +428,7 @@ import libephemeris as ephem
 # Total eclipse of April 8, 2024
 jd_start = ephem.julday(2024, 4, 1, 0.0)
 ecl_type, tret = ephem.sol_eclipse_when_glob(
-    jd_start, eclipse_type=ephem.ECL_TOTAL
+    jd_start, ecltype=ephem.ECL_TOTAL
 )
 jd_ecl = tret[0]
 
@@ -480,8 +480,7 @@ jd = ephem.julday(2024, 1, 1, 0.0)
 
 ret, tret = ephem.lun_occult_when_glob(
     jd,
-    ipl=0,              # 0 = not a planet
-    starname="Regulus",  # it's a star
+    body="Regulus",
 )
 
 if ret > 0:
@@ -504,8 +503,7 @@ jd = ephem.julday(2024, 1, 1, 0.0)
 
 ret, tret = ephem.lun_occult_when_glob(
     jd,
-    ipl=ephem.JUPITER,  # planet
-    starname="",            # not a star
+    body=ephem.JUPITER,
 )
 
 if ret > 0:

@@ -15,18 +15,17 @@ from libephemeris.constants import FLG_SPEED, FLG_EQUATORIAL
 from tests.test_leb.compare.conftest import (
     ECLIPTIC_BODIES,
     ECLIPTIC_TOLERANCES,
-    HYPOTHETICAL_BODIES,
     ICRS_PLANETS,
     CompareHelper,
 )
 
 from .conftest import TOLS_EXT
 
-EXT_BODIES = ICRS_PLANETS + ECLIPTIC_BODIES + HYPOTHETICAL_BODIES
+EXT_BODIES = ICRS_PLANETS + ECLIPTIC_BODIES
 
 
 class TestExtVelocityEcliptic:
-    """Longitude and latitude velocity for planets + ecliptic + hypothetical."""
+    """Longitude and latitude velocity for planets and ecliptic bodies."""
 
     @pytest.mark.leb_compare_extended
     @pytest.mark.slow

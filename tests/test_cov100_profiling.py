@@ -49,12 +49,8 @@ class TestIdentifyHotPaths:
 
         categories = report._identify_hot_paths()
 
-        assert any(
-            "jpllib" in fs.name for fs in categories["Skyfield Operations"]
-        )
-        assert any(
-            "planets" in fs.name for fs in categories["Libephemeris Core"]
-        )
+        assert any("jpllib" in fs.name for fs in categories["Skyfield Operations"])
+        assert any("planets" in fs.name for fs in categories["Libephemeris Core"])
 
     def test_summary_uses_hot_paths(self):
         """summary() walks the hot-path categories and renders percentages."""

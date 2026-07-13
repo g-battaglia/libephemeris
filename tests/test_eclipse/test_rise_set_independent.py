@@ -1,7 +1,7 @@
 """Independent (erfa) validation of rise/set/twilight.
 
 The existing rise/set tests check ordering + loose bounds vs Swiss Ephemeris.
-These adjudicate rise_trans against an independent observed-altitude oracle:
+These adjudicate rise_trans against an independent observed-altitude reference:
 
   * Sun rise + astronomical twilight via erfa.atco13 (observed zenith distance),
     with refraction OFF so lib and erfa share the same altitude condition — pure
@@ -13,6 +13,7 @@ These adjudicate rise_trans against an independent observed-altitude oracle:
 
 Network-free but needs pyerfa; marked slow (root-finding over many positions).
 """
+
 from __future__ import annotations
 
 import math
@@ -21,9 +22,20 @@ import pytest
 
 import libephemeris as L
 from libephemeris.constants import (
-    SUN, MOON, FLG_SWIEPH, FLG_EQUATORIAL, FLG_J2000, FLG_NOABERR, FLG_NOGDEFL,
-    FLG_TOPOCTR, CALC_RISE, CALC_SET, CALC_MTRANSIT,
-    BIT_DISC_CENTER, BIT_NO_REFRACTION, BIT_ASTRO_TWILIGHT,
+    SUN,
+    MOON,
+    FLG_SWIEPH,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    FLG_NOABERR,
+    FLG_NOGDEFL,
+    FLG_TOPOCTR,
+    CALC_RISE,
+    CALC_SET,
+    CALC_MTRANSIT,
+    BIT_DISC_CENTER,
+    BIT_NO_REFRACTION,
+    BIT_ASTRO_TWILIGHT,
 )
 
 erfa = pytest.importorskip("erfa")
@@ -44,12 +56,30 @@ def _sun_obs_alt(jd_ut, lon, lat, phpa):
     """Sun observed altitude (deg) via erfa.atco13 fed the Sun's ICRS astrometric
     place. phpa=0 disables refraction."""
     jd_tt = jd_ut + L.deltat(jd_ut)
-    rd, _ = L.calc(jd_tt, SUN,
-                   FLG_SWIEPH | FLG_J2000 | FLG_EQUATORIAL | FLG_NOABERR | FLG_NOGDEFL)
+    rd, _ = L.calc(
+        jd_tt, SUN, FLG_SWIEPH | FLG_J2000 | FLG_EQUATORIAL | FLG_NOABERR | FLG_NOGDEFL
+    )
     rc, dc = math.radians(rd[0]), math.radians(rd[1])
     _aob, zob, _h, _d, _r, _eo = erfa.atco13(
-        rc, dc, 0, 0, 0, 0, jd_ut, 0.0, 0.0,
-        math.radians(lon), math.radians(lat), 0.0, 0, 0, phpa, 10.0, 0.5, 0.55)
+        rc,
+        dc,
+        0,
+        0,
+        0,
+        0,
+        jd_ut,
+        0.0,
+        0.0,
+        math.radians(lon),
+        math.radians(lat),
+        0.0,
+        0,
+        0,
+        phpa,
+        10.0,
+        0.5,
+        0.55,
+    )
     return 90.0 - math.degrees(zob)
 
 
@@ -62,8 +92,11 @@ def _moon_obs_alt(jd_ut, lon, lat):
     gst = erfa.gst06a(2400000.5, jd_ut - 2400000.5, 2400000.5, jd_ut - 2400000.5)
     H = gst + math.radians(lon) - ra
     phi = math.radians(lat)
-    return math.degrees(math.asin(
-        math.sin(dec) * math.sin(phi) + math.cos(dec) * math.cos(phi) * math.cos(H)))
+    return math.degrees(
+        math.asin(
+            math.sin(dec) * math.sin(phi) + math.cos(dec) * math.cos(phi) * math.cos(H)
+        )
+    )
 
 
 def _find_rise(alt_fn, jd0, target_alt):
@@ -90,18 +123,20 @@ def _find_rise(alt_fn, jd0, target_alt):
 @pytest.mark.parametrize("lon,lat", [(12.5, 41.9), (0.0, 0.0), (-78.5, -0.2)])
 def test_sun_rise_and_twilight_match_erfa(lon, lat):
     """Sun rise (disc-center, no refraction) and astronomical twilight match the
-    erfa observed-altitude oracle to a few seconds (shared geometry)."""
+    erfa observed-altitude reference to a few seconds (shared geometry)."""
     jd0 = L.julday(2023, 6, 15, 0.0, L.GREG_CAL)
     geopos = (lon, lat, 0.0)
 
     rf, tret = L.rise_trans(
-        jd0, SUN, CALC_RISE | BIT_DISC_CENTER | BIT_NO_REFRACTION, geopos)
+        jd0, SUN, CALC_RISE | BIT_DISC_CENTER | BIT_NO_REFRACTION, geopos
+    )
     ref = _find_rise(lambda j: _sun_obs_alt(j, lon, lat, 0.0), jd0, 0.0)
     assert rf == 0 and ref is not None
     assert abs(tret[0] - ref) * 86400.0 < 5.0
 
     rf2, tret2 = L.rise_trans(
-        jd0, SUN, CALC_RISE | BIT_ASTRO_TWILIGHT | BIT_DISC_CENTER, geopos)
+        jd0, SUN, CALC_RISE | BIT_ASTRO_TWILIGHT | BIT_DISC_CENTER, geopos
+    )
     ref2 = _find_rise(lambda j: _sun_obs_alt(j, lon, lat, 0.0), jd0, -18.0)
     assert rf2 == 0 and ref2 is not None
     assert abs(tret2[0] - ref2) * 86400.0 < 5.0
@@ -115,7 +150,8 @@ def test_moon_rise_matches_independent_hour_angle(lon, lat):
     jd0 = L.julday(2023, 3, 10, 0.0, L.GREG_CAL)
     geopos = (lon, lat, 0.0)
     rf, tret = L.rise_trans(
-        jd0, MOON, CALC_RISE | BIT_DISC_CENTER | BIT_NO_REFRACTION, geopos)
+        jd0, MOON, CALC_RISE | BIT_DISC_CENTER | BIT_NO_REFRACTION, geopos
+    )
     ref = _find_rise(lambda j: _moon_obs_alt(j, lon, lat), jd0, 0.0)
     assert rf == 0 and ref is not None
     assert abs(tret[0] - ref) * 86400.0 < 5.0

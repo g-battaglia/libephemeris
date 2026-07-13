@@ -23,8 +23,8 @@ from typing import Tuple
 # =============================================================================
 
 # Planet GM values
-GM_JUPITER: float = 126686531.9  # JUP365
-GM_SATURN: float = 37931206.23  # SAT441
+GM_JUPITER: float = 126686531.9  # JPL JUP365 satellite ephemeris
+GM_SATURN: float = 37931206.23  # JPL SAT441 satellite ephemeris
 GM_URANUS: float = 5793951.3  # URA111
 GM_NEPTUNE: float = 6835099.97  # NEP097
 GM_PLUTO: float = 869.3  # PLU060

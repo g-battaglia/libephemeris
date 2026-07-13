@@ -248,9 +248,7 @@ def test_download_file_hash_match(tmp_path, monkeypatch):
     digest = hashlib.sha256(data).hexdigest()
     monkeypatch.setattr(dl.urllib.request, "urlopen", _make_urlopen(data, len(data)))
     dest = tmp_path / "v.bin"
-    ok = dl.download_file(
-        "http://x", dest, expected_sha256=digest, show_progress=False
-    )
+    ok = dl.download_file("http://x", dest, expected_sha256=digest, show_progress=False)
     assert ok is True
     assert dest.exists()
 
@@ -297,6 +295,11 @@ def test_download_planet_centers_already_valid(tmp_path, monkeypatch, capsys):
     dest = tmp_path / "planet_centers.bsp"
     dest.write_bytes(b"data")
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: True)
+    monkeypatch.setattr(
+        dl,
+        "_file_sha256",
+        lambda path: dl.DATA_FILES["planet_centers.bsp"]["sha256"],
+    )
     result = dl.download_planet_centers(force=False, quiet=False)
     assert result == dest
     out = capsys.readouterr().out
@@ -309,6 +312,11 @@ def test_download_planet_centers_already_valid_quiet(tmp_path, monkeypatch, caps
     dest = tmp_path / "planet_centers.bsp"
     dest.write_bytes(b"data")
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: True)
+    monkeypatch.setattr(
+        dl,
+        "_file_sha256",
+        lambda path: dl.DATA_FILES["planet_centers.bsp"]["sha256"],
+    )
     result = dl.download_planet_centers(force=False, quiet=True)
     assert result == dest
     assert capsys.readouterr().out == ""
@@ -425,9 +433,7 @@ def test_download_planet_centers_oserror(tmp_path, monkeypatch, capsys):
 def test_download_all(tmp_path, monkeypatch):
     """download_all delegates to download_planet_centers (525-529)."""
     sentinel = tmp_path / "planet_centers.bsp"
-    monkeypatch.setattr(
-        dl, "download_planet_centers", lambda **kwargs: sentinel
-    )
+    monkeypatch.setattr(dl, "download_planet_centers", lambda **kwargs: sentinel)
     paths = dl.download_all(force=True, show_progress=False, quiet=True)
     assert paths == [sentinel]
 
@@ -451,9 +457,8 @@ def test_check_data_status(tmp_path, monkeypatch):
     assert status["planet_centers_base.bsp"]["size"] == 5
     assert status["base_core.leb2"]["exists"] is True
     assert status["base_core.leb2"]["size"] == 7
-    # A file that does not exist gets the None branch.
-    assert status["ephemeris_extended.leb"]["exists"] is False
-    assert status["ephemeris_extended.leb"]["path"] is None
+    # Retired release companions are absent from the active manifest.
+    assert "base_asteroids.leb2" not in status
 
 
 # ---------------------------------------------------------------------------
@@ -769,9 +774,7 @@ def test_init_all_full_paths(monkeypatch, capsys):
     # Step 1: DE440 succeeds.
     monkeypatch.setattr(state, "get_planets", lambda: object())
     # Step 2: planet_centers succeeds.
-    monkeypatch.setattr(
-        dl, "download_planet_centers", lambda **kw: Path("/tmp/pc.bsp")
-    )
+    monkeypatch.setattr(dl, "download_planet_centers", lambda **kw: Path("/tmp/pc.bsp"))
 
     # No real sleeping for rate-limit (init_all imports time locally).
     import time as _time
@@ -893,9 +896,7 @@ def test_init_all_quiet_full_loop(monkeypatch):
     monkeypatch.setattr(spk_auto, "_iso_to_jd", lambda s: 2451545.0)
     # Nothing cached -> each chunk attempts a download.
     monkeypatch.setattr(dl.os.path, "exists", lambda p: False)
-    monkeypatch.setattr(
-        spk_auto, "download_spk_from_horizons", lambda **kw: None
-    )
+    monkeypatch.setattr(spk_auto, "download_spk_from_horizons", lambda **kw: None)
 
     result = dl.init_all(
         force=False,
@@ -1126,6 +1127,46 @@ def test_download_leb_for_tier_invalid_tier():
         dl.download_leb_for_tier("nonsense")
 
 
+@pytest.mark.parametrize("tier", ["base", "medium", "extended"])
+def test_download_leb_for_tier_delegates_to_reviewed_leb2_core(
+    tier, tmp_path, monkeypatch
+):
+    """The compatibility entry point installs the current reviewed format."""
+    core = tmp_path / f"{tier}_core.leb2"
+    calls = []
+
+    def _download(tier_name, **kwargs):
+        calls.append((tier_name, kwargs))
+        return [core]
+
+    monkeypatch.setattr(dl, "download_leb2_for_tier", _download)
+    result = dl.download_leb_for_tier(
+        tier, force=True, show_progress=False, quiet=True, activate=False
+    )
+
+    assert result == core
+    assert calls == [
+        (
+            tier,
+            {
+                "groups": ["core"],
+                "force": True,
+                "show_progress": False,
+                "quiet": True,
+                "activate": False,
+            },
+        )
+    ]
+
+
+def test_download_leb_for_tier_requires_published_core(monkeypatch):
+    """A missing manifest entry remains fail-closed."""
+    monkeypatch.setattr(dl, "download_leb2_for_tier", lambda *args, **kwargs: [])
+    with pytest.raises(RuntimeError, match="SHA-256-pinned"):
+        dl.download_leb_for_tier("medium")
+
+
+@pytest.mark.skip(reason="legacy monolithic release downloads are retired")
 def test_download_leb_for_tier_no_hash(monkeypatch):
     """A None sha256 raises RuntimeError (1399-1403)."""
     monkeypatch.setitem(
@@ -1137,6 +1178,7 @@ def test_download_leb_for_tier_no_hash(monkeypatch):
         dl.download_leb_for_tier("base")
 
 
+@pytest.mark.skip(reason="legacy monolithic release downloads are retired")
 def test_download_leb_for_tier_existing_valid_activate(tmp_path, monkeypatch, capsys):
     """Existing valid file short-circuits and activates (1408-1418)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
@@ -1158,6 +1200,7 @@ def test_download_leb_for_tier_existing_valid_activate(tmp_path, monkeypatch, ca
     assert "already exists" in out
 
 
+@pytest.mark.skip(reason="legacy monolithic release downloads are retired")
 def test_download_leb_for_tier_existing_valid_quiet_no_activate(tmp_path, monkeypatch):
     """Existing valid file, quiet=True + activate=False (arcs 1410->1414, 1414->1418)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
@@ -1170,7 +1213,9 @@ def test_download_leb_for_tier_existing_valid_quiet_no_activate(tmp_path, monkey
     from libephemeris import state
 
     called = {"n": 0}
-    monkeypatch.setattr(state, "set_leb_file", lambda p: called.update(n=called["n"] + 1))
+    monkeypatch.setattr(
+        state, "set_leb_file", lambda p: called.update(n=called["n"] + 1)
+    )
 
     result = dl.download_leb_for_tier("base", force=False, quiet=True, activate=False)
     assert result == dest
@@ -1178,6 +1223,7 @@ def test_download_leb_for_tier_existing_valid_quiet_no_activate(tmp_path, monkey
     assert called["n"] == 0
 
 
+@pytest.mark.skip(reason="legacy monolithic release downloads are retired")
 def test_download_leb_for_tier_corrupt_then_download(tmp_path, monkeypatch, capsys):
     """Corrupt cache removed, fresh download validates + activates (1419-1467)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
@@ -1213,6 +1259,7 @@ def test_download_leb_for_tier_corrupt_then_download(tmp_path, monkeypatch, caps
     assert "Downloaded to:" in out
 
 
+@pytest.mark.skip(reason="legacy monolithic release downloads are retired")
 def test_download_leb_for_tier_corrupt_remove_oserror(tmp_path, monkeypatch):
     """os.remove OSError during corrupt-cache cleanup is swallowed (1422-1424)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
@@ -1232,12 +1279,15 @@ def test_download_leb_for_tier_corrupt_remove_oserror(tmp_path, monkeypatch):
         dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
     )
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"f")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"f"),
     )
     result = dl.download_leb_for_tier("base", force=False, quiet=True, activate=False)
     assert result == dest
 
 
+@pytest.mark.skip(reason="legacy monolithic release downloads are retired")
 def test_download_leb_for_tier_download_invalid(tmp_path, monkeypatch):
     """Downloaded file failing validation raises + removes (1444-1451)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
@@ -1246,12 +1296,15 @@ def test_download_leb_for_tier_download_invalid(tmp_path, monkeypatch):
     # No pre-existing file -> goes straight to download.
     monkeypatch.setattr(dl, "_is_valid_leb", lambda p: False)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     with pytest.raises(ValueError, match="failed LEB validation"):
         dl.download_leb_for_tier("base", force=True, quiet=False, activate=False)
 
 
+@pytest.mark.skip(reason="legacy monolithic release downloads are retired")
 def test_download_leb_for_tier_download_invalid_remove_oserror(tmp_path, monkeypatch):
     """Validation-failure os.remove OSError swallowed before raise (1446-1448)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
@@ -1259,7 +1312,9 @@ def test_download_leb_for_tier_download_invalid_remove_oserror(tmp_path, monkeyp
     leb_dir.mkdir()
     monkeypatch.setattr(dl, "_is_valid_leb", lambda p: False)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     monkeypatch.setattr(
         dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
@@ -1268,6 +1323,7 @@ def test_download_leb_for_tier_download_invalid_remove_oserror(tmp_path, monkeyp
         dl.download_leb_for_tier("base", force=True, quiet=True, activate=False)
 
 
+@pytest.mark.skip(reason="legacy monolithic release downloads are retired")
 def test_download_leb_for_tier_download_no_activate(tmp_path, monkeypatch, capsys):
     """Successful download with activate=False skips set_leb_file (1453-1467)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
@@ -1275,7 +1331,9 @@ def test_download_leb_for_tier_download_no_activate(tmp_path, monkeypatch, capsy
     leb_dir.mkdir()
     monkeypatch.setattr(dl, "_is_valid_leb", lambda p: True)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     result = dl.download_leb_for_tier("base", force=True, quiet=False, activate=False)
     assert result == leb_dir / "ephemeris_base.leb"
@@ -1288,13 +1346,73 @@ def test_download_leb_for_tier_download_no_activate(tmp_path, monkeypatch, capsy
 # ---------------------------------------------------------------------------
 
 
+def test_download_leb2_for_tier_invalid_tier():
+    with pytest.raises(ValueError, match="Unknown tier"):
+        dl.download_leb2_for_tier("nonsense")
+
+
+def test_published_wider_core_pins_match_reviewed_release_bytes():
+    assert dl.DATA_FILES["medium_core.leb2"]["sha256"] == (
+        "4655d490ed951bdfd214c0a94fc08e8113a724d99b5afb1a026400cc290e37ad"
+    )
+    assert dl.DATA_FILES["extended_core.leb2"]["sha256"] == (
+        "38e244d2cbcbb216269f5ea97316b543966d368a8f62a507be669aae95003389"
+    )
+
+
+def test_regenerated_medium_planet_centers_pin_matches_reviewed_bytes():
+    assert dl.DATA_FILES["planet_centers_medium.bsp"]["sha256"] == (
+        "d3c34f5efe9223ef588ec59a8c59c1bd6619b0eab5d5e0b35c353d675efe7b4d"
+    )
+    assert dl.DATA_FILES["planet_centers_medium.bsp"]["size_mb"] == 191.25
+
+
+def test_install_bundled_file_verifies_and_publishes(tmp_path, monkeypatch):
+    """A package resource is hash-checked before atomic publication."""
+    package = tmp_path / "package"
+    source = package / "data" / "core.leb2"
+    source.parent.mkdir(parents=True)
+    payload = b"reviewed bundled core"
+    source.write_bytes(payload)
+    monkeypatch.setattr(dl.resources, "files", lambda package_name: package)
+
+    destination = tmp_path / "cache" / "base_core.leb2"
+    dl._install_bundled_file(
+        "data/core.leb2",
+        destination,
+        expected_sha256=hashlib.sha256(payload).hexdigest(),
+    )
+
+    assert destination.read_bytes() == payload
+
+
+def test_install_bundled_file_rejects_hash_mismatch(tmp_path, monkeypatch):
+    """A corrupt package resource never replaces an existing destination."""
+    package = tmp_path / "package"
+    source = package / "data" / "core.leb2"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"unexpected")
+    monkeypatch.setattr(dl.resources, "files", lambda package_name: package)
+    destination = tmp_path / "base_core.leb2"
+    destination.write_bytes(b"known-good")
+
+    with pytest.raises(ValueError, match="Bundled data hash mismatch"):
+        dl._install_bundled_file(
+            "data/core.leb2",
+            destination,
+            expected_sha256=hashlib.sha256(b"expected").hexdigest(),
+        )
+
+    assert destination.read_bytes() == b"known-good"
+
+
 def test_download_leb2_for_tier_full(tmp_path, monkeypatch, capsys):
-    """Cover skip/exists/download/fail arms + core activation (1497-1549)."""
+    """Only the reviewed bundled core is installed and activated."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     leb_dir = tmp_path / "leb"
     leb_dir.mkdir()
 
-    # Pre-create asteroids file (exists + valid -> [OK] already exists arm).
+    # A retired companion in the cache is never treated as installable data.
     (leb_dir / "base_asteroids.leb2").write_bytes(b"ast")
 
     def _is_valid(p):
@@ -1302,14 +1420,11 @@ def test_download_leb2_for_tier_full(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr(dl, "_is_valid_leb", _is_valid)
 
-    def _fake_download_file(url, dest_path, **kw):
-        # apogee download fails; others succeed.
-        if str(dest_path).endswith("base_apogee.leb2"):
-            raise OSError("apogee boom")
-        Path(dest_path).write_bytes(b"data")
-        return True
-
-    monkeypatch.setattr(dl, "download_file", _fake_download_file)
+    monkeypatch.setattr(
+        dl,
+        "download_file",
+        lambda *args, **kwargs: pytest.fail("remote LEB download attempted"),
+    )
 
     from libephemeris import state
 
@@ -1323,11 +1438,55 @@ def test_download_leb2_for_tier_full(tmp_path, monkeypatch, capsys):
     )
     out = capsys.readouterr().out
     assert "[SKIP]" in out
-    assert "already exists" in out
-    assert "[FAIL]" in out
+    assert "already exists" not in out
+    assert "[FAIL]" not in out
+    assert "base_apogee.leb2: not in DATA_FILES" in out
     # core was downloaded -> activation should have happened.
     assert activated["path"].endswith("base_core.leb2")
     assert any(str(p).endswith("base_core.leb2") for p in downloaded)
+
+
+def test_download_leb2_remote_asset_requires_and_passes_sha_pin(tmp_path, monkeypatch):
+    """A reviewed wider-tier manifest entry uses the pinned downloader."""
+    monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
+    payload = b"synthetic structurally valid reviewed core"
+    digest = hashlib.sha256(payload).hexdigest()
+    monkeypatch.setitem(
+        dl.DATA_FILES,
+        "medium_core.leb2",
+        {
+            "url": "https://example.invalid/medium_core.leb2",
+            "sha256": digest,
+            "size_mb": 1,
+            "description": "test",
+            "dest_subdir": "leb",
+        },
+    )
+    calls = []
+
+    def _download(url, dest_path, **kwargs):
+        calls.append((url, kwargs))
+        Path(dest_path).write_bytes(payload)
+        return True
+
+    monkeypatch.setattr(dl, "download_file", _download)
+    monkeypatch.setattr(dl, "_is_valid_leb", lambda path: True)
+
+    result = dl.download_leb2_for_tier(
+        "medium", groups=["core"], quiet=True, activate=False
+    )
+
+    assert result == [tmp_path / "leb" / "medium_core.leb2"]
+    assert calls == [
+        (
+            "https://example.invalid/medium_core.leb2",
+            {
+                "description": "medium_core.leb2",
+                "show_progress": True,
+                "expected_sha256": digest,
+            },
+        )
+    ]
 
 
 def test_download_leb2_for_tier_default_groups_quiet(tmp_path, monkeypatch):
@@ -1349,32 +1508,30 @@ def test_download_leb2_for_tier_default_groups_quiet(tmp_path, monkeypatch):
     downloaded = dl.download_leb2_for_tier(
         "base", groups=None, force=True, quiet=True, activate=False
     )
-    # All four groups download.
-    assert len(downloaded) == 4
+    # Only the independently reviewed bundled core is available.
+    assert len(downloaded) == 1
 
 
 def test_download_leb2_for_tier_quiet_arcs(tmp_path, monkeypatch):
-    """quiet=True variants of every branch (arcs 1508->1510, 1516->1518, 1537->1504).
+    """quiet mode never fetches retired companions.
 
     - bogus group skip (quiet)
-    - pre-existing valid file (quiet append)
-    - a failing download (quiet)
+    - pre-existing retired file ignored
+    - reviewed bundled core installed
     """
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     leb_dir = tmp_path / "leb"
     leb_dir.mkdir()
 
-    # asteroids already exists + valid -> quiet append arm (1516->1518).
+    # A cached retired companion must not enter the result.
     (leb_dir / "base_asteroids.leb2").write_bytes(b"ast")
     monkeypatch.setattr(dl, "_is_valid_leb", lambda p: True)
 
-    def _fake_download_file(url, dest_path, **kw):
-        if str(dest_path).endswith("base_apogee.leb2"):
-            raise OSError("apogee boom")  # quiet FAIL arm (1537->1504)
-        Path(dest_path).write_bytes(b"data")
-        return True
-
-    monkeypatch.setattr(dl, "download_file", _fake_download_file)
+    monkeypatch.setattr(
+        dl,
+        "download_file",
+        lambda *args, **kwargs: pytest.fail("remote LEB download attempted"),
+    )
 
     from libephemeris import state
 
@@ -1384,7 +1541,7 @@ def test_download_leb2_for_tier_quiet_arcs(tmp_path, monkeypatch):
     downloaded = dl.download_leb2_for_tier(
         "base", groups=groups, force=False, quiet=True, activate=True
     )
-    assert any(str(p).endswith("base_core.leb2") for p in downloaded)
+    assert [p.name for p in downloaded] == ["base_core.leb2"]
 
 
 def test_download_leb2_for_tier_invalid_cache_redownload(tmp_path, monkeypatch):
@@ -1415,20 +1572,54 @@ def test_download_leb2_for_tier_invalid_cache_redownload(tmp_path, monkeypatch):
     assert len(downloaded) == 1
 
 
+def test_download_leb2_replaces_valid_but_unreviewed_bundled_core(
+    tmp_path, monkeypatch, capsys
+):
+    """A structurally valid old release core cannot bypass the pinned hash."""
+    monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
+    leb_dir = tmp_path / "leb"
+    leb_dir.mkdir()
+    core = leb_dir / "base_core.leb2"
+    core.write_bytes(b"old structurally valid core")
+    monkeypatch.setattr(dl, "_is_valid_leb", lambda path: True)
+    installed = []
+
+    def _install(resource_path, dest_path, *, expected_sha256):
+        installed.append((resource_path, expected_sha256))
+        Path(dest_path).write_bytes(b"reviewed core")
+
+    monkeypatch.setattr(dl, "_install_bundled_file", _install)
+
+    result = dl.download_leb2_for_tier(
+        "base", groups=["core"], activate=False, quiet=False
+    )
+
+    assert result == [core]
+    assert installed == [
+        (
+            "data/leb2/base_core.leb2",
+            "a02b15344de946f8d0945c30c3ad47c3c1ce69f335af99e545c777fe9ec1bcfd",
+        )
+    ]
+    assert "replacing unreviewed cached core" in capsys.readouterr().out
+
+
 def test_download_leb2_for_tier_activate_core_missing(tmp_path, monkeypatch):
     """core appended but core file not on disk skips activation (arc 1543->1549)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     leb_dir = tmp_path / "leb"
     leb_dir.mkdir()
     monkeypatch.setattr(dl, "_is_valid_leb", lambda p: True)
-    # download_file "succeeds" without writing the file, so core_path.exists()
-    # is False at activation time.
-    monkeypatch.setattr(dl, "download_file", lambda url, dest_path, **kw: True)
+    # The bundled installer "succeeds" without writing the file, so
+    # core_path.exists() is False at activation time.
+    monkeypatch.setattr(dl, "_install_bundled_file", lambda *args, **kwargs: None)
 
     from libephemeris import state
 
     called = {"n": 0}
-    monkeypatch.setattr(state, "set_leb_file", lambda p: called.update(n=called["n"] + 1))
+    monkeypatch.setattr(
+        state, "set_leb_file", lambda p: called.update(n=called["n"] + 1)
+    )
 
     downloaded = dl.download_leb2_for_tier(
         "base", groups=["core"], force=True, quiet=True, activate=True
@@ -1455,6 +1646,11 @@ def test_download_planet_centers_for_tier_existing_valid(tmp_path, monkeypatch, 
     dest = tmp_path / "planet_centers_base.bsp"
     dest.write_bytes(b"pc")
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: True)
+    monkeypatch.setattr(
+        dl,
+        "_file_sha256",
+        lambda path: dl.DATA_FILES["planet_centers_base.bsp"]["sha256"],
+    )
     result = dl._download_planet_centers_for_tier("base", force=False, quiet=False)
     assert result == dest
     out = capsys.readouterr().out
@@ -1467,6 +1663,11 @@ def test_download_planet_centers_for_tier_existing_valid_quiet(tmp_path, monkeyp
     dest = tmp_path / "planet_centers_base.bsp"
     dest.write_bytes(b"pc")
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: True)
+    monkeypatch.setattr(
+        dl,
+        "_file_sha256",
+        lambda path: dl.DATA_FILES["planet_centers_base.bsp"]["sha256"],
+    )
     result = dl._download_planet_centers_for_tier("base", force=False, quiet=True)
     assert result == dest
 
@@ -1488,7 +1689,9 @@ def test_download_planet_centers_for_tier_corrupt_remove_oserror(tmp_path, monke
         dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
     )
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"f")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"f"),
     )
     result = dl._download_planet_centers_for_tier("base", force=False, quiet=True)
     assert result == dest
@@ -1499,7 +1702,9 @@ def test_download_planet_centers_for_tier_download_invalid(tmp_path, monkeypatch
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     with pytest.raises(ValueError, match="failed validation"):
         dl._download_planet_centers_for_tier("base", force=True, quiet=False)
@@ -1512,7 +1717,9 @@ def test_download_planet_centers_for_tier_download_invalid_remove_oserror(
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     monkeypatch.setattr(
         dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
@@ -1526,7 +1733,9 @@ def test_download_planet_centers_for_tier_success(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: True)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     result = dl._download_planet_centers_for_tier("medium", force=True, quiet=False)
     assert result == tmp_path / "planet_centers_medium.bsp"

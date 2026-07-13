@@ -179,9 +179,7 @@ class TestRiseTransPlanets:
         jd_start = julday(2024, 1, 15, 0)
         lat, lon = 40.7128, -74.0060  # New York
 
-        retflag, tret = rise_trans(
-            jd_start, JUPITER, CALC_MTRANSIT, [lon, lat, 0]
-        )
+        retflag, tret = rise_trans(jd_start, JUPITER, CALC_MTRANSIT, [lon, lat, 0])
         jd_transit = tret[0]
 
         assert jd_transit > jd_start
@@ -244,9 +242,7 @@ class TestRiseTransFlags:
         jd_rise_limb = tret[0]
 
         # With disc center
-        _, tret = rise_trans(
-            jd_start, SUN, CALC_RISE | BIT_DISC_CENTER, [lon, lat, 0]
-        )
+        _, tret = rise_trans(jd_start, SUN, CALC_RISE | BIT_DISC_CENTER, [lon, lat, 0])
         jd_rise_center = tret[0]
 
         # Center rise should be later than upper limb rise

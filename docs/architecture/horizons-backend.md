@@ -18,7 +18,7 @@ or the `LIBEPHEMERIS_MODE` environment variable:
 | Mode | Behavior | Fails when |
 |------|----------|-----------|
 | `"auto"` (default) | LEB → Horizons (if no DE440) → Skyfield | never |
-| `"leb"` | Require LEB (auto-discovered or auto-downloaded if needed); unsupported bodies/flags fall back to Skyfield | no LEB resolvable |
+| `"leb"` | Require the bundled, configured, or locally auto-discovered LEB; unsupported bodies/flags fall back to Skyfield | no LEB resolvable |
 | `"horizons"` | Prefer Horizons; unsupported bodies/flags fall back to Skyfield | no internet |
 | `"skyfield"` | Always Skyfield/DE440 | DE440 not available |
 
@@ -58,9 +58,8 @@ swe.set_calc_mode("horizons")
 |----------|--------|--------|
 | Standard planets | Sun, Moon, Mercury-Pluto, Earth | Horizons VECTORS API |
 | Asteroids | Chiron, Ceres, Pallas, Juno, Vesta | Horizons small-body syntax |
-| Mean Node | MEAN_NODE (10) | Analytical (Meeus polynomial, no HTTP) |
-| Mean Apogee/Lilith | MEAN_APOG (12) | Analytical (no HTTP) |
-| Uranians | Cupido-Transpluto (40-48) | Analytical heliocentric (no HTTP) |
+| Mean Node / Mean Apogee | MEAN_NODE (10), MEAN_APOG (12) | ERFA/IERS fundamental arguments (no HTTP) |
+| Historical hypothetical bodies | IDs 40–58 | Local runtime models in their native center (no HTTP) |
 
 ### Not Supported (fallback to Skyfield)
 
@@ -68,7 +67,9 @@ swe.set_calc_mode("horizons")
 - **Fixed stars** — no Horizons equivalent
 - **Planetary moons** — require satellite-specific SPK
 - **FLG_TOPOCTR** — requires Earth orientation parameters
-- **Uranian bodies in geocentric mode** — only heliocentric supported
+- **Hypothetical center conversions** — non-native heliocentric/geocentric or
+  barycentric requests fall through to Skyfield for the Earth/Sun vector
+  subtraction; they are never classified as unknown bodies
 
 ## Pipeline Architecture
 

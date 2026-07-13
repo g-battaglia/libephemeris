@@ -22,10 +22,9 @@ Usage:
     .venv/bin/python scripts/verify_galilean.py compare [--spk path/to/jup365.bsp]
 
 Grid design:
-    * 1800-01-01 .. ~2200-01 every 16 days (9132 epochs) — two centuries of
-      margin around the 1900-2100 pyswisseph comparison window, wide enough
-      that any frame/precession mistake that grows with |t - J2000| blows
-      past the gate at the edges.
+    * 1800-01-01 .. ~2200-01 every 16 days (9132 epochs), wide enough that any
+      frame/precession mistake that grows with |t - J2000| is amplified at the
+      edges.
     * Golden epochs: the E5 theory epoch (JDE 2443000.5), J2000, and the
       fixed dates used by the unit/compare suites.
     * +/- 1 s pairs around two epochs to pin the central-difference velocity
@@ -35,11 +34,11 @@ Gate rationale: the smallest published series terms are ~1e-5 deg
 (~0.3 km on Callisto's orbit), while pure floating-point re-association in
 an independently structured implementation stays at the centimeter level;
 1e-3 km therefore detects any single mistranscribed coefficient without
-tripping on legitimate FP reordering.  Through the GM-weighted COB dilution
+tripping on legitimate FP reordering. Through the GM-weighted COB dilution
 (~2.07e-4) and Jupiter's geocentric distance, even 1 km of moon drift moves
 Jupiter's geocentric position by only ~7e-11 arcsec, so the gate is far
-tighter than pyswisseph parity requires — it is a transcription-correctness
-detector, not a parity bound.
+tighter than astronomical use requires: it is a transcription-correctness
+detector, not an external-output bound.
 
 This script is standalone (project convention: verification via standalone
 scripts, not the pytest suite).
@@ -110,9 +109,7 @@ def evaluate(jd: float, ts) -> list[float]:
     values: list[float] = []
     for xyz in galilean_moon_positions(jd):
         values.extend(float(c) for c in xyz)
-    values.extend(
-        float(c) for c in get_cob_offset("jupiter barycenter", ts.tt_jd(jd))
-    )
+    values.extend(float(c) for c in get_cob_offset("jupiter barycenter", ts.tt_jd(jd)))
     return values
 
 

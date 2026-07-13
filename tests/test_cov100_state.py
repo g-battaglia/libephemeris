@@ -12,6 +12,7 @@ in ``tests/conftest.py`` reset global state between tests.
 from __future__ import annotations
 
 import os
+from unittest.mock import Mock
 
 import pytest
 
@@ -105,19 +106,53 @@ def test_set_leb_file_close_raises(monkeypatch):
 # ===========================================================================
 
 
-def test_discover_leb_file_leb2_core(monkeypatch, tmp_path):
-    """leb2 core file present -> returned (line 336)."""
+def test_reviewed_base_core_hash_gate(tmp_path):
+    """The packaged core passes and a structurally arbitrary file does not."""
+    bundled = os.path.join(
+        os.path.dirname(state.__file__), "data", "leb2", "base_core.leb2"
+    )
+    unreviewed = tmp_path / "base_core.leb2"
+    unreviewed.write_bytes(b"not the reviewed artifact")
+
+    assert state._is_reviewed_base_core(bundled)
+    assert not state._is_reviewed_base_core(str(unreviewed))
+
+
+def test_discover_leb_file_reviewed_cached_core(monkeypatch, tmp_path):
+    """A cached core is auto-discovered only when its pinned hash matches."""
     monkeypatch.setattr(state, "get_precision_tier", lambda: "base")
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
     leb_dir = tmp_path / "leb"
     leb_dir.mkdir()
     target = leb_dir / "base_core.leb2"
     target.write_bytes(b"x")
+    monkeypatch.setattr(
+        state, "_is_reviewed_base_core", lambda path: path == str(target)
+    )
     assert state._discover_leb_file() == str(target)
 
 
-def test_discover_leb_file_leb2_legacy(monkeypatch, tmp_path):
-    """leb2 legacy .leb extension present -> returned (line 341)."""
+def test_discover_leb_file_reviewed_medium_core(monkeypatch, tmp_path):
+    """A wider cached core is trusted only through its tier-specific pin."""
+    monkeypatch.setattr(state, "get_precision_tier", lambda: "medium")
+    monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
+    leb_dir = tmp_path / "leb"
+    leb_dir.mkdir()
+    target = leb_dir / "medium_core.leb2"
+    target.write_bytes(b"pinned")
+    monkeypatch.setattr(
+        state,
+        "_is_reviewed_tier_core",
+        lambda path, tier: path == str(target) and tier == "medium",
+    )
+
+    assert state._discover_leb_file() == str(target)
+
+
+def test_discover_leb_file_medium_legacy_core_precedes_base_fallback(
+    monkeypatch, tmp_path
+):
+    """The standard legacy core filename retains rc7 auto-discovery."""
     monkeypatch.setattr(state, "get_precision_tier", lambda: "medium")
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
     leb_dir = tmp_path / "leb"
@@ -127,108 +162,119 @@ def test_discover_leb_file_leb2_legacy(monkeypatch, tmp_path):
     assert state._discover_leb_file() == str(target)
 
 
+@pytest.mark.parametrize("tier", ["base", "medium"])
+def test_discover_leb_file_legacy_ephemeris_name(monkeypatch, tmp_path, tier):
+    """The historical ephemeris_{tier}.leb path remains discoverable."""
+    monkeypatch.setattr(state, "get_precision_tier", lambda: tier)
+    monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
+    leb_dir = tmp_path / "leb"
+    leb_dir.mkdir()
+    target = leb_dir / f"ephemeris_{tier}.leb"
+    target.write_bytes(b"legacy user file")
+
+    assert state._discover_leb_file() == str(target)
+
+
 def test_discover_leb_file_bundled_base(monkeypatch, tmp_path):
-    """base tier -> bundled leb2 path returned (lines 349-354)."""
+    """The hash-pinned bundled base core is the safe fallback."""
     monkeypatch.setattr(state, "get_precision_tier", lambda: "base")
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
 
     pkg_dir = os.path.dirname(state.__file__)
     bundled = os.path.join(pkg_dir, "data", "leb2", "base_core.leb2")
-
-    real_isfile = os.path.isfile
-
-    def fake_isfile(p):
-        if p == bundled:
-            return True
-        return real_isfile(p)
-
-    monkeypatch.setattr("libephemeris.state.os.path.isfile", fake_isfile)
+    monkeypatch.setattr(state, "_is_reviewed_base_core", lambda path: path == bundled)
     assert state._discover_leb_file() == bundled
 
 
-def test_discover_leb_file_bundled_base_legacy(monkeypatch, tmp_path):
-    """base tier -> legacy bundled .leb path returned (lines 355-360)."""
+def test_discover_leb_file_unreviewed_cache_falls_back_to_bundle(monkeypatch, tmp_path):
+    """A stale cached core cannot shadow the reviewed package artifact."""
     monkeypatch.setattr(state, "get_precision_tier", lambda: "base")
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
-
-    pkg_dir = os.path.dirname(state.__file__)
-    bundled_legacy = os.path.join(pkg_dir, "data", "leb2", "base_core.leb")
-
-    def fake_isfile(p):
-        # Only the legacy bundled path "exists"; everything else (including
-        # the bundled .leb2 that may really ship in the wheel) is absent.
-        return p == bundled_legacy
-
-    monkeypatch.setattr("libephemeris.state.os.path.isfile", fake_isfile)
-    assert state._discover_leb_file() == bundled_legacy
-
-
-def test_discover_leb_file_download_success(monkeypatch, tmp_path):
-    """No local file -> auto-download path succeeds (lines 362-384)."""
-    monkeypatch.setattr(state, "get_precision_tier", lambda: "base")
-    monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
-    monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
-
     leb_dir = tmp_path / "leb"
     leb_dir.mkdir()
-    downloaded_file = leb_dir / "base_core.leb2"
+    cached = leb_dir / "base_core.leb2"
+    cached.write_bytes(b"unreviewed")
+    pkg_dir = os.path.dirname(state.__file__)
+    bundled = os.path.join(pkg_dir, "data", "leb2", "base_core.leb2")
+    monkeypatch.setattr(state, "_is_reviewed_base_core", lambda path: path == bundled)
+    logger = Mock()
+    monkeypatch.setattr(state, "get_logger", lambda: logger)
 
-    real_isfile = os.path.isfile
-
-    def fake_isfile(p):
-        # All local + bundled checks miss until the download "creates" it.
-        if p == str(downloaded_file):
-            return downloaded_file.exists()
-        return False
-
-    monkeypatch.setattr("libephemeris.state.os.path.isfile", fake_isfile)
-
-    def fake_download(tier, quiet, show_progress, activate):
-        downloaded_file.write_bytes(b"x")
-        return True
-
-    import libephemeris.download as dl
-
-    monkeypatch.setattr(dl, "download_leb2_for_tier", fake_download)
-    assert state._discover_leb_file() == str(downloaded_file)
+    assert state._discover_leb_file() == bundled
+    assert "Ignoring unreviewed cached LEB core" in logger.warning.call_args.args[0]
 
 
-def test_discover_leb_file_download_returns_falsy(monkeypatch, tmp_path):
-    """Download returns falsy -> final return None (line 388)."""
-    monkeypatch.setattr(state, "get_precision_tier", lambda: "medium")
+def test_discover_leb_file_rejects_bad_bundle(monkeypatch, tmp_path):
+    """A bundled file with the wrong hash is never opened."""
+    monkeypatch.setattr(state, "get_precision_tier", lambda: "base")
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
-    monkeypatch.setattr(state, "get_calc_mode", lambda: "leb")
-    monkeypatch.setattr("libephemeris.state.os.path.isfile", lambda p: False)
+    monkeypatch.setattr(state, "_is_reviewed_base_core", lambda path: False)
+    logger = Mock()
+    monkeypatch.setattr(state, "get_logger", lambda: logger)
 
-    import libephemeris.download as dl
-
-    monkeypatch.setattr(dl, "download_leb2_for_tier", lambda *a, **k: False)
     assert state._discover_leb_file() is None
+    assert (
+        "Bundled LEB core failed its pinned SHA-256" in logger.error.call_args.args[0]
+    )
 
 
-def test_discover_leb_file_download_raises(monkeypatch, tmp_path):
-    """Download raises -> warning then return None (lines 385-388)."""
-    monkeypatch.setattr(state, "get_precision_tier", lambda: "medium")
-    monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
-    monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
-    monkeypatch.setattr("libephemeris.state.os.path.isfile", lambda p: False)
+def test_reviewed_core_does_not_attach_cached_companions(monkeypatch, tmp_path):
+    """Opening the pinned core uses one reader, not prefix auto-discovery."""
+    path = tmp_path / "base_core.leb2"
+    path.write_bytes(b"reviewed")
+    sentinel = object()
+    opened = []
 
-    import libephemeris.download as dl
+    import libephemeris.leb_composite as composite
+    import libephemeris.leb_reader as leb_reader
 
-    def boom(*a, **k):
-        raise RuntimeError("network down")
+    monkeypatch.setattr(state, "_LEB_FILE", str(path))
+    monkeypatch.setattr(state, "_LEB_READER", None)
+    monkeypatch.setattr(state, "_is_reviewed_base_core", lambda value: True)
+    monkeypatch.setattr(
+        leb_reader,
+        "open_leb",
+        lambda value: opened.append(value) or sentinel,
+    )
+    monkeypatch.setattr(
+        composite.CompositeLEBReader,
+        "from_file_with_companions",
+        lambda value: pytest.fail("reviewed core attached unreviewed companions"),
+    )
+    monkeypatch.setattr(state, "_release_when_unused", lambda reader: None)
+    monkeypatch.setattr(state, "_maybe_warm_reader", lambda reader: None)
 
-    monkeypatch.setattr(dl, "download_leb2_for_tier", boom)
-    assert state._discover_leb_file() is None
+    assert state._get_leb_reader_locked("auto") is sentinel
+    assert opened == [str(path)]
 
 
-def test_discover_leb_file_skyfield_mode_no_download(monkeypatch, tmp_path):
-    """skyfield mode -> never downloads, returns None (skips 367 body)."""
-    monkeypatch.setattr(state, "get_precision_tier", lambda: "medium")
-    monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
-    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
-    monkeypatch.setattr("libephemeris.state.os.path.isfile", lambda p: False)
-    assert state._discover_leb_file() is None
+def test_reviewed_medium_core_does_not_attach_cached_companions(monkeypatch, tmp_path):
+    path = tmp_path / "medium_core.leb2"
+    path.write_bytes(b"reviewed")
+    sentinel = object()
+    opened = []
+
+    import libephemeris.leb_composite as composite
+    import libephemeris.leb_reader as leb_reader
+
+    monkeypatch.setattr(state, "_LEB_FILE", str(path))
+    monkeypatch.setattr(state, "_LEB_READER", None)
+    monkeypatch.setattr(state, "_is_reviewed_core", lambda value: True)
+    monkeypatch.setattr(
+        leb_reader,
+        "open_leb",
+        lambda value: opened.append(value) or sentinel,
+    )
+    monkeypatch.setattr(
+        composite.CompositeLEBReader,
+        "from_file_with_companions",
+        lambda value: pytest.fail("reviewed core attached unreviewed companions"),
+    )
+    monkeypatch.setattr(state, "_release_when_unused", lambda reader: None)
+    monkeypatch.setattr(state, "_maybe_warm_reader", lambda reader: None)
+
+    assert state._get_leb_reader_locked("auto") is sentinel
+    assert opened == [str(path)]
 
 
 # ===========================================================================
@@ -769,8 +815,8 @@ def test_get_planet_centers_locked_no_candidates(monkeypatch, tmp_path):
     assert state._get_planet_centers_locked("medium") is None
 
 
-def test_get_planet_centers_locked_first_missing_second_loads(monkeypatch, tmp_path):
-    """First candidate missing (1067->1066), second loads OK."""
+def test_get_planet_centers_locked_base_legacy_loads_when_pinned(monkeypatch, tmp_path):
+    """The legacy destination is accepted only for the exact base artifact."""
     monkeypatch.setattr(state, "_PLANET_CENTERS", None)
     monkeypatch.setattr(state, "_PLANET_CENTERS_TIER", None)
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
@@ -779,9 +825,101 @@ def test_get_planet_centers_locked_first_missing_second_loads(monkeypatch, tmp_p
     legacy.write_bytes(b"x")
     fake_loader = _FakeLoader(kernel="pc-kernel")
     monkeypatch.setattr(state, "get_loader", lambda: fake_loader)
-    result = state._get_planet_centers_locked("medium")
+    monkeypatch.setattr(
+        state,
+        "_matches_pinned_data_file",
+        lambda path, name: name == "planet_centers.bsp",
+    )
+    result = state._get_planet_centers_locked("base")
     assert result == "pc-kernel"
-    assert state._PLANET_CENTERS_TIER == "medium"
+    assert state._PLANET_CENTERS_TIER == "base"
+
+
+def test_get_planet_centers_locked_rejects_unreviewed_cache(monkeypatch, tmp_path):
+    """A stale cache with the expected filename is not implicitly trusted."""
+    monkeypatch.setattr(state, "_PLANET_CENTERS", None)
+    monkeypatch.setattr(state, "_PLANET_CENTERS_TIER", None)
+    monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
+    candidate = tmp_path / "planet_centers_medium.bsp"
+    candidate.write_bytes(b"unreviewed")
+    fake_loader = _FakeLoader(kernel="must-not-load")
+    monkeypatch.setattr(state, "get_loader", lambda: fake_loader)
+
+    assert state._get_planet_centers_locked("medium") is None
+    assert fake_loader.calls == []
+
+
+def test_rejected_planet_center_hash_and_warning_are_cached(monkeypatch, tmp_path):
+    """An unchanged stale SPK is hashed and warned about only once."""
+    monkeypatch.setattr(state, "_PLANET_CENTERS", None)
+    monkeypatch.setattr(state, "_PLANET_CENTERS_TIER", None)
+    monkeypatch.setattr(state, "_PLANET_CENTER_CACHE_TIER", None)
+    monkeypatch.setattr(state, "_PLANET_CENTER_REJECTED_FILES", set())
+    monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(state, "get_precision_tier", lambda: "medium")
+    monkeypatch.setattr(state, "get_loader", lambda: _FakeLoader())
+    logger = Mock()
+    monkeypatch.setattr(state, "get_logger", lambda: logger)
+    candidate = tmp_path / "planet_centers_medium.bsp"
+    candidate.write_bytes(b"stale planet-center bytes")
+
+    real_matcher = state._matches_pinned_data_file
+    matcher = Mock(wraps=real_matcher)
+    monkeypatch.setattr(state, "_matches_pinned_data_file", matcher)
+
+    assert state.get_planet_centers() is None
+    assert state.get_planet_centers() is None
+
+    assert matcher.call_count == 1
+    assert logger.warning.call_count == 1
+    assert len(state._PLANET_CENTER_REJECTED_FILES) == 1
+
+
+def test_replaced_planet_center_file_retries_hash_and_load(monkeypatch, tmp_path):
+    """A stat change invalidates the rejection and checks replacement bytes."""
+    monkeypatch.setattr(state, "_PLANET_CENTERS", None)
+    monkeypatch.setattr(state, "_PLANET_CENTERS_TIER", None)
+    monkeypatch.setattr(state, "_PLANET_CENTER_CACHE_TIER", None)
+    monkeypatch.setattr(state, "_PLANET_CENTER_REJECTED_FILES", set())
+    monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(state, "get_precision_tier", lambda: "medium")
+    fake_loader = _FakeLoader(kernel="replacement-kernel")
+    monkeypatch.setattr(state, "get_loader", lambda: fake_loader)
+    matcher = Mock(side_effect=[False, True])
+    monkeypatch.setattr(state, "_matches_pinned_data_file", matcher)
+    candidate = tmp_path / "planet_centers_medium.bsp"
+    candidate.write_bytes(b"stale")
+
+    assert state.get_planet_centers() is None
+    candidate.write_bytes(b"reviewed replacement with a new stat fingerprint")
+    assert state.get_planet_centers() == "replacement-kernel"
+
+    assert matcher.call_count == 2
+    assert fake_loader.calls == [str(candidate)]
+    assert state._PLANET_CENTER_REJECTED_FILES == set()
+
+
+def test_planet_center_rejection_cache_resets_on_tier_change_and_close():
+    """Tier changes and full teardown clear every planet-center miss cache."""
+    fingerprint = ("/tmp/stale.bsp", 123, 456, "planet_centers_medium.bsp")
+    state._PLANET_CENTER_REJECTED_FILES.add(fingerprint)
+    state._PLANET_CENTER_CACHE_TIER = "medium"
+    state._PLANET_CENTER_MISSING.add(599)
+
+    state.set_precision_tier("base")
+
+    assert state._PLANET_CENTER_REJECTED_FILES == set()
+    assert state._PLANET_CENTER_CACHE_TIER is None
+    assert state._PLANET_CENTER_MISSING == set()
+
+    state._PLANET_CENTER_REJECTED_FILES.add(fingerprint)
+    state._PLANET_CENTER_CACHE_TIER = "medium"
+    state._PLANET_CENTER_MISSING.add(599)
+    state.close()
+
+    assert state._PLANET_CENTER_REJECTED_FILES == set()
+    assert state._PLANET_CENTER_CACHE_TIER is None
+    assert state._PLANET_CENTER_MISSING == set()
 
 
 def test_get_planet_centers_locked_load_raises(monkeypatch, tmp_path):
@@ -797,6 +935,7 @@ def test_get_planet_centers_locked_load_raises(monkeypatch, tmp_path):
             raise ValueError("bad spk")
 
     monkeypatch.setattr(state, "get_loader", lambda: _BoomLoader())
+    monkeypatch.setattr(state, "_matches_pinned_data_file", lambda path, name: True)
     result = state._get_planet_centers_locked("medium")
     assert result is None
 
@@ -839,6 +978,22 @@ def test_get_planet_center_segment_in_coverage(monkeypatch):
     monkeypatch.setattr(state, "get_planet_centers", lambda: _Centers([seg]))
     result = state.get_planet_center_segment(599, jd=2451545.0)
     assert result is seg
+
+
+def test_get_planet_center_segment_dispatches_across_all_descriptors(monkeypatch):
+    """A split target remains usable after the first descriptor ends."""
+    monkeypatch.setattr(state, "_PLANET_CENTER_MISSING", set())
+    early = _Seg(599, start_jd=2400000.0, end_jd=2450000.0)
+    late = _Seg(599, start_jd=2450000.0, end_jd=2500000.0)
+    for seg in (early, late):
+        seg.center = 5
+        seg.ephemeris = None
+    monkeypatch.setattr(state, "get_planet_centers", lambda: _Centers([early, late]))
+
+    stack = state.get_planet_center_segment(599)
+
+    assert stack.segments == [early, late]
+    assert state.get_planet_center_segment(599, jd=2490000.0) is late
 
 
 def test_get_planet_center_segment_outside_coverage(monkeypatch):

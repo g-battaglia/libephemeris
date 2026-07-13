@@ -2,11 +2,15 @@
 
 ## Contesto Generale del Progetto
 
-LibEphemeris e' una reimplementazione clean-room in puro Python della Swiss Ephemeris,
-la libreria standard de facto per calcoli astronomici ed astrologici. Usa esclusivamente
-dati NASA JPL (DE440/DE441) tramite Skyfield, anziche' i file di effemeridi proprietari
-della Swiss Ephemeris. L'obiettivo e' la compatibilita' 1:1 con l'API PySwissEph
-mantenendo una precisione sub-arcsecond rispetto ai dati JPL.
+LibEphemeris e' un'implementazione clean-room in puro Python di un'API
+compatibile, basata su NASA JPL DE440/DE441 e standard IAU/IERS. Non usa file di
+distribuzione Swiss Ephemeris. Le chiamate pubbliche PySwissEph possono essere
+confrontate solo in modo effimero: l'output non puo' essere salvato come
+fixture, usato per fit/regressioni, trasformato in coefficienti o dati, oppure
+committato.
+
+> Questo documento e' uno snapshot storico del 2026-03-27. I punti relativi ai
+> vecchi modelli lunari sono stati superati dalla revisione clean-room 2026-07.
 
 ---
 
@@ -20,10 +24,10 @@ Last updated: 2026-03-27
 |---|-----------|----------|----------|--------|
 | 1 | `get_ayanamsa_ut` returns numpy.float64, not native float | 2 | HIGH | PENDING |
 | 2 | Eclipse local API signatures (`lun_eclipse_when_loc`, `sol_eclipse_when_loc`) | 8 | HIGH | PENDING |
-| 3 | LEB files stale — InterpApogee/InterpPerigee encoded with pre-fix values | ~60 | MED | PENDING (regen) |
+| 3 | LEB files stale — derived lunar channels need independent regeneration | ~60 | MED | SUPERSEDED |
 | 4 | Extended tier asteroids — "Invalid Time to evaluate" (SPK date range) | ~40 | MED | PENDING |
 | 5 | TrueNode crosstier at boundary JD 2290867.5 (1560) — EphemerisRangeError | 2 | LOW | PENDING |
-| 6 | Lunar ELP2000 perturbation consistency after BUG-001 fix | 2 | LOW | PENDING |
+| 6 | Legacy fitted lunar perturbation consistency | 2 | LOW | RETIRED |
 | 7 | Interpolated apogee edge case — range returns negative JD | 1 | MED | PENDING |
 | 8 | Precision tier — `de441.bsp` != `de440s.bsp` (tier doesn't switch file) | 1 | LOW | PENDING |
 | 9 | Sunshine house 'i' at lat > 58° — missing Makransky algorithm | 16 (verify) | LOW | KNOWN LIMITATION |
@@ -40,11 +44,11 @@ Last updated: 2026-03-27
   - `sol_eclipse_when_loc` returns int where sequence expected (`object of type 'int' has no len()`)
 - **Fix**: Check and fix API signatures in eclipse module
 
-### Issue 3: LEB stale InterpApogee/InterpPerigee (~60 failures)
-- **Files**: All `test_leb/compare/` dirs for bodies 21 (InterpApogee), 22 (InterpPerigee)
-- **Error**: Chebyshev polynomials encode pre-BUG-001 values; errors 500-10000+ arcseconds
-- **Fix**: Regenerate LEB files: `poe leb:generate:base`, `poe leb:generate:medium`, `poe leb:generate:extended`
-- **Note**: Data regeneration, not a code bug
+### Issue 3: LEB derived lunar channels (superseded)
+
+Current generation evaluates mean points from ERFA/IERS arguments and smoothed
+apsides from active JPL states. Any bundled LEB must be regenerated only from
+those independent models; no persisted compatibility output may be used.
 
 ### Issue 4: Extended asteroids date range (~40 failures)
 - **Files**: `test_extended_asteroids.py`, `test_compare_leb_asteroids.py`, `test_compare_leb_distances.py`, `test_compare_leb_velocities.py`
@@ -58,10 +62,11 @@ Last updated: 2026-03-27
 - **Cause**: TrueNode needs Moon position slightly outside medium tier range for internal computation
 - **Fix**: Widen safety margin for True Node at tier boundaries
 
-### Issue 6: Lunar perturbation consistency (2 failures)
-- **Files**: `test_elp2000_apogee_perturbations.py:137`, `test_elp2000_perigee_perturbations.py:238`
-- **Error**: Decomposition mismatch — BUG-001 changed coefficients but test expectations weren't updated
-- **Fix**: Update test expected values to match new perturbation coefficients
+### Issue 6: Legacy lunar perturbation consistency (retired)
+
+The output-fitted perturbation series and its expected-value tests were
+removed. Current tests use IERS identities, orbital geometry, smoothing
+invariants, and backend consistency rather than frozen oracle values.
 
 ### Issue 7: Interpolated apogee range (1 failure)
 - **File**: `test_interpolated_apogee_edge_cases.py:88`

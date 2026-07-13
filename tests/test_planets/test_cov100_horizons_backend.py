@@ -20,6 +20,7 @@ Two seams are mocked:
 from __future__ import annotations
 
 import json
+import math
 from unittest import mock
 
 import pytest
@@ -31,7 +32,6 @@ from libephemeris.horizons_backend import (
     _HorizonsDeflectorSource,
     _apply_deflection_horizons,
     _calc_analytical,
-    _calc_uranian,
     _get_ssl_context,
     _to_ecliptic_output,
     horizons_calc_ut,
@@ -56,6 +56,7 @@ from libephemeris.constants import (  # noqa: E402
     FLG_TOPOCTR,
     FLG_TRUEPOS,
     FLG_XYZ,
+    HARRINGTON,
 )
 
 
@@ -157,9 +158,9 @@ class TestStateVector:
 
 
 class TestSSLContext:
-    def test_builds_once_and_caches(self):
+    def test_builds_once_and_caches(self, monkeypatch):
         # Reset module-level cache so the build branch is exercised.
-        hb._SSL_CTX = None
+        monkeypatch.setattr(hb, "_SSL_CTX", None)
         sentinel = object()
         fake_ssl = mock.MagicMock()
         fake_ssl.create_default_context.return_value = sentinel
@@ -173,12 +174,12 @@ class TestSSLContext:
             assert ctx2 is sentinel
         fake_ssl.create_default_context.assert_called_once()
 
-    def test_double_checked_lock_already_built(self):
+    def test_double_checked_lock_already_built(self, monkeypatch):
         # Exercise the inner "already built" branch (122->128): the outer
         # check sees None, but by the time the lock is acquired another
         # thread has populated _SSL_CTX. Simulate with a fake lock whose
         # __enter__ sets the module global.
-        hb._SSL_CTX = None
+        monkeypatch.setattr(hb, "_SSL_CTX", None)
         sentinel = object()
 
         class _SettingLock:
@@ -192,6 +193,11 @@ class TestSSLContext:
         with mock.patch.object(hb, "_SSL_CTX_LOCK", _SettingLock()):
             ctx = _get_ssl_context()
         assert ctx is sentinel
+
+
+def test_ssl_context_unit_tests_leave_a_runtime_compatible_cache() -> None:
+    """Mock sentinels must not leak into later live Horizons calculations."""
+    assert hb._SSL_CTX is None or callable(getattr(hb._SSL_CTX, "wrap_socket", None))
 
 
 # ===========================================================================
@@ -395,13 +401,42 @@ class TestCalcUtDispatch:
         (data, fl) = horizons_calc_ut(None, JD, 10, FLG_SWIEPH)
         assert len(data) == 6
 
-    def test_uranian_geocentric_raises(self):
-        # Uranian body without HELCTR -> KeyError.
-        with pytest.raises(KeyError):
+    def test_hypothetical_geocentric_uses_deterministic_fallback(self):
+        with pytest.raises(KeyError, match="Skyfield fallback"):
             horizons_calc_ut(None, JD, 40, FLG_SWIEPH)
 
-    def test_uranian_helio_dispatch(self):
-        (data, fl) = horizons_calc_ut(None, JD, 40, FLG_SWIEPH | FLG_HELCTR)
+    def test_restored_hypothetical_helio_dispatch(self):
+        data, flags = horizons_calc_ut(None, JD, 40, FLG_SWIEPH | FLG_HELCTR)
+        assert len(data) == 6
+        assert all(math.isfinite(value) for value in data)
+        assert flags == FLG_SWIEPH | FLG_HELCTR
+
+    @pytest.mark.parametrize(
+        "body",
+        [*range(40, 56), 57],
+    )
+    def test_all_heliocentric_hypothetical_ids_dispatch(self, body):
+        data, _ = horizons_calc_ut(None, JD, body, FLG_SWIEPH | FLG_HELCTR)
+        assert len(data) == 6
+        assert all(math.isfinite(value) for value in data)
+
+    @pytest.mark.parametrize("body", [56, 58])
+    def test_native_geocentric_hypothetical_ids_dispatch(self, body, monkeypatch):
+        from libephemeris import mean_lunar_apse
+
+        monkeypatch.setattr(
+            mean_lunar_apse, "_active_ephemeris_range", lambda: (None, 0.0, 0.0)
+        )
+        data, _ = horizons_calc_ut(None, JD, body, FLG_SWIEPH)
+        assert len(data) == 6
+        assert all(math.isfinite(value) for value in data)
+
+    def test_harrington_geocentric_raises(self):
+        with pytest.raises(KeyError):
+            horizons_calc_ut(None, JD, HARRINGTON, FLG_SWIEPH)
+
+    def test_harrington_helio_dispatch(self):
+        (data, fl) = horizons_calc_ut(None, JD, HARRINGTON, FLG_SWIEPH | FLG_HELCTR)
         assert len(data) == 6
 
     def test_unknown_body_raises(self):
@@ -429,7 +464,18 @@ class TestCalcUtHeliocentric:
         assert len(data) == 6
         # Sun + target + light-time retarded target fetches happened.
         assert any(c[0] == "10" for c in client.calls)
-        assert any(c[0] == "499" for c in client.calls)
+        target_calls = [call for call in client.calls if call[0] == "499"]
+        assert len(target_calls) == 4
+
+        # The first retarded epoch follows the heliocentric distance
+        # |Mars(t)-Sun(t)|/c, not either body's distance from the SSB.
+        sun = FakeHorizonsClient._POS["10"]
+        mars = FakeHorizonsClient._POS["499"]
+        helio_distance = math.sqrt(
+            (mars[0] - sun[0]) ** 2 + (mars[1] - sun[1]) ** 2 + (mars[2] - sun[2]) ** 2
+        )
+        expected_retarded_jd = target_calls[0][1] - helio_distance / 173.14463267
+        assert target_calls[1][1] == pytest.approx(expected_retarded_jd, abs=1e-12)
 
     def test_planet_heliocentric_truepos_skips_lighttime(self):
         client = FakeHorizonsClient()
@@ -721,7 +767,7 @@ class TestApplyDeflectionHorizons:
 
 
 # ===========================================================================
-# _calc_analytical (lines 740-789) + _calc_uranian (792-814)
+# Independently derived analytical bodies
 # ===========================================================================
 
 
@@ -763,25 +809,10 @@ class TestCalcAnalytical:
         assert abs(data[3]) < 1.0
 
 
-class TestCalcUranian:
-    def test_transpluto(self):
-        (data, fl) = _calc_uranian(JD, 48, FLG_SWIEPH)
-        assert len(data) == 6
-
-    def test_uranian_planet(self):
-        (data, fl) = _calc_uranian(JD, 40, FLG_SWIEPH)
-        assert len(data) == 6
-
-    def test_uranian_sidereal(self):
-        (data, fl) = _calc_uranian(JD, 40, FLG_SWIEPH | FLG_SIDEREAL)
-        assert 0.0 <= data[0] < 360.0
-
-
 class TestSiderealSpeedBranchResolvesGlobalMode:
     """The star-anchored speed branch must resolve sid_mode=None to the
-    global mode (measured gap vs the precession branch: ~0.36"/day for
-    SIDM_TRUE_CITRA). The module-level Horizons dispatch passes no sid_mode,
-    so an unresolved None sent every star-based mode down the wrong branch.
+    global mode. The module-level Horizons dispatch passes no sid_mode, so an
+    unresolved None sent star-based modes down the generic precession branch.
     """
 
     POS = (1.2, -1.0, 0.4)

@@ -5,6 +5,7 @@ and that fixstar (legacy) and fixstar2 (modern) agree exactly for proper/Bayer
 names. They diverge only for fragile Flamsteed designations (documented in
 docs/comparison/known-differences.md §4, Fixed stars); these guards lock the parts that must hold.
 """
+
 from __future__ import annotations
 
 import math
@@ -15,8 +16,20 @@ import libephemeris as L
 from libephemeris.constants import FLG_SWIEPH
 
 J2000 = 2451545.0
-_NAMED = ["Sirius", "Aldebaran", "Regulus", "Spica", "Antares", "Betelgeuse",
-          "Rigel", "Vega", "Polaris", "Arcturus", "Canopus", "Procyon"]
+_NAMED = [
+    "Sirius",
+    "Aldebaran",
+    "Regulus",
+    "Spica",
+    "Antares",
+    "Betelgeuse",
+    "Rigel",
+    "Vega",
+    "Polaris",
+    "Arcturus",
+    "Canopus",
+    "Procyon",
+]
 
 
 @pytest.fixture(autouse=True)
@@ -46,7 +59,10 @@ def test_full_catalog_no_anomalies():
         comps = L.fixstar2_ut(name, J2000, FLG_SWIEPH)[0]
         if not all(math.isfinite(v) for v in comps):
             bad.append((name, "nan"))
-        elif not (0.0 <= comps[0] < 360.001 and -90.001 <= comps[1] <= 90.001
-                  and comps[2] > 0.0):
+        elif not (
+            0.0 <= comps[0] < 360.001
+            and -90.001 <= comps[1] <= 90.001
+            and comps[2] > 0.0
+        ):
             bad.append((name, comps[:3]))
     assert not bad, f"{len(bad)} catalog anomalies, e.g. {bad[:5]}"

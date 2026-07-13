@@ -41,6 +41,9 @@ from libephemeris.constants import (
     SIDM_RAMAN,
     SIDM_TRUE_CITRA,
     SIDM_YUKTESHWAR,
+    SIDM_J2000,
+    SIDM_J1900,
+    SIDM_B1950,
 )
 
 pytestmark = pytest.mark.slow
@@ -106,12 +109,12 @@ class TestLockCorrectness:
         errors: List[str] = []
         errors_lock = threading.Lock()
 
-        # Two very different ayanamsha configurations
+        # Independently defined ayanamsha configurations
         configs = [
-            (SIDM_LAHIRI, "Lahiri"),
-            (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-            (SIDM_RAMAN, "Raman"),
-            (SIDM_KRISHNAMURTI, "Krishnamurti"),
+            (SIDM_J2000, "J2000"),
+            (SIDM_J1900, "J1900"),
+            (SIDM_B1950, "B1950"),
+            (SIDM_TRUE_CITRA, "True Citra"),
         ]
 
         # Pre-calculate expected values for each config
@@ -228,9 +231,7 @@ class TestNoDeadlocks:
         def worker(thread_id: int):
             try:
                 ctx = EphemerisContext()
-                mode = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN][
-                    thread_id % 3
-                ]
+                mode = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN][thread_id % 3]
                 ctx.set_sid_mode(mode)
 
                 # Perform a few calculations
@@ -735,37 +736,37 @@ class TestMemoryVisibility:
         errors_lock = threading.Lock()
 
         # Pre-calculate expected difference between two modes
-        ctx_lahiri = EphemerisContext()
-        ctx_lahiri.set_sid_mode(SIDM_LAHIRI)
-        pos_lahiri, _ = ctx_lahiri.calc_ut(jd, SUN, FLG_SIDEREAL)
+        ctx_j2000 = EphemerisContext()
+        ctx_j2000.set_sid_mode(SIDM_J2000)
+        pos_j2000, _ = ctx_j2000.calc_ut(jd, SUN, FLG_SIDEREAL)
 
-        ctx_fagan = EphemerisContext()
-        ctx_fagan.set_sid_mode(SIDM_FAGAN_BRADLEY)
-        pos_fagan, _ = ctx_fagan.calc_ut(jd, SUN, FLG_SIDEREAL)
+        ctx_j1900 = EphemerisContext()
+        ctx_j1900.set_sid_mode(SIDM_J1900)
+        pos_j1900, _ = ctx_j1900.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # The two should be different
-        assert abs(pos_lahiri[0] - pos_fagan[0]) > 0.1, (
+        assert abs(pos_j2000[0] - pos_j1900[0]) > 0.1, (
             "Modes should produce different results"
         )
 
         def worker(thread_id: int):
             # Alternate between modes
-            use_lahiri = thread_id % 2 == 0
-            expected = pos_lahiri[0] if use_lahiri else pos_fagan[0]
+            use_j2000 = thread_id % 2 == 0
+            expected = pos_j2000[0] if use_j2000 else pos_j1900[0]
 
             try:
                 ctx = EphemerisContext()
-                if use_lahiri:
-                    ctx.set_sid_mode(SIDM_LAHIRI)
+                if use_j2000:
+                    ctx.set_sid_mode(SIDM_J2000)
                 else:
-                    ctx.set_sid_mode(SIDM_FAGAN_BRADLEY)
+                    ctx.set_sid_mode(SIDM_J1900)
 
                 # Verify the calculation uses the mode we just set
                 for i in range(100):
                     pos, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
                     if abs(pos[0] - expected) > 1e-6:
                         with errors_lock:
-                            mode_name = "Lahiri" if use_lahiri else "Fagan-Bradley"
+                            mode_name = "J2000" if use_j2000 else "J1900"
                             errors.append(
                                 f"Thread {thread_id} ({mode_name}) iter {i}: "
                                 f"got {pos[0]:.6f}, expected {expected:.6f}"

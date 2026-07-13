@@ -15,7 +15,6 @@ from libephemeris.exceptions import EphemerisRangeError
 
 from tests.test_leb.compare.conftest import (
     ECLIPTIC_BODIES,
-    HYPOTHETICAL_BODIES,
     ICRS_PLANETS,
     lon_error_arcsec,
 )
@@ -23,7 +22,7 @@ from tests.test_leb.compare.conftest import (
 from .conftest import TOLS_CROSS, CrossTierHelper
 
 # Asteroids may have different SPK coverage per tier, test cautiously
-CROSSTIER_BODIES = ICRS_PLANETS + ECLIPTIC_BODIES + HYPOTHETICAL_BODIES
+CROSSTIER_BODIES = ICRS_PLANETS + ECLIPTIC_BODIES
 
 
 class TestMediumExtendedPosition:

@@ -55,18 +55,18 @@ By default positions are apparent (light-time + aberration corrected).
 
 | Flag | Effect |
 |------|--------|
-| `FLG_SIDEREAL` | Subtract ayanamsha from ecliptic longitude. Requires prior `set_sid_mode()` call to select ayanamsha (Lahiri, Fagan-Bradley, etc.). |
+| `FLG_SIDEREAL` | Apply the selected sidereal frame/ayanamsha. Every predefined base mode 0--46 and `SIDM_USER` is operational; see the ayanamsha reference for source-audit status. |
 | `FLG_TROPICAL` | Tropical zodiac (value `0`); the default complement of `FLG_SIDEREAL`, listed for explicitness. |
 
 ## Compatibility
 
 | Flag | Effect |
 |------|--------|
-| `FLG_JPLEPH` | Select the JPL ephemeris -- what libephemeris always uses, so effectively the default. |
-| `FLG_SWIEPH` | Accepted for API compatibility, ignored -- all calculations use JPL DE440/DE441. |
-| `FLG_MOSEPH` | Accepted for API compatibility, ignored. There is no Moshier fallback. |
+| `FLG_JPLEPH` | Requests the JPL-backed route for ordinary ephemeris bodies; analytical/standards bodies retain their native model. |
+| `FLG_SWIEPH` | Accepted for API compatibility and routed through the configured JPL/LEB backend for ordinary bodies. |
+| `FLG_MOSEPH` | Accepted for API compatibility; it does not activate a Moshier implementation or replace analytical body models. |
 | `FLG_DEFAULTEPH` | Default ephemeris selector (value `2`), equivalent to `FLG_SWIEPH`. |
-| `FLG_SPEED3` | Converted to `FLG_SPEED` internally. |
+| `FLG_SPEED3` | Requests the three-position speed selector and is echoed distinctly from `FLG_SPEED`. Standards-derived mean lunar points and the interpolated compatibility curves expose deterministic derivatives; both selectors preserve the same body model. |
 
 ## Advanced / specialized
 
@@ -96,7 +96,7 @@ pos, _ = swe.calc_ut(jd, MARS, FLG_SPEED)
 pos, _ = swe.calc_ut(jd, MARS, FLG_SPEED | FLG_HELCTR)
 
 # Sidereal equatorial
-swe.set_sid_mode(SIDM_LAHIRI)
+swe.set_sid_mode(SIDM_TRUE_CITRA)
 pos, _ = swe.calc_ut(jd, SUN, FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL)
 
 # J2000 ecliptic, no aberration

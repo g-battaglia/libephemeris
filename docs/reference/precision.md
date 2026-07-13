@@ -77,11 +77,10 @@ Resolution priority (highest to lowest):
 
 ### FLG_MOSEPH handling
 
-The `FLG_MOSEPH` flag — which in some engines selects a Moshier semi-analytical
-fallback (VSOP87 for planets, ELP2000-82B for the Moon, with errors of ~1" for
-inner planets and ~10+" for outer planets at historical dates) — is accepted for
-API compatibility but ignored. Every libephemeris calculation always uses the full
-JPL numerical integration.
+The `FLG_MOSEPH` flag — which in some engines selects a semi-analytical
+fallback — is accepted for API compatibility but does not switch LibEphemeris
+to that model. Planetary bodies continue through the selected JPL/LEB backend;
+standards-derived and analytical bodies retain their documented local models.
 
 ---
 
@@ -101,16 +100,20 @@ LibEphemeris uses the **IAU 2006/2000A** nutation model via the IAU ERFA library
 
 The model computes nutation in longitude (Δψ) and nutation in obliquity (Δε) from the five Delaunay fundamental arguments plus nine planetary fundamental arguments, with corrections from the IAU 2006 precession-rate adjustments (Capitaine et al. 2005).
 
-### Full-precision override
+### Runtime model
 
-Skyfield's internal nutation (used before pyerfa integration) defaults to IAU
-2000B, a truncated model with only **77 terms** and ~1 milliarcsecond precision.
-LibEphemeris overrides this with the full 1365-term model via pyerfa for all planet
-and house calculations.
+Skyfield 1.54 also defaults to the full IAU 2000A series. LibEphemeris uses
+pyerfa's IAU 2006-adjusted `nut06a()` realization consistently for planet and
+house calculations, keeping nutation aligned with the rest of the ERFA/Vondrák
+reduction chain.
 
 ### Impact on ecliptic longitude
 
-Nutation in longitude (Δψ) directly shifts ecliptic longitudes. The maximum amplitude of Δψ is ~17.2 arcseconds (the 18.6-year lunar nodal cycle). Using a 77-term model vs. a 1365-term model introduces up to ~1 mas error in this correction, which over decades accumulates to measurable differences in planetary longitudes.
+Nutation in longitude (Δψ) directly shifts ecliptic longitudes. The maximum
+amplitude of Δψ is ~17.2 arcseconds (the 18.6-year lunar nodal cycle). A
+truncated 77-term IAU 2000B calculation can differ from the full series at the
+milliarcsecond scale; it is available only for comparison, not selected by the
+runtime pipeline.
 
 ---
 
@@ -170,120 +173,46 @@ JPL DE440/DE441 provide positions for outer planets as **system barycenters** --
 
 For inner planets (Mercury, Venus, Earth, Mars), the barycenter effectively equals the body center because their moons (if any) have negligible mass relative to the planet.
 
-### Three-tier correction strategy
+### JPL center segments and explicit fallback
 
-LibEphemeris corrects barycenters to body centers **automatically** using a three-tier fallback:
+LibEphemeris uses a physical planet-center segment when the active JPL data
+covers the epoch. Otherwise it explicitly uses the planetary system
+barycenter; no analytical satellite theory is substituted.
 
 #### Tier 1: SPK-based planet centers (<0.001 arcsec)
 
-An auto-downloaded planet-centers kernel (~25 MB, `planet_centers_{tier}.bsp` per precision tier, legacy name `planet_centers.bsp`; not shipped in the wheel) contains precise center-of-body segments for NAIF IDs 599 (Jupiter), 699 (Saturn), 799 (Uranus), 899 (Neptune), and 999 (Pluto). These segments are extracted from JPL satellite ephemerides:
+An auto-downloaded planet-centers kernel (`planet_centers_{tier}.bsp` per precision tier, legacy name `planet_centers.bsp`; not shipped in the wheel) contains precise center-of-body segments for NAIF IDs 599 (Jupiter), 699 (Saturn), 799 (Uranus), 899 (Neptune), and 999 (Pluto). A regenerated medium build uses the widest published JPL center products:
 
 | NAIF ID | Source SPK | Coverage |
 |---------|-----------|----------|
-| 599 | jup204.bsp | ~1925--2025 |
-| 699 | sat319.bsp | ~1950--2050 |
-| 799 | ura083.bsp | ~1950--2050 |
-| 899 | nep050.bsp | ~1989--2049 |
-| 999 | plu017.bsp | ~1990--2050 |
+| 599 | jup365.bsp | 1600--2200 |
+| 699 | sat441xl (two parts) | covers 1550--2650 |
+| 799 | ura111xl-799.bsp | covers 1550--2650 |
+| 899 | nep097xl-899.bsp | covers 1550--2650 |
+| 999 | plu060.bsp | 1800--2200 |
 
 The `_SpkCenterTarget` class in `planets.py` adds the SPK offset to the DE440 barycenter position at the retarded time (when light left the planet), ensuring the correction is applied correctly for light-time-corrected observations.
 
-**If the date falls outside the SPK coverage**, Tier 1 silently falls back to Tier 2.
-
-#### Tier 2: Analytical satellite theories (sub-arcsecond)
-
-The `_CobCorrectedTarget` class computes the barycenter-to-center offset using analytical theories for major satellites. The correction formula:
-
-```
-offset = -Σ(m_i × r_i) / M_total
-```
-
-where m_i is the satellite mass and r_i is the satellite position relative to the planet center.
-
-**Jupiter -- Lieske E5 theory (Meeus implementation)**
-
-Theory for Io, Europa, Ganymede, and Callisto based on Lieske (1998), as presented in Meeus "Astronomical Algorithms" ch. 44.
-
-| Property | Value |
-|----------|-------|
-| Reference epoch | JDE 2443000.5 (1976-08-10) |
-| Terms per satellite | 21--50 (longitude), 7--11 (latitude), 7--16 (radius) |
-| Coordinate frame | Jupiter equatorial → J2000 ecliptic (4 rotations) |
-| Precession correction | From B1950.0: P = 1.3966626·T₀ + 0.0003088·T₀² |
-| Positional precision | ~100--200 km (~0.05 arcsec at opposition) |
-
-GM values from JUP365:
-
-| Satellite | GM (km³/s²) | Mass ratio (m/M_Jupiter) |
-|-----------|------------|--------------------------|
-| Io | 5959.915 | 4.70 × 10⁻⁵ |
-| Europa | 3202.712 | 2.53 × 10⁻⁵ |
-| Ganymede | 9887.833 | 7.80 × 10⁻⁵ |
-| Callisto | 7179.283 | 5.67 × 10⁻⁵ |
-| **Total** | **26229.744** | **2.07 × 10⁻⁴** |
-
-Jupiter GM = 126,686,531.9 km³/s² (JUP365).
-
-**Saturn -- TASS 1.7 theory (Vienne & Duriez 1995)**
-
-Full analytical theory for 8 Saturnian satellites, ported from the Stellarium implementation (Johannes Gajdosik, MIT license).
-
-| Property | Value |
-|----------|-------|
-| Reference epoch | JD 2444240.0 (1980-01-01 TT) |
-| Satellites | Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Iapetus, Hyperion |
-| Total terms | ~1500 (from `tass17_data.py`, 2964 lines of coefficients) |
-| Orbital elements | 6 per satellite (n, λ, e·cos ω̃, e·sin ω̃, sin(i/2)·cos Ω, sin(i/2)·sin Ω) |
-| Kepler solver | Newton's method, 15 iterations, convergence at 10⁻¹⁴ |
-| Coordinate frame | TASS17 → VSOP87 (J2000 ecliptic) via fixed rotation matrix |
-| Positional precision | ~50--100 km (~0.05 arcsec at opposition) |
-
-Titan dominates the correction (GM = 8978.137 km³/s², 96% of total Saturnian moon mass). Saturn GM = 37,931,206.23 km³/s² (SAT441).
-
-**Neptune -- Triton Keplerian model**
-
-Simple Keplerian orbit with secular J2 nodal precession, based on NEP097 elements (Jacobson 2009).
-
-| Property | Value |
-|----------|-------|
-| Semi-major axis | 354,759 km |
-| Period | 5.877 days (retrograde) |
-| Eccentricity | 0.000016 |
-| Inclination | 156.865° (retrograde orbit) |
-| Node precession | −360°/(688 × 365.25 days) (~688-year period) |
-| Kepler solver | 1 iteration (sufficient for e ≈ 0) |
-| Positional precision | ~20--50 km (~0.003 arcsec at opposition) |
-
-Triton GM = 1428.495 km³/s², Neptune GM = 6,835,099.97 km³/s² (NEP097). Mass ratio = 2.09 × 10⁻⁴.
-
-**Pluto -- Charon two-body Keplerian**
-
-Two-body Keplerian solution from PLU060 (Brozovic & Jacobson 2024).
-
-| Property | Value |
-|----------|-------|
-| Semi-major axis | 19,591 km |
-| Period | 6.387 days |
-| Eccentricity | 0.0002 (tidally locked) |
-| Inclination | 96.145° |
-| Node precession | 0 (negligible) |
-| Kepler solver | 5 iterations |
-
-Pluto-Charon is a **binary system**: the barycenter lies ~2130 km outside Pluto's center. Charon GM = 106.1 km³/s², Pluto GM = 869.3 km³/s² (PLU060). Mass ratio Charon/(Pluto+Charon) = **0.109**.
-
-**Uranus**: Currently returns zero offset. The total mass ratio of Uranian moons to Uranus is ~1.0 × 10⁻⁴, corresponding to a maximum geocentric offset of ~0.01 arcsec. This is below the precision of most astrological applications.
-
-#### Tier 3: Raw barycenters (last resort)
-
-If both SPK and analytical methods fail, the raw barycenter position from DE440/DE441 is used. This path is not reached under normal operation.
+If the date falls outside the center segment's coverage, the calculation uses
+the DE440/DE441 system barycenter and exposes that choice through tracing. For
+geocentric, heliocentric, and barycentric requests, light time is always formed
+from the actual observer to the selected target state (physical center when
+available, system barycenter otherwise).
 
 ### Velocity correction
 
-The velocity component of the COB offset is computed via central difference numerical differentiation with a 1-second step:
+The general apparent-place pipeline uses a one-second central half-step (six
+seconds for the Moon). The LEB fast path uses its documented `0.0005`-day
+(`43.2`-second) half-step so the Chebyshev/reduction derivative remains stable:
 
 ```
-v_offset = [offset(t + 0.5s) - offset(t - 0.5s)] / 1s
+v = [position(t + 1s) - position(t - 1s)] / 2s
+v_LEB = [position(t + 43.2s) - position(t - 43.2s)] / 86.4s
 ```
+
+If that stencil reaches a planet-center coverage boundary, both samples use
+the system barycenter. This prevents a finite center/barycenter offset from
+being divided by the short stencil and reported as a velocity spike.
 
 ---
 
@@ -301,7 +230,9 @@ dp/dt = [p(t + dt) - p(t - dt)] / (2 · dt)
 |---------|---------------|-----------|
 | Planetary longitude/latitude | 1 second | ~0.0001°/day |
 | COB offset velocity | 1 second | ~10⁻⁸ AU/day |
-| Lunar node/Lilith | 0.5 days | ~0.001°/day |
+| Mean node/apogee | One-day centered derivative of ERFA arguments | Smooth standards rate |
+| True node/osculating apogee | 0.05 days | Rapid osculating curve |
+| Interpolated apogee/perigee | 0.5 days | Complete compatibility series |
 | Fixed star apparent motion | 1 second | ~10⁻⁶°/day |
 
 The central difference method is O(h²) accurate, meaning halving the step size reduces the error by a factor of 4.
@@ -394,80 +325,63 @@ Above the polar circle (~66.56° = 90° − obliquity), Placidus and Koch are ge
 
 ### True Node (osculating lunar node)
 
-The True Node is where the Moon's **instantaneous orbital plane** intersects the ecliptic. LibEphemeris uses a two-stage approach.
-
-**Stage 1: Geometric osculating node from JPL DE440**
+The True Node is where the Moon's **instantaneous orbital plane** intersects the ecliptic. LibEphemeris derives it geometrically from the active JPL ephemeris:
 
 1. Get Moon's geocentric position **r** and velocity **v** from JPL DE440 (~1 milliarcsecond source precision)
 2. Compute angular momentum vector: **h** = **r** × **v**
 3. This vector is perpendicular to the instantaneous orbital plane
 4. Find intersection with the ecliptic: Ω = atan2(h_x, −h_y)
-5. Apply Vondrák 2011 precession (J2000 → date)
-6. Apply IAU 2006/2000A nutation (1365 terms)
+5. Transform into the true ecliptic frame of date using IAU 2006 precession and IAU 2000A nutation
 
 This computes **exactly** what the True Node is by definition: the intersection of the orbital plane with the ecliptic. Deriving the node directly from the state vectors avoids the approximation errors inherent in analytical series — the geometric construction is exact by definition.
 
-**ELP2000-82B perturbation series (available but not applied)**
-
-The codebase contains a comprehensive ELP2000-82B perturbation series (~170 terms, ~900 lines) organized into the following categories:
-
-| Category | Terms | Dominant amplitude |
-|----------|-------|-------------------|
-| Solar (main) | 9 | −1.5233° · sin(2D) |
-| Solar (2nd order) | 12 | 0.003°--0.04° |
-| Solar (3rd order) | 10 | 0.001°--0.006° |
-| Inclination (F-related) | 9 | 0.001°--0.01° |
-| Venus perturbation | 9 | 0.001°--0.005° |
-| Mars perturbation | 9 | 0.001°--0.004° |
-| Jupiter perturbation | 7 | 0.001°--0.003° |
-| Saturn perturbation | 7 | 0.001°--0.003° |
-| Evection | 6 | up to 0.047° |
-| Variation | 10 | up to 0.052° |
-| Annual equation | 6 | up to 0.186° (E · sin M) |
-| Parallactic inequality | 3 | up to 0.035° |
-| Second-order coupling | 8 | 0.0001°--0.003° |
-| Secular terms | 3+ | T-dependent corrections to T⁵ |
-
-The Earth eccentricity factor E = 1.0 − 0.002516·T − 0.0000074·T² is applied to Sun-dependent terms per Meeus convention.
-
-> **Note:** These perturbation corrections are **not currently applied** to the True Node calculation. Investigation revealed that the ELP2000-82B series was designed for the *mean* lunar node, not the geometric node derived from state vectors via `h = r × v`. Applying the series to the geometric node produced errors of tens of degrees, confirming the two approaches are incompatible. The geometric method from Stage 1 is used alone. The residual against an analytical mean-node series (~8.9 arcsec mean, ~0.14° max) reflects the fundamental methodological difference. See [Precision History](../development/precision-history.md) for the full investigation record.
+No analytical perturbation series is layered over the state-vector result: the
+JPL state already contains the physical perturbations. The residual against an
+analytical mean-node series reflects the difference between instantaneous and
+mean orbital planes. See [Precision History](../development/precision-history.md)
+for the investigation record.
 
 ### Mean Node
 
-Meeus polynomial for the mean ascending node longitude, extended with T⁴ and T⁵ corrections from Chapront et al. (2002) and Simon et al. (1994).
+Evaluated from the IERS 2003 Delaunay argument for the mean longitude of the
+lunar ascending node, through ERFA's standards implementation.
+The reference radius is the conventional mean lunar distance of 384,400 km,
+converted with the exact IAU astronomical unit.
 
 ### Mean Lilith (Black Moon)
 
-Mean longitude of the lunar apogee, computed from Meeus polynomials (ch. 50). Includes latitude computation. Velocity via central difference with 0.5-day step.
+Evaluated from the IERS Delaunay identities for the mean lunar apse on a
+conventional `5.145°` lunar orbital plane. Distance uses the conventional
+mean-apogee radius. Rates are centered derivatives of the complete analytical
+state.
 
 ### True Lilith (osculating apogee)
 
-Computed from JPL DE440 Moon state vectors via orbital mechanics: the eccentricity vector **e** is derived from position and velocity, and the apogee direction points from the focus along **e**.
+Computed from JPL DE440/DE441 Moon state vectors via orbital mechanics: the
+eccentricity vector **e** is derived from position and velocity, and the
+apogee direction is opposite **e**.
 
 ### Interpolated Apogee and Perigee
 
-Uses the Moshier analytical method: ELP2000-82B perturbation series (~50 harmonic terms) fitted to DE404 over a 7000-year span (Moshier 1992). Removes the spurious ~30° oscillations present in the osculating apsides.
+Evaluated as separate Delaunay-argument series for apogee and perigee fitted
+at the actual DE440 apsis passages, plus spline-interpolated residual tables
+that make the curves exact at every passage. The model file
+(`lunar_apse_model.py`) is generated by the committed
+`scripts/generate_lunar_apse_model.py` and accepted only at its reviewed
+SHA-256; modified payloads fail the lunar provenance gate. Latitude follows a
+two-harmonic DE440 fit (within `0.25°` of the instantaneous passage
+latitude). The distance channels are the mean DE440 passage distances
+(`0.0027100 AU` for apogee and `0.0024236 AU` for perigee), not instantaneous
+lunar distances.
 
-### Meeus polynomial validity ranges
+### Verification
 
-| Range | |T| (centuries) | Accuracy |
-|-------|---------------|----------|
-| Optimal | <2 (~±200 years) | <0.001° |
-| Valid | <10 (~±1000 years) | <0.01° |
-| Maximum | <20 (~±2000 years) | Significant degradation |
-
-Fundamental arguments include T⁵ corrections from Chapront et al. (2002).
-
-### Measured precision
-
-| Point | Max difference | Mean difference | Independent verification |
-|-------|---------------|-----------------|------------------------|
-| Mean Node | < 0.001° | < 0.001° | — |
-| True Node | < 0.01" | < 0.01" | **Verified vs JPL Horizons** to < 0.01" (machine precision) across 24 dates (1950–2050). Both libraries match Horizons identically. |
-| Mean Lilith | < 0.015" (lon, ±100yr) | < 0.01" | Latitude ~20" systematic difference from different analytical node formulas. No practical impact. |
-| True Lilith | < 0.5" | ~0.1" | **Verified vs JPL Horizons**: both libraries show ~240" offset from Horizons (inherent two-body approximation). Libraries match each other to < 0.5". |
-| Interpolated Apogee | ~1300 arcsec (0.36°) | ~350 arcsec (0.10°) | Genuine algorithm difference (JPL DE440 vs ELP2000). |
-| Interpolated Perigee | ~9400 arcsec (2.6°) | ~1650 arcsec (0.46°) | Intentional — JPL DE440 physical passages vs truncated ELP2000. |
+The lunar model tests cover the ERFA/IERS fundamental arguments,
+angular-momentum and eccentricity-vector mechanics for osculating points,
+finite-difference agreement of reported velocities, exact artifact hashing,
+and ephemeral pass/fail comparison of the interpolated curves. Apogee and
+perigee are intentionally evaluated by different series and are not required
+to be antipodal.
 
 **J2000 frame (FLG_J2000) for lunar bodies:** at the J2000.0 epoch, tropical and
 J2000 ecliptic coordinates are identical by definition (zero precession), and
@@ -555,27 +469,12 @@ flags are supported for fixed-star calculations: `FLG_SIDEREAL`, `FLG_J2000`,
 
 ## 12. Ayanamsha (Sidereal Modes)
 
-47 predefined ayanamsha systems are supported, covering the full set of standard sidereal modes.
-
-### Formula-based ayanamshas
-
-| Category | Examples | Max difference (measured) |
-|----------|----------|---------------------------|
-| Standard | Fagan-Bradley, Lahiri, Raman | <0.0002° |
-| Epoch-based | J2000, J1900, B1950 | <0.0002° |
-| Historical | Babylonian variants (Kugler 1-3, Huber) | <0.001° |
-
-### Star-based ayanamshas
-
-Star-based ayanamshas anchor the sidereal zodiac to a specific fixed star. The slightly higher differences reflect different proper motion and precession models:
-
-| Ayanamsha | Max difference |
-|-----------|---------------|
-| True Citra (Spica, HIP 65474) | <0.006° |
-| True Revati | <0.006° |
-| True Pushya | <0.006° |
-| True Mula | <0.006° |
-| Galactic Center variants | <0.001° |
+All predefined base IDs 0--46 compute again. Formula/epoch modes share one
+defining table across the direct and LEB backends; stellar and galactic modes
+use the independent catalogue pipeline at runtime. The source audit is not
+uniformly complete: [Sidereal modes](ayanamsha.md) distinguishes definitions
+verified in primary publications from modes whose defining epochs are
+documented but whose full primary-source chain is still being traced.
 
 The Vondrák 2011 long-term precession model (used by LibEphemeris) is more accurate than the older Lieske (1977) model for computing the precession of the equinox, which directly affects ayanamsha values.
 
@@ -606,7 +505,10 @@ Saros and Inex series numbers are computed from eclipse-to-eclipse relationships
 
 ## 14. Rise, Set, and Transit
 
-Computed using the Bennett (1982) atmospheric refraction formula with configurable atmospheric conditions (pressure, temperature).
+Plain `refrac()` uses independently characterized clean-room closed forms for
+public-API compatibility, including measured branch and clamp behavior. The
+physical ICAO ray tracer remains available internally. Pressure and temperature
+are configurable in both directions.
 
 | Event | Precision (measured) |
 |-------|----------------------|
@@ -672,7 +574,7 @@ These measured differences are **not errors**. They arise from intentional metho
 | Source | Typical contribution |
 |--------|---------------------|
 | Nutation model (IAU 2006/2000A vs internal) | ~0.01--0.05 mas |
-| COB correction (analytical vs none) | ~0.01--0.6 arcsec (outer planets) |
+| Planet-center availability | JPL physical center or explicit system barycenter |
 | DE440 vs DE431 ephemeris generation | ~0.001 arcsec |
 | Velocity method (numerical vs analytical) | ~0.0001°/day |
 | Light-time iteration tolerance | ~0.001 arcsec |
@@ -776,114 +678,38 @@ Memory overhead per context: ~1 KB. Ephemeris files (DE440: ~119 MB) are loaded 
 
 ## 20. Comprehensive Precision Audit
 
-A deep cross-validation audit was performed across all calculation modes and coordinate systems, using `pyswisseph` as a black-box validation oracle. This section summarizes the findings.
+A comprehensive audit covers all calculation modes, coordinate systems, flags,
+and body families. Accuracy acceptance is based on independent sources:
 
-### Planetary positions at extreme dates
+- JPL DE440/DE441 and Horizons for planetary, lunar, and minor-body states;
+- ERFA/SOFA and IERS for frames, Earth orientation, and time scales;
+- Hipparcos/Gaia/SIMBAD and Astropy for fixed-star astrometry;
+- published geometric definitions for houses, nodes, apsides, eclipses,
+  occultations, refraction, and visibility;
+- backend equivalence, defining conditions, round trips, step halving, and
+  metamorphic relations for numerical correctness.
 
-Tested all 10 major bodies (Sun through Pluto) at dates spanning 1551--2649 CE (the full DE440 range).
+PySwissEphemeris may be called only for ephemeral public-API compatibility
+checks. Its output is discarded after each comparison and is never retained as
+a precision table, fixture, constant, coefficient, or generated model. The
+non-reconstructive compatibility overview lives in the comparison section.
 
-| Era | Years | Max dLon | Notes |
-|-----|-------|----------|-------|
-| Modern | 1900--2100 | <1" | All bodies sub-arcsecond |
-| 19th century | 1800--1850 | <1" | All bodies excellent |
-| 18th century | 1700 | ~1" | All bodies fine |
-| 16th--17th century | 1551--1600 | ~11" | Moon only exceeds threshold |
-| 22nd--27th century | 2149--2649 | up to 283" | Moon most sensitive; outer planets remain <3" |
+The main bounded difference families are remote-epoch Earth rotation,
+different JPL ephemeris solutions, abstract lunar-point definitions,
+catalog/space-motion policies, Keplerian minor-body fallback, atmosphere and
+observer models, grazing event thresholds, and historical ayanamsha
+definitions.
 
-The divergence at extreme dates is driven by ΔT-extrapolation differences. The Moon's rapid motion (~13°/day) amplifies any time-base discrepancy. Outer planets are insensitive due to slow motion and remain within tolerance at all dates.
-
-### Fixed stars
-
-Tested 116 representative stars at 3 epochs (J2000, J2025, J2100). Proper motions updated to van Leeuwen 2007 (new Hipparcos reduction). All stars independently cross-checked against SIMBAD.
-
-| Metric | Value |
-|--------|-------|
-| Max longitude diff | 0.51" (Rigil Kentaurus — nearest star, parallax not modeled) |
-| Mean longitude diff | < 0.1" |
-| Stars within 0.5" | 98% of 101 comparable stars |
-| Stars within 0.1" | 80% of 101 comparable stars |
-| Catalog bugs found & fixed | 2 (Algedi wrong component, Asellus Borealis wrong HIP) |
-
-Remaining sub-arcsecond differences are from precession/nutation pipeline choices. High proper motion stars (Sirius, Rigil Kentaurus) show largest differences due to annual parallax (not modeled).
-
-### House cusps at extreme latitudes
-
-Tested 7 house systems at latitudes 0°--89°, including the arctic circle (66.56°).
-
-| Result | Detail |
-|--------|--------|
-| Max cusp difference | 0.000005° (0.018") |
-| Placidus/Koch above arctic | Both libraries correctly fail (geometrically undefined) |
-| Geometric systems (Regiomontanus, Campanus, Equal, Whole Sign, Porphyry) | Valid to 89° with sub-arcsecond agreement |
-
-### Velocities and speed flags
-
-Tested all bodies with FLG_SPEED, FLG_SPEED|FLG_EQUATORIAL, and FLG_SPEED|FLG_NONUT at 20 dates.
-
-| Metric | Value |
-|--------|-------|
-| Max longitude speed diff | 0.000065 °/day (Moon) |
-| Max latitude speed diff | 0.000025 °/day |
-| Retrograde sign mismatches | 0 (Mercury station resolved to <10⁻⁶ °/day) |
-| Threshold (0.001 °/day) exceeded | Never |
-
-### Heliocentric and barycentric modes
-
-| Mode | Bodies tested | Max dLon | Status |
-|------|--------------|----------|--------|
-| Heliocentric (FLG_HELCTR) | Mercury--Pluto | 0.00032° | All OK |
-| Barycentric (FLG_BARYCTR) | Sun--Pluto | <1" at J2000 | All OK |
-| Equatorial (FLG_EQUATORIAL) | Sun, Moon, Mars, Jupiter | 0.00047° (Moon) | All OK |
-| XYZ Cartesian (FLG_XYZ) | All bodies | 0.000033 AU (Pluto) | All OK |
-
-Note: Barycentric Sun shows large angular differences (~100"+) at dates when the Sun is near the Solar System Barycenter (distance ~0.001 AU). This is a geometric amplification effect, not a precision issue -- the Cartesian positions agree to <0.000001 AU.
-
-### Sidereal mode and ayanamshas
-
-Tested Lahiri, Raman, Krishnamurti, and Fagan/Bradley ayanamshas.
-
-| Metric | Value |
-|--------|-------|
-| Max sidereal longitude diff | 0.07" (Moon) |
-| Ayanamsha value differences | <0.000001° (floating-point noise) |
-
-### Delta-T
-
-| Era | Max diff (seconds) | Notes |
-|-----|-------------------|-------|
-| Modern (1900--2025) | <1 sec | Both use IERS observed data |
-| Historical (1700--1900) | <1 sec | Model blending differences |
-| Pre-telescope (<1700) | up to 187 sec | Different deep-past ΔT reconstructions |
-| Future (>2025) | up to 297 sec (at 2500) | Different future parabolic extrapolations |
-
-LibEphemeris uses the Stephenson, Morrison & Hohenkerk (2016) reconstruction. For the modern era where observed data exists, agreement is sub-second.
-
-### Ecliptic obliquity and nutation
-
-| Metric | Max diff |
-|--------|----------|
-| True obliquity | 0.00086" |
-| Mean obliquity | 0.00016" |
-| Nutation in longitude | 0.0013" |
-| Nutation in obliquity | 0.00087" |
-
-Sub-milliarcsecond agreement across all tested dates (1800--2200), implementing IAU 2006/2000A correctly.
-
-### FLG_MOSEPH behavior
-
-The `FLG_MOSEPH` flag (value 4) is accepted for API compatibility but always
-resolves to JPL DE440 — there is no Moshier semi-analytical fallback. Against an
-engine that does fall back to Moshier the resulting differences (typically <0.2"
-for modern dates) reflect the lower precision of the Moshier ephemeris, not a bug.
+`FLG_MOSEPH` is accepted for API compatibility but still resolves to the JPL
+pipeline; LibEphemeris has no Moshier semi-analytical fallback.
 
 ---
 
 ## See Also
 
-- **[Swiss Ephemeris Comparison](../comparison/index.md)** — the centralized
-  head-to-head with pyswisseph: measured precision tables, known differences with
-  detailed explanations, intentional divergences, bugs found and fixed, and API
-  signature differences.
+- **[Swiss Ephemeris Comparison](../comparison/index.md)** — compatibility
+  methodology, aggregate behavior, known differences, intentional divergences,
+  and API signature differences.
 
 ---
 

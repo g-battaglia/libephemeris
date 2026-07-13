@@ -47,6 +47,11 @@ def _python(args: list[str], env: dict[str, str] | None = None) -> None:
     sys.exit(subprocess.call([sys.executable, *args], env=run_env))
 
 
+def _skyfield_pytest(args: list[str]) -> None:
+    """Run pytest with the Skyfield backend selected explicitly."""
+    _pytest([*args, "--calc-mode", "skyfield"])
+
+
 # ---------------------------------------------------------------------------
 # Root test group
 # ---------------------------------------------------------------------------
@@ -55,7 +60,7 @@ def _python(args: list[str], env: dict[str, str] | None = None) -> None:
 @click.group(
     "test",
     short_help="Run tests: unit, lunar, LEB, Horizons, coverage.",
-    help="Run tests: unit, lunar, LEB format, Horizons, coverage.\n\nEach subgroup specifies WHAT is tested and WHICH backend is used.\nUse TAB completion to explore: leph test <TAB>\n\nRecommended for daily development:\n\n  leph test skyfield essential       # ~490 tests, ~20s\n  leph test leb-backend unit-fast    # ~5890 tests, ~1 min\n\nNever run the full test suite -- always pick a targeted subcommand.",
+    help="Run tests: unit, lunar, LEB format, Horizons, coverage.\n\nEach subgroup specifies WHAT is tested and WHICH backend is used.\nUse TAB completion to explore: leph test <TAB>\n\nRecommended for daily development:\n\n  leph test skyfield essential       # ~900 tests, ~20s\n  leph test leb-backend unit-fast    # ~16,000 tests, ~1 min\n\nNever run the full test suite -- always pick a targeted subcommand.",
 )
 def test_group() -> None:
     """Test runner with clear backend/target naming."""
@@ -71,7 +76,7 @@ _ESSENTIAL_FILES = [
     "tests/test_planets/test_nod_aps.py",
     "tests/test_houses/test_house_algorithms.py",
     "tests/test_lunar_eclipse.py",
-    "tests/test_lunar/test_interpolated_apogee.py",
+    "tests/test_interpolated_lunar_apsides.py",
     "tests/test_fixed_stars/test_fixstar2.py",
     "tests/test_asteroid_by_number.py",
     "tests/test_hypothetical.py",
@@ -95,6 +100,7 @@ _SMOKE_FILES = _ESSENTIAL_FILES + [
     "tests/test_ephemeris_config.py",
     "tests/test_extinction.py",
     "tests/test_logging_config.py",
+    "tests/test_packaging_metadata.py",
     "tests/test_dotenv.py",
     "tests/test_type_safety.py",
     "tests/test_golden_regression.py",
@@ -106,8 +112,7 @@ _SMOKE_FILES = _ESSENTIAL_FILES + [
     "tests/test_leb/test_leb_format.py",
     "tests/test_leb/test_leb_reader.py",
     "tests/test_leb/test_fast_calc.py",
-    "tests/test_lunar/test_mean_lilith_enhanced.py",
-    "tests/test_lunar/test_true_node_terms.py",
+    "tests/test_lunar/test_mean_lunar_apse_model.py",
     "tests/test_time/test_utc_to_jd.py",
     "tests/test_time/test_iers_delta_t.py",
     "tests/test_time/test_deltat_smh2016.py",
@@ -118,12 +123,12 @@ _SMOKE_FILES = _ESSENTIAL_FILES + [
     "skyfield",
     short_help="Unit tests via Skyfield/DE440 backend (essential, smoke, unit, all).",
     help="Unit tests that calculate positions via the Skyfield/DE440 backend.\n\n"
-    "This is the default calculation engine: it loads NASA JPL DE440 binary\n"
+    "This is the local reference backend: it loads NASA JPL DE440 binary\n"
     "kernels via the Skyfield library and computes positions in real time.\n"
     "Requires DE440 data to be downloaded first (leph download spk-medium).\n\n"
     "Start here:\n\n"
-    "  leph test skyfield essential   # ~490 tests, ~20s, parallel\n"
-    "  leph test skyfield smoke       # ~1460 tests, ~30s, parallel",
+    "  leph test skyfield essential   # ~900 tests, ~20s, parallel\n"
+    "  leph test skyfield smoke       # ~1,700 tests, ~30s, parallel",
 )
 def skyfield_group() -> None:
     """Unit tests using the Skyfield/DE440 backend."""
@@ -139,7 +144,7 @@ def skyfield_all() -> None:
     Runs the tests/ tree (pytest.ini testpaths).
     Sequential execution means slower but easier to debug failures.
     """
-    _pytest(["-m", "not slow"])
+    _skyfield_pytest(["-m", "not slow"])
 
 
 @skyfield_group.command(
@@ -152,7 +157,7 @@ def skyfield_all_full() -> None:
     Includes iterative search tests, hypothesis property tests, and other
     slow tests that are normally skipped. Very slow (~10+ min).
     """
-    _pytest([])
+    _skyfield_pytest([])
 
 
 @skyfield_group.command(
@@ -165,7 +170,7 @@ def skyfield_all_fast() -> None:
     Same scope as 'all' but uses pytest-xdist for parallel execution.
     Much faster (~2 min) but harder to read output on failures.
     """
-    _pytest(["-n", "auto", "-m", "not slow"])
+    _skyfield_pytest(["-n", "auto", "-m", "not slow"])
 
 
 @skyfield_group.command(
@@ -174,7 +179,7 @@ def skyfield_all_fast() -> None:
 )
 def skyfield_all_full_fast() -> None:
     """Run ALL tests including @slow in parallel. Still slow due to iterative tests."""
-    _pytest(["-n", "auto"])
+    _skyfield_pytest(["-n", "auto"])
 
 
 @skyfield_group.command(
@@ -185,34 +190,34 @@ def progress() -> None:
 
     Same scope as 'all' (no @slow) but uses --no-header -q for minimal output.
     """
-    _pytest(["--no-header", "-q", "-m", "not slow"])
+    _skyfield_pytest(["--no-header", "-q", "-m", "not slow"])
 
 
 @skyfield_group.command(
-    short_help="Quick sanity check: 1 test per module, parallel (~490 tests, ~20s).",
+    short_help="Quick sanity check: 1 test per module, parallel (~900 tests, ~20s).",
 )
 def essential() -> None:
-    """Quick sanity check: 1 test file per major module, in parallel (~490 tests, ~20s).
+    """Quick sanity check: 1 test file per major module, in parallel (~900 tests, ~20s).
 
     Covers planets, houses, eclipses, fixed stars, asteroids, hypothetical
     bodies, heliacal events, rise/transit, Arabic parts, planetary moons,
     date conversion, sidereal, and more. Best for a fast "did I break anything?" check.
     """
-    _pytest(["-n", "auto", "-m", "not slow", *_ESSENTIAL_FILES])
+    _skyfield_pytest(["-n", "auto", "-m", "not slow", *_ESSENTIAL_FILES])
 
 
 @skyfield_group.command(
-    short_help="Broader sanity check: 1+ test files per module, parallel (~1460 tests).",
+    short_help="Broader sanity check: 1+ test files per module, parallel (~1,700 tests).",
 )
 def smoke() -> None:
-    """Broader sanity check: 1+ test files per module, in parallel (~1460 tests, ~30s).
+    """Broader sanity check: 1+ test files per module, in parallel (~1,700 tests, ~30s).
 
     Everything in 'essential' plus cache, SPK loader, ephemeris config,
     extinction, logging, packaging, dotenv, type safety, golden regression,
     coordinate validation, profiling, retrograde stations, edge cases,
     ERFA nutation, LEB format/reader, Lilith, true node, UTC, IERS delta-T.
     """
-    _pytest(["-n", "auto", "-m", "not slow", *_SMOKE_FILES])
+    _skyfield_pytest(["-n", "auto", "-m", "not slow", *_SMOKE_FILES])
 
 
 @skyfield_group.command(
@@ -221,9 +226,9 @@ def smoke() -> None:
 def unit() -> None:
     """Run all unit tests from the tests/ directory sequentially with verbose output.
 
-    Excludes @slow-marked tests. ~5890 tests, takes ~2 min.
+    Excludes @slow-marked tests. ~16,000 tests, takes ~2 min.
     """
-    _pytest(["tests/", "-v", "-m", "not slow"])
+    _skyfield_pytest(["tests/", "-v", "-m", "not slow"])
 
 
 @skyfield_group.command(
@@ -236,7 +241,7 @@ def unit_full() -> None:
     Includes iterative searches, hypothesis property-based tests, and other
     long-running tests that are excluded by default.
     """
-    _pytest(["tests/", "-v"])
+    _skyfield_pytest(["tests/", "-v"])
 
 
 @skyfield_group.command(
@@ -248,7 +253,7 @@ def unit_fast() -> None:
 
     Same scope as 'unit' but parallelized for speed.
     """
-    _pytest(["tests/", "-n", "auto", "-m", "not slow"])
+    _skyfield_pytest(["tests/", "-n", "auto", "-m", "not slow"])
 
 
 test_group.add_command(skyfield_group)
@@ -258,7 +263,7 @@ test_group.add_command(skyfield_group)
 # leph test leb-backend — Unit tests using LEB precomputed backend
 # ===========================================================================
 
-_LEB_ENV = {"LIBEPHEMERIS_LEB": "data/leb/ephemeris_medium.leb"}
+_LEB_ENV = {"LIBEPHEMERIS_LEB": "libephemeris/data/leb2/base_core.leb2"}
 
 
 @click.group(
@@ -268,9 +273,9 @@ _LEB_ENV = {"LIBEPHEMERIS_LEB": "data/leb/ephemeris_medium.leb"}
     "Instead of computing positions from DE440 kernels in real time (Skyfield),\n"
     "these tests use precomputed Chebyshev polynomial approximations stored in\n"
     ".leb files. ~14x faster than Skyfield at runtime.\n\n"
-    "Requires: data/leb/ephemeris_medium.leb (generate with 'leph leb generate medium groups').\n\n"
+    "Uses the hash-pinned reviewed base_core.leb2 bundled in this tree.\n\n"
     "Recommended for everyday development:\n\n"
-    "  leph test leb-backend unit-fast   # ~5890 tests, ~1 min, parallel",
+    "  leph test leb-backend unit-fast   # ~16,000 tests, ~1 min, parallel",
 )
 def leb_backend_group() -> None:
     """Unit tests using LEB as the calculation backend."""
@@ -278,14 +283,15 @@ def leb_backend_group() -> None:
 
 @leb_backend_group.command(
     "essential",
-    short_help="Quick sanity check in LEB mode: ~490 tests, parallel (~20s).",
+    short_help="Quick sanity check in LEB mode: ~900 tests, parallel (~20s).",
 )
 def leb_essential() -> None:
-    """Quick sanity check in LEB mode: 1 test file per major module, parallel (~490 tests, ~20s).
+    """Quick sanity check in LEB mode: 1 test file per major module, parallel (~900 tests, ~20s).
 
     Same file set as 'leph test skyfield essential' but positions are read from
     precomputed Chebyshev polynomials instead of computed from DE440.
-    Requires data/leb/ephemeris_medium.leb.
+    Uses the reviewed bundled base core; unsupported bodies and dates fall
+    through to the independent Skyfield backend.
     """
     _pytest(
         ["-n", "auto", "-m", "not slow", "--calc-mode", "leb", *_ESSENTIAL_FILES],
@@ -302,7 +308,7 @@ def leb_unit() -> None:
 
     Same test suite as 'leph test skyfield unit' but positions are read from
     precomputed Chebyshev polynomials instead of computed from DE440.
-    Requires data/leb/ephemeris_medium.leb to exist.
+    Uses the reviewed bundled base core.
     """
     _pytest(["tests/", "-v", "-m", "not slow", "--calc-mode", "leb"], env=_LEB_ENV)
 
@@ -327,8 +333,8 @@ def leb_unit_fast() -> None:
     """RECOMMENDED: run unit tests in LEB mode, parallel across CPU cores (~1 min).
 
     Best balance of speed and coverage for everyday development.
-    Runs ~5890 tests in ~1 minute using pytest-xdist parallelism.
-    Requires data/leb/ephemeris_medium.leb (generate with 'leph leb generate medium groups').
+    Runs ~16,000 tests in ~1 minute using pytest-xdist parallelism.
+    Uses the reviewed bundled base core; unsupported cases fall through.
     """
     _pytest(
         ["tests/", "-n", "auto", "-m", "not slow", "--calc-mode", "leb"], env=_LEB_ENV
@@ -343,20 +349,19 @@ test_group.add_command(leb_backend_group)
 # ===========================================================================
 
 _LILITH_FILES = [
-    "tests/test_lunar/test_mean_lilith_enhanced.py",
-    "tests/test_lunar/test_true_lilith_annual_equation.py",
-    "tests/test_lunar/test_true_lilith_evection_secondary.py",
-    "tests/test_lunar/test_true_lilith_parallactic_inequality.py",
-    "tests/test_lunar/test_true_lilith_reduction_to_ecliptic.py",
-    "tests/test_lunar/test_true_lilith_solar_perturbation.py",
-    "tests/test_lunar/test_true_lilith_variation.py",
+    "tests/test_lunar/test_mean_lunar_apse_model.py",
+    "tests/test_lunar/test_meeus_compatibility.py",
+    "tests/test_lunar/test_lunar_model_integration.py",
+    "tests/test_lunar/test_osculating_lunar_mechanics.py",
+    "tests/test_interpolated_lunar_apsides.py",
+    "tests/test_planets/test_nodes_apsides_comprehensive.py",
 ]
 
 
 @click.group(
     "lunar",
-    short_help="Lunar module: nodes, apsides, Lilith, ELP2000 perturbation coefficients.",
-    help="Tests for the lunar module: mean/true nodes, perigee/apogee apsides,\nmean and true Lilith (Black Moon), ELP2000 perturbation coefficients.\n\nThese tests validate the analytical lunar element calculations and\nthe interpolated perigee/apogee pipeline.\n\n  leph test lunar perigee   # ELP2000 coefficients + interpolated perigee\n  leph test lunar lilith    # Mean + true Lilith precision (7 test files)",
+    short_help="Lunar module: nodes, apsides, and Lilith.",
+    help="Tests for the lunar module: mean/true nodes, perigee/apogee apsides,\nand mean/true Lilith (Black Moon).\n\nThese tests validate the independent lunar mechanics and the runtime\ninterpolated perigee/apogee pipeline.\n\n  leph test lunar perigee   # Interpolated perigee pipeline\n  leph test lunar lilith    # Mean/true lunar apsides (6 test files)",
 )
 def lunar_group() -> None:
     """Lunar-specific test suites."""
@@ -368,54 +373,52 @@ def lunar_group() -> None:
 )
 def lunar_all() -> None:
     """Run all lunar module tests (nodes, Lilith, perigee, apogee), excluding @slow."""
-    _pytest(["tests/test_lunar/", "-v", "-m", "not slow"])
+    _pytest(
+        [
+            "tests/test_lunar/",
+            "tests/test_interpolated_lunar_apsides.py",
+            "tests/test_planets/test_nodes_apsides_comprehensive.py",
+            "-v",
+            "-m",
+            "not slow",
+        ]
+    )
 
 
 @lunar_group.command(
-    short_help="Test ELP2000 perigee coefficients + interpolated perigee.",
+    short_help="Test independently derived interpolated and osculating perigee.",
 )
 def perigee() -> None:
-    """Test ELP2000 perigee perturbation coefficients, interpolated and osculating perigee.
-
-    Runs 2 test files: elp2000_perigee_perturbations, interpolated_perigee.
-    Run this after calibrating perigee coefficients.
-    """
+    """Test independently derived interpolated and osculating perigee mechanics."""
     _pytest(
         [
             "-v",
-            "tests/test_lunar/test_elp2000_perigee_perturbations.py",
-            "tests/test_lunar/test_interpolated_perigee.py",
+            "tests/test_interpolated_lunar_apsides.py",
+            "tests/test_lunar/test_osculating_lunar_mechanics.py",
         ]
     )
 
 
 @lunar_group.command(
-    short_help="Test ELP2000 apogee coefficients and interpolated apogee.",
+    short_help="Test independently derived mean, interpolated, and osculating apogee.",
 )
 def apogee() -> None:
-    """Test ELP2000 apogee perturbation coefficients and interpolated apogee.
-
-    Runs 2 test files: elp2000_apogee_perturbations, interpolated_apogee.
-    """
+    """Test independently derived mean, interpolated, and osculating apogee."""
     _pytest(
         [
             "-v",
-            "tests/test_lunar/test_elp2000_apogee_perturbations.py",
-            "tests/test_lunar/test_interpolated_apogee.py",
+            "tests/test_lunar/test_mean_lunar_apse_model.py",
+            "tests/test_interpolated_lunar_apsides.py",
+            "tests/test_lunar/test_osculating_lunar_mechanics.py",
         ]
     )
 
 
 @lunar_group.command(
-    short_help="Test mean + true Lilith precision across 8 test files.",
+    short_help="Test mean + true lunar apsides across 6 test files.",
 )
 def lilith() -> None:
-    """Test mean Lilith and true Lilith precision across 8 test files.
-
-    Covers: mean_lilith_enhanced, true_lilith_precision, annual_equation,
-    evection_secondary, parallactic_inequality, reduction_to_ecliptic,
-    solar_perturbation, variation.
-    """
+    """Test mean, osculating, and interpolated lunar-apse models."""
     _pytest(["-v", *_LILITH_FILES])
 
 
@@ -634,8 +637,8 @@ test_group.add_command(leb_format_group)
     "LEB2 is a lossy-compressed version of LEB1 that achieves 4-10x smaller\n"
     'files while maintaining <0.001" precision. These tests verify the\n'
     "compression/decompression roundtrip and measure precision loss vs LEB1.\n\n"
-    "  leph test leb2-format all             # Compression + reader unit tests (27)\n"
-    "  leph test leb2-format precision-base  # 31 bodies x 6 flags x 200 dates (~15s)",
+    "  leph test leb2-format all             # Compression + reader unit tests\n"
+    "  leph test leb2-format precision-base  # Core companion x 6 flags x 200 dates",
 )
 def leb2_format_group() -> None:
     """Tests for the LEB2 compressed format."""
@@ -643,10 +646,10 @@ def leb2_format_group() -> None:
 
 @leb2_format_group.command(
     "all",
-    short_help="Run LEB2 compression and reader unit tests (27 tests).",
+    short_help="Run LEB2 compression and reader unit tests.",
 )
 def leb2_format_all() -> None:
-    """Run LEB2 compression and reader unit tests (27 tests).
+    """Run LEB2 compression and reader unit tests.
 
     Tests compress/decompress roundtrip, mantissa bit computation,
     LEB2Reader lazy decompression, and format auto-detection.
@@ -667,8 +670,9 @@ def leb2_format_all() -> None:
 def leb2_precision_base() -> None:
     """Measure LEB2 vs LEB1 precision for base tier (~15s).
 
-    Evaluates 31 bodies x 6 calculation flags x 200 random dates and
-    reports the maximum arcsecond difference between LEB2 and LEB1.
+    Evaluates every body in the tier's core LEB2 companion across 6 calculation
+    flags x 200 random dates and reports the maximum arcsecond difference
+    between LEB2 and LEB1.
     """
     _python(["scripts/test_leb2_precision.py", "base"])
 

@@ -7,8 +7,8 @@ This guide helps users migrate from `pyswisseph` (Python bindings to Swiss Ephem
 - [Overview](#overview)
 - [Quick Migration](#quick-migration)
 - [API Differences](#api-differences)
-- [Precision Differences](#precision-differences)
-- [Features Not Yet Implemented](#features-not-yet-implemented)
+- [Numerical model differences](#numerical-model-differences)
+- [Known Compatibility Gaps](#known-compatibility-gaps)
 - [Thread Safety with EphemerisContext](#thread-safety-with-ephemeriscontext)
 - [FLG_MOSEPH (Moshier Ephemeris Flag)](#flg_moseph-moshier-ephemeris-flag)
 - [Calculation Backend](#calculation-backend)
@@ -84,7 +84,7 @@ LibEphemeris uses the **same constant names** as pyswisseph — no prefix change
 | `swe.FLG_SPEED` | `FLG_SPEED` |
 | `swe.FLG_SIDEREAL` | `FLG_SIDEREAL` |
 | `swe.FLG_TOPOCTR` | `FLG_TOPOCTR` |
-| `swe.SIDM_LAHIRI` | `SIDM_LAHIRI` (1) |
+| `swe.SIDM_LAHIRI` | `SIDM_LAHIRI` (computed predefined mode) |
 
 ### House Cusp Array Indexing
 
@@ -104,62 +104,47 @@ cusp1 = cusps[0]  # First house cusp
 
 ---
 
-## Precision Differences
+## Numerical model differences
 
-LibEphemeris uses NASA JPL DE ephemerides (via Skyfield) instead of Swiss Ephemeris data files. Here are the validated precision differences:
+LibEphemeris uses NASA JPL DE ephemerides, IAU/ERFA reductions, and independently
+published models. Results are therefore not guaranteed to be bit-identical to
+another ephemeris. Compatibility checks are performed ephemerally; per-date
+per-date comparison values and delta tables are not stored in this project.
 
-### Planetary Positions
-
-| Component | Max Difference | Notes |
-|-----------|---------------|-------|
-| Longitude (geocentric) | < 0.001 degrees | Sub-arcsecond accuracy |
-| Latitude (geocentric) | < 0.001 degrees | |
-| Distance | < 0.0001 AU | |
-| Heliocentric longitude | < 0.03 degrees | Slightly relaxed tolerance |
-
-### House Cusps and Angles
-
-| Component | Max Difference | Notes |
-|-----------|---------------|-------|
-| House cusps | < 0.001 degrees | All 25 house systems |
-| Ascendant | < 0.001 degrees | |
-| MC | < 0.001 degrees | |
-| ARMC | < 0.001 degrees | |
-| Vertex | < 0.01 degrees | |
+Planetary coordinates are validated against JPL states, house geometry against
+the published spherical definitions, and frame transforms against ERFA. Speeds
+are direct JPL state derivatives where available and documented numerical
+derivatives otherwise.
 
 ### Ayanamshas
 
-| Component | Max Difference | Notes |
-|-----------|---------------|-------|
-| Standard ayanamshas | < 0.01 degrees | Fagan-Bradley, Lahiri, etc. |
-| Star-based ayanamshas | < 0.06 degrees | True Citra, Galactic Center, etc. |
-
-Star-based ayanamshas have slightly higher tolerance due to differences in star position calculations, precession models, and coordinate transformations between the underlying ephemeris engines.
-
-### Velocities
-
-| Component | Max Difference | Notes |
-|-----------|---------------|-------|
-| Angular velocity | < 0.01 degrees/day | |
-| Radial velocity | < 0.001 AU/day | |
+Only fixed-epoch modes, True Citra, and Galactic Centre 0 Sagittarius are
+computed natively. Every predefined base mode 0–46 is operational without a
+warn-and-degrade fallback. Review the [sidereal mode
+classification](../reference/ayanamsha.md) for each mode's defining anchor;
+use `SIDM_USER` for a custom epoch and offset.
 
 ### Lunar Nodes
 
-| Component | Max Difference | Notes |
-|-----------|---------------|-------|
-| Mean Node | < 0.005 degrees | High precision |
-| True Node | < 0.14 degrees | Different oscillation model |
+| Component | Model | Notes |
+|-----------|-------|-------|
+| Mean Node | ERFA/IERS Delaunay node argument | Standards-derived mean curve |
+| True Node | JPL angular-momentum geometry | Instantaneous orbital plane |
 
-The True Node (osculating node) shows larger differences due to different algorithms for computing the short-period oscillations. Both implementations agree on the mean position but differ on the instantaneous oscillation.
+The True Node is derived from the Moon's JPL position and velocity and is
+validated through independent orbital-plane identities.
 
 ### Lilith (Lunar Apogee)
 
-| Component | Max Difference | Notes |
-|-----------|---------------|-------|
-| Mean Apogee (Mean Lilith) | < 0.01 degrees | High precision |
-| Osculating Apogee (True Lilith) | ~0.015° mean, ~0.065° max | Sub-arcminute precision |
+| Component | Model | Notes |
+|-----------|-------|-------|
+| Mean Apogee (Mean Lilith) | ERFA/IERS Delaunay identities | Conventional inclined mean orbit |
+| Osculating Apogee (True Lilith) | JPL eccentricity-vector geometry | Instantaneous orbit |
+| Interpolated Apogee/Perigee | Separate Delaunay series and hash-pinned refinement | rc7 compatibility contract |
 
-**Note**: True Lilith (OSCU_APOG, body ID 13) achieves ~0.015° mean agreement with the reference by computing the osculating apogee directly from the Moon's JPL DE440/DE441 geocentric state vectors (eccentricity-vector method); no analytical perturbation series is applied — the perturbations are already contained in the numerical state vectors. See [True Lilith Methods](../methodology/true-lilith.md) for details.
+**Note:** True Lilith (`OSCU_APOG`, body 13) comes directly from the
+eccentricity vector of the JPL DE440/DE441 geocentric lunar state; no fitted
+perturbation series is added. See [Osculating Lunar Apogee](../methodology/true-lilith.md).
 
 ---
 
@@ -167,22 +152,19 @@ The True Node (osculating node) shows larger differences due to different algori
 
 The following features are present in pyswisseph but have limited or different implementation in LibEphemeris:
 
-### Eclipse Functions (Partial)
+### Eclipses and other measured differences
 
-Eclipse functions are implemented but some return values are not yet calculated:
-
-- **Sunrise/sunset on central line**: Returns 0 for solar eclipses (not implemented)
-
-Affected functions:
-- `sol_eclipse_when_glob()` / `sol_eclipse_when_glob()`
-- `sol_eclipse_when_loc()` / `sol_eclipse_when_loc()`
+Solar/lunar eclipse and occultation entry points are implemented. Remaining
+numeric or convention differences are maintained in the evidence-backed
+[Known Differences](../comparison/known-differences.md) catalog rather than a
+blanket "partial" classification.
 - `lun_eclipse_when()` / `lun_eclipse_when()`
 - `lun_occult_when_glob()` / `lun_occult_when_glob()`
 
 ### Fixed Star Velocities
 
-Fixed star velocities ARE computed (proper motion, precession and frame
-rates) and match the reference API. Note the 3-tuple return shape:
+Fixed star velocities are computed from proper motion, precession, and frame
+rates. Note the 3-tuple return shape:
 
 ```python
 xx, star_name, retflag = ephem.fixstar_ut("Aldebaran", jd, FLG_SPEED)
@@ -254,7 +236,9 @@ Resolution priority (highest to lowest):
 
 **This is a major difference from pyswisseph.**
 
-The Swiss Ephemeris (and pyswisseph) uses global state and is **NOT thread-safe**. LibEphemeris provides the same behavior for the module-level API, but also offers a **thread-safe alternative** via `EphemerisContext`.
+The compatibility module-level API exposes process-global configuration state.
+LibEphemeris preserves that public behavior and also offers an explicitly
+thread-safe alternative through `EphemerisContext`.
 
 ### Global API (pyswisseph-compatible, NOT thread-safe)
 
@@ -263,7 +247,7 @@ import libephemeris as swe
 
 # This works like pyswisseph - uses global state
 swe.set_topo(12.5, 41.9, 0)  # Rome
-swe.set_sid_mode(1)  # Lahiri
+swe.set_sid_mode(swe.SIDM_TRUE_CITRA)  # independently sourced stellar mode
 
 pos, _ = swe.calc_ut(2451545.0, swe.SUN, swe.FLG_SIDEREAL)
 ```
@@ -281,7 +265,7 @@ from libephemeris.constants import SUN, MOON, FLG_SIDEREAL
 # Each thread creates its own context with isolated state
 ctx = EphemerisContext()
 ctx.set_topo(12.5, 41.9, 0)    # Rome - isolated to this context
-ctx.set_sid_mode(1)            # Lahiri - isolated to this context
+ctx.set_sid_mode(swe.SIDM_TRUE_CITRA)  # isolated to this context
 
 # Thread-safe calculations
 sun, _ = ctx.calc_ut(2451545.0, SUN, FLG_SIDEREAL)
@@ -301,7 +285,7 @@ def calculate_chart(location: dict, jd: float) -> dict:
     # Each thread creates its own context
     ctx = EphemerisContext()
     ctx.set_topo(location['lon'], location['lat'], 0)
-    ctx.set_sid_mode(1)  # Lahiri
+    ctx.set_sid_mode(swe.SIDM_TRUE_CITRA)
 
     sun, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
     moon, _ = ctx.calc_ut(jd, MOON, FLG_SIDEREAL)
@@ -365,8 +349,8 @@ ctx2 = EphemerisContext()
 ctx3 = EphemerisContext()
 
 # Each context has isolated state
-ctx1.set_sid_mode(1)  # Lahiri
-ctx2.set_sid_mode(0)  # Fagan-Bradley
+ctx1.set_sid_mode(swe.SIDM_TRUE_CITRA)
+ctx2.set_sid_mode(swe.SIDM_J2000)
 ctx3.set_sid_mode(27) # True Citra
 
 # But they all share the same ephemeris data in memory
@@ -376,10 +360,14 @@ ctx3.set_sid_mode(27) # True Citra
 
 ## FLG_MOSEPH (Moshier Ephemeris Flag)
 
-The `FLG_MOSEPH` flag is accepted for API compatibility but **silently ignored**. All calculations in LibEphemeris always use JPL DE440/DE441 via Skyfield, regardless of whether `FLG_MOSEPH` is passed. Code that previously used `FLG_MOSEPH` to select the Moshier semi-analytical ephemeris will continue to work without errors, but will use the JPL ephemeris instead.
+The `FLG_MOSEPH` flag is accepted for API compatibility but does not select a
+Moshier semi-analytical ephemeris. Backend selection remains controlled by the
+active calculation mode: LEB, Horizons, or the local Skyfield/JPL pipeline.
+Code that used `FLG_MOSEPH` continues to run, but the flag does not replace the
+active source with Moshier.
 
 ```python
-# This still works, but FLG_MOSEPH is silently ignored:
+# This still works, but FLG_MOSEPH does not select another backend:
 pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_MOSEPH | swe.FLG_SPEED)
 # Equivalent to:
 pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_SPEED)
@@ -389,7 +377,11 @@ pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_SPEED)
 
 ## Calculation Backend
 
-Unlike Swiss Ephemeris (which selects between JPL, Swiss, and Moshier backends via flags), LibEphemeris uses **JPL DE440/DE441** as its data source. The default `"auto"` mode resolves positions via LEB (if configured), Horizons API (if no local DE440), or Skyfield — no manual configuration required.
+LibEphemeris uses **JPL DE440/DE441** as its planetary data source. The default
+`"auto"` mode resolves positions via LEB (if configured), Horizons API (if no
+local DE kernel), or Skyfield. Compatibility flags are accepted according to
+measured public behavior; no claim about the reference API's internal backend
+is needed.
 
 For performance-critical workloads, LibEphemeris also supports an optional **LEB** (LibEphemeris Binary) backend that provides ~14x faster evaluation using precomputed Chebyshev approximations. LEB is entirely opt-in and not needed for correctness.
 
@@ -399,7 +391,7 @@ The calculation mode controls which backend is used:
 |------|----------|
 | `"auto"` **(default)** | Try LEB first, then Horizons API (if no local DE440), then Skyfield |
 | `"skyfield"` | Always Skyfield/DE440 |
-| `"leb"` | Require LEB (auto-discovered or auto-downloaded if needed); unsupported bodies/flags fall back to Skyfield |
+| `"leb"` | Require the bundled, configured, or locally generated LEB; unsupported bodies/flags fall back to Skyfield |
 | `"horizons"` | Prefer Horizons API (requires internet); unsupported bodies/flags fall back to Skyfield |
 
 ```python
@@ -411,7 +403,11 @@ set_calc_mode("horizons")   # Force Horizons API
 set_calc_mode("auto")       # Default: LEB -> Horizons -> Skyfield
 ```
 
-The default `"auto"` mode resolves data transparently: it tries LEB (bundled base-tier core or auto-downloaded), then Horizons API, then Skyfield. With the default `medium` tier, LEB2 files are auto-downloaded on first use.
+The default `"auto"` mode tries the bundled/configured/local LEB first, then
+Horizons API, then Skyfield. The wheel contains the reviewed base core; reviewed
+medium and extended cores are available through the SHA-256-pinned downloader.
+Additional modular LEB1/LEB2 files can be generated locally from the selected
+JPL kernel.
 
 See the [LEB Technical Guide](../leb/guide.md) for details.
 
@@ -425,8 +421,8 @@ See the [LEB Technical Guide](../leb/guide.md) for details.
 - [ ] Verify date range is within ephemeris coverage (1550-2650 for DE440)
 - [ ] For multi-threaded apps: migrate to `EphemerisContext` API
 - [ ] Update tests for relaxed tolerances on star-based ayanamshas (< 0.06 degrees)
-- [ ] Review True Node usage (up to 0.14 degrees difference from pyswisseph)
-- [ ] Review True Lilith usage (~0.065° max difference - sub-arcminute precision)
+- [ ] Review any application-specific tolerance against the current
+      [precision report](../comparison/precision.md)
 
 ---
 
@@ -437,7 +433,10 @@ If you encounter compatibility issues not covered in this guide, please report t
 https://github.com/g-battaglia/libephemeris/issues
 
 Include:
-1. Your pyswisseph code that doesn't work
-2. The expected result from pyswisseph
-3. The actual result from LibEphemeris
+1. A minimal public-API call that demonstrates the semantic issue
+2. The documented behavior you expected
+3. The LibEphemeris error or behavior category
 4. Python version and LibEphemeris version
+
+Do not attach reference-distribution files or persist numerical comparison
+output in the issue. Maintainers reproduce public-API comparisons ephemerally.

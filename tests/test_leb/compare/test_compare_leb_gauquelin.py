@@ -64,9 +64,7 @@ class TestGauquelinSector:
         ref_sector = compare.skyfield(
             ephem.gauquelin_sector, jd, body_id, method, geopos
         )
-        leb_sector = compare.leb(
-            ephem.gauquelin_sector, jd, body_id, method, geopos
-        )
+        leb_sector = compare.leb(ephem.gauquelin_sector, jd, body_id, method, geopos)
 
         # Function returns float directly (sector number with decimal position)
         if ref_sector > 0 and leb_sector > 0:

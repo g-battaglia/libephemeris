@@ -113,9 +113,7 @@ class _FakeEphem:
 
     def get_particle(self, name, t):
         # Return a Sun barycentric state; values are arbitrary but finite.
-        return _FakeParticle(
-            x=0.001, y=-0.002, z=0.0003, vx=1e-6, vy=2e-6, vz=3e-7
-        )
+        return _FakeParticle(x=0.001, y=-0.002, z=0.0003, vx=1e-6, vy=2e-6, vz=3e-7)
 
 
 class _FakeExtras:
@@ -440,9 +438,7 @@ class TestDownloadSingleFile:
         """A mid-download OSError cleans up the temp file and re-raises."""
         dest = tmp_path / "err.dat"
 
-        with patch(
-            "urllib.request.urlopen", side_effect=OSError("network down")
-        ):
+        with patch("urllib.request.urlopen", side_effect=OSError("network down")):
             with pytest.raises(OSError):
                 ri._download_single_file(
                     url="https://example.invalid/err.dat",
@@ -514,9 +510,7 @@ class TestDownloadAssistData:
             Path(dest).write_bytes(b"x")
 
         with patch.object(ri, "_download_single_file", side_effect=_fake_dl):
-            result = ri.download_assist_data(
-                target_dir=str(tmp_path), quiet=False
-            )
+            result = ri.download_assist_data(target_dir=str(tmp_path), quiet=False)
 
         assert result == tmp_path
         assert len(calls) == 2
@@ -787,9 +781,7 @@ class TestPropagateOrbitRebound:
 
     def test_default_ias15(self, fake_rebound, ceres):
         """IAS15 (no dt set) integrates over jd_end - jd_start (750-805)."""
-        result = ri.propagate_orbit_rebound(
-            ceres, ceres.epoch, ceres.epoch + 30
-        )
+        result = ri.propagate_orbit_rebound(ceres, ceres.epoch, ceres.epoch + 30)
         assert isinstance(result, ri.PropagationResult)
         assert result.jd_tt == ceres.epoch + 30
 
@@ -824,9 +816,7 @@ class TestPropagateOrbitRebound:
         """rebound absent -> ImportError (lines 742-746)."""
         with patch.dict(sys.modules, {"rebound": None}):
             with pytest.raises(ImportError, match="REBOUND is required"):
-                ri.propagate_orbit_rebound(
-                    ceres, ceres.epoch, ceres.epoch + 1
-                )
+                ri.propagate_orbit_rebound(ceres, ceres.epoch, ceres.epoch + 1)
 
 
 # ---------------------------------------------------------------------------
@@ -860,9 +850,7 @@ class TestPropagateOrbitAssist:
         assert isinstance(result, ri.PropagationResult)
         assert result.jd_tt == ceres.epoch + 30
 
-    def test_assist_with_asteroids(
-        self, fake_rebound, fake_assist, ceres, tmp_path
-    ):
+    def test_assist_with_asteroids(self, fake_rebound, fake_assist, ceres, tmp_path):
         """Asteroids config takes the two-file Ephem arm (line 897)."""
         cfg = self._config(tmp_path, with_asteroids=True)
         result = ri.propagate_orbit_assist(
@@ -870,9 +858,7 @@ class TestPropagateOrbitAssist:
         )
         assert result.jd_tt == ceres.epoch + 30
 
-    def test_assist_non_gravitational(
-        self, fake_rebound, fake_assist, ceres, tmp_path
-    ):
+    def test_assist_non_gravitational(self, fake_rebound, fake_assist, ceres, tmp_path):
         """include_non_gravitational sets extras.particle_params (932-933)."""
         cfg = self._config(tmp_path)
         captured = {}
@@ -904,33 +890,25 @@ class TestPropagateOrbitAssist:
         assert params.dtype == np.float64
         np.testing.assert_array_equal(params, [1e-10, 2e-10, 3e-10])
 
-    def test_assist_default_config(
-        self, fake_rebound, fake_assist, ceres, tmp_path
-    ):
+    def test_assist_default_config(self, fake_rebound, fake_assist, ceres, tmp_path):
         """ephem_config None builds an AssistEphemConfig (line 874-875)."""
         planets = tmp_path / "linux_p1550p2650.440"
         planets.write_bytes(b"planets")
         with patch.dict(os.environ, {"ASSIST_DIR": str(tmp_path)}):
-            result = ri.propagate_orbit_assist(
-                ceres, ceres.epoch, ceres.epoch + 30
-            )
+            result = ri.propagate_orbit_assist(ceres, ceres.epoch, ceres.epoch + 30)
         assert result.jd_tt == ceres.epoch + 30
 
     def test_assist_absent_rebound(self, ceres):
         """rebound absent -> ImportError (lines 859-862)."""
         with patch.dict(sys.modules, {"rebound": None}):
             with pytest.raises(ImportError, match="REBOUND is required"):
-                ri.propagate_orbit_assist(
-                    ceres, ceres.epoch, ceres.epoch + 1
-                )
+                ri.propagate_orbit_assist(ceres, ceres.epoch, ceres.epoch + 1)
 
     def test_assist_absent_assist(self, fake_rebound, ceres):
         """assist absent -> ImportError (lines 866-871)."""
         with patch.dict(sys.modules, {"assist": None}):
             with pytest.raises(ImportError, match="ASSIST is required"):
-                ri.propagate_orbit_assist(
-                    ceres, ceres.epoch, ceres.epoch + 1
-                )
+                ri.propagate_orbit_assist(ceres, ceres.epoch, ceres.epoch + 1)
 
     def test_assist_no_planets_file(self, fake_rebound, fake_assist, ceres):
         """planets_file None -> FileNotFoundError (lines 878-883)."""
@@ -994,9 +972,7 @@ class TestPropagateTrajectory:
         cfg.data_dir = None
         return cfg
 
-    def test_assist_trajectory(
-        self, fake_rebound, fake_assist, ceres, tmp_path
-    ):
+    def test_assist_trajectory(self, fake_rebound, fake_assist, ceres, tmp_path):
         """ASSIST path returns num_points results (lines 999-1060)."""
         cfg = self._assist_config(tmp_path)
         traj = ri.propagate_trajectory(
@@ -1126,9 +1102,7 @@ class TestCompareWithKeplerian:
 
     def test_rebound_path(self, fake_rebound, ceres):
         """use_assist False -> rebound result, method 'rebound'."""
-        comp = ri.compare_with_keplerian(
-            ceres, ceres.epoch + 100, use_assist=False
-        )
+        comp = ri.compare_with_keplerian(ceres, ceres.epoch + 100, use_assist=False)
         assert comp["method"] == "rebound"
         assert "angular_sep_arcsec" in comp
         assert comp["propagation_days"] == ceres.epoch + 100 - ceres.epoch
@@ -1146,9 +1120,7 @@ class TestCompareWithKeplerian:
         )
         assert comp["method"] == "assist"
 
-    def test_assist_fallback_to_rebound(
-        self, fake_rebound, fake_assist, ceres
-    ):
+    def test_assist_fallback_to_rebound(self, fake_rebound, fake_assist, ceres):
         """use_assist True but ASSIST raises -> rebound fallback (1137-1138).
 
         No planet file is available so ``propagate_orbit_assist`` raises
@@ -1174,13 +1146,9 @@ class TestCompareWithKeplerian:
         # Force a near-0 nbody longitude against a near-360 keplerian one,
         # so the raw delta is strongly negative -> wrap up branch; and the
         # opposite for the high branch.  We patch propagate to control it.
-        with patch.object(
-            ri, "propagate_orbit_rebound", return_value=big
-        ):
+        with patch.object(ri, "propagate_orbit_rebound", return_value=big):
             # Patch keplerian to ~350 deg so nbody(0) - kep(350) = -350 < -180.
-            comp = ri.compare_with_keplerian(
-                ceres, ceres.epoch + 1, use_assist=False
-            )
+            comp = ri.compare_with_keplerian(ceres, ceres.epoch + 1, use_assist=False)
         assert "delta_lon_arcsec" in comp
 
     def test_delta_lon_wrap_branches(self, fake_rebound, ceres):
@@ -1201,9 +1169,7 @@ class TestCompareWithKeplerian:
                 side_effect=_fake_kep,
             ),
         ):
-            comp = ri.compare_with_keplerian(
-                ceres, ceres.epoch + 1, use_assist=False
-            )
+            comp = ri.compare_with_keplerian(ceres, ceres.epoch + 1, use_assist=False)
         assert abs(comp["delta_lon_arcsec"]) < 180 * 3600
 
         # Now nbody ~ 1 deg, keplerian ~ 359 deg -> delta ~ -358 < -180 -> wrap up
@@ -1221,7 +1187,5 @@ class TestCompareWithKeplerian:
                 side_effect=_fake_kep2,
             ),
         ):
-            comp2 = ri.compare_with_keplerian(
-                ceres, ceres.epoch + 1, use_assist=False
-            )
+            comp2 = ri.compare_with_keplerian(ceres, ceres.epoch + 1, use_assist=False)
         assert abs(comp2["delta_lon_arcsec"]) < 180 * 3600
