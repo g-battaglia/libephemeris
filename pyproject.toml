@@ -1,10 +1,10 @@
 [project]
 name = "libephemeris"
-version = "3.0.0rc8"
+version = "3.0.0rc10"
 description = "A high-precision astronomical ephemeris library for Python, powered by NASA JPL DE440/DE441."
 readme = "README.md"
 requires-python = ">=3.12"
-license = "Apache-2.0"
+license = "AGPL-3.0-only"
 license-files = [
     "LICENSE",
     "LICENSING.md",

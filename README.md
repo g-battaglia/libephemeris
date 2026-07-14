@@ -13,12 +13,10 @@ A high-precision astronomical ephemeris library for Python, powered by NASA JPL 
 
 **Drop-in replacement for PySwissEph** - readable Python algorithms, standard debugging, easy deployment on the scientific Python stack (NumPy, Skyfield, pyerfa).
 
-**100% independent of the Swiss Ephemeris.** Permissively **Apache-2.0**
-licensed, with no Swiss Ephemeris source code, source comments, documentation
-prose, algorithms, distribution data files, or runtime dependency.
-Compatibility validation uses only public API inputs and outputs as a black
-box — [how the stack differs](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/independence.md).
-See [NOTICE.md](NOTICE.md) / [LICENSING.md](LICENSING.md).
+Licensed under the **[GNU Affero General Public License v3.0](LICENSE)**
+([AGPL-3.0-only](LICENSING.md)). Built on NASA JPL DE440/DE441
+ephemerides, IAU/ERFA standards, and cited primary literature. See
+[NOTICE.md](NOTICE.md) for data sources and attribution.
 
 ---
 
@@ -226,19 +224,20 @@ Learn more at [kerykeion.net](https://kerykeion.net).
 
 ## License
 
-Licensed under the **[Apache License 2.0](LICENSE)** — a permissive license
-free for any use, including closed-source and commercial products, subject to
-preservation of copyright, license, and attribution notices. See
-[LICENSING.md](LICENSING.md) for details. Published distributions beginning
-with `3.0.0rc3` carry this license; older distributions retain their original
-terms.
+Licensed under the **[GNU Affero General Public License v3.0](LICENSE)**
+(`AGPL-3.0-only`). See [LICENSING.md](LICENSING.md) for details.
 
 > **Note:** the optional `libephemeris[nbody]` extra pulls in `rebound` and
 > `assist` (GPL-3.0-or-later), which are not part of the core install and are
-> never bundled. Installing that extra makes your combined installation subject
-> to the GPL; the core library has no strong-copyleft (GPL/LGPL/AGPL) runtime
-> dependency (all required deps are permissive except certifi's weak MPL-2.0).
-> See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+> never bundled. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-LibEphemeris is an independent, API-compatible implementation — see
+### License history
+
+Pre-releases `v3.0.0rc2` through `v3.0.0rc8` incorrectly declared
+`Apache-2.0` in their PyPI metadata. The relicensing was premature: unresolved
+components prevent an Apache-2.0 grant. Those releases are to be treated as
+**AGPL-3.0-only** and have been yanked from PyPI. All versions from
+`v3.0.0rc10` onward correctly declare `AGPL-3.0-only`.
+
+LibEphemeris provides an API-compatible interface — see
 [NOTICE.md](NOTICE.md). "Swiss Ephemeris" is a product of Astrodienst AG.

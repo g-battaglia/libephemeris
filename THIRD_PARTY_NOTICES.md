@@ -3,8 +3,8 @@
 This file inventories third-party software and data that LibEphemeris
 **contains** (vendored or adapted code shipped inside the package) or
 **depends on** (PyPI dependencies installed alongside it), together with
-their licenses. It is maintained as part of the Apache-2.0 compliance
-process — see [LICENSING.md](LICENSING.md) and [NOTICE.md](NOTICE.md).
+their licenses. It is maintained as part of the AGPL-3.0 compliance
+process -- see [LICENSING.md](LICENSING.md) and [NOTICE.md](NOTICE.md).
 
 ## Code shipped inside the package (vendored / adapted)
 
@@ -22,15 +22,15 @@ Retained upstream copyright notices:
 
 Each of these files carries its own `SPDX-License-Identifier` header and
 documents its upstream provenance in the module docstring. They are **not**
-covered by the project's Apache-2.0 license, but they are all permissively
-(MIT) licensed; the package contains no copyleft code.
+covered by the project's AGPL-3.0 license, but they are all permissively
+(MIT) licensed.
 
 The Galilean satellite module (`libephemeris/moon_theories/galilean.py`)
 was, through v2.1.0, adapted from PyMeeus and licensed LGPL-3.0. <!-- provenance-implementation-ok --> It was
 rewritten in June 2026 as an independent implementation of the published
 theory (Lieske, J.H. 1998, "Galilean satellite ephemerides E5", A&AS 129,
 205; Meeus 1998, *Astronomical Algorithms*, ch. 44) and is now owned by
-the project under the Apache-2.0 license. Theory specification:
+the project under the AGPL-3.0 license. Theory specification:
 [docs/methodology/galilean-e5-spec.md](docs/methodology/galilean-e5-spec.md).
 
 ### MIT license text (spktype21, TASS 1.7 port)
@@ -78,12 +78,12 @@ own licenses; they are not part of LibEphemeris's license grant.
 | astropy | BSD-3-Clause | Installed by the `stars` extra for star-catalog tooling; also a development dependency |
 | astroquery | BSD-3-Clause | Installed by the `stars` extra and development environment for catalog/validation scripts; runtime SPK downloads use LibEphemeris's direct JPL Horizons HTTPS client |
 
-## Optional `nbody` extra — GPL-3.0 (not bundled)
+## Optional `nbody` extra -- GPL-3.0 (not bundled)
 
 The opt-in `libephemeris[nbody]` extra (deliberately NOT part of
-`libephemeris[all]`, which stays permissive-only) installs two
-**GPL-3.0-or-later** packages used by the shipped `rebound_integration.py`
-module for ephemeris-quality n-body propagation of minor bodies:
+`libephemeris[all]`) installs two **GPL-3.0-or-later** packages used by the
+shipped `rebound_integration.py` module for ephemeris-quality n-body
+propagation of minor bodies:
 
 | Package | License | Notes |
 |---|---|---|
@@ -92,29 +92,25 @@ module for ephemeris-quality n-body propagation of minor bodies:
 
 These packages are **not** part of the core install, are **never bundled or
 redistributed** in any LibEphemeris artifact (they are installed separately
-from PyPI under their own GPL license), and are imported only on demand. The
-LibEphemeris source itself is Apache-2.0. Because Apache-2.0 is one-way
-compatible with the GPL, a user who chooses to install `libephemeris[nbody]`
-forms a combined runtime work that is, **for that user**, governed by the
-GPLv3. The default/core library and all of its required runtime dependencies
-are permissively licensed, with the sole exception of certifi's MPL-2.0 (a
-file-level weak copyleft that imposes no obligation on LibEphemeris code and
-is not modified); the shipped wheel contains no copyleft code and no
-strong-copyleft (GPL/LGPL/AGPL) dependency.
+from PyPI under their own GPL license), and are imported only on demand.
+GPL-3.0 and AGPL-3.0 are compatible per their respective Section 13
+provisions; a user who installs `libephemeris[nbody]` forms a combined
+work governed by the AGPL-3.0.
 
 ## Data sources
 
 - **JPL DE440 / DE441** planetary and lunar ephemerides (NASA/JPL/Caltech):
-  U.S. government work, freely usable; downloaded at runtime, not bundled.
+  publicly distributed scientific data; downloaded at runtime, not bundled.
 - **ESA Hipparcos Catalogue** (ESA SP-1200, 1997) and **van Leeuwen 2007**
   reduction: star positions and proper motions (facts of nature) compiled
   into `libephemeris/fixed_stars.py`, with attribution in the module.
 - **IAU Working Group on Star Names** (WGSN) designations.
 - **IERS** Earth-orientation / Delta-T / leap-second tables: public data,
   fetched at runtime.
-- `libephemeris/data/fictitious_orbits.csv`: only the independently verified
-  Harrington (ID 50) elements from Harrington (1988). IDs 40–49 and 51–58
-  remain API constants but have no bundled elements and are unsupported.
+- `libephemeris/data/fictitious_orbits.csv`: conventional orbital elements
+  for hypothetical bodies (IDs 40-58) maintained for API compatibility.
+  Per-body source status is documented in
+  [docs/methodology/hypothetical-bodies.md](docs/methodology/hypothetical-bodies.md).
 - `libephemeris/data/leb2/base_core.leb2`: generated by this project from JPL
   DE440 state data and ERFA/IERS standards-derived abstract lunar channels.
 
@@ -124,11 +120,4 @@ strong-copyleft (GPL/LGPL/AGPL) dependency.
   for ephemeral compatibility comparisons in a separate validation environment.
   It is not declared among this package's dependencies (including the `dev`
   extra), is never imported by the shipped package, and is not a runtime
-  dependency. See [NOTICE.md](NOTICE.md) for the independence statement.
-- **Reference-distribution source and data artifacts are prohibited.** Neither
-  this repository nor its separate validation worktree may contain or consume
-  those files. Compatibility validation may call the installed Python API and
-  compare outputs, but results must remain ephemeral. The provenance gate
-  applies name checks to the physical project tree (including ignored and
-  untracked paths) and reachable Git history, and scans project text outside
-  its exact infrastructure-cache exclusions.
+  dependency. See [NOTICE.md](NOTICE.md) for details.

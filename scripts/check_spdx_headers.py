@@ -2,7 +2,7 @@
 """Check (or stamp) SPDX license headers on shipped source files.
 
 Every Python file under ``libephemeris/`` must carry an SPDX identifier in
-its first lines.  Owned files are Apache-2.0 licensed; vendored/adapted files
+its first lines.  Owned files are AGPL-3.0-only licensed; vendored/adapted files
 keep their upstream identifier (see ``EXCEPTIONS`` and THIRD_PARTY_NOTICES.md).
 
 Usage:
@@ -23,7 +23,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_ROOT = REPO_ROOT / "libephemeris"
 
-PROJECT_LICENSE = "Apache-2.0"
+PROJECT_LICENSE = "AGPL-3.0-only"
 COPYRIGHT_LINE = "# Copyright (c) 2025-2026 Giacomo Battaglia"
 
 # Vendored or adapted third-party code keeps its upstream license and must

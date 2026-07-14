@@ -4,7 +4,7 @@ subtitle: "Calcoli astronomici di alta precisione con Python"
 author: "Giacomo Battaglia"
 lang: it-IT
 date: "2026"
-rights: "Apache-2.0"
+rights: "AGPL-3.0-only"
 description: |
   Manuale completo di LibEphemeris, una libreria Python per calcoli
   astronomici e astrologici di alta precisione basata sulle effemeridi

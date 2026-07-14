@@ -2,8 +2,8 @@
 
 LibEphemeris targets 1:1 compatibility with the public PySwissEphemeris API so
 existing programs can migrate with minimal changes. The implementation itself
-is independent and uses NASA JPL, IAU/ERFA, primary literature, and permissively
-licensed catalogue sources.
+uses NASA JPL, IAU/ERFA, primary literature, and published
+catalogue sources.
 
 PySwissEphemeris is used only as an external reference API for behavioral
 comparison. A validation run may compare public return values in memory, but
