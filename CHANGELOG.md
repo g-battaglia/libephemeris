@@ -7,11 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Post-rc8 changes: the four remaining special house constructions were
-reimplemented from published definitions, the lunar apse path now uses the
-ERFA/IERS 2003 arguments and the DE440 passage model exclusively, and the
+## [3.0.0rc11] - 2026-07-15
+
+The candidate that completes the v3 independence remediation alongside the
+restored AGPL-3.0-only license. The four remaining special house constructions
+were reimplemented from published definitions, the lunar apse path now uses
+the ERFA/IERS 2003 arguments and the DE440 passage model exclusively, and the
 historical hypothetical-body registry was rebuilt from page-level primary
-sources, with unsourced IDs failing closed.
+sources, with unsourced IDs failing closed. License metadata is AGPL-3.0-only
+throughout, including SPDX headers in tests, scripts, and code generators.
+
+### Breaking
+
+- Historical hypothetical-body IDs 48, 49, 54, 55, 57, and 58 keep their
+  public names and constants but now raise `UnknownBodyError`. No
+  source-complete published definition could be recovered for these IDs, so a
+  deterministic failure is preferable to returning positions that cannot be
+  traced to any source. The field-by-field inventory of what is missing per ID
+  is in `docs/methodology/missing-hypothetical-models.md`.
+- White Moon / Selena (ID 56) now follows the uniform seven-year convention
+  published by Velichko and Larin (2007), unwrapped from its 1800–2000
+  baseline. Its returned positions therefore differ from the legacy convention.
 
 ### Fixed
 
@@ -4261,8 +4277,8 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.25.0...HEAD
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v3.0.0rc11...HEAD
+[3.0.0rc11]: https://github.com/g-battaglia/libephemeris/releases/tag/v3.0.0rc11
 [0.26.0]: https://github.com/g-battaglia/libephemeris/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/g-battaglia/libephemeris/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/g-battaglia/libephemeris/compare/v0.23.0...v0.24.0
