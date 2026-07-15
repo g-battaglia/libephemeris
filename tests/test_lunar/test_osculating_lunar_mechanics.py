@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 """Tests for the JPL-state-vector lunar node and osculating apsides."""
 
 from __future__ import annotations

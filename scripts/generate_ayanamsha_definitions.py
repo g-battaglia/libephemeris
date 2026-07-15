@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """Generate ``libephemeris/ayanamsha_definitions.py`` from published sources.
 
@@ -486,7 +486,7 @@ MULA_WILHELM_TARGET = 246.0 + 40.0 / 60.0  # middle of Mula: 246\N{DEGREE SIGN}4
 MARDYKS_EPOCH = mean_september_equinox_jd(1998.0)
 
 
-HEADER = '''# SPDX-License-Identifier: Apache-2.0
+HEADER = '''# SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """Shared defining data for predefined sidereal modes.
 

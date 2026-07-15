@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """Generate the independent interpolated lunar-apse model from JPL DE440.
 
@@ -382,7 +382,7 @@ def _fmt_table(values: np.ndarray, per_line: int = 8) -> str:
 def _write_module(apo, per) -> None:
     apo_coeffs, apo_corr, apo_lat, apo_dist, apo_stats = apo
     per_coeffs, per_corr, per_lat, per_dist, per_stats = per
-    header = f'''# SPDX-License-Identifier: Apache-2.0
+    header = f'''# SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """Independent interpolated lunar-apse model, derived from JPL DE440.
 
