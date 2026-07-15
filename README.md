@@ -63,9 +63,14 @@ Methodology: [Long-term sidereal time, precession & cusp speeds](https://github.
 
 LibEphemeris aims for 1:1 API compatibility at the level of function names,
 flags, and slot semantics. A small number of behaviors are deliberately
-different because reproducing them would mean shipping data fitted to an
-external implementation's output or introducing a known physical
-inconsistency. Every divergence is documented with its rationale in
+different, and all of them follow one criterion: **when a published definition
+or a checkable physical invariant exists, LibEphemeris follows it** — an
+ecliptic frame in which the Sun actually stays at latitude zero, a speed slot
+that is the true derivative of the reported position, an obscuration that
+respects its bounded definition, orbital elements taken from the page where
+their author printed them. Where matching the reference would instead require
+data fitted to another implementation's output, the value is derived from the
+primary source. Every divergence is documented with its rationale in
 [Intentional Divergences](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/intentional-divergences.md);
 the headline items are:
 
@@ -80,10 +85,13 @@ the headline items are:
 | **Phase angle** | Light-time-consistent geometry. | Bounded 15–40″ difference on inner planets; elongation identical. |
 | **Historical hypothetical bodies (IDs 40–58)** | Thirteen IDs compute from their primary published sources (Neely 1980, Harrington 1988, Le Verrier 1846, Adams 1846, Lowell 1915, Velichko–Larin 2007 for White Moon/Selena). IDs 48, 49, 54, 55, 57 and 58 keep their names and constants but raise `UnknownBodyError`. | A recognised name is not a numerical model: where no source-complete published definition could be recovered, failing closed is preferable to returning positions that cannot be traced to any source. The field-by-field inventory of what is missing per ID is in [Missing Hypothetical Models](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/missing-hypothetical-models.md). |
 
-Modern-era planetary and lunar positions, house cusps, eclipses, rise/set,
-and the majority of sidereal modes agree with the reference API at the
-sub-arcsecond level. The full comparison methodology and per-channel bounds
-are in [Known Differences](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/known-differences.md).
+Everywhere else the goal is indistinguishability, and it is met: modern-era
+planetary and lunar positions, house cusps, eclipses, rise/set, and the
+majority of sidereal modes agree with the reference API at the sub-arcsecond
+level. The divergences above are documented choices with a stated rationale
+and a measured bound — not accuracy limits. The full comparison methodology
+and per-channel bounds are in
+[Known Differences](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/known-differences.md).
 
 ---
 
