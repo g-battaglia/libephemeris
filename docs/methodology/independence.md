@@ -1,10 +1,12 @@
 # Independence and Methodology
 
-LibEphemeris is an independent implementation: it shares an API surface with
-the Swiss Ephemeris ecosystem so existing code can migrate without changes,
-while its implementation is built from the independent sources and components
-documented below. This page describes that stack and how behavioral parity is
-achieved without sharing any code or implementation material.
+The current LibEphemeris release line is maintained as an independent
+implementation: it shares an API surface with the Swiss Ephemeris ecosystem so
+existing code can migrate without changes, while current registered models
+use the sources and components documented below. Earlier development history
+contained legacy/reference-derived material removed during the v3 remediation;
+this page describes the current implementation and policy, not a retroactive
+claim about every historical revision.
 
 ## Different data sources
 
@@ -14,7 +16,7 @@ achieved without sharing any code or implementation material.
 | Asteroids / minor bodies | JPL **SBDB** osculating elements, JPL **Horizons** SPK kernels, optional ASSIST N-body propagation | Coverage and values are compared through public API calls. |
 | Fixed stars | Catalog built from **Hipparcos** (van Leeuwen 2007), Tycho-2, VizieR and the IAU WGSN name list — public astrometry only | Names and returned astrometry are compared through public API calls. |
 | Outer-planet centers | JPL satellite ephemerides (jup204, sat319, ura083, nep050, plu017) for barycenter→body-center correction | Center/barycenter distinctions are established from output comparisons. |
-| Hypothetical bodies | Published elements where available; built-in compatibility conventions otherwise | API shape and behavior are checked ephemerally. |
+| Hypothetical bodies | Neely IDs 40–47, Harrington 50, Le Verrier 51, Adams 52, and Lowell 53 from page-level primary transcriptions; Selena 56 from Velichko–Larin's published seven-year rule, 1800–2000 endpoint unwrap, and independent 1879–2007 checkpoints; IDs 48, 49, 54, 55, 57, and 58 are recognised but unsupported | API shape and error behavior are checked ephemerally; unsupported source gaps are listed in [the missing-models inventory](missing-hypothetical-models.md). |
 
 The local Skyfield path reads DE440/DE441 SPK kernels directly. The LEB path is
 an intentional intermediate representation generated from the same JPL state
@@ -38,13 +40,14 @@ routines** rather than on a private reimplementation:
   current published reconstruction of Earth rotation. See
   [delta-t.md](delta-t.md).
 - **House systems:** each of the 25 systems is implemented from its
-  published definition (Polich & Page 1964, Krusinski/Pisa/Goelzer, Savard,
-  Makransky 1988, Knegt, Raman, …), driven by a shared spherical-geometry
-  engine.
+  cited public definition or independently documented construction, driven by
+  a shared spherical-geometry engine. The four v3-remediated vector
+  constructions have focused primary-source/provenance tests.
 - **Lunar points:** true/osculating geometry comes from DE440/DE441 state
   vectors. Mean points use ERFA/IERS Delaunay arguments. Interpolated
-  points use the rc7 Delaunay-series model and its immutable, SHA-256-pinned
-  compatibility residual table; see [lunar-apsides.md](lunar-apsides.md).
+  points use independently fitted Delaunay-series models and residual tables
+  generated from DE440 apsis passages and pinned by SHA-256; see
+  [lunar-apsides.md](lunar-apsides.md).
 
 ## Own architecture
 
@@ -78,9 +81,9 @@ difference is measured and documented in
 [intentional-divergences.md](../comparison/intentional-divergences.md)
 rather than papered over.
 
-Every model is derived from published JPL/IAU standards, primary literature,
-public catalogues, or permissively licensed sources. The data-source inventory
-is stated in
+Each currently registered model must have a model-specific derivation from
+published JPL/IAU standards, primary literature, public catalogues, or a
+permissively licensed source. The data-source inventory is stated in
 [NOTICE.md](https://github.com/g-battaglia/libephemeris/blob/main/NOTICE.md).
 
 ## What this means in practice
@@ -89,10 +92,11 @@ is stated in
 - Positions come from JPL DE440/DE441 and IAU standard reductions; typical
   agreement with the reference engine is at the sub-arcsecond level, with
   every systematic difference measured and documented.
-- No reference-product source code, documentation prose, algorithms, or
-  distribution data files, and no runtime dependency on a reference-product
-  component. The package and its required dependencies are permissively
-  licensed (Apache-2.0 core).
+- Current release artifacts exclude reference-product source code,
+  documentation prose, algorithms, and distribution data files, and have no
+  runtime dependency on a reference-product component. Project-authored core
+  code is Apache-2.0; third-party components retain the terms in
+  `THIRD_PARTY_NOTICES.md`.
 
 "Swiss Ephemeris" is a product of Astrodienst AG; the name is used here
 nominatively only.

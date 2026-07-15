@@ -98,7 +98,7 @@ tests/test_leb/compare/
 ├── conftest.py                          # Shared infrastructure (tolerances, helpers, fixtures)
 ├── test_compare_leb_planets.py          # Lon, lat, dist, speed for ICRS planets
 ├── test_compare_leb_asteroids.py        # Position, speed, distance for asteroids
-├── test_compare_leb_hypothetical.py     # Runtime models for historical IDs 40–58
+├── test_compare_leb_hypothetical.py     # Reviewed runtime models and unsupported-ID behavior
 ├── test_compare_leb_velocities.py       # Speed lon/lat/dist for covered bodies
 ├── test_compare_leb_distances.py        # Geocentric and heliocentric distance
 ├── test_compare_leb_crossings.py        # cross_ut, solcross_ut, ...
@@ -258,7 +258,7 @@ external-comparison measurements.
 | `POSITION_ARCSEC` | 0.001 | 0.001 | arcsec | All planets including outer |
 | `ASTEROID_ARCSEC` | 0.001 | 0.001 | arcsec | |
 | `ECLIPTIC_ARCSEC` | 0.001 | 0.001 | arcsec | Nodes, Lilith |
-| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | arcsec | IDs 40–58 use runtime models rather than persisted legacy channels |
+| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | arcsec | Reviewed IDs use local runtime models rather than persisted legacy channels |
 | `EQUATORIAL_ARCSEC` | 0.02 | 0.02 | arcsec | Heliocentric amplification |
 | `J2000_ARCSEC` | 0.001 | 0.001 | arcsec | |
 | `SIDEREAL_ARCSEC` | 0.001 | 0.001 | arcsec | |
@@ -340,9 +340,9 @@ external-comparison measurements.
 
 ### Hypothetical bodies
 
-Historical IDs 40–58 must remain calculable even with old LEB files. The LEB
-dispatcher bypasses persisted hypothetical channels and uses the current
-runtime models, whose provenance status is checked separately.
+Historical IDs 40–58 bypass persisted hypothetical channels even with old LEB
+files. IDs 40–47, 50–53, and 56 use reviewed local runtime models; IDs 48, 49,
+54, 55, 57, and 58 remain unavailable and raise `UnknownBodyError`.
 
 ---
 

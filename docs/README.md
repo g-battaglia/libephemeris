@@ -37,7 +37,8 @@
 - **[Interpolated Apogee](methodology/interpolated-apogee.md)** -- INTP_APOG analytical compatibility curve
 - **[Interpolated Perigee](methodology/interpolated-perigee.md)** -- INTP_PERG analytical compatibility curve
 - **[True Lilith](methodology/true-lilith.md)** -- Osculating lunar apogee calculation
-- **[Hypothetical Bodies](methodology/hypothetical-bodies.md)** -- per-ID provenance status and restored runtime models for IDs 40–58
+- **[Hypothetical Bodies](methodology/hypothetical-bodies.md)** -- per-ID primary provenance, transformations, and fail-closed status
+- **[Missing Hypothetical Models](methodology/missing-hypothetical-models.md)** -- field-by-field inventory of the six fail-closed IDs and the evidence needed to restore them
 - **[pyerfa Integration](methodology/pyerfa-integration.md)** -- IAU standard nutation, precession, obliquity
 - **[REBOUND Integration](methodology/rebound-integration.md)** -- N-body minor body orbit propagation
 

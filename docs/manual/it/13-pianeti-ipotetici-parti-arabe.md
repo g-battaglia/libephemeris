@@ -26,27 +26,39 @@ Gli otto pianeti uraniani sono:
 
 ### Disponibilità
 
-Gli ID 40–47 sono calcoli kepleriani integrati. Gli elementi orbitali sono
-trascritti dalle pubblicazioni di Witte e Sieggruen.
+Gli ID 40–47 vengono calcolati da una nuova trascrizione di “Orbital Elements
+for the Transneptunian Planets” di James Neely, *Matrix Magazine* VII (1980),
+Tabella I, p. 10. La fonte definisce il tempo in secoli giuliani da
+JD 2415020.0; elementi letterali, scelta del frame e propagazione a due corpi
+sono descritti nel
+[registro di provenienza](../../methodology/hypothetical-bodies.md).
 
 ---
 
 ## 13.2 Corpi ipotetici integrati
 
-Tutti gli ID storici 40–58 calcolano. **Harrington** (`HARRINGTON`, ID 50) è
-derivato direttamente dall'articolo del 1988 sull'*Astronomical Journal*. Tutti
-i modelli usano elementi orbitali integrati.
+Tredici ID vengono calcolati da ricostruzioni documentali verificate pagina per
+pagina: **Cupido–Poseidon** (40–47), **Harrington** (50), **Le Verrier** (51),
+**Adams** (52), **Lowell** (53) e **Luna Bianca / Selena** (56). Gli ID 48,
+49, 54, 55, 57 e 58 restano nominati per compatibilità ma sollevano
+`UnknownBodyError`; tutti i campi mancanti sono elencati
+[nell'inventario dei modelli mancanti](../../methodology/missing-hypothetical-models.md).
 
 ```python
 import libephemeris as ephem
 
 jd_tt = ephem.julday(2024, 4, 8, 12.0) + ephem.deltat(ephem.julday(2024, 4, 8, 12.0))
 
-pos = ephem.calc_hypothetical_position(ephem.HARRINGTON, jd_tt)
+cupido = ephem.calc_hypothetical_position(ephem.CUPIDO, jd_tt)
+harrington = ephem.calc_hypothetical_position(ephem.HARRINGTON, jd_tt)
+selena = ephem.calc_hypothetical_position(ephem.WHITE_MOON, jd_tt)
 ```
 
-Nessun file di dati della distribuzione di riferimento viene incluso. Ogni riga
-di elementi fissi contiene una fonte e uno stato di revisione.
+Nessun file di dati della distribuzione di riferimento viene incluso. Il
+dataset contiene 12 righe orbitali trascritte indipendentemente; Selena è un
+modello simbolico separato derivato dalla regola di moto uniforme e dai
+checkpoint pubblicati. `HYPOTHETICAL_PROVENANCE` registra stato e confine
+documentale di ogni ID.
 
 ---
 
@@ -58,7 +70,7 @@ nove campi di elementi orbitali. Usa valori provenienti da fonti che sei
 autorizzato a utilizzare; i file di dati della distribuzione di riferimento non
 sono richiesti né supportati come input inclusi.
 
-### Caricare l'orbita integrata verificata
+### Caricare le orbite integrate verificate
 
 La libreria include un file di orbite fittizie predefinite:
 
@@ -69,7 +81,7 @@ import libephemeris as ephem
 orbite = ephem.load_bundled_fictitious_orbits()
 print(f"Caricate {len(orbite)} orbite fittizie")
 
-# Cerca il corpo verificato per nome
+# Cerca uno dei corpi verificati per nome
 corpo = ephem.get_orbital_body_by_name(orbite, "Harrington")
 if corpo:
     print(f"Trovato: {corpo.name}")
@@ -190,16 +202,18 @@ In questo capitolo abbiamo esplorato i corpi celesti non fisici usati in diverse
 **Concetti chiave:**
 
 - I **pianeti uraniani** sono otto punti matematici (Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon) con orbite ipotetiche, usati nella Scuola di Amburgo e nella tecnica dei punti medi
-- Tutti gli ID ipotetici storici **40–58** calcolano nuovamente
-- Harrington ha una derivazione primaria indipendente; tutti i modelli usano
-  elementi orbitali integrati
+- Gli ID 40–47, 50–53 e 56 hanno modelli ricostruiti indipendentemente e
+  documentati; i sei ID non recuperati falliscono in modo esplicito
+  conservando nomi e costanti
+- Ogni modello storico supportato ha una derivazione pagina per pagina e un
+  test di provenienza vincolante
 - Le **orbite fittizie personalizzate** permettono di definire qualsiasi corpo ipotetico con i propri elementi orbitali
 - Le **parti arabe** sono punti calcolati dalla formula ASC + Pianeta A − Pianeta B, con la Parte di Fortuna come la più importante
 
 **Funzioni introdotte:**
 
-- `calc_hypothetical_position(body_id, jd_tt)` — calcola qualsiasi corpo
-  ipotetico storico con ID 40–58
+- `calc_hypothetical_position(body_id, jd_tt)` — calcola un corpo ipotetico
+  supportato (ID 40–47, 50–53 e 56)
 - `load_bundled_fictitious_orbits()` — carica le orbite fittizie predefinite
 - `parse_orbital_elements(filepath)` — carica orbite fittizie da un file personalizzato
 - `get_orbital_body_by_name(elements, nome)` — cerca un corpo per nome nella lista di orbite

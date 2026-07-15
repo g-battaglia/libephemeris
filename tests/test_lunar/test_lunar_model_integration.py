@@ -37,6 +37,12 @@ def test_mean_public_helpers_are_thin_standards_wrappers() -> None:
     assert all(type(value) is float for value in node_state + apogee_state)
 
 
+def test_retired_mean_baselines_are_not_distributed() -> None:
+    assert not hasattr(lunar, "_calc_mean_apse_analytical")
+    assert not hasattr(lunar, "_compat_legacy_mean_lilith")
+    assert not hasattr(lunar, "_compat_legacy_mean_lunar_node")
+
+
 @pytest.mark.parametrize(
     ("body_id", "position_helper"),
     [
@@ -44,7 +50,7 @@ def test_mean_public_helpers_are_thin_standards_wrappers() -> None:
         (INTP_PERG, lunar.calc_interpolated_perigee),
     ],
 )
-def test_interpolated_helpers_share_the_jpl_smoothed_state(
+def test_interpolated_helpers_share_the_generated_jpl_passage_state(
     body_id: int,
     position_helper: Callable[[float], tuple[float, float, float]],
 ) -> None:
@@ -59,6 +65,20 @@ def test_interpolated_helpers_share_the_jpl_smoothed_state(
 def test_interpolated_state_rejects_non_apse_body() -> None:
     with pytest.raises(ValueError, match="Unsupported"):
         lunar.calc_interpolated_apse_state(J2000, swe.MOON)
+
+
+def test_interpolated_helpers_do_not_reenter_mean_point_range_checks(
+    monkeypatch,
+) -> None:
+    import libephemeris.mean_lunar_apse as mean_model
+
+    monkeypatch.setattr(
+        mean_model,
+        "_check_range",
+        lambda *args: pytest.fail("interpolated evaluator called mean range gate"),
+    )
+    assert all(type(value) is float for value in lunar.calc_interpolated_apogee(J2000))
+    assert all(type(value) is float for value in lunar.calc_interpolated_perigee(J2000))
 
 
 def test_evaluator_lifecycle_distinguishes_reset_from_close() -> None:

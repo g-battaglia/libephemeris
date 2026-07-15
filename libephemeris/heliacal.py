@@ -3744,12 +3744,11 @@ def _heliacal_pheno_ut_pythonic(
     met_range: float = 0.0,
     observer: Sequence[float] = _NAKED_OBSERVER,
 ) -> Tuple[Tuple[float, ...], int]:
-    """
-    Provides data relevant for the calculation of heliacal risings and settings.
+    """Evaluate the observing geometry and visibility metrics of a heliacal event.
 
-    This function calculates detailed phenomena associated with heliacal events,
-    including altitudes, azimuths, arcus visionis, magnitude, visibility times,
-    and other parameters used in heliacal visibility calculations.
+    The 50-slot result preserves the public compatibility layout.  Each populated
+    slot is documented below using independently worded definitions; unused slots
+    are returned as zero.
 
     Args:
         jd: Julian Day (UT) for the calculation
@@ -3768,36 +3767,36 @@ def _heliacal_pheno_ut_pythonic(
         flags: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
-        Tuple containing:
-            - dret: Tuple of 50 floats with heliacal phenomena data:
-                - 0: AltO [deg] topocentric altitude of object (unrefracted)
-                - 1: AppAltO [deg] apparent altitude of object (refracted)
-                - 2: GeoAltO [deg] geocentric altitude of object
-                - 3: AziO [deg] azimuth of object
-                - 4: AltS [deg] topocentric altitude of Sun
-                - 5: AziS [deg] azimuth of Sun
-                - 6: TAVact [deg] actual topocentric arcus visionis
-                - 7: ARCVact [deg] actual (geocentric) arcus visionis
-                - 8: DAZact [deg] actual difference between object's and sun's azimuth
-                - 9: ARCLact [deg] actual longitude difference between object and sun
-                - 10: kact [-] extinction coefficient
-                - 11: minTAV [deg] smallest topocentric arcus visionis
-                - 12: TfirstVR [JDN] first time object is visible, according to VR
-                - 13: TbVR [JDN] optimum time the object is visible, according to VR
-                - 14: TlastVR [JDN] last time object is visible, according to VR
-                - 15: TbYallop [JDN] best time the object is visible, according to Yallop
-                - 16: WMoon [deg] crescent width of Moon
-                - 17: qYal [-] q-test value of Yallop
-                - 18: qCrit [-] Yallop visibility class code (1..6; A..F)
-                - 19: ParO [deg] parallax of object
-                - 20: Magn [-] magnitude of object
-                - 21: RiseO [JDN] rise/set time of object
-                - 22: RiseS [JDN] rise/set time of Sun
-                - 23: Lag [JDN] rise/set time of object minus rise/set time of Sun
-                - 24: TvisVR [JDN] visibility duration
-                - 25: LMoon [deg] crescent length of Moon
-                - 26-49: Reserved for future use
-            - retflag: Return flag (flags on success, negative on error)
+        A pair ``(values, status)``. ``values`` has the following fixed layout:
+
+        - 0 ``AltO``: object altitude at the observing site before refraction (deg).
+        - 1 ``AppAltO``: refracted object altitude seen by the observer (deg).
+        - 2 ``GeoAltO``: altitude obtained from the geocentric direction (deg).
+        - 3 ``AziO``: object azimuth (deg).
+        - 4 ``AltS`` and 5 ``AziS``: topocentric solar altitude and azimuth (deg).
+        - 6 ``TAVact``: topocentric vertical separation from the Sun (deg).
+        - 7 ``ARCVact``: geocentric vertical separation from the Sun (deg).
+        - 8 ``DAZact``: signed object-minus-Sun azimuth separation (deg).
+        - 9 ``ARCLact``: signed object-minus-Sun longitude separation (deg).
+        - 10 ``kact``: atmospheric extinction coefficient.
+        - 11 ``minTAV``: limiting topocentric vertical separation (deg).
+        - 12-14 ``TfirstVR``, ``TbVR``, ``TlastVR``: beginning, optimum, and
+          end of the visibility window (Julian days).
+        - 15 ``TbYallop``: Yallop optimum-visibility time (Julian day).
+        - 16 ``WMoon``: angular width of the lunar crescent (deg).
+        - 17 ``qYal``: Yallop q statistic.
+        - 18 ``qCrit``: numeric Yallop class, 1 through 6 (A through F).
+        - 19 ``ParO``: object parallax (deg).
+        - 20 ``Magn``: apparent magnitude.
+        - 21 ``RiseO`` and 22 ``RiseS``: relevant object and solar horizon
+          crossings (Julian days).
+        - 23 ``Lag``: difference ``RiseO - RiseS`` (days).
+        - 24 ``TvisVR``: duration of the visibility interval (days).
+        - 25 ``LMoon``: angular length of the lunar crescent (deg).
+        - 26-49: compatibility padding reserved for later fields.
+
+        ``status`` contains the accepted calculation flags, or a negative error
+        indicator.
 
     Raises:
         ValueError: If invalid body ID or event_type

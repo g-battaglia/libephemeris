@@ -609,17 +609,30 @@ class TestBundledFictitiousOrbits:
         """Test that load_bundled_fictitious_orbits returns a list of elements."""
         elements = load_bundled_fictitious_orbits()
         assert isinstance(elements, list), "Should return a list"
-        assert len(elements) == 19
+        assert len(elements) == 12
         for elem in elements:
             assert isinstance(elem, OrbitalElements), (
                 "Each element should be OrbitalElements"
             )
 
-    def test_load_bundled_fictitious_orbits_contains_expected_bodies(self):
-        """The restored fixed-element compatibility rows are bundled."""
+    def test_load_bundled_fictitious_orbits_contains_reviewed_rows(self):
+        """Only independently transcribed, source-complete rows are bundled."""
         elements = load_bundled_fictitious_orbits()
         names = {elem.name for elem in elements}
-        assert {"Cupido", "Isis-Transpluto", "Harrington", "Waldemath"} <= names
+        assert names == {
+            "Cupido",
+            "Hades",
+            "Zeus",
+            "Kronos",
+            "Apollon",
+            "Admetos",
+            "Vulkanus",
+            "Poseidon",
+            "Harrington",
+            "Leverrier-Neptune",
+            "Adams-Neptune",
+            "Lowell-Pluto",
+        }
 
     def test_load_bundled_fictitious_orbits_harrington_elements(self):
         """Test the values transcribed from Harrington AJ 96 p. 1478."""
@@ -634,11 +647,11 @@ class TestBundledFictitiousOrbits:
         assert harrington.asc_node.constant == pytest.approx(275.4)
         assert harrington.inclination.constant == pytest.approx(32.4)
 
-    def test_load_bundled_fictitious_orbits_are_heliocentric(self):
-        """Selena and Waldemath are geocentric fixed-element rows."""
+    def test_load_bundled_fictitious_orbit_is_heliocentric(self):
+        """The reviewed Harrington row is heliocentric."""
         elements = load_bundled_fictitious_orbits()
         geocentric = {element.name for element in elements if element.is_geocentric}
-        assert geocentric == {"Selena", "Waldemath"}
+        assert geocentric == set()
 
     def test_load_bundled_fictitious_orbits_can_calculate_position(self):
         """Test that positions can be calculated from the bundled elements."""
@@ -653,12 +666,21 @@ class TestBundledFictitiousOrbits:
         assert -90 <= pos[1] <= 90, "Latitude should be in range [-90, 90]"
         assert pos[2] > 0, "Distance should be positive"
 
-    def test_load_bundled_fictitious_orbits_covers_fixed_element_ids(self):
-        """Every fixed-element restored convention has a bundled row."""
+    def test_load_bundled_fictitious_orbits_excludes_unverified_rows(self):
+        """Every formerly bundled but unverified historical row is absent."""
         elements = load_bundled_fictitious_orbits()
         names = {element.name for element in elements}
-        assert len(names) == 19
-        assert "Selena" in names
+        assert names.isdisjoint(
+            {
+                "Isis-Transpluto",
+                "Nibiru",
+                "Pickering-Pluto",
+                "Vulcan",
+                "Selena",
+                "Proserpina",
+                "Waldemath",
+            }
+        )
 
     # --- Backward-compatibility shims ---
 

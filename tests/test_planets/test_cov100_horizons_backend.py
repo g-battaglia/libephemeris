@@ -36,6 +36,7 @@ from libephemeris.horizons_backend import (
     _to_ecliptic_output,
     horizons_calc_ut,
 )
+from libephemeris.exceptions import UnknownBodyError
 
 JD = 2451545.0  # J2000.0
 
@@ -405,31 +406,39 @@ class TestCalcUtDispatch:
         with pytest.raises(KeyError, match="Skyfield fallback"):
             horizons_calc_ut(None, JD, 40, FLG_SWIEPH)
 
-    def test_restored_hypothetical_helio_dispatch(self):
-        data, flags = horizons_calc_ut(None, JD, 40, FLG_SWIEPH | FLG_HELCTR)
+    def test_reviewed_hypothetical_helio_uses_local_model(self):
+        data, _flags = horizons_calc_ut(
+            None, JD, 40, FLG_SWIEPH | FLG_HELCTR | FLG_SPEED
+        )
         assert len(data) == 6
         assert all(math.isfinite(value) for value in data)
-        assert flags == FLG_SWIEPH | FLG_HELCTR
 
     @pytest.mark.parametrize(
         "body",
-        [*range(40, 56), 57],
+        [48, 49, 54, 55, 57],
     )
-    def test_all_heliocentric_hypothetical_ids_dispatch(self, body):
-        data, _ = horizons_calc_ut(None, JD, body, FLG_SWIEPH | FLG_HELCTR)
-        assert len(data) == 6
-        assert all(math.isfinite(value) for value in data)
+    def test_unverified_heliocentric_hypothetical_ids_fail_closed(self, body):
+        with pytest.raises(UnknownBodyError) as raised:
+            horizons_calc_ut(None, JD, body, FLG_SWIEPH | FLG_HELCTR)
+        assert raised.value.body_id == body
 
-    @pytest.mark.parametrize("body", [56, 58])
-    def test_native_geocentric_hypothetical_ids_dispatch(self, body, monkeypatch):
-        from libephemeris import mean_lunar_apse
-
-        monkeypatch.setattr(
-            mean_lunar_apse, "_active_ephemeris_range", lambda: (None, 0.0, 0.0)
+    @pytest.mark.parametrize("body", [*range(40, 48), 50, 51, 52, 53])
+    def test_reviewed_heliocentric_hypothetical_ids_are_finite(self, body):
+        data, _flags = horizons_calc_ut(
+            None, JD, body, FLG_SWIEPH | FLG_HELCTR | FLG_SPEED
         )
-        data, _ = horizons_calc_ut(None, JD, body, FLG_SWIEPH)
         assert len(data) == 6
         assert all(math.isfinite(value) for value in data)
+
+    def test_reviewed_white_moon_native_geocentric_is_finite(self):
+        data, _flags = horizons_calc_ut(None, JD, 56, FLG_SWIEPH | FLG_SPEED)
+        assert len(data) == 6
+        assert all(math.isfinite(value) for value in data)
+
+    def test_unverified_waldemath_native_geocentric_fails_closed(self):
+        with pytest.raises(UnknownBodyError) as raised:
+            horizons_calc_ut(None, JD, 58, FLG_SWIEPH)
+        assert raised.value.body_id == 58
 
     def test_harrington_geocentric_raises(self):
         with pytest.raises(KeyError):

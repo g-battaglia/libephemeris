@@ -3785,10 +3785,18 @@ def _calc_body(
         result = _maybe_equatorial_convert(result, jd_tt, iflag, already_j2000=True)
         return _to_native_floats(result), iflag
 
-    # Handle White Moon (Selena), Vulcan, Proserpina, Waldemath — fictitious bodies (IDs 55-58)
-    # White Moon and Waldemath are geocentric constructions; Vulcan and
-    # Proserpina are heliocentric orbits and must be converted to
-    # geocentric (with light-time retardation) like any orbiting body.
+    # Route the non-Uranian historical compatibility IDs through the local
+    # hypothetical-body layer.  Only the entries admitted by that layer's
+    # reviewed provenance registry can return a state: Selena (56) is the
+    # source-backed geocentric symbolic construction, and IDs 50--53 are the
+    # independently transcribed heliocentric predicted-planet models.  IDs 49,
+    # 54, 55, 57, and 58 remain in this dispatcher so every public constant
+    # reaches one deterministic error boundary; their calculation functions
+    # raise UnknownBodyError before any unavailable element could be used.
+    #
+    # The heliocentric/geocentric classification below is therefore also a
+    # coordinate-routing declaration for future provenance-complete models,
+    # not evidence that the currently unsupported names carry numerical data.
     _FICT_HELIO_IDS = (
         NIBIRU,
         HARRINGTON,

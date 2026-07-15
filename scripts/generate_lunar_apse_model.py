@@ -9,16 +9,15 @@ reproducibly, as the smooth track through the Moon's actual apsis passages:
    ephemeris range (~1549--2651 CE), refined to ~1 second.
 2. Record the Moon's geometric true-ecliptic-of-date longitude, latitude and
    distance at each passage.
-3. Interpolate the passage track with a natural cubic spline (longitude
-   unwrapped; C2-continuous — the mathematical realization of "interpolated
-   apsis").
-4. Fit the Delaunay-argument trigonometric series (least squares on the
-   correction-table grid) against track - mean_apse.
-5. Store the remaining residuals as the correction tables, and refit the
-   2-harmonic latitude model and the mean apsis distances.
+3. Subtract the mean apse derived from the IERS 2003 Delaunay arguments and
+   fit a trigonometric series in the same IERS arguments at the passages.
+4. Interpolate the remaining passage residual with a natural cubic spline and
+   sample it onto the fixed runtime correction grid.
+5. Refit the 2-harmonic latitude model and mean apsis distances.
 
 Everything derives from the JPL DE440 kernel (Park et al. 2021, AJ 161:105),
-the IERS/Meeus fundamental arguments already used by the runtime, and this
+the IAU SOFA/IERS 2003 fundamental arguments exposed by BSD-licensed ERFA,
+the mean Earth-orbit eccentricity published by Simon et al. (1994), and this
 script. No value is fitted to any external ephemeris implementation.
 
 Outputs ``libephemeris/lunar_apse_model.py`` (tables + fitted coefficients).
@@ -28,7 +27,6 @@ Run:  uv run python scripts/generate_lunar_apse_model.py
 
 from __future__ import annotations
 
-import datetime as _dt
 import math
 import sys
 from pathlib import Path
@@ -46,6 +44,7 @@ APOGEE_CT_COUNT = 40250
 PERIGEE_CT_JD_START = 2286820.5
 PERIGEE_CT_STEP_DAYS = 2.0
 PERIGEE_CT_COUNT = 201249
+EDGE_TAPER_DAYS = 365.25
 
 # --------------------------------------------------------------------------
 # Delaunay trigonometric basis (project design):
@@ -80,24 +79,35 @@ PERIGEE_TERMS = _basis(30, list(range(2, 15)))
 
 
 def _fundamental_arguments(jd_tt: np.ndarray) -> tuple[np.ndarray, ...]:
-    """Delaunay arguments (radians) matching lunar._calc_lunar_fundamental_arguments."""
-    from libephemeris.lunar import _calc_lunar_fundamental_arguments
+    """Return the IERS 2003 Delaunay arguments in radians."""
+    from libephemeris.mean_lunar_apse import lunar_delaunay_arguments
 
     D = np.empty_like(jd_tt)
     M = np.empty_like(jd_tt)
     Mp = np.empty_like(jd_tt)
     F = np.empty_like(jd_tt)
     for i, jd in enumerate(jd_tt):
-        D[i], M[i], Mp[i], F[i] = _calc_lunar_fundamental_arguments(float(jd))
+        D[i], M[i], Mp[i], F[i] = lunar_delaunay_arguments(float(jd))
     return D, M, Mp, F
 
 
 def _design_matrix(
     jd_tt: np.ndarray, terms: list[tuple[int, int, int, int, int]]
 ) -> np.ndarray:
+    from libephemeris.mean_lunar_apse import (
+        EARTH_ECCENTRICITY_J2000,
+        EARTH_ECCENTRICITY_T,
+        EARTH_ECCENTRICITY_T2,
+    )
+
     D, M, Mp, F = _fundamental_arguments(jd_tt)
     T = (jd_tt - J2000) / 36525.0
-    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
+    eccentricity = (
+        EARTH_ECCENTRICITY_J2000
+        + EARTH_ECCENTRICITY_T * T
+        + EARTH_ECCENTRICITY_T2 * T**2
+    )
+    E = eccentricity / EARTH_ECCENTRICITY_J2000
     cols = []
     for cd, cm, cmp_, cf, epow in terms:
         arg = cd * D + cm * M + cmp_ * Mp + cf * F
@@ -214,10 +224,6 @@ class NaturalCubicSpline:
         return self.y[idx] + dx * (self.b[idx] + dx * (self.c[idx] + dx * self.d[idx]))
 
 
-def _unwrap_deg(lon: np.ndarray) -> np.ndarray:
-    return np.degrees(np.unwrap(np.radians(lon)))
-
-
 # --------------------------------------------------------------------------
 # Model generation
 # --------------------------------------------------------------------------
@@ -251,21 +257,30 @@ def build_side(
     coeffs, *_ = np.linalg.lstsq(A, delta, rcond=None)
     residual = delta - A @ coeffs
 
-    # Interpolate the passage residuals onto the correction-table grid;
-    # zero outside the passage range (the runtime tapers the edge
-    # correction to zero within a year).
+    # Interpolate the passage residuals onto the correction-table grid. The
+    # grid has roughly one year of margin outside DE440 coverage; taper the
+    # first/last observed residual through that margin so interpolation at the
+    # terminal passages remains continuous and accurate.
     resid_spline = NaturalCubicSpline(passages, residual)
     grid = ct_start + ct_step * np.arange(ct_count)
     lo, hi = passages[0], passages[-1]
     mask = (grid >= lo) & (grid <= hi)
     corrections = np.zeros(ct_count)
     corrections[mask] = resid_spline(grid[mask]) * 3600.0
+    before = grid < lo
+    before_weight = np.clip(1.0 - (lo - grid[before]) / EDGE_TAPER_DAYS, 0.0, 1.0)
+    corrections[before] = residual[0] * before_weight * 3600.0
+    after = grid > hi
+    after_weight = np.clip(1.0 - (grid[after] - hi) / EDGE_TAPER_DAYS, 0.0, 1.0)
+    corrections[after] = residual[-1] * after_weight * 3600.0
+    interpolated_residual = np.interp(passages, grid, corrections) / 3600.0
+    table_error = residual - interpolated_residual
 
     # Latitude 2-harmonic refit at the passages: lat = a*sin(w) + b*sin(3w),
     # w = passage longitude - mean node longitude.
-    from libephemeris.lunar import _compat_legacy_mean_lunar_node
+    from libephemeris.mean_lunar_apse import mean_lunar_node_position
 
-    node = np.array([_compat_legacy_mean_lunar_node(float(jd)) for jd in passages])
+    node = np.array([mean_lunar_node_position(float(jd))[0] for jd in passages])
     w = np.radians((lon_p % 360.0) - node)
     L = np.column_stack([np.sin(w), np.sin(3.0 * w)])
     lat_fit, *_ = np.linalg.lstsq(L, lat_p, rcond=None)
@@ -277,6 +292,8 @@ def build_side(
         "passages": len(passages),
         "trig_rms_arcsec": float(np.sqrt(np.mean(residual**2))) * 3600.0,
         "trig_max_arcsec": float(np.max(np.abs(residual))) * 3600.0,
+        "table_rms_arcsec": float(np.sqrt(np.mean(table_error**2))) * 3600.0,
+        "table_max_arcsec": float(np.max(np.abs(table_error))) * 3600.0,
         "pre_trig_rms_deg": float(np.sqrt(np.mean(delta**2))),
         "lat_rms_arcsec": float(np.sqrt(np.mean(lat_resid**2))) * 3600.0,
         "mean_dist_au": mean_dist,
@@ -286,23 +303,27 @@ def build_side(
 
 
 def main() -> int:
-    from libephemeris.lunar import (
-        _compat_legacy_mean_lilith,
+    from libephemeris.mean_lunar_apse import (
+        mean_lunar_apogee_position,
     )
 
     def mean_apogee(jd: float) -> float:
-        return _compat_legacy_mean_lilith(jd)
+        return mean_lunar_apogee_position(jd)[0]
 
     def mean_perigee(jd: float) -> float:
-        return (_compat_legacy_mean_lilith(jd) + 180.0) % 360.0
+        return (mean_lunar_apogee_position(jd)[0] + 180.0) % 360.0
 
     # Clamp to the DE440 medium kernel coverage (with a refinement margin).
-    # Grid points outside the passage-track range keep a zero correction and
-    # the runtime tapers the edge correction, so the slightly wider table
-    # grids are unaffected.
-    from libephemeris.state import get_planets
+    # The wider correction grids provide a one-year taper around the passage
+    # interval without extrapolating the fitted spline.
+    from libephemeris.state import get_current_file_data, get_planets
 
     spk = get_planets()["moon"].ephemeris.spk
+    _, _, _, denum = get_current_file_data(0)
+    if denum != 440:
+        raise RuntimeError(
+            f"lunar apse model generation requires DE440, active kernel is DE{denum}"
+        )
     moon_segs = [s for s in spk.segments if s.target == 301]
     kernel_lo = max(s.start_jd for s in moon_segs)
     kernel_hi = min(s.end_jd for s in moon_segs)
@@ -361,34 +382,35 @@ def _fmt_table(values: np.ndarray, per_line: int = 8) -> str:
 def _write_module(apo, per) -> None:
     apo_coeffs, apo_corr, apo_lat, apo_dist, apo_stats = apo
     per_coeffs, per_corr, per_lat, per_dist, per_stats = per
-    stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
     header = f'''# SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """Independent interpolated lunar-apse model, derived from JPL DE440.
 
 AUTO-GENERATED by scripts/generate_lunar_apse_model.py - DO NOT EDIT.
-Generated on: {stamp} UTC
+The output is deterministic for the reviewed DE440 kernel and generator.
 
 Derivation (fully documented in the generator and in
 docs/methodology/interpolated-perigee.md):
   1. Every apsis passage of the DE440 Moon (Park et al. 2021, AJ 161:105)
      over ~1549--2651 CE, refined to ~1 second.
-  2. Natural cubic spline through the passages (geometric true-ecliptic-of-
-     date longitude): the interpolated-apsis track.
+  2. Geometric true-ecliptic-of-date longitude at each passage.
   3. Delaunay-argument trigonometric series fitted by least squares against
-     track - mean_apse (IERS/Meeus fundamental arguments).
-  4. These tables store the remaining residuals (arcseconds) on fixed grids.
+     track - the IERS 2003 mean apse.
+  4. Natural-spline interpolation of the remaining passage residual, sampled
+     onto fixed runtime grids in arcseconds.
   At runtime: longitude = mean + trig series + interpolated correction.
 
-Sources: JPL DE440; IERS Conventions (2010) / Meeus, Astronomical Algorithms
-(1998) for the fundamental arguments. No value derives from any external
-ephemeris implementation.
+Sources: JPL DE440; IERS Conventions (2010), Eq. 5.43; ERFA's BSD-licensed
+implementation of the IAU SOFA fundamental-argument routines; and the mean
+Earth-orbit eccentricity from Simon et al. (1994), A&A 282, 663--683.
+No value derives from any external ephemeris implementation.
 
 Fit quality (vs the DE440 passage track):
-  apogee : trig RMS {apo_stats["trig_rms_arcsec"]:.1f}\", table residual 0 by construction,
+  apogee : trig RMS {apo_stats["trig_rms_arcsec"]:.1f}\", table RMS {apo_stats["table_rms_arcsec"]:.2f}\",
+           table max {apo_stats["table_max_arcsec"]:.2f}\",
            latitude RMS {apo_stats["lat_rms_arcsec"]:.1f}\", {apo_stats["passages"]} passages
-  perigee: trig RMS {per_stats["trig_rms_arcsec"]:.1f}\",
+  perigee: trig RMS {per_stats["trig_rms_arcsec"]:.1f}\", table RMS {per_stats["table_rms_arcsec"]:.2f}\",
+           table max {per_stats["table_max_arcsec"]:.2f}\",
            latitude RMS {per_stats["lat_rms_arcsec"]:.1f}\", {per_stats["passages"]} passages
 """
 

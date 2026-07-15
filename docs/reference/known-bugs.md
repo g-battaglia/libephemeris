@@ -22,12 +22,15 @@ Error reduced from 3.25e-4 AU to ~1.5e-7 AU (2000x improvement).
 Previously, `calc(jd, SUN, FLG_HELCTR)` returned ~126° longitude
 (garbage from `arctan2` of near-zero values). Now correctly returns (0,0,0,0,0,0).
 
-### Historical hypothetical-body regression (FIXED)
+### Historical hypothetical-body availability (v3 provenance boundary)
 
-An rc8 regression temporarily made IDs 40–49 and 51–58 raise
-`UnknownBodyError`. Calculations for all historical IDs 40–58 are available
-again. Each model carries an explicit source status; see
-[Hypothetical bodies](../methodology/hypothetical-bodies.md).
+IDs 40–47, 50–53, and 56 have reviewed primary-source numerical models. IDs
+48, 49, 54, 55, 57, and 58 remain recognised for API compatibility but raise
+`UnknownBodyError` because a source-complete transcription could not be
+established. This is a deliberate provenance boundary rather than an
+accidental failure. See
+[Hypothetical bodies](../methodology/hypothetical-bodies.md) and the exact
+[missing-models field inventory](../methodology/missing-hypothetical-models.md).
 
 ## Horizons Backend Limitations
 

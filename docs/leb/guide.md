@@ -738,9 +738,11 @@ Earth-relative analytical quantities).
 ### 5.5 Pipeline C: Heliocentric-format data
 
 The format can represent a heliocentric J2000 ecliptic channel and transform a
-lawfully generated custom model to geocentric output. Built-in historical IDs
-40–58 are evaluated from their current runtime models instead of persisted LEB
-channels, so old files remain readable without reviving embedded legacy data.
+lawfully generated custom model to geocentric output. Historical IDs 40–58
+bypass persisted LEB channels: the reviewed source-backed models at IDs
+40–47, 50–53, and 56 use the local runtime, while IDs 48, 49, 54, 55, 57,
+and 58 fail closed. Old files remain readable without reviving embedded legacy
+data.
 
 Readers retain structural compatibility with legacy files that contain the
 retired hypothetical group. That decode-only compatibility does not extend to
@@ -1466,7 +1468,7 @@ These are never stored as LEB Chebyshev data:
 
 | Category | Bodies | IDs | Count | How computed |
 |----------|--------|-----|-------|--------------|
-| Historical hypothetical | Cupido through Waldemath | 40–58 | 19 | Current runtime models from `hypothetical.py`; per-ID provenance status is separately gated |
+| Historical hypothetical | 13 source-backed models; 6 names-only IDs | 40–58 | 19 IDs | IDs 40–47, 50–53, and 56 use reviewed runtime models; IDs 48, 49, 54, 55, 57, and 58 raise `UnknownBodyError` |
 | Fixed stars | full star catalog (Regulus, Spica, Aldebaran, …) | FIXSTAR_OFFSET + n | 1447 | `fixed_stars.py` (see §9.4) |
 | Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | MOON_OFFSET + n | 21 | SPK via `planetary_moons.py` |
 | Astrological angles | Ascendant, MC, Descendant, IC, Vertex, Antivertex | 9000–9005 | 6 | `angles.py` (house-based) |
@@ -1476,8 +1478,9 @@ These are never stored as LEB Chebyshev data:
 Any minor body outside the `exotics` registry (e.g. Bennu) likewise falls
 back to the SPK → Skyfield pipeline.
 
-IDs 40–58 do not require LEB coefficients; the dispatcher bypasses any legacy
-hypothetical channel and uses the current runtime model.
+IDs 40–58 do not use LEB coefficients. The dispatcher uses local,
+primary-source runtime models for IDs 40–47, 50–53, and 56 and fails closed
+for the six IDs without independently reviewed complete definitions.
 
 **Total bodies NOT in LEB Chebyshev data:** ~1498 (19 hypothetical + 1447
 stars + 21 moons + 10 angles/parts + 1 nutation).
@@ -1634,7 +1637,7 @@ Historical monolithic size claims and downloads are retired.
 | `EQUATORIAL_ARCSEC` | 0.02 | 0.02 | 0.02 | Heliocentric amplification |
 | `J2000_ARCSEC` | 0.001 | 0.001 | 0.001 | |
 | `SIDEREAL_ARCSEC` | 0.001 | 0.001 | 0.001 | |
-| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | 0.001 | Historical IDs 40–58 use runtime models, including with legacy LEB files |
+| `HYPOTHETICAL_ARCSEC` | 0.001 | 0.001 | 0.001 | Reviewed IDs use local runtime models even with legacy LEB files |
 | `DISTANCE_AU` | 5e-6 | 5e-6 | 5e-6 | |
 
 ### 10.3 Architectural Limitations

@@ -1598,7 +1598,7 @@ def test_download_leb2_replaces_valid_but_unreviewed_bundled_core(
     assert installed == [
         (
             "data/leb2/base_core.leb2",
-            "a02b15344de946f8d0945c30c3ad47c3c1ce69f335af99e545c777fe9ec1bcfd",
+            "e5a9730b09f4a21dd35c7adcc938767644eb242145807bd8a6bf7e6042f5b420",
         )
     ]
     assert "replacing unreviewed cached core" in capsys.readouterr().out

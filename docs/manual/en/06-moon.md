@@ -188,13 +188,21 @@ print(f"Difference:   {true_lon - mean_lilith:.1f}°")
 ### The White Moon (Selena)
 
 Some astrological traditions use a distinct point called the **White Moon** or
-**Selena**. Body ID 56 retains the rc7 seven-year circular compatibility
-convention; it is not defined as the point opposite Lilith and is not a physical
-lunar apsis.
+**Selena**. ID 56 implements the uniform seven-year convention stated by
+Velichko and Larin (2007), pp. 17–18. Its uniform rate and phase are unwrapped
+from their January 1800 and January 2000 rows (pp. 20 and 45), then checked
+against three unused rows through 2007. LibEphemeris declares the otherwise
+unstated time convention explicitly: first day of the month at 00:00 TT. It is
+a symbolic longitude, not a physical lunar apsis or satellite; the returned
+radius is an IAU-standards-derived display convention.
 
 ```python
-white_moon, _ = ephem.calc_ut(jd, ephem.WHITE_MOON)
+selena = ephem.calc_hypothetical_position(ephem.WHITE_MOON, jd_tt)
+print(f"Selena longitude: {selena[0]:.6f}°")
 ```
+
+The complete page-level derivation and arithmetic are in the
+[hypothetical-body provenance record](../../methodology/hypothetical-bodies.md#id-56-white-moon--selena).
 
 Use the documented mean, osculating, or interpolated lunar-apsis APIs when an
 astronomical apsis is required.

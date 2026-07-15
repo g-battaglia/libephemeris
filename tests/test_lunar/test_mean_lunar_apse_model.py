@@ -12,6 +12,7 @@ from libephemeris.mean_lunar_apse import (
     INCLINATION_DEG,
     MEAN_APOGEE_DISTANCE_AU,
     MEAN_NODE_DISTANCE_AU,
+    lunar_delaunay_arguments,
     mean_lunar_apogee_position,
     mean_lunar_apogee_state,
     mean_lunar_apse_plane_node,
@@ -22,6 +23,20 @@ from libephemeris.mean_lunar_apse import (
 from libephemeris.state import get_current_file_data, get_planets
 
 J2000 = 2451545.0
+
+
+@pytest.mark.parametrize("jd", [2415020.5, J2000, 2488070.5])
+def test_shared_delaunay_basis_is_exactly_the_iers_erfa_basis(jd: float) -> None:
+    centuries = (jd - J2000) / 36525.0
+    assert lunar_delaunay_arguments(jd) == pytest.approx(
+        (
+            float(erfa.fad03(centuries)),
+            float(erfa.falp03(centuries)),
+            float(erfa.fal03(centuries)),
+            float(erfa.faf03(centuries)),
+        ),
+        abs=0.0,
+    )
 
 
 @pytest.mark.parametrize("jd", [2415020.5, J2000, 2488070.5])

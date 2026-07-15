@@ -3,7 +3,7 @@
   "generator": "scripts/generate_golden.py",
   "provenance": "LibEphemeris independent NASA JPL/IAU/IERS runtime output; no external-reference calls",
   "source_artifact": "libephemeris/data/leb2/base_core.leb2",
-  "source_sha256": "a02b15344de946f8d0945c30c3ad47c3c1ce69f335af99e545c777fe9ec1bcfd",
+  "source_sha256": "e5a9730b09f4a21dd35c7adcc938767644eb242145807bd8a6bf7e6042f5b420",
   "optional_planet_centers": "disabled; base_core-only regression",
   "generated_at": "2026-07-13T20:12:36Z",
   "entry_count": 133,

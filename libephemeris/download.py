@@ -119,7 +119,7 @@ DATA_FILES: dict[str, dict[str, Any]] = {
         # Ships in every wheel; installed from package resources.
         "url": None,
         "bundled_resource": "data/leb2/base_core.leb2",
-        "sha256": "a02b15344de946f8d0945c30c3ad47c3c1ce69f335af99e545c777fe9ec1bcfd",
+        "sha256": "e5a9730b09f4a21dd35c7adcc938767644eb242145807bd8a6bf7e6042f5b420",
         "size_mb": 10.8,
         "description": "LEB2 core bodies for 'base' tier (1850-2150)",
         "dest_subdir": "leb",

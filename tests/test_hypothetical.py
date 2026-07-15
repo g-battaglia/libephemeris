@@ -25,10 +25,15 @@ from libephemeris.hypothetical import (
     ISIS,
     KRONOS,
     KRONOS_KEPLERIAN_ELEMENTS,
+    LOWELL_PLANET_X_ELEMENTS,
+    NEPTUNE_ADAMS,
+    NEPTUNE_LEVERRIER,
     NIBIRU,
     PICKERING_PLANET_X_ELEMENTS,
     POSEIDON,
     POSEIDON_KEPLERIAN_ELEMENTS,
+    PLUTO_LOWELL,
+    PLUTO_PICKERING,
     PROSERPINA,
     TRANSPLUTO_KEPLERIAN_ELEMENTS,
     TransplutoKeplerianElements,
@@ -90,6 +95,16 @@ from libephemeris.hypothetical import (
 
 J2000 = 2451545.0
 
+_SUPPORTED_IDS = {
+    *range(CUPIDO, POSEIDON + 1),
+    HARRINGTON,
+    NEPTUNE_LEVERRIER,
+    NEPTUNE_ADAMS,
+    PLUTO_LOWELL,
+    WHITE_MOON,
+}
+_UNSUPPORTED_IDS = set(range(CUPIDO, WALDEMATH + 1)) - _SUPPORTED_IDS
+
 _RC7_LEGACY_PUBLIC_NAMES = {
     "ADMETOS_KEPLERIAN_ELEMENTS",
     "APOLLON_KEPLERIAN_ELEMENTS",
@@ -112,19 +127,47 @@ _RC7_LEGACY_PUBLIC_NAMES = {
 }
 
 
-def test_compatibility_tables_cover_all_restored_fictitious_bodies() -> None:
+def test_builtin_tables_contain_only_primary_transcriptions() -> None:
+    assert set(URANIAN_ELEMENTS) == set(range(CUPIDO, POSEIDON + 1))
     assert set(URANIAN_KEPLERIAN_ELEMENTS) == set(range(CUPIDO, POSEIDON + 1))
-    assert set(HYPOTHETICAL_ELEMENTS) == {ISIS, PROSERPINA}
-    assert TRANSPLUTO_KEPLERIAN_ELEMENTS is HYPOTHETICAL_ELEMENTS[ISIS]
+    assert HYPOTHETICAL_ELEMENTS == {}
     assert type(TRANSPLUTO_KEPLERIAN_ELEMENTS) is TransplutoKeplerianElements
     assert TRANSPLUTO_KEPLERIAN_ELEMENTS.name == "Transpluto"
-    assert set(FICTITIOUS_ORBITAL_ELEMENTS) == set(range(NIBIRU, 55))
+    assert set(FICTITIOUS_ORBITAL_ELEMENTS) == {
+        HARRINGTON,
+        NEPTUNE_LEVERRIER,
+        NEPTUNE_ADAMS,
+        PLUTO_LOWELL,
+    }
     assert VULCAN_ELEMENTS.name == "Vulcan"
     assert WALDEMATH_ELEMENTS.name == "Waldemath"
     assert set(HYPOTHETICAL_PROVENANCE) == set(range(CUPIDO, WALDEMATH + 1))
+    assert all(
+        HYPOTHETICAL_PROVENANCE[body_id][0] == "primary-transcription"
+        for body_id in _SUPPORTED_IDS - {WHITE_MOON}
+    )
+    assert HYPOTHETICAL_PROVENANCE[WHITE_MOON][0] == "published-model"
+    assert all(
+        HYPOTHETICAL_PROVENANCE[body_id][0] == "unsupported"
+        for body_id in _UNSUPPORTED_IDS
+    )
 
     rows = load_bundled_fictitious_orbits()
-    assert len(rows) == 19
+    assert len(rows) == 12
+    assert {row.name for row in rows} == {
+        "Cupido",
+        "Hades",
+        "Zeus",
+        "Kronos",
+        "Apollon",
+        "Admetos",
+        "Vulkanus",
+        "Poseidon",
+        "Harrington",
+        "Leverrier-Neptune",
+        "Adams-Neptune",
+        "Lowell-Pluto",
+    }
     row = get_orbital_body_by_name(rows, "Harrington")
     assert row is not None
     assert row.epoch_jd == 2374696.5
@@ -143,143 +186,46 @@ def test_removed_element_constants_are_exported_at_package_import() -> None:
     assert ephem.WALDEMATH_ELEMENTS is WALDEMATH_ELEMENTS
     assert ephem.PICKERING_PLANET_X_ELEMENTS is PICKERING_PLANET_X_ELEMENTS
     assert ephem.TransplutoKeplerianElements is TransplutoKeplerianElements
-    assert URANIAN_KEPLERIAN_ELEMENTS
-    assert TRANSPLUTO_KEPLERIAN_ELEMENTS is not None
+    assert set(URANIAN_KEPLERIAN_ELEMENTS) == set(range(CUPIDO, POSEIDON + 1))
+    assert HYPOTHETICAL_ELEMENTS == {}
 
 
-def test_rc7_legacy_uranian_public_objects_keep_exact_types_and_values() -> None:
-    expected_mean_elements = {
-        CUPIDO: ("Cupido", 241.2067, 1.091437, 1.5, 21.6, 83.0),
-        HADES: ("Hades", 176.0581, 0.736380, 1.5, 258.0, 56.0),
-        ZEUS: ("Zeus", 32.1893, 0.532664, 1.0, 141.0, 41.0),
-        KRONOS: ("Kronos", 213.2096, 0.420481, 1.0, 98.0, 32.0),
-        APOLLON: ("Apollon", 71.8925, 0.341403, 1.0, 326.0, 26.0),
-        ADMETOS: ("Admetos", 142.2269, 0.283756, 1.0, 250.0, 22.0),
-        VULKANUS: ("Vulkanus", 195.6753, 0.240116, 1.0, 178.0, 18.0),
-        POSEIDON: ("Poseidon", 274.4073, 0.207016, 1.0, 105.0, 16.0),
-    }
-    assert set(URANIAN_ELEMENTS) == set(expected_mean_elements)
-    for body_id, expected in expected_mean_elements.items():
-        elements = URANIAN_ELEMENTS[body_id]
-        assert type(elements) is UranianElements
-        assert (
-            elements.name,
-            elements.L0,
-            elements.n,
-            elements.amplitude,
-            elements.phase,
-            elements.phase_rate,
-        ) == expected
+def test_legacy_public_element_objects_reflect_reviewed_or_unavailable_state() -> None:
+    assert set(URANIAN_ELEMENTS) == set(range(CUPIDO, POSEIDON + 1))
+    assert UranianElements.__name__ == "UranianElements"
 
-    expected_keplerian = [
-        (
-            CUPIDO_KEPLERIAN_ELEMENTS,
-            CupidoKeplerianElements,
-            (
-                "Cupido",
-                2415020.0,
-                40.99837,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                105.301693,
-                0.0037945179,
-            ),
-        ),
-        (
-            HADES_KEPLERIAN_ELEMENTS,
-            HadesKeplerianElements,
-            (
-                "Hades",
-                2415020.0,
-                50.66744,
-                0.00245,
-                1.05,
-                148.1796,
-                161.3339,
-                26.850162,
-                0.00278759,
-            ),
-        ),
-        (
-            ZEUS_KEPLERIAN_ELEMENTS,
-            ZeusKeplerianElements,
-            ("Zeus", 2415020.0, 59.21436, 0.0, 0.0, 0.0, 0.0, 104.289095, 0.002220375),
-        ),
-        (
-            KRONOS_KEPLERIAN_ELEMENTS,
-            KronosKeplerianElements,
-            ("Kronos", 2415020.0, 64.8169, 0.0, 0.0, 0.0, 0.0, 17.111353, 0.0019351856),
-        ),
-        (
-            APOLLON_KEPLERIAN_ELEMENTS,
-            ApollonKeplerianElements,
-            (
-                "Apollon",
-                2415020.0,
-                70.36118,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                138.565328,
-                0.0017177599,
-            ),
-        ),
-        (
-            ADMETOS_KEPLERIAN_ELEMENTS,
-            AdmetosKeplerianElements,
-            (
-                "Admetos",
-                2415020.0,
-                73.736396,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                350.613913,
-                0.0016016766,
-            ),
-        ),
-        (
-            VULKANUS_KEPLERIAN_ELEMENTS,
-            VulkanusKeplerianElements,
-            (
-                "Vulkanus",
-                2415020.0,
-                77.445895,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                55.397715,
-                0.0015069325,
-            ),
-        ),
-        (
-            POSEIDON_KEPLERIAN_ELEMENTS,
-            PoseidonKeplerianElements,
-            (
-                "Poseidon",
-                2415020.0,
-                83.666307,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                166.140256,
-                0.0013256078,
-            ),
-        ),
+    reviewed_keplerian = [
+        (CUPIDO_KEPLERIAN_ELEMENTS, CupidoKeplerianElements, "Cupido"),
+        (HADES_KEPLERIAN_ELEMENTS, HadesKeplerianElements, "Hades"),
+        (ZEUS_KEPLERIAN_ELEMENTS, ZeusKeplerianElements, "Zeus"),
+        (KRONOS_KEPLERIAN_ELEMENTS, KronosKeplerianElements, "Kronos"),
+        (APOLLON_KEPLERIAN_ELEMENTS, ApollonKeplerianElements, "Apollon"),
+        (ADMETOS_KEPLERIAN_ELEMENTS, AdmetosKeplerianElements, "Admetos"),
+        (VULKANUS_KEPLERIAN_ELEMENTS, VulkanusKeplerianElements, "Vulkanus"),
+        (POSEIDON_KEPLERIAN_ELEMENTS, PoseidonKeplerianElements, "Poseidon"),
     ]
-    for elements, expected_type, expected_values in expected_keplerian:
+    for elements, expected_type, expected_name in reviewed_keplerian:
         assert type(elements) is expected_type
-        assert tuple(vars(elements).values()) == expected_values
+        values = vars(elements).copy()
+        assert values.pop("name") == expected_name
+        assert values
+        assert all(math.isfinite(value) for value in values.values())
 
-    # These are import-compatibility objects; the independently gated runtime
-    # registry remains separate and unchanged.
-    assert CUPIDO_KEPLERIAN_ELEMENTS is not URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
+    assert all(
+        math.isfinite(value)
+        for name, value in vars(LOWELL_PLANET_X_ELEMENTS).items()
+        if name != "name"
+    )
+    for elements in (
+        TRANSPLUTO_KEPLERIAN_ELEMENTS,
+        PICKERING_PLANET_X_ELEMENTS,
+        VULCAN_ELEMENTS,
+        WALDEMATH_ELEMENTS,
+    ):
+        values = vars(elements).copy()
+        assert isinstance(values.pop("name"), str)
+        assert values
+        assert all(math.isnan(value) for value in values.values())
 
 
 def test_rc7_legacy_public_names_are_real_module_level_definitions() -> None:
@@ -305,9 +251,10 @@ def test_rc7_legacy_public_names_are_real_module_level_definitions() -> None:
     assert _RC7_LEGACY_PUBLIC_NAMES <= defined_names
 
 
-def test_harrington_position_is_finite_and_continuous() -> None:
-    position = calc_fictitious_position(HARRINGTON, J2000)
-    later = calc_hypothetical_position(HARRINGTON, J2000 + 1.0)
+@pytest.mark.parametrize("body_id", sorted(_SUPPORTED_IDS))
+def test_reviewed_position_is_finite_and_continuous(body_id: int) -> None:
+    position = calc_hypothetical_position(body_id, J2000)
+    later = calc_hypothetical_position(body_id, J2000 + 1.0)
 
     assert len(position) == 6
     assert all(math.isfinite(value) for value in position)
@@ -318,16 +265,34 @@ def test_harrington_position_is_finite_and_continuous() -> None:
     assert abs(delta) < 1.0
 
 
-@pytest.mark.parametrize("body_id", range(CUPIDO, WALDEMATH + 1))
-def test_all_restored_ids_return_finite_states(
-    body_id: int,
-) -> None:
+@pytest.mark.parametrize(
+    "body_id",
+    sorted(_UNSUPPORTED_IDS),
+)
+def test_recognised_but_unverified_ids_raise_unknown_body(body_id: int) -> None:
     assert is_hypothetical_body(body_id)
-    state = calc_hypothetical_position(body_id, J2000)
-    assert len(state) == 6
-    assert all(math.isfinite(value) for value in state)
-    assert 0.0 <= state[0] < 360.0
-    assert state[2] > 0.0
+    with pytest.raises(UnknownBodyError) as raised:
+        calc_hypothetical_position(body_id, J2000)
+    assert raised.value.body_id == body_id
+
+
+@pytest.mark.parametrize(
+    ("function", "body_id"),
+    [
+        (calc_transpluto, ISIS),
+        (calc_transpluto_position, ISIS),
+        (calc_vulcan, VULCAN),
+        (calc_proserpina, PROSERPINA),
+        (calc_waldemath, WALDEMATH),
+        (calc_waldemath_position, WALDEMATH),
+        (calc_planet_x_pickering, PLUTO_PICKERING),
+    ],
+)
+def test_unverified_named_entry_points_raise(function: object, body_id: int) -> None:
+    assert is_hypothetical_body(body_id)
+    with pytest.raises(UnknownBodyError) as raised:
+        function(J2000)  # type: ignore[operator]
+    assert raised.value.body_id == body_id
 
 
 @pytest.mark.parametrize(
@@ -341,28 +306,24 @@ def test_all_restored_ids_return_finite_states(
         (calc_admetos, ADMETOS),
         (calc_vulkanus, VULKANUS),
         (calc_poseidon, POSEIDON),
-        (calc_transpluto, ISIS),
-        (calc_transpluto_position, ISIS),
-        (calc_vulcan, VULCAN),
+        (calc_planet_x_lowell, PLUTO_LOWELL),
         (calc_white_moon_position, WHITE_MOON),
-        (calc_proserpina, PROSERPINA),
-        (calc_waldemath, WALDEMATH),
-        (calc_waldemath_position, WALDEMATH),
-        (calc_planet_x_lowell, 53),
-        (calc_planet_x_pickering, 54),
     ],
 )
-def test_named_entry_points_compute(function: object, body_id: int) -> None:
+def test_reviewed_named_entry_points_return_finite_state(
+    function: object, body_id: int
+) -> None:
     assert is_hypothetical_body(body_id)
-    result = function(J2000)  # type: ignore[operator]
-    assert len(result) == 6
-    assert all(math.isfinite(value) for value in result)
+    state = function(J2000)  # type: ignore[operator]
+    assert len(state) == 6
+    assert all(math.isfinite(value) for value in state)
 
 
 @pytest.mark.parametrize("function", [calc_uranian_planet, calc_uranian_position])
-def test_generic_uranian_entry_points_compute(function: object) -> None:
-    result = function(CUPIDO, J2000)  # type: ignore[operator]
-    assert len(result) == 6
+def test_generic_uranian_entry_points_calculate_reviewed_body(function: object) -> None:
+    state = function(CUPIDO, J2000)  # type: ignore[operator]
+    assert len(state) == 6
+    assert all(math.isfinite(value) for value in state)
 
 
 @pytest.mark.parametrize("function", [calc_uranian_planet, calc_uranian_position])
@@ -373,8 +334,9 @@ def test_generic_uranian_entry_points_preserve_body_id_on_error(
         function(999, J2000)  # type: ignore[operator]
 
 
-def test_uranian_longitude_matches_full_position() -> None:
-    assert calc_uranian_longitude(CUPIDO, J2000) == calc_cupido(J2000)[0]
+def test_uranian_longitude_calculates_reviewed_body() -> None:
+    longitude = calc_uranian_longitude(CUPIDO, J2000)
+    assert 0.0 <= longitude < 360.0
 
 
 def test_missing_fictitious_elements_error_carries_body_id() -> None:
@@ -383,19 +345,54 @@ def test_missing_fictitious_elements_error_carries_body_id() -> None:
     assert raised.value.body_id == 999
 
 
-@pytest.mark.parametrize("jd", [2415020.0, J2000, 2488070.0])
-def test_white_moon_pins_rc7_seven_year_convention(jd: float) -> None:
-    centuries = (jd - J2000) / 36525.0
-    expected = (
-        (242.2205555 + 5143.5418158 * centuries) % 360.0,
-        0.0,
-        0.05280098949,
-        5143.5418158 / 36525.0,
-        0.0,
-        0.0,
+@pytest.mark.parametrize("use_true_lilith", [False, True])
+def test_white_moon_matches_published_seven_year_model(
+    use_true_lilith: bool,
+) -> None:
+    # Velichko--Larin (2007), p. 17 defines uniform zodiacal motion with a
+    # seven-year cycle.  Pages 20 and 45 print January 1800 as 6 deg 08 arcmin
+    # Taurus and January 2000 as 2 deg 18 arcmin Sagittarius.  LibEphemeris
+    # maps monthly rows to the first civil day at 00:00 TT; the common January
+    # label means any fixed alternative sample instant would cancel from the
+    # rate's 200-year time difference.
+    early_jd = 2378496.5
+    early_longitude = 30.0 + 6.0 + 8.0 / 60.0
+    source_jd = 2451544.5
+    source_longitude = 240.0 + 2.0 + 18.0 / 60.0
+    elapsed_days = source_jd - early_jd
+    displacement = 28.0 * 360.0 + source_longitude - early_longitude
+    daily_motion = displacement / elapsed_days
+    period_days = 360.0 / daily_motion
+
+    source_state = calc_white_moon_position(source_jd, use_true_lilith=use_true_lilith)
+    assert source_state[0] == pytest.approx(source_longitude, abs=1e-12)
+    early_state = calc_white_moon_position(early_jd, use_true_lilith=use_true_lilith)
+    assert early_state[0] == pytest.approx(early_longitude, abs=1e-12)
+
+    state = calc_white_moon_position(J2000, use_true_lilith=use_true_lilith)
+    assert state[0] == pytest.approx(
+        source_longitude + daily_motion * (J2000 - source_jd), abs=1e-12
     )
-    assert calc_white_moon_position(jd) == expected
-    assert calc_white_moon_position(jd, use_true_lilith=True) == expected
+    assert state[1] == 0.0
+    assert state[2] == pytest.approx(
+        (3.986004e14 * (period_days * 86_400.0 / (2.0 * math.pi)) ** 2) ** (1.0 / 3.0)
+        / 149_597_870_700.0,
+        abs=1e-15,
+    )
+    assert state[3] == pytest.approx(daily_motion, abs=1e-15)
+    assert state[4:] == (0.0, 0.0)
+
+    # These rows were not used to derive rate or phase.  Their maximum residual
+    # is below half an arcminute, as required for nearest-minute printed data:
+    # March 1879 is on p. 29; December 2000 and January 2007 are on p. 45.
+    for jd, published in (
+        (2407409.5, 120.0 + 27.0 + 29.0 / 60.0),
+        (2451879.5, 270.0 + 19.0 + 28.0 / 60.0),
+        (2454101.5, 240.0 + 2.0 + 22.0 / 60.0),
+    ):
+        calculated = calc_white_moon_position(jd)[0]
+        difference = abs((calculated - published + 180.0) % 360.0 - 180.0)
+        assert difference <= 0.5 / 60.0
 
 
 def test_recognised_names_remain_available_for_api_compatibility() -> None:

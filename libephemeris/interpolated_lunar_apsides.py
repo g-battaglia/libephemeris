@@ -10,10 +10,9 @@ evaluated with Gauss-Legendre quadrature in the fixed ICRS frame.  No sampled
 output table, fitted coefficient set, or external compatibility artifact is
 used.
 
-This evaluator is retained for research and internal validation.  The public
-``INTP_APOG`` and ``INTP_PERG`` compatibility path is implemented by the
-SHA-256-pinned rc7 series in :mod:`libephemeris.lunar`; it does not call this
-module.
+This evaluator is retained for research and internal validation. The public
+``INTP_APOG`` and ``INTP_PERG`` path uses separate non-antipodal curves through
+the DE440 apsis passages; it does not call this one-month boxcar evaluator.
 
 The smoothing kernel is an independent LibEphemeris definition, not a claim
 that another ephemeris uses the same interpolation.  The anomalistic period is

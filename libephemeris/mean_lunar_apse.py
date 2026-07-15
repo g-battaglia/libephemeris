@@ -25,6 +25,13 @@ _J2000_JD = 2451545.0
 _JULIAN_CENTURY_DAYS = 36525.0
 _RATE_HALF_SPAN_DAYS = 0.5
 
+# Mean Earth-orbit eccentricity through T^2 from Simon et al. (1994), A&A
+# 282, 663--683. The interpolated-apse harmonic basis uses its ratio to the
+# J2000 value for solar-anomaly terms.
+EARTH_ECCENTRICITY_J2000 = 0.016708634
+EARTH_ECCENTRICITY_T = -0.000042037
+EARTH_ECCENTRICITY_T2 = -0.0000001267
+
 # Conventional mean lunar orbit.  Distances are computed from the exact IAU
 # 2012 astronomical unit rather than copied from another ephemeris product.
 _AU_KM = 149_597_870.7
@@ -102,6 +109,25 @@ def _check_range(jd: float, body_id: int, body_name: str) -> None:
 
 def _centuries(jd: float) -> float:
     return (jd - _J2000_JD) / _JULIAN_CENTURY_DAYS
+
+
+def lunar_delaunay_arguments(jd_tt: float) -> tuple[float, float, float, float]:
+    """Return the IERS 2003 lunar arguments ``(D, M, M', F)`` in radians.
+
+    ERFA implements the IAU SOFA fundamental-argument routines published in
+    IERS Conventions (2010), Eq. 5.43.  The explicit order used here matches
+    the trigonometric basis of the independently generated interpolated-apse
+    model: mean elongation, solar anomaly, lunar anomaly, and argument of
+    latitude.
+    """
+    jd = float(jd_tt)
+    centuries = _centuries(jd)
+    return (
+        float(erfa.fad03(centuries)),
+        float(erfa.falp03(centuries)),
+        float(erfa.fal03(centuries)),
+        float(erfa.faf03(centuries)),
+    )
 
 
 def _fundamental_arguments(jd: float) -> tuple[float, float, float]:
@@ -217,7 +243,17 @@ def _cartesian_to_polar_state(
 
 def mean_lunar_apogee_position(jd_tt: float) -> tuple[float, float, float]:
     """Return mean lunar apogee longitude, latitude, and distance."""
-    return mean_lunar_apogee_state(float(jd_tt))[:3]
+    jd = float(jd_tt)
+    _check_range(jd, MEAN_APOG, "mean lunar apogee")
+    return _mean_lunar_apogee_position_unchecked(jd)
+
+
+def _mean_lunar_apogee_position_unchecked(
+    jd_tt: float,
+) -> tuple[float, float, float]:
+    """Evaluate the analytic IERS mean apogee without a kernel range check."""
+    jd = float(jd_tt)
+    return _cartesian_to_polar_state(_mean_apogee_cartesian_state(jd))[:3]
 
 
 def mean_lunar_apogee_state(
@@ -237,7 +273,20 @@ def mean_lunar_apogee_state(
 
 def mean_lunar_node_position(jd_tt: float) -> tuple[float, float, float]:
     """Return mean lunar node longitude, zero latitude, and mean distance."""
-    return mean_lunar_node_state(float(jd_tt))[:3]
+    jd = float(jd_tt)
+    _check_range(jd, MEAN_NODE, "mean lunar node")
+    return _mean_lunar_node_position_unchecked(jd)
+
+
+def _mean_lunar_node_position_unchecked(jd_tt: float) -> tuple[float, float, float]:
+    """Evaluate the analytic IERS mean node without a kernel range check."""
+    jd = float(jd_tt)
+    _, _, node = _fundamental_arguments(jd)
+    return (
+        float(math.degrees(node) % 360.0),
+        0.0,
+        float(MEAN_NODE_DISTANCE_AU),
+    )
 
 
 def mean_lunar_node_state(
@@ -263,6 +312,7 @@ __all__ = [
     "INCLINATION_DEG",
     "MEAN_APOGEE_DISTANCE_AU",
     "MEAN_NODE_DISTANCE_AU",
+    "lunar_delaunay_arguments",
     "mean_lunar_apogee_position",
     "mean_lunar_apogee_state",
     "mean_lunar_apse_plane_node",

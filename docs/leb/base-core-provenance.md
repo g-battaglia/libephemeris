@@ -6,9 +6,9 @@ repository.
 ## Artifact
 
 - Path: `libephemeris/data/leb2/base_core.leb2`
-- Build date: 2026-07-13
+- Build date: 2026-07-15
 - Size: 10,841,639 bytes
-- SHA-256: `a02b15344de946f8d0945c30c3ad47c3c1ce69f335af99e545c777fe9ec1bcfd`
+- SHA-256: `e5a9730b09f4a21dd35c7adcc938767644eb242145807bd8a6bf7e6042f5b420`
 - Body IDs: 0–12 and 14
 - Format: LEB2 v2; populated section types 0, 2, 3, 4, and 6
 
@@ -21,11 +21,30 @@ uv run python scripts/generate_leb2.py generate --tier base --group core --worke
 The reviewed result was then installed at
 `libephemeris/data/leb2/base_core.leb2`.
 
+Exact generation-input pins:
+
+- DE440s SPK SHA-256:
+  `c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2`;
+- `scripts/generate_leb.py` SHA-256:
+  `a6b7376393f1431711d7fc63480bda580519aea94b4805fcc753c0484f05a322`;
+- `scripts/generate_leb2.py` SHA-256:
+  `8bcbcd70d3972b78bc4fce00980531c897c446152c8f8d38a108b24db7af518d`;
+- `libephemeris/mean_lunar_apse.py` SHA-256:
+  `ee2cfe81464e950da9760fed1942b4003178f7069fd75c058aa38a882d06b068`;
+- `libephemeris/lunar.py` SHA-256:
+  `83e48a4cf6c9eb18c088e91f4862bb781e68a53d3a942e005f2612919d5199af`.
+
+These pins identify the bytes used for this artifact even if later commits
+change a generator or lunar model. The source kernel remains an external JPL
+input and is not relicensed by this project.
+
 ## Scientific inputs
 
 - Planetary, Earth, and lunar state data: NASA JPL DE440s.
 - Mean-node and mean-apogee inputs: ERFA's implementation of the IERS 2003
-  Delaunay arguments plus conventional orbital-plane geometry.
+  Delaunay arguments plus conventional orbital-plane geometry. This build was
+  performed after removal of the superseded compatibility baseline and does
+  not use an earlier LEB body channel as an input or target.
 - Serialization and compression: the project-owned LEB2 generator and format
   implementation in this repository.
 
@@ -53,10 +72,11 @@ The attestation covers every payload in the file, not only the body channels:
   generated entirely by the repository's LEB2 serializer from the body and
   auxiliary values described above.
 
-No Swiss Ephemeris source, documentation, algorithm, data file, or generated
-artifact was used. The build made no call to the reference API and consumed no
-external comparison output. It did not convert or reuse any previously published
-LEB file.
+The recorded build inputs contain no reference-distribution source,
+documentation, algorithm, data file, generated artifact, or comparison output;
+the build regenerated the asset rather than converting a previously published
+LEB file. This attestation is scoped to the named build inputs and artifact. It
+does not make a claim about every historical repository revision.
 The retired hypothetical group was neither generated nor converted; active
 tooling excludes it from publication.
 

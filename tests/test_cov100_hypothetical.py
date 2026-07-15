@@ -158,16 +158,16 @@ def test_fictitious_position_rejects_nonclassical_id_with_body_id() -> None:
     assert raised.value.body_id == ISIS
 
 
-def test_transpluto_raw_computes_restored_elements() -> None:
-    position = _calc_transpluto_raw(J2000)
-    assert len(position) == 3
-    assert all(math.isfinite(value) for value in position)
+def test_transpluto_raw_rejects_unverified_elements() -> None:
+    with pytest.raises(UnknownBodyError) as raised:
+        _calc_transpluto_raw(J2000)
+    assert raised.value.body_id == ISIS
 
 
-def test_dispatch_computes_restored_uranian_id() -> None:
-    position = calc_hypothetical_position(CUPIDO, J2000)
-    assert len(position) == 6
-    assert all(math.isfinite(value) for value in position)
+def test_dispatch_calculates_reviewed_uranian_id() -> None:
+    state = calc_hypothetical_position(CUPIDO, J2000)
+    assert len(state) == 6
+    assert all(math.isfinite(value) for value in state)
 
 
 def test_synthetic_keplerian_rotation_and_precession() -> None:

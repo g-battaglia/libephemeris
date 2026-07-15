@@ -32,17 +32,31 @@ couplings. The perigee series has the larger asymmetric evection spectrum and
 extends through harmonic 30. This is why the two interpolated directions are
 not generally separated by exactly `180°`.
 
-The analytical result is refined by `libephemeris/lunar_apse_model.py`,
+The baseline apse and node come from the same ERFA/IERS model used by the mean
+points. The analytical result is refined by `libephemeris/lunar_apse_model.py`,
 generated from the DE440 apsis passages by the committed
-`scripts/generate_lunar_apse_model.py` and pinned by SHA-256: the reported
-curve is exact at every DE440 apsis passage. Latitude follows a two-harmonic
-inclined-plane fit (within `0.25°` of the instantaneous passage latitude).
-The distance channels carry the mean DE440 passage distances rather than the
-Moon's instantaneous distance.
+`scripts/generate_lunar_apse_model.py` and pinned by SHA-256. The generator
+uses `fad03`, `falp03`, `fal03`, and `faf03` directly; it has no compatibility
+ephemeris target. On a two-year interval around J2000, passage-longitude errors
+are below `12 arcsec` for apogee and `2 arcsec` for perigee. Latitude follows a
+two-harmonic inclined-plane fit (within about `0.2°` of the instantaneous
+passage latitude). The distance channels carry the mean DE440 passage
+distances rather than the Moon's instantaneous distance.
+
+Across all 14,581 passages per side, including both terminal intervals, the
+fixed-grid residual has RMS/max error `2.66/18.39 arcsec` for apogee and
+`0.80/6.35 arcsec` for perigee. The one-year terminal taper is part of the
+generator and avoids a correction jump at the first and last DE440 passages.
 
 Interpolated points start on the true ecliptic of date. Speeds are centered
 half-day derivatives of the complete reported curve, including longitude
 unwrapping.
+
+The fitted correction tables cover the DE440 medium interval, approximately
+1550--2650 CE. Outside the terminal taper, the standards-derived baseline plus
+trigonometric series remains; accuracy then has the documented trig-only RMS
+of about `0.045°` (apogee) and `0.112°` (perigee). This extrapolated curve is an
+abstract coordinate, not a substitute for DE441 lunar distance extrema.
 
 ## Osculating points
 
@@ -73,8 +87,9 @@ speed-output contracts.
 - [IERS Conventions (2010), Chapter 5, Eq. 5.43](https://iers-conventions.obspm.fr/content/chapter5/icc5.pdf), Delaunay fundamental arguments.
 - [ERFA](https://github.com/liberfa/erfa), BSD-licensed implementation of the
   IAU SOFA standards routines.
-- Chapront-Touzé & Chapront (1988), *ELP 2000-82B: a semi-analytical lunar
-  ephemeris adequate for historical times*, A&A 190, 342–352.
+- Simon et al. (1994), *Numerical expressions for precession formulae and mean
+  elements for the Moon and the planets*, A&A 282, 663--683, for the mean
+  Earth-orbit eccentricity used to scale solar-anomaly harmonics.
 - [Park et al. (2021), DE440 and DE441](https://ssd.jpl.nasa.gov/doc/de440_de441.html).
 
 See [Scientific Precision](../reference/precision.md).

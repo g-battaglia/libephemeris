@@ -1,41 +1,115 @@
-# Historical hypothetical-body orbital conventions (IDs 40--58).
+# Independently transcribed historical hypothetical-body orbits.
 #
 # Format:
 #   name,epoch_jd,equinox,mean_anomaly,semi_axis_au,eccentricity,
 #   arg_perihelion,asc_node,inclination,geocentric,source/status
 #
-# Each row carries a source annotation. Integrity is checked by
-# scripts/check_hypothetical_provenance.py.
+# This file is deliberately a small, reviewed data set rather than a catalogue
+# of every historical body recognised by the public API.  IDs without a fully
+# recoverable independent source remain recognised by name and number, but are
+# absent here and fail closed at calculation time.  See
+# docs/methodology/missing-hypothetical-models.md.
+#
+# The runtime does not parse the prose after the final comma; it exists so that
+# every numerical row remains auditable when this file is viewed by itself.
 
-# Hamburg-school planets. Witte's primary articles define Cupido, Hades, Zeus,
-# and Kronos; Sieggruen's 1929/1937 publications define the later four. The
-# refined epoch-1900.0 element set is James Neely's (1988), reproduced in the
-# independent Uranian-astrology literature; the semi-major axes below were
-# corroborated against independently circulated copies of Neely's table
-# (Cupido 40.998370, Hades 50.667443, Zeus 59.214362, Kronos 64.816896).
-# Page-by-page transcription of Neely (1988) itself remains tracked.
-Cupido,2415020.0,J1900,163.7409,40.99837,0.00460,171.4333,129.8325,1.0833,0,built-in: Witte 1923 and Neely 1988 refinement
-Hades,2415020.0,J1900,27.6496,50.66744,0.00245,148.1796,161.3339,1.0500,0,built-in: Witte 1924 and Neely 1988 refinement
-Zeus,2415020.0,J1900,165.1232,59.21436,0.00120,299.0440,0.0,0.0,0,built-in: Witte 1924 and Neely 1988 refinement
-Kronos,2415020.0,J1900,169.0193,64.81690,0.00305,208.8801,0.0,0.0,0,built-in: Witte 1924 and Neely 1988 refinement
-Apollon,2415020.0,J1900,138.0533,70.29949,0.0,0.0,0.0,0.0,0,built-in: Sieggruen 1929 and 1937
-Admetos,2415020.0,J1900,351.3350,73.62765,0.0,0.0,0.0,0.0,0,built-in: Sieggruen 1929 and 1937
-Vulkanus,2415020.0,J1900,55.8983,77.25568,0.0,0.0,0.0,0.0,0,built-in: Sieggruen 1929 and 1937
-Poseidon,2415020.0,J1900,165.5163,83.66907,0.0,0.0,0.0,0.0,0,built-in: Sieggruen 1929 and 1937
+# ---------------------------------------------------------------------------
+# IDs 40--47: James Neely's Hamburg-school elements
+# ---------------------------------------------------------------------------
+# Primary source:
+#   James Neely, "Orbital Elements for the Transneptunian Planets",
+#   Matrix Magazine, issue VII (1980), pp. 6--12, Table I on p. 10.
+#   Alexandria iBase primary scan, item 18:
+#   https://special-collections.alexandriaibase.org/items/show/18
+#
+# The source defines T as Julian centuries from JD 2415020.0 and publishes, for
+# each body, a, e, i, argument of perihelion, mean anomaly at T=0 plus its
+# secular rate, and node at T=0 plus 1.3960*T.  The rows below transcribe the
+# T=0 values.  LibEphemeris treats those angles as a fixed J1900 ecliptic frame
+# and performs its own documented precession; consequently the source's common
+# 1.3960 deg/century moving-equinox term is not added a second time.
+#
+# For Apollon through Poseidon, e=i=0.  In that circular coplanar limit,
+# perihelion and node are geometrically undefined and only M+omega+Omega is
+# observable.  We retain Neely's printed convention (M0=0 and the phase in
+# omega) rather than moving the same phase into M0.  The two representations
+# are mathematically identical, but the one below is a literal transcription.
+Cupido,2415020.0,J1900,163.7409,40.99837,0.00460,171.4333,129.8325,1.0833,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I
+Hades,2415020.0,J1900,27.6496,50.66744,0.00245,148.1796,161.3339,1.0500,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I
+Zeus,2415020.0,J1900,165.1232,59.21436,0.00120,299.0440,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I
+Kronos,2415020.0,J1900,169.0193,64.81690,0.00305,208.8801,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I
+Apollon,2415020.0,J1900,0.0,70.29949,0.0,138.0533,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I; circular phase convention
+Admetos,2415020.0,J1900,0.0,73.62765,0.0,351.3350,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I; circular phase convention
+Vulkanus,2415020.0,J1900,0.0,77.25568,0.0,55.8983,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I; circular phase convention
+Poseidon,2415020.0,J1900,0.0,83.66907,0.0,165.5163,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I; circular phase convention
 
-# M. Strubell, "Die Sterne" 3/1952, p. 70ff.
-Isis-Transpluto,2368547.66,2431456.5,0.0,77.775,0.3,0.7,0.0,0.0,0,primary-derived: Strubell 1952 Die Sterne 3 p.70ff
+# ---------------------------------------------------------------------------
+# ID 50: Harrington's nominal Planet X
+# ---------------------------------------------------------------------------
+# Primary source:
+#   R. S. Harrington, "The Location of Planet X", The Astronomical Journal
+#   96 (1988), 1476--1478, element list on p. 1478:
+#   https://articles.adsabs.harvard.edu/pdf/1988AJ.....96.1476H
+#
+# Harrington prints perihelion date 1789-08-06, a=101.2 AU, e=0.411,
+# omega=208.5 deg, node=275.4 deg and i=32.4 deg.  The civil date converts to
+# JD 2374696.5, so M=0 at that epoch.  The paper does not assign a modern
+# machine frame; J2000 is an explicit LibEphemeris propagation convention.
+Harrington,2374696.5,J2000,0.0,101.2,0.411,208.5,275.4,32.4,0,primary-transcription: Harrington 1988 AJ 96 p.1478; J2000 project frame
 
-# Classical predictions and compatibility convention.
-Nibiru,1856113.380954,1856113.380954,0.0,234.8921,0.981092,103.966,-44.567,158.708,0,built-in: no independently published element set found
-Harrington,2374696.5,J2000,0.0,101.2,0.411,208.5,275.4,32.4,0,primary-derived: Harrington 1988 AJ 96(4) p.1478; J2000 frame selected by LibEphemeris
-Leverrier-Neptune,2395662.5,2395662.5,34.05,36.15,0.10761,284.75,0.0,0.0,0,built-in: Le Verrier CRAS 23 (1846); digits compiled by Hoyt 1980 p.63
-Adams-Neptune,2395662.5,2395662.5,24.28,37.25,0.12062,299.11,0.0,0.0,0,built-in: Adams 1846 prediction; digits compiled by Hoyt 1980 p.63
-Lowell-Pluto,2425977.5,2425977.5,281.0,43.0,0.202,204.9,0.0,0.0,0,built-in: Lowell 1915 memoir; row compiled by Hoyt 1980 p.63
-Pickering-Pluto,2425977.5,2425977.5,48.95,55.1,0.31,280.1,100.0,15.0,0,built-in: Pickering historical prediction; row compiled by Hoyt 1980 p.63
+# ---------------------------------------------------------------------------
+# ID 51: Le Verrier's predicted trans-Uranian planet
+# ---------------------------------------------------------------------------
+# Primary source:
+#   U.-J. Le Verrier, "Sur la planete qui produit les anomalies observees dans
+#   le mouvement d'Uranus", Comptes rendus, vol. 23 (31 Aug 1846), pp. 428--438,
+#   especially p. 432.  Public-domain facsimile:
+#   https://fr.wikisource.org/wiki/Livre:Comptes_rendus_hebdomadaires_des_s%C3%A9ances_de_l%E2%80%99Acad%C3%A9mie_des_sciences,_tome_023,_1846.djvu
+#
+# Page 432 prints a=36.154 AU, e=0.10761, longitude of perihelion 284 deg 45
+# arcmin and mean longitude 318 deg 47 arcmin at 1847-01-01.  Le Verrier's
+# longer memoir gives a=36.1539 and M=34 deg 1 arcmin 56 arcsec; we preserve
+# that additional published precision.  The original solution assumes the
+# ecliptic plane, hence node=i=0.  Sexagesimal angles are converted arithmetically,
+# not by treating arcminutes as decimal hundredths.
+Leverrier-Neptune,2395662.5,2395662.5,34.03222222222222,36.1539,0.10761,284.75,0.0,0.0,0,primary-transcription: Le Verrier 1846 CRAS 23 p.432 and Recherches pp.234-236
 
-# Time-dependent compatibility conventions.
-Vulcan,2415020.0,JDATE,252.8987988 + 707550.7341 * T,0.13744,0.019,322.212069 + 1670.056 * T,47.787931 - 1670.056 * T,7.5,0,built-in: L. H. Weston historical convention
-Selena,2451545.0,JDATE,242.2205555 + 5143.5418158 * T,0.05280098949,0.0,0.0,0.0,0.0,1,built-in: Russian-school seven-year circular convention; digits not independently verified
-Proserpina,2415020.0,JDATE,170.73,79.225630,0.0,0.0,0.0,0.0,0,built-in: V. Abramov convention; digits not independently verified
-Waldemath,2414290.95827875,2414290.95827875,70.3407215 + 109023.2634989 * T,0.0068400705250028,0.1587,8.14049594 + 2393.47417444 * T,136.24878256 - 1131.71719709 * T,2.5,1,built-in: Waldemath 1898 claim; detailed reconstruction not independently verified
+# ---------------------------------------------------------------------------
+# ID 52: Adams's second predicted orbit
+# ---------------------------------------------------------------------------
+# Primary source:
+#   J. C. Adams, "An Explanation of the Observed Irregularities in the Motion
+#   of Uranus ...", read 13 Nov 1846 and printed in the Appendix to the
+#   Nautical Almanac for 1851 (London, 1846), sections 47--48, printed pp.25--26.
+#   Public scan record:
+#   https://archive.org/details/explanationofobs00adam
+#
+# Adams prints mean longitude 323 deg 02 arcmin on 1846-10-06, longitude of
+# perihelion 299 deg 11 arcmin and e=0.120615.  Their difference gives
+# M=23 deg 51 arcmin=23.85 deg at the same epoch.  His second distance
+# hypothesis is a(Uranus)/a(body)=0.515.  Benjamin A. Gould's 1850 Smithsonian
+# Report on the History of the Discovery of Neptune, p. 30, explicitly records
+# the corresponding mean distance as 37.25 AU and cites Adams sections 47--48:
+#   https://commons.wikimedia.org/wiki/File:Report_on_the_history_of_the_discovery_of_Neptune_(IA_reportonhistoryo00goulrich).pdf
+# Adams reports that the latitude observations did not determine a trustworthy
+# node or inclination, so this historical prediction is kept in the ecliptic
+# plane.  In particular, 299 deg 11 arcmin is 299.183333... deg; the former
+# 299.11 decimal was a sexagesimal-conversion error and is retired.
+Adams-Neptune,2395575.5,2395575.5,23.85,37.25,0.120615,299.18333333333334,0.0,0.0,0,primary-transcription: Adams 1846 sections 47-48 pp.25-26; corrected sexagesimal conversion
+
+# ---------------------------------------------------------------------------
+# ID 53: Lowell's preferred 1915 Planet-X solution
+# ---------------------------------------------------------------------------
+# Primary source:
+#   Percival Lowell, Memoir on a Trans-Neptunian Planet (1915), pp. 5, 9 and
+#   105.  Public-domain HathiTrust record:
+#   https://catalog.hathitrust.org/Record/009026348
+#
+# Page 5 defines epsilon as mean longitude at the epoch and varpi as longitude
+# of perihelion; p.9 states that the calculation epoch is 1850.0.  In the
+# preferred solution on p.105 Lowell prints epsilon=22.1 deg, a=43.0 AU,
+# e=0.202 and varpi=203.8 deg.  Therefore M0=(22.1-203.8) mod 360=178.3 deg.
+# Lowell says the latitude perturbations did not yield a trustworthy orbital
+# plane.  His analogy-based expectation of about 10 deg inclination is not a
+# determined element, so the reproducible numerical model uses node=i=0.
+Lowell-Pluto,2396757.5,2396757.5,178.3,43.0,0.202,203.8,0.0,0.0,0,primary-transcription: Lowell 1915 pp.5,9,105; direct J1850 element convention

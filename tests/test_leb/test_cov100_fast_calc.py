@@ -540,8 +540,8 @@ def test_pipeline_helio_geocentric_default(reader):
 
 
 @pytest.mark.parametrize("body_id", range(40, 59))
-def test_fictitious_channels_fall_through_to_runtime_models(body_id):
-    """Every public fictitious ID bypasses even a matching legacy channel."""
+def test_fictitious_channels_fall_through_to_runtime_dispatch(body_id):
+    """Every recognised fictitious ID bypasses a matching legacy channel."""
 
     class LegacyReader:
         def has_body(self, _body_id):

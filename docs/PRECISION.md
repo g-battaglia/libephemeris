@@ -121,10 +121,15 @@ Max difference: 0.51" (Rigil Kentaurus — nearest star, parallax not modeled).
 
 ## Hypothetical Planets
 
-All historical IDs 40–58 have built-in runtime models. Harrington (ID 50) has
-an independent primary-source derivation; models whose complete primary
-transcription is pending, including White Moon, are documented in
-[the provenance record](methodology/hypothetical-bodies.md).
+Thirteen historical models are independently sourced: Neely's eight
+Hamburg-school points (IDs 40–47), Harrington (50), Le Verrier (51), Adams
+(52), Lowell (53), and the published uniform-motion Selena convention (56).
+Their accuracy means fidelity to the cited historical or symbolic model, not
+to a real discovered body. IDs 48, 49, 54, 55, 57, and 58 raise
+`UnknownBodyError` because their complete primary definitions were not
+recovered; see [the provenance record](methodology/hypothetical-bodies.md) and
+the exact
+[missing-data inventory](methodology/missing-hypothetical-models.md).
 
 ## Heliocentric / Barycentric / Equatorial / XYZ
 

@@ -104,6 +104,17 @@ Cusp and angle speeds are numerical derivatives of the independently computed
 geometry. Discontinuities at wraps and branch boundaries are handled as
 coordinate discontinuities, not fitted toward external output.
 
+For Sunshine-Makransky (system ``i``), solar declination zero is a regular
+limit of Makransky's published construction: the ascensional difference is
+zero, the diurnal and nocturnal semiarcs are both 90 degrees, and the eight
+intermediate cusps vary continuously through the equinox. At geographic
+latitude zero the house-circle poles are also zero, so the complete result is
+independent of solar declination and remains cyclically ordered. One external
+reference API instead exposes an exact-zero/equatorial branch discontinuity in
+``houses_armc`` that disappears for arbitrarily small nonzero declinations.
+LibEphemeris intentionally returns the source-defined continuous limit. This is
+covered by provenance tests rather than by preserving the reference anomaly.
+
 ### Fixed stars
 
 Fixed-star astrometry uses the permissively sourced LibEphemeris catalogue,
@@ -193,12 +204,20 @@ physical parameters rather than output-fitted seasonal or geographic terms.
 
 ### Hypothetical bodies
 
-All historical IDs 40–58 calculate. Harrington (ID 50) is traced directly to
-its 1988 *Astronomical Journal* paper. Remaining models expose an explicit
-built-in orbital elements; models whose full primary transcription is pending,
-including the White Moon convention, are documented in the methodology page.
+IDs 40–47 and 50–53 calculate from independently transcribed primary-source
+models: Neely, Harrington, Le Verrier, Adams, and Lowell. ID 56 (Selena/White
+Moon) uses Velichko and Larin's published seven-year uniform zodiac cycle,
+unwrapped over their published January 1800–January 2000 endpoints and checked
+against three unused rows through 2007; its compatibility-only radius is
+derived from published IAU nominal constants. IDs 48, 49, 54, 55, 57, and 58
+remain named and recognised but raise `UnknownBodyError`; their
+complete historical definitions were not recovered. Source-exact epochs,
+frames, and sexagesimal conversions can intentionally differ from an
+undocumented legacy convention where reproducing that convention would require
+unverified data.
 
-See [Hypothetical bodies](../methodology/hypothetical-bodies.md).
+See [Hypothetical bodies](../methodology/hypothetical-bodies.md) and
+[the missing-models inventory](../methodology/missing-hypothetical-models.md).
 
 ### Constants, names, and return encodings
 

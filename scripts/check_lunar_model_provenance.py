@@ -27,11 +27,8 @@ RETIRED_PATHS = (
 )
 
 PINNED_PATHS = {
-    "libephemeris/lunar.py": (
-        "b69348b6f3bf90f32aeaa1e34fbaaa1541d94c22147795bad38aff890c87cbff"
-    ),
     "libephemeris/lunar_apse_model.py": (
-        "c034bc9b7cde9aee7ee3d72c39a868371c5d275616f543d7fa837f5bd41ccf17"
+        "5bf484cb0342fad6e8e42e33dcec6f9091eb5548a090bc42f77823a9ad60e2b2"
     ),
 }
 
@@ -42,13 +39,15 @@ LUNAR_FUNCTION_REQUIREMENTS = {
     "calc_mean_lunar_node_state": ("mean_lunar_node_state",),
     "calc_mean_lilith_state": ("mean_lunar_apogee_state",),
     "calc_interpolated_apogee": (
-        "_compat_legacy_mean_lilith",
-        "_compat_legacy_mean_lunar_node",
+        "_mean_lunar_apogee_position_unchecked",
+        "_mean_lunar_node_position_unchecked",
     ),
     "calc_interpolated_perigee": (
-        "_compat_legacy_mean_lilith",
-        "_compat_legacy_mean_lunar_node",
+        "_mean_lunar_apogee_position_unchecked",
+        "_mean_lunar_node_position_unchecked",
     ),
+    "_calc_de440_apogee_passage_terms": ("lunar_delaunay_arguments",),
+    "_calc_de440_perigee_passage_terms": ("lunar_delaunay_arguments",),
 }
 
 SOURCE_REQUIREMENTS = {
@@ -56,11 +55,22 @@ SOURCE_REQUIREMENTS = {
         "erfa.fal03",
         "erfa.faf03",
         "erfa.faom03",
+        "erfa.fad03",
+        "erfa.falp03",
+        "EARTH_ECCENTRICITY_J2000 = 0.016708634",
+        "Simon et al. (1994)",
     ),
     "libephemeris/interpolated_lunar_apsides.py": (
         "_moon_icrs_state",
         "_osculating_eccentricity_and_p",
         "np.polynomial.legendre.leggauss",
+    ),
+    "scripts/generate_lunar_apse_model.py": (
+        "lunar_delaunay_arguments",
+        "mean_lunar_apogee_position",
+        "mean_lunar_node_position",
+        "denum != 440",
+        "EARTH_ECCENTRICITY_J2000",
     ),
 }
 
@@ -70,6 +80,12 @@ RETIRED_RUNTIME_TOKENS = (
     "MODEL_SHA256",
     "mean_lunar_apse.bin",
     "interpolated_lunar_apsides.bin",
+)
+
+RETIRED_LUNAR_FUNCTIONS = (
+    "_calc_mean_apse_analytical",
+    "_compat_legacy_mean_lilith",
+    "_compat_legacy_mean_lunar_node",
 )
 
 
@@ -107,6 +123,11 @@ def main() -> int:
         for node in lunar_tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
+    for function_name in RETIRED_LUNAR_FUNCTIONS:
+        if function_name in functions:
+            problems.append(
+                f"libephemeris/lunar.py still defines retired {function_name!r}"
+            )
     for function_name, requirements in LUNAR_FUNCTION_REQUIREMENTS.items():
         function_source = functions.get(function_name)
         if function_source is None:

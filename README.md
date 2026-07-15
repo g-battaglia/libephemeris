@@ -13,11 +13,13 @@ A high-precision astronomical ephemeris library for Python, powered by NASA JPL 
 
 **Drop-in replacement for PySwissEph** - readable Python algorithms, standard debugging, easy deployment on the scientific Python stack (NumPy, Skyfield, pyerfa).
 
-**100% independent of the Swiss Ephemeris.** Permissively **Apache-2.0**
-licensed, with no Swiss Ephemeris source code, source comments, documentation
-prose, algorithms, distribution data files, or runtime dependency.
-Compatibility validation uses only public API inputs and outputs as a black
-box — [how the stack differs](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/independence.md).
+The current release line is maintained as an **independent implementation**
+under **Apache-2.0** for project-authored code. It has no reference-engine
+runtime dependency, and current release artifacts exclude reference source,
+prose, algorithms, and distribution data. Compatibility validation is limited
+to ephemeral black-box public-API comparisons. Earlier development history
+contained legacy/reference-derived material removed during the v3 remediation;
+see [the independence methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/independence.md).
 See [NOTICE.md](NOTICE.md) / [LICENSING.md](LICENSING.md).
 
 ---

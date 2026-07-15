@@ -188,13 +188,22 @@ print(f"Differenza:   {lon_vera - lilith_media:.1f}°")
 ### La Luna Bianca (Selena)
 
 Alcune tradizioni astrologiche usano un punto distinto chiamato **Luna Bianca**
-o **Selena**. Il corpo ID 56 conserva la convenzione circolare settennale di
-compatibilità di rc7; non è definito come il punto opposto a Lilith e non è
-un'apside lunare fisica.
+o **Selena**. L'ID 56 implementa la convenzione uniforme di sette anni
+pubblicata da Velichko e Larin (2007), pp. 17–18. Moto uniforme e fase sono
+ricavati dalle righe di gennaio 1800 e gennaio 2000 (pp. 20 e 45), quindi
+verificati su tre righe indipendenti fino al 2007. LibEphemeris dichiara
+esplicitamente la convenzione temporale non specificata dalla fonte: primo
+giorno del mese alle 00:00 TT. È una longitudine simbolica, non un'apside o un
+satellite fisico; la distanza restituita è una convenzione di visualizzazione
+derivata da standard IAU.
 
 ```python
-luna_bianca, _ = ephem.calc_ut(jd, ephem.WHITE_MOON)
+selena = ephem.calc_hypothetical_position(ephem.WHITE_MOON, jd_tt)
+print(f"Longitudine di Selena: {selena[0]:.6f}°")
 ```
+
+La derivazione completa, con pagine e aritmetica, è nel
+[registro di provenienza dei corpi ipotetici](../../methodology/hypothetical-bodies.md#id-56-white-moon--selena).
 
 Per un'apside astronomica usa le API documentate del punto lunare medio,
 osculante o interpolato.

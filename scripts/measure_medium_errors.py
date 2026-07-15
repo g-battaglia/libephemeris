@@ -38,7 +38,13 @@ FLG_SIDEREAL = 64 * 1024
 MAIN_PLANETS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 14]
 ECLIPTIC_BODIES = [10, 11, 12, 13, 21, 22]
 ASTEROIDS = [15, 17, 18, 19, 20]
-HYPOTHETICAL = [40, 41, 42, 43, 44, 45, 46, 47, 48]
+# Only IDs with a reviewed, independently documented runtime model belong in
+# a numerical-error campaign.  Recognised IDs 48, 49, 54, 55, 57, and 58 are
+# deliberately names-only compatibility constants and raise UnknownBodyError;
+# measuring them would turn the provenance boundary into a misleading test
+# failure.  ID 56 is the separately sourced uniform Selena convention rather
+# than a row in fictitious_orbits.csv, but it is still a supported local model.
+HYPOTHETICAL = [*range(40, 48), 50, 51, 52, 53, 56]
 
 BODY_NAMES = {
     0: "Sun",

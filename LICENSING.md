@@ -9,11 +9,13 @@ closed-source and commercial products — subject to the terms of the Apache
 License 2.0, most notably preservation of copyright, license, and attribution
 notices and the [NOTICE](NOTICE.md) file.
 
-The current source tree is Apache-2.0. Published distributions beginning with
-`3.0.0rc3` declare Apache-2.0; distributions through `3.0.0rc1` retain the
-license terms under which they were originally released. PyPI distributions
-are immutable, so consult the metadata and bundled license for the exact
-version you use.
+Project-authored files in the current release tree are offered under
+Apache-2.0; vendored files and external data retain the terms identified in
+`THIRD_PARTY_NOTICES.md`. Published distributions retain the terms and content
+under which they were released. PyPI distributions are immutable, so consult
+the metadata and bundled notices for the exact version you use. The v3
+remediation does not retroactively relicense removed material or earlier
+artifacts.
 
 ## Copyright
 
@@ -33,8 +35,11 @@ texts, and the runtime/dev dependency licenses are in
 **Optional `nbody` extra:** the opt-in `libephemeris[nbody]` feature pulls in
 `rebound` and `assist`, which are licensed **GPL-3.0-or-later**. They are not
 part of the core install and are never bundled in any LibEphemeris artifact;
-installing the extra forms a combined work that is, for that user, governed by
-the GPL. The core library carries no strong-copyleft (GPL/LGPL/AGPL) runtime dependency; all required runtime dependencies are permissively licensed except certifi's weak MPL-2.0 (file-level copyleft, unmodified, no obligation on LibEphemeris code).
+users and redistributors must comply with those packages' GPL terms. Whether a
+particular installation or distribution is a combined work is fact-specific
+and is not determined by this notice. The core library declares no
+strong-copyleft (GPL/LGPL/AGPL) runtime dependency; `certifi` is a separately
+installed MPL-2.0 dependency.
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.
 
 ## Contributions
@@ -47,12 +52,14 @@ agreement is required.
 
 ## Relationship to Swiss Ephemeris
 
-LibEphemeris is an **independent implementation** with an API that is
-signature-compatible with the reference ephemeris API (see
-[NOTICE.md](NOTICE.md)). "Swiss Ephemeris" is a product of Astrodienst AG;
-the name is used here nominatively only. The reference API's Python binding
-may be used for ephemeral compatibility comparisons in a separate validation
-environment, and is never a dependency of this package.
+The current LibEphemeris release line is maintained as an independently
+implemented, signature-compatible API (see [NOTICE.md](NOTICE.md)). "Swiss
+Ephemeris" is a product of Astrodienst AG; the name is used here nominatively
+only. The reference API's Python binding may be used only for ephemeral
+behavioral comparisons in a separate validation environment and is not a
+dependency of this package. Earlier development history included material now
+removed by the v3 remediation; Apache-2.0 applies only where the project has
+the necessary rights.
 
 ---
 

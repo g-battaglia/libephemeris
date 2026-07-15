@@ -7,16 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No changes beyond the prepared `3.0.0rc8` candidate.
+Post-rc8 changes: the four remaining special house constructions were
+reimplemented from published definitions, the lunar apse path now uses the
+ERFA/IERS 2003 arguments and the DE440 passage model exclusively, and the
+historical hypothetical-body registry was rebuilt from page-level primary
+sources, with unsourced IDs failing closed.
+
+### Fixed
+
+- Reimplemented the Savard-A, Krusinski, APC, and Sunshine-Makransky house
+  constructions with vector/spherical geometry tied to cited public
+  definitions. A 4,992-case ephemeral compatibility grid reports zero error
+  mismatches and worst cusp deviation below `2e-9` degrees.
+- Replaced the retired legacy mean-lunar-apse compatibility path with the
+  ERFA/IERS 2003 Delaunay-argument model and added a source-integrity gate.
+- Rewrote the heliacal result-layout prose without changing runtime behavior.
+
+### Changed
+
+- Rebuilt the historical hypothetical-body registry from page-level primary
+  sources instead of retaining the former 19-row lineage. Fresh
+  transcriptions now support Neely's Hamburg-school points (IDs 40–47),
+  Harrington (50), Le Verrier (51), Adams (52), and Lowell (53). Selena (56)
+  is independently reconstructed from Velichko and Larin's published uniform
+  seven-year rule and 1800–2007 checkpoints. Its rate is unwrapped from the
+  200-year January baseline and independently reproduces three unused table
+  rows within `0.36′`; its epoch and IAU-derived radial conventions are
+  explicit. The exact source angles, epochs, sexagesimal arithmetic, frame
+  decisions, and available scan hashes are documented and integrity-gated.
+- Removed numerical models for IDs 48, 49, 54, 55, 57, and 58 because a complete
+  primary-source definition could not be established independently. Names,
+  IDs, exception types, and legacy import containers remain available;
+  calculations fail closed with `UnknownBodyError`.
+  `docs/methodology/missing-hypothetical-models.md` records every unrecovered
+  field and the evidence required to restore each ID.
+
+### Documentation
+
+- Corrected licensing and third-party notices to distinguish current release
+  artifacts from historical revisions, project code from external data, and
+  NAIF/JPL kernel terms from a blanket U.S.-government public-domain claim.
+- Qualified the optional REBOUND/ASSIST GPL notice; the legal effect of a
+  particular installation or redistribution is fact-specific.
+- Added a field-by-field missing-source inventory and corrected all notices,
+  manuals, backend tables, and LEB documentation to distinguish the 13
+  reviewed models from the six names-only compatibility IDs.
 
 ## [3.0.0rc8] - 2026-07-13
 
-A compatibility-restoration, independence, and release-hardening pass over
-`3.0.0rc7`. It keeps the complete rc7 API surface, derives every shipped data
-model from published sources, restores four scientifically stricter behaviors
-as documented intentional divergences, corrects entry-point/backend edge
-cases, strengthens provenance and packaging gates, and keeps the generated
-API documentation aligned with the runtime surface.
+A compatibility-restoration and release-hardening pass over `3.0.0rc7`. A
+subsequent provenance audit found that some rc8 independence claims were too
+broad; the corrective post-rc8 work is recorded under **Unreleased** above.
 
 ### Changed
 
@@ -59,9 +100,9 @@ API documentation aligned with the runtime surface.
   illuminated fraction read 1.0).
 - **Full ayanamsha coverage.** Every predefined mode 0–46 calculates without a
   J2000 warning or degradation across direct, Horizons, and LEB paths.
-- **Historical hypothetical bodies.** IDs 40–58 calculate again, including the
-  rc7 White Moon convention. Module-level element classes and constants are
-  restored with per-row source status and an exact CSV integrity pin.
+- **Historical hypothetical bodies (superseded).** rc8 temporarily restored
+  calculations for IDs 40–58. The post-rc8 remediation removed all unverified
+  numerical element sets; see **Unreleased** above.
 - **LEB tier UX and legacy discovery.** Default medium installs have a bundled
   fast path; both tier download functions support base/medium/extended, and
   existing local `.leb` names remain auto-discoverable.
@@ -178,13 +219,14 @@ API documentation aligned with the runtime surface.
   foundation instead of implying that every calculation runs through
   Skyfield.
 
-### Restored
+### Restored in rc8 (superseded by the post-rc8 remediation)
 
-- Public hypothetical-body compatibility from rc7: every ID 40–58 calculates
-  again, and the module-level Uranian display table, per-body element classes,
-  and constants are importable with exact integrity pins. Entries still awaiting
-  independent primary-source transcription remain isolated and explicitly marked
-  `legacy-owner-review`; independently derived entries retain their citations.
+- Public hypothetical-body calculations from rc7 were temporarily restored in
+  rc8. The module-level names and container types remain importable, but the
+  post-rc8 remediation retired unverified numerical values and independently
+  rebuilt IDs 40–47 and 50–53 from primary publications and reconstructed ID
+  56 from its published uniform-motion convention. The remaining six
+  calculation paths fail closed.
 
 ## [3.0.0rc7] - 2026-07-12
 

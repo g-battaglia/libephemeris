@@ -6,6 +6,8 @@ These tests verify the offline analytical paths in the Horizons backend
 
 from __future__ import annotations
 
+import math
+
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
@@ -17,6 +19,7 @@ from libephemeris.constants import (
     FLG_HELCTR,
 )
 from libephemeris.horizons_backend import horizons_calc_ut
+from libephemeris.exceptions import UnknownBodyError
 
 JD_J2000 = 2451545.0
 
@@ -128,24 +131,29 @@ class TestHorizonsFictitiousAnalytical:
     """Exercise the no-HTTP native-center hypothetical paths."""
 
     @pytest.mark.parametrize("body_id", [*range(40, 56), 57])
-    def test_restored_helio_analytical(self, body_id):
-        """Every heliocentric historical model is available without HTTP."""
-        result = horizons_calc_ut(None, JD_J2000, body_id, FLG_SWIEPH | FLG_HELCTR)
-        data = result[0]
-        assert len(data) == 6
-        assert 0.0 <= data[0] < 360.0
+    def test_heliocentric_historical_models_follow_provenance_boundary(self, body_id):
+        """Reviewed models compute; unverified heliocentric models fail closed."""
+        if body_id in {*range(40, 48), 50, 51, 52, 53}:
+            data, _ = horizons_calc_ut(None, JD_J2000, body_id, FLG_SWIEPH | FLG_HELCTR)
+            assert len(data) == 6
+            assert 0.0 <= data[0] < 360.0
+            return
 
-    @pytest.mark.parametrize("body_id", [56, 58])
-    def test_native_geocentric_analytical(self, body_id, monkeypatch):
-        """White Moon and Waldemath use their native geocentric models."""
-        from libephemeris import mean_lunar_apse
+        with pytest.raises(UnknownBodyError) as raised:
+            horizons_calc_ut(None, JD_J2000, body_id, FLG_SWIEPH | FLG_HELCTR)
+        assert raised.value.body_id == body_id
 
-        monkeypatch.setattr(
-            mean_lunar_apse, "_active_ephemeris_range", lambda: (None, 0.0, 0.0)
-        )
-        data, _ = horizons_calc_ut(None, JD_J2000, body_id, FLG_SWIEPH)
+    def test_reviewed_white_moon_native_geocentric_model(self):
+        """White Moon uses its local published seven-year convention."""
+        data, _ = horizons_calc_ut(None, JD_J2000, 56, FLG_SWIEPH | FLG_SPEED)
         assert len(data) == 6
-        assert 0.0 <= data[0] < 360.0
+        assert all(math.isfinite(value) for value in data)
+
+    def test_unverified_waldemath_native_geocentric_fails_closed(self):
+        """Waldemath has no reviewed built-in model."""
+        with pytest.raises(UnknownBodyError) as raised:
+            horizons_calc_ut(None, JD_J2000, 58, FLG_SWIEPH)
+        assert raised.value.body_id == 58
 
 
 @pytest.mark.unit

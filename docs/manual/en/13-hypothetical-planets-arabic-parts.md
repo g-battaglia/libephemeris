@@ -27,26 +27,38 @@ The eight Uranian planets are:
 
 ### Availability
 
-IDs 40–47 are built-in Keplerian calculations. The orbital elements are
-transcribed from the Witte/Sieggruen publications.
+IDs 40–47 calculate from a fresh transcription of James Neely's “Orbital
+Elements for the Transneptunian Planets,” *Matrix Magazine* VII (1980),
+Table I, p. 10. The source defines its time variable as Julian centuries from
+JD 2415020.0; LibEphemeris documents the literal elements, frame choice, and
+two-body propagation in the
+[provenance record](../../methodology/hypothetical-bodies.md).
 
 ---
 
 ## 13.2 Built-in hypothetical bodies
 
-All historical IDs 40–58 compute. **Harrington** (`HARRINGTON`, ID 50) is
-directly derived from Harrington's 1988 *Astronomical Journal* paper. All
-models use built-in orbital elements; see the methodology page.
+Thirteen IDs compute from built-in, page-level source reconstructions:
+**Cupido–Poseidon** (40–47), **Harrington** (50), **Le Verrier** (51),
+**Adams** (52), **Lowell** (53), and **White Moon / Selena** (56). IDs 48, 49,
+54, 55, 57, and 58 remain named for compatibility but raise
+`UnknownBodyError`; the exact missing fields are listed in
+[the missing-models inventory](../../methodology/missing-hypothetical-models.md).
 
 ```python
 import libephemeris as ephem
 
 jd_tt = ephem.julday(2024, 4, 8, 12.0) + ephem.deltat(ephem.julday(2024, 4, 8, 12.0))
-pos = ephem.calc_hypothetical_position(ephem.HARRINGTON, jd_tt)
+cupido = ephem.calc_hypothetical_position(ephem.CUPIDO, jd_tt)
+harrington = ephem.calc_hypothetical_position(ephem.HARRINGTON, jd_tt)
+selena = ephem.calc_hypothetical_position(ephem.WHITE_MOON, jd_tt)
 ```
 
-No reference-distribution data file is bundled. The fixed-element dataset
-contains a source/status field for every row.
+No reference-distribution data file is bundled. The fixed-element dataset has
+12 independently transcribed orbital rows; Selena is a separate symbolic model
+derived from its published uniform-motion rule and checkpoints.
+`HYPOTHETICAL_PROVENANCE` records a status and page-level source boundary for
+every recognised ID.
 
 ---
 
@@ -57,7 +69,7 @@ your own orbit using LibEphemeris's documented nine-field orbital-elements text
 format. Supply values from sources you are entitled to use; reference-distribution
 data files are not required or supported as bundled inputs.
 
-### Loading the reviewed built-in orbit
+### Loading the reviewed built-in orbits
 
 The library includes a file of predefined fictitious orbits:
 
@@ -68,7 +80,7 @@ import libephemeris as ephem
 orbits = ephem.load_bundled_fictitious_orbits()
 print(f"Loaded {len(orbits)} fictitious orbits")
 
-# Search for the reviewed body by name
+# Search for one reviewed body by name
 body = ephem.get_orbital_body_by_name(orbits, "Harrington")
 if body:
     print(f"Found: {body.name}")
@@ -189,16 +201,17 @@ In this chapter we explored non-physical celestial bodies used in various astrol
 **Key concepts:**
 
 - The **Uranian planets** are eight mathematical points (Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon) with hypothetical orbits, used in the Hamburg School and in the midpoints technique
-- All historical hypothetical IDs **40–58** calculate again
-- Harrington has an independent primary derivation; all models use built-in
-  orbital elements
+- IDs 40–47, 50–53, and 56 have independently reconstructed, cited models;
+  the six unrecovered IDs fail closed while retaining names and constants
+- Every supported historical model has a page-level derivation and a pinned
+  provenance test
 - **Custom fictitious orbits** allow you to define any hypothetical body with its own orbital elements
 - The **Arabic parts** are points calculated by the formula ASC + Planet A − Planet B, with the Part of Fortune being the most important
 
 **Functions introduced:**
 
-- `calc_hypothetical_position(body_id, jd_tt)` — calculate any historical
-  hypothetical body ID 40–58
+- `calc_hypothetical_position(body_id, jd_tt)` — calculate any supported
+  hypothetical body (IDs 40–47, 50–53, and 56)
 - `load_bundled_fictitious_orbits()` — loads predefined fictitious orbits
 - `parse_orbital_elements(filepath)` — loads fictitious orbits from a custom file
 - `get_orbital_body_by_name(elements, name)` — searches for a body by name in the list of orbits

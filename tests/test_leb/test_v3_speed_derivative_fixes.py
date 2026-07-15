@@ -9,9 +9,10 @@ agree on it. Covered:
 * L2/L3/L4/L5 node/apse LEB speeds match the Skyfield backend (J2000 equinox
   drift, nutation-in-longitude rate, TrueNode/OscuApog smoothing window,
   MeanApog latitude rate).
-* H1 the independently sourced Harrington orbit carries the required frame
-  derivatives.
-* H2 restored fictitious identifiers all remain calculable.
+* H1 independently sourced hypothetical orbits carry finite position and
+  derivative channels.
+* H2 recognised fictitious identifiers without verified elements fail closed,
+  while every reviewed primary-source model remains calculable.
 * H3 topocentric parallax is applied to Harrington (and requires an observer,
   like the planets).
 * D1 the TT and UT fast-path entry points are coherent.
@@ -29,6 +30,7 @@ import pytest
 import libephemeris as le
 from libephemeris import constants as C
 from libephemeris import fast_calc as fc
+from libephemeris.exceptions import UnknownBodyError
 from libephemeris.fast_calc import fast_calc_tt, fast_calc_ut
 from libephemeris.leb_reader import open_leb
 
@@ -328,7 +330,7 @@ def test_harrington_default_speed_carries_nutation_rate(reader, skyfield_backend
 
 
 # ---------------------------------------------------------------------------
-# H2 — the sourced Harrington orbit reports position derivatives.
+# H2 — reviewed source models calculate; unsupported IDs fail closed.
 # ---------------------------------------------------------------------------
 
 
@@ -354,15 +356,24 @@ def test_harrington_j2000_heliocentric_state_rates(skyfield_backend):
         assert abs(delta * 3600.0) < 0.01, component
 
 
-RESTORED_FICTITIOUS_IDS = tuple(range(C.FICT_OFFSET, C.WALDEMATH + 1))
+REVIEWED_FICTITIOUS_IDS = (*range(C.CUPIDO, C.POSEIDON + 1), 50, 51, 52, 53, 56)
+UNVERIFIED_FICTITIOUS_IDS = (48, 49, 54, 55, 57, 58)
 
 
-@pytest.mark.parametrize("ipl", RESTORED_FICTITIOUS_IDS)
-def test_restored_fictitious_ids_return_finite_states(skyfield_backend, ipl):
-    """Every historical compatibility ID returns a six-value state."""
-    position = _sky(JD_2000, ipl, C.FLG_SPEED)
-    assert len(position) == 6
-    assert all(math.isfinite(value) for value in position)
+@pytest.mark.parametrize("ipl", REVIEWED_FICTITIOUS_IDS)
+def test_reviewed_fictitious_ids_return_finite_state(skyfield_backend, ipl):
+    """Each primary-source-backed model returns all six native channels."""
+    state = _sky(JD_2000, ipl, C.FLG_SPEED)
+    assert len(state) == 6
+    assert all(math.isfinite(value) for value in state)
+
+
+@pytest.mark.parametrize("ipl", UNVERIFIED_FICTITIOUS_IDS)
+def test_unverified_fictitious_ids_fail_closed(skyfield_backend, ipl):
+    """Recognised IDs remain named but cannot use unverified element sets."""
+    with pytest.raises(UnknownBodyError) as raised:
+        _sky(JD_2000, ipl, C.FLG_SPEED)
+    assert raised.value.body_id == ipl
 
 
 # ---------------------------------------------------------------------------

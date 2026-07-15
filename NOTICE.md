@@ -21,10 +21,17 @@ All astronomical computations are based on:
   - Park, R.S. et al. — "The JPL Planetary and Lunar Ephemerides DE440 and
     DE441", AJ 161, 105 (2021)
   - Lieske, J.H. — "Galilean satellite ephemerides E5", A&AS 129, 205 (1998)
-- **Historical hypothetical-body conventions (IDs 40–58)**. Transpluto and
-  Harrington have primary-source derivations; per-body source status is
-  documented in the
-  [per-body source record](docs/methodology/hypothetical-bodies.md).
+- **Historical hypothetical-body conventions (IDs 40–58)**. Thirteen reviewed
+  source-backed models are built in: the twelve orbital models represented by
+  the Neely Hamburg-school points (IDs 40–47), Harrington (50), Le Verrier
+  (51), Adams (52), and Lowell (53), plus the independently reconstructed
+  uniform seven-year Selena convention (56), unwrapped from its published
+  1800–2000 baseline. IDs 48, 49, 54, 55, 57, and 58
+  remain named API constants but fail closed because a source-complete model
+  was not recovered. Per-body sources and transformations are documented in the
+  [source record](docs/methodology/hypothetical-bodies.md); exact missing fields
+  are inventoried in the
+  [missing-models inventory](docs/methodology/missing-hypothetical-models.md).
 - **Sidereal zero points and catalogue geometry** documented per mode in the
   [ayanamsha source table](docs/reference/ayanamsha.md).
 
@@ -38,30 +45,36 @@ independently written.
 
 ## Validation
 
-Compatibility with the reference API is verified by calling its public
-interface and comparing outputs. These comparisons are ephemeral: results are
-not recorded as fixtures, fitted into coefficients, or encoded into artifacts.
-Reference-distribution source, prose, algorithms, and data are not part of
-this repository.
+The current validation policy permits only ephemeral calls to the reference
+public API: raw outputs must not be recorded as fixtures, fitted into
+coefficients, or encoded into artifacts. Current release artifacts do not ship
+reference-distribution source, prose, algorithms, or data. Earlier development
+history contained legacy/reference-derived material that the v3 remediation
+removed; this notice does not rewrite the provenance or licensing of those
+earlier revisions or distributions.
 
-All numerical data and models are reproducible from the independent sources
-listed above. Mean lunar points use ERFA's IERS 2003 Delaunay arguments; true
-and osculating points use the active NASA JPL state; and Harrington uses its
-cited publication.
+Current numerical models have model-specific source records and integrity
+gates. Mean lunar points use ERFA's IERS 2003 Delaunay arguments; true and
+osculating points use the active NASA JPL state; and supported historical
+hypothetical models use the cited primary transcriptions in their source
+record. A passing technical gate is not a legal opinion about historical
+releases or third-party rights.
 
 ## Vendored Components
 
 Three files are vendored or adapted third-party code and keep their upstream
 licenses, all permissive (MIT): `vendor/spktype21.py`,
 `moon_theories/tass17.py`, and `moon_theories/tass17_data.py`. The package
-contains no copyleft code. Full inventory:
+contains no vendored copyleft code in the current release artifact. Historical
+versions and separately installed dependencies retain their own terms. Full
+inventory:
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## AI-Assisted Development
 
-Parts of this codebase were developed with AI assistance (Anthropic Claude)
-under the direction and review of the project author. Copyright in the work
-is held by Giacomo Battaglia.
+Parts of this codebase were developed with AI assistance, including Anthropic
+Claude and OpenAI Codex, under the direction and review of the project author.
+Copyright in the project-authored work is held by Giacomo Battaglia.
 
 ## Trademarks
 

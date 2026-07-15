@@ -1,146 +1,29 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""
-Lunar node and apogee (Lilith) calculations for libephemeris.
+"""Lunar node and apsis calculations.
 
-This module computes:
-- Private rc7 mean baselines used only by the interpolated compatibility curves
-- True Lunar Node: Instantaneous osculating ascending node
-- True Lilith: Instantaneous osculating lunar apogee
+Mean node and mean apogee delegate to :mod:`libephemeris.mean_lunar_apse`,
+which derives their geometry from the IERS 2003 Delaunay arguments implemented
+by BSD-licensed ERFA.
 
-The public mean node and mean apogee functions at the end of this module
-delegate to :mod:`libephemeris.mean_lunar_apse`, whose implementation is based
-on ERFA/IERS fundamental arguments.  The private legacy mean functions in this
-file remain isolated to ``INTP_APOG`` and ``INTP_PERG`` so those public bodies
-retain their rc7 compatibility contract.
+Interpolated apogee and perigee are independent, non-antipodal curves anchored
+to every DE440 lunar-distance extremum over the medium kernel interval. Their
+runtime series and residual tables are regenerated solely by
+``scripts/generate_lunar_apse_model.py`` from DE440 states and the same IERS
+arguments. No compatibility-ephemeris samples enter that model.
 
-True Node Calculation Method (live)
-===================================
+True node, osculating apogee, and osculating perigee come directly from the
+active JPL geocentric lunar position and velocity through angular-momentum and
+eccentricity-vector geometry.
 
-The True Lunar Node is the instantaneous (osculating) ascending node of
-the Moon's orbit.  calc_true_lunar_node computes it purely geometrically:
+Inputs are TT Julian days. Mean points begin on the mean ecliptic of date;
+interpolated and osculating points begin on the true ecliptic of date. The
+shared calculation pipeline applies the requested output-frame and flag
+transformations.
 
-- Obtains the Moon's geocentric position r and velocity v from the JPL
-  DE ephemeris, directly in Skyfield's true-ecliptic-of-date frame
-  (IAU 2006 precession + IAU 2000A nutation applied by Skyfield)
-- Computes the angular momentum vector h = r x v
-- Reads the ascending node longitude from atan2(h_x, -h_y)
-- Derives the node distance from the osculating conic (p, e, omega)
-
-No perturbation series is applied on top: the DE state vectors already
-contain every perturbation.  The analytical node series is not part of this
-pipeline.  The interpolated compatibility bodies use the private rc7
-Delaunay-series path in this module.
-
-**Perturbation Terms Included:**
-
-The ELP2000-82B series covers the following categories:
-
-1. **Main Solar Perturbation Terms** (~1.5° amplitude):
-   - Dominant fortnightly variation: -1.5233 sin(2D)
-   - Solar-lunar coupling terms: sin(2D±M), sin(2D±M')
-   - Total: 9 terms, amplitudes 0.01-1.52°
-
-2. **Second-Order Solar Terms** (0.003-0.04°):
-   - Combined Sun-Moon anomaly: sin(2D-M-M'), sin(2D-M+M')
-   - Parallactic inequality: sin(D)
-   - Higher harmonics: sin(3D), sin(4D)
-   - Total: 12 terms
-
-3. **Third-Order and Higher Solar Terms** (0.001-0.006°):
-   - Triple frequency combinations: sin(M±M'), sin(2D-2M)
-   - Higher Moon anomaly harmonics: sin(2D±3M'), sin(3M')
-   - Total: 10 terms
-
-4. **F-Related (Inclination) Terms** (0.001-0.01°):
-   - Latitude argument harmonics: sin(2F), sin(4F)
-   - Elongation-latitude coupling: sin(2D±2F), sin(2F±D)
-   - Solar-latitude coupling: sin(2F±M)
-   - Total: 9 terms
-
-5. **Planetary Perturbation Terms**:
-   - Venus (0.001-0.005°): 9 terms involving L_Venus
-   - Mars (0.001-0.004°): 9 terms involving L_Mars
-   - Jupiter (0.001-0.003°): 7 terms involving L_Jupiter
-   - Saturn (0.001-0.003°): 7 terms involving L_Saturn
-   - Planetary cross-terms: Venus-Jupiter, Mars-Jupiter, Saturn-Jupiter
-
-6. **Long-Period Terms**:
-   - Evection (~31.8 day period): 6 terms, up to 0.047°
-   - Variation (~14.77 day period): 10 terms, up to 0.052°
-   - Annual Equation (~365 day period): 6 terms, up to 0.186°
-   - Parallactic Inequality (~29.5 day period): 3 terms, up to 0.035°
-
-7. **Second-Order Coupling Terms** (0.0001-0.003°):
-   - Evection x Variation: cos(M'), cos(4D-M')
-   - Evection x Annual Equation: cos(2D-M'±M)
-   - Variation x Annual Equation: cos(2D±M)
-   - Self-coupling: cos(4D-2M'), cos(4D), cos(2F), cos(2M)
-   - E² corrections for Earth's orbital eccentricity
-
-8. **Secular Terms** (T-dependent):
-   - Long-term drift corrections proportional to Julian centuries from J2000
-   - Higher-order T³, T⁴, T⁵ corrections for historical dates
-
-9. **High-Order Elongation Terms** (for historical date accuracy):
-   - Sixth-order terms (6D combinations): 7 terms
-   - Seventh-order terms (7D combinations): 4 terms
-   - Enhanced 5D terms: 7 terms
-   - Enhanced 4D evection-elongation coupling: 6 terms
-
-**Total: 120+ perturbation terms**
-
-Expected Precision
-==================
-
-- **Modern dates (1900-2100)**: <0.01° error vs JPL DE ephemeris
-- **Extended range (1000-3000 CE)**: ~0.01-0.03° error
-- **Historical dates (1500-1800 CE)**: <0.15° with enhanced terms
-- **Early historical dates (1000-1500 CE)**: <0.25° error
-- **Ancient dates (before 1000 CE)**: 0.3-1° due to fundamental limitations
-- **IAU 2000A nutation**: sub-milliarcsecond precision in nutation correction
-
-The main sources of error are:
-1. Truncation of perturbation series (omitted terms < 0.0001°)
-2. Meeus polynomial accuracy degradation for distant dates
-3. Missing higher-order planetary perturbation cross-terms
-
-Coordinate Systems
-==================
-
-- **Input**: Julian Day in Terrestrial Time (TT)
-- **Intermediate**: ICRS (International Celestial Reference System) equatorial
-- **Output**: True ecliptic of date (includes precession and nutation)
-
-The coordinate transformation chain:
-1. JPL DE ephemeris positions (ICRS, equatorial)
-2. J2000 ecliptic (via obliquity rotation)
-3. Ecliptic of date (via IAU 2006 precession)
-4. True ecliptic of date (via IAU 2000A nutation in longitude)
-
-References
-==========
-
-Primary sources:
-- Chapront-Touze, M. & Chapront, J. "ELP 2000-82B: A semi-analytical lunar
-  ephemeris adequate for historical times" (1988), Astronomy & Astrophysics
-- Chapront-Touze, M. & Chapront, J. "Lunar Tables and Programs from 4000 B.C.
-  to A.D. 8000" (1991), Willmann-Bell
-- Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Willmann-Bell, Ch. 47
-
-Perturbation theory:
-- Brown, E.W. "An Introductory Treatise on the Lunar Theory" (1896)
-- Brown, E.W. "Tables of the Moon" (1919)
-- Eckert, W.J. et al. "The Motion of the Moon" (1954)
-
-Precession and nutation:
-- Capitaine et al. (2003) "Expressions for IAU 2000 precession quantities"
-- IERS Conventions 2010, Chapter 5 (Nutation model)
-- Simon et al. (1994) "Numerical expressions for precession formulae"
-
-Orbital mechanics:
-- Vallado, D. "Fundamentals of Astrodynamics and Applications" (2013)
-- Park, R.S. et al. (2021) "The JPL Planetary and Lunar Ephemerides DE440 and DE441"
+Primary sources are IERS Conventions (2010), Chapter 5, Eq. 5.43, and Park et
+al. (2021), "The JPL Planetary and Lunar Ephemerides DE440 and DE441",
+Astronomical Journal 161:105.
 """
 
 from __future__ import annotations
@@ -149,6 +32,14 @@ import math
 import warnings
 from functools import lru_cache
 from typing import Tuple
+from .mean_lunar_apse import (
+    EARTH_ECCENTRICITY_J2000,
+    EARTH_ECCENTRICITY_T,
+    EARTH_ECCENTRICITY_T2,
+    _mean_lunar_apogee_position_unchecked,
+    _mean_lunar_node_position_unchecked,
+    lunar_delaunay_arguments,
+)
 from .state import get_timescale, get_planets
 from .exceptions import EphemerisRangeError
 
@@ -332,82 +223,6 @@ def _interpolate_apse_correction(
     return float(corrections[idx_low]) + frac * (
         float(corrections[idx_low + 1]) - float(corrections[idx_low])
     )
-
-
-def _calc_mean_apse_analytical(jd_tt: float) -> float:
-    """
-    Calculate mean lunar apogee using analytical polynomial formula.
-
-    Uses the geometric relationship: Mean Apogee = L' - M' + 180 degrees
-    projected from the lunar orbital plane to the ecliptic.
-    The polynomial coefficients are derived from JPL DE440/DE441 ephemeris data.
-
-    Args:
-        jd_tt: Julian Day in TT
-
-    Returns:
-        Mean apogee longitude in degrees [0, 360)
-
-    References:
-        - Simon, J.L. et al. (1994) A&A 282, 663-683
-        - Chapront, J. et al. (2002) A&A 387, 700-708
-    """
-    T = (jd_tt - 2451545.0) / 36525.0
-    _check_meeus_range(T)
-    T2 = T * T
-    fracT = T % 1.0
-
-    z_F_T2 = -1.312045233711e01
-    z_F_T3 = -1.138215912580e-03
-    z_F_T4 = -9.646018347184e-06
-    z_MP_T2 = 3.146734198839e01
-    z_MP_T3 = 4.768357585780e-02
-    z_MP_T4 = -3.421689790404e-04
-    z_LP_T2 = -5.663161722088e00
-    z_LP_T3 = 5.722859298199e-03
-    z_LP_T4 = -8.466472828815e-05
-
-    NF = 1739232000.0 * fracT + 295263.0983 * T - 0.2079419901760 * T + 335779.55755
-    NF = NF % 1296000.0
-    NF += ((z_F_T4 * T + z_F_T3) * T + z_F_T2) * T2
-
-    MP = 1717200000.0 * fracT + 715923.4728 * T - 0.2035946368532 * T + 485868.28096
-    MP = MP % 1296000.0
-    MP += ((z_MP_T4 * T + z_MP_T3) * T + z_MP_T2) * T2
-
-    LP = 1731456000.0 * fracT + 1108372.83264 * T - 0.6784914260953 * T + 785939.95571
-    LP = LP % 1296000.0
-    LP += ((z_LP_T4 * T + z_LP_T3) * T + z_LP_T2) * T2
-
-    STR = math.pi / (180.0 * 3600.0)
-
-    apogee_rad = (LP - MP) * STR + math.pi
-    apogee_rad = apogee_rad % (2.0 * math.pi)
-
-    node_rad = (LP - NF) * STR
-    node_rad = node_rad % (2.0 * math.pi)
-
-    MOON_MEAN_INCL = 5.1453964
-
-    lon_from_node = apogee_rad - node_rad
-
-    x = math.cos(lon_from_node)
-    y = math.sin(lon_from_node)
-    z = 0.0
-
-    incl_rad = -math.radians(MOON_MEAN_INCL)
-    cos_incl = math.cos(incl_rad)
-    sin_incl = math.sin(incl_rad)
-    y_new = y * cos_incl - z * sin_incl
-    # z_new (= y*sin_incl + z*cos_incl) is not needed: the projection onto
-    # the ecliptic only uses atan2(y_new, x).
-
-    lon_from_node_proj = math.atan2(y_new, x)
-
-    apogee_projected = lon_from_node_proj + node_rad
-    apogee_projected = apogee_projected % (2.0 * math.pi)
-
-    return math.degrees(apogee_projected)
 
 
 def _calc_lunar_fundamental_arguments(
@@ -612,8 +427,8 @@ def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     Each perturbation term has the form:
         amplitude × E^n × trig_func(a₁D + a₂M + a₃M' + a₄F + planet_terms)
 
-    where E = 1 - 0.002516T - 0.0000074T² is Earth's orbital eccentricity,
-    and T is Julian centuries from J2000.0.
+    where E is the Simon et al. (1994) mean Earth-orbit eccentricity relative
+    to its J2000 value, and T is Julian centuries from J2000.0.
 
     Perturbation Categories
     =======================
@@ -807,7 +622,7 @@ def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     """
     T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000.0
 
-    D, M, M_prime, F = _calc_lunar_fundamental_arguments(jd_tt)
+    D, M, M_prime, F = lunar_delaunay_arguments(jd_tt)
     L_jupiter = _calc_jupiter_mean_longitude(jd_tt)
     L_venus = _calc_venus_mean_longitude(jd_tt)
     L_mars = _calc_mars_mean_longitude(jd_tt)
@@ -826,7 +641,12 @@ def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     )
 
     # Eccentricity of Earth's orbit (decreases over time)
-    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
+    eccentricity = (
+        EARTH_ECCENTRICITY_J2000
+        + EARTH_ECCENTRICITY_T * T
+        + EARTH_ECCENTRICITY_T2 * T**2
+    )
+    E = eccentricity / EARTH_ECCENTRICITY_J2000
     E2 = E * E
 
     perturbation = 0.0
@@ -1501,35 +1321,23 @@ def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     return perturbation
 
 
-def _calc_elp2000_apogee_perturbations(jd_tt: float) -> float:
-    """Perturbation series for the interpolated lunar apogee (degrees).
+def _calc_de440_apogee_passage_terms(jd_tt: float) -> float:
+    """Evaluate the IERS-basis terms fitted to DE440 apogee passages.
 
-    Delaunay-argument trigonometric series fitted by least squares against
-    the DE440 apogee-passage track (14,581 passages, ~1549--2651 CE); the
-    coefficients live in :mod:`libephemeris.lunar_apse_model`, generated by
-    ``scripts/generate_lunar_apse_model.py``. The series models the ~5-degree
-    oscillation of the apogee around its mean position (evection, annual
-    equation, inclination coupling).
-
-    Args:
-        jd_tt: Julian Day in Terrestrial Time (TT).
-
-    Returns:
-        float: Total perturbation correction in degrees. Range: ~-5 to +5.
-
-    Precision (vs the DE440 passage track):
-        - Trig-only RMS error: ~163" (max ~546")
-        - With correction table: exact at every DE440 apsis passage
-
-    References:
-        - Park, R.S. et al. "The JPL Planetary and Lunar Ephemerides
-          DE440 and DE441" (2021), AJ 161:105
-        - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988), A&A 190
-        - Simon, J.L. et al. (1994) A&A 282, 663-683
+    The project-designed harmonic basis and every coefficient are generated by
+    ``scripts/generate_lunar_apse_model.py``. The input angles are the ERFA
+    implementations of the IERS 2003 Delaunay arguments. Trig-only residuals
+    against the 14,581 DE440 passages have RMS 163 arcsec; the separately
+    generated residual table supplies the remaining low-frequency correction.
     """
     T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000.0
-    D, M, M_prime, F = _calc_lunar_fundamental_arguments(jd_tt)
-    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
+    D, M, M_prime, F = lunar_delaunay_arguments(jd_tt)
+    eccentricity = (
+        EARTH_ECCENTRICITY_J2000
+        + EARTH_ECCENTRICITY_T * T
+        + EARTH_ECCENTRICITY_T2 * T**2
+    )
+    E = eccentricity / EARTH_ECCENTRICITY_J2000
 
     perturbation = 0.0
     for coeff, c_d, c_m, c_mp, c_f, e_pow in APOGEE_TRIG_TERMS:
@@ -1542,36 +1350,22 @@ def _calc_elp2000_apogee_perturbations(jd_tt: float) -> float:
     return perturbation
 
 
-def _calc_elp2000_perigee_perturbations(jd_tt: float) -> float:
-    """Perturbation series for the interpolated lunar perigee (degrees).
+def _calc_de440_perigee_passage_terms(jd_tt: float) -> float:
+    """Evaluate the IERS-basis terms fitted to DE440 perigee passages.
 
-    Delaunay-argument trigonometric series fitted by least squares against
-    the DE440 perigee-passage track (14,581 passages, ~1549--2651 CE); the
-    coefficients live in :mod:`libephemeris.lunar_apse_model`, generated by
-    ``scripts/generate_lunar_apse_model.py``. Perigee oscillations are much
-    larger than apogee ones (~25 vs ~5 degrees) because solar perturbations
-    affect perigee more strongly; the evection ladder extends to k = 30 to
-    capture the slowly converging spectrum.
-
-    Args:
-        jd_tt: Julian Day in Terrestrial Time (TT).
-
-    Returns:
-        float: Total perturbation correction in degrees. Range: ~-25 to +25.
-
-    Precision (vs the DE440 passage track):
-        - Trig-only RMS error: ~403" (max ~2505")
-        - With correction table: exact at every DE440 apsis passage
-
-    References:
-        - Park, R.S. et al. "The JPL Planetary and Lunar Ephemerides
-          DE440 and DE441" (2021), AJ 161:105
-        - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988), A&A 190
-        - Simon, J.L. et al. (1994) A&A 282, 663-683
+    The perigee basis is generated independently of the apogee basis and keeps
+    harmonics through order 30. Every coefficient comes from the 14,581 DE440
+    passages. Trig-only residuals have RMS 403 arcsec; the generated residual
+    table supplies the remaining low-frequency correction.
     """
     T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000.0
-    D, M, M_prime, F = _calc_lunar_fundamental_arguments(jd_tt)
-    E = 1.0 - 0.002516 * T - 0.0000074 * T**2
+    D, M, M_prime, F = lunar_delaunay_arguments(jd_tt)
+    eccentricity = (
+        EARTH_ECCENTRICITY_J2000
+        + EARTH_ECCENTRICITY_T * T
+        + EARTH_ECCENTRICITY_T2 * T**2
+    )
+    E = eccentricity / EARTH_ECCENTRICITY_J2000
 
     perturbation = 0.0
     for coeff, c_d, c_m, c_mp, c_f, e_pow in PERIGEE_TRIG_TERMS:
@@ -1670,47 +1464,6 @@ def _check_meeus_range(T: float) -> None:
             MeeusPolynomialWarning,
             stacklevel=3,
         )
-
-
-def _compat_legacy_mean_lunar_node(jd_tt: float) -> float:
-    """
-    Calculate Mean Lunar Node (ascending node of lunar orbit on ecliptic).
-
-    Uses the Meeus polynomial formula (Chapter 47) for the mean longitude
-    of the ascending node.
-
-    Args:
-        jd_tt: Julian Day in Terrestrial Time (TT)
-
-    Returns:
-        float: Ecliptic longitude of mean ascending node in degrees (0-360)
-
-    Precision:
-        - Within +/-200 years (1800-2200): <0.01 degree precision
-        - Within +/-1000 years (1000-3000): ~0.02 degree precision
-        - Beyond +/-2000 years: error grows rapidly (warning emitted)
-
-    Note:
-        The mean node is a smoothed average that ignores short-period perturbations.
-        For instantaneous precision, use calc_true_lunar_node() instead.
-
-    References:
-        - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
-        - Simon, J.L. et al. (1994) "Numerical expressions for precession formulae", A&A 282
-        - Chapront, J. et al. (2002) "A new determination of lunar orbital parameters", A&A 387
-    """
-    T = (jd_tt - 2451545.0) / 36525.0
-    _check_meeus_range(T)
-
-    Omega = (
-        125.0445479
-        - 1934.1362891 * T
-        + 0.0020754 * T**2
-        + T**3 / 467441.0
-        - T**4 / 60616000.0
-    )
-
-    return Omega % 360.0
 
 
 def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
@@ -1913,37 +1666,6 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
         dist = 384400.0 / 149597870.7
 
     return node_lon, 0.0, dist
-
-
-def _compat_legacy_mean_lilith(jd_tt: float) -> float:
-    """
-    Calculate Mean Lilith (Mean Lunar Apogee, also called Black Moon Lilith).
-
-    Uses the analytical polynomial formula from Simon et al. (1994) and
-    Chapront et al. (2002) with DE404-fitted coefficients for the mean
-    longitude of the lunar apse.
-
-    Args:
-        jd_tt: Julian Day in Terrestrial Time (TT)
-
-    Returns:
-        float: Ecliptic longitude of mean lunar apogee in degrees (0-360)
-
-    Precision:
-        - Within +/-200 years (1800-2200): <0.01 degree precision
-        - Within +/-1000 years (1000-3000): ~0.02 degree precision
-        - Beyond +/-2000 years: error grows rapidly (warning emitted)
-
-    Note:
-        Mean Lilith is the time-averaged apogee, ignoring short-period variations.
-        The actual apogee oscillates +/-5-10 degrees from this mean position.
-        Apsidal precession period: ~8.85 years (prograde)
-
-    References:
-        - Simon, J.L. et al. (1994) "Numerical expressions for precession formulae", A&A 282
-        - Chapront, J. et al. (2002) "A new determination of lunar orbital parameters", A&A 387
-    """
-    return _calc_mean_apse_analytical(jd_tt)
 
 
 def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
@@ -2395,82 +2117,34 @@ def _unwrap_longitudes(longitudes: list) -> list:
 
 
 def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
-    """
-    Calculate the Interpolated (Natural) Lunar Apogee.
+    """Return the independently generated interpolated lunar apogee.
 
-    The interpolated apogee is a smoothed version of the osculating apogee that
-    removes the spurious short-period oscillations caused by the instantaneous
-    nature of osculating orbital elements.
+    Longitude combines the ERFA/IERS mean-apogee baseline, an IERS Delaunay
+    series fitted to all DE440 apogee passages over the medium-kernel interval,
+    and a fixed-grid interpolation of the remaining passage residual. Latitude
+    is a two-harmonic inclined-plane fit to the same passages; distance is their
+    mean geocentric distance.
 
-    Physical Background
-    ===================
-
-    The osculating apogee (True Lilith) is calculated from instantaneous orbital
-    elements that change rapidly due to solar perturbations. These rapid changes
-    are artifacts of the instantaneous orbital element model, not real physical
-    motion of the apsidal line.
-
-    The interpolated apogee removes these spurious oscillations to reveal the
-    "natural" apogee position - representing the true apsidal line orientation.
-
-    Key Characteristics of the Natural Apogee
-    ==========================================
-
-    1. **Apogee oscillates ~5 degrees from mean position** (vs. perigee which oscillates ~25 degrees)
-    2. **Apogee and perigee are not exactly opposite** - they are only roughly
-       opposite when the Sun is in conjunction with one of them or at 90 degrees angle
-    3. **The curves should be continuous** - both position and velocity
-
-    Algorithm
-    =========
-
-    This implementation uses an analytical approach based on ELP2000-82B lunar theory:
-
-    1. **Mean Apogee Position:** Calculate the mean lunar apogee (Mean Lilith)
-       using polynomial formula for the mean argument of perigee + 180 degrees.
-
-    2. **Perturbation Series:** Add 25 periodic perturbation terms
-       derived from ELP2000-82B theory, capturing:
-       - Primary evection harmonics (kD - kM') up to k=14
-       - Solar anomaly coupling (M-dependent terms)
-       - Latitude coupling (F-dependent terms)
-       - Cross-coupling terms for D, M, M', F interactions
-
-    3. **Result:** mean_apogee + perturbations = interpolated apogee longitude
-
-    Expected Precision
-    ==================
-
-    - Within the table range (1549-2651): exact at every DE440 apogee
-      passage (grid-interpolation error only, a few arcseconds)
-    - Outside the correction table range: trig-only RMS ~163" (~0.045°)
-    - Smooth, continuous curve without the artifacts of osculating elements
-    - Frame contract: the output is the true ecliptic of date everywhere.
-      Outside the correction-table range only the precision drops (the
-      edge correction tapers to zero within a year); the frame does not
-      change, and FLG_NONUT keeps subtracting dpsi as usual.
+    The result begins on the true ecliptic of date. Beyond the fitted
+    approximately 1550--2650 interval, the residual table tapers to zero over
+    one year and the trig-only longitude has about 0.045 degree RMS error
+    against the DE440 passage track. This abstract coordinate is not a
+    lunar-distance event finder.
 
     Args:
-        jd_tt: Julian Day in Terrestrial Time (TT).
+        jd_tt: Julian day in Terrestrial Time.
 
     Returns:
-        Tuple[float, float, float]: (longitude, latitude, distance) where:
-            - longitude: Ecliptic longitude of interpolated apogee in degrees [0, 360)
-            - latitude: Ecliptic latitude in degrees
-            - distance: Apogee distance from Earth in AU
+        Native Python floats ``(longitude_deg, latitude_deg, distance_au)``.
 
     References:
-        - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988), A&A 190
-        - Chapront-Touze, M. & Chapront, J. "Lunar Tables and Programs" (1991)
-        - Meeus, J. "Astronomical Algorithms" (2nd ed., 1998), Chapter 47
+        IERS Conventions (2010), Eq. 5.43; Park et al. (2021), AJ 161:105.
     """
-    # Calculate mean apogee position using Meeus polynomial
-    # This is the time-averaged apsidal longitude, precessing at ~40.7°/year
-    mean_apogee = _compat_legacy_mean_lilith(jd_tt)
+    # Standards-derived IERS mean apogee used by the DE440 model generator.
+    mean_apogee = _mean_lunar_apogee_position_unchecked(jd_tt)[0]
 
-    # Add ELP2000-82B perturbation corrections
-    # These model the ~5° oscillations of the apogee around its mean position
-    perturbation = _calc_elp2000_apogee_perturbations(jd_tt)
+    # Add the passage-fitted terms that model the apsidal oscillation.
+    perturbation = _calc_de440_apogee_passage_terms(jd_tt)
 
     # Combine mean position and perturbations
     interp_lon = mean_apogee + perturbation
@@ -2492,7 +2166,7 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     # The interpolated apogee lies near the lunar orbital plane, which is
     # inclined ~5.145° to the ecliptic. Latitude varies sinusoidally as the
     # apogee moves relative to the ascending node.
-    node_lon = _compat_legacy_mean_lunar_node(jd_tt)
+    node_lon = _mean_lunar_node_position_unchecked(jd_tt)[0]
     _a1, _a3 = APOGEE_LAT_COEFFS
     _omega = math.radians(interp_lon - node_lon)
     interp_lat = _a1 * math.sin(_omega) + _a3 * math.sin(3.0 * _omega)
@@ -2766,79 +2440,33 @@ def _sample_osculating_perigee_with_fallback(
 
 
 def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
-    """
-    Calculate the Interpolated (Natural) Lunar Perigee.
+    """Return the independently generated interpolated lunar perigee.
 
-    The interpolated perigee is a smoothed version of the osculating perigee that
-    removes the spurious short-period oscillations caused by the instantaneous
-    nature of osculating orbital elements.
+    This curve is fitted independently from apogee and is not forced to be
+    antipodal. Longitude combines the ERFA/IERS mean-perigee baseline, a
+    Delaunay series fitted to all DE440 perigee passages over the medium-kernel
+    interval, and a fixed-grid interpolation of the remaining passage residual.
+    Latitude is a two-harmonic fit to the same passages; distance is their mean
+    geocentric distance.
 
-    Physical Background
-    ===================
-
-    The osculating perigee is calculated from instantaneous orbital elements that
-    change rapidly due to solar perturbations. These rapid changes are artifacts
-    of the instantaneous orbital element model, not real physical motion of the
-    apsidal line.
-
-    The interpolated perigee removes these spurious oscillations to reveal the
-    "natural" perigee position - representing the true apsidal line orientation.
-
-    Key Characteristics of the Natural Perigee
-    ==========================================
-
-    1. **Perigee oscillates ~25 degrees from mean position** (vs. apogee which oscillates ~5 degrees)
-    2. **Apogee and perigee are not exactly opposite** - they are only roughly
-       opposite when the Sun is in conjunction with one of them or at 90 degrees angle
-    3. **The curves should be continuous** - both position and velocity
-
-    Algorithm
-    =========
-
-    This implementation uses an analytical approach based on ELP2000-82B lunar
-    theory. The perigee is calculated as the mean apogee plus 180 degrees plus
-    additional perturbation corrections that account for the asymmetry between
-    apogee and perigee oscillations.
-
-    The perturbation series includes evection harmonics up to k=18, solar anomaly
-    coupling terms, latitude coupling terms, and combined higher-order terms.
-
-    Note: Apogee and perigee are NOT exactly 180 degrees apart - they can deviate
-    by up to 28 degrees depending on Sun-Moon geometry. This implementation
-    captures this physical reality through additional perturbation terms.
-
-    Expected Precision
-    ==================
-
-    - Within the table range (1549-2651): exact at every DE440 perigee
-      passage (grid-interpolation error only, a few arcseconds)
-    - Outside the correction table range: trig-only RMS ~403" (~0.112°)
-    - Frame contract: the output is the true ecliptic of date everywhere.
-      Outside the correction-table range only the precision drops (the
-      edge correction tapers to zero within a year); the frame does not
-      change, and FLG_NONUT keeps subtracting dpsi as usual.
-    - Smooth, continuous curve
-
-    This is an abstract compatibility coordinate, not a physical Moon-distance
-    event finder. Use the geocentric Moon-distance curve for perigee timing or
-    tidal applications.
+    The result begins on the true ecliptic of date. Beyond the fitted
+    approximately 1550--2650 interval, the residual table tapers to zero over
+    one year and the trig-only longitude has about 0.112 degree RMS error
+    against the DE440 passage track. This abstract coordinate is not a
+    lunar-distance or tidal event finder.
 
     Args:
-        jd_tt: Julian Day in Terrestrial Time (TT).
+        jd_tt: Julian day in Terrestrial Time.
 
     Returns:
-        Tuple[float, float, float]: (longitude, latitude, distance) where:
-            - longitude: Ecliptic longitude of interpolated perigee in degrees [0, 360)
-            - latitude: Ecliptic latitude in degrees
-            - distance: Perigee distance from Earth in AU
+        Native Python floats ``(longitude_deg, latitude_deg, distance_au)``.
 
     References:
-        - Chapront-Touze, M. & Chapront, J. "Lunar Tables and Programs" (1991)
-        - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B" (1988)
+        IERS Conventions (2010), Eq. 5.43; Park et al. (2021), AJ 161:105.
     """
-    mean_perigee = (_compat_legacy_mean_lilith(jd_tt) + 180.0) % 360.0
+    mean_perigee = (_mean_lunar_apogee_position_unchecked(jd_tt)[0] + 180.0) % 360.0
 
-    perturbation = _calc_elp2000_perigee_perturbations(jd_tt)
+    perturbation = _calc_de440_perigee_passage_terms(jd_tt)
 
     interp_lon = mean_perigee + perturbation
 
@@ -2858,7 +2486,7 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     # Latitude: inclination * sin(longitude - ascending node)
     # The interpolated perigee lies near the lunar orbital plane, which is
     # inclined ~5.145° to the ecliptic.
-    node_lon = _compat_legacy_mean_lunar_node(jd_tt)
+    node_lon = _mean_lunar_node_position_unchecked(jd_tt)[0]
     _p1, _p3 = PERIGEE_LAT_COEFFS
     _omega = math.radians(interp_lon - node_lon)
     interp_lat = _p1 * math.sin(_omega) + _p3 * math.sin(3.0 * _omega)
@@ -2992,13 +2620,13 @@ def calc_mean_lilith_with_latitude(jd_tt: float) -> Tuple[float, float]:
     return float(longitude), float(latitude)
 
 
-def _compatibility_polar_state(
+def _finite_difference_polar_state(
     position_function,
     jd_tt: float,
     *,
     step_days: float = 0.5,
 ) -> Tuple[float, float, float, float, float, float]:
-    """Return an rc7-compatible polar state and centered derivative."""
+    """Return a native-float polar state and centered derivative."""
     jd = float(jd_tt)
     longitude, latitude, distance = position_function(jd)
     before = position_function(jd - step_days)
@@ -3036,7 +2664,7 @@ def calc_mean_lilith_state(
 def calc_interpolated_apse_state(
     jd_tt: float, body_id: int, *, speed3: bool = False
 ) -> Tuple[float, float, float, float, float, float]:
-    """Return the restored rc7 interpolated lunar-apsis polar state."""
+    """Return the independently generated interpolated lunar-apsis state."""
     del speed3
     from .constants import INTP_APOG, INTP_PERG
 
@@ -3046,7 +2674,7 @@ def calc_interpolated_apse_state(
         function = calc_interpolated_perigee
     else:
         raise ValueError(f"Unsupported interpolated lunar apsis body: {body_id}")
-    return _compatibility_polar_state(function, float(jd_tt))
+    return _finite_difference_polar_state(function, float(jd_tt))
 
 
 @lru_cache(maxsize=1)

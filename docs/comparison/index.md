@@ -21,11 +21,12 @@ written to this repository or its validation worktree.
 | Delta T | IERS observations plus the published Stephenson–Morrison–Hohenkerk model |
 | Atmosphere | Published Sæmundsson/Bennett relations and ICAO atmosphere ray tracing |
 | Photometry | Published almanac and peer-reviewed planetary magnitude models |
-| Historical hypothetical bodies | Independently published elements, cited per supported ID |
+| Historical hypothetical bodies | IDs 40–47, 50–53, and 56 from cited publications; six unsupported IDs fail closed |
 
-The reference API's internal models and data are neither inspected nor inferred.
-Numerical differences are interpreted only in light of LibEphemeris's own
-documented model choices.
+Current project policy prohibits inspecting or inferring the reference API's
+internal models and data. Numerical differences are interpreted only in light
+of LibEphemeris's own documented model choices. See the independence page for
+the scope of historical remediation statements.
 
 ## Pages in this section
 

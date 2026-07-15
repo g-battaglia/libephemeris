@@ -58,7 +58,7 @@ Vectorization completed for all 6 ecliptic bodies. A single Skyfield call `(moon
 
 **Batch functions implemented in `scripts/generate_leb.py`:**
 
-- `_calc_mean_lilith_batch()` — vectorized `_calc_mean_apse_analytical()`
+- vectorized ERFA/IERS mean-apogee evaluation for bulk generation
 - `_calc_lunar_fundamental_arguments_batch()` — vectorized Delaunay arguments
 - `_calc_elp2000_apogee_perturbations_batch()` — vectorized 40+ term series
 - `_calc_elp2000_perigee_perturbations_batch()` — vectorized 61-term series

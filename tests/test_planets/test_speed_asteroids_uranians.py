@@ -1,4 +1,4 @@
-"""Independent speed checks for asteroids and restored fictitious bodies."""
+"""Independent speed checks for asteroids and sourced fictitious bodies."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from libephemeris.constants import (
     FLG_SWIEPH,
     FLG_SPEED,
 )
+from libephemeris.exceptions import UnknownBodyError
 
 
 @pytest.fixture(autouse=True)
@@ -28,7 +29,8 @@ def _reset_state():
 JD_J2000 = 2451545.0
 DT = 0.01  # 0.01 days for numerical derivative
 
-FICTITIOUS_IDS = tuple(range(40, 59))
+REVIEWED_FICTITIOUS_IDS = (*range(40, 48), 50, 51, 52, 53, 56)
+UNVERIFIED_FICTITIOUS_IDS = (48, 49, 54, 55, 57, 58)
 
 
 def _numerical_speed(body, jd, flags, component=0):
@@ -100,13 +102,28 @@ class TestAsteroidSpeedConsistency:
         assert abs(pos[3]) < 1.0, f"Body {body}: lon speed {pos[3]} too fast"
 
 
-class TestRestoredFictitiousBodies:
-    """Every historical fictitious ID remains in the speed pipeline."""
+class TestFictitiousBodies:
+    """Only independently sourced built-ins enter the speed pipeline."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("body", FICTITIOUS_IDS)
-    def test_speed_request_returns_finite_state(self, body: int) -> None:
+    def test_harrington_speed_request_returns_finite_state(self) -> None:
+        swe.set_calc_mode("skyfield")
+        position, _ = swe.calc_ut(JD_J2000, swe.HARRINGTON, FLG_SWIEPH | FLG_SPEED)
+        assert len(position) == 6
+        assert all(math.isfinite(value) for value in position)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", REVIEWED_FICTITIOUS_IDS)
+    def test_reviewed_body_speed_request_returns_finite_state(self, body: int) -> None:
         swe.set_calc_mode("skyfield")
         position, _ = swe.calc_ut(JD_J2000, body, FLG_SWIEPH | FLG_SPEED)
         assert len(position) == 6
         assert all(math.isfinite(value) for value in position)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", UNVERIFIED_FICTITIOUS_IDS)
+    def test_unverified_body_speed_request_fails_closed(self, body: int) -> None:
+        swe.set_calc_mode("skyfield")
+        with pytest.raises(UnknownBodyError) as raised:
+            swe.calc_ut(JD_J2000, body, FLG_SWIEPH | FLG_SPEED)
+        assert raised.value.body_id == body
