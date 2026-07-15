@@ -69,7 +69,12 @@ stars = [
 # package and every other extra stay permissive-only. Opt in explicitly
 # with `libephemeris[nbody]`.
 nbody = [
-    "rebound>=4.0.0",
+    # assist's C extension builds against rebound.h, which rebound 4.x ships in
+    # its package dir but rebound 5.x removed. assist itself pins
+    # rebound>=4.4.11,<5.0.0, so mirror that upper bound here: a loose >=4.0.0
+    # would let uv resolve rebound 5.x and break the assist build. Build with
+    # `uv pip install assist --no-build-isolation` after rebound is present.
+    "rebound>=4.4.11,<5.0.0",
     "assist>=1.1.0",
 ]
 # All permissive-licensed optional runtime features. Deliberately does NOT

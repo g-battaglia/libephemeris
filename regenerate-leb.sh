@@ -25,6 +25,10 @@ INSTALL=0
 INSTALL_DIR="${LIBEPHEMERIS_DATA_DIR:-$HOME/.libephemeris}/leb"
 DRY_RUN=0
 QUIET=0
+# Run only the dependency/data preflight and exit (no generation, no lock).
+DOCTOR=0
+# Bypass the always-on preflight that runs before any work starts.
+SKIP_DEPS_CHECK=0
 
 LEB1_GROUPS=(planets asteroids exotics analytical)
 # Keep this build-orchestration list in exactly the same order as
@@ -114,6 +118,16 @@ Install:
                           timestamped backups.
   --install-dir DIR       Override install destination.
 
+Preflight:
+  --doctor                Run only the dependency/data preflight for the selected
+                          tier/groups and exit (0 OK, 2 missing). No generation,
+                          no lock. Scoped: './regenerate-leb.sh --doctor' checks
+                          everything reachable under the defaults; 'medium
+                          --doctor' checks only what the medium tier needs.
+  --skip-deps-check       Bypass the preflight that otherwise runs before any
+                          work starts. Use only when you know the environment
+                          is complete.
+
 Other:
   --dry-run               Print actions without running generators or copying.
   -q, --quiet             Pass quiet mode to generators where supported.
@@ -125,9 +139,14 @@ Examples:
   ./regenerate-leb.sh all --group all --no-verify
   ./regenerate-leb.sh medium --leb2-only --leb2-groups exotics --install
   ./regenerate-leb.sh extended --group exotics --leb1-only
+  ./regenerate-leb.sh --doctor          # check the whole environment, no work
+  ./regenerate-leb.sh base --doctor     # check only what the base tier needs
 
 Notes:
   - Extended generation can take hours.
+  - Extended exotics need the optional `nbody` extra (rebound/assist) plus ASSIST
+    data files; the preflight checks these and fails fast instead of crashing
+    mid-run. Install with: uv pip install -e ".[nbody]".
   - "planets" is the LEB1 Skyfield planet group. LEB2 "core" is different and
     also contains node/apogee analytical bodies, so LEB2 groups are inferred
     conservatively from the changed LEB1 groups.
@@ -250,6 +269,14 @@ parse_args() {
         ;;
       --dry-run)
         DRY_RUN=1
+        shift
+        ;;
+      --doctor)
+        DOCTOR=1
+        shift
+        ;;
+      --skip-deps-check)
+        SKIP_DEPS_CHECK=1
         shift
         ;;
       -q|--quiet)
@@ -466,6 +493,32 @@ exotics_selected() {
   local group
   while IFS= read -r group; do
     [[ "$group" == "exotics" ]] && return 0
+  done < <(selected_leb1_groups)
+  return 1
+}
+
+# The ASSIST/REBOUND N-body path is reached only for the extended tier, and only
+# for the exotics group: assemble_leb() populates nbody_ids solely when
+# tier == "extended" (see scripts/generate_leb.py). Base/medium exotics use the
+# SPK path and never need rebound/assist, so the preflight must not require the
+# nbody extra unless this exact combination is selected.
+nbody_required() {
+  exotics_selected || return 1
+  local tier
+  while IFS= read -r tier; do
+    [[ "$tier" == "extended" ]] && return 0
+  done < <(selected_tiers)
+  return 1
+}
+
+# The asteroids and exotics groups auto-download small-body SPK kernels from JPL
+# Horizons (pure urllib), so they need network unless every kernel is cached.
+spk_network_needed() {
+  local group
+  while IFS= read -r group; do
+    case "$group" in
+      asteroids|exotics) return 0 ;;
+    esac
   done < <(selected_leb1_groups)
   return 1
 }
@@ -1042,7 +1095,230 @@ print_configuration() {
   echo "Verify: $([[ "$VERIFY" == 1 ]] && echo yes || echo no)"
   echo "Install: $([[ "$INSTALL" == 1 ]] && echo "$INSTALL_DIR" || echo no)"
   echo "Dry run: $([[ "$DRY_RUN" == 1 ]] && echo yes || echo no)"
+  echo "Preflight: $([[ "$SKIP_DEPS_CHECK" == 1 ]] && echo "skipped (--skip-deps-check)" || echo "enabled")"
+  echo "N-body extra required: $(nbody_required && echo "yes (extended exotics -> rebound/assist)" || echo no)"
   echo "Log: $LOG_FILE"
+}
+
+# Preflight dependency/data check. Runs before any work starts so a missing
+# optional dependency (e.g. the nbody extra for extended exotics) fails fast
+# instead of crashing hours into a run.
+#
+# With "--report" it behaves as the standalone doctor: prints the report and
+# returns the heredoc status (0 OK / 2 hard failures) without dying, so main()
+# can exit with it. Without "--report" (the always-on preflight) a hard failure
+# dies with exit 2 and points back at --doctor.
+#
+# All path/data resolution is delegated to the project's own resolvers inside
+# the heredoc, so this never drifts out of sync with how generation actually
+# locates kernels and ASSIST files.
+preflight_check() {
+  local report=0
+  [[ "${1:-}" == "--report" ]] && report=1
+
+  local modspec="numpy:core,skyfield:core,erfa:core,click:core,zstandard:core,certifi:core,libephemeris:core"
+  if nbody_required; then
+    modspec="$modspec,rebound:nbody,assist:nbody"
+  fi
+  # Diagnostic hook (also exercised by the test suite): probe extra module names,
+  # e.g. LEPH_DOCTOR_EXTRA_MODULES=scipy,astropy ./regenerate-leb.sh --doctor
+  if [[ -n "${LEPH_DOCTOR_EXTRA_MODULES:-}" ]]; then
+    local _m
+    for _m in ${LEPH_DOCTOR_EXTRA_MODULES//,/ }; do
+      modspec="${modspec},${_m}:core"
+    done
+  fi
+
+  local tiers_csv flags=""
+  tiers_csv="$(selected_tiers | paste -sd, -)"
+  if nbody_required; then
+    flags="${flags:+$flags,}nbody"
+  fi
+  if spk_network_needed; then
+    flags="${flags:+$flags,}net"
+  fi
+
+  echo
+  echo "================================================================"
+  echo "Preflight dependency check"
+  echo "  tier=$TIER  groups=$(selected_leb1_groups | paste -sd, -)"
+  echo "================================================================"
+
+  "$PYTHON" - "$modspec" "$tiers_csv" "$flags" <<'PY'
+import importlib
+import os
+import sys
+import urllib.request
+
+modspec, tiers_csv, flags_csv = sys.argv[1:4]
+flags = set(f for f in flags_csv.split(",") if f)
+tiers = [t for t in tiers_csv.split(",") if t]
+
+hard = 0
+warns = 0
+# Which fix commands are needed, in display order, deduplicated.
+missing_extras = []  # e.g. ["core"] or ["nbody"]
+missing_data = False  # any ASSIST data file missing
+
+
+def _need(extra):
+    if extra and extra not in missing_extras:
+        missing_extras.append(extra)
+
+
+def ok(label):
+    print(f"  [OK ] {label}")
+
+
+def miss(label, extra=None):
+    global hard
+    print(f"  [MISS] {label}")
+    hard += 1
+    _need(extra)
+
+
+def warn(label, note=""):
+    global warns
+    print(f"  [WARN] {label}" + (f"  -- {note}" if note else ""))
+    warns += 1
+
+
+print("Python modules:")
+for token in [t for t in modspec.split(",") if t]:
+    name, _, extra = token.partition(":")
+    extra = extra or "core"
+    try:
+        importlib.import_module(name)
+        ok(name)
+    except Exception as exc:  # ImportError, etc.
+        miss(f"{name}  ({extra} extra)", extra)
+
+# Vendored SPK reader; not a pip package but load-time required.
+try:
+    importlib.import_module("libephemeris.vendor.spktype21")
+    ok("libephemeris.vendor.spktype21 (vendored)")
+except Exception:
+    miss("libephemeris.vendor.spktype21 (vendored)", "core")
+
+# ASSIST data files: only on the extended-exotics N-body path. They are not
+# fetched during generation, so a missing one is a guaranteed mid-run failure.
+if "nbody" in flags:
+    print("\nASSIST data files (required for extended exotics N-body):")
+    try:
+        from libephemeris.rebound_integration import (
+            _ASSIST_DEFAULT_DIR,
+            AssistEphemConfig,
+        )
+
+        cfg = AssistEphemConfig()
+        items = [
+            ("planet ephemeris", cfg.planets_file),
+            ("asteroid perturbers", cfg.asteroids_file),
+            # Deep-time DE441, pinned exactly as _resolve_assist_config_for_range
+            # does: extended (-5000..+5000) exceeds the DE440 window (1550-2650).
+            ("deep-time DE441", str(_ASSIST_DEFAULT_DIR / "linux_m13000p17000.441")),
+        ]
+        for label, path in items:
+            if path and os.path.exists(path):
+                ok(f"{label}: {os.path.basename(path)}")
+            else:
+                base = os.path.basename(path) if path else label
+                miss(f"{label}: {base}", "nbody")
+                missing_data = True
+    except Exception as exc:  # resolver itself broken
+        miss(f"ASSIST config resolution ({type(exc).__name__}: {exc})", "nbody")
+        missing_data = True
+
+# JPL planetary kernels per tier. Skyfield auto-downloads these, so a miss is a
+# warning, not a hard failure.
+if tiers:
+    print("\nJPL planetary kernels (auto-download if missing):")
+    try:
+        from libephemeris.state import _get_data_dir
+
+        data_dir = _get_data_dir()
+        kernel = {"base": "de440s.bsp", "medium": "de440.bsp", "extended": "de441.bsp"}
+        for tier in tiers:
+            fname = kernel.get(tier, f"<unknown tier {tier}>")
+            path = os.path.join(data_dir, fname)
+            if os.path.exists(path):
+                ok(f"{fname} ({tier})")
+            else:
+                warn(f"{fname} ({tier})", f"absent from {data_dir}; skyfield will download")
+    except Exception as exc:
+        warn(f"kernel dir resolution ({type(exc).__name__}: {exc})")
+
+# Network reachability for SPK auto-download / Horizons. Non-fatal: the run may
+# still succeed from cached kernels.
+if "net" in flags:
+    print("\nNetwork (JPL Horizons reachability):")
+    url = "https://ssd.jpl.nasa.gov/"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            ok(f"reachable ({resp.status} {url})")
+    except Exception as exc:
+        warn(f"unreachable ({type(exc).__name__})", "SPK auto-download/Horizons may fail")
+
+print()
+if not hard:
+    print(f"RESULT: all required items present ({warns} warning(s))")
+    sys.exit(0)
+
+# Hard failures: emit the EXACT commands that fix them. The nbody extra cannot
+# be installed with the naive `uv pip install -e ".[nbody]"`: assist's C
+# extension builds in isolation and cannot see rebound.h, so the build fails
+# with "fatal error: 'rebound.h' file not found". rebound must go in first,
+# then assist without build isolation.
+print("To fix, run the commands below, then re-run './regenerate-leb.sh --doctor':\n")
+seen = set()
+
+
+def cmd(c, note=""):
+    if c in seen:
+        return
+    seen.add(c)
+    print(f"  $ {c}" + (f"   # {note}" if note else ""))
+
+
+if "core" in missing_extras:
+    cmd('uv pip install -e ".[dev]"', "core runtime deps")
+if "nbody" in missing_extras or missing_data:
+    cmd('uv pip install "rebound>=4.4.11,<5.0.0"', "rebound 5.x drops the C header assist needs")
+    cmd('uv pip install setuptools wheel', "--no-build-isolation needs these present")
+    cmd(
+        "uv pip install assist --no-build-isolation",
+        "finds rebound.h from rebound 4.x; isolated build/.[nbody] cannot",
+    )
+if missing_data:
+    cmd(
+        'uv run python -c "from libephemeris.rebound_integration import '
+        'download_assist_data as d; d(planets_de441=True)"',
+        "fetch ASSIST kernels (~2.6 GB incl. deep-time DE441)",
+    )
+
+print()
+print(f"RESULT: {hard} required item(s) MISSING, {warns} warning(s)")
+sys.exit(2)
+PY
+
+  local rc=$?
+  if ((rc == 0)); then
+    return 0
+  fi
+
+  # Hard failures. The doctor always starts (this function always runs unless
+  # --skip-deps-check is given), but it only aborts a REAL run. Under --report
+  # (standalone doctor) or --dry-run it surfaces the report and returns so the
+  # caller can print its plan on a broken environment.
+  if ((report)) || ((DRY_RUN)); then
+    echo
+    echo "Preflight found issues (see above); not aborting (doctor/dry-run mode)."
+    return "$rc"
+  fi
+  echo
+  die "preflight dependency check failed (see report above)." \
+    "Install the missing items, then re-run." \
+    "Tip: './regenerate-leb.sh --doctor' re-checks without regenerating."
 }
 
 main() {
@@ -1052,6 +1328,20 @@ main() {
   mkdir -p "$LOG_DIR"
   trap cleanup EXIT
 
+  # Pick the interpreter and validate the environment BEFORE acquiring the lock
+  # or touching any backup/output: a missing optional dependency (e.g. the
+  # nbody extra for extended exotics) must fail fast, not hours into a run.
+  select_python
+
+  if ((DOCTOR)); then
+    preflight_check --report
+    exit $?
+  fi
+
+  if ! ((SKIP_DEPS_CHECK)); then
+    preflight_check
+  fi
+
   while ! mkdir "$LOCK_DIR" 2>/dev/null; do
     echo "WARNING: lock exists: $LOCK_DIR"
     echo "Waiting ${LOCK_WAIT_SECONDS}s before retrying."
@@ -1060,7 +1350,6 @@ main() {
   # Lock is now held by this process; the EXIT trap may remove it.
   LOCK_ACQUIRED=1
 
-  select_python
   print_configuration
 
   backup_problem_tno_spks | tee -a "$LOG_FILE"

@@ -633,7 +633,7 @@ requires-dist = [
     { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.1.1" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5.0" },
     { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
-    { name = "rebound", marker = "extra == 'nbody'", specifier = ">=4.0.0" },
+    { name = "rebound", marker = "extra == 'nbody'", specifier = ">=4.4.11,<5.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.6" },
     { name = "skyfield", specifier = ">=1.54" },
     { name = "skyfield-data", specifier = ">=7.0.0" },
