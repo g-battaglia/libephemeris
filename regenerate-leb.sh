@@ -27,7 +27,17 @@ DRY_RUN=0
 QUIET=0
 
 LEB1_GROUPS=(planets asteroids exotics analytical)
-LEB2_GROUPS=(core asteroids apogee uranians exotics)
+# Keep this build-orchestration list in exactly the same order as
+# ``libephemeris.leb_groups.LEB2_GROUPS``.  It is intentionally repeated here
+# because this script must be able to parse its arguments before a project
+# Python interpreter has been selected.  The focused regression test compares
+# the two definitions so future group changes cannot silently drift apart.
+#
+# There is deliberately no ``uranians`` companion.  That historical group was
+# retired together with its unsupported hypothetical-body inventory.  The
+# surviving analytical LEB1 group contributes only to ``core`` (nodes) and
+# ``apogee`` (apsides) in LEB2.
+LEB2_GROUPS=(core asteroids exotics apogee)
 TIERS=(base medium extended)
 TNO_SPK_IDS=(
   136199  # Eris
@@ -85,7 +95,7 @@ LEB2 selection:
   --leb1-only             Generate/merge/verify LEB1 only.
   --leb2-only             Convert/verify LEB2 only from existing LEB1 files.
   --leb2-groups LIST      Comma-separated LEB2 groups: core, asteroids,
-                          apogee, uranians, exotics, all. If omitted, the
+                          exotics, apogee, all. If omitted, the
                           affected LEB2 groups are inferred from selected LEB1
                           groups.
 
@@ -267,6 +277,15 @@ parse_args() {
 
   [[ "$VERIFY_SAMPLES" =~ ^[0-9]+$ ]] || die "--verify-samples must be an integer"
   [[ "$LEB2_VERIFY_SAMPLES" =~ ^[0-9]+$ ]] || die "--leb2-verify-samples must be an integer"
+
+  # Validate group specifications here, in the parent shell.  Most execution
+  # loops consume the selectors through process substitution; an ``exit``
+  # raised while producing that substitution would terminate only its child
+  # shell and could otherwise leave the orchestrator running with no groups.
+  # Eager validation therefore makes stale/unknown names fail closed before a
+  # lock, backup, output file, or generator process is touched.
+  selected_leb1_groups >/dev/null
+  selected_leb2_groups >/dev/null
 }
 
 cleanup() {
@@ -341,6 +360,12 @@ selected_tiers() {
 selected_leb1_groups() {
   local spec
   local group
+  local candidate
+  # macOS ships Bash 3.2, where expanding an empty array under ``set -u`` is
+  # an error even after ``local selected=()``.  A private sentinel keeps the
+  # array bound while preserving portable ordered de-duplication.
+  local selected=(__leph_no_group__)
+  local candidates=()
 
   spec="$(normalize_csv "$GROUP_SPEC")"
   if [[ -z "$spec" || "$spec" == "all" ]]; then
@@ -351,18 +376,30 @@ selected_leb1_groups() {
   IFS=',' read -r -a _groups <<< "$spec"
   for group in "${_groups[@]}"; do
     case "$group" in
-      planets|asteroids|exotics|analytical) printf '%s\n' "$group" ;;
+      planets|asteroids|exotics|analytical) candidates=("$group") ;;
       all)
-        printf '%s\n' "${LEB1_GROUPS[@]}"
+        candidates=("${LEB1_GROUPS[@]}")
         ;;
       *) die "invalid LEB1 group: $group" ;;
     esac
-  done | awk '!seen[$0]++'
+    for candidate in "${candidates[@]}"; do
+      if ! contains_word "$candidate" "${selected[@]}"; then
+        selected+=("$candidate")
+      fi
+    done
+  done
+  for candidate in "${selected[@]}"; do
+    [[ "$candidate" == "__leph_no_group__" ]] || printf '%s\n' "$candidate"
+  done
 }
 
 selected_leb2_groups() {
   local spec
   local group
+  local candidate
+  # See ``selected_leb1_groups`` for the Bash-3.2/nounset sentinel rationale.
+  local selected=(__leph_no_group__)
+  local candidates=()
 
   spec="$(normalize_csv "$LEB2_GROUP_SPEC")"
   if [[ -n "$spec" ]]; then
@@ -373,11 +410,19 @@ selected_leb2_groups() {
     IFS=',' read -r -a _groups <<< "$spec"
     for group in "${_groups[@]}"; do
       case "$group" in
-        core|asteroids|apogee|uranians|exotics) printf '%s\n' "$group" ;;
-        all) printf '%s\n' "${LEB2_GROUPS[@]}" ;;
+        core|asteroids|exotics|apogee) candidates=("$group") ;;
+        all) candidates=("${LEB2_GROUPS[@]}") ;;
         *) die "invalid LEB2 group: $group" ;;
       esac
-    done | awk '!seen[$0]++'
+      for candidate in "${candidates[@]}"; do
+        if ! contains_word "$candidate" "${selected[@]}"; then
+          selected+=("$candidate")
+        fi
+      done
+    done
+    for candidate in "${selected[@]}"; do
+      [[ "$candidate" == "__leph_no_group__" ]] || printf '%s\n' "$candidate"
+    done
     return 0
   fi
 
@@ -399,7 +444,10 @@ affected_leb2_groups() {
         printf '%s\n' exotics
         ;;
       analytical)
-        printf '%s\n' core apogee uranians
+        # The analytical LEB1 partition contains the public node/apsis models.
+        # In LEB2 those bodies are distributed between core and apogee only;
+        # the former hypothetical ``uranians`` output no longer exists.
+        printf '%s\n' core apogee
         ;;
     esac
   done < <(selected_leb1_groups) | awk '!seen[$0]++'
@@ -883,7 +931,12 @@ convert_leb2_tier() {
   while IFS= read -r group; do
     output="$(leb2_path "$tier" "$group")"
     backup_path_if_exists "$output"
-    args=(scripts/generate_leb2.py convert "$source" -o "$output" --group "$group")
+    # ``--tier`` is not merely output naming metadata.  The converter uses it
+    # to authenticate the exact body inventory permitted for that tier (most
+    # notably, the extended exotics set excludes the near-Earth asteroids).
+    # Omitting it makes a valid extended file look like a malformed generic
+    # exotics file, so always propagate the tier selected by this orchestrator.
+    args=(scripts/generate_leb2.py convert "$source" -o "$output" --group "$group" --tier "$tier")
     ((QUIET)) && args+=(-q)
     run "$PYTHON" "${args[@]}" || return 1
     GENERATED_LEB2_FILES+=("$output")
@@ -905,7 +958,10 @@ verify_leb2_tier() {
   reference="$(main_leb1_path "$tier")"
   while IFS= read -r group; do
     input="$(leb2_path "$tier" "$group")"
-    args=(scripts/generate_leb2.py verify "$input" --reference "$reference" --samples "$LEB2_VERIFY_SAMPLES")
+    # Verification must apply the same authenticated group/tier contract as
+    # conversion.  Supplying both values also prevents a correctly readable
+    # file with the wrong companion inventory from passing unnoticed.
+    args=(scripts/generate_leb2.py verify "$input" --reference "$reference" --samples "$LEB2_VERIFY_SAMPLES" --group "$group" --tier "$tier")
     ((QUIET)) && args+=(-q)
     run "$PYTHON" "${args[@]}" || return 1
   done < <(selected_leb2_groups)
@@ -1045,4 +1101,6 @@ main() {
   exit 1
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
