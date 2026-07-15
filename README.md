@@ -13,14 +13,10 @@ A high-precision astronomical ephemeris library for Python, powered by NASA JPL 
 
 **Drop-in replacement for PySwissEph** - readable Python algorithms, standard debugging, easy deployment on the scientific Python stack (NumPy, Skyfield, pyerfa).
 
-The current release line is maintained as an **independent implementation**
-under **Apache-2.0** for project-authored code. It has no reference-engine
-runtime dependency, and current release artifacts exclude reference source,
-prose, algorithms, and distribution data. Compatibility validation is limited
-to ephemeral black-box public-API comparisons. Earlier development history
-contained legacy/reference-derived material removed during the v3 remediation;
-see [the independence methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/independence.md).
-See [NOTICE.md](NOTICE.md) / [LICENSING.md](LICENSING.md).
+Licensed under the **[GNU Affero General Public License v3.0](LICENSE)**
+([AGPL-3.0-only](LICENSING.md)). Built on NASA JPL DE440/DE441
+ephemerides, IAU/ERFA standards, and cited primary literature. See
+[NOTICE.md](NOTICE.md) for data sources and attribution.
 
 ---
 
@@ -82,6 +78,7 @@ the headline items are:
 | **Published-source ayanamshas** | Every mode derives from its author's published defining statement (IAE for Lahiri, Burgess/Clark for the Siddhantic modes, etc.). | No value is fitted to another implementation's output. Sub-arcsecond agreement for most modes; documented offsets for historical-pair modes (e.g. Yukteshwar ~5.5′ from the book value, De Luce ~22″). |
 | **House-cusp speeds** | The derivative of the reported cusp position (centered finite difference). Whole Sign cusps report 0.0. | The speed slot is the derivative of the position slot, not a convention-dependent analytic approximation. |
 | **Phase angle** | Light-time-consistent geometry. | Bounded 15–40″ difference on inner planets; elongation identical. |
+| **Historical hypothetical bodies (IDs 40–58)** | Thirteen IDs compute from their primary published sources (Neely 1980, Harrington 1988, Le Verrier 1846, Adams 1846, Lowell 1915, Velichko–Larin 2007 for White Moon/Selena). IDs 48, 49, 54, 55, 57 and 58 keep their names and constants but raise `UnknownBodyError`. | A recognised name is not a numerical model: where no source-complete published definition could be recovered, failing closed is preferable to returning positions that cannot be traced to any source. The field-by-field inventory of what is missing per ID is in [Missing Hypothetical Models](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/missing-hypothetical-models.md). |
 
 Modern-era planetary and lunar positions, house cusps, eclipses, rise/set,
 and the majority of sidereal modes agree with the reference API at the
@@ -228,19 +225,20 @@ Learn more at [kerykeion.net](https://kerykeion.net).
 
 ## License
 
-Licensed under the **[Apache License 2.0](LICENSE)** — a permissive license
-free for any use, including closed-source and commercial products, subject to
-preservation of copyright, license, and attribution notices. See
-[LICENSING.md](LICENSING.md) for details. Published distributions beginning
-with `3.0.0rc3` carry this license; older distributions retain their original
-terms.
+Licensed under the **[GNU Affero General Public License v3.0](LICENSE)**
+(`AGPL-3.0-only`). See [LICENSING.md](LICENSING.md) for details.
 
 > **Note:** the optional `libephemeris[nbody]` extra pulls in `rebound` and
 > `assist` (GPL-3.0-or-later), which are not part of the core install and are
-> never bundled. Installing that extra makes your combined installation subject
-> to the GPL; the core library has no strong-copyleft (GPL/LGPL/AGPL) runtime
-> dependency (all required deps are permissive except certifi's weak MPL-2.0).
-> See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+> never bundled. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-LibEphemeris is an independent, API-compatible implementation — see
+### License history
+
+Pre-releases `v3.0.0rc2` through `v3.0.0rc8` incorrectly declared
+`Apache-2.0` in their PyPI metadata. The relicensing was premature: unresolved
+components prevent an Apache-2.0 grant. Those releases are to be treated as
+**AGPL-3.0-only** and have been yanked from PyPI. All versions from
+`v3.0.0rc10` onward correctly declare `AGPL-3.0-only`.
+
+LibEphemeris provides an API-compatible interface — see
 [NOTICE.md](NOTICE.md). "Swiss Ephemeris" is a product of Astrodienst AG.

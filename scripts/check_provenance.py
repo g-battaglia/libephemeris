@@ -77,16 +77,18 @@ INHERITED_HISTORY_ALLOWLIST = frozenset(
     }
 )
 
-# Documents that legitimately NAME licenses (the retired AGPL/dual era, the
-# optional GPL nbody extra) but must NOT carry SE source-file references,
-# internal identifiers or PyMeeus tokens: the root legal/notice files (incl.
-# README, the shipped long_description) and the historical release notes.
-# These are exempt from the copyleft/agpl classes ONLY; every other class
-# still applies.
+# Documents that legitimately NAME licenses (the GPL nbody extra, historical
+# license notes) but must NOT carry SE source-file references, internal
+# identifiers or PyMeeus tokens: the root legal/notice files (incl. README,
+# the shipped long_description) and the historical release notes.
+# These are exempt from the copyleft class ONLY; every other class still
+# applies.
 LICENSE_NAMING_OK = frozenset(
     {
         "CHANGELOG.md",
+        "LICENSE",
         "LICENSING.md",
+        "NOTICE.md",
         "RELEASE_NOTES.md",
         "README.md",
         "THIRD_PARTY_NOTICES.md",
@@ -121,30 +123,23 @@ PYMEEUS_RE = re.compile(
     r"|jupiter_system_angles",
     re.IGNORECASE,
 )
-# Copyleft license declarations (case-insensitive). Matches L/GPL token
-# forms (LGPL, GPL, GPLv2/v3, GPL-2.0/3.0, LGPL-3.0) and the spelled-out
-# "GNU/Lesser General Public License", but NOT AGPL (which now appears only
-# in historical release notes and the dev-only reference API, never in this
-# project's shipped Apache-2.0 headers): the leading word boundary means the
-# GPL inside "AGPL" is not at a token start, and "GNU Affero General Public"
-# breaks the GNU...general adjacency. Word boundaries also avoid false hits
-# on substrings such as the "gPl" inside "PickeringPlanet".
+# Copyleft license declarations OTHER than AGPL (case-insensitive). Matches
+# L/GPL token forms (LGPL, GPL, GPLv2/v3, GPL-2.0/3.0, LGPL-3.0) and the
+# spelled-out "GNU/Lesser General Public License". AGPL is the project's
+# own license and is NOT flagged. The leading word boundary means the GPL
+# inside "AGPL" is not at a token start. Word boundaries also avoid false
+# hits on substrings such as the "gPl" inside "PickeringPlanet".
 COPYLEFT_RE = re.compile(
     r"\bL?GPL(?:[-\s]?v?[23](?:\.0)?)?\b"
     r"|\blesser\s+general\s+public\b"
     r"|\bGNU\s+general\s+public\b",
     re.IGNORECASE,
 )
-# AGPL is its own class: the reference implementation's license. It must
-# never appear in shipped code or data; docs may name it only in the
-# allowlisted legal/notice files.
-AGPL_RE = re.compile(r"\bAGPL\b|\bGNU\s+Affero\b", re.IGNORECASE)
 CLASSES = (
     ("source-file-ref", SOURCE_FILE_RE),
     ("identifier", IDENTIFIER_RE),
     ("pymeeus", PYMEEUS_RE),
     ("copyleft", COPYLEFT_RE),
-    ("agpl", AGPL_RE),
 )
 # Data artifacts that must never (re-)enter the tree: the reference
 # distribution's ephemeris/orbital-element/star files. This is a
@@ -726,7 +721,7 @@ def _line_hit_labels(rel: str, line: str) -> list[str]:
             "pymeeus",
         ):
             continue
-        if label in ("copyleft", "agpl") and license_naming_ok:
+        if label == "copyleft" and license_naming_ok:
             continue
         if pattern.search(line):
             labels.append(label)

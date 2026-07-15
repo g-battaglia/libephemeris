@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """LibEphemeris -- high-precision astronomical ephemeris library.
 
@@ -642,10 +642,10 @@ from ._dotenv import load_dotenv
 # Extended astrology helpers submodule
 from . import contrib
 
-__version__ = "3.0.0rc8"
+__version__ = "3.0.0rc10"
 version = __version__
 __author__ = "Giacomo Battaglia"
-__license__ = "Apache-2.0"
+__license__ = "AGPL-3.0-only"
 
 # Note: the original Pythonic variants of sol_eclipse_*, lun_eclipse_*,
 # lun_occult_when_loc, heliacal_ut, heliacal_pheno_ut, and gauquelin_sector

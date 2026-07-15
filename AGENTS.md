@@ -4,13 +4,13 @@ LibEphemeris is a pure-Python astronomical ephemeris library with a Swiss Epheme
 
 **Always maintain 1:1 compatibility with PySwissEphemeris.**
 
-## Independence
+## Development Policy
 
-LibEphemeris is 100% independent. Every implementation, model, and data file
-is derived from NASA JPL/IAU data and standards, cited primary literature,
-and permissively licensed sources.
+The project is licensed AGPL-3.0-only.
 
-- Never inspect, retrieve, possess, read, translate, adapt, or copy Swiss
+Development rules for new and modified code:
+
+- Do not inspect, retrieve, possess, read, translate, adapt, or copy Swiss
   Ephemeris source code, source comments, documentation prose, algorithms, or
   data files. Reference-distribution files must not enter this repository.
 - The reference API may be used only for ephemeral behavioral comparison:

@@ -230,19 +230,16 @@ def test_archive_text_payloads_receive_provenance_scan() -> None:
     ]
     assert (
         _text_payload_hits(
-            "libephemeris-3.0.0rc8/README.md",
+            f"{EXPECTED_SDIST_ROOT}/README.md",
             b"GPL-3.0\n",
-            sdist_root="libephemeris-3.0.0rc8",
+            sdist_root=EXPECTED_SDIST_ROOT,
         )
         == []
     )
-    assert (
-        _text_payload_hits("libephemeris-3.0.0rc8.dist-info/METADATA", b"GPL-3.0\n")
-        == []
-    )
+    assert _text_payload_hits(f"{EXPECTED_DIST_INFO}/METADATA", b"GPL-3.0\n") == []
     assert (
         _text_payload_hits(
-            "libephemeris-3.0.0rc8.dist-info/licenses/LICENSING.md",
+            f"{EXPECTED_DIST_INFO}/licenses/LICENSING.md",
             b"GPL-3.0\n",
         )
         == []

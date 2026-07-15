@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Analytical theories for planetary moon positions.
@@ -18,10 +18,10 @@ References:
 - Jacobson, R.A. (2009) "The Orbits of the Neptunian Satellites"
 - Brozović, M. & Jacobson, R.A. (2024) "Pluto system orbits", AJ 167:256
 
-License: Apache-2.0, except the
+License: AGPL-3.0-only, except the
          TASS 1.7 port from Stellarium (`tass17.py`, `tass17_data.py`),
-         which is MIT. The Galilean theory is an independent
-         implementation from Lieske 1998 / Meeus ch. 44 (see
+         which is MIT. The Galilean theory is implemented from
+         Lieske 1998 / Meeus ch. 44 (see
          docs/methodology/galilean-e5-spec.md).
 """
 

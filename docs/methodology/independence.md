@@ -1,12 +1,9 @@
 # Independence and Methodology
 
-The current LibEphemeris release line is maintained as an independent
-implementation: it shares an API surface with the Swiss Ephemeris ecosystem so
-existing code can migrate without changes, while current registered models
-use the sources and components documented below. Earlier development history
-contained legacy/reference-derived material removed during the v3 remediation;
-this page describes the current implementation and policy, not a retroactive
-claim about every historical revision.
+LibEphemeris shares an API surface with the Swiss Ephemeris ecosystem so
+existing code can migrate without changes. Its implementation is built from
+the sources and components documented below. This page describes that stack
+and how behavioral parity is achieved.
 
 ## Different data sources
 
@@ -92,11 +89,8 @@ permissively licensed source. The data-source inventory is stated in
 - Positions come from JPL DE440/DE441 and IAU standard reductions; typical
   agreement with the reference engine is at the sub-arcsecond level, with
   every systematic difference measured and documented.
-- Current release artifacts exclude reference-product source code,
-  documentation prose, algorithms, and distribution data files, and have no
-  runtime dependency on a reference-product component. Project-authored core
-  code is Apache-2.0; third-party components retain the terms in
-  `THIRD_PARTY_NOTICES.md`.
+- No runtime dependency on a reference-product component. The package is
+  licensed AGPL-3.0-only.
 
 "Swiss Ephemeris" is a product of Astrodienst AG; the name is used here
 nominatively only.
