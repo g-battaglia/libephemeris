@@ -8,6 +8,10 @@ completion scripts. Unlike Click's built-in completion, these scripts:
   1. Auto-create a ``leph`` shell function for this source checkout
   2. Pin the project path so the function works outside the repository
   3. Work whether the venv is activated or not
+
+Provenance:
+    Project-authored shell-completion text generation. It contains no
+    astronomical model, scientific datum, or numerical coefficient.
 """
 
 from __future__ import annotations

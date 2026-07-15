@@ -11,6 +11,14 @@ Upstream is unmaintained since 2018.
 Changes from upstream:
   - Lines 568, 599: Added .item() to daf.map_array() calls for numpy 2.x
     compatibility (numpy 2.x rejects int() on 1-element arrays).
+  - Module header: added the explicit vendoring and provenance record; the
+    numerical implementation is otherwise the identified 0.1.0 upstream.
+
+Provenance:
+  This file remains MIT-licensed third-party code by Shushi Uetsuki, vendored
+  from the exact upstream/version named above. Its scientific input format is
+  NASA/JPL/NAIF SPK type 21. LibEphemeris does not claim this implementation as
+  project-owned and does not relicense it; see ``THIRD_PARTY_NOTICES.md``.
 
 This module computes position and velocity of a celestial small body, from a 
 NASA SPICE SPK ephemeris kernel file of data type 21 (Extended Modified 
@@ -694,7 +702,6 @@ def titlecase(name):
     """Title-case target `name` if it looks safe to do so.
     """
     return name if name.startswith(('1', 'C/', 'DSS-')) else name.title()
-
 
 
 

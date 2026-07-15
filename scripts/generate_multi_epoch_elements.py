@@ -2,12 +2,26 @@
 """
 Generate multi-epoch orbital elements for all minor bodies.
 
-L1/L2 from KEPLERIAN_TODO.md: Creates MINOR_BODY_ELEMENTS_MULTI entries
-at 20-year intervals (1650-2450) for all 37 bodies with SPK support.
+Provenance:
+    Input position/velocity records are public NASA/JPL Horizons SPK type-21
+    states. The J2000-equatorial-to-J2000-ecliptic rotation and
+    state-to-osculating-element equations are stated in this script and
+    referenced to Curtis and Bate-Mueller-White. Epoch spacing, selection, and
+    runtime cross-fade policy are project choices. The script emits the body-map
+    fragment used by the reviewed ``multi_epoch_data.py`` artifact; it does not
+    fit foreign output.
+
+The reviewed artifact in ``libephemeris/multi_epoch_data.py`` uses the default
+ten-year grid from 1650 through 2450 inclusive. The generator attempts every
+body in ``MINOR_BODY_ELEMENTS`` and emits only bodies for which a compatible
+heliocentric J2000 type-21 kernel covers at least one requested epoch. The
+reviewed artifact contains 36 of 37 bodies; Bennu is intentionally represented
+only by its separately documented curated epoch in ``minor_bodies.py``.
 
 The script:
 1. Downloads/finds wide-range SPK files for each body
-2. Computes heliocentric state vectors at 20-year epochs
+2. Computes heliocentric state vectors at the requested epochs (ten years by
+   default)
 3. Converts state vectors to osculating Keplerian elements
 4. Outputs Python code for MINOR_BODY_ELEMENTS_MULTI
 
@@ -16,7 +30,7 @@ Usage:
     python scripts/generate_multi_epoch_elements.py --body chiron  # Single body
     python scripts/generate_multi_epoch_elements.py --dry-run      # Show epochs only
     python scripts/generate_multi_epoch_elements.py --output /path/to/output.py
-    python scripts/generate_multi_epoch_elements.py --spacing 20   # 20-year intervals
+    python scripts/generate_multi_epoch_elements.py --spacing 5    # Optional denser grid
     python scripts/generate_multi_epoch_elements.py --start 1650 --end 2450
 
 Requirements:
@@ -24,15 +38,19 @@ Requirements:
 
 Algorithm:
     State vector (x,y,z,vx,vy,vz) from SPK → osculating Keplerian elements
-    using the vis-viva equation and standard orbital mechanics.
+    using the vis-viva equation, angular-momentum and eccentricity vectors,
+    and the elliptic/hyperbolic anomaly identities written beside the code.
 
-    The SPK provides heliocentric ICRS (J2000 equatorial) positions and
-    velocities. We convert to ecliptic J2000 and then extract (a, e, i,
+    The accepted SPK segments declare NAIF frame ID 1 (J2000 equatorial) and
+    center ID 10 (Sun). We convert to ecliptic J2000 and then extract (a, e, i,
     ω, Ω, M₀, n) in the same conventions as MINOR_BODY_ELEMENTS.
 
 References:
-    Curtis "Orbital Mechanics for Engineering Students" Ch. 4
-    Bate, Mueller, White "Fundamentals of Astrodynamics" Ch. 2
+    * NASA/JPL Horizons System manual, "SPK File Generation".
+    * NASA/JPL/NAIF, ``SPK Required Reading``, type 21.
+    * IAU (1976), System of Astronomical Constants; IAU (2012), Resolution B2.
+    * Curtis, *Orbital Mechanics for Engineering Students*, chapter 4.
+    * Bate, Mueller & White, *Fundamentals of Astrodynamics*, chapter 2.
 """
 
 from __future__ import annotations
@@ -48,25 +66,38 @@ from typing import Optional
 # Ensure libephemeris can be imported from the project root
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Sun's gravitational parameter in AU³/day²
-# GM_sun = 1.32712440018e20 m³/s² → convert to AU³/day²
-# 1 AU = 149597870700 m, 1 day = 86400 s
-# k² = GM / (AU³/day²) = 0.01720209895² (Gaussian gravitational constant squared)
-MU_SUN_AU3_DAY2 = 2.9591220828559093e-04  # GM_sun in AU³/day²
+# Historical Gaussian solar mass parameter in AU³/day².
+#
+# The IAU 1976 System of Astronomical Constants defined the Gaussian
+# gravitational constant as k = 0.01720209895 when length, mass, and time are
+# measured in au, solar masses, and days. The value below is k², rounded to
+# the precision used when the reviewed multi_epoch_data.py table was produced.
+# IAU 2012 Resolution B2 subsequently made the au an exact SI length and
+# removed k from the current system of constants. We retain this historical
+# value *only* as a declared generation convention so regenerating the shipped
+# table does not silently change every mean motion. It must not be described
+# as a current IAU nominal or observational GM of the Sun.
+MU_SUN_AU3_DAY2 = 2.9591220828559093e-04
 
-# Obliquity of J2000 ecliptic
+# Mean obliquity of the J2000 ecliptic used by the table's frame convention.
+# The IAU 1976 resolution gives epsilon_0 = 23°26'21.448" =
+# 23.439291111... degrees. The stored 23.4392911-degree value is its explicit
+# 0.0000001-degree rounding. Position and velocity receive the identical
+# passive x-axis rotation, preserving their common reference frame.
 OBLIQUITY_J2000_RAD = math.radians(23.4392911)
 COS_EPS = math.cos(OBLIQUITY_J2000_RAD)
 SIN_EPS = math.sin(OBLIQUITY_J2000_RAD)
 
-# AU in km
+# Astronomical unit in kilometres. IAU 2012 Resolution B2 defines
+# 1 au = 149,597,870,700 m exactly, hence this conversion is exact.
 AU_KM = 149597870.7
 
-# Default epoch grid: 1650–2450 at 20-year spacing
-# Julian dates for Jan 1 of each year (approximately)
+# Reviewed artifact grid: Julian-year labels 1650–2450 at ten-year spacing.
+# These labels are mapped to uniform 365.25-day offsets from J2000.0; they are
+# not civil-calendar January 1 instants. See _year_to_jd().
 DEFAULT_START_YEAR = 1650
 DEFAULT_END_YEAR = 2450
-DEFAULT_SPACING = 20
+DEFAULT_SPACING = 10
 
 
 @dataclass
@@ -85,9 +116,11 @@ class KeplerianElements:
 
 
 def _year_to_jd(year: float) -> float:
-    """Convert a calendar year to approximate Julian Day.
+    """Convert a Julian-year label to its uniform-grid Julian Day.
 
-    Uses the standard formula: JD of J2000.0 = 2451545.0 (2000 Jan 1.5 TDB).
+    Uses the IAU/JPL epoch definition J2000.0 = JD 2451545.0 TDB
+    (2000 January 1, 12:00 TDB) and 365.25 Julian days per Julian year. Thus
+    labels other than 2000 are not assertions about civil-calendar January 1.
     """
     return 2451545.0 + (year - 2000.0) * 365.25
 
@@ -275,9 +308,22 @@ def _state_to_keplerian(
 def _get_spk_state_vector(
     spk_file: str, jd: float
 ) -> Optional[tuple[float, float, float, float, float, float]]:
-    """Get heliocentric ecliptic J2000 state vector from SPK at a given JD.
+    """Get a heliocentric ecliptic-J2000 state from a type-21 SPK.
 
-    Returns (x, y, z, vx, vy, vz) in AU and AU/day, or None on failure.
+    Type-21 records store a target state relative to the segment's declared
+    center and reference frame. This generator accepts only center ID 10
+    (the Sun) and frame ID 1 (J2000). Enforcing those metadata is essential:
+    merely calling a relative-state reader does not make a barycentric or
+    planet-centered segment heliocentric, and rotating an arbitrary SPICE
+    frame by the J2000 obliquity would be scientifically invalid.
+
+    The type-21 reader returns kilometres and kilometres per second. The
+    function converts them to au and au/day, then applies the documented
+    equatorial-J2000 to ecliptic-J2000 x-axis rotation to both vectors.
+
+    Returns:
+        ``(x, y, z, vx, vy, vz)`` in ecliptic-J2000 au and au/day, or
+        ``None`` when the kernel is incompatible, unreadable, or out of range.
     """
     try:
         from spktype21 import SPKType21
@@ -291,8 +337,25 @@ def _get_spk_state_vector(
     try:
         kernel = SPKType21.open(spk_file)
         try:
+            if not kernel.segments:
+                return None
+
             center_id = kernel.segments[0].center
             target_id = kernel.segments[0].target
+
+            # Horizons small-body kernels used for the reviewed artifact are
+            # Sun-centered J2000 segments. Reject mixed or differently framed
+            # files rather than silently assigning the wrong physical meaning
+            # to their coordinates.
+            if any(
+                segment.center != center_id
+                or segment.target != target_id
+                or segment.frame != 1
+                for segment in kernel.segments
+            ):
+                return None
+            if center_id != 10:
+                return None
 
             # compute_type21 returns (position_km, velocity_km_per_s)
             pos_km, vel_km_s = kernel.compute_type21(center_id, target_id, jd)
@@ -391,11 +454,30 @@ def generate_epochs(
     end_year: int = DEFAULT_END_YEAR,
     spacing: int = DEFAULT_SPACING,
 ) -> list[float]:
-    """Generate Julian Day epochs at regular year intervals.
+    """Generate the declared uniform Julian-year epoch grid.
 
-    Uses the same epoch values as the existing MINOR_BODY_ELEMENTS_MULTI
-    for backward compatibility where possible.
+    ``start_year`` and ``end_year`` are human-readable Julian-year labels,
+    not Gregorian calendar dates. Each integer year advances exactly 365.25
+    TDB days from J2000.0, matching the epoch convention embedded in the
+    reviewed :data:`MINOR_BODY_ELEMENTS_MULTI` artifact. With the defaults,
+    both endpoints are included and 81 epochs are emitted.
+
+    Args:
+        start_year: First inclusive Julian-year label.
+        end_year: Last inclusive Julian-year label.
+        spacing: Positive interval between labels in Julian years.
+
+    Returns:
+        Increasing Julian Dates on the declared TDB-like generation grid.
+
+    Raises:
+        ValueError: If spacing is not positive or the end precedes the start.
     """
+    if spacing <= 0:
+        raise ValueError("spacing must be positive")
+    if end_year < start_year:
+        raise ValueError("end_year must be greater than or equal to start_year")
+
     epochs = []
     year = start_year
     while year <= end_year:
@@ -501,7 +583,7 @@ def main() -> int:
 Examples:
   python scripts/generate_multi_epoch_elements.py                # All bodies
   python scripts/generate_multi_epoch_elements.py --body chiron  # Single body
-  python scripts/generate_multi_epoch_elements.py --spacing 20   # 20-year intervals
+  python scripts/generate_multi_epoch_elements.py --spacing 5    # Optional denser grid
   python scripts/generate_multi_epoch_elements.py --dry-run      # Show plan only
   python scripts/generate_multi_epoch_elements.py --output out.py  # Write to file
         """,
@@ -680,6 +762,12 @@ Examples:
 # Generated by scripts/generate_multi_epoch_elements.py
 # Epoch range: {args.start}–{args.end}, spacing: {args.spacing} years
 # Source: JPL SPK type 21 state vectors → osculating Keplerian elements
+# Provenance: public NASA/JPL Horizons SPK states; explicit state-to-element
+# equations in this script; no compatibility-output fit. This command emits the
+# body-map fragment incorporated into the reviewed multi_epoch_data.py module.
+# Generation conventions: IAU-1976 k² solar mass parameter and J2000 mean
+# obliquity, plus the IAU-2012 exact au. The script rejects center != Sun and
+# frame != J2000 so "heliocentric ecliptic J2000" is enforced, not assumed.
 #
 # Each body has elements at {args.spacing}-year intervals; the consumer
 # (_get_epoch_elements_blend) picks the nearest epoch and cross-fades

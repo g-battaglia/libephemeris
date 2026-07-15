@@ -35,6 +35,13 @@ the blocked tokens. Reviewed legal/history lines use narrow inline waivers;
 
 Usage:
     python scripts/check_provenance.py
+
+Provenance:
+    Project-authored clean-room policy gate. It scans project paths, text, and
+    reachable Git metadata for prohibited provenance fingerprints without
+    opening blocked reference-distribution payloads. Pattern literals are audit
+    controls, not imported algorithms or data. The script performs no
+    astronomical calculation and cannot establish scientific accuracy.
 """
 
 from __future__ import annotations
@@ -790,6 +797,7 @@ def _statement_spans(text: str) -> list[tuple[int, int]]:
 
 
 def _high_precision_literal_hits(root: Path) -> list[tuple[Path, int, str, str]]:
+    """Find unexplained high-precision literals outside generated/vendor code."""
     import io
     import tokenize
 
@@ -858,6 +866,7 @@ def _high_precision_literal_hits(root: Path) -> list[tuple[Path, int, str, str]]
 
 
 def main() -> int:
+    """Run every repository independence and provenance policy check."""
     name_hits: list[tuple[Path, int, str, str]] = []
 
     # Physical name gate: no reference-distribution directory, source file or

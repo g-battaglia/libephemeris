@@ -14,6 +14,11 @@ Usage::
     result = libephemeris.calc_ut(jd, body_id, flags)
     traces = libephemeris.get_trace_results()   # {body_id: "LEB", ...}
     token.var.reset(token)
+
+Provenance:
+    Project-authored ContextVar bookkeeping. It records a label after a
+    registered backend succeeds and cannot modify the value or backend choice.
+    The module contains no astronomical model or coefficient.
 """
 
 from __future__ import annotations

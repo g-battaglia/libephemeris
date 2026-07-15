@@ -4,6 +4,12 @@
 
 Contains tier metadata, download helpers, and common CLI patterns reused
 across both entry points.
+
+Provenance:
+    Project-authored CLI infrastructure. The tier names, coverage labels, and
+    download descriptions are release metadata; this module contains no
+    astronomical model or coefficient and is never consulted by a numerical
+    calculation.
 """
 
 from __future__ import annotations

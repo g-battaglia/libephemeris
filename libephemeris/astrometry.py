@@ -16,6 +16,15 @@ References:
 - Capitaine, Wallace, Chapront (2003), A&A 412, 567-586
 - McCarthy & Luzum (2003), Celestial Mechanics 85, 37-49
 - IAU SOFA software collection
+
+Provenance:
+    Nutation/precession quantities follow the cited IAU/IERS publications and
+    ERFA/SOFA conventions; aberration is the standard Lorentz transformation of
+    the incoming unit direction by the observer velocity. Constants are labelled
+    with units and epochs beside their use. Project code supplies vector algebra,
+    validation, and fallback plumbing only; it does not transcribe another
+    ephemeris implementation. The production long-term precession path is
+    centralized in ``precession_vondrak.py``.
 """
 
 from __future__ import annotations

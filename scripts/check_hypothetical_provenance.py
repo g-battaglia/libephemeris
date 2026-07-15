@@ -12,6 +12,14 @@ The reviewed sources themselves are not vendored.  Their identifiers and the
 SHA-256 digests of the scans used during transcription are printed by
 ``--explain`` so a release reviewer can obtain and compare the public scans
 without placing research copies in the repository.
+
+Provenance:
+    Project-authored integrity and derivation gate. Its expected values are
+    independently recomputed from the page-level public quantities catalogued
+    in ``docs/methodology/hypothetical-bodies.md``; scan hashes identify review
+    evidence but do not license or embed it. The gate also proves unsupported
+    records fail closed. It does not compare against or learn from another
+    ephemeris implementation.
 """
 
 from __future__ import annotations

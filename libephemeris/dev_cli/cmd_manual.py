@@ -3,6 +3,10 @@
 """Manual/documentation build commands: EPUB, PDF, pandoc and ebooklib workflows.
 
 Replaces 8 poe tasks: manual:build*, docs:manual:generate*.
+
+Provenance:
+    Project-authored documentation-build orchestration with no astronomical
+    model, scientific data transformation, or runtime coefficient.
 """
 
 from __future__ import annotations

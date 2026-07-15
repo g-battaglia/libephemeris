@@ -1,6 +1,66 @@
 # House System Algorithms and Mathematical Formulas
 
-This document provides comprehensive mathematical documentation for the 25 house systems (26 codes including the A/E equal-house alias) implemented in LibEphemeris. Each section includes the underlying algorithm, mathematical formulas, and implementation notes.
+This document provides mathematical documentation for the 25 house systems
+(26 codes including the A/E equal-house alias) implemented in LibEphemeris.
+Each section states the construction evaluated by this project. Historical
+attribution and implementation provenance are separate questions: a system can
+have a traditional name while its local Cartesian/spherical derivation is
+project-authored from the public definition.
+
+## Provenance contract and source status
+
+No cusp is obtained from a copied cusp table or by fitting another program's
+output. General coordinate transformations follow Meeus chapter 13 and the
+IERS/ERFA frame conventions. ARMC, nutation, precession, and obliquity come from
+the source-mapped IERS/ERFA/Vondrak pipeline. Those astronomy standards do not
+define a house system; the division/projection rule must be accounted for
+separately below.
+
+The evidence labels are deliberately precise:
+
+- **Author definition**: a public description by the system's author or named
+  originator identifies the construction.
+- **Published secondary definition**: an independent published treatment
+  describes the construction, but this audit does not claim a primary-author
+  transcription.
+- **Project-defined variant**: the formula is completely disclosed here and in
+  code, but no primary historical locator is asserted for the name/variant.
+- **Mathematical identity**: the rule is only an equal division, midpoint, or
+  other equation printed in full; no empirical coefficient exists.
+
+| Code | Construction source/status | Local derivation boundary |
+|---|---|---|
+| `P` | **Published secondary definition:** Holden (1977); independent time-division description in Urania Trust, “The Astronomy of Houses.” | Project fixed-point solution of semi-arc trisection; convergence and polar failure policy are local choices. |
+| `K` | **Published secondary definition:** Holden (1977) and Urania Trust's Koch description. | Project iterative oblique-ascension solution; tolerances/fallbacks are local. |
+| `R` | **Published secondary definition:** Holden (1977); equator division projected through horizon north/south points. | Project spherical projection. |
+| `C` | **Published secondary definition:** Holden (1977); prime-vertical division projected through horizon north/south points. | Project spherical projection. |
+| `O` | **Published secondary definition / identity:** trisection of the four ecliptic angle arcs. | Direct modular-arc arithmetic. |
+| `A`, `E` | **Mathematical identity:** twelve 30-degree sectors from the Ascendant. | `A` is an API alias of `E`. |
+| `W` | **Mathematical identity:** sign containing the Ascendant becomes house 1. | Zero-based sign-boundary arithmetic. |
+| `B` | **Published secondary definition:** Holden (1977) and independent Alcabitius histories. | Project semi-arc/oblique-ascension implementation and polar policy. |
+| `T` | **Published definition:** Polich & Page (1961), *The Topocentric System of Houses*. | Project trigonometric evaluation of the published pole construction. |
+| `M` | **Published secondary definition:** Holden (1977), equator division projected through the ecliptic poles. | Project spherical projection. |
+| `X` | **Published secondary definition:** axial/meridian equatorial division. | Project RA-to-ecliptic mapping. |
+| `H` | **Published secondary definition:** horizon/azimuth division projected by vertical circles. | Project vector/trigonometric projection and degeneracy policy. |
+| `U` | **Author definition:** Bogdan Krusinski's public 1995 description. | Independent Cartesian construction in `house_constructions.py`. |
+| `Y` | **Independent published description:** Ingmar de Boer, “APC Houses,” describing the Ascendant Parallel Circle attributed to L. Knegt. | Independent Cartesian construction in `house_constructions.py`; no claim that de Boer is the originator. |
+| `I` | **Published modern description:** Sunshine system using the Sun's diurnal/nocturnal arc; the `I` branch is the documented Treindl solution. | Project numerical solution and fallback policy. |
+| `i` | **Author definition:** Bob Makransky, “The Sunshine House System.” | Project spherical-trigonometry implementation of the upper/lower-meridian convention. |
+| `J` | **Author definition:** John Savard, “Astrological House Systems,” Albategnus/Savard-A entry. | Independent Cartesian construction in `house_constructions.py`. |
+| `L`, `Q` | **Author definition:** Walter D. Pullen's public “Sinusoidal House Systems” specification. | Project evaluation of the stated delta/ratio interpolation, including explicit narrow-quadrant policy. |
+| `S` | **Project-defined API realization:** midpoint construction over Porphyry boundaries, conventionally named Sripati. | Formula is completely stated below; no primary-author locator is asserted here. |
+| `V` | **Project-defined API realization:** equal sectors with the Ascendant at the middle of house 1. | Exact 15-degree offset is the complete rule; historical-priority claim is not needed for reproduction. |
+| `F` | **Project-defined API realization:** 30-degree RA sectors from the Ascendant RA, projected along hour circles. | Exact projection is stated below; a page-level Carter/Cope locator remains unasserted. |
+| `N` | **Project-defined API realization:** fixed natural-zodiac sectors beginning at 0 Aries. | Exact formula contains no observer-dependent astronomy. |
+| `D` | **Project-defined API realization:** twelve equal sectors anchored to the MC. | Exact 30-degree formula is printed below. |
+| `G` | **Published sector definition:** 36 Gauquelin diurnal/nocturnal sectors. | Project semi-arc solver, indexing, convergence, and polar failure behavior. |
+
+“Project-defined” is not a hidden-source placeholder. It says exactly that the
+equation shown in this document is the project's source of truth and that the
+historical label has not been upgraded into an unsupported bibliographic claim.
+See `house_constructions.py` for the fully commented vector frames, oriented
+arc invariants, branch selection, and degeneracy handling of `J`, `U`, `Y`, and
+`i`.
 
 ## Table of Contents
 
@@ -456,7 +516,10 @@ Meridian: λ = atan2(sin(RA), cos(RA)·cos(ε))
 
 ## Vehlow (V)
 
-**Historical Origin:** Johannes Vehlow (1890-1958), German astrologer.
+**Source status:** Project-defined API realization carrying the conventional
+Vehlow name. This audit does not claim a page-level Vehlow transcription for
+the exact 15-degree offset below; the displayed identity is the complete local
+definition.
 
 **Conceptual Basis:** Equal houses with Ascendant at center (15°) of House 1 rather than at cusp.
 
@@ -473,7 +536,9 @@ start = (λ_Asc - 15°) mod 360°
 
 ## Carter Poli-Equatorial (F)
 
-**Historical Origin:** Charles Carter (1887-1968), English astrologer.
+**Source status:** Project-defined API realization carrying the conventional
+Carter/Cope name. A page-level primary locator for this exact projection is not
+asserted; the equations below are the complete reproducible definition.
 
 **Conceptual Basis:** Equal 30° divisions on equator starting from RA of Ascendant, projected to ecliptic.
 
@@ -493,47 +558,58 @@ RA = RA_Asc + (i-1)·30°
 
 **Historical Origin:** Michel and Françoise Gauquelin (20th century), for statistical research.
 
-**Conceptual Basis:** 36 sectors based on true diurnal and nocturnal arc division.
+**Conceptual Basis:** 36 clockwise sectors obtained by dividing each
+diurnal/nocturnal quadrant into ninths. The boundaries are position circles,
+not uniform right-ascension cuts on the equator.
 
-### Algorithm
+### Independent numerical realization
 
-1. Calculate diurnal arc (Asc → MC → Desc): 18 sectors
-2. Calculate nocturnal arc (Desc → IC → Asc): 18 sectors
-3. Map 36 sectors to 12 houses (3 sectors per house)
-4. Use middle sector as house cusp
+The cardinal boundaries are fixed first:
 
-### Mathematical Formulas
-
-**Arc calculation:**
 ```
-arc_diurnal = (RA_Desc - RA_Asc) mod 360°
-arc_nocturnal = 360° - arc_diurnal
+sector 1  = Ascendant
+sector 10 = Midheaven
+sector 19 = Descendant
+sector 28 = Imum Coeli
 ```
 
-**Sector RA positions (1-36):**
-```
-For sectors 1-18 (diurnal):
-  RA_sector = RA_Asc + (sector-1)/18 × arc_diurnal
+For each of the eight intermediate boundaries in a quadrant, let `k = 1..8`
+be its ninth-arc index and compute the latitude/obliquity ascensional difference
 
-For sectors 19-36 (nocturnal):
-  RA_sector = RA_Desc + (sector-19)/18 × arc_nocturnal
+```
+a = asin(clamp(tan φ · tan ε, -1, +1)).
 ```
 
-**House cusp mapping:**
+The trial meridian is `RAMC ± k·10°`, with the sign and base meridian selected
+for the quadrant. The initial pole height of its position circle is
+
 ```
-House 1 cusp = sector 2 longitude
-House 2 cusp = sector 5 longitude
-House n cusp = sector (3n-1) longitude
+p₀ = atan(sin(k·a/9) / tan ε).
 ```
 
-**RA to ecliptic:**
+`Asc(r, ε, φ, p)` denotes the ecliptic intersection returned by the common
+house-circle projection for trial meridian `r` and pole height `p`. Starting
+with `λ₀ = Asc(r, ε, φ, p₀)`, the code refines
+
 ```
-λ = atan2(sin(RA), cos(RA)·cos(ε))
+δⱼ     = asin(sin ε · sin λⱼ)
+ADⱼ    = asin(clamp(tan φ · tan δⱼ, -1, +1))
+pⱼ₊₁   = atan(sin(k·ADⱼ/9) / tan δⱼ)
+λⱼ₊₁   = Asc(r, ε, φ, pⱼ₊₁)
 ```
 
-### Polar Limitation
+until the wrapped longitude change is below `1e-8°`, with at most 100
+iterations. Opposite boundaries are exact antipodes. The iteration limit,
+convergence threshold, `1e-10` degeneracy guard, and `clamp` operations are
+project numerical choices; the ninths-of-semi-arc construction is the sourced
+Gauquelin definition.
 
-Fails within polar circle due to undefined diurnal/nocturnal arcs.
+### Polar policy
+
+Within the polar circle (`|φ| >= 90° - ε`) ordinary rising/setting semi-arcs
+are undefined. The API therefore returns an explicit project fallback of 36
+clockwise equal 10-degree sectors from the Ascendant; it does not present that
+fallback as the historical Gauquelin construction.
 
 ---
 
@@ -583,51 +659,54 @@ cusp 1 falls on the East Point. The remaining cusps follow by symmetry.)
 
 ## Krusinski-Pisa (U)
 
-**Historical Origin:** Bogdan Krusinski (modern Polish astrologer).
+**Author source:** Bogdan Krusinski,
+[“The Krusinski House System”](https://www.astrologia.pl/house-system.html)
+(1995 public description): divide the Ascendant--zenith great circle into
+30-degree arcs and project its division points to the ecliptic along meridian
+(hour) circles.
 
 **Conceptual Basis:** Great circle passing through Ascendant and Zenith, divided into 12 equal parts.
 
-### Algorithm
+### Independent Cartesian construction
 
-1. Transform Ascendant from ecliptic to equatorial coordinates
-2. Rotate to align with meridian
-3. Transform to horizontal coordinates
-4. Create Asc-Zenith great circle
-5. Divide into 30° segments
-6. Transform each segment back to ecliptic
+`house_constructions.py` evaluates that definition directly in the
+right-handed equatorial frame of date. For Ascendant longitude `a`, obliquity
+`ε`, ARMC `m`, and latitude `φ`, form the Ascendant and zenith unit vectors:
 
-### Mathematical Formulas
-
-**Coordinate rotation (cotrans):**
 ```
-x' = x
-y' = y·cos(θ) + z·sin(θ)
-z' = -y·sin(θ) + z·cos(θ)
+A = (cos a, sin a cos ε, sin a sin ε)
+Z = (cos φ cos m, cos φ sin m, sin φ)
+U = normalize(Z - (Z·A) A)
 ```
 
-**Algorithm steps:**
-```
-A0. x = [λ_Asc, 0, 1]  (ecliptic coords)
-A1. x = cotrans(x, -ε)  (to equatorial)
-A2. x[0] = x[0] - (ARMC - 90°)  (rotate)
-A3. x = cotrans(x, -(90° - φ))  (to horizontal)
-A4. Save horizon_lon; set x[0] = 0
-A5. x = cotrans(x, -90°)  (to house circle)
+`U` is the zenith-facing tangent of the Ascendant--zenith great circle. Its
+division point at signed arc `θ` is therefore
 
-For each cusp i (0-5):
-  B0. x_cusp = [30°·i, 0, 1]
-  B1. x_cusp = cotrans(x_cusp, 90°)
-  B2. x_cusp[0] += horizon_lon
-  B3. x_cusp = cotrans(x_cusp, 90° - φ)
-  B4. x_cusp[0] += (ARMC - 90°)
-  B5. λ = atan(tan(RA)/cos(ε)) with quadrant adjustment
 ```
+P(θ) = cos θ A + sin θ U
+θ = 0°, +30°, +60°, +90°, -30°, -60°
+      H1   H12    H11    H10    H2    H3
+```
+
+The hour circle through `P` has `RA = atan2(P_y, P_x)` and cuts the ecliptic at
+
+```
+λ = atan2(sin RA, cos RA cos ε).
+```
+
+The `atan2` expression preserves the quadrant without a copied case table.
+Cusps 4--9 are exact antipodes of 10--3. The local Gram--Schmidt step above,
+floating-point normalization, and antipodal construction are project-authored
+numerical realization; the 30-degree division and hour-circle projection are
+Krusinski's published definition.
 
 ---
 
 ## Natural Gradient (N)
 
-**Historical Origin:** Modern simplified system.
+**Source status:** Project-defined API realization. The fixed zodiac partition
+printed below is the complete rule; no historical-origin claim is needed to
+reproduce it.
 
 **Conceptual Basis:** Equal houses starting from 0° Aries.
 
@@ -644,13 +723,22 @@ House 1 = 0° Aries, House 2 = 0° Taurus, etc.
 
 ## APC (Y)
 
-**Historical Origin:** Modern system (Ascendant-Parallel Circle).
+**Source:** Ingmar de Boer, [“APC Houses”](https://www.ingmardeboer.nl/index.php?title=APC_Houses), an independent construction description attributing the system to L. Knegt and the Dutch School of Ram.
 
-**Conceptual Basis:** Based on the great circle parallel to the horizon passing through the Ascendant.
+**Conceptual Basis:** The small circle parallel to the celestial equator that
+passes through the Ascendant is divided separately into six equal arcs above
+and six below the horizon. House circles through the north and south points of
+the horizon carry those division anchors to the ecliptic. A declination
+parallel is a small circle, not a “great circle parallel to the horizon.”
 
 ### Algorithm
 
 Uses the declination of the Ascendant to define the house circle.
+
+The formula below is the spherical expression of that definition. The runtime
+implementation in `house_constructions.py` constructs the same anchors and
+planes with Cartesian vectors, selects the ecliptic intersection by oriented
+arc containment, and explicitly validates cusp 1 = Ascendant and cusp 10 = MC.
 
 ### Mathematical Formulas
 
@@ -683,7 +771,9 @@ For n >= 8 (above horizon):
 
 ## Sripati (S)
 
-**Historical Origin:** Sripati (1019-1066), Indian mathematician and astronomer.
+**Source status:** Project-defined API realization conventionally named
+Sripati. This document does not assert that the exact midpoint rule below is a
+page-level transcription from Sripati.
 
 **Conceptual Basis:** Midpoints of Porphyry cusps. Each cusp is the midpoint between consecutive Porphyry cusps, effectively shifting Porphyry houses by half a house.
 
@@ -703,14 +793,34 @@ half of house 1. The cusp-12 boundary itself remains `12.0`.
 
 ## Pullen SD / Neo-Porphyry (L)
 
-**Historical Origin:** Walter Pullen, modern astrologer.
+**Author source:** Walter D. Pullen,
+[“Sinusoidal House Systems”](https://www.astrolog.org/astrolog/astsine.htm),
+“Sinusoidal Delta Houses” (first described in 1994).
 
 **Conceptual Basis:** Sinusoidal delta interpolation between angles. Instead of linear trisection (Porphyry), uses a sinusoidal curve to distribute cusps more smoothly between the angles.
 
 ### Algorithm
 
-1. Compute quadrant arcs as in Porphyry
-2. Apply sinusoidal weighting to cusp placement within each quadrant
+For the smaller of a pair of opposite quadrant arcs, let its size be `q` and
+write the three consecutive house widths as `x+n, x, x+n`. The opposite
+quadrant widths are `x+3n, x+4n, x+3n`. Solving the two sum constraints gives:
+
+```
+n = (90 - q) / 4
+x = (q - 30) / 2
+```
+
+The implementation evaluates the algebra symmetrically for every quadrant as:
+
+```
+d = quadrant_size - 90
+side   = 30 + d/4
+middle = 30 + d/2
+```
+
+When a quadrant is smaller than 30 degrees, the author specification says the
+middle house is pinned to zero and the two side houses bisect the quadrant.
+That narrow-quadrant rule is explicit code, not an inferred correction.
 
 **Properties:** Works at all latitudes, smoother cusp distribution than Porphyry.
 
@@ -718,14 +828,27 @@ half of house 1. The cusp-12 boundary itself remains `12.0`.
 
 ## Pullen SR (Q)
 
-**Historical Origin:** Walter Pullen, modern astrologer.
+**Author source:** Walter D. Pullen,
+[“Sinusoidal House Systems”](https://www.astrolog.org/astrolog/astsine.htm),
+“Sinusoidal Ratio Houses” (first implemented in 2016).
 
 **Conceptual Basis:** Sinusoidal ratio interpolation between angles. Similar to Pullen SD but uses a ratio-based sinusoidal formula.
 
 ### Algorithm
 
-1. Compute quadrant arcs as in Porphyry
-2. Apply sinusoidal ratio weighting to cusp placement within each quadrant
+For quadrant size `q`, the three widths are `r*x, x, r*x`; the opposite
+quadrant uses `r^3*x, r^4*x, r^3*x`. Therefore:
+
+```
+x * (2*r + 1) = q
+x * r^3 * (2 + r) = 180 - q
+r^3 * (2 + r) / (2*r + 1) = (180 - q) / q
+```
+
+LibEphemeris solves the positive `r` root with at most 20 Newton iterations,
+an initial value of 1, a derivative guard of `1e-12`, a positive floor of
+`0.01`, and a step convergence threshold of `1e-10`. Those are disclosed
+project numerical choices; the width equations are Pullen's definition.
 
 **Properties:** Works at all latitudes, alternative sinusoidal distribution to Pullen SD.
 
@@ -733,7 +856,8 @@ half of house 1. The cusp-12 boundary itself remains `12.0`.
 
 ## Equal from MC (D)
 
-**Historical Origin:** Modern variant of the Equal house system.
+**Source status:** Project-defined API realization. The exact MC-anchored
+30-degree identity printed below is the complete rule.
 
 **Conceptual Basis:** Equal 30-degree houses starting from the MC (10th house cusp) rather than the Ascendant.
 
@@ -751,15 +875,25 @@ where i = 1, 2, ..., 12
 
 ## Sunshine / Treindl (I)
 
-**Historical Origin:** Developed by Alois Treindl. Also known as the Sunshine house system.
+**Source status:** Treindl numerical solution of Bob Makransky's published
+Sunshine construction. This code identifier distinguishes the solution method,
+not a different physical Sun path.
 
 **Conceptual Basis:** Houses based on the Sun's diurnal arc, dividing the sky according to the Sun's actual path above and below the horizon. Uses the Sun's declination to define house boundaries.
 
 ### Algorithm
 
-1. Compute Sun's semi-diurnal and semi-nocturnal arcs from solar declination
-2. Divide arcs to produce house cusps
-3. Special handling when MC is below the horizon
+1. Compute the Sun's ascensional difference
+   `AD = asin(tan(sun_declination) * tan(latitude))`.
+2. Form the diurnal semi-arc `90 + AD` and nocturnal semi-arc `90 - AD`.
+3. Trisect each semi-arc to obtain the eight intermediate anchors.
+4. Project each anchor to the ecliptic through the corresponding house circle
+   containing the horizon north/south points.
+5. Apply the explicitly documented MC-below-horizon orientation branch.
+
+If the requested ephemeris cannot supply solar declination, the caller uses the
+Meeus chapter 25 low-precision apparent-Sun fallback documented in
+`houses.py`; zero is never silently substituted.
 
 **Properties:** Requires Sun's declination as input. Latitude-dependent.
 
@@ -767,13 +901,22 @@ where i = 1, 2, ..., 12
 
 ## Sunshine / Makransky (i)
 
-**Historical Origin:** Variant of the Sunshine system attributed to Makransky.
+**Author source:** Bob Makransky, “The Sunshine House System,” public author
+article reproduced in [Astrology House Systems](https://www.astro.nu/2017/03/03/astrology-house-systems/).
 
 **Conceptual Basis:** Similar to Sunshine/Treindl but with an alternative division algorithm for the Sun's diurnal arc.
 
 ### Algorithm
 
-Same general approach as Sunshine/Treindl with modified arc division.
+The Sun's diurnal and nocturnal arcs are divided into six parts, then projected
+through horizon-north/south house circles. `house_constructions.py` follows the
+author's upper/lower-meridian spherical-trigonometry convention and documents:
+
+- the equatorial frame, hour-angle sign, and horizon basis;
+- which semi-arc supplies each cusp;
+- the pole height and RA of each house-circle/equator intersection;
+- ecliptic-intersection orientation; and
+- polar/degenerate guards.
 
 **Properties:** Requires Sun's declination as input. Latitude-dependent.
 
@@ -781,13 +924,22 @@ Same general approach as Sunshine/Treindl with modified arc division.
 
 ## Savard-A (J)
 
-**Historical Origin:** Modern system by Savard.
+**Author source:** John Savard,
+[“Astrological House Systems”](http://www.quadibloc.com/other/as01.htm),
+Albategnus/Savard-A entry.
 
-**Conceptual Basis:** A variant of the Campanus system with modified prime vertical projection.
+**Conceptual Basis:** Declination parallels cut the east-point-to-zenith arc of
+the prime vertical at one third and two thirds of the observer latitude. Great
+circles through each anchor and the horizon's north/south points intersect the
+ecliptic to form the intermediate cusps.
 
 ### Algorithm
 
-Uses Campanus-style prime vertical division with an alternative projection method.
+`house_constructions.py` derives every anchor in the equatorial frame of date,
+forms the plane through the horizon north/south axis, intersects it with the
+ecliptic, and selects the correct antipodal intersection with an oriented-arc
+invariant. Opposite cusps are exact antipodes. No lookup or fitted branch table
+is used.
 
 **Properties:** Latitude-dependent.
 
@@ -831,10 +983,44 @@ Uses Campanus-style prime vertical division with an alternative projection metho
 
 ## References
 
-1. Meeus, Jean. "Astronomical Algorithms" 2nd Edition (1998), Chapter 13
-2. Koch, Dieter & Treindl, Alois. House System Technical Notes. Referenced for algorithm description only.
-3. Hand, Robert. "Horoscope Symbols" (1981)
-4. Holden, Ralph William. "The Elements of House Division" (1977)
-5. IERS Conventions 2003 (IAU nutation models)
-6. Polich, Wendel & Page, A.P. Nelson. "The Topocentric System of Houses" (1961)
-7. Krusinski, Bogdan. Technical papers on Krusinski-Pisa system
+1. Meeus, Jean, *Astronomical Algorithms*, 2nd ed. (1998), chapter 13,
+   [WorldCat record](https://search.worldcat.org/title/40521322). Used for
+   general spherical-coordinate transformations, not as the definition of all
+   house systems.
+2. Petit, G. and Luzum, B. (eds.), *IERS Conventions (2010)*,
+   [IERS Technical Note 36](https://iers-conventions.obspm.fr/content/tn36.pdf).
+   Used for time/frame conventions surrounding the house geometry.
+3. Vondrak, J., Capitaine, N., and Wallace, P. (2011), “New precession
+   expressions, valid for long time intervals,”
+   [A&A 534:A22](https://doi.org/10.1051/0004-6361/201117274), with the
+   published corrigendum. Used for the common long-term frame, not a house
+   division rule.
+4. Holden, Ralph William, *The Elements of House Division* (1977),
+   [WorldCat OCLC 4549972](https://search.worldcat.org/title/4549972).
+5. Bates, Graham, [“The Astronomy of Houses”](https://www.uraniatrust.org/astrology/astronomy-of-houses),
+   Urania Trust: independent construction descriptions and bibliography for
+   the major ecliptic, space, and time systems.
+6. Houlding, Deborah,
+   [“House Division Principles”](https://www.skyscript.co.uk/glossary/house-division/),
+   Skyscript: independent historical/construction overview.
+7. Polich, Wendel, and A. P. Nelson Page, *The Topocentric System of Houses*
+   (1961); the public Urania Trust treatment above identifies the radius/pole
+   construction and the authors' 1964 *Spica* article.
+8. Krusinski, Bogdan,
+   [“The Krusinski House System”](https://www.astrologia.pl/house-system.html)
+   (author's 1995 description).
+9. de Boer, Ingmar,
+   [“APC Houses”](https://www.ingmardeboer.nl/index.php?title=APC_Houses).
+10. Makransky, Bob, “The Sunshine House System,” public author article
+    [reproduced here](https://www.astro.nu/2017/03/03/astrology-house-systems/).
+11. Savard, John,
+    [“Astrological House Systems”](http://www.quadibloc.com/other/as01.htm),
+    Albategnus/Savard-A entry.
+12. Pullen, Walter D.,
+    [“Sinusoidal House Systems”](https://www.astrolog.org/astrolog/astsine.htm)
+    (author specification for SD and SR).
+
+These sources define or independently describe the geometry; all prose and
+code in this project are independently written. No source code, source
+comments, documentation prose, algorithm transcription, or data file from the
+API-compatibility target is used in this document or implementation.

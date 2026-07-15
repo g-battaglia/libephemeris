@@ -5,6 +5,12 @@ The command-line shape is retained so existing automation fails safely and
 clearly. Publishing prebuilt LEB1 assets remains disabled until those files
 have been regenerated from independently sourced inputs and reviewed under the
 current clean-room policy.
+
+Provenance:
+    Project-authored fail-closed compatibility entry point. It performs no
+    upload, generation, or astronomical calculation. The retained command name
+    is workflow metadata only; any future release implementation must use the
+    registered generators, source attestations, hashes, and release review.
 """
 
 from __future__ import annotations

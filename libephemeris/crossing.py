@@ -32,6 +32,14 @@ Algorithm: Initial linear estimate + Newton-Raphson refinement + Brent's fallbac
 References:
     - Meeus "Astronomical Algorithms" Ch. 5 (interpolation)
     - Brent, R.P. (1973) "Algorithms for Minimization without Derivatives"
+
+Provenance:
+    Body longitudes and speeds come exclusively from the registered calculation
+    pipeline. The event solver is project-authored orchestration of published
+    Newton iteration and Brent's bracketed method. Scan spans, derivative floors,
+    iteration caps, and the 0.001-arcsecond angular tolerance are implementation
+    choices stated in this module and tested at wrap boundaries, stations, and
+    backward searches; none is fitted from stored compatibility output.
 """
 
 from __future__ import annotations

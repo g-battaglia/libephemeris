@@ -180,22 +180,22 @@ fitted external observations.
 
 ## Numerically independent data models
 
-Every predefined ayanamsha derives from its author's published defining
-statement propagated with the project's Vondrák Method-B model
-([Sidereal modes](../reference/ayanamsha.md) lists the per-mode sources),
-and the interpolated lunar apsides are anchored to the actual DE440 apsis
-passages ([methodology](../methodology/interpolated-perigee.md)). Because
-these values are derived from the published sources rather than tuned to any
-external implementation, small numeric offsets from other engines are
-expected: sub-arcsecond for many modes (Lahiri on the Indian Astronomical
-Ephemeris J2000 constant, Fagan/Bradley, Krishnamurti, the galactic-center
-family on the Reid & Brunthaler 2004 Sgr A* position, the vernal-point and
-frame modes), of order 10″–25″ where a historical defining pair is
-propagated with the project's precession model (De Luce, the Babylonian
-solutions), up to a few arcminutes for modes anchored directly to their
-author's book value (e.g. Yukteshwar's published 20°54′36″ at the 1894
-equinox), and of order 0.01°–0.05° for `INTP_APOG` / `INTP_PERG` between
-apsis passages.
+Every predefined ayanamsha has an explicit defining pair or live geometric
+anchor propagated with the project's Vondrák Method-B model. The evidence
+record is deliberately per-mode: it distinguishes primary publications and
+public catalogue/frame geometry from secondary historical attributions and
+disclosed project conventions
+([Sidereal modes](../reference/ayanamsha.md) gives the complete status table).
+The interpolated lunar apsides are separately anchored to physical DE440 apsis
+passages ([methodology](../methodology/interpolated-perigee.md)). Because no
+value is tuned to external implementation output, small numeric offsets from
+other engines are expected: sub-arcsecond for many modes (Lahiri on the Indian
+Astronomical Ephemeris J2000 constant, the galactic-center family on the Reid &
+Brunthaler 2004 Sgr A* position, and geometric frame modes), of order 10″–25″
+for some historical-pair modes, up to a few arcminutes for Yukteshwar's primary
+book value, and of order 0.01°–0.05° for `INTP_APOG` / `INTP_PERG` between
+apsis passages. A numeric result can therefore be reproducible without being
+misrepresented as a direct author transcription.
 These offsets are properties of the independent derivation, not defects, and
 they are stable and documented.
 

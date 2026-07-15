@@ -48,6 +48,14 @@ References:
 - van Leeuwen F., 2007, A&A 474, 653-664 (new Hipparcos reduction)
 - IAU 2006 Precession: Capitaine et al. A&A 412, 567-586 (2003)
 - IAU WGSN: https://www.iau.org/public/themes/naming_stars/
+
+Provenance:
+    Every catalog field is sourced by ``star_catalog_gen.py`` and its generator:
+    Hipparcos/van-Leeuwen astrometry, public VizieR cross-catalog fields, and IAU
+    names. Runtime propagation implements the cited vector space-motion model;
+    Vondrak 2011 and ERFA provide the of-date frame. Name normalization and
+    matching aliases are project API choices. Catalog comparison results are
+    validation only and never update a row at runtime.
 """
 
 from __future__ import annotations

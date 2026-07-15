@@ -9,6 +9,12 @@ Usage:
     python scripts/test_horizons_precision.py              # default (200 dates)
     python scripts/test_horizons_precision.py --dates 50   # quick test
     python scripts/test_horizons_precision.py --dates 500  # thorough test
+
+Provenance:
+    Project-authored live comparison between the public NASA/JPL Horizons
+    service and the registered Skyfield/JPL pipeline. Query settings, deterministic
+    dates, frames, and tolerances define verification only. Responses and
+    residuals are neither persisted nor fitted into LibEphemeris models.
 """
 
 from __future__ import annotations
@@ -61,6 +67,15 @@ JD_END = 2488069.5  # 2100
 
 
 def run_test(n_dates: int = 200, seed: int = 42) -> bool:
+    """Compare live Horizons and direct JPL/Skyfield output on a seeded grid.
+
+    Dates, flag combinations, exclusions, and tolerances are test policy
+    declared in this module.  Horizons responses remain in memory only and are
+    discarded after the verdict; they never become fitted model data.
+
+    Returns:
+        Whether every completed comparison met its category threshold.
+    """
     rng = np.random.default_rng(seed)
     jds = rng.uniform(JD_START, JD_END, n_dates)
 
@@ -149,6 +164,7 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
 
 
 def main():
+    """Parse the requested date count and exit with the live-test verdict."""
     parser = argparse.ArgumentParser(
         description="Horizons vs Skyfield precision test (requires internet)"
     )

@@ -17,6 +17,15 @@ Calculations are based on spherical astronomy and house system cusps.
 Note:
     Angles are independent of house system choice (though computed via houses).
     They represent fundamental horizon/meridian intersections with the ecliptic.
+
+Provenance:
+    This module adds no separate angle theory: it delegates the Ascendant,
+    Midheaven, ARMC, Vertex, and equatorial Ascendant to ``houses.py``, whose
+    spherical construction is sourced from public house definitions,
+    Vondrak-2011 precession, and IAU/IERS Earth-orientation conventions.
+    Descendant, IC, and Anti-Vertex are the exact antipodes (+180 degrees).
+    Selecting Placidus is only an API route to the system-independent ASCMC
+    tuple; it does not make the angles Placidus-derived.
 """
 
 from __future__ import annotations

@@ -5,6 +5,10 @@
 The developer CLI downloads only local-development prerequisites and source
 inputs. Generated artifacts such as LEB files and planet-centers outputs are
 produced by dedicated generation commands, not downloaded here.
+
+Provenance:
+    Project-authored development download orchestration. File identities point
+    to registered public source inputs and do not supply model coefficients.
 """
 
 from __future__ import annotations

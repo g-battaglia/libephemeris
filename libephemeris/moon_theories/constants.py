@@ -11,6 +11,13 @@ References:
 - SAT441: Jacobson (2022) - Saturn system
 - NEP097: Brozović (2020) - Neptune system
 - PLU060: Brozović & Jacobson (2024) - Pluto system
+
+Provenance:
+    Every gravitational parameter is labelled by the public JPL satellite
+    solution from which it was transcribed and remains in km^3/s^2. Derived
+    totals and barycenter weights are exact arithmetic on those values. The IAU
+    astronomical-unit conversion is labelled at its use; no value is inferred
+    from positions returned by another application.
 """
 
 from __future__ import annotations

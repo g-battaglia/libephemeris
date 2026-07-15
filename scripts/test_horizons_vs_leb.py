@@ -8,6 +8,12 @@ to verify consistency across all three backends.
 Usage:
     python scripts/test_horizons_vs_leb.py              # default (100 dates)
     python scripts/test_horizons_vs_leb.py --dates 500  # thorough test
+
+Provenance:
+    Project-authored live comparison of the public NASA/JPL Horizons service
+    with a registered, project-generated LEB2 artifact. Explicit query frames,
+    centers, dates, and tolerances are test policy. Service responses and
+    residuals remain transient and cannot become runtime correction tables.
 """
 
 from __future__ import annotations
@@ -54,6 +60,15 @@ THRESHOLD = 0.01  # arcseconds
 
 
 def run_test(n_dates: int = 100, seed: int = 42) -> bool:
+    """Compare a local LEB2 artifact with live Horizons on a seeded grid.
+
+    Missing optional artifacts produce the script's explicit skip behavior.
+    Service responses and residuals stay transient and cannot influence LEB2
+    coefficients or compression settings.
+
+    Returns:
+        Whether all completed comparisons remained below ``THRESHOLD``.
+    """
     rng = np.random.default_rng(seed)
     jds = rng.uniform(JD_START, JD_END, n_dates)
 
@@ -129,6 +144,7 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
 
 
 def main():
+    """Run the live Horizons/LEB2 comparison and expose its process status."""
     parser = argparse.ArgumentParser(description="Horizons vs LEB2 precision test")
     parser.add_argument("--dates", type=int, default=100)
     args = parser.parse_args()

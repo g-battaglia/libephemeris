@@ -26,6 +26,13 @@ Resolution order (highest to lowest priority):
 2. Environment variables (including ``.env`` file)
 3. **TOML configuration file** (this module)
 4. Hardcoded defaults
+
+Provenance:
+    Project-authored configuration infrastructure using Python's standard
+    ``tomllib`` parser and ordinary environment/path precedence. This module
+    contains no astronomical algorithm, datum, or coefficient; it only selects
+    documented runtime options. Canonical classification:
+    ``docs/methodology/algorithm-provenance.md``.
 """
 
 from __future__ import annotations

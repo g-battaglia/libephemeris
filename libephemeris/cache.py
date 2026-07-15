@@ -23,6 +23,13 @@ Thread Safety:
     The caches use functools.lru_cache which is thread-safe for reads but
     not for simultaneous writes with the same key. In practice, this is
     acceptable since we're caching pure functions with deterministic outputs.
+
+Provenance:
+    The cache policy and sizes are project-authored performance choices; they
+    do not alter or approximate a cached value. Nutation delegates to ERFA's
+    IAU 2006/2000A implementation and mean obliquity to the cited Vondrak 2011
+    module. Clearing every cache must therefore change performance only, never
+    numerical semantics. See ``docs/methodology/algorithm-provenance.md``.
 """
 
 from __future__ import annotations

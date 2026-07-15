@@ -14,6 +14,12 @@ This module maintains the library's singleton state including:
 
 All state is stored in module-level globals to provide a stateful module-level API
 compatible with the reference ephemeris's threading model (thread-unsafe by design).
+
+Provenance:
+    Project-authored resource ownership, configuration, and compatibility-state
+    orchestration. JPL kernels and IERS/Skyfield resources retain their own
+    registered provenance; this module merely opens, caches, or releases them.
+    It contains no astronomical series or fitted coefficient.
 """
 
 from __future__ import annotations

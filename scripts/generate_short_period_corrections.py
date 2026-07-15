@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 """Generate empirical short-period perturbation correction coefficients.
 
+Provenance:
+    NON-PRODUCTION, REJECTED EXPERIMENT. Inputs are public NASA/JPL SPK states
+    and the project's cited Keplerian fallback, but the residual fit is not a
+    primary-source orbital theory. Its output is not shipped, imported, or
+    accepted as runtime provenance. The script is retained to make the rejected
+    methodology reproducible and to prevent it being rediscovered silently;
+    ``docs/development/roadmap.md`` records why numerical integration won.
+
+Status:
+    Output from this script is neither packaged nor accepted as a runtime
+    model. Reintroducing any generated coefficient requires a new, independently
+    sourced scientific design and review of the provenance registry.
+
 Fits Fourier series to the DETRENDED residuals (SPK - Keplerian) for each
 major asteroid, capturing the dominant short-period perturbation terms from
 Jupiter, Saturn, and (for centaurs) Uranus.
@@ -793,6 +806,13 @@ def generate_python_code(results: dict[int, dict]) -> str:
 
 
 def main():
+    """Fit and emit the experimental short-period correction tables.
+
+    The command applies this module's declared sampling, detrending, spectral
+    selection, and amplitude thresholds to public SPK-derived residuals.  All
+    fit settings are printed with the result; no compatibility-target output
+    is sampled or used as a fitting authority.
+    """
     print("=" * 70)
     print("SHORT-PERIOD PERTURBATION CORRECTION GENERATOR (v2 — detrended)")
     print("=" * 70)

@@ -26,6 +26,14 @@ References:
     - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction"
     - Young, A.T. (1974) "Observational Technique and Data Reduction"
     - Kasten, F. & Young, A.T. (1989) "Revised optical air mass tables"
+
+Provenance:
+    Rayleigh, aerosol, ozone, water-vapour, and airmass relations are empirical
+    source models and are identified beside their formulas. Standard-pressure,
+    temperature, humidity, wavelength, clamping, and below-horizon behavior are
+    explicitly labelled defaults or numerical guards, not source observations.
+    The module performs unit conversions and composition independently and does
+    not recover constants from compatibility output.
 """
 
 from __future__ import annotations
@@ -1307,12 +1315,16 @@ def calc_visibility_threshold(
     observer_altitude_m: float = DEFAULT_ALTITUDE_M,
 ) -> VisibilityResult:
     """
-    Determine if an object is visible using the Schaefer visibility model.
+    Determine whether an object clears the project visibility threshold.
 
-    This function implements the Schaefer visibility threshold model, which
-    determines whether a celestial object of given apparent magnitude can
-    be detected against a sky of given surface brightness, accounting for
-    the observer's eye adaptation and experience level.
+    This is a deliberately compact, Schaefer-inspired convenience model, not
+    a verbatim reproduction of Schaefer's complete retinal/telescope model.
+    :func:`calc_contrast_threshold` first constructs a piecewise limiting
+    magnitude from sky brightness, adaptation, and observer skill; this
+    function applies exactly the inverse magnitude/flux relation. The regime
+    boundaries, limiting-magnitude anchors, and skill offsets are declared
+    project heuristics in that helper and are not presented as measured
+    universal constants.
 
     The model calculates:
     1. The limiting magnitude for the given sky brightness
@@ -1351,11 +1363,20 @@ def calc_visibility_threshold(
             - observer_skill: The skill level used
 
     Algorithm:
-        1. Calculate the contrast threshold for the given conditions
-        2. Convert sky brightness to flux (nanoLamberts)
-        3. Calculate object flux from magnitude
-        4. Compute contrast = (object_flux - sky_flux) / sky_flux
-        5. Compare contrast to threshold
+        1. Calculate the model's star-to-sky flux-ratio threshold.
+        2. Apply optional atmospheric extinction to the point-source
+           magnitude.
+        3. Use Pogson's relation ``F/F0 = 10**(-0.4*m)`` for both magnitude
+           channels.
+        4. Compare ``F_object/F_sky`` with the threshold and recover the
+           algebraically equivalent limiting magnitude.
+
+        Because ``sky_brightness`` is a surface brightness (mag/arcsec^2)
+        while ``object_magnitude`` is an integrated point-source magnitude,
+        the ratio assumes a one-square-arcsecond effective background patch.
+        It is therefore a stable API approximation, not a dimensionally
+        complete model of a telescope point-spread function or the eye's
+        integration area.
 
         The limiting magnitude is derived from the contrast threshold:
             m_lim = sky_brightness - 2.5 * log10(C_threshold)
@@ -1387,10 +1408,12 @@ def calc_visibility_threshold(
         True
 
     References:
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-        - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
-        - Blackwell, H.R. (1946) "Contrast thresholds of the human eye"
-        - Crumey, A. (2014) "Human contrast threshold and astronomical visibility"
+        - Schaefer, B.E. (1990), "Telescopic Limiting Magnitudes", PASP
+          102, 212-229, DOI 10.1086/132629
+        - Blackwell, H.R. (1946), "Contrast Thresholds of the Human Eye",
+          JOSA 36, 624-643
+        - Crumey, A. (2014), "Human contrast threshold and astronomical
+          visibility", MNRAS 442, 2600-2619, DOI 10.1093/mnras/stu992
     """
     # Apply atmospheric extinction if requested
     effective_magnitude = object_magnitude
@@ -1414,9 +1437,11 @@ def calc_visibility_threshold(
         observer_skill=observer_skill,
     )
 
-    # Convert magnitudes to flux for contrast calculation
-    # Using: flux ~ 10^(-0.4 * magnitude)
-    # The zero-point is arbitrary since we only need ratios
+    # Pogson magnitudes obey F = F0 * 10**(-0.4*m).  We set the shared
+    # normalization F0 to one because it cancels exactly in
+    # F_object/F_sky; no physical photometric zero point is being estimated.
+    # Treating the sky value as the flux of a one-arcsec^2 patch is the
+    # project approximation documented above.
     sky_flux = 10 ** (-0.4 * sky_brightness)
     object_flux = 10 ** (-0.4 * effective_magnitude)
 

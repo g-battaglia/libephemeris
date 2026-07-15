@@ -11,6 +11,12 @@ Usage:
     python scripts/tier_diagnostic_base.py 1985-06-15
     python scripts/tier_diagnostic_base.py 2000-01-01 1950-03-15
     python scripts/tier_diagnostic_base.py --jd 2451545.0
+
+Provenance:
+    Project-authored entry point delegating to ``_tier_diagnostic.py`` and the
+    registered base-tier DE440s/SPK/analytical channels. Dates are user-selected
+    probes; printed coordinates and backend labels are diagnostics only and do
+    not create scientific data or coefficients.
 """
 
 import os

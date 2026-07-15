@@ -2,6 +2,12 @@
 """
 Download SPK files with the maximum date range supported by JPL Horizons.
 
+Provenance:
+    Project-authored batch wrapper over the public NASA/JPL Horizons SPK
+    service and the registered body-ID map. The 1600-2500 interval is a measured
+    service-availability boundary, not an orbital model or accuracy claim.
+    Downloaded bytes retain their JPL/NAIF provenance and are never fitted here.
+
 JPL Horizons supports SPK generation for minor bodies in the range
 1600-01-01 to 2500-01-01 (verified empirically 2026-02-20).
 
@@ -124,6 +130,17 @@ def download_body(
 
 
 def main() -> int:
+    """Download or inventory maximum-range public Horizons small-body SPKs.
+
+    Parses optional body filters, creates the requested cache directory, and
+    requests the fixed 1600–2500 service range with a configurable courtesy
+    delay. Existing files are preserved unless ``--force`` is supplied;
+    ``--dry-run`` performs no network writes.
+
+    Returns:
+        Zero when every selected body succeeds (or is intentionally skipped),
+        otherwise one after reporting the failed bodies.
+    """
     parser = argparse.ArgumentParser(
         description="Download max-range SPK files (1600-2500) for all minor bodies.",
         formatter_class=argparse.RawDescriptionHelpFormatter,

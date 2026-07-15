@@ -17,6 +17,13 @@ reference does the same; the internal ``FLG_J2000`` bit is not echoed).
 Callers rewrite the request via :func:`fixed_epoch_request_flags`, run the
 normal machinery, then map the result back with
 :func:`transform_fixed_epoch_result`.
+
+Provenance:
+    Frame transformations use ERFA/IAU and the registered Vondrak 2011
+    precession chain. J2000, J1900, and B1950 epochs are public astronomical
+    conventions; request rewriting and flag echoing are project API plumbing.
+    No sidereal zero point, polynomial, or fitted compatibility correction is
+    introduced here.
 """
 
 from __future__ import annotations
@@ -107,6 +114,7 @@ def _epoch_matrices(sid_mode: int) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def _rot_x(angle_rad: float) -> np.ndarray:
+    """Return the passive x-axis rotation matrix used for ecliptic frames."""
     c, s = math.cos(angle_rad), math.sin(angle_rad)
     return np.array([[1.0, 0.0, 0.0], [0.0, c, s], [0.0, -s, c]])
 

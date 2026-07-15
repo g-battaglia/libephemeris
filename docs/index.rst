@@ -91,6 +91,8 @@ Contents
    :caption: Methodology
 
    methodology/overview
+   methodology/algorithm-provenance
+   methodology/classical-astrology-helpers
    methodology/independence
    methodology/delta-t
    methodology/sidereal-time-longterm
@@ -101,6 +103,7 @@ Contents
    methodology/interpolated-perigee
    methodology/true-lilith
    methodology/hypothetical-bodies
+   methodology/missing-hypothetical-models
    methodology/pyerfa-integration
    methodology/rebound-integration
    methodology/galilean-e5-spec

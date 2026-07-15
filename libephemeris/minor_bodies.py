@@ -38,6 +38,17 @@ For research-grade precision, use full numerical integration (e.g., JPL Horizons
 
 Orbital elements source: JPL Small-Body Database (epoch JD 2461000.5 TDB = 2025-Sep-19)
 Algorithm: Keplerian mechanics with Laplace-Lagrange secular perturbations + resonant libration
+
+Provenance:
+    Body elements and state-based multi-epoch anchors come from the public JPL
+    SBDB/Horizons services. Two-body propagation and perturbation terms are
+    implemented from cited celestial-mechanics sources (including Simon et al.
+    for planetary rates and Brouwer & Clemence for short-period theory).
+    Resonance approximations, blend widths, precision thresholds, and fallback
+    order are explicitly project-authored approximations with stated limits;
+    SPK or optional ASSIST is preferred where available. The research-only
+    Fourier fitter in ``scripts/generate_short_period_corrections.py`` is not
+    imported and none of its output is shipped as a runtime coefficient.
 """
 
 from __future__ import annotations
@@ -901,26 +912,32 @@ def _calc_laplace_coefficients(alpha: float, s: float, j: int) -> float:
 def calc_secular_perturbation_rates(
     elements: OrbitalElements,
 ) -> Tuple[float, float, float]:
-    """
-    Calculate secular perturbation rates for orbital elements due to Jupiter, Saturn, Uranus, and Neptune.
+    """Estimate fallback secular rates from the four outer giant planets.
 
-    Uses first-order Laplace-Lagrange secular perturbation theory to compute
-    the time rates of change of the argument of perihelion (ω), longitude of
-    ascending node (Ω), and a correction to mean motion.
+    The published foundation is first-order, non-resonant Laplace-Lagrange
+    theory: disturbing-function terms built from planet/Sun mass ratios,
+    semi-major-axis ratios, and Laplace coefficients produce leading apsidal
+    and nodal rates. This function uses a deliberately reduced test-particle
+    form of those equations for the last-resort Keplerian fallback; it is not
+    a complete secular eigenmode solution.
+
+    Two returned behaviors are explicitly LibEphemeris choices rather than
+    transcriptions from the cited books: ``d_n`` couples the computed apsidal
+    rate to eccentricity, and a bounded near-resonance heuristic can scale the
+    apsidal/nodal rates. Their exact formulas, thresholds, and validity warnings
+    are documented beside the corresponding blocks below.
 
     The secular perturbations cause:
     - Precession of perihelion (ω advances or regresses)
     - Precession of the ascending node (Ω regresses for prograde orbits)
-    - Small correction to mean motion due to non-Keplerian effects
+    - A small project approximation to mean-motion drift
 
     Note:
-        Neptune perturbations are critical for TNO accuracy, especially for
-        plutinos like Ixion and Orcus which are in 2:3 mean motion resonance
-        with Neptune. Neptune perturbations are only applied for bodies with
-        semi-major axis > 20 AU to avoid overhead for inner solar system objects.
-        Uranus perturbations are particularly significant for Trans-Neptunian Objects
-        (TNOs) where its gravitational influence is comparable to or greater than
-        Saturn's influence.
+        The reduced equations assume a bound orbit sufficiently far from close
+        encounters and exact/co-orbital resonances. Neptune is evaluated only
+        for ``a > 20 au`` as a documented scope/performance choice. Results are
+        fallback approximations; SPK or ASSIST/REBOUND propagation takes
+        scientific precedence.
 
     Args:
         elements: Orbital elements of the minor body
@@ -929,10 +946,10 @@ def calc_secular_perturbation_rates(
         Tuple[float, float, float]: (d_omega, d_Omega, d_n) rates in degrees/day
             - d_omega: Rate of change of argument of perihelion
             - d_Omega: Rate of change of longitude of ascending node
-            - d_n: Correction to mean motion (small)
+        - d_n: Project approximation to mean-motion drift (small)
 
     Algorithm:
-        Uses the classical Laplace-Lagrange secular theory formulas:
+        Uses reduced forms motivated by the classical Laplace-Lagrange terms:
         - dω/dt ≈ n * (m'/M) * α * b_{3/2}^{(1)}(α) * (1/4) * ...
         - dΩ/dt ≈ -n * (m'/M) * α * b_{3/2}^{(1)}(α) * cos(i) * ...
 
@@ -943,8 +960,9 @@ def calc_secular_perturbation_rates(
         - b is the Laplace coefficient
 
     References:
-        Murray & Dermott "Solar System Dynamics" Ch. 7
-        Brouwer & Clemence "Methods of Celestial Mechanics" Ch. XVI
+        Murray & Dermott, *Solar System Dynamics* (1999), chapters 6–8.
+        Brouwer & Clemence, *Methods of Celestial Mechanics* (1961),
+        chapters XI and XVI.
     """
     a = elements.a
     e = elements.e
@@ -1090,23 +1108,22 @@ def calc_secular_perturbation_rates(
             d_omega += math.degrees(d_omega_nep)
             d_Omega += math.degrees(d_Omega_nep)
 
-    # L3: Compute second-order mean motion correction (d_n ≠ 0)
-    # The mean motion receives a correction from the interaction between the
-    # asteroid's forced eccentricity and the perturbing planets. From second-order
-    # secular theory (Murray & Dermott §7.4):
-    #   d_n = -(3/2) * (n/a) * d_a_secular
-    # where d_a_secular arises from the coupling between ω precession and the
-    # forced eccentricity oscillation. For a body near a mean-motion resonance
-    # p:q with a planet, the correction is approximately:
-    #   d_n ≈ -(3n/2a) * Σ_j [μ_j * α_j * b_{3/2}^{(2)}(α_j) * e_j * cos(ϖ - ϖ_j)]
-    # This is typically < 0.01"/yr for most bodies but can reach arcminute level
-    # for near-resonant bodies over decades.
+    # Project mean-motion drift approximation (not a published equation).
     #
-    # We approximate this using the d_omega rate (which captures the secular
-    # precession from all perturbers) and the forced eccentricity magnitude:
-    # d_n ≈ -(3/2) * n * e_forced^2 * (d_omega_rad / n_rad) where d_omega_rad
-    # is the total precession rate. This second-order effect is small but
-    # accumulates over decades.
+    # First-order Laplace-Lagrange secular theory keeps the semi-major axis,
+    # and therefore the Keplerian mean motion, constant. It consequently does
+    # not provide a non-zero d_a/dt that we can transcribe here. LibEphemeris
+    # nevertheless retains the small formula below as an empirical engineering
+    # approximation coupling the already computed apsidal rate to e². Its exact
+    # expression is disclosed so it cannot be mistaken for a Murray & Dermott
+    # result or an externally sourced coefficient:
+    #
+    #   d_n = degrees[-(3/2) * radians(d_omega) * e² / (1 - e²)]
+    #
+    # The e < 0.99 guard prevents the rational factor from diverging near the
+    # parabolic limit. This term is subordinate to SPK/ASSIST propagation and
+    # must be retained, altered, or removed only on public-state ablation
+    # evidence; compatibility-target output is not a scientific source.
     d_omega_rad = math.radians(d_omega)
     if abs(n_rad) > 1e-20 and e < 0.99:
         # Second-order correction: interaction of precession with eccentricity
@@ -1115,13 +1132,14 @@ def calc_secular_perturbation_rates(
     else:
         d_n = 0.0
 
-    # M4: Near-resonance amplification of secular rates
-    # Bodies near (but not in) mean-motion resonances experience amplified
-    # perturbation effects. The amplification factor scales as 1/|Δ| where
-    # Δ = (p·n_body - q·n_planet) / n_body measures the distance from exact
-    # resonance. This applies to Hildas (3:2 Jupiter), some main belt bodies
-    # near 3:1, 5:2, 7:3 Jupiter resonances, and TNOs near Neptune resonances.
-    # Reference: Murray & Dermott (1999), Chapter 8, eq. 8.72-8.76
+    # Project near-resonance validity heuristic (not resonant perturbation
+    # theory). Murray & Dermott (1999), chapter 8, establishes the physical
+    # reason ordinary non-resonant secular expansions degrade near a mean-
+    # motion commensurability. It does *not* prescribe the eight-item list,
+    # delta window, scaling function, or caps below; those are explicit
+    # LibEphemeris choices. They provide bounded behavior in the last-resort
+    # Keplerian fallback and must never be described as a published resonant
+    # Hamiltonian. High-accuracy work uses SPK or numerical integration.
     _resonance_checks = [
         # (n_planet, p, q, max_amplification)
         (JUPITER_N, 3, 1, 3.0),  # 3:1 Kirkwood gap
@@ -1135,12 +1153,13 @@ def calc_secular_perturbation_rates(
     ]
     resonance_amplification = 1.0
     for n_planet, p_res, q_res, max_amp in _resonance_checks:
-        # Distance from exact resonance: Δ = |p·n_body - q·n_planet| / n_body
+        # Dimensionless project distance from the declared commensurability.
         if abs(n) > 1e-20:
             delta = abs(p_res * n - q_res * n_planet) / n
-            # Only amplify if close to resonance (within ~5%)
+            # Project window: avoid both far-from-resonance scaling and the
+            # singular/inside-resonance region where this heuristic is invalid.
             if 0.001 < delta < 0.05:
-                # Amplification: min(1/delta, max_amp) to avoid singularity
+                # Project scale and cap, documented verbatim for auditability.
                 amp = min(1.0 / (delta * 20.0), max_amp)
                 resonance_amplification = max(resonance_amplification, amp)
 

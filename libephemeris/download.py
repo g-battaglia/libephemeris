@@ -18,8 +18,19 @@ Usage:
     from libephemeris.download import download_for_tier
     download_for_tier("medium")
 
-Without the data files, libephemeris will fall back to analytical approximations
-which are still accurate to ~0.1 arcseconds.
+Without an optional data file, the owning calculation either uses its
+explicitly documented fallback or reports the missing capability. Accuracy is
+body-, date-, frame-, and backend-dependent; this infrastructure module makes
+no universal arcsecond promise. See ``docs/reference/precision.md`` and the
+tracing API for the selected source and applicable measured bounds.
+
+Provenance:
+    Project-authored HTTPS, integrity-check, installation, and cache
+    infrastructure. Reviewed URLs, filenames, sizes, and SHA-256 values identify
+    distribution artifacts; they are not astronomical coefficients. The
+    scientific lineage of each downloaded JPL/LEB/SPK asset is documented by
+    its generator or data-source record, and download failure never fabricates
+    replacement data.
 """
 
 from __future__ import annotations

@@ -3,6 +3,14 @@
 """
 LEB2 compression primitives.
 
+Provenance:
+    The compression layout and per-body error policy are original project
+    architecture. Bit clearing follows the IEEE-754 binary64 representation;
+    coefficient reordering and byte shuffle are lossless transforms; final
+    compression uses the BSD-licensed Zstandard library. Mantissa truncation is
+    deliberately lossy and is accepted only after the registered generator
+    verifies the resulting component/angular error against documented targets.
+
 Implements error-bounded lossy compression for Chebyshev polynomial coefficients:
 
 1. Mantissa truncation — zeros out unneeded mantissa bits per coefficient order,
@@ -13,8 +21,9 @@ Implements error-bounded lossy compression for Chebyshev polynomial coefficients
    cluster together (standard technique from HDF5/Blosc).
 4. zstd compression — the shuffled data with zeroed mantissa bits compresses well.
 
-The pipeline is fully reversible: decompress -> unshuffle -> inverse reorder.
-Truncated floats are valid float64 values — no special handling needed at eval time.
+After the intentional mantissa truncation, all remaining stages are reversible:
+decompress -> unshuffle -> inverse reorder. Truncated values remain valid binary64
+floats, so evaluation needs no private number format or hidden reconstruction.
 """
 
 from __future__ import annotations
@@ -27,11 +36,16 @@ import zstandard as zstd
 from .exceptions import LEBCorruptionError
 from .exotic_bodies import target_au_map as _exotic_target_au
 
-# Default target: 0.001 arcsecond expressed in AU
-# 0.001" = 4.848e-9 radians; at 1 AU distance = 4.848e-9 AU positional error
+# Legacy public name retained for compatibility. Numerically this is the
+# default *native stored-component* coefficient target. It is AU for Cartesian
+# position channels; angular channels store degrees for longitude/latitude and
+# AU for distance. The 5e-9 value corresponds to about 0.001 arcsecond only for
+# a 5e-9 AU transverse error at 1 AU. It is not, by itself, a universal angular
+# guarantee after observer subtraction and the apparent-place pipeline.
 DEFAULT_TARGET_AU = 5e-9
 
-# Per-body precision targets based on minimum geocentric distance.
+# Per-body Cartesian coefficient targets selected by project error sweeps and
+# conservative distance/pipeline leverage estimates.
 # The angular error from a position error delta_AU at distance d_AU is:
 #   delta_arcsec = delta_AU / d_AU * 206265
 # Bodies closer to Earth need tighter AU precision for the same angular precision.
@@ -64,7 +78,8 @@ def compute_mantissa_bits(
 
     Args:
         coeffs: Array of shape (segment_count, components, degree+1) with float64.
-        target_precision: Maximum acceptable absolute error per coefficient (AU).
+        target_precision: Maximum absolute truncation target per coefficient in
+            the component's native stored unit (AU for Cartesian channels).
 
     Returns:
         List of length degree+1 with the number of mantissa bits to keep for
@@ -209,6 +224,13 @@ def compress_body(
     """Compress a body's Chebyshev coefficients.
 
     Pipeline: truncation -> coeff-major reorder -> byte shuffle -> zstd.
+
+    Mantissa truncation is the only lossy stage. A per-coefficient target is
+    not an end-to-end angular bound: evaluating a degree-N Chebyshev series can
+    accumulate errors from N+1 coefficients, and later observer/frame
+    transformations can amplify native-component error. The registered LEB2
+    generator therefore verifies both the conservative native-component sum
+    bound and focused calculated-coordinate tolerances after serialization.
 
     Args:
         raw_coeffs: Raw coefficient bytes in segment-major layout.

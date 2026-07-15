@@ -5,6 +5,14 @@ Utility functions for libephemeris.
 
 Provides helper functions compatible with the reference API including
 angular calculations and other mathematical utilities.
+
+Provenance:
+    Coordinate rotations, longitude normalization, angular differences, and
+    vector/spherical conversions are direct mathematical identities with units
+    documented per function. Nutation/obliquity and time inputs delegate to the
+    registered ERFA/IERS/Vondrak pipeline; refraction delegates to
+    ``refraction.py``. API-compatible names and edge-case policy are project
+    presentation choices, not sources of numerical formulas.
 """
 
 from __future__ import annotations
@@ -1008,8 +1016,11 @@ def csroundsec(cs: int) -> int:
 
     Notes:
         - 1 centisecond = 1/100 arcsecond
-        - Uses truncation-toward-zero integer division with +50 offset
-        - Round-down at every 30° multiple in both signs (reference behavior)
+        - The compatibility rule adds 50 centiseconds and then uses integer
+          truncation toward zero, rather than Python's floor division.
+        - A sign-boundary guard keeps a rounded display value inside its
+          original 30° zodiac sector; this is an API/display convention, not
+          an astronomical model.
 
     Examples:
         >>> csroundsec(150)  # 1.50 arcseconds -> 2 arcseconds = 200 cs
@@ -1042,14 +1053,16 @@ def csroundsec(cs: int) -> int:
     if cs > 0 and result % 10800000 == 0 and result != 0 and cs < result:
         return result - 100
 
-    # Boundary correction for negative values: the reference API applies
-    # the same 30°-multiple round-down on the negative side (verified:
-    # csroundsec(-10800149) = -10800100, and likewise at -60°, -90°, ...).
+    # Apply the same sector-preserving convention on the negative side.  The
+    # explicit branch is required because Python ``//`` floors negative
+    # operands whereas this API operation is defined using truncation toward
+    # zero after the +50-centisecond bias.
     if cs < 0:
         if result != 0 and result % 10800000 == 0 and cs <= result - 100:
             return result - 100
-        # Negative values in (-100, 0) round to 0; values <= -100 round to -100
-        # when the standard formula yields 0 (truncation toward zero artifact)
+        # The biased quotient collapses part of [-149, -100] to zero. Restore
+        # that interval to -1 arcsecond while leaving (-100, 0) at zero, which
+        # completes the stated truncation-based compatibility convention.
         if cs <= -100 and result == 0:
             return -100
 

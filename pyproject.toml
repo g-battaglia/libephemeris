@@ -203,6 +203,7 @@ coverage = {cmd = "python -m libephemeris.dev_cli test coverage run", help = "Te
 # --- Integrity gates (local poe tasks only; no CI) ---
 "license:check" = {cmd = "python scripts/check_spdx_headers.py --check", help = "Verify SPDX headers on all shipped source files"}
 "provenance:sweep" = {cmd = "python scripts/check_provenance.py", help = "Source/content integrity sweep"}
+"provenance:algorithms" = {cmd = "python scripts/check_algorithm_provenance.py", help = "Verify complete algorithm/data provenance coverage"}
 "provenance:hypothetical" = {cmd = "python scripts/check_hypothetical_provenance.py", help = "Verify fictitious elements match the pinned dataset"}
 "wheel:audit" = {cmd = "python scripts/check_wheel_contents.py", help = "Build the wheel and verify packaged contents"}
 

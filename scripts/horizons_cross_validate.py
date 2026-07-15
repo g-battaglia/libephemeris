@@ -28,6 +28,13 @@ Tolerance tiers:
       → relaxed tolerance (2.0" planets, 20.0" Moon)
 
 Deliverable for validation-plan-v2.md §1.
+
+Provenance:
+    Project-authored cross-service verification. Comparison coordinates are
+    requested live from the public NASA/JPL Horizons API with the frame, center,
+    time interpretation, and tolerances stated above. Results are transient:
+    they are not committed, fitted, or used as runtime constants. Horizons is
+    verification evidence and a public data source, not a source of copied code.
 """
 
 from __future__ import annotations
@@ -354,6 +361,16 @@ def compare_body(
 
 
 def main() -> int:
+    """Run the declared public Horizons cross-validation matrix.
+
+    Horizons is used as an independent JPL service check, not as training data
+    or a coefficient source.  The finite dates and era-adaptive tolerances are
+    documented validation-policy choices; the report preserves those choices
+    alongside every measured result.
+
+    Returns:
+        Zero when every section passes its declared tolerance, otherwise one.
+    """
     print("=" * 78)
     print("  JPL Horizons Cross-Validation for libephemeris")
     print("=" * 78)

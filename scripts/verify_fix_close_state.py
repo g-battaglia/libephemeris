@@ -16,6 +16,12 @@ Checks (standalone, no pytest):
 
 Usage:
     python scripts/verify_fix_close_state.py
+
+Provenance:
+    Project-authored state-lifecycle regression check. Object identity, resource
+    reopening, and configured-path invariants are software behavior only; no
+    astronomical output is recorded or used as a source. The check cannot alter
+    model selection beyond its isolated test process.
 """
 
 from __future__ import annotations
@@ -29,6 +35,7 @@ FAILURES: list[str] = []
 
 
 def check(cond: bool, label: str) -> None:
+    """Record one state-lifecycle assertion and print its stable label."""
     status = "ok  " if cond else "FAIL"
     print(f"  [{status}] {label}")
     if not cond:
@@ -36,6 +43,15 @@ def check(cond: bool, label: str) -> None:
 
 
 def main() -> int:
+    """Verify configured LEB reopening and timescale-cache reset semantics.
+
+    Assertions concern resource identity and deterministic reopening only.  A
+    repeated longitude confirms continuity but is not stored or treated as a
+    scientific source.
+
+    Returns:
+        Zero when every lifecycle assertion passes, otherwise one.
+    """
     import libephemeris as le
     from libephemeris import context as ctx_module
     from libephemeris import state

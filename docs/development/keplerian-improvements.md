@@ -6,13 +6,13 @@ estimated cost and expected precision gain.
 
 ## Table of Contents
 
-- [Current precision (measured)](#current-precision-measured)
+- [Historical precision snapshot](#historical-precision-snapshot)
 - [Current implementation summary](#current-implementation-summary)
 - [Low-cost improvements](#low-cost-improvements)
 - [Medium-cost improvements](#medium-cost-improvements)
 - [High-cost improvements](#high-cost-improvements)
 - [Structural issues (not precision improvements)](#structural-issues-not-precision-improvements)
-- [Priority recommendations](#priority-recommendations)
+- [Remaining investigation priorities](#remaining-investigation-priorities)
 - [References](#references)
 
 The Keplerian fallback is the last resort in the minor body calculation chain:
@@ -27,10 +27,15 @@ fallback is the only option available.
 
 ---
 
-## Current precision (measured)
+## Historical precision snapshot
 
-From `tests/test_keplerian_precision_benchmark.py`, comparing Keplerian
-positions against SPK truth for 5 bodies (Ceres, Pallas, Juno, Vesta, Chiron):
+The table below is the original five-body benchmark that motivated the dense
+multi-epoch work. It measured Ceres, Pallas, Juno, Vesta, and Chiron while only
+six bodies had 50-year nodes. It is retained as dated engineering evidence,
+not presented as the precision of the current ten-year, 36-body artifact.
+Current measurements must be produced by
+`tests/test_keplerian_precision_benchmark.py`, whose explicit body matrix now
+contains all 37 configured bodies and skips only unavailable SPK truth inputs.
 
 | Time from epoch | Max error | Dominant error source |
 |-----------------|-----------|------------------------|
@@ -48,170 +53,103 @@ positions against SPK truth for 5 bodies (Ceres, Pallas, Juno, Vesta, Chiron):
 
 ## Current implementation summary
 
-**37 bodies** with osculating elements at epoch JD 2461000.5 (2025-Sep-19):
-13 main belt, 6 centaurs, 9 TNOs, 9 NEAs.
+**37 bodies** have curated osculating elements: 13 main-belt objects, 6
+centaurs, 9 TNOs, and 9 NEAs. Thirty-six use JD 2461000.5; Bennu uses the
+separately documented OSIRIS-REx-derived heliocentric state at JD 2459000.5.
 
-**Multi-epoch elements** for **6 bodies** only (Ceres, Pallas, Juno, Vesta,
-Chiron, Pholus): 17 epochs each at 50-year intervals, 1650–2450 CE.
+**Multi-epoch elements** cover **36 bodies** with 81 nodes each on the exact
+ten-Julian-year grid 1650–2450. Bennu is the sole exception because no
+compatible full-range heliocentric type-21 source kernel was available during
+the reviewed generation. `scripts/generate_multi_epoch_elements.py` is the
+authoritative generator; it now defaults to the exact shipped grid and rejects
+non-solar centers or non-J2000 frames.
 
 **Secular perturbations** from 4 planets (Jupiter, Saturn, Uranus, Neptune):
 - omega (arg. perihelion): linear precession
 - Omega (ascending node): linear regression
 - e (eccentricity): oscillation via (h,k) vector formalism (Laplace-Lagrange)
 - i (inclination): oscillation via (p,q) vector formalism (Laplace-Lagrange)
-- n (mean motion): **NOT perturbed** (d_n = 0 always)
-- a (semi-major axis): **NOT perturbed** (constant)
+- n (mean motion): small, explicitly labelled project approximation coupled
+  to the computed apsidal rate and eccentricity
+- a (semi-major axis): constant, as in first-order secular theory
 
 **Libration model** for 2 plutinos (Ixion, Orcus).
 
-**Kepler equation solver**: Newton-Raphson, tolerance 1e-8, 30 iterations
-(elliptic), 50 iterations (hyperbolic), Barker closed-form (parabolic).
+**Kepler equation solver**: Newton-Raphson with a Markley high-eccentricity
+starter, tolerance 1e-8 and a 30-iteration elliptic cap; an independently
+documented hyperbolic starter with a 50-iteration cap; and the Barker/Cardano
+closed form for the parabolic limit. Both iterative solvers log non-convergence.
 
 ---
 
 ## Low-cost improvements
 
-### L1. Denser multi-epoch table (every 20 years instead of 50)
+### L1. Denser multi-epoch table — completed at ten-year spacing
 
-**Cost:** Low — only data generation, no algorithm changes.
-**Impact:** High at 25-50 year scales.
+The initial 50-year, 17-node table was first proposed for reduction to twenty
+years. The shipped artifact goes further: 81 nodes per covered body at ten-year
+spacing from 1650 through 2450 inclusive. Away from the separately curated
+present-day node, the nearest-node propagation distance is therefore at most
+five Julian years.
 
-Currently the multi-epoch table has 17 entries per body at 50-year intervals
-(1650–2450). Maximum propagation distance from nearest epoch: ~25 years.
-Reducing to 20-year intervals gives ~10-year max propagation, reducing the
-error at 25-50 year timescales by roughly 2-3x.
+The density is a LibEphemeris engineering choice, not a constant taken from a
+publication. Every node is independently recomputed from a public JPL Horizons
+type-21 position/velocity state by the equations in
+`scripts/generate_multi_epoch_elements.py`; no compatibility output is fitted.
 
-**Changes required:**
-- Regenerate `MINOR_BODY_ELEMENTS_MULTI` in `minor_bodies.py` with 20-year
-  spacing: ~41 entries per body instead of 17
-- Data source: SPK type 21 state vectors → Keplerian conversion (same method
-  as current, script exists in `scripts/`)
-- No code changes to `_get_closest_epoch_elements()` — it already does linear
-  scan
+### L2. Multi-epoch coverage — completed for 36 of 37 bodies
 
-**Estimated data size increase:** 6 bodies × 41 entries × ~8 floats × ~80
-chars = ~15 KB (from current ~6 KB). Negligible.
+The reviewed table expands the original six-body experiment to every
+configured body for which compatible source coverage was available. Each of
+the 36 lists has the same 81-node grid. Bennu deliberately remains outside the
+dense table: its curated single node is derived from the identified
+OSIRIS-REx/JPL kernel, while the generator fails closed rather than inventing
+unavailable full-range states.
 
-**Expected improvement:**
-- 25 years: 2.6' → < 1' (max propagation drops from 25 → 10 years)
-- 50 years: 3.6° → < 1° (max propagation drops from 25 → 10 years)
+Dense osculating nodes reduce propagation distance but do not turn two-body
+motion into a precision numerical integration. Close encounters and resonant
+dynamics can still dominate, especially for NEAs and TNOs; the SPK and
+ASSIST/REBOUND paths remain scientifically preferred when available.
 
-### L2. Multi-epoch for all 37 bodies (not just 6)
+### L3. Mean-motion drift approximation — implemented project choice
 
-**Cost:** Low-medium — data generation for 31 additional bodies.
-**Impact:** High for TNOs, centaurs, NEAs at long timescales.
-
-Currently only 6 bodies have multi-epoch data. The remaining 31 bodies
-propagate from a single 2025 epoch. For a body like Sedna (a=549 AU,
-P=~12,000 yr), a 100-year Keplerian propagation from a single epoch
-accumulates significant error.
-
-**Changes required:**
-- Generate SPK files for all 37 bodies covering 1650-2450 (or wider for
-  bodies with available SPK coverage)
-- Convert state vectors to Keplerian elements at 20-year intervals
-- Add entries to `MINOR_BODY_ELEMENTS_MULTI`
-
-**Complications:**
-- Some NEAs (Apophis, Bennu, Ryugu) have chaotic orbits — close planetary
-  encounters make Keplerian propagation unreliable regardless of epoch density
-- Some TNOs (Sedna, Gonggong) may have limited SPK coverage from Horizons
-- NEAs with extreme eccentricity (Icarus e=0.827) may have poorly conditioned
-  Keplerian elements at some epochs
-
-**Expected improvement:** Variable by body; most benefit for centaurs
-(Nessus, Asbolus, Chariklo) and non-resonant TNOs (Quaoar, Varuna, Haumea).
-
-### L3. Semi-major axis secular perturbation (d_n ≠ 0)
-
-**Cost:** Low — straightforward formula addition.
-**Impact:** Low-moderate over decades.
-
-Currently `d_n` is hardcoded to 0.0 in `calc_secular_perturbation_rates()`
-(line 772). The semi-major axis (and thus mean motion) does receive secular
-perturbations from planetary interactions, particularly near mean-motion
-resonances.
-
-The second-order secular theory gives a correction to `n`:
+First-order Laplace-Lagrange secular theory keeps the semi-major axis constant,
+so it does not itself supply a non-zero `d_a/dt`. The runtime nevertheless
+applies a deliberately small project approximation
 
 ```
-d_a/dt = 0  (first-order secular theory)
+d_n = degrees(-1.5 * radians(d_omega) * e² / (1 - e²))
 ```
 
-At first order, `a` is constant. But the mean longitude rate `n` receives
-a correction from the interaction with the forced eccentricity:
+for `e < 0.99`. This couples the already computed apsidal rate to eccentricity
+to limit phase drift. It is **not** transcribed from Murray & Dermott and must
+not be represented as a literal second-order secular equation. The formula,
+guard, and rationale are documented beside the implementation; changing it
+requires a new SPK-backed validation, not an appeal to compatibility output.
 
-```
-d_n = -(3/2) * (n/a) * d_a
-```
+### L4. Evolving planet elements — completed
 
-For most asteroids this is negligible (< 0.01"/year), but for near-resonant
-bodies (e.g., Hildas near 3:2, plutinos near 2:3) it could matter at the
-arcminute level over decades.
+`_calc_forced_elements()` accepts the target JD and evolves the four
+perturbers' mean elements from J2000 with the published linear rates of Simon
+et al. (1994). The static constants remain the defined J2000 intercepts. This
+is a secular approximation with a documented validity limit, not a substitute
+for evaluating the planets from JPL states.
 
-**Changes required:**
-- Compute `d_n` from second-order secular theory in
-  `calc_secular_perturbation_rates()`
-- Use `n_pert = elements.n + d_n * dt` instead of `n_pert = elements.n`
+### L5. Kepler solver convergence handling — completed
 
-**Expected improvement:** < 1' over 50 years for most bodies. More for
-near-resonant bodies.
+The elliptic and hyperbolic solvers now log the input and final residual when
+their 30- or 50-iteration caps are reached. The elliptic branch also uses the
+Markley (1995) high-eccentricity starter. No claim is made that a warning turns
+a non-converged iterate into a valid result; callers needing stronger guarantees
+should use the SPK or numerical-integration path.
 
-### L4. Evolving planet elements
+### L6. Laplace coefficient integration density — completed
 
-**Cost:** Low — replace constants with linear functions of time.
-**Impact:** Low-moderate over centuries.
-
-The 4 perturbing planets (Jupiter, Saturn, Uranus, Neptune) use static
-J2000.0 orbital elements. Over centuries, the planets' own elements drift
-(Jupiter's eccentricity oscillates with a ~300,000 year period, etc.).
-Using linear rates for the planet elements would improve the forced
-eccentricity/inclination vectors.
-
-**Changes required:**
-- Replace static constants (JUPITER_E, JUPITER_I, etc.) with functions
-  of time: `e_J(t) = e_J0 + de_J * (t - t_J2000)`
-- Rates available from Simon et al. (1994) or Standish (1992)
-- Update `_calc_forced_elements()` to accept `jd_tt` and compute
-  planet elements at that date
-
-**Expected improvement:** ~10-30" over 500-year propagations. Negligible
-for < 100 years.
-
-### L5. Kepler solver convergence warning
-
-**Cost:** Very low — add a warning log.
-**Impact:** Debugging/correctness only.
-
-The Newton-Raphson solver returns the last iterate without warning if 30
-(elliptic) or 50 (hyperbolic) iterations are exceeded. For highly eccentric
-orbits (Icarus e=0.827, Sedna e=0.861), non-convergence is possible.
-
-**Changes required:**
-- Add `logger.warning()` if max iterations reached
-- Optionally: implement Markley's (1995) or Raposo-Pulido & Pelaez (2017)
-  starter for high eccentricity, which guarantees convergence in 2-3
-  iterations for any eccentricity
-
-**Expected improvement:** No precision change, but prevents silent failures.
-
-### L6. Laplace coefficient integration accuracy
-
-**Cost:** Very low — increase step count.
-**Impact:** Low (sub-arcsecond) for near-resonant bodies.
-
-The trapezoidal integration for Laplace coefficients uses 100 steps
-(`_calc_laplace_coefficients()`, line 698). For large alpha (plutinos:
-alpha ≈ 0.76), higher resolution may improve the secular rates.
-
-**Changes required:**
-- Increase `n_steps` from 100 to 500 or 1000
-- Or: use Gauss-Legendre quadrature for exact integration with fewer points
-- Or: use the closed-form recursion formula for Laplace coefficients
-  (Brouwer & Clemence 1961, eq. 15.21)
-
-**Expected improvement:** < 0.1" for most bodies. May matter for bodies
-very close to resonance where alpha → 1.
+`_calc_laplace_coefficients()` evaluates the published integral with composite
+trapezoidal quadrature: 200 panels normally and 500 when `alpha > 0.7`, where
+the integrand becomes sharply peaked. The quadrature density is a project
+accuracy choice. The defining integral and its `2/pi` normalization are cited
+to Murray & Dermott section 6.4 beside the code.
 
 ---
 
@@ -294,46 +232,32 @@ Other TNOs in mean-motion resonances with Neptune:
 **Expected improvement:** For resonant bodies, reduces error from degrees
 to arcminutes over 100-year propagations.
 
-### M3. Benchmark expansion to all 37 bodies
+### M3. Benchmark expansion — body matrix completed
 
-**Cost:** Medium — needs SPK truth values for all bodies.
-**Impact:** Better understanding of where improvements are needed.
+`tests/test_keplerian_precision_benchmark.py` now enumerates all 37 configured
+bodies, grouped as main-belt, centaur, TNO, and NEA objects. It compares only
+when an independent SPK truth kernel is available and explicitly skips missing
+truth inputs; therefore a green run is not evidence that every body was
+measured unless the run report also confirms all kernels were present. The
+historical five-body numbers at the top of this document remain labelled as
+such until a controlled, fully provisioned 37-body matrix is archived.
 
-Currently the benchmark tests only 5 bodies. Expanding to all 37 would
-reveal which bodies have the worst Keplerian precision and where to
-prioritize improvements.
+### M4. Near-resonance rate scaling — heuristic implemented
 
-**Changes required:**
-- Ensure SPK files are available for all 37 bodies at test time
-- Extend `BENCHMARK_BODIES` in `test_keplerian_precision_benchmark.py`
-- Group results by category (main belt, centaur, TNO, NEA)
-- Identify outliers where Keplerian is catastrophically wrong
+The runtime identifies eight declared Jupiter/Neptune commensurabilities using
+the dimensionless distance
 
-**Expected outcome:** A precision matrix showing which bodies and timescales
-are the weakest, guiding further improvements.
+```
+delta = abs(p * n_body - q * n_planet) / n_body
+```
 
-### M4. Mean motion resonance corrections (beyond libration)
-
-**Cost:** Medium — analytical or semi-analytical.
-**Impact:** Moderate for near-resonant bodies.
-
-Bodies near (but not in) mean-motion resonances experience amplified
-secular perturbation rates. The current secular model treats all bodies
-equally, but near-resonant bodies (e.g., Hildas at 3:2 with Jupiter)
-have much larger perturbation effects.
-
-**Changes required:**
-- Detect near-resonance condition: `|p/q - n_body/n_planet| < threshold`
-- Apply resonant secular perturbation formulae (Murray & Dermott 1999,
-  Chapter 8)
-- Different perturbation model for bodies within the resonance width
-
-**Bodies affected:** Ixion, Orcus (2:3 Neptune), potentially Gonggong
-(3:10 Neptune), some main belt bodies near 3:1, 5:2, 7:3 Jupiter
-resonances.
-
-**Expected improvement:** Factor of 2-5x for near-resonant bodies at
-10-50 year timescales.
+and, only for `0.001 < delta < 0.05`, scales the non-resonant apsidal and nodal
+rates by a capped project factor. Murray & Dermott chapter 8 supports the
+physical warning that ordinary secular theory degrades near resonances; it
+does **not** supply LibEphemeris's threshold, `1 / (20 delta)` scale, or caps.
+Those numbers are transparent project heuristics and require empirical
+validation against public SPK states. A true resonant Hamiltonian or numerical
+integrator remains the scientifically preferred treatment.
 
 ---
 
@@ -460,80 +384,70 @@ accumulates.
 **Expected improvement:** ~1" per decade for NEAs with known Yarkovsky.
 Irrelevant for main belt and TNOs.
 
-### H5. Cubic Hermite interpolation of multi-epoch elements
+### H5. Cubic Hermite element interpolation — tested and rejected
 
-**Cost:** Medium-high.
-**Impact:** Moderate — smoother transitions between epochs.
-
-Currently `_get_closest_epoch_elements()` picks the single closest epoch.
-This creates discontinuities in the computed position when the "closest
-epoch" switches from one entry to the next (at midpoints between epochs).
-
-A cubic Hermite interpolation of the orbital elements between adjacent
-epochs would:
-- Eliminate position discontinuities at epoch boundaries
-- Use the velocity information implicit in the element rates
-- Provide C¹-continuous positions across the full date range
-
-**Changes required:**
-- Compute element rates (from finite differences of adjacent epochs)
-- Implement Hermite interpolation for each element (a, e, i, ω, Ω, M)
-  with proper angle unwrapping
-- Handle eccentricity bounds (0 < e < 1) and inclination bounds (0 < i < π)
-
-**Complication:** Orbital elements are not smooth functions — they can have
-discontinuities near resonances or close encounters. Hermite interpolation
-assumes smoothness and would produce artifacts in these cases.
-
-**Expected improvement:** Eliminates ~10" discontinuities at epoch
-boundaries. Smooth position function across full date range.
+Cubic Hermite interpolation of osculating elements was prototyped, then
+rejected because perturbation-driven element oscillations and angular wrapping
+produced overshoot. The recorded tests degraded some TNO positions by up to
+28× and main-belt positions by 3–4× at selected offsets. The production
+consumer instead propagates the two nearest osculating nodes independently and
+linearly cross-fades their **Cartesian positions** within a one-Julian-year
+window centred on the epoch midpoint. This removes the step without claiming
+that the elements themselves form a smooth interpolant.
 
 ---
 
 ## Structural issues (not precision improvements)
 
-### S1. Missing convergence handling in Kepler solver
+### S1. Solver convergence handling — remediated
 
-The Newton-Raphson solver silently returns a non-converged result after
-30 (elliptic) or 50 (hyperbolic) iterations. Should log a warning and
-optionally fall back to a bisection method.
+Both iterative branches now emit a warning with the residual after exhausting
+their iteration cap. A future bracketed fallback could strengthen this further,
+but silent non-convergence is no longer the behavior.
 
-### S2. No validation of orbital element sanity
+### S2. Orbital-element sanity validation — remediated
 
-No check that e < 1 for elliptic orbits, a > 0, 0 < i < 180°, etc.
-Garbage elements would produce garbage positions silently.
+`OrbitalElements.validate()` checks semi-major-axis sign, eccentricity/sign
+consistency, inclination range, and bound-orbit mean motion. The runtime wrapper
+logs every issue. These are diagnostic guards, not an orbit-determination
+quality assessment.
 
-### S3. Parabolic/hyperbolic orbits skip all perturbations
+### S3. Near-parabolic perturbation dispatch — remediated for bound orbits
 
-`calc_minor_body_position()` only applies secular perturbations for
-elliptic orbits (e < 1). Hyperbolic comets and parabolic bodies get zero
-perturbation corrections. This is correct for single-pass trajectories
-but wrong for bodies with poorly determined orbits that happen to have
-e ≈ 1.
+Secular corrections are applied to bound and numerically near-parabolic inputs;
+genuinely hyperbolic trajectories still bypass the bound-orbit perturbation
+model by design. Applying Laplace-Lagrange terms to an unbound flyby would be
+less defensible than exposing the limitation and preferring SPK/numerical
+propagation.
 
-### S4. Co-orbital detection too aggressive
+### S4. Co-orbital detection too aggressive — remediated
 
-`_calc_forced_elements()` skips a perturber if `|a - a_planet| < 0.1 AU`.
-This threshold is arbitrary and could skip important perturbations for
-Trojan asteroids or bodies in horseshoe orbits with Jupiter.
+The former implementation skipped a perturber whenever
+`|a - a_planet| < 0.1 AU`. That fixed project heuristic could suppress terms
+for Trojan or horseshoe objects and had no scale dependence. The current
+implementation instead uses the public Hill-radius approximation
+`r_H = a_planet * (mu_planet / 3)^(1/3)` and disables linear secular theory
+inside that planet-specific domain. This is a validity guard: close/co-orbital
+dynamics violate the small, non-resonant perturbation assumptions of
+Laplace-Lagrange theory and require SPK or N-body propagation.
 
 ---
 
-## Priority recommendations
+## Remaining investigation priorities
 
-### If the goal is maximum impact for minimum effort:
+### If the goal is maximum evidence for minimum effort:
 
-1. **L2** — Multi-epoch for all 37 bodies (biggest gap today)
-2. **L1** — Denser multi-epoch (20-year intervals)
-3. **M3** — Benchmark all 37 bodies (understand the problem first)
-4. **L5** — Kepler solver convergence warning (correctness)
+1. Provision independent SPK truth for every body in the existing 37-body
+   benchmark and archive a dated result matrix.
+2. Quantify the project `d_n` and near-resonance heuristics by ablation against
+   those public states; remove either heuristic if it does not improve robustly.
+3. Add a bracketed fallback for the rare non-converged Kepler solve.
 
 ### If the goal is pushing Keplerian to its theoretical limit:
 
 1. **M1** — Analytical short-period perturbations (eliminates 7-49" errors)
 2. **H2** — Full Brouwer theory (sub-arcsecond at 1 year)
-3. **H5** — Hermite interpolation (smooth transitions)
-4. **L4** — Evolving planet elements (century-scale accuracy)
+3. **L4 follow-up** — validate evolved mean elements at century scale
 
 ### If the goal is making the Keplerian fallback irrelevant:
 

@@ -2,6 +2,12 @@
 """
 Download SPK files for common celestial bodies.
 
+Provenance:
+    Project-authored selective downloader calling ``libephemeris.spk``, whose
+    data source is NASA/JPL Horizons and whose format is the public NAIF SPK
+    standard. Body groups, chunk sizes, retries, and cache paths are workflow
+    choices; this script creates no astronomical coefficient or derived orbit.
+
 This script pre-downloads SPK (SPICE kernel) files from JPL Horizons for common
 minor bodies, allowing users to populate the cache ahead of time rather than
 downloading on demand.

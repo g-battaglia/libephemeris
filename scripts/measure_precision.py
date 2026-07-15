@@ -3,6 +3,12 @@
 
 Dense sampling across the full date range per body to find worst-case errors.
 Reports per-body statistics: mean, P99, max error in arcseconds.
+
+Provenance:
+    Project-authored precision measurement over two independently implemented
+    project backends sharing registered JPL/IAU source data. Date grids and
+    summary statistics are validation policy. Measurements may accept or reject
+    an artifact but never become runtime offsets or fitted parameters.
 """
 
 from __future__ import annotations
@@ -203,6 +209,13 @@ def _detect_tier(leb_path: str) -> str:
 
 
 def main():
+    """Measure a chosen LEB artifact against its matching public JPL tier.
+
+    The tier is explicit or inferred only from the artifact filename, then
+    applied to both sides of the comparison.  Sample counts and body groups
+    define an empirical project test grid; results are not fed back into the
+    scientific model or stored as correction data.
+    """
     import argparse
 
     parser = argparse.ArgumentParser(

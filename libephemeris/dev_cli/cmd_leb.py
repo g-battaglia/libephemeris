@@ -7,6 +7,11 @@ Replaces 28 poe tasks: leb:generate:*, leb:verify:*.
 Structure:
   leph leb generate <tier> <mode>   -- generate LEB files
   leph leb verify <tier>            -- verify existing LEB files
+
+Provenance:
+    Project-authored process orchestration for the registered LEB generator
+    and verifier. It does not define Chebyshev parameters or astronomical
+    values; those live in the format, generator, and source registry.
 """
 
 from __future__ import annotations

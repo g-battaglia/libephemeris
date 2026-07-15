@@ -6,6 +6,12 @@ For each failing outer planet, measures:
 2. COB mismatch: Skyfield geometric with SPK centers vs analytical COB
 3. Pipeline error: LEB pipeline using perfect positions vs Skyfield apparent
 4. Total end-to-end: LEB pipeline vs calc
+
+Provenance:
+    Project-authored error-budget diagnostic. Every compared state comes from a
+    registered JPL/Skyfield or LEB path; the decomposition changes no runtime
+    value. Selected epochs and printed residuals are verification evidence only
+    and must not be promoted to correction tables or model inputs.
 """
 
 from __future__ import annotations
@@ -251,6 +257,13 @@ def diagnose_body(ipl, leb_path, jd_samples, planets, ts):
 
 
 def main():
+    """Report outer-planet LEB error components over a selected kernel range.
+
+    The diagnostic inspects planet-center availability, samples the requested
+    LEB artifact, and compares stored evaluation with the project's independent
+    Skyfield pipeline. It prints exploratory statistics only and never alters
+    the LEB file or promotes comparison output into a scientific model.
+    """
     import argparse
 
     parser = argparse.ArgumentParser()

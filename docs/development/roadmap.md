@@ -154,11 +154,22 @@ Investigation completed with two empirical approaches (Fourier fit of SPK - Kepl
 
 The fundamental problem: Keplerian propagation with secular perturbations produces errors that grow as a power of time, not as stationary periodic oscillations. A static fit captures the mean amplitude, which is wrong for any specific date. For precision beyond the current level (arcminutes over decades), the only viable path is numerical integration (REBOUND/ASSIST). Generation script `scripts/generate_short_period_corrections.py` kept as reference, not integrated.
 
-### 4.3 Multi-Epoch Orbital Elements — COMPLETED
+### 4.3 Multi-Epoch Orbital Elements — COMPLETED, THEN EXPANDED
 
-Generated orbital elements from SPK type 21 state vectors at 50-year intervals (1650-2450 CE) for 6 bodies: Chiron, Pholus, Ceres, Pallas, Juno, Vesta (17 epochs each, ~600 lines in `MINOR_BODY_ELEMENTS_MULTI`). `_get_closest_epoch_elements()` selects the nearest epoch considering both the original single-epoch element and all multi-epoch entries.
+The first completed milestone generated 17 nodes at 50-year intervals
+(1650–2450) for Chiron, Pholus, Ceres, Pallas, Juno, and Vesta. The benchmark
+below records that historical six-body experiment. It is not the current table.
 
-**Benchmark results:**
+The shipped `multi_epoch_data.py` artifact now contains 81 ten-year nodes for
+36 of 37 configured bodies. `_get_epoch_elements_blend()` merges each curated
+present-day node with the generated nodes, selects the nearest propagation,
+and cross-fades adjacent **Cartesian positions** near their midpoint. Bennu
+retains only its separately sourced curated epoch. The authoritative generator,
+exact IAU/JPL conventions, frame checks, and provenance are documented in
+`scripts/generate_multi_epoch_elements.py` and
+`docs/development/keplerian-improvements.md`.
+
+**Historical 50-year/six-body benchmark results:**
 
 | Offset | Before | After | Improvement |
 |--------|--------|-------|-------------|
@@ -168,7 +179,10 @@ Generated orbital elements from SPK type 21 state vectors at 50-year intervals (
 | 50 years | 5.3 deg | 3.6 deg | ~1.5x |
 | 100 years | 10.7 deg | 3.5 deg | ~3x |
 
-The dramatic improvement at 25 years (~75x) is due to the multi-epoch table with entries every 50 years, placing the test point ~0 years from the nearest epoch.
+The original improvement at 25 years (~75x) resulted from a 50-year node
+falling at that test date. Current precision must be measured with the
+37-body benchmark and a fully provisioned independent SPK truth set; these
+historical figures must not be quoted as guarantees for the current fallback.
 
 ### 4.4 REBOUND/ASSIST Integration as Intermediate Fallback — COMPLETED
 

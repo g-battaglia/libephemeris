@@ -16,11 +16,22 @@ The model calculates:
 2. Sky brightness from twilight, moonlight, zodiacal light, and airglow
 3. Visibility thresholds based on contrast sensitivity
 
-This implementation follows the standard approach for
-compatibility with archaeoastronomical applications.
+This implementation independently combines the cited published model family
+with explicitly labelled project defaults for convenience APIs.
 
 Constants:
-    Most constants are from Schaefer (1990).
+    A constant is attributed to Schaefer only where its local comment supplies
+    that locator. Approximate atmosphere/observer defaults and the legacy
+    magnitude-band arcus table are project choices, not historical
+    transcriptions.
+
+Provenance:
+    Each atmospheric, sky-brightness, scattering, eye-response, and contrast
+    term is attributed in this module to Schaefer (1990/1993) or the additional
+    cited observational source. Empirical constants remain labelled empirical;
+    clamps, unit conversions, defaults, and numerical guards are labelled
+    project choices. This implementation is independent and contains no table
+    recovered from another ephemeris application's output.
 """
 
 from __future__ import annotations
@@ -98,16 +109,14 @@ AGE_BASELINE = 20.0
 # Perfect vision (Snellen 1.0) = no change
 
 # =============================================================================
-# PTOLEMAIC ARCUS VISIONIS
+# PROJECT ARCUS-VISIONIS DEFAULTS (LEGACY PUBLIC NAMES)
 # =============================================================================
 
-# Minimum arcus visionis values from Ptolemy's Almagest
-# These are the minimum altitude of object above horizon when
-# Sun is at dawn/dusk, for first/last visibility
-# Values depend on object magnitude
-
-# Ptolemaic arcus visionis table (Schaefer's interpretation)
-# Format: (magnitude_min, magnitude_max, arcus_visionis_degrees)
+# This exact piecewise table has no asserted page-level locator in Ptolemy or
+# Schaefer. It is a project-authored compatibility/convenience heuristic over
+# the historical quantity called arcus visionis. The legacy identifier is kept
+# to avoid an API break; it must not be cited as an ancient measured table.
+# Format: (magnitude_min, magnitude_max, project_default_degrees)
 PTOLEMY_ARCUS_VISIONIS = [
     (-5.0, -2.0, 5.0),  # Very bright (Venus at brightest)
     (-2.0, 0.0, 7.0),  # Bright (Jupiter, Sirius)
@@ -117,8 +126,8 @@ PTOLEMY_ARCUS_VISIONIS = [
     (4.5, 6.0, 15.0),  # Very faint
 ]
 
-# Minimum elongation from Sun for visibility
-# Depends on object brightness
+# Project safety gates for minimum solar elongation. These are disclosed API
+# heuristics rather than constants transcribed from the Schaefer papers.
 MIN_ELONGATION_BRIGHT = 7.0  # Venus at brightest
 MIN_ELONGATION_NORMAL = 10.0  # Typical planets
 MIN_ELONGATION_FAINT = 15.0  # Faint stars
@@ -797,8 +806,10 @@ def get_arcus_visionis(object_magnitude: float) -> float:
     Returns:
         Minimum arcus visionis in degrees
 
-    Reference:
-        Based on Ptolemy's Almagest with Schaefer's modern interpretation
+    Source status:
+        Project-authored piecewise convenience rule stored in
+        ``PTOLEMY_ARCUS_VISIONIS``. The name preserves the existing API; the
+        exact bins are not claimed as a transcription from Ptolemy or Schaefer.
     """
     for mag_min, mag_max, arcus in PTOLEMY_ARCUS_VISIONIS:
         if mag_min <= object_magnitude < mag_max:

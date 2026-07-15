@@ -44,6 +44,12 @@ DEBUG-Level Source Tracing:
     Possible source values: LEB, Skyfield, Horizons, SPK, ASSIST (n-body),
     Keplerian (fallback), Analytical, ERFA, and Mixed. See the computation
     tracing guide for details.
+
+Provenance:
+    Project-authored observability infrastructure based on Python ``logging``.
+    Source labels report which registered pipeline already produced a result;
+    they neither select nor alter the numerical model. This module contains no
+    astronomical coefficient.
 """
 
 from __future__ import annotations

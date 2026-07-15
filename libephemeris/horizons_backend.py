@@ -14,6 +14,14 @@ This backend is used when:
 
 Bodies not supported by Horizons (fixed stars, planetary moons, FLG_TOPOCTR)
 raise KeyError to trigger Skyfield fallback.
+
+Provenance:
+    Raw vectors and metadata come from NASA/JPL's public Horizons API. Target and
+    center IDs follow public NAIF conventions; the response parser validates
+    units and epochs. Apparent-place corrections are project code shared with
+    the JPL/IAU reduction pipeline. Request batching, retry/cache limits, and
+    fallback behavior are project choices and do not modify returned source
+    states or create fitted coefficients.
 """
 
 from __future__ import annotations

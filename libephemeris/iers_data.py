@@ -25,6 +25,14 @@ Data Sources:
 References:
     - IERS EOP Data: https://www.iers.org/IERS/EN/DataProducts/EarthOrientationData/eop.html
     - IERS Bulletin A: https://www.iers.org/IERS/EN/Publications/Bulletins/Bulletins.html
+
+Provenance:
+    All Earth-orientation, UT1-UTC, and leap-second observations are parsed from
+    the official public IERS/USNO files identified above. Column positions,
+    units, prediction markers, and ``Delta T = 32.184 + (TAI-UTC) - (UT1-UTC)``
+    follow IERS time-scale definitions. Cache age, mirrors, timeouts, and the
+    packaged last-resort leap-second list are project availability policy; they
+    are versioned and never inferred from another ephemeris.
 """
 
 from __future__ import annotations

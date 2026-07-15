@@ -53,6 +53,14 @@ Frames and conventions:
     - All public functions take degrees and return longitudes in degrees in
       ``[0, 360)``, except :func:`apc_cusp` whose scalar inputs are radians
       (its caller works in radians).
+
+Provenance:
+    The four geometric definitions and their public locators are stated above;
+    ``docs/reference/house-systems.md`` preserves the complete source record.
+    Cartesian cross/dot products, oriented-arc branch selection, and degeneracy
+    handling are project-authored derivations from those definitions. Branches
+    are selected by geometric orientation and anchor invariants, not by stored
+    outputs. Epsilon guards are numerical choices documented beside their use.
 """
 
 from __future__ import annotations
@@ -75,6 +83,7 @@ def _unit_radec(ra_rad: float, dec_rad: float) -> Vec3:
 
 
 def _cross(u: Sequence[float], v: Sequence[float]) -> Vec3:
+    """Return the right-handed three-dimensional cross product ``u x v``."""
     return (
         u[1] * v[2] - u[2] * v[1],
         u[2] * v[0] - u[0] * v[2],
@@ -83,10 +92,12 @@ def _cross(u: Sequence[float], v: Sequence[float]) -> Vec3:
 
 
 def _dot(u: Sequence[float], v: Sequence[float]) -> float:
+    """Return the Euclidean dot product of two three-component vectors."""
     return u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
 
 
 def _normalized(v: Sequence[float]) -> Vec3:
+    """Return ``v`` scaled to unit length; callers exclude degenerate input."""
     n = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
     return (v[0] / n, v[1] / n, v[2] / n)
 

@@ -2,6 +2,14 @@
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """Generate the independent interpolated lunar-apse model from JPL DE440.
 
+Provenance:
+    Sole authoritative generator for ``libephemeris/lunar_apse_model.py``.
+    Targets are physical distance extrema in the reviewed DE440 kernel; the
+    basis uses published IERS/ERFA Delaunay arguments and Simon eccentricity.
+    Passage refinement, basis selection, least-squares fit, residual spline,
+    sampling grid, edge coverage, and emitted statistics are explicit project
+    choices. No compatibility-ephemeris sample is an input.
+
 The interpolated (natural) apogee/perigee is defined here, independently and
 reproducibly, as the smooth track through the Moon's actual apsis passages:
 
@@ -55,6 +63,21 @@ EDGE_TAPER_DAYS = 365.25
 
 
 def _basis(max_k: int, m_ks: list[int]) -> list[tuple[int, int, int, int, int]]:
+    """Construct the project-selected Delaunay sine-term inventory.
+
+    Each returned tuple is ``(cD, cM, cMp, cF, e_power)`` and represents
+    ``E**e_power * sin(cD*D + cM*M + cMp*Mp + cF*F)``.  The arguments and
+    eccentricity polynomial come from the cited IERS/Simon sources, while the
+    harmonic ladder and its truncation are explicit LibEphemeris model-design
+    choices validated against physical DE440 apsis passages.
+
+    Args:
+        max_k: Highest integer multiple in the principal evection ladder.
+        m_ks: Ladder indices that receive first-order solar sidebands.
+
+    Returns:
+        Ordered term descriptors suitable for deterministic serialization.
+    """
     terms: list[tuple[int, int, int, int, int]] = []
     for k in range(1, max_k + 1):
         terms.append((k, 0, -k, 0, 0))
@@ -94,6 +117,20 @@ def _fundamental_arguments(jd_tt: np.ndarray) -> tuple[np.ndarray, ...]:
 def _design_matrix(
     jd_tt: np.ndarray, terms: list[tuple[int, int, int, int, int]]
 ) -> np.ndarray:
+    """Evaluate the declared Delaunay basis at TT Julian dates.
+
+    Columns follow ``terms`` exactly.  Angular arguments are IERS 2003
+    quantities in radians and ``E`` is the Simon et al. mean Earth-orbit
+    eccentricity normalized to its J2000 value.  This is a linear-model design
+    matrix only; it contains no observations from another ephemeris product.
+
+    Args:
+        jd_tt: One-dimensional array of TT Julian dates.
+        terms: Basis descriptors returned by :func:`_basis`.
+
+    Returns:
+        Matrix with one row per date and one column per basis term.
+    """
     from libephemeris.mean_lunar_apse import (
         EARTH_ECCENTRICITY_J2000,
         EARTH_ECCENTRICITY_T,
@@ -152,6 +189,12 @@ def _moon_states(jd_tt: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]
 
 
 def _moon_distance(jd_tt: np.ndarray) -> np.ndarray:
+    """Return DE440 geocentric Moon distance in astronomical units.
+
+    Earth and Moon barycentric vectors are read from the active reviewed JPL
+    kernel through Skyfield, then subtracted before taking the Euclidean norm.
+    The input is interpreted as TT Julian dates.
+    """
     from libephemeris.state import get_planets, get_timescale
 
     planets = get_planets()
@@ -197,6 +240,15 @@ def find_passages(jd_start: float, jd_end: float) -> tuple[np.ndarray, np.ndarra
 
 
 class NaturalCubicSpline:
+    """One-dimensional natural cubic spline with vectorized evaluation.
+
+    The endpoint second derivatives are fixed to zero (the standard *natural*
+    boundary condition).  Interior coefficients are solved by the Thomas
+    algorithm for the resulting tridiagonal system.  This is a transparent
+    numerical interpolation choice for small passage residuals, not a source
+    of astronomical observations or inherited correction values.
+    """
+
     def __init__(self, x: np.ndarray, y: np.ndarray) -> None:
         n = len(x) - 1
         h = np.diff(x)
@@ -303,6 +355,16 @@ def build_side(
 
 
 def main() -> int:
+    """Regenerate the DE440-derived lunar apogee/perigee runtime module.
+
+    Generation is deliberately fail-closed unless the active kernel identifies
+    itself as DE440.  The routine locates physical distance extrema, fits the
+    documented IERS-argument model and residual splines, emits validation
+    statistics, and serializes the result deterministically.
+
+    Returns:
+        Zero after successful generation; failures raise with source context.
+    """
     from libephemeris.mean_lunar_apse import (
         mean_lunar_apogee_position,
     )
@@ -360,6 +422,12 @@ def main() -> int:
 
 
 def _fmt_terms(terms, coeffs) -> str:
+    """Serialize fitted coefficients and basis descriptors as Python rows.
+
+    Ordering is preserved exactly so regeneration produces an auditable diff;
+    this helper performs formatting only and does not round-trip through or
+    consult an external ephemeris implementation.
+    """
     rows = []
     for (cd, cm, cmp_, cf, epow), c in zip(terms, coeffs):
         rows.append(f"    ({float(c)!r}, {cd}, {cm}, {cmp_}, {cf}, {epow}),\n")
@@ -367,6 +435,12 @@ def _fmt_terms(terms, coeffs) -> str:
 
 
 def _fmt_table(values: np.ndarray, per_line: int = 8) -> str:
+    """Serialize an arcsecond correction array in stable grouped lines.
+
+    Values are intentionally rounded to three decimal places, matching the
+    generated module's declared milliarcsecond storage resolution.  ``per_line``
+    affects source readability only.
+    """
     out = []
     line: list[str] = []
     for v in values:
@@ -380,6 +454,13 @@ def _fmt_table(values: np.ndarray, per_line: int = 8) -> str:
 
 
 def _write_module(apo, per) -> None:
+    """Write the generated lunar-apse module with sources and fit statistics.
+
+    ``apo`` and ``per`` are the complete products returned by ``build_side``.
+    The emitted header records the DE440/IERS/ERFA/Simon derivation, numerical
+    construction, validation metrics, and no-reference-product guarantee so
+    that the artifact remains self-describing outside the generator.
+    """
     apo_coeffs, apo_corr, apo_lat, apo_dist, apo_stats = apo
     per_coeffs, per_corr, per_lat, per_dist, per_stats = per
     header = f'''# SPDX-License-Identifier: AGPL-3.0-only
@@ -404,6 +485,12 @@ Sources: JPL DE440; IERS Conventions (2010), Eq. 5.43; ERFA's BSD-licensed
 implementation of the IAU SOFA fundamental-argument routines; and the mean
 Earth-orbit eccentricity from Simon et al. (1994), A&A 282, 663--683.
 No value derives from any external ephemeris implementation.
+
+Provenance:
+    AUTO-GENERATED solely by ``scripts/generate_lunar_apse_model.py`` from the
+    reviewed DE440 kernel and published IERS/ERFA/Simon inputs named above.
+    The generator emits its method and fit statistics with the values. No
+    reference-product sample or correction table is an input.
 
 Fit quality (vs the DE440 passage track):
   apogee : trig RMS {apo_stats["trig_rms_arcsec"]:.1f}\", table RMS {apo_stats["table_rms_arcsec"]:.2f}\",

@@ -7,6 +7,13 @@ hash and fails this gate.
 
 Usage:
     uv run python scripts/check_lunar_model_provenance.py
+
+Provenance:
+    Project-authored release gate over the documented IERS/ERFA/JPL lunar-model
+    boundary. Pinned hashes attest that reviewed generated/source files did not
+    change; they do not replace the publications, data provenance, or numerical
+    validation. The checker parses project files only and creates no lunar
+    coefficient.
 """
 
 from __future__ import annotations
@@ -28,7 +35,7 @@ RETIRED_PATHS = (
 
 PINNED_PATHS = {
     "libephemeris/lunar_apse_model.py": (
-        "5bf484cb0342fad6e8e42e33dcec6f9091eb5548a090bc42f77823a9ad60e2b2"
+        "7ce63d2f390efceab53e6e27a8d4192ff23066af44f6af97360d70f82b4615ba"
     ),
 }
 
@@ -90,6 +97,7 @@ RETIRED_LUNAR_FUNCTIONS = (
 
 
 def main() -> int:
+    """Verify lunar generators, source markers, hashes, and retired boundaries."""
     problems: list[str] = []
     for relative in RETIRED_PATHS:
         if (ROOT / relative).exists():

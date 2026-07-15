@@ -21,6 +21,12 @@ Usage:
 
     # Find worst-case across ALL segments (slow but definitive):
     python scripts/test_chebyshev_params.py --body jupiter --interval 1 --degree 19 --scan-all
+
+Provenance:
+    Project-authored focused parameter test using the registered JPL/IAU source
+    channel and public Chebyshev approximation. User-supplied intervals, degrees,
+    and probe epochs affect only the experiment. Reported errors must be followed
+    by full-range verification and are never emitted as runtime correction data.
 """
 
 from __future__ import annotations
@@ -214,6 +220,13 @@ def _run_combo(
 
 
 def main() -> None:
+    """Run focused Chebyshev interval/degree experiments for one body.
+
+    User-supplied combinations and probe dates affect this diagnostic only.
+    Random scans use the script's reproducible sampling policy, while an
+    all-segment scan still tests finitely many points per segment; neither mode
+    silently promotes measured residuals into runtime coefficients.
+    """
     parser = argparse.ArgumentParser(
         description="Fast Chebyshev parameter tester (single-segment)"
     )

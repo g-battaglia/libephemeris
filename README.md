@@ -20,6 +20,51 @@ ephemerides, IAU/ERFA standards, and cited primary literature. See
 
 ---
 
+## Public-source guarantee
+
+**No astronomical result in LibEphemeris is accepted because it happens to
+match another program, and no unexplained number is treated as scientific
+authority.** Every model, coefficient, catalogue field, and generated table
+must be traceable to public NASA/JPL, IERS, IAU, ESA, or other identified
+scientific data; an independently citable standard, catalogue, or publication;
+an explicitly identified permissively licensed upstream component; or a fully
+stated project convention that is never misrepresented as an observed fact or
+historical author's rule. Primary sources are required whenever the project
+claims to reproduce a particular author's numerical model.
+
+When LibEphemeris must choose a numerical tolerance, interpolation grid,
+compression parameter, fallback, or branch convention that a publication does
+not prescribe, the code labels it as a **project-authored choice** and supports
+it with a derivation, error budget, convergence test, or mathematical/physical
+invariant. If a historical model cannot be reconstructed completely from its
+sources, the corresponding body fails closed instead of returning a guessed or
+output-fitted orbit.
+
+This is an enforced engineering contract, not a general aspiration:
+
+- the [complete algorithm and data provenance map](docs/methodology/algorithm-provenance.md)
+  explains every scientific chain and every project-authored boundary;
+- the [machine-readable registry](docs/methodology/provenance-registry.toml)
+  classifies every runtime module, generator, development script, and shipped
+  scientific asset; and
+- `uv run python scripts/check_algorithm_provenance.py` fails if a module is
+  undocumented, a project-owned top-level function/class lacks a docstring, a
+  scientific component has no source, a generated artifact has no generator,
+  a vendored component lacks its upstream/license, or a citation is replaced
+  by a vague placeholder.
+
+Public API compatibility is kept separate from scientific provenance. Public
+behavior may be measured ephemerally for regression testing, but those outputs
+are never stored as model data or fitted into coefficients. The detailed policy
+is in [Independence and Methodology](docs/methodology/independence.md).
+
+“Public source” means independently identifiable and citable. Some standards,
+books, and papers retain their publishers' copyright; LibEphemeris uses the
+facts, equations, and definitions they publish and does not copy their prose or
+another implementation's expression.
+
+---
+
 ## Features
 
 - **NASA JPL DE440/DE441** - modern planetary ephemerides via Skyfield, with full-range DE441 support for deep-history and far-future work
@@ -80,7 +125,7 @@ the headline items are:
 | **Of-date mean obliquity** | Angle between the Vondrák ecliptic and equator poles (self-consistent frame). | A direction on the ecliptic (the Sun) stays at ~0° ecliptic latitude at every epoch; the separately fitted series drifts ~6″ at −3000. |
 | **`deltat_ex` purity** | `deltat_ex()` never mutates `get_tid_acc()`. | Delta-T queries should not have side effects on library state. |
 | **Total-eclipse obscuration** | `attr[2]` reports 1.0 during totality (bounded fraction). | Obscuration is a covered-area fraction \[0, 1\] by its published definition; the disc-area ratio stays derivable as `attr[1] ** 2`. |
-| **Published-source ayanamshas** | Every mode derives from its author's published defining statement (IAE for Lahiri, Burgess/Clark for the Siddhantic modes, etc.). | No value is fitted to another implementation's output. Sub-arcsecond agreement for most modes; documented offsets for historical-pair modes (e.g. Yukteshwar ~5.5′ from the book value, De Luce ~22″). |
+| **Source-audited ayanamshas** | Every mode carries a per-mode evidence status: primary publication, public catalogue/frame geometry, secondary historical attribution, or explicit project convention. | No value is fitted to another implementation's output. Modes without a recovered primary statement are not mislabeled as author transcriptions; all epochs, anchors, propagation rules, and known offsets are documented in the [sidereal-mode inventory](docs/reference/ayanamsha.md). |
 | **House-cusp speeds** | The derivative of the reported cusp position (centered finite difference). Whole Sign cusps report 0.0. | The speed slot is the derivative of the position slot, not a convention-dependent analytic approximation. |
 | **Phase angle** | Light-time-consistent geometry. | Bounded 15–40″ difference on inner planets; elongation identical. |
 | **Historical hypothetical bodies (IDs 40–58)** | Thirteen IDs compute from their primary published sources (Neely 1980, Harrington 1988, Le Verrier 1846, Adams 1846, Lowell 1915, Velichko–Larin 2007 for White Moon/Selena). IDs 48, 49, 54, 55, 57 and 58 keep their names and constants but raise `UnknownBodyError`. | A recognised name is not a numerical model: where no source-complete published definition could be recovered, failing closed is preferable to returning positions that cannot be traced to any source. The field-by-field inventory of what is missing per ID is in [Missing Hypothetical Models](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/missing-hypothetical-models.md). |
@@ -127,7 +172,8 @@ More examples: [Getting Started](https://github.com/g-battaglia/libephemeris/blo
 [Precision report](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/precision.md) · [full comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md).
 
 Numerical correctness is established from independent NASA JPL/ERFA sources,
-published defining conditions, and reference-free invariants.
+published defining conditions, explicitly labelled conventions, and
+reference-free invariants.
 
 ---
 
@@ -202,6 +248,7 @@ libephemeris download extended     # -13200 to +17191 CE, full range
 - [Horizons Backend](https://github.com/g-battaglia/libephemeris/blob/main/docs/architecture/horizons-backend.md) - HTTP client, pipeline, precision
 - [Architecture](https://github.com/g-battaglia/libephemeris/blob/main/docs/development/architecture-overview.md) - internal design and data flow
 - [Methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/overview.md) - planet centers, lunar apsides, pyerfa integration
+- [Algorithm and Data Provenance](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/algorithm-provenance.md) - complete module-by-module source map, project-authored choices, generators, and enforcement gate
 - [CLI Reference](https://github.com/g-battaglia/libephemeris/blob/main/CLI.md) - full command reference
 - [Changelog](https://github.com/g-battaglia/libephemeris/blob/main/CHANGELOG.md) - release history
 
@@ -209,10 +256,18 @@ libephemeris download extended     # -13200 to +17191 CE, full range
 
 ## Contributing
 
+Every new or materially changed numerical implementation must include an
+in-code `Provenance` section and a record in
+`docs/methodology/provenance-registry.toml`. Cite the defining public source,
+separate source values from project choices, state units/frame/time scale and
+validity limits, and identify the generator for checked-in data. Agreement with
+a compatibility target is never an acceptable source.
+
 ```bash
 git clone https://github.com/g-battaglia/libephemeris.git
 cd libephemeris && uv pip install -e ".[dev]"
 poe lint                           # Ruff lint + auto-fix
+uv run python scripts/check_algorithm_provenance.py
 poe test:leb:fast                  # Recommended fast unit suite
 poe test:skyfield:fast             # Skyfield backend unit suite
 ```

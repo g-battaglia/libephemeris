@@ -4,6 +4,12 @@
 Directly evaluates the generator pipeline at Chebyshev nodes for one segment,
 fits, and compares — pinpointing whether the fitting itself is the problem
 or the pipeline output.
+
+Provenance:
+    Project-authored diagnostic over the registered JPL/IAU generation channel
+    and public Chebyshev fitting method. The chosen Saturn epoch is a debugging
+    probe, not a fitted runtime datum. Printed residuals may reveal an error but
+    are never copied into production coefficients.
 """
 
 from __future__ import annotations
@@ -26,6 +32,12 @@ TARGET_JD = 2501964.8
 
 
 def chebyshev_nodes(n):
+    """Return the ``n`` first-kind Chebyshev roots on ``[-1, 1]``.
+
+    The formula ``cos(pi * (k + 1/2) / n)`` is the public Gauss-Chebyshev
+    node definition used by the LEB coefficient fitter. The descending order
+    is intentional and is consumed consistently by NumPy's fit routine.
+    """
     return np.cos(np.pi * (np.arange(n) + 0.5) / n)
 
 
@@ -75,6 +87,7 @@ def eval_swe_calc_at_jds(jds_array):
 
 
 def ang_diff(a, b):
+    """Return the unsigned shortest separation of two degree angles."""
     d = abs(a - b)
     if d > 180:
         d = 360 - d
@@ -82,6 +95,13 @@ def ang_diff(a, b):
 
 
 def main():
+    """Diagnose one Saturn Chebyshev segment at nodes and interior samples.
+
+    Reconstructs the generator pipeline and the public runtime calculation at
+    identical TT epochs, fits the configured polynomial, and prints component
+    residuals. The command is read-only and exists to localize fitting versus
+    frame-pipeline error; its numbers are not shipped as coefficients.
+    """
     # Find the segment containing TARGET_JD
     seg_idx = int((TARGET_JD - JD_START) / INTERVAL)
     seg_start = JD_START + seg_idx * INTERVAL

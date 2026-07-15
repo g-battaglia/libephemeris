@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Development status report for the `leph` CLI."""
+"""Development status report for the ``leph`` CLI.
+
+Provenance:
+    Project-authored inspection and presentation of configured files and
+    backends. It reports metadata without changing any scientific value.
+"""
 
 from __future__ import annotations
 

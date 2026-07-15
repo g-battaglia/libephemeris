@@ -2,6 +2,13 @@
 """
 LEB2 compressed ephemeris file generator.
 
+Provenance:
+    Project converter/generator over registered LEB/JPL/IAU inputs. Mantissa
+    truncation follows IEEE-754 binary64; coefficient ordering and byte shuffle
+    are documented reversible transforms; final compression uses Zstandard.
+    Per-body bit counts are derived from explicit error targets and verified
+    against the uncompressed values. No hidden reconstruction table is used.
+
 Two modes of operation:
 
 1. Convert: Read an existing LEB1 file and produce a compressed LEB2 file.
@@ -1124,6 +1131,13 @@ def convert_all_groups(
 
 
 def main():
+    """Dispatch LEB2 generation, conversion, verification, and inspection.
+
+    Chunking, compression, body-group boundaries, and CLI defaults are
+    LibEphemeris format choices.  Astronomical samples retain the public source
+    channels registered by the generator, so conversion does not introduce a
+    second scientific authority.
+    """
     parser = argparse.ArgumentParser(
         description="Generate or convert LEB2 compressed ephemeris files",
         formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -12,6 +12,13 @@ Usage:
     python scripts/test_leb2_precision.py medium         # ~15s
     python scripts/test_leb2_precision.py extended       # ~15s
     python scripts/test_leb2_precision.py base --dates 1000  # more dates
+
+Provenance:
+    Project-authored compression verification comparing a registered LEB2
+    artifact with its LEB1 source representation. The 0.001-arcsecond gate is
+    the documented storage error budget, not an astronomical constant. Random
+    samples are deterministic test evidence; measured deltas are never fitted
+    back into coefficients.
 """
 
 from __future__ import annotations
@@ -104,6 +111,16 @@ def _angular_error_arcsec(value: float, reference: float) -> float:
 
 
 def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
+    """Verify one tier's LEB2 storage against the named LEB1 source artifact.
+
+    The intersection of file-header ranges and authenticated core inventories
+    defines coverage.  A seeded finite grid checks representation loss under
+    each declared flag set; failures, missing bodies, or absent inputs close the
+    gate rather than being silently omitted.
+
+    Returns:
+        Whether coverage was complete and every comparison met the storage gate.
+    """
     cfg = TIER_CONFIG[tier]
     for f in [cfg["leb1"], cfg["leb2"]]:
         if not os.path.isfile(f):
@@ -266,6 +283,7 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
 
 
 def main():
+    """Run the focused LEB2 compression gate for one or every named tier."""
     parser = argparse.ArgumentParser(description="Fast LEB2 precision test")
     parser.add_argument("tier", choices=["base", "medium", "extended", "all"])
     parser.add_argument(

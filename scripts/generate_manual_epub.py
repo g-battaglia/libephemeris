@@ -13,6 +13,12 @@ Usage:
     python scripts/generate_manual_epub.py --lang en        # English only
 
 Output goes to docs/build/.
+
+Provenance:
+    Project-authored EPUB packaging over reviewed repository Markdown, using
+    the documented ebooklib/Markdown dependencies. Chapter splitting, XHTML
+    escaping, and navigation are presentation choices only. This script adds no
+    astronomical algorithm, coefficient, or source claim.
 """
 
 from __future__ import annotations
@@ -335,6 +341,12 @@ def build_epub(lang: str) -> bool:
 
 
 def main() -> None:
+    """Generate the selected language editions of the project EPUB manual.
+
+    This entry point performs document packaging only.  It selects reviewed
+    Markdown inputs and delegates EPUB construction without changing any
+    scientific formula, table, or runtime value.
+    """
     parser = argparse.ArgumentParser(
         description="Generate LibEphemeris manual EPUB files (no pandoc required)"
     )

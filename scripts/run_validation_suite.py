@@ -9,6 +9,13 @@ edge cases, and cross-backend consistency.
 Usage:
     python scripts/run_validation_suite.py              # full (~5 min)
     python scripts/run_validation_suite.py --quick      # reduced (~1 min)
+
+Provenance:
+    Project-authored behavioral and invariant test runner over registered
+    LibEphemeris backends. Test dates, combinations, and tolerances are explicit
+    verification policy; no output is emitted as model data. Cross-backend
+    agreement can detect regressions but does not replace each backend's public
+    scientific provenance.
 """
 
 from __future__ import annotations
@@ -54,12 +61,20 @@ BODY_NAMES = {
 
 
 def _section(name):
+    """Print a stable human-readable heading for one validation section."""
     print(f"\n{'=' * 60}")
     print(f"  {name}")
     print(f"{'=' * 60}")
 
 
 class Results:
+    """Accumulate pass/fail counts and a bounded diagnostic sample.
+
+    The class is reporting infrastructure only.  Capping retained messages at
+    fifty prevents unbounded console noise without changing the total counts
+    or the verdict.
+    """
+
     def __init__(self):
         self.total = 0
         self.passed = 0
@@ -399,6 +414,12 @@ def run_section8_crossbackend(rng, n_dates=50):
 
 
 def main():
+    """Run the deterministic multi-section local validation campaign.
+
+    A seeded generator makes sampled dates reproducible.  ``--quick`` scales
+    the finite evidence grid but does not alter scientific algorithms; neither
+    mode is represented as a proof over unsampled dates.
+    """
     parser = argparse.ArgumentParser(description="LibEphemeris validation suite")
     parser.add_argument("--quick", action="store_true", help="Reduced test count")
     args = parser.parse_args()

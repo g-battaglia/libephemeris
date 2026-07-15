@@ -76,17 +76,15 @@ uses **UT1**. The TT↔UT1 difference (ΔT) is obtained from the library's own �
 model (:func:`libephemeris.time_utils.deltat`), so houses and planetary positions
 use one consistent ΔT.
 
-Provenance
-----------
-All coefficients are transcribed from the cited peer-reviewed papers (Vondrák
-2011 + corrigendum A&A 541 C1; Simon 1994) and the IAU 2006 GMST expression
-(Capitaine, Wallace & Chapront 2003, A&A 412, 567). No third-party source code
-is used. The series and the geometric construction are standard published
-astronomy.
-
-The two internal branches are joined continuously at the modern-window
-boundaries. See ``docs/methodology/sidereal-time-longterm.md`` for the complete
-independent construction and references.
+Provenance:
+    All coefficients are transcribed from the cited peer-reviewed papers
+    (Vondrák 2011 plus corrigendum A&A 541 C1; Simon 1994) and the IAU 2006
+    GMST expression (Capitaine, Wallace & Chapront 2003, A&A 412, 567). No
+    third-party source code is used. The series and geometric construction are
+    standard published astronomy. The modern/long-term branch boundary,
+    continuity offsets, caching, and floating-point evaluation order are
+    project choices; their derivation and tests are recorded in
+    ``docs/methodology/sidereal-time-longterm.md``.
 """
 
 from __future__ import annotations
@@ -452,6 +450,7 @@ def _equator_pole(jd_tt: float) -> tuple[float, float, float]:
 
 
 def _cross(a: tuple, b: tuple) -> tuple[float, float, float]:
+    """Return the right-handed cross product of two pole/frame vectors."""
     return (
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
@@ -514,6 +513,7 @@ def _rot_x(vec: tuple, eps: float) -> tuple[float, float, float]:
 # Sidereal time
 # --------------------------------------------------------------------------
 def _deltat_days(jd_ut1: float) -> float:
+    """Return canonical TT-minus-UT in days for the supplied UT Julian date."""
     # Imported lazily to avoid a module import cycle (time_utils imports constants
     # but not this module; keeping the import local is defensive and cheap).
     from .time_utils import deltat

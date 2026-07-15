@@ -24,6 +24,15 @@ transformations.
 Primary sources are IERS Conventions (2010), Chapter 5, Eq. 5.43, and Park et
 al. (2021), "The JPL Planetary and Lunar Ephemerides DE440 and DE441",
 Astronomical Journal 161:105.
+
+Provenance:
+    Source/derivation boundaries are intentionally separate: ERFA evaluates the
+    IERS mean arguments; JPL states feed angular-momentum and eccentricity-vector
+    geometry; and the checked-in interpolated curves are produced only by
+    ``scripts/generate_lunar_apse_model.py``. Grid spacing, residual
+    interpolation, edge taper, cache size, and finite-difference speed steps are
+    project choices with tests and documented bounds. Compatibility observations
+    never enter either generated model or runtime correction.
 """
 
 from __future__ import annotations
@@ -1420,10 +1429,11 @@ def _mean_obliquity_radians(jd_tt: float) -> float:
 class MeeusPolynomialWarning(UserWarning):
     """Warning issued when Meeus polynomial is used outside its optimal range.
 
-    Severity levels based on distance from J2000.0 (warnings only — no
-    range ever raises, matching the reference API which computes any date):
-        - Beyond ±1000 years: precision degraded but still usable
-        - Beyond ±2000 years: error may exceed 1 degree; use with caution
+    The warning thresholds are based on distance from J2000.0. They never
+    raise a range error: beyond ±1000 years the message reports degraded
+    precision, and beyond ±2000 years it warns that the error may exceed one
+    degree. These are project warning bands around the retained polynomial,
+    not universal accuracy guarantees for every lunar quantity.
     """
 
     pass
@@ -1476,8 +1486,7 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
         at ~19.3°/year retrograde), the True Node oscillates around the mean position
         with amplitudes up to ±1.5° on timescales of days to weeks.
 
-        Calculation Method
-        ==================
+        **Calculation method**
 
         This function uses a rigorous orbital mechanics approach, computing the
         angular momentum vector directly in the true ecliptic frame of date:
@@ -1501,12 +1510,11 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
             - Longitude = atan2(h_x, -h_y), normalized to [0°, 360°)
             - Result is directly in the true ecliptic of date
 
-        Mathematical Foundation
-        =======================
+        **Mathematical foundation**
 
         The osculating orbital plane is defined by the angular momentum vector:
 
-            h = r × v = |r| |v| sin(θ) n̂
+            h = r × v = norm(r) norm(v) sin(θ) n̂
 
         where θ is the angle between r and v, and n̂ is the unit normal to the
         orbital plane. The ascending node is where the orbital plane intersects
@@ -1536,8 +1544,7 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
                            ascending node in AU, from the conic r = p/(1 + e cos nu)
                            evaluated at the node (p, e, omega from r, v)
 
-    Precision and Accuracy
-    ======================
+    **Precision and accuracy**
 
     **Compared to JPL DE ephemeris geometric method (1000 random dates, 1950-2050):**
         - Mean error: ~8.9 arcsec (~0.0025 degrees)
@@ -1555,8 +1562,7 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
         - Secondary oscillations: fortnightly (~14.8 days), monthly (~29.5 days)
         - Long-term motion: retrograde ~19.3 degrees/year (18.6 year period)
 
-        Physical Interpretation
-        =======================
+        **Physical interpretation**
 
         The True Node represents the actual intersection of the Moon's instantaneous
         orbit with the ecliptic. Key points:
@@ -1677,8 +1683,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     the Moon's instantaneous position and velocity from JPL DE ephemeris,
     points toward perigee. The apogee direction is 180° from perigee.
 
-    Algorithm
-    =========
+    **Algorithm**
 
     **Step 1: Obtain Moon State Vectors in Ecliptic Frame**
         - Query JPL DE ephemeris via Skyfield
@@ -1689,7 +1694,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
 
     **Step 2: Compute Eccentricity Vector**
         - h = r × v (angular momentum)
-        - e = (v × h)/μ - r/|r| (points toward perigee)
+        - e = (v × h)/μ - r/norm(r) (points toward perigee)
         - μ = G(M_Earth + M_Moon) for the two-body problem
         - Apogee direction = -e (opposite to perigee)
 
@@ -1698,8 +1703,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
           vector is directly in ecliptic coordinates of date
         - Convert from Cartesian to spherical (longitude, latitude)
 
-    Physical Background
-    ==================
+    **Physical background**
 
     The osculating lunar apogee is the apogee direction of the instantaneous
     Keplerian orbit that passes through the Moon's current position with its
@@ -1715,8 +1719,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
             - latitude: Ecliptic latitude in degrees (small, typically < 5°)
             - distance: Apogee distance from Earth in AU
 
-    Precision
-    =========
+    **Precision**
 
     **Computed from JPL DE ephemeris state vectors (500 random dates, 1950-2050):**
         - Mean internal consistency: sub-arcsecond

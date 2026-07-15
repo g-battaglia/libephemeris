@@ -2,6 +2,14 @@
 """
 Generate tier-specific planet_centers SPK files for libephemeris.
 
+Provenance:
+    Source segments are downloaded from NASA/JPL NAIF's public satellite SPK
+    archive and selected by documented NAIF center IDs. Project code copies the
+    required segments into compact tier artifacts without fitting a correction
+    model. Source URLs, kernel identities, coverage intersection, hashes, SPK
+    structure, and verification procedure are documented in
+    ``docs/methodology/planet-centers-spk.md``.
+
 This script downloads satellite SPK files from JPL NAIF and extracts planet
 center segments (NAIF IDs 599, 699, 799, 899, 999) to create compact SPK files
 for each precision tier.
@@ -781,6 +789,13 @@ def download_sources_for_tier(tier: str, cache_dir: str, force: bool = False) ->
 
 
 def main():
+    """Generate or download inputs for tier-specific planet-center SPKs.
+
+    The command makes the tier, source-kernel cache, output directory, and
+    verification phase explicit.  Barycentric states originate in the public
+    NAIF/JPL kernels named by this module; segment assembly and tier partition
+    are reproducible project packaging decisions.
+    """
     parser = argparse.ArgumentParser(
         description="Generate tier-specific planet_centers SPK files for libephemeris",
         formatter_class=argparse.RawDescriptionHelpFormatter,

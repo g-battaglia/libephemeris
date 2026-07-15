@@ -2,6 +2,13 @@
 """
 Build Star Catalog from Hipparcos using astroquery.vizier.
 
+Provenance:
+    Historical project generator over the public ESA Hipparcos I/239 catalogue
+    and IAU names. It is retained to explain a rejected/superseded pipeline and
+    MUST NOT regenerate the shipped table because the name map below contains
+    documented errors. ``build_star_catalog_v2.py`` is the sole authoritative
+    generator; no output of this script is accepted as current source data.
+
 SUPERSEDED — DO NOT USE TO REGENERATE THE SHIPPED CATALOG.
     The shipped catalog (libephemeris/star_catalog_gen.py) is produced by
     scripts/build_star_catalog_v2.py from van Leeuwen 2007 (CDS I/311).

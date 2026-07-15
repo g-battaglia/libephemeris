@@ -12,6 +12,12 @@ Output:
     - Detailed cProfile statistics
     - Top functions by cumulative time
     - Top functions by total time (self-time)
+
+Provenance:
+    Project-authored performance diagnostic using Python's standard ``cProfile``
+    and the registered public API. Workload dates and bodies exercise code paths
+    but supply no model data. Profiles may justify engineering optimization;
+    they are not scientific validation and are never emitted as coefficients.
 """
 
 import cProfile
@@ -179,6 +185,12 @@ def profile_with_cprofile() -> pstats.Stats:
 
 
 def main():
+    """Profile the declared local benchmark workload and print hot paths.
+
+    Iteration counts and cProfile sort orders are engineering diagnostics, not
+    scientific parameters.  This command changes no ephemeris data and makes
+    no portable performance guarantee for other machines or environments.
+    """
     print("=" * 70)
     print("libephemeris Performance Profiling")
     print("=" * 70)

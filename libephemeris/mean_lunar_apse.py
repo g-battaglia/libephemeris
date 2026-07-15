@@ -10,6 +10,14 @@ opposite the mean perigee in a conventional inclined lunar orbit.
 ERFA is the BSD-licensed open-source implementation of the IAU SOFA standards.
 The argument definitions are published in IERS Conventions (2010), Eq. 5.43:
 https://iers-conventions.obspm.fr/content/chapter5/icc5.pdf
+
+Provenance:
+    ERFA supplies the published Delaunay arguments; this module combines them
+    through explicit mean-node/perigee geometry. Simon et al. (1994) supplies
+    the Earth-eccentricity polynomial used by the interpolated model, while the
+    IAU 2012 astronomical unit and stated conventional mean lunar orbit supply
+    display distances. The half-day derivative interval and range delegation
+    are project API choices, not fitted coefficients.
 """
 
 from __future__ import annotations
@@ -108,6 +116,7 @@ def _check_range(jd: float, body_id: int, body_name: str) -> None:
 
 
 def _centuries(jd: float) -> float:
+    """Convert a TT Julian date to Julian centuries since J2000.0."""
     return (jd - _J2000_JD) / _JULIAN_CENTURY_DAYS
 
 
@@ -161,6 +170,7 @@ def _fundamental_argument_rates(jd: float) -> tuple[float, float, float]:
 
 
 def _plane_node_unchecked(jd: float) -> tuple[float, float]:
+    """Evaluate mean apogee-plane and node longitudes without range policy."""
     lunar_anomaly, argument_latitude, node = _fundamental_arguments(jd)
     apogee_plane = node + argument_latitude - lunar_anomaly + math.pi
     return (
@@ -224,6 +234,11 @@ def _mean_apogee_cartesian_state(
 def _cartesian_to_polar_state(
     state: tuple[float, float, float, float, float, float],
 ) -> tuple[float, float, float, float, float, float]:
+    """Convert Cartesian position/velocity to spherical state and rates.
+
+    Inputs are ecliptic Cartesian AU and AU/day; outputs are longitude,
+    latitude, distance, degree/day angular rates, and AU/day radial rate.
+    """
     x, y, z, vx, vy, vz = state
     rho_squared = x * x + y * y
     rho = math.sqrt(rho_squared)

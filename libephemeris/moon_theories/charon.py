@@ -13,6 +13,13 @@ Reference:
 - Orbital elements from PLU060 ephemeris
 
 Precision: ~1-5 km (sufficient for ~0.01 arcsec at Pluto's distance)
+
+Provenance:
+    Orbital period, scale, orientation, phase, and mass inputs are attributed to
+    the cited Brozovic/Jacobson Pluto-system solution and its public JPL
+    ephemeris record. The runtime uses an independently written two-body Kepler
+    solver. Treating unavailable secular rates as zero and the quoted accuracy
+    are explicit approximation limits; no compatibility output is fitted.
 """
 
 import math

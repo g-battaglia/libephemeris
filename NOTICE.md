@@ -29,6 +29,12 @@ All astronomical computations are based on:
 - **Sidereal zero points and catalogue geometry** documented per mode in the
   [ayanamsha source table](docs/reference/ayanamsha.md).
 
+The path-exact inventory of every runtime module, generator, development tool,
+and shipped scientific asset is the
+[algorithm/data provenance registry](docs/methodology/provenance-registry.toml),
+with a human-readable derivation map in
+[Algorithm and Data Provenance](docs/methodology/algorithm-provenance.md).
+
 ## API Compatibility
 
 LibEphemeris provides an API signature-compatible with the reference
@@ -43,11 +49,14 @@ interface and comparing outputs. The development process aims to keep these
 comparisons ephemeral. Reference-distribution source, prose, algorithms, and
 data files should not be part of the shipped package.
 
-All numerical data and models are reproducible from the sources
-listed above. Mean lunar points use ERFA's IERS 2003 Delaunay arguments; true
-and osculating points use the active NASA JPL state; and supported historical
-hypothetical models use the cited primary publications in their source
-record.
+The registry and focused methodology pages state exactly which numerical data
+and models are reproducible from a primary/public source, which are generated
+from public data, and which historical API values remain labelled Secondary or
+Convention. Mean lunar points use ERFA's IERS 2003 Delaunay arguments; true and
+osculating points use the active NASA JPL state; and supported historical
+hypothetical models use the cited primary publications in their source record.
+No secondary attribution or project convention is represented as a primary
+scientific measurement.
 
 ## Vendored Components
 

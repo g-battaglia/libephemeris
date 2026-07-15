@@ -7,6 +7,13 @@ while spherical (lon, lat, dist) has cusps from atan2. If true, we can:
 2. At runtime: read (x, y, z) → convert to (lon, lat, dist) via atan2/asin — exact
 
 This script tests both representations at Saturn's worst-case retrograde segment.
+
+Provenance:
+    Project-authored, non-production representation experiment using the
+    registered generator pipeline and public Cartesian/spherical identities.
+    The selected segment is a stress case, not a model datum. Prototype output
+    is not imported or shipped; adoption requires full-range error validation
+    and a documented format decision.
 """
 
 from __future__ import annotations
@@ -25,6 +32,7 @@ from libephemeris.state import get_planets, get_timescale
 
 
 def chebyshev_nodes(n):
+    """Return the standard ``n`` first-kind Gauss-Chebyshev nodes."""
     return np.cos(np.pi * (np.arange(n) + 0.5) / n)
 
 
@@ -65,6 +73,7 @@ def eval_apparent_ecliptic_spherical(body_id, jds):
 
 
 def ang_diff(a, b):
+    """Return the smaller unsigned longitude separation in degrees."""
     d = abs(a - b)
     if d > 180:
         d = 360 - d
@@ -144,6 +153,12 @@ def test_segment(body_id, body_name, seg_start, seg_end, degree, n_test=100):
 
 
 def main():
+    """Compare Cartesian and spherical fits on declared stress segments.
+
+    Bodies, dates, degrees, and segment widths are experimental probes printed
+    by this non-production prototype.  Outcomes are not imported into runtime
+    code; adopting either representation requires separate full-range review.
+    """
     JD_START = 2396758.5  # base tier start
 
     # Test cases: body, name, interval, degree, worst-case JD

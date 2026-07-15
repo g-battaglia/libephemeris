@@ -43,6 +43,13 @@ ImportError if astropy is not installed. Install with:
 
 This module is designed for evaluation purposes to determine how astropy
 could supplement (not replace) the existing Skyfield-based calculations.
+
+Provenance:
+    Project-authored optional verification bridge over the BSD-licensed Astropy
+    public API. Astropy results are returned as diagnostics only: they are not
+    persisted, fitted, copied into constants, or used by the runtime ephemeris
+    pipeline. This module therefore supplies independent validation evidence,
+    not scientific model inputs.
 """
 
 from __future__ import annotations

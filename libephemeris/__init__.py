@@ -23,6 +23,14 @@ Calculation backend:
       Bodies/flags not in the LEB file fall back to Skyfield.
     - ``"horizons"``: prefer NASA JPL Horizons API (requires internet).
       Bodies/flags not supported by Horizons fall back to Skyfield.
+
+Provenance:
+    This module is project-authored API and dispatch infrastructure. It contains
+    no planetary theory or fitted coefficient: JPL state generation, IAU/ERFA
+    reductions, historical models, and LEB evaluation live in the source-mapped
+    modules they dispatch to. Public-API observations constrain signatures and
+    return semantics only; they are never numerical model inputs. The complete
+    boundary is recorded in ``docs/methodology/algorithm-provenance.md``.
 """
 
 from __future__ import annotations

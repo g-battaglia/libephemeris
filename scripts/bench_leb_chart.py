@@ -14,6 +14,12 @@ Usage:
 
     # Custom body set:
     python scripts/bench_leb_chart.py --charts 200 --bodies core
+
+Provenance:
+    Project-authored performance harness. Its fixed dates, body selections, and
+    repetition counts define workloads only; results are timings and checksums,
+    never astronomical coefficients. The harness invokes the same registered
+    runtime calculations as callers and cannot establish scientific validity.
 """
 
 from __future__ import annotations
@@ -169,6 +175,13 @@ def run_benchmark(
 
 
 def main():
+    """Run the command-line LEB chart benchmark and print comparative timing.
+
+    The command optionally generates a temporary LEB file, warms the selected
+    body set, executes one or more timed rounds, and reports the best round.
+    It is a performance diagnostic only: it does not generate scientific
+    coefficients for distribution and removes any temporary artifact it owns.
+    """
     parser = argparse.ArgumentParser(description="Benchmark LEB chart calculations")
     parser.add_argument(
         "--charts",

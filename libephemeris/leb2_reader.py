@@ -12,6 +12,15 @@ Provides the same interface as LEBReader.
 - **v2 (chunked)**: Each body is split into 10-year temporal chunks, each
   compressed independently.  Only the chunk containing the requested JD is
   decompressed (~300 KB for Moon), giving near-instant cold-start performance.
+
+Provenance:
+    LEB2 versioning and ten-year chunking are project-native storage choices.
+    Payloads use the registered IEEE-754/byte-shuffle/Zstandard pipeline, and
+    numerical evaluation is delegated to the cited Clenshaw implementation in
+    ``leb_reader``. The reader creates no astronomical coefficient; it validates
+    sizes, ranges, and indexes before decoding generator-attested data. Cache
+    capacity, locking, lazy decompression, and OS memory advice affect resource
+    use only.
 """
 
 from __future__ import annotations

@@ -9,6 +9,12 @@ that has it.
 
 This enables the modular packaging strategy where bodies are split across
 multiple files (for example, core.leb, asteroids.leb, and apogee.leb).
+
+Provenance:
+    Project-authored routing infrastructure over already validated LEB readers.
+    First-file precedence, body-to-reader mapping, discovery order, and auxiliary
+    channel selection are explicit container policy. This module evaluates no
+    polynomial itself and contains no astronomical model or coefficient.
 """
 
 from __future__ import annotations

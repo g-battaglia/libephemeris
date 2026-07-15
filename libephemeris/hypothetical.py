@@ -21,6 +21,14 @@ The source transcription, frame choices and arithmetic transformations are
 documented beside the constants below, in ``fictitious_orbits.csv`` and in
 ``docs/methodology/hypothetical-bodies.md``.  Missing fields for disabled IDs
 are inventoried in ``docs/methodology/missing-hypothetical-models.md``.
+
+Provenance:
+    The source record names the primary publication, page/table, literal field,
+    epoch/frame, and each project conversion for every enabled ID. Runtime
+    propagation uses only those transcriptions plus published two-body geometry.
+    Six source-incomplete IDs have no hidden replacement constants and raise
+    ``UnknownBodyError``. Public API observation is limited to identifiers,
+    shapes, and error behavior; no numerical output is persisted or fitted.
 """
 
 from __future__ import annotations

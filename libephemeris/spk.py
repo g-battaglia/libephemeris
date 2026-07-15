@@ -3,6 +3,14 @@
 """
 SPK kernel support for high-precision minor body calculations.
 
+Provenance:
+    Kernel bytes and state vectors come from NASA/JPL Horizons and use the
+    public NAIF SPK specification. Project-authored code handles HTTPS,
+    validation, target registration, frame conversion, and type dispatch.
+    Types 2/3 are read through Skyfield; type 21 uses the separately identified
+    MIT ``spktype21`` vendor. Downloaded states are never fitted into a hidden
+    runtime model.
+
 This module provides functionality to:
 - Download SPK (SPICE kernel) files from JPL Horizons API
 - Register mappings between libephemeris body IDs and SPK targets

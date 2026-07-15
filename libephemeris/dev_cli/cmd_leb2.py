@@ -7,6 +7,11 @@ Replaces 8 poe tasks: leb2:convert:*, leb2:verify:*.
 LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major
 reorder + byte shuffle + zstd) to achieve 4-10x compression. Verification
 reports per-component errors in each body's native stored coordinate units.
+
+Provenance:
+    Project-authored command orchestration. LEB2 format mathematics, bit/error
+    decisions, and Zstandard provenance are documented in ``leb_compression``
+    and ``docs/leb/algorithms.md``; this wrapper adds no coefficient.
 """
 
 from __future__ import annotations

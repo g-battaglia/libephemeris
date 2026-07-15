@@ -11,6 +11,11 @@ Shell completion + shell function (works with uv, no venv activation needed):
     uv run ./leph completion zsh >> ~/.zshrc     # zsh — make permanent
     uv run ./leph completion bash >> ~/.bashrc   # bash
     uv run ./leph completion fish > ~/.config/fish/conf.d/leph.fish  # fish
+
+Provenance:
+    Project-authored development-command registration. It contains no
+    astronomical model or coefficient; scientific generators and verification
+    programs invoked here retain their own provenance records.
 """
 
 from __future__ import annotations

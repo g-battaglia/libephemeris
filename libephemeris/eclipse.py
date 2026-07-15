@@ -27,8 +27,21 @@ Algorithm:
 
 References:
     - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-    - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
-    - Reference documentation
+    - Espenak & Meeus, "Five Millennium Canon of Solar Eclipses",
+      NASA/TP-2006-214141
+    - Espenak & Meeus, "Five Millennium Canon of Lunar Eclipses",
+      NASA/TP-2009-214172, and the companion "Five Millennium Catalog of
+      Lunar Eclipses", NASA/TP-2009-214173
+    - NASA/JPL DE440/DE441 Sun, Earth, and Moon state vectors
+
+Provenance:
+    Eclipse contacts, shadow cones, local circumstances, and classifications are
+    independently derived from the cited public geometry and JPL-backed body
+    states. Search windows, bracketing, convergence thresholds, and numerical
+    derivative steps are labelled project choices and are checked by geometric
+    invariants (ordered contacts, bounded obscuration, and consistent tangency).
+    Public compatibility calls validate return semantics only and never provide
+    coefficients, contact tables, or Besselian elements to this module.
 """
 
 from __future__ import annotations
@@ -1667,12 +1680,11 @@ def _calc_penumbra_limit(jd: float) -> float:
     # At the fundamental plane (distance moon_dist from Moon toward Earth),
     # the penumbra radius is: l1_km = moon_dist * tan(f1) + MOON_RADIUS
 
-    # But for Besselian elements, l1 is measured from the shadow axis,
-    # which is the penumbral radius at the fundamental plane.
-    #
-    # Standard formula for l1 (penumbral shadow radius at fundamental plane):
-    # l1 = sin(f1) + z * tan(f1) where z is along shadow axis
-    # At the fundamental plane, this simplifies to the geometry below.
+    # In the Besselian convention l1 is the penumbral radius measured from the
+    # shadow axis in the fundamental plane.  The exact cone relation is a
+    # lunar-radius intercept plus an axial-distance times tan(f1); this legacy
+    # helper deliberately retains its documented small-angle approximation
+    # below for compatibility with its contact-time callers.
 
     # Angular semi-diameter of Sun from Earth
     sun_angular_rad = SUN_RADIUS_KM / sun_dist_km  # radians
@@ -2302,9 +2314,11 @@ def sol_eclipse_max_time(
         >>> print(f"Local max at JD {jd_local_max:.8f}, sep = {separation:.6f}°")
 
     References:
-        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
-        - Reference documentation on Besselian elements
+        - Meeus (1998), "Astronomical Algorithms", 2nd ed., Ch. 54
+        - Espenak & Meeus (2006), "Five Millennium Canon of Solar
+          Eclipses", NASA/TP-2006-214141
+        - Espenak, NASA/GSFC, "Besselian Elements of Solar Eclipses":
+          https://eclipse.gsfc.nasa.gov/SEcat5/beselm.html
     """
     # Validate that both lat and lon are provided or neither
     if (lat is None) != (lon is None):
@@ -7324,9 +7338,15 @@ def heliacal_ut(
         >>> print(f"Heliacal rising at JD {jd_event:.5f}")
 
     References:
-        - Reference API: heliacal_ut()
-        - Schoch "Planets in Mesopotamian Astral Science"
-        - Ptolemy's criteria for heliacal visibility
+        - Schaefer (1990), PASP 102, 212-229, DOI 10.1086/132629,
+          limiting-magnitude and observer model.
+        - Schaefer (1993), Vistas in Astronomy 36, 311-361, visibility
+          context and observer effects.
+        - Kasten & Young (1989), DOI 10.1364/AO.28.004735, optical airmass.
+
+        Public API compatibility defines arguments and return semantics only;
+        it is not a source for the visibility model. The historical narrative
+        above is context, not a numerical algorithm.
     """
     from .constants import (
         HELIACAL_RISING,
@@ -11941,8 +11961,9 @@ def _sol_eclipse_magnitude_at_loc_pythonic(
         >>> print(f"London magnitude: {magnitude:.4f}")  # Will be 0.0
 
     References:
-        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Reference documentation
+        - Meeus (1998), "Astronomical Algorithms", 2nd ed., Ch. 54
+        - Espenak & Meeus (2006), NASA/TP-2006-214141, Sec. 1.1;
+          eclipse magnitude is the occulted fraction of the solar diameter
     """
     # reader is provided by the caller (None forces Skyfield path)
 
@@ -12179,9 +12200,11 @@ def _sol_eclipse_obscuration_at_loc_pythonic(
         >>> print(f"Magnitude: {magnitude:.4f}, Obscuration: {obscuration:.4f}")
 
     References:
-        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Reference documentation
-        - Intersection of two circles formula (computational geometry)
+        - Meeus (1998), "Astronomical Algorithms", 2nd ed., Ch. 54
+        - Espenak & Meeus (2006), NASA/TP-2006-214141, Sec. 1.1;
+          obscuration is the occulted fraction of the solar-disc area
+        - Weisstein, "Circle-Circle Intersection", MathWorld; the partial
+          branch evaluates the equivalent sum-of-circular-segments formula
     """
     # reader is provided by the caller (None forces Skyfield path)
 
@@ -12444,8 +12467,10 @@ def _lun_eclipse_umbral_magnitude_pythonic(
         >>> print(f"Magnitude: {mag:.4f}")  # Will be 0.0
 
     References:
-        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Reference documentation
+        - Meeus (1998), "Astronomical Algorithms", 2nd ed., Ch. 54
+        - Espenak & Meeus (2009), "Five Millennium Catalog of Lunar
+          Eclipses", NASA/TP-2009-214173, Sec. 1 (magnitude definitions and
+          Danjon shadow enlargement)
     """
     # Delegate to the same shadow core (_lun_how_core) that backs
     # lun_eclipse_how()/lun_eclipse_when(), so this convenience function
@@ -12560,8 +12585,10 @@ def _lun_eclipse_penumbral_magnitude_pythonic(
         >>> print(f"Magnitude: {mag:.4f}")  # Will be 0.0
 
     References:
-        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Reference documentation
+        - Meeus (1998), "Astronomical Algorithms", 2nd ed., Ch. 54
+        - Espenak & Meeus (2009), "Five Millennium Catalog of Lunar
+          Eclipses", NASA/TP-2009-214173, Sec. 1 (magnitude definitions and
+          Danjon shadow enlargement)
     """
     # Delegate to the same shadow core (_lun_how_core) that backs
     # lun_eclipse_how()/lun_eclipse_when() so the penumbral magnitude (attr[1])
@@ -12681,9 +12708,10 @@ def _lun_eclipse_gamma_pythonic(
         >>> print(f"Gamma: {gamma:.4f}")  # Will be large (no eclipse)
 
     References:
-        - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
-        - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
-        - Reference documentation
+        - Meeus (1998), "Astronomical Algorithms", 2nd ed., Ch. 54
+        - Espenak & Meeus (2009), "Five Millennium Catalog of Lunar
+          Eclipses", NASA/TP-2009-214173, Secs. 1 and 3 (gamma definition,
+          sign convention, and eclipse classification)
     """
     # Use the existing calculation function
     (

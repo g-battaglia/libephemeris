@@ -1,0 +1,768 @@
+schema_version = 1
+scope_document = "docs/methodology/algorithm-provenance.md"
+
+# This registry is deliberately data, not executable Python. The checker expands
+# every component path and compares it with the tracked runtime/tooling tree.
+
+[sources.JPL_DE]
+kind = "primary-publication-and-public-data"
+citation = "Park, Folkner, Williams & Boggs (2021), The JPL Planetary and Lunar Ephemerides DE440 and DE441, AJ 161:105"
+url = "https://doi.org/10.3847/1538-3881/abd414"
+
+[sources.JPL_HORIZONS]
+kind = "official-public-data-service"
+citation = "NASA/JPL Solar System Dynamics, Horizons System and API"
+url = "https://ssd-api.jpl.nasa.gov/doc/horizons.html"
+
+[sources.JPL_SBDB]
+kind = "official-public-data-service"
+citation = "NASA/JPL Small-Body Database API"
+url = "https://ssd-api.jpl.nasa.gov/doc/sbdb.html"
+
+[sources.NAIF_SPK]
+kind = "official-public-standard"
+citation = "NASA/JPL NAIF, SPK Required Reading"
+url = "https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/spk.html"
+
+[sources.IERS_2010]
+kind = "official-public-standard"
+citation = "Petit & Luzum, eds. (2010), IERS Conventions, IERS Technical Note 36"
+url = "https://iers-conventions.obspm.fr/content/tn36.pdf"
+
+[sources.ERFA]
+kind = "permissively-licensed-standard-implementation"
+citation = "ERFA, liberfa implementation of IAU SOFA algorithms, BSD-compatible licence"
+url = "https://github.com/liberfa/erfa"
+
+[sources.VONDRAK_2011]
+kind = "primary-publication"
+citation = "Vondrak, Capitaine & Wallace (2011), New precession expressions, valid for long time intervals, A&A 534:A22; corrigendum A&A 541:C1"
+url = "https://doi.org/10.1051/0004-6361/201117274"
+
+[sources.SIMON_1994]
+kind = "primary-publication"
+citation = "Simon et al. (1994), Numerical expressions for precession formulae and mean elements for the Moon and the planets, A&A 282, 663-683"
+url = "https://ui.adsabs.harvard.edu/abs/1994A%26A...282..663S/abstract"
+
+[sources.DELTA_T]
+kind = "primary-publications-and-observed-public-data"
+citation = "Stephenson, Morrison & Hohenkerk (2016), Proc. R. Soc. A 472:20160404; Morrison et al. (2021); IERS observed Earth-orientation data"
+url = "https://doi.org/10.1098/rspa.2016.0404"
+
+[sources.MEEUS_1998]
+kind = "published-algorithm-reference"
+citation = "Meeus (1998), Astronomical Algorithms, 2nd edition"
+url = "https://search.worldcat.org/title/40521322"
+
+[sources.BRENT_1973]
+kind = "published-numerical-method"
+citation = "Brent (1973), Algorithms for Minimization without Derivatives"
+url = "https://maths-people.anu.edu.au/~brent/pub/pub011.html"
+
+[sources.CLENSHAW_1955]
+kind = "primary-publication"
+citation = "Clenshaw (1955), A note on the summation of Chebyshev series, MTAC 9, 118-120"
+url = "https://doi.org/10.1090/S0025-5718-1955-0071856-0"
+
+[sources.IEEE_754]
+kind = "public-technical-standard"
+citation = "IEEE 754 binary floating-point representation; Python struct uses platform-independent binary64 encodings"
+url = "https://standards.ieee.org/ieee/754/6210/"
+
+[sources.ZSTANDARD]
+kind = "permissively-licensed-format-and-library"
+citation = "Zstandard compression format and reference implementation"
+url = "https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md"
+
+[sources.SKYFIELD]
+kind = "permissively-licensed-upstream-library"
+citation = "Skyfield, MIT-licensed astronomical computation library"
+url = "https://rhodesmill.org/skyfield/"
+
+[sources.ASTROPY]
+kind = "permissively-licensed-independent-library"
+citation = "Astropy Project, BSD-licensed astronomy library"
+url = "https://www.astropy.org/"
+
+[sources.HIPPARCOS]
+kind = "official-public-catalog"
+citation = "ESA (1997), The Hipparcos and Tycho Catalogues, ESA SP-1200; van Leeuwen (2007) new reduction, VizieR I/311"
+url = "https://cdsarc.cds.unistra.fr/viz-bin/cat/I/311"
+
+[sources.IAU_WGSN]
+kind = "official-public-catalog"
+citation = "IAU Working Group on Star Names, Catalog of Star Names"
+url = "https://www.iau.org/public/themes/naming_stars/"
+
+[sources.HOUSE_DEFINITIONS]
+kind = "published-definitions-and-explicit-project-realizations"
+citation = "Per-code evidence matrix of author definitions, independent published descriptions, mathematical identities, and fully disclosed project-defined API realizations"
+url = "docs/reference/house-systems.md"
+
+[sources.HISTORICAL_LOTS]
+kind = "primary-text-and-explicit-project-conventions"
+citation = "Al-Biruni (1029), Book of Instruction, Wright translation (1934), section 476; exact formula/status matrix"
+url = "docs/methodology/classical-astrology-helpers.md#lots-in-arabic_partspy"
+
+[sources.BPHS]
+kind = "public-primary-text-transcription"
+citation = "Brihat Parashara Hora Shastra, chapter 3, verses 4-5 and 49-56; exact field/status matrix"
+url = "docs/methodology/classical-astrology-helpers.md#zodiac-and-jyotisha-helpers-in-contrib"
+
+[sources.AYANAMSHA_DEFINITIONS]
+kind = "published-definitions-public-geometry-and-labelled-conventions"
+citation = "Mode-by-mode bibliography, source-status label, epoch, anchor, frame, derivation convention, and unresolved-primary-source record"
+url = "docs/reference/ayanamsha.md"
+
+[sources.HYPOTHETICAL_PRIMARY]
+kind = "primary-publications"
+citation = "Neely, Harrington, Le Verrier, Adams, Lowell, and Velichko-Larin field-level source record"
+url = "docs/methodology/hypothetical-bodies.md"
+
+[sources.LIESKE_E5]
+kind = "primary-publication"
+citation = "Lieske (1998), Galilean satellite ephemerides E5, A&AS 129, 205-217"
+url = "https://doi.org/10.1051/aas:1998182"
+
+[sources.TASS]
+kind = "primary-publication"
+citation = "Vienne & Duriez (1995), TASS1.6, A&A 297, 588-605; TASS 1.7 public theory distribution"
+url = "https://ui.adsabs.harvard.edu/abs/1995A%26A...297..588V/abstract"
+
+[sources.JPL_SATELLITES]
+kind = "official-public-data-and-primary-publications"
+citation = "NASA/JPL satellite SPK kernels, system GM values, and cited Jacobson/Brozovic orbit solutions"
+url = "https://ssd.jpl.nasa.gov/sats/"
+
+[sources.REBOUND]
+kind = "upstream-scientific-software"
+citation = "Rein & Liu (2012), A&A 537:A128, DOI 10.1051/0004-6361/201118085; Rein & Spiegel (2015), MNRAS 446, 1424-1437, DOI 10.1093/mnras/stu2164"
+url = "https://rebound.readthedocs.io/"
+
+[sources.ASSIST]
+kind = "upstream-scientific-software"
+citation = "Holman et al. (2023), ASSIST: An Ephemeris-quality Test-particle Integrator, Planetary Science Journal 4:69"
+url = "https://assist.readthedocs.io/"
+
+[sources.MINOR_BODY_DYNAMICS]
+kind = "published-celestial-mechanics"
+citation = "Brouwer & Clemence (1961), Methods of Celestial Mechanics; Murray & Dermott (1999), Solar System Dynamics; JPL state/element inputs"
+url = "docs/development/keplerian-improvements.md"
+
+[sources.REFRACTION]
+kind = "standards-and-primary-publications"
+citation = "ISO 2533/ICAO Doc 7488 standard atmosphere; Barrell & Sears (1939); Green (1985); Auer & Standish (2000); Bennett (1982)"
+url = "https://doi.org/10.1086/301325"
+
+[sources.SCHAEFER_VISIBILITY]
+kind = "primary-publications"
+citation = "Schaefer (1990), Telescopic Limiting Magnitudes, PASP 102, 212-229; Schaefer (1993), Astronomy and the Limits of Vision"
+url = "https://doi.org/10.1086/132629"
+
+[sources.EXTINCTION]
+kind = "primary-publications"
+citation = "Kasten & Young (1989), Green (1992), Young (1974), Schaefer (1990), and citations local to extinction.py"
+url = "https://doi.org/10.1364/AO.28.004735"
+
+[sources.ECLIPSE_GEOMETRY]
+kind = "published-algorithms-and-public-data"
+citation = "Meeus (1998), chapter 54; Espenak & Meeus, solar NASA/TP-2006-214141 and lunar NASA/TP-2009-214172/214173; NASA Besselian definitions; JPL Sun/Moon states"
+url = "https://eclipse.gsfc.nasa.gov/SEpubs/5MCSE.html"
+
+[sources.PHOTOMETRY]
+kind = "primary-publications-and-official-constants"
+citation = "Mallama & Hilton (2018), Bowell et al. (1989), planet-specific cited photometry, NASA fact sheets, IAU 2015 Resolution B3"
+url = "https://arxiv.org/abs/1808.01973"
+
+[sources.SPKTYPE21]
+kind = "vendored-permissive-code"
+citation = "spktype21 0.1.0 by Shushi Uetsuki, MIT licence"
+url = "https://pypi.org/project/spktype21/0.1.0/"
+
+[sources.STELLARIUM_TASS]
+kind = "adapted-permissive-code"
+citation = "Johannes Gajdosik's MIT-licensed Stellarium TASS implementation"
+url = "https://github.com/Stellarium/stellarium/blob/master/src/core/planetsephems/tass17.c"
+
+[sources.IAU_B3]
+kind = "official-public-resolution"
+citation = "IAU 2015 Resolution B3 on recommended nominal conversion constants"
+url = "https://www.iau.org/static/resolutions/IAU2015_English.pdf"
+
+[sources.IAU_1976]
+kind = "official-public-resolution"
+citation = "IAU 1976 System of Astronomical Constants (Gaussian constant and J2000 obliquity)"
+url = "https://www.iau.org/static/resolutions/IAU1976_French.pdf"
+
+[sources.IAU_2012_B2]
+kind = "official-public-resolution"
+citation = "IAU 2012 Resolution B2 (exact astronomical unit and retirement of the Gaussian constant from the defining constants)"
+url = "https://www.iau.org/static/resolutions/IAU2012_English.pdf"
+
+[[component]]
+id = "runtime-public-facade"
+category = "public-api"
+paths = [
+  "libephemeris/__init__.py",
+  "libephemeris/context.py",
+  "libephemeris/state.py",
+]
+scientific_content = false
+origin = "Project-authored public dispatch and state isolation. It delegates every numerical model to separately registered modules and never derives coefficients from compatibility observations."
+sources = []
+documentation = ["docs/development/architecture-overview.md", "docs/methodology/independence.md"]
+docstring = "detailed"
+
+[[component]]
+id = "runtime-infrastructure"
+category = "infrastructure"
+paths = [
+  "libephemeris/_config_toml.py",
+  "libephemeris/_dotenv.py",
+  "libephemeris/cache.py",
+  "libephemeris/exceptions.py",
+  "libephemeris/logging_config.py",
+  "libephemeris/profiling.py",
+  "libephemeris/tracing.py",
+]
+scientific_content = false
+origin = "Project-authored configuration, caching, diagnostics, exceptions, and observability. These modules contain no astronomical model or scientific coefficient."
+sources = []
+documentation = ["docs/development/architecture-overview.md", "docs/guides/tracing.md"]
+docstring = "detailed"
+
+[[component]]
+id = "production-cli-and-downloads"
+category = "infrastructure"
+paths = [
+  "libephemeris/cli/__init__.py",
+  "libephemeris/cli/init_wizard.py",
+  "libephemeris/cli/shared.py",
+  "libephemeris/download.py",
+]
+scientific_content = false
+origin = "Project-authored CLI and authenticated data-delivery orchestration. Remote identities and checksums select reviewed artifacts; they are not fitted numerical inputs."
+sources = []
+documentation = ["CLI.md", "docs/guides/getting-started.md"]
+docstring = "detailed"
+
+[[component]]
+id = "development-cli"
+category = "development-tool"
+paths = [
+  "libephemeris/dev_cli/__init__.py",
+  "libephemeris/dev_cli/__main__.py",
+  "libephemeris/dev_cli/cmd_code.py",
+  "libephemeris/dev_cli/cmd_completion.py",
+  "libephemeris/dev_cli/cmd_diag.py",
+  "libephemeris/dev_cli/cmd_download.py",
+  "libephemeris/dev_cli/cmd_generate.py",
+  "libephemeris/dev_cli/cmd_leb.py",
+  "libephemeris/dev_cli/cmd_leb2.py",
+  "libephemeris/dev_cli/cmd_manual.py",
+  "libephemeris/dev_cli/cmd_release.py",
+  "libephemeris/dev_cli/cmd_status.py",
+  "libephemeris/dev_cli/cmd_test.py",
+]
+scientific_content = false
+origin = "Project-authored task-runner commands. They invoke registered generators and checks but do not define scientific models."
+sources = []
+documentation = ["CLI.md"]
+docstring = "detailed"
+
+[[component]]
+id = "public-identifiers"
+category = "public-api"
+paths = ["libephemeris/constants.py"]
+scientific_content = false
+origin = "Public body identifiers, flags, mode identifiers, NAIF mappings, and API constants. Values used as physical constants are re-sourced at the model call site."
+sources = ["NAIF_SPK"]
+documentation = ["docs/reference/flags.md", "docs/comparison/api-compatibility.md"]
+docstring = "detailed"
+
+[[component]]
+id = "coordinate-and-angle-utilities"
+category = "scientific-pipeline"
+paths = ["libephemeris/angles.py", "libephemeris/utils.py"]
+scientific_content = true
+origin = "Project-authored spherical/vector transformations composed from public coordinate definitions and the registered time, house, and refraction models."
+sources = ["IERS_2010", "MEEUS_1998", "HOUSE_DEFINITIONS", "REFRACTION"]
+documentation = ["docs/reference/house-systems.md", "docs/methodology/overview.md"]
+docstring = "detailed"
+
+[[component]]
+id = "historical-astrology-helpers"
+category = "scientific-model"
+paths = ["libephemeris/arabic_parts.py", "libephemeris/contrib/__init__.py"]
+scientific_content = true
+origin = "Elementary zodiacal arithmetic and historically published lot/dignity conventions. Modern naming, validation, and API presentation are project choices and are labelled as such."
+sources = ["HISTORICAL_LOTS", "BPHS"]
+documentation = ["docs/methodology/classical-astrology-helpers.md"]
+docstring = "detailed"
+
+[[component]]
+id = "astrometry-time-and-earth-orientation"
+category = "scientific-pipeline"
+paths = [
+  "libephemeris/astrometry.py",
+  "libephemeris/erfa_nutation.py",
+  "libephemeris/iers_data.py",
+  "libephemeris/precession_vondrak.py",
+  "libephemeris/sidereal_epoch.py",
+  "libephemeris/sidereal_longterm.py",
+  "libephemeris/time_utils.py",
+]
+scientific_content = true
+origin = "IAU/IERS/ERFA reductions, Vondrak long-term precession, Simon secular expressions, published calendar algorithms, and observed IERS data. Project blend boundaries and caches are explicit."
+sources = ["IERS_2010", "ERFA", "VONDRAK_2011", "SIMON_1994", "DELTA_T", "MEEUS_1998"]
+documentation = ["docs/methodology/pyerfa-integration.md", "docs/methodology/sidereal-time-longterm.md", "docs/methodology/delta-t.md"]
+docstring = "detailed"
+
+[[component]]
+id = "house-systems"
+category = "scientific-model"
+paths = ["libephemeris/house_constructions.py", "libephemeris/houses.py"]
+scientific_content = true
+origin = "Independent spherical/vector implementations of the per-code evidence matrix: published definitions where located, elementary identities where complete, and explicitly labelled project API realizations otherwise. Convergence limits, polar behavior, and fallbacks are project engineering."
+sources = ["HOUSE_DEFINITIONS", "IERS_2010", "VONDRAK_2011"]
+documentation = ["docs/reference/house-systems.md", "docs/methodology/sidereal-time-longterm.md"]
+docstring = "detailed"
+
+[[component]]
+id = "generated-sidereal-definitions"
+category = "generated-scientific-data"
+paths = ["libephemeris/ayanamsha_definitions.py"]
+scientific_content = true
+origin = "Deterministically generated from the per-mode source/status record: published definitions and public catalog geometry where available, with secondary attributions and project conventions explicitly labelled rather than promoted to primary evidence. No values are fitted to another implementation."
+sources = ["AYANAMSHA_DEFINITIONS", "VONDRAK_2011", "HIPPARCOS", "IAU_WGSN"]
+documentation = ["docs/reference/ayanamsha.md"]
+generator = ["scripts/generate_ayanamsha_definitions.py"]
+docstring = "detailed"
+
+[[component]]
+id = "planetary-reduction-pipelines"
+category = "scientific-pipeline"
+paths = ["libephemeris/fast_calc.py", "libephemeris/horizons_backend.py", "libephemeris/planets.py"]
+scientific_content = true
+origin = "JPL states reduced through documented light-time, deflection, aberration, frame, and time-scale operations using IAU/ERFA and Skyfield foundations. Backend dispatch and differentiation steps are project choices."
+sources = ["JPL_DE", "JPL_HORIZONS", "IERS_2010", "ERFA", "SKYFIELD", "PHOTOMETRY"]
+documentation = ["docs/methodology/overview.md", "docs/architecture/horizons-backend.md", "docs/reference/precision.md"]
+docstring = "detailed"
+
+[[component]]
+id = "crossing-events"
+category = "numerical-method"
+paths = ["libephemeris/crossing.py"]
+scientific_content = true
+origin = "Project event-search orchestration using Newton refinement and safeguarded Brent bracketing over registered body positions. Tolerances and scan windows are explicit project parameters."
+sources = ["BRENT_1973", "MEEUS_1998"]
+documentation = ["docs/reference/precision.md"]
+docstring = "detailed"
+
+[[component]]
+id = "eclipse-geometry"
+category = "scientific-model"
+paths = ["libephemeris/eclipse.py"]
+scientific_content = true
+origin = "Independent vector/cone eclipse geometry evaluated from JPL-backed Sun, Moon, and observer states; published eclipse definitions and root solvers provide the model, not another implementation."
+sources = ["ECLIPSE_GEOMETRY", "JPL_DE", "BRENT_1973"]
+documentation = ["docs/reference/precision.md", "docs/comparison/intentional-divergences.md"]
+docstring = "detailed"
+
+[[component]]
+id = "atmospheric-refraction"
+category = "scientific-model"
+paths = ["libephemeris/refraction.py"]
+scientific_content = true
+origin = "Published closed-form refraction formulas plus a project-authored numerical ray integral through the cited standard atmosphere. Quadrature and inversion tolerances are labelled project choices."
+sources = ["REFRACTION"]
+documentation = ["docs/methodology/algorithm-provenance.md", "docs/reference/precision.md"]
+docstring = "detailed"
+
+[[component]]
+id = "atmospheric-visibility"
+category = "scientific-model"
+paths = ["libephemeris/extinction.py", "libephemeris/heliacal.py", "libephemeris/schaefer.py"]
+scientific_content = true
+origin = "Cited observational atmosphere, extinction, twilight, and visibility models. Empirical source constants and project numerical guards are distinguished in comments."
+sources = ["SCHAEFER_VISIBILITY", "EXTINCTION", "REFRACTION"]
+documentation = ["docs/reference/precision.md"]
+docstring = "detailed"
+
+[[component]]
+id = "fixed-star-runtime"
+category = "scientific-data"
+paths = ["libephemeris/fixed_stars.py"]
+scientific_content = true
+origin = "Public catalog astrometry propagated with documented three-dimensional space-motion geometry and IAU/Vondrak frame reductions."
+sources = ["HIPPARCOS", "IAU_WGSN", "VONDRAK_2011", "ERFA"]
+documentation = ["NOTICE.md", "docs/reference/precision.md"]
+docstring = "detailed"
+
+[[component]]
+id = "generated-star-catalog"
+category = "generated-scientific-data"
+paths = ["libephemeris/star_catalog_gen.py"]
+scientific_content = true
+origin = "Generated catalog rows with per-field public catalog sources, units, epochs, and transformation recorded by the generator."
+sources = ["HIPPARCOS", "IAU_WGSN"]
+documentation = ["NOTICE.md", "docs/methodology/algorithm-provenance.md"]
+generator = ["scripts/build_star_catalog_v2.py"]
+docstring = "detailed"
+
+[[component]]
+id = "lunar-points"
+category = "scientific-model"
+paths = [
+  "libephemeris/interpolated_lunar_apsides.py",
+  "libephemeris/lunar.py",
+  "libephemeris/mean_lunar_apse.py",
+]
+scientific_content = true
+origin = "Mean points derive from IERS fundamental arguments; osculating geometry derives from JPL state vectors; interpolated points use the separately registered DE440-derived generated model."
+sources = ["JPL_DE", "IERS_2010", "ERFA", "SIMON_1994"]
+documentation = ["docs/methodology/lunar-apsides.md", "docs/methodology/interpolated-perigee.md", "docs/methodology/interpolated-apogee.md"]
+docstring = "detailed"
+
+[[component]]
+id = "generated-lunar-apse-model"
+category = "generated-scientific-data"
+paths = ["libephemeris/lunar_apse_model.py"]
+scientific_content = true
+origin = "Deterministic fit and residual grids from every reviewed DE440 apsis passage in the generator interval, using IERS Delaunay arguments and documented spline/grid choices."
+sources = ["JPL_DE", "IERS_2010", "ERFA", "SIMON_1994"]
+documentation = ["docs/methodology/interpolated-perigee.md", "docs/methodology/interpolated-apogee.md"]
+generator = ["scripts/generate_lunar_apse_model.py"]
+docstring = "detailed"
+
+[[component]]
+id = "historical-hypothetical-bodies"
+category = "scientific-model"
+paths = ["libephemeris/hypothetical.py"]
+scientific_content = true
+origin = "Field-level primary-source transcriptions and explicit project arithmetic. Source-incomplete IDs retain public names but have no numerical model and fail closed."
+sources = ["HYPOTHETICAL_PRIMARY", "IAU_B3"]
+documentation = ["docs/methodology/hypothetical-bodies.md", "docs/methodology/missing-hypothetical-models.md"]
+docstring = "detailed"
+
+[[component]]
+id = "minor-body-runtime"
+category = "scientific-model"
+paths = [
+  "libephemeris/exotic_bodies.py",
+  "libephemeris/minor_bodies.py",
+  "libephemeris/planetary_mean_elements.py",
+]
+scientific_content = true
+origin = "Public JPL elements/states propagated with published two-body and perturbation methods. Source constants, experimental approximations, precision limits, and SPK fallbacks are explicit."
+sources = ["JPL_SBDB", "JPL_HORIZONS", "SIMON_1994", "MINOR_BODY_DYNAMICS"]
+documentation = ["docs/development/keplerian-improvements.md", "docs/development/full-range-coverage.md"]
+docstring = "detailed"
+
+[[component]]
+id = "generated-multi-epoch-elements"
+category = "generated-scientific-data"
+paths = ["libephemeris/multi_epoch_data.py"]
+scientific_content = true
+origin = "Generated osculating elements from JPL SPK type-21 state vectors at declared ten-year epochs; runtime blending is documented in the consumer."
+sources = ["JPL_HORIZONS", "NAIF_SPK", "IAU_1976", "IAU_2012_B2"]
+documentation = ["docs/development/keplerian-improvements.md"]
+generator = ["scripts/generate_multi_epoch_elements.py"]
+docstring = "detailed"
+
+[[component]]
+id = "spk-access"
+category = "scientific-pipeline"
+paths = ["libephemeris/spk.py", "libephemeris/spk_auto.py"]
+scientific_content = true
+origin = "Official JPL Horizons generation and NAIF SPK semantics, with project-authored validation, registration, download, cache, and fallback policy."
+sources = ["JPL_HORIZONS", "NAIF_SPK", "SPKTYPE21"]
+documentation = ["docs/guides/optional-modules.md", "docs/development/full-range-coverage.md"]
+docstring = "detailed"
+
+[[component]]
+id = "optional-nbody"
+category = "scientific-pipeline"
+paths = ["libephemeris/rebound_integration.py"]
+scientific_content = true
+origin = "Optional adapter over documented REBOUND/ASSIST integrations and JPL ephemerides. The packages and large data files are not bundled."
+sources = ["REBOUND", "ASSIST", "JPL_DE"]
+documentation = ["docs/methodology/rebound-integration.md", "docs/guides/optional-modules.md"]
+docstring = "detailed"
+
+[[component]]
+id = "planetary-moon-spk-runtime"
+category = "scientific-pipeline"
+paths = ["libephemeris/planetary_moons.py"]
+scientific_content = true
+origin = "JPL satellite SPK vectors reduced through the same documented planetary frames and observer corrections. Public moon identifiers are interface metadata."
+sources = ["JPL_SATELLITES", "NAIF_SPK", "IERS_2010"]
+documentation = ["docs/methodology/planet-centers-spk.md"]
+docstring = "detailed"
+
+[[component]]
+id = "project-moon-theories"
+category = "scientific-model"
+paths = [
+  "libephemeris/moon_theories/__init__.py",
+  "libephemeris/moon_theories/charon.py",
+  "libephemeris/moon_theories/constants.py",
+  "libephemeris/moon_theories/galilean.py",
+  "libephemeris/moon_theories/triton.py",
+  "libephemeris/moon_theories/uranian.py",
+]
+scientific_content = true
+origin = "Independent implementations of the cited published theories and JPL system solutions, with frame adaptations and approximation limits stated in-file."
+sources = ["LIESKE_E5", "JPL_SATELLITES"]
+documentation = ["docs/methodology/galilean-e5-spec.md", "docs/methodology/planet-centers-spk.md"]
+docstring = "detailed"
+
+[[component]]
+id = "vendored-tass"
+category = "vendored"
+paths = ["libephemeris/moon_theories/tass17.py", "libephemeris/moon_theories/tass17_data.py"]
+scientific_content = true
+origin = "Identified MIT-licensed Stellarium implementation and periodic-term table of the published TASS theory; upstream copyright and licence retained."
+sources = ["TASS", "STELLARIUM_TASS"]
+documentation = ["THIRD_PARTY_NOTICES.md", "docs/methodology/planet-centers-spk.md"]
+docstring = "detailed"
+
+[[component]]
+id = "leb-representation"
+category = "numerical-method"
+paths = [
+  "libephemeris/leb2_reader.py",
+  "libephemeris/leb_composite.py",
+  "libephemeris/leb_compression.py",
+  "libephemeris/leb_format.py",
+  "libephemeris/leb_groups.py",
+  "libephemeris/leb_reader.py",
+]
+scientific_content = true
+origin = "Project-native Chebyshev ephemeris layouts, readers, chunking, and compression. Published Clenshaw, IEEE-754, and Zstandard foundations are separated from project interval/bit/error decisions."
+sources = ["CLENSHAW_1955", "IEEE_754", "ZSTANDARD", "JPL_DE"]
+documentation = ["docs/leb/algorithms.md", "docs/leb/guide.md", "docs/leb/base-core-provenance.md"]
+docstring = "detailed"
+
+[[component]]
+id = "astropy-evaluation"
+category = "verification-tool"
+paths = ["libephemeris/astropy_integration.py"]
+scientific_content = false
+origin = "Optional project-authored comparison bridge. Astropy outputs are diagnostics and never become runtime coefficients or tables."
+sources = ["ASTROPY"]
+documentation = ["docs/methodology/algorithm-provenance.md"]
+docstring = "detailed"
+
+[[component]]
+id = "vendored-spk-type21"
+category = "vendored"
+paths = ["libephemeris/vendor/__init__.py", "libephemeris/vendor/spktype21.py"]
+scientific_content = true
+origin = "Vendored spktype21 0.1.0 under MIT, with only the two documented NumPy 2 scalar-compatibility edits."
+sources = ["SPKTYPE21", "NAIF_SPK"]
+documentation = ["THIRD_PARTY_NOTICES.md"]
+docstring = "detailed"
+
+[[component]]
+id = "script-namespace"
+category = "development-tool"
+paths = ["scripts/__init__.py"]
+scientific_content = false
+origin = "Namespace marker only; no executable or scientific content."
+sources = []
+documentation = ["docs/methodology/algorithm-provenance.md"]
+docstring = "detailed"
+
+[[component]]
+id = "manual-builders"
+category = "development-tool"
+paths = ["scripts/build_manual.py", "scripts/generate_manual_epub.py"]
+scientific_content = false
+origin = "Project-authored document assembly and rendering; it does not calculate or generate scientific values."
+sources = []
+documentation = ["docs/README.md"]
+docstring = "detailed"
+
+[[component]]
+id = "star-catalog-generators"
+category = "development-tool"
+paths = ["scripts/build_star_catalog.py", "scripts/build_star_catalog_v2.py"]
+scientific_content = true
+origin = "Fetch, join, transform, and emit catalog fields from the public catalogs declared in each script; v2 generates the shipped table."
+sources = ["HIPPARCOS", "IAU_WGSN"]
+documentation = ["NOTICE.md", "docs/methodology/algorithm-provenance.md"]
+docstring = "detailed"
+
+[[component]]
+id = "provenance-and-packaging-gates"
+category = "verification-tool"
+paths = [
+  "scripts/check_algorithm_provenance.py",
+  "scripts/check_hypothetical_provenance.py",
+  "scripts/check_lunar_model_provenance.py",
+  "scripts/check_provenance.py",
+  "scripts/check_spdx_headers.py",
+  "scripts/check_wheel_contents.py",
+]
+scientific_content = false
+origin = "Project-authored inventory, integrity, licence, source-boundary, and packaging checks. They inspect evidence but define no astronomical model."
+sources = []
+documentation = ["docs/methodology/algorithm-provenance.md", "LICENSING.md"]
+docstring = "detailed"
+
+[[component]]
+id = "sidereal-generator"
+category = "development-tool"
+paths = ["scripts/generate_ayanamsha_definitions.py"]
+scientific_content = true
+origin = "Deterministically evaluates the per-mode source/status record: published definitions and public catalog geometry where available, plus explicitly labelled secondary attributions and project conventions, then emits source-labelled runtime data."
+sources = ["AYANAMSHA_DEFINITIONS", "VONDRAK_2011", "HIPPARCOS", "IAU_WGSN"]
+documentation = ["docs/reference/ayanamsha.md"]
+docstring = "detailed"
+
+[[component]]
+id = "lunar-apse-generator"
+category = "development-tool"
+paths = ["scripts/generate_lunar_apse_model.py"]
+scientific_content = true
+origin = "Deterministically extracts DE440 apsis passages and emits the documented IERS-basis series and residual grids with fit statistics."
+sources = ["JPL_DE", "IERS_2010", "ERFA", "SIMON_1994"]
+documentation = ["docs/methodology/interpolated-perigee.md", "docs/methodology/interpolated-apogee.md"]
+docstring = "detailed"
+
+[[component]]
+id = "jpl-minor-body-and-center-tools"
+category = "development-tool"
+paths = [
+  "scripts/download_max_range_spk.py",
+  "scripts/download_spk.py",
+  "scripts/generate_multi_epoch_elements.py",
+  "scripts/generate_planet_centers_spk.py",
+  "scripts/update_orbital_elements.py",
+]
+scientific_content = true
+origin = "Retrieve and transform official JPL Horizons/SBDB/NAIF products. Each output declares target/center, epoch, frame, units, and consumer."
+sources = ["JPL_HORIZONS", "JPL_SBDB", "NAIF_SPK", "JPL_SATELLITES"]
+documentation = ["docs/methodology/planet-centers-spk.md", "docs/development/keplerian-improvements.md"]
+docstring = "detailed"
+
+[[component]]
+id = "experimental-short-period-fit"
+category = "development-tool"
+paths = ["scripts/generate_short_period_corrections.py"]
+scientific_content = true
+origin = "Research-only Fourier-fit experiment over JPL SPK residuals. Its output is not imported, generated during packaging, or shipped as a runtime model."
+sources = ["JPL_HORIZONS", "SIMON_1994", "MINOR_BODY_DYNAMICS"]
+documentation = ["docs/development/roadmap.md", "docs/development/keplerian-improvements.md"]
+docstring = "detailed"
+
+[[component]]
+id = "leb-generators"
+category = "development-tool"
+paths = ["scripts/generate_leb.py", "scripts/generate_leb2.py"]
+scientific_content = true
+origin = "Sample the registered JPL/IAU pipeline and encode it in the project-native Chebyshev formats under measured per-body error budgets."
+sources = ["JPL_DE", "IERS_2010", "ERFA", "CLENSHAW_1955", "IEEE_754", "ZSTANDARD"]
+documentation = ["docs/leb/algorithms.md", "docs/leb/guide.md", "docs/leb/base-core-provenance.md"]
+docstring = "detailed"
+
+[[component]]
+id = "leb-diagnostics"
+category = "verification-tool"
+paths = [
+  "scripts/_tier_diagnostic.py",
+  "scripts/check_leb_params.py",
+  "scripts/diagnose_chebyshev.py",
+  "scripts/diagnose_errors.py",
+  "scripts/diagnose_leb_read.py",
+  "scripts/diagnose_pipeline.py",
+  "scripts/leb_accuracy_sweep.py",
+  "scripts/measure_medium_errors.py",
+  "scripts/measure_precision.py",
+  "scripts/prototype_cartesian_v3.py",
+  "scripts/prototype_v2_fix.py",
+  "scripts/sweep_leb_params.py",
+  "scripts/test_chebyshev_params.py",
+  "scripts/test_leb2_precision.py",
+  "scripts/tier_diagnostic_base.py",
+  "scripts/tier_diagnostic_extended.py",
+  "scripts/tier_diagnostic_medium.py",
+]
+scientific_content = true
+origin = "Project diagnostics that measure representation and pipeline error against the registered JPL/Skyfield path. Results are evidence, not runtime coefficients."
+sources = ["JPL_DE", "SKYFIELD", "CLENSHAW_1955"]
+documentation = ["docs/leb/testing.md", "docs/leb/algorithms.md"]
+docstring = "detailed"
+
+[[component]]
+id = "cross-backend-verification"
+category = "verification-tool"
+paths = [
+  "scripts/horizons_cross_validate.py",
+  "scripts/run_validation_suite.py",
+  "scripts/test_eclipse_leb_precision.py",
+  "scripts/test_horizons_precision.py",
+  "scripts/test_horizons_vs_leb.py",
+  "scripts/verify_fix_horizons.py",
+]
+scientific_content = true
+origin = "Ephemeral comparisons among project backends and public APIs. Outputs are reports only and are prohibited as model inputs."
+sources = ["JPL_HORIZONS", "JPL_DE", "SKYFIELD", "ECLIPSE_GEOMETRY"]
+documentation = ["docs/comparison/index.md", "docs/development/testing.md"]
+docstring = "detailed"
+
+[[component]]
+id = "focused-verification"
+category = "verification-tool"
+paths = ["scripts/verify_fix_close_state.py", "scripts/verify_fix_precession.py", "scripts/verify_galilean.py"]
+scientific_content = true
+origin = "Focused checks of project state invariants and cited precession/Galilean implementations; no runtime artifact is emitted."
+sources = ["VONDRAK_2011", "LIESKE_E5"]
+documentation = ["docs/methodology/galilean-e5-spec.md", "docs/methodology/sidereal-time-longterm.md"]
+docstring = "detailed"
+
+[[component]]
+id = "performance-tools"
+category = "development-tool"
+paths = ["scripts/bench_leb_chart.py", "scripts/profile_hot_paths.py"]
+scientific_content = false
+origin = "Project-authored timing/profiling tools. Measured performance never changes numerical models or coefficients."
+sources = []
+documentation = ["docs/analysis/test-performance-analysis.md"]
+docstring = "detailed"
+
+[[component]]
+id = "regression-fixture-helper"
+category = "development-tool"
+paths = ["scripts/generate_golden.py"]
+scientific_content = false
+origin = "Project regression-fixture helper. Generated fixtures preserve behavior but are never accepted as scientific provenance."
+sources = []
+documentation = ["docs/development/testing.md"]
+docstring = "detailed"
+
+[[component]]
+id = "retired-release-tool"
+category = "development-tool"
+paths = ["scripts/release_leb.py"]
+scientific_content = false
+origin = "Retired release entry point retained only for an explicit failure message; no upload or scientific generation path remains."
+sources = []
+documentation = ["CLI.md"]
+docstring = "detailed"
+
+[[asset]]
+path = "libephemeris/data/fictitious_orbits.csv"
+category = "scientific-data"
+origin = "Field-level historical orbital-element transcriptions with explicit conversions and fail-closed omissions."
+sources = ["HYPOTHETICAL_PRIMARY"]
+documentation = ["docs/methodology/hypothetical-bodies.md", "docs/methodology/missing-hypothetical-models.md"]
+
+[[asset]]
+path = "libephemeris/data/leb2/base_core.leb2"
+category = "generated-scientific-data"
+origin = "Reviewed LEB2 base-core generated from JPL DE440 and IAU/ERFA-derived channels."
+sources = ["JPL_DE", "IERS_2010", "ERFA", "CLENSHAW_1955"]
+documentation = ["docs/leb/base-core-provenance.md"]
+generator = ["scripts/generate_leb.py", "scripts/generate_leb2.py"]

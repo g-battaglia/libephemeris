@@ -7,20 +7,28 @@ Arabic Parts are classical astrological points calculated from combinations
 of planetary positions and angles. They represent specific life areas and
 are used in Hellenistic, Medieval, and modern astrology.
 
-Formulas follow traditional methods from:
-- Dorotheus of Sidon (1st century CE)
-- Vettius Valens (2nd century CE)
-- Al-Biruni "Book of Instruction" (11th century)
-- Robert Schmidt translations (Project Hindsight)
-
-Standard formula structure: ASC + [Point A] - [Point B]
-Many parts have day/night variations for sect consideration.
+The reversible Fortune/Spirit rules map directly to al-Biruni,
+*The Book of Instruction in the Elements of the Art of Astrology*, R. Ramsay
+Wright translation (1934), section 476. Every result evaluates the explicit
+modular arc ``ASC + A - B``. Fortune and Spirit reverse that arc by sect; Love
+and Faith retain documented project formulas and are not attributed to that
+section. The exact source/status matrix is
+``docs/methodology/classical-astrology-helpers.md``.
 
 Supported Parts:
 - Part of Fortune (Pars Fortunae): Body, health, material success
 - Part of Spirit (Pars Spiritus): Soul, intellect, spiritual matters
 - Part of Love (Pars Amoris/Eros): Romance, desire, relationships
 - Part of Faith (Pars Fidei): Belief, religion, trust
+
+Provenance:
+    Fortune/Spirit and their sect reversal map exactly to al-Biruni section 476;
+    the public facsimile, formula table, and field mapping are recorded in
+    ``docs/methodology/classical-astrology-helpers.md``. Love/Faith, the
+    60-degree high-latitude switch, boundary handling, validation, and API
+    shapes are labelled project conventions. Geometric sect delegates to the
+    registered unrefracted horizontal-coordinate pipeline. No compatibility
+    output supplies a formula or coefficient.
 """
 
 from __future__ import annotations
@@ -164,9 +172,10 @@ def calc_arabic_part_of_love(asc: float, venus: float, sun: float) -> float:
         float: Part of Love longitude in degrees (0-360)
 
     Note:
-        This formula is not sect-dependent. Venus naturally signifies
-        love and attraction in all charts. Some medieval sources use
-        alternate formulas with Moon or Mars for male/female charts.
+        This sect-independent expression is an explicitly documented project
+        convention retained by the API. It is not al-Biruni section 476's
+        "Friendship and love" lot, which uses Fortune and Spirit and reverses
+        them by sect.
     """
     return (asc + venus - sun) % 360.0
 
@@ -188,9 +197,10 @@ def calc_arabic_part_of_faith(asc: float, mercury: float, moon: float) -> float:
         float: Part of Faith longitude in degrees (0-360)
 
     Note:
-        Mercury represents rational thought and communication of beliefs.
-        The Moon represents unconscious reception and emotional faith.
-        This part shows how one's beliefs are communicated/manifested.
+        This expression is an explicitly documented project convention. No
+        page-level primary locator has been established for this exact
+        name/formula pairing, and it is not presented as al-Biruni's Spirit or
+        religion lot.
     """
     return (asc + mercury - moon) % 360.0
 

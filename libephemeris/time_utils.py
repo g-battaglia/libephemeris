@@ -10,6 +10,14 @@ Implements standard astronomical time functions for conversions between:
 
 Functions provide reference-API-compatible signatures.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
+
+Provenance:
+    Calendar/Julian-day transforms follow the cited published algorithms;
+    TT/UT1, UTC, leap-second, and fundamental-argument relations follow IERS
+    Conventions (2010) and observed IERS data. Historical Delta-T branches are
+    documented in ``docs/methodology/delta-t.md``. Blend dates, cache use,
+    compatibility signatures, and user-override precedence are project choices;
+    no coefficient is recovered from compatibility output.
 """
 
 from __future__ import annotations

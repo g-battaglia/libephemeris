@@ -14,6 +14,12 @@ consumer in sync: add a group in ONE place and it propagates.
 The body-to-group mapping itself lives with the generators
 (``scripts/generate_leb.py`` ``BODY_GROUPS``, ``scripts/generate_leb2.py``
 ``LEB2_GROUPS``); the keys of those dicts must match the tuples below.
+
+Provenance:
+    Project-authored build/distribution metadata with no astronomical model or
+    coefficient. Group names affect file partitioning only; a body's source,
+    coordinate channel, and approximation parameters remain in the registered
+    generator/format records.
 """
 
 from __future__ import annotations

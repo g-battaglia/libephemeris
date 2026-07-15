@@ -40,7 +40,7 @@ future development.
 
 ## Completed Fixes
 
-### Formula-anchor ayanamshas
+### Formula-anchor ayanamshas (retired)
 
 All predefined IDs 0–46 retain their rc7 calculations without a generic J2000
 fallback. Published anchors are cited in the current reference page; exact

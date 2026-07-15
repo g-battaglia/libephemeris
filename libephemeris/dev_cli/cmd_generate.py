@@ -3,6 +3,11 @@
 """Data generation commands for planet-center SPKs and Keplerian elements.
 
 Replaces the planet-center and multi-epoch Keplerian poe tasks.
+
+Provenance:
+    Project-authored command dispatch. The invoked generator scripts document
+    their JPL inputs, transformations, frames, and generated artifacts; this
+    wrapper contains no independent scientific algorithm.
 """
 
 from __future__ import annotations
@@ -110,9 +115,13 @@ def planet_centers_spk() -> None:
 def keplerian_elements() -> None:
     """Generate multi-epoch Keplerian orbital elements from SPK files.
 
-    Creates orbital elements at 20-year intervals for all 37 minor bodies.
-    These are used by the Keplerian fallback when SPK files are not available
-    for a given body/date, providing approximate positions (~1 degree accuracy).
+    Attempts every configured minor body on the reviewed 1650–2450 ten-year
+    grid and emits entries only where a local, heliocentric J2000 type-21 SPK
+    has coverage. The emitted map fragment is reviewed before incorporation in
+    ``multi_epoch_data.py``; the currently shipped table covers 36 of 37
+    bodies. These osculating nodes limit two-body propagation distance when an
+    SPK or optional numerical integrator is unavailable. Precision is
+    body/date dependent and is not represented by a universal degree bound.
     """
     _python(["scripts/generate_multi_epoch_elements.py"])
 

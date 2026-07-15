@@ -30,17 +30,30 @@ Coordinate Systems:
 
 Precision Notes:
 - Nutation: IAU 2006/2000A model via pyerfa (~0.01-0.05 mas precision)
-- Obliquity: IAU 2006 model via pyerfa (consistent across all code paths)
-- Precession: IAU 2006 (Capitaine et al. 2003) with terms up to T^5
+- Obliquity: Vondrak 2011 long-term mean ecliptic/equator geometry plus ERFA
+  nutation, shared by all code paths
+- Precession: Vondrak, Capitaine & Wallace (2011), with ERFA frame bias
 - Ayanamsa: Properly converts ET to UT using Delta T
-- Planet positions: JPL DE440 (accurate to ~0.001" for modern dates)
+- Planet positions: JPL DE440; uncertainty is body-, observable-, and
+  epoch-dependent as documented by Park et al. (2021), not one universal
+  angular bound
 - Planets use NAIF planet center IDs (599, 699, etc.) for accurate positions
-- Ecliptic frame uses true ecliptic of date (Skyfield ecliptic_frame with IAU 2006 precession + IAU 2000A nutation)
+- Ecliptic frame uses the registered true-ecliptic-of-date reduction
 
 References:
-- JPL DE440 ephemeris (accurate to ~0.001 arcsecond for modern dates)
-- IAU 2006/2000A nutation via pyerfa; Skyfield also uses IAU 2000A
-- Reference API compatibility layer
+- Park et al. (2021), JPL DE440/DE441, AJ 161:105
+- IERS Conventions (2010), IAU 2006/2000A through ERFA
+- Vondrak, Capitaine & Wallace (2011), A&A 534:A22
+
+Provenance:
+    Geometric states originate in public JPL DE kernels, JPL Horizons/SPK, or a
+    separately registered analytical/catalog model. The apparent-place chain
+    applies explicit light-time, gravitational deflection, aberration,
+    precession/nutation, observer, and output-frame operations from public
+    JPL/IAU/IERS conventions. Photometric and physical constants are attributed
+    beside their tables. Backend dispatch, finite-difference steps, caches, and
+    flag/error behavior are project choices. Public compatibility observations
+    constrain API semantics only and never supply an algorithm or coefficient.
 """
 
 from __future__ import annotations
@@ -5145,6 +5158,11 @@ def _star_position_ecliptic_cached(
     nonut: bool,
     geometric: bool,
 ) -> float:
+    """Cache the scalarized fixed-star longitude calculation by full input.
+
+    Scalar fields make the key immutable; the uncached routine retains the
+    catalogue-motion and frame provenance documented for fixed stars.
+    """
     star = StarData(
         ra_j2000=ra_j2000,
         dec_j2000=dec_j2000,
@@ -5357,9 +5375,11 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         )
         sid_mode = SIDM_LAHIRI
 
-    # Published defining pair: ayanamsha value at the defining epoch,
+    # Registered defining pair: ayanamsha value at the defining epoch,
     # propagated with Method-B on that epoch's mean ecliptic — the same
-    # contract as SIDM_USER. Sources: docs/reference/ayanamsha.md.
+    # numerical contract as SIDM_USER. Evidence is deliberately per-mode:
+    # docs/reference/ayanamsha.md distinguishes primary and geometric anchors
+    # from secondary attributions and explicit project conventions.
     defining_value, defining_epoch = AYANAMSHA_DEFINING[sid_mode]
     value = defining_value + method_b_accumulated_precession(tjd_tt, defining_epoch)
     return float(value % 360.0)

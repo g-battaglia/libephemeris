@@ -5,6 +5,12 @@ Reads the actual .leb Chebyshev data for Saturn at the worst-case JD
 and compares with calc.  This tells us whether the stored Chebyshev
 data matches what calc produces, or whether the error is introduced
 somewhere else.
+
+Provenance:
+    Project-authored reader-path diagnostic. It compares a registered LEB
+    artifact with the project's registered calculation pipeline at an explicit
+    probe epoch. It neither alters the file nor derives replacement parameters;
+    any measured difference remains transient verification output.
 """
 
 from __future__ import annotations
@@ -147,6 +153,13 @@ def check_leb_vs_swe_calc(leb_path: str, body_id: int, body_name: str, jd_ut: fl
 
 
 def main():
+    """Run fixed read-path diagnostics against the base-tier LEB artifact.
+
+    The selected Sun and outer-planet cases isolate time-scale, coefficient,
+    and evaluation differences by printing intermediate values. This is a
+    read-only debugging entry point; missing local data fails visibly and no
+    diagnostic output is persisted as model input.
+    """
     leb_path = "data/leb/ephemeris_base.leb"
 
     test_cases = [

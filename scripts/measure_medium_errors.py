@@ -1,6 +1,12 @@
 """Measure actual max errors for medium tier LEB V3 across all tolerance categories.
 
 Usage: python scripts/measure_medium_errors.py
+
+Provenance:
+    Project-authored measurement harness for the medium-tier LEB artifact versus
+    the registered Skyfield/JPL channel. It reports empirical error maxima for
+    review; it creates no coefficient, correction, or scientific source. A
+    threshold change requires independent error-budget justification.
 """
 
 from __future__ import annotations
@@ -82,6 +88,7 @@ BODY_NAMES = {
 
 
 def angular_diff(a: float, b: float) -> float:
+    """Return the smaller unsigned longitude separation in degrees."""
     d = abs(a - b)
     if d > 180.0:
         d = 360.0 - d
@@ -91,6 +98,12 @@ def angular_diff(a: float, b: float) -> float:
 def generate_dates(
     n: int, jd_start: float, jd_end: float, margin: float = 30.0
 ) -> list[float]:
+    """Return ``n`` evenly spaced JDs inside a guarded closed interval.
+
+    The margin avoids endpoint behavior that is measured separately.  This
+    deterministic grid is a project screening choice, not a stochastic sample
+    and not evidence of a continuous global maximum.
+    """
     s = jd_start + margin
     e = jd_end - margin
     step = (e - s) / (n - 1)
@@ -98,6 +111,12 @@ def generate_dates(
 
 
 def skyfield_calc(body: int, jd: float, flags: int = FLG_SPEED):
+    """Evaluate one body through the registered direct JPL/Skyfield channel.
+
+    Temporary global backend state is restored in ``finally``.  This function
+    supplies an independent computation for measurement only; its output is
+    never persisted as a generated coefficient or correction table.
+    """
     ephem.state._LEB_FILE = None
     ephem.state._LEB_READER = None
     ephem.set_precision_tier(TIER)
@@ -110,6 +129,11 @@ def skyfield_calc(body: int, jd: float, flags: int = FLG_SPEED):
 
 
 def leb_calc(body: int, jd: float, flags: int = FLG_SPEED):
+    """Evaluate one body through the selected local LEB artifact.
+
+    The helper installs the artifact only for this calculation and clears
+    backend state in ``finally`` so comparisons do not depend on call order.
+    """
     ephem.state._LEB_FILE = LEB_PATH
     ephem.state._LEB_READER = None
     ephem.set_calc_mode("auto")
@@ -298,6 +322,13 @@ def measure_sidereal(dates):
 
 
 def main():
+    """Measure category-wise errors for the selected precision-tier artifact.
+
+    The command reports maxima over declared finite date/body grids for
+    positions, velocities, flags, and sidereal output.  These measurements are
+    release evidence only: they neither fit data nor establish an unsampled
+    mathematical error bound.
+    """
     print(f"LEB file: {LEB_PATH}")
     print(f"Samples: {N_SAMPLES}")
 

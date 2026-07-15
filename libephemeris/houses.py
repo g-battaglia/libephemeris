@@ -56,17 +56,23 @@ Polar Latitudes:
 - Automatic fallback to Porphyry when iteration fails
 - Equal/Whole Sign work at all latitudes
 
-Algorithm Sources:
-- Placidus: Time divisions of diurnal/nocturnal arcs
-- Regiomontanus: Equator trisection projected to ecliptic
-- Campanus: Prime vertical trisection
-- Equal: Simple 30° additions
-- Algorithms from Meeus "Astronomical Algorithms"
+Source boundary:
+- Meeus, chapter 13, supplies general coordinate transformations, not the
+  definitions of the individual house systems.
+- Each system's defining construction and bibliographic status are recorded
+  separately in ``docs/reference/house-systems.md``.
+- IERS/ERFA and Vondrak supply Earth orientation and the equator/ecliptic of
+  date; they do not define astrological house divisions.
 
-References:
-- Meeus "Astronomical Algorithms" 2nd Ed., Ch. 13 (coordinate systems)
-- Hand "Astrological Houses" (comprehensive house treatise)
-- IERS Conventions 2003 (nutation models)
+Provenance:
+    Per-system definitions and source status are enumerated in
+    ``docs/reference/house-systems.md``. This module independently derives the
+    cusp geometry using spherical trigonometry or Cartesian great-circle
+    intersections; ARMC, obliquity, precession, and nutation come from the
+    registered Vondrak/IAU/IERS chain. Iteration tolerances, centered speed
+    differences, polar-domain checks, and fallback policy are project-authored
+    numerical/API choices and are documented beside their use. No cusp table or
+    fitted output from another implementation is an input.
 """
 
 from __future__ import annotations
@@ -496,7 +502,8 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
     if lat == 0.0:
         lat = 1e-12
 
-    # Standard formula: Vertex is where Prime Vertical intersects ecliptic in West
+    # Evaluate the prime-vertical/ecliptic intersection derived in the
+    # docstring, then choose its western antipode geometrically below.
     armc_rad = math.radians(armc_deg)
     lat_rad = math.radians(lat)
 
@@ -2139,26 +2146,21 @@ def _houses_placidus(
     Returns:
         List of 13 house cusp longitudes (index 0 is 0.0, indices 1-12 are cusps)
     """
-    # Actually, standard Placidus:
-    # 11, 12 are in SE quadrant (MC to Asc).
-    # 2, 3 are in NE quadrant (Asc to IC).
-
     cusps = _init_cardinal_cusps(asc, mc)
 
     rad_lat = math.radians(lat)
     rad_eps = math.radians(eps)
 
-    # Helper to find cusp
-    # factor: 1.0/3.0 for 11 and 3, 2.0/3.0 for 12 and 2
-    # quadrant: 1 for 11/12, 2 for 2/3?
-    # Actually, we solve for RA.
-
     def iterate_placidus(offset_deg, is_below_horizon):
-        # Initial guess: RAMC + offset
-        # For 11: offset = 30
-        # For 12: offset = 60
-        # For 2: offset = 120
-        # For 3: offset = 150
+        """Solve one non-cardinal Placidus cusp by fixed-point iteration.
+
+        ``offset_deg`` is only a stable internal selector and initial RA
+        displacement: 30, 60, 120, and 150 identify cusps 11, 12, 2, and 3.
+        ``is_below_horizon`` records whether the selected cusp belongs to the
+        nocturnal half; the explicit selector table below determines the exact
+        fraction and sign.  The defining equations are those in the parent
+        docstring, not empirical offsets inferred from compatibility output.
+        """
 
         ra = (armc + offset_deg) % 360.0
         new_ra = ra  # Initialize for type safety
@@ -2195,213 +2197,32 @@ def _houses_placidus(
             elif prod < -1.0:
                 prod = -1.0
 
-            # AD (Ascensional Difference) = asin(prod)
-            # SA (Semi-Arc) = 90 + AD (if decl north and lat north)
-            # H = RAMC - RA
-            # Placidus condition:
-            # H = f * SA?
-            # Or sin(H) = f * sin(SA)? No.
-            # Placidus: H is proportional to SA.
-            # H = (offset / 90) * SA?
-            # For 11 (30 deg from MC): H = SA/3.
-            # For 12 (60 deg from MC): H = 2*SA/3.
-
-            # Wait, offset 30 means 30 degrees of RA? No.
-            # It implies the trisection.
-            # Factor f.
-
-            if offset_deg == 30 or offset_deg == 210:
-                pass
-            if offset_deg == 60 or offset_deg == 240:
-                pass
-            if offset_deg == 120 or offset_deg == 300:
-                pass  # From IC?
-            if offset_deg == 150 or offset_deg == 330:
-                pass
-
-            # If below horizon (houses 2, 3), semi-arc is nocturnal.
-            # SA_noct = 180 - SA_diurnal = 90 - AD.
-            # H is measured from IC (RAMC + 180).
-
-            ad = math.asin(prod)
-
-            if is_below_horizon:
-                # Houses 2, 3
-                # Measured from IC (RAMC + 180)
-                # H = f * (90 - AD)
-                # RA = IC - H = RAMC + 180 - H?
-                # Or RA = IC + H?
-                # House 2 is East of IC. RA > IC.
-                # RA = RAMC + 180 + f * (90 - AD) ?
-                # No, House 2 is "following" IC.
-                # Let's stick to standard formula:
-                # R = RAMC + 180 + f * (90 + AD)?
-                # Note: AD has sign of dec.
-
-                # Let's use the formula:
-                # R = RAMC + 180 + f * (90 - AD) ?
-                # If lat > 0, dec > 0, AD > 0.
-                # Nocturnal arc = 180 - (90 + AD) = 90 - AD.
-                # House 2 is 2/3 of way from Asc to IC? No.
-                # House 2 is 1/3 of way from IC to Asc? No.
-                # House 2 start is 2/3 SA_noct from IC?
-                # House 3 start is 1/3 SA_noct from IC?
-
-                # Correct mapping:
-                # 11: RAMC + SA/3
-                # 12: RAMC + 2*SA/3
-                # 2: RAMC + 180 - 2*SA_noct/3 ? No.
-                # 2 is after Asc (House 1).
-                # Asc is at RAMC + 90 + AD? No.
-
-                # Let's use the standard iterative formula directly:
-                # RA_new = RAMC + const + AD? No.
-
-                pass
-
-            # Simplified Placidus Iteration:
-            # R(n+1) = RAMC + asin( tan(lat)*tan(dec(Rn)) * factor ) + base_offset
-            # Where factor depends on house.
-            # House 11: factor = 1/3? No.
-            # House 11 condition: sin(RA - RAMC) = tan(dec)*tan(lat)/3 ? No.
-            # The condition is on time.
-            # H = RA - RAMC.
-            # H = SA / 3.
-            # SA = 90 + AD.
-            # H = 30 + AD/3 ? No.
-
-            # Correct Placidus Formula (from Munkasey):
-            # House 11: tan(H) = f * tan(H_Asc)? No.
-
-            # Let's use the "Pole" method which is equivalent.
-            # tan(Pole) = sin(HouseAngle) * tan(Lat) ? No.
-
-            # Let's go back to basics:
-            # House 11: 1/3 of semi-arc from MC.
-            # H = (90 + AD) / 3.
-            # RA = RAMC - H (since 11 is East of MC).
-            # RA = RAMC - (90 + asin(tan(lat)tan(dec))) / 3.
-
-            # House 12: 2/3 of semi-arc.
-            # RA = RAMC - 2*(90 + asin(tan(lat)tan(dec))) / 3.
-
-            # House 2: 2/3 of nocturnal semi-arc from IC (West of IC? No, East).
-            # House 2 is below horizon, West of Asc? No, East.
-            # 1 -> 2 -> 3 -> 4(IC).
-            # House 2 is 1/3 of way from Asc to IC? No.
-            # House 2 cusp is 2/3 of semi-arc from IC?
-            # SA_noct = 90 - AD.
-            # H_from_IC = 2 * SA_noct / 3.
-            # RA = (RAMC + 180) - H_from_IC.
-            # RA = RAMC + 180 - 2*(90 - AD)/3.
-
-            # House 3: 1/3 of semi-arc from IC.
-            # RA = RAMC + 180 - 1*(90 - AD)/3.
-
-            # Let's verify signs.
-            # 11 is SE. MC is S. 11 is East of S. RA < RAMC?
-            # No, stars rise in East, RA increases Eastwards?
-            # RA increases Eastwards.
-            # MC is on Meridian.
-            # Point East of Meridian has RA > RAMC?
-            # H = LST - RA.
-            # East of Meridian -> H < 0.
-            # So RA > LST.
-            # So House 11 (SE) has RA > RAMC?
-            # No, House 11 is "before" MC in diurnal motion.
-            # Sun is in 11 before it culminates.
-            # So RA_Sun > RAMC? No.
-            # H = LST - RA.
-            # If Sun is East, H is negative (e.g. -2h).
-            # RA = LST - H = LST + 2h.
-            # So RA > RAMC.
-
-            # So for House 11:
-            # H_from_MC = SA / 3.
-            # RA = RAMC + H_from_MC = RAMC + (90 + AD)/3.
-
-            # House 12:
-            # RA = RAMC + 2*(90 + AD)/3.
-
-            # House 2:
-            # Below horizon.
-            # H_from_IC = 2 * SA_noct / 3.
-            # RA = (RAMC + 180) + H_from_IC.
-            # RA = RAMC + 180 + 2*(90 - AD)/3.
-
-            # House 3:
-            # RA = RAMC + 180 + 1*(90 - AD)/3.
-
-            # Let's implement this.
-
             ad = math.asin(prod)
             ad_deg = math.degrees(ad)
 
             if offset_deg == 30:  # House 11
+                # One third of the semi-diurnal arc, east of the upper
+                # meridian: alpha_11 = ARMC + (90 deg + AD) / 3.
                 h_deg = (90.0 + ad_deg) / 3.0
-                new_ra = (armc - h_deg) % 360.0  # Wait, 11 is East of MC.
-                # If RA > RAMC, H < 0.
-                # H = RAMC - RA.
-                # If H is "distance from MC", then RA = RAMC - H (if East).
-                # Wait.
-                # Sun rises. H = -SA. RA = RAMC + SA.
-                # Sun culminates. H = 0. RA = RAMC.
-                # House 11 is between Rise and Culminate.
-                # So RA should be between RAMC+SA and RAMC.
-                # So RA > RAMC.
-                # So RA = RAMC + part_of_SA.
-                new_ra = (
-                    armc + h_deg
-                ) % 360.0  # Wait, H is usually defined positive West.
-                # If H is positive West, then East is negative H.
-                # H = RAMC - RA.
-                # RA = RAMC - H.
-                # If we want East, H must be negative.
-                # H = - (SA/3).
-                # RA = RAMC - (-SA/3) = RAMC + SA/3.
-                # Correct.
-
-                # But wait, standard Placidus 11th cusp is usually *South-East*.
-                # It is 30 degrees "above" Ascendant? No.
-                # It is 30 degrees "before" MC?
-                # House 10 starts at MC. House 11 starts at Cusp 11.
-                # Order: 10, 11, 12, 1.
-                # 10 is MC. 1 is Asc.
-                # So 11 is between MC and Asc.
-                # So RA is between RAMC and RAMC+SA.
-                # So RA = RAMC + SA/3?
-                # No, 10 is MC. 11 is next.
-                # So 11 is "later" in RA?
-                # Houses increase in counter-clockwise direction on Ecliptic.
-                # 10 (MC) -> 11 -> 12 -> 1 (Asc).
-                # MC RA approx 270 (if Aries rising). Asc RA approx 0.
-                # So RA increases from 10 to 1.
-                # So RA_11 > RA_10.
-                # So RA_11 = RAMC + something.
-                # Correct.
-
                 new_ra = (armc + h_deg) % 360.0
 
             elif offset_deg == 60:  # House 12
+                # Two thirds of the same semi-diurnal arc.
                 h_deg = 2.0 * (90.0 + ad_deg) / 3.0
                 new_ra = (armc + h_deg) % 360.0
 
             elif offset_deg == 120:  # House 2
-                # House 2 is after Asc (1).
-                # 1 -> 2 -> 3 -> 4 (IC).
-                # Asc RA approx 0. IC RA approx 90.
-                # So RA increases.
-                # RA_2 = RAMC + 180 - something?
-                # IC is RAMC + 180.
-                # House 2 is "before" IC.
-                # So RA_2 < RA_IC.
-                # So RA_2 = RAMC + 180 - H_from_IC.
-                # H_from_IC = 2 * SA_noct / 3.
-                # SA_noct = 90 - AD_deg.
+                # Two thirds of the semi-nocturnal arc measured back from
+                # the lower meridian (IC).
                 h_deg = 2.0 * (90.0 - ad_deg) / 3.0
                 new_ra = (armc + 180.0 - h_deg) % 360.0
 
             elif offset_deg == 150:  # House 3
+                # One third of the same semi-nocturnal arc from the IC.
+                # Keep the historical operation order literally unchanged:
+                # multiplying by 1.0 is algebraically redundant, but retaining
+                # it makes this documentation-only edit byte-for-byte neutral
+                # at the floating-point expression level.
                 h_deg = 1.0 * (90.0 - ad_deg) / 3.0
                 new_ra = (armc + 180.0 - h_deg) % 360.0
 
@@ -3976,13 +3797,15 @@ def _houses_sunshine(
     armc: float, lat: float, eps: float, asc: float, mc: float, sun_dec: float
 ) -> List[float]:
     """
-    Sunshine (Makransky) house system (code 'I').
+    Sunshine/Treindl numerical solution (code ``I``) of Makransky's system.
 
-    Invented by Bob Makransky and published in 1988 in "Primary Directions".
-    The diurnal and nocturnal arcs of the Sun are divided into thirds, and
-    great circles through these trisection points and the horizon's north/south
-    points define the house boundaries.  Each great circle is projected onto
-    the ecliptic via spherical triangle arc-trisection geometry.
+    Bob Makransky's public Sunshine definition divides the diurnal and
+    nocturnal arcs of the Sun, then carries the division anchors to the
+    ecliptic through the horizon north/south house circles. Code ``I`` denotes
+    this project's documented Treindl-style numerical realization; code ``i``
+    is the separately implemented Makransky upper/lower-meridian construction
+    in ``house_constructions.py``. The exact source/status boundary is recorded
+    in ``docs/reference/house-systems.md``.
 
     Note: Cusps 11, 12, 2, 3 are NOT in exact opposition to cusps 5, 6, 8, 9.
 
@@ -4335,26 +4158,32 @@ CUSP_BOUNDARY_OFFSET = 0.0
 
 
 def _sin_deg(x: float) -> float:
+    """Return the sine of an angle supplied in degrees."""
     return math.sin(math.radians(x))
 
 
 def _cos_deg(x: float) -> float:
+    """Return the cosine of an angle supplied in degrees."""
     return math.cos(math.radians(x))
 
 
 def _tan_deg(x: float) -> float:
+    """Return the tangent of an angle supplied in degrees."""
     return math.tan(math.radians(x))
 
 
 def _atan_deg(x: float) -> float:
+    """Return the principal arctangent in degrees."""
     return math.degrees(math.atan(x))
 
 
 def _asin_deg(x: float) -> float:
+    """Return arcsine in degrees after a roundoff-only unit-domain clamp."""
     return math.degrees(math.asin(max(-1.0, min(1.0, x))))
 
 
 def _acos_deg(x: float) -> float:
+    """Return arccosine in degrees after a roundoff-only unit-domain clamp."""
     return math.degrees(math.acos(max(-1.0, min(1.0, x))))
 
 

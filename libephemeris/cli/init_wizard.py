@@ -10,6 +10,12 @@ Usage (from CLI):
     libephemeris init                    Interactive wizard
     libephemeris init --non-interactive  All defaults, no prompts
     libephemeris init -o config.toml     Custom output path
+
+Provenance:
+    Project-authored user-interface and configuration serialization. It does
+    not evaluate an ephemeris or define scientific constants. Date ranges and
+    asset sizes shown to users are release metadata maintained with the tier
+    manifests and do not enter calculations.
 """
 
 from __future__ import annotations

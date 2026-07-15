@@ -75,6 +75,15 @@ References
 ----------
 - Bennett, G.G. (1982), *Journal of Navigation*, 35, 255-259
 - Meeus, J. (1998), *Astronomical Algorithms*, 2nd ed., chapter 16
+
+Provenance:
+    Standard-atmosphere layers, gas laws, refractivity, and closed-form public
+    formulas come from the sources cited in their respective sections. The
+    spherical ray integral, Gauss-Legendre evaluation, inverse Newton solve,
+    quadrature order, coefficient rounding, and guard domains are independently
+    documented project engineering; convergence and horizon error are measured.
+    Source constants and project-selected numerical parameters are kept in
+    separate named tables and are never fitted to compatibility output.
 """
 
 from __future__ import annotations

@@ -57,6 +57,15 @@ REFERENCES:
     - Rein & Spiegel 2015, MNRAS 446, 1424 (IAS15)
     - Rein & Tamayo 2015, MNRAS 452, 376 (WHFast)
     - Holman et al. 2023 (ASSIST)
+
+Provenance:
+    Numerical integration is performed by the optional upstream REBOUND/ASSIST
+    packages under their own licences; ASSIST reads public JPL DE and massive-
+    asteroid data. This module is a project-authored adapter that converts the
+    registered osculating elements, selects an explicitly requested integrator,
+    validates data files, and converts units/frames. Default timestep, tolerance,
+    cache, and fallback behavior are project choices. No upstream code or state
+    vector table is vendored here.
 """
 
 from __future__ import annotations

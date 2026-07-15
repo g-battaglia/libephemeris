@@ -2,6 +2,14 @@
 """
 LEB file generator.
 
+Provenance:
+    Project generator sampling only the registered LibEphemeris channels:
+    NASA/JPL DE states, IAU/ERFA reductions, and independently sourced derived
+    bodies. NumPy's public Chebyshev routines produce each segment; degrees,
+    intervals, coordinate storage, sampling density, and verification
+    tolerances are explicit project parameters documented in
+    ``docs/leb/algorithms.md``. No compatibility output is sampled or fitted.
+
 Produces a .leb binary ephemeris file by sampling Skyfield/libephemeris
 analytical functions and fitting Chebyshev polynomials to the results.
 
@@ -3435,6 +3443,13 @@ def _group_output_path(base_output: str, group: str) -> str:
 
 
 def main():
+    """Generate, verify, merge, or inspect an LEB1 ephemeris artifact.
+
+    The CLI exposes the generation contract: public JPL kernel tier, date
+    interval, body group, Chebyshev configuration, and verification controls.
+    Its defaults are documented LibEphemeris engineering choices, not copied
+    parameters from a compatibility-target implementation.
+    """
     parser = argparse.ArgumentParser(
         description="Generate LEB binary ephemeris file",
         epilog=(

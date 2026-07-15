@@ -28,6 +28,14 @@ Fit quality (vs the DE440 passage track):
   perigee: trig RMS 402.6", table RMS 0.80",
            table max 6.35",
            latitude RMS 328.6", 14581 passages
+
+Provenance:
+    This generated module is the immutable output boundary, not an editable
+    source of theory. Regenerate only with
+    ``scripts/generate_lunar_apse_model.py`` from the reviewed DE440 kernel.
+    The generator records passage extraction, IERS basis construction,
+    least-squares design matrix, residual interpolation grid, units, coverage,
+    and fit statistics. No reference-product sample is an input.
 """
 
 from __future__ import annotations

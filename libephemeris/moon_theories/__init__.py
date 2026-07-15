@@ -23,6 +23,13 @@ License: AGPL-3.0-only, except the
          which is MIT. The Galilean theory is implemented from
          Lieske 1998 / Meeus ch. 44 (see
          docs/methodology/galilean-e5-spec.md).
+
+Provenance:
+    This package facade contains no additional theory. Project-owned modules
+    state their publication/JPL solution, elements, frame adaptation, units,
+    and approximation limits in their docstrings. The two TASS files preserve
+    their identified MIT upstream and are inventoried separately in
+    ``THIRD_PARTY_NOTICES.md``.
 """
 
 from .constants import (

@@ -23,6 +23,11 @@ Usage:
     >>> with ProfileContext() as p:
     ...     # your code here
     >>> p.print_stats(top_n=20)
+
+Provenance:
+    Project-authored performance tooling over Python's standard ``cProfile``
+    and ``pstats`` modules. Timings are diagnostic only and never feed model
+    selection, coefficients, tolerances, or generated scientific artifacts.
 """
 
 from __future__ import annotations

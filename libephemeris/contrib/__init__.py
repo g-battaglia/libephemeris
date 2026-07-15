@@ -2,11 +2,19 @@
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """libephemeris.contrib — extended astrology helpers.
 
-Zodiac and nakshatra constants, Vedic planet IDs, classical aspect
-angles, longitude conversions, dignity calculations, and a small set
-of time/coordinate utilities. Names and signatures follow established
-conventions in Python astrology tooling; implementations are derived
-from standard zodiacal arithmetic and classical/Vedic tradition.
+Provenance:
+    The exact source/status matrix is
+    ``docs/methodology/classical-astrology-helpers.md``. Published BPHS verses
+    support the rasi/nakshatra partitions, exaltation degrees, and friendship
+    rules; elementary coordinate/aspect helpers print their equations. Values
+    lacking a page-level locator—including residential strength and several API
+    groupings—are labelled project conventions. Compatibility influences names,
+    signatures, and shapes only; absent database models fail explicitly.
+
+Zodiac and nakshatra constants, Vedic planet IDs, named aspect angles,
+longitude conversions, dignity calculations, and a small set of
+time/coordinate utilities. Every historical rule, mathematical identity, and
+project convention is distinguished in the source/status matrix linked above.
 
 Contents
 --------
@@ -441,8 +449,11 @@ def house_system_name(code: str) -> str:
 # Vedic dignities / strengths
 # =============================================================================
 
-# Domicile lordship: which planet rules each sign (Vedic tradition)
-# Indices match RASI codes; values are Vedic planet ids.
+# Conventional seven-graha domicile table used by this API. Indices match RASI
+# codes and values are Vedic planet IDs. A page-level locator for the complete
+# tuple has not yet been established, so the provenance record deliberately
+# classifies it as a visible project convention rather than an unspecified
+# appeal to "Vedic tradition".
 _RASI_LORDS = (
     KUJA,  # Aries  - Mars
     SUKRA,  # Taurus - Venus
@@ -464,7 +475,9 @@ def lord(rasi: int) -> int:
     return _RASI_LORDS[rasinorm(rasi)]
 
 
-# Exaltation degree of each planet (Vedic): planet -> (sign, degree_within_sign)
+# Exaltation degree of each planet: BPHS chapter 3, verses 49-50 gives
+# Sun..Saturn signs in order and the degree sequence 10, 3, 28, 15, 5, 27, 20.
+# Representation is planet_id -> (zero-based sign_id, degree_within_sign).
 _EXALTATION = {
     SURYA: (ARIES, 10.0),
     CHANDRA: (TAURUS, 3.0),
@@ -482,8 +495,8 @@ _DEBILITATION = {p: ((sign + 6) % 12, deg) for p, (sign, deg) in _EXALTATION.ite
 def ochchabala(planet: int, longitude: float) -> float:
     """Return Ochchabala (exaltation strength) of a planet at a longitude.
 
-    Ranges from 0 (at debilitation) to 60 (at exaltation), linear with
-    180° between the two — the classical Vedic strength function.
+    Ranges from 0 (at debilitation) to 60 (at exaltation), using the explicit
+    project linearization over the 180° between the two published endpoints.
     Returns 0.0 for nodes (Rahu/Ketu) and for unknown planet ids.
     """
     if planet not in _EXALTATION:
@@ -501,14 +514,14 @@ def residential_strength(deg: float) -> float:
     """Return residential strength as a fraction (0..1) of the planet's
     progress through its current sign.
 
-    Classical interpretation: a planet is strongest at the start of its
-    sign and weakest at the end — this returns the inverse position
-    (1.0 at 0°, 0.0 at 30°)."""
+    This linear normalization is a LibEphemeris API convention, not a claim
+    about a classical strength doctrine: 1.0 at 0° and a limit of 0.0 as the
+    longitude approaches 30° within the sign."""
     within = _normalize_longitude(deg) % 30.0
     return 1.0 - within / 30.0
 
 
-# Vedic naisargika (natural) friendships:
+# BPHS chapter 3, verse 55 natural-friend rule expanded into a finite lookup:
 #   2 = friend, 1 = neutral, 0 = enemy
 # Order: from <- to for the table key.
 _NAISARGIKA = {
@@ -534,8 +547,9 @@ def naisargika_relation(p1: int, p2: int) -> int:
 def tatkalika_relation(p1_house: int, p2_house: int) -> int:
     """Return the temporal (tatkalika) friendship between two planets,
     given their relative house separation. Planets in houses 2, 3, 4,
-    10, 11, 12 from one another are temporal friends (2). Others are
-    temporal enemies (0). Same house is neutral (1)."""
+    10, 11, 12 from one another are temporal friends (2), following BPHS
+    chapter 3, verse 56. Others are temporal enemies (0). Same-house neutral
+    (1) is an explicit API convention because verse 56 does not specify it."""
     d = (p2_house - p1_house) % 12
     if d == 0:
         return 1
@@ -543,12 +557,12 @@ def tatkalika_relation(p1_house: int, p2_house: int) -> int:
 
 
 def raman_houses(jd: float, geolon: float, geolat: float) -> tuple[float, ...]:
-    """Return 12 house cusps using B.V. Raman's variant of the Sripati
-    house system.
+    """Return 12 house cusps through the API's Raman-named Sripati wrapper.
 
     This is a thin convenience wrapper around the canonical ``houses``
-    function with the Sripati system code 'S'. ``houses`` returns the
-    12 cusps as a 12-tuple (house 1 at index 0)."""
+    function with the Sripati system code 'S'. It defines no additional Raman
+    coefficient or geometry, and no primary-source claim is made for the alias
+    name. ``houses`` returns 12 cusps with house 1 at index 0."""
     from .. import houses as _houses
 
     cusps, _ascmc = _houses(jd, geolat, geolon, ord("S"))
@@ -556,9 +570,11 @@ def raman_houses(jd: float, geolon: float, geolat: float) -> tuple[float, ...]:
 
 
 def saturn_4_stars(jd: float) -> tuple[float, float, float, float]:
-    """Return the longitudes of the four mythological Saturn-related
-    fixed stars at a given JD: Aldebaran, Regulus, Antares, Fomalhaut.
-    These are the Vedic "Royal Stars" / Watchers of the Heavens.
+    """Return a compatibility grouping of four named fixed stars.
+
+    The tuple is Aldebaran, Regulus, Antares, and Fomalhaut. The function name
+    and grouping are API conventions; LibEphemeris does not claim that the set
+    is physically Saturn-related or Vedic in origin.
 
     Uses the canonical ``fixstar_ut`` to obtain ecliptic longitude
     of each star."""
@@ -918,6 +934,12 @@ def next_retro(
 
 
 def _not_implemented(name: str) -> _Any:
+    """Build a fail-closed stub for an unavailable database-backed helper.
+
+    The returned callable preserves the public name but never fabricates atlas,
+    timezone, or record data when the optional upstream databases are absent.
+    """
+
     def _stub(*args, **kwargs):  # noqa: ARG001
         raise NotImplementedError(
             f"libephemeris.contrib.{name}() is not implemented. "

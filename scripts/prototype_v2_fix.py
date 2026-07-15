@@ -10,6 +10,13 @@ against calc(). Tests with:
   D) B+C combined
 
 If D gives ~0" error, the solution is to upgrade _pipeline_icrs.
+
+Provenance:
+    Project-authored, non-production reduction experiment. Source states come
+    from the registered Skyfield/JPL path; deflection and aberration candidates
+    are public relativistic models documented in the production pipeline. The
+    experiment prints residuals only and cannot supply a hidden correction or
+    production coefficient.
 """
 
 from __future__ import annotations
@@ -243,6 +250,7 @@ def simulate_pipeline(body_id, jd_tt, *, deflection=False, sr_aberration=False):
 
 
 def ang_diff(a, b):
+    """Return the smaller unsigned longitude separation in degrees."""
     d = abs(a - b)
     if d > 180:
         d = 360 - d
@@ -250,6 +258,12 @@ def ang_diff(a, b):
 
 
 def main():
+    """Exercise the prototype apparent-position pipeline on fixed probes.
+
+    The date/body matrix contains reproducible regression stress cases only.
+    It neither supplies production coefficients nor treats compatibility
+    output as an astronomical source.
+    """
     # Bodies to test
     bodies = [
         (0, "Sun"),

@@ -11,6 +11,12 @@ Usage:
 
 Exit status: 0 if every file carries the expected identifier, 1 otherwise
 (--fix only fails on identifier mismatches it refuses to rewrite).
+
+Provenance:
+    Project-authored licensing-metadata gate. Expected identifiers come from the
+    repository licensing policy and explicit vendoring exceptions; the script
+    neither determines copyright ownership nor modifies scientific behavior.
+    ``--fix`` stamps headers only and deliberately refuses conflicting licenses.
 """
 
 from __future__ import annotations
@@ -52,11 +58,13 @@ HEAD_LINES = 6  # the identifier must appear within the first lines
 
 
 def expected_expression(path: Path) -> str:
+    """Return the project or preserved third-party SPDX expression for ``path``."""
     rel = path.relative_to(REPO_ROOT).as_posix()
     return EXCEPTIONS.get(rel, PROJECT_LICENSE)
 
 
 def find_spdx(lines: list[str]) -> str | None:
+    """Extract an SPDX expression from the permitted leading source lines."""
     for line in lines[:HEAD_LINES]:
         match = SPDX_RE.match(line.strip())
         if match:
@@ -65,6 +73,7 @@ def find_spdx(lines: list[str]) -> str | None:
 
 
 def header_lines(path: Path) -> list[str]:
+    """Build the exact project/vendor SPDX and copyright header for ``path``."""
     expr = expected_expression(path)
     lines = [f"# SPDX-License-Identifier: {expr}"]
     if expr == PROJECT_LICENSE:
@@ -92,6 +101,7 @@ def insertion_index(lines: list[str]) -> int:
 
 
 def stamp(path: Path) -> None:
+    """Insert a missing canonical header without displacing shebang/encoding."""
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines(keepends=True)
     idx = insertion_index([ln.rstrip("\n") for ln in lines])
@@ -101,6 +111,7 @@ def stamp(path: Path) -> None:
 
 
 def main() -> int:
+    """Check or add SPDX headers according to explicit vendor exceptions."""
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--check", action="store_true", help="report problems (default)")

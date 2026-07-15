@@ -34,6 +34,14 @@ each trigonometric call site, and never reduces an argument modulo 360;
 every output component is therefore a smooth, pure, deterministic function
 of the input epoch (the caller differentiates it numerically to obtain
 velocities).
+
+Provenance:
+    Periodic terms are independently transcribed from the cited Lieske E5/Meeus
+    publication path and are mapped term-by-term in
+    ``docs/methodology/galilean-e5-spec.md``. The fixed B1950-to-J2000 frame
+    adaptation, retained unwrapped arguments, degree-to-radian operation order,
+    and caller-side velocity differentiation are project choices documented
+    above. No third-party source code or compatibility-output fit is present.
 """
 
 from __future__ import annotations

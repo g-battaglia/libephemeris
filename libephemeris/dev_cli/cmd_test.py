@@ -13,6 +13,11 @@ Naming convention:
   - ``leb2-format``   = LEB2 compressed format
   - ``horizons``      = Horizons API precision tests
   - ``coverage``      = test coverage reports
+
+Provenance:
+    Project-authored test-command selection. Referenced tests and diagnostics
+    provide validation evidence only; this module contains no model, coefficient,
+    or persisted comparison output.
 """
 
 from __future__ import annotations

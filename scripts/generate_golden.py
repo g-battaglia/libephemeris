@@ -9,6 +9,13 @@ Usage:
 
 Output:
     tests/golden/golden_reference.json
+
+Provenance:
+    Project-authored regression-fixture generator. It snapshots LibEphemeris's
+    own reviewed, hash-pinned runtime behavior; it does not call, persist, or fit
+    output from another ephemeris. Golden values detect unintended changes but
+    are not scientific sources and cannot justify a production coefficient or
+    algorithm.
 """
 
 from __future__ import annotations

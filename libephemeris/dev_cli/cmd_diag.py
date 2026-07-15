@@ -3,6 +3,10 @@
 """Diagnostic commands: tier positions, data download verification.
 
 Replaces 4 poe tasks: diag:base, diag:medium, diag:extended, diag:download.
+
+Provenance:
+    Project-authored command orchestration. The invoked diagnostics own their
+    source and validation records; this module adds no scientific computation.
 """
 
 from __future__ import annotations

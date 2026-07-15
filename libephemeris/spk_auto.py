@@ -3,6 +3,12 @@
 """
 Automatic SPK download and caching for minor bodies.
 
+Provenance:
+    Project-authored cache, locking, coverage, and integrity orchestration over
+    the public NASA/JPL Horizons downloader in ``spk.py``. Body identifiers and
+    SPK bytes retain their JPL/NAIF provenance; cache policy cannot change a
+    state vector and produces no astronomical coefficient.
+
 This module provides automatic SPK file management for minor body calculations:
 - Automatic download of SPK kernels from JPL Horizons on demand
 - Local caching to avoid redundant downloads

@@ -7,6 +7,12 @@ introduce precision regressions.
 
 Usage:
     uv run python scripts/test_eclipse_leb_precision.py
+
+Provenance:
+    Project-authored backend-consistency test. Both paths use registered JPL
+    states and the same published eclipse geometry; the comparison isolates LEB
+    representation error. Event differences are transient test evidence and are
+    never converted into contact-time corrections or production coefficients.
 """
 
 from __future__ import annotations
@@ -208,6 +214,15 @@ def compare_rise_trans():
 
 
 def main():
+    """Compare eclipse and rise computations through LEB and Skyfield paths.
+
+    The command fails closed when no actual LEB reader is configured, avoiding
+    a meaningless same-backend comparison.  Event-time and Besselian-element
+    differences are transient regression evidence, not correction inputs.
+
+    Returns:
+        Zero when every declared comparison passes, otherwise one.
+    """
     from libephemeris.state import get_leb_reader
 
     print("Eclipse LEB vs Skyfield Precision Test")

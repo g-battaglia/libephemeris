@@ -11,6 +11,15 @@ Three pipelines:
     A: ICRS barycentric bodies (Sun-Pluto, Earth, Chiron, Ceres-Vesta)
     B: Ecliptic direct bodies (lunar nodes, Lilith variants)
     C: Independently sourced heliocentric fictitious bodies
+
+Provenance:
+    Stored coefficients are generated from the registered NASA JPL/IAU source
+    pipeline and evaluated with the documented LEB Chebyshev representation.
+    Light-time, deflection, aberration, precession/nutation, frame, center, and
+    flag ordering follow the public IAU/IERS and JPL conventions cited in
+    ``docs/leb/algorithms.md``. Dispatch order, cache boundaries, and finite-
+    difference steps are project engineering and are documented beside their
+    use. This module contains no independently fitted astronomical table.
 """
 
 from __future__ import annotations
@@ -937,6 +946,7 @@ def _set_active_reader(reader: "LEBReaderLike") -> None:
 
 
 def _active_has_nutation() -> bool:
+    """Return whether this thread's current LEB reader contains nutation data."""
     return getattr(_active_local, "gen", -1) == _active_generation and getattr(
         _active_local, "has_nutation", False
     )
@@ -1133,8 +1143,11 @@ def _calc_ayanamsa_from_leb(
         t0 = sid_t0 if sid_t0 is not None else J2000
         mean_aya = ayan_t0 + method_b_accumulated_precession(jd_tt, t0)
     elif mode in AYANAMSHA_DEFINING:
-        # Published defining pair propagated with Method-B on the defining
-        # epoch's mean ecliptic — mirrors planets._calc_ayanamsa exactly.
+        # Registered defining pair propagated with Method-B on the defining
+        # epoch's mean ecliptic. The per-mode evidence status (primary,
+        # geometric, secondary, or project convention) is intentionally kept
+        # in docs/reference/ayanamsha.md; a numeric pair alone is not asserted
+        # to be an author's published statement.
         defining_value, defining_epoch = AYANAMSHA_DEFINING[mode]
         mean_aya = defining_value + method_b_accumulated_precession(
             jd_tt, defining_epoch
@@ -1546,8 +1559,10 @@ def _pipeline_icrs(
                     retarded_vel[2] * (1.0 - _ltdot) - observer_vel[2],
                 )
 
-    # 5. Gravitational deflection by Sun, Jupiter, Saturn (PPN formula).
-    #    Dominant correction: up to ~4" for Saturn near the Sun's limb.
+    # 5. Gravitational deflection by Sun, Jupiter, Saturn (finite-source PPN
+    #    point-mass reduction documented in the IERS/Skyfield source chain).
+    #    The correction can be arcsecond-scale near solar conjunction; its
+    #    exact magnitude depends on finite observer/deflector/target geometry.
     #    Skipped for helio/bary/truepos/nogdefl and for the Moon (negligible at
     #    ~0.0026 AU, deflection < 0.000001"). NOABERR deliberately does NOT
     #    skip deflection: the public flag contract assigns that bit only to

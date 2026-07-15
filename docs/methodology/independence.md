@@ -82,6 +82,11 @@ Each currently registered model must have a model-specific derivation from
 published JPL/IAU standards, primary literature, public catalogues, or a
 permissively licensed source. The data-source inventory is stated in
 [NOTICE.md](https://github.com/g-battaglia/libephemeris/blob/main/NOTICE.md).
+The exhaustive source, derivation, project-choice, generator, and documentation
+coverage is maintained in the machine-checked
+[Algorithm and Data Provenance](algorithm-provenance.md) registry. A new Python
+module or shipped scientific asset cannot pass that gate until it is classified
+and its in-code provenance contract is present.
 
 ## What this means in practice
 

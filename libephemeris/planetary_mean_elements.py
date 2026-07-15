@@ -13,6 +13,13 @@ ecliptic and equinox **of date**.
 
 These published mean elements feed the NODBIT_MEAN branch of ``nod_aps`` /
 ``nod_aps_ut``.
+
+Provenance:
+    Coefficients are a direct, labelled transcription of Meeus Table 31.A and
+    its Simon et al. (1994) source, not a numerical fit. The polynomial form,
+    TT epoch, Julian-century unit, angle unit, and mean-ecliptic/equinox-of-date
+    frame are stated above. Runtime code only evaluates the printed polynomial
+    and derives node/apsis vectors; compatibility comparisons do not alter it.
 """
 
 from __future__ import annotations

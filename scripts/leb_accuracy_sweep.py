@@ -9,6 +9,12 @@ Validation Plan v2, Section 2.
 
 Usage:
     .venv/bin/python3 scripts/leb_accuracy_sweep.py [--tier medium] [--samples 1000]
+
+Provenance:
+    Project-authored end-to-end verification of project-generated LEB values
+    against the registered Skyfield/JPL pipeline. Sampling seeds, boundary cases,
+    and tolerances are test-policy choices documented by the LEB error budget.
+    Observed residuals are not model sources and are never fitted or packaged.
 """
 
 from __future__ import annotations
@@ -97,6 +103,12 @@ TOLERANCE_HELIO = 5.0
 
 
 def _get_tolerance(body_id: int) -> float:
+    """Return the project validation threshold for a body identifier.
+
+    Threshold categories are policy values declared immediately above; they
+    are not physical constants or estimates learned from measured residuals.
+    Unknown bodies conservatively use the heliocentric-category threshold.
+    """
     if body_id in PLANET_IDS:
         return TOLERANCE_PLANET
     elif body_id in ECLIPTIC_IDS:
@@ -124,6 +136,7 @@ def angular_sep_arcsec(lon1: float, lat1: float, lon2: float, lat2: float) -> fl
 
 
 def lon_diff_arcsec(lon1: float, lon2: float) -> float:
+    """Return signed shortest wrapped longitude difference in arcseconds."""
     d = lon2 - lon1
     if d > 180:
         d -= 360
@@ -577,6 +590,16 @@ def sweep_performance(reader) -> dict:
 
 
 def main() -> int:
+    """Run the configured LEB accuracy, behavior, and speed screening grid.
+
+    Sampling counts and tolerances are explicit project validation policy.
+    The finite sweep compares a local LEB artifact with the registered public
+    JPL/Skyfield computation channel; it is empirical evidence, not a proof of
+    a continuous error bound and not an input to coefficient generation.
+
+    Returns:
+        Zero when all declared checks pass, otherwise a nonzero status.
+    """
     import argparse
 
     parser = argparse.ArgumentParser(description="LEB Accuracy Sweep")

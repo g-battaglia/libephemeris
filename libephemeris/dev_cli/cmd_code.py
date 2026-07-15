@@ -3,6 +3,10 @@
 """Code quality commands: lint, format, typecheck.
 
 Replaces poe tasks: lint, format, format-black, typecheck.
+
+Provenance:
+    Project-authored wrappers around external code-quality commands. They do
+    not execute or define astronomical calculations.
 """
 
 from __future__ import annotations

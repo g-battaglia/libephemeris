@@ -6,6 +6,12 @@ Skyfield's observer.at(t).observe(target).apparent() step by step
 at specific TT Julian Days for Saturn, Neptune, and Pluto.
 
 This identifies which step introduces the ~1" discrepancy.
+
+Provenance:
+    Project-authored stage-by-stage diagnostic over NASA/JPL states and the
+    registered IAU/IERS reduction chain. The named bodies and TT epochs isolate
+    numerical stages; they are not calibration records. Results are printed for
+    review and never persisted or fitted into runtime code.
 """
 
 from __future__ import annotations
@@ -320,6 +326,13 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
 
 
 def main():
+    """Execute the frame/light-time pipeline diagnostic at known stress dates.
+
+    Each case compares alternative public JPL/Skyfield frame transformations
+    with the LibEphemeris calculation to identify the stage responsible for a
+    residual. Results are console evidence only and are never fitted or copied
+    into production coefficients.
+    """
     # Test JDs from where errors were observed
     # Saturn worst: JD 2501964.8 (~year 2138)
     # Also test a nearby year for comparison

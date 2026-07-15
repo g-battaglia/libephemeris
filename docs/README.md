@@ -1,5 +1,11 @@
 # LibEphemeris Documentation
 
+For the source of every algorithm, generated table, public dataset, and
+project-authored numerical choice, start with
+[Algorithm and Data Provenance](methodology/algorithm-provenance.md). It is the
+canonical, machine-checked map of the codebase; the pages below provide the
+topic-level derivations.
+
 ## Getting Started
 
 - **[Getting Started](guides/getting-started.md)** -- Installation, ephemeris tiers, first calculations, thread safety
@@ -28,6 +34,8 @@
 
 ## Methodology
 
+- **[Algorithm and Data Provenance](methodology/algorithm-provenance.md)** -- Complete source, derivation, generator, and project-choice map for the codebase
+- **[Classical Astrology Helpers](methodology/classical-astrology-helpers.md)** -- Per-function distinction between published definitions, mathematical identities, and project conventions
 - **[Overview](methodology/overview.md)** -- Principal computational approaches
 - **[Independence and Methodology](methodology/independence.md)** -- What differs from the reference stack: data sources, reduction chain, architecture, and how parity is measured
 - **[Delta T (ΔT)](methodology/delta-t.md)** -- The multi-era TT−UT1 model and selector

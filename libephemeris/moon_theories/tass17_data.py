@@ -4,6 +4,13 @@
 """
 TASS 1.7 Periodic Terms Data
 
+Provenance:
+    This is the generated coefficient table accompanying the identified
+    MIT-licensed Stellarium TASS implementation, not project-authored data. The
+    Vienne-Duriez publication is the scientific theory source; upstream code,
+    copyright, license, and table lineage are retained in this header and
+    ``THIRD_PARTY_NOTICES.md``.
+
 Auto-generated from Stellarium tass17.c by Johannes Gajdosik (MIT License).
 Original theory: Vienne & Duriez (1995), IMCCE.
 

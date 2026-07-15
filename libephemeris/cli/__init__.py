@@ -25,6 +25,12 @@ Shell completion (add to your shell profile):
 
     # bash
     eval "$(_LIBEPHEMERIS_COMPLETE=bash_source libephemeris)"
+
+Provenance:
+    Project-authored Click command orchestration. It contains no astronomical
+    model or coefficient and delegates downloads, status inspection, and
+    initialization to their registered modules. Tier labels and file identities
+    are distribution metadata, not scientific values.
 """
 
 from __future__ import annotations

@@ -4,6 +4,13 @@
 """
 TASS 1.7 - Theorie Analytique des Satellites de Saturne.
 
+Provenance:
+    This file is not project-owned code. It is the identified
+    Johannes-Gajdosik Stellarium implementation retained under MIT, evaluating
+    the Vienne-Duriez TASS theory. The upstream copyright and license remain at
+    the top of the file and in ``THIRD_PARTY_NOTICES.md``; LibEphemeris only
+    supplies the surrounding adapter boundary.
+
 This is a Python port of the TASS 1.7 theory by Alain Vienne and Luc Duriez,
 as implemented by Johannes Gajdosik for Stellarium (MIT license).
 

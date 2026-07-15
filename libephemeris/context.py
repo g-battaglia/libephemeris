@@ -19,6 +19,13 @@ Usage:
 Thread Safety:
     Multiple EphemerisContext instances can be used concurrently in different
     threads without interference. Each context has isolated state.
+
+Provenance:
+    Project-authored state isolation and dispatch. The class carries observer,
+    sidereal, and backend selections but delegates every scientific calculation
+    to the same registered implementations as the module-level API. It contains
+    no independent astronomical series or fitted data. Compatibility behavior
+    constrains state semantics only, never model coefficients.
 """
 
 from __future__ import annotations

@@ -10,6 +10,12 @@ It compares horizons_calc_ut directly against the default calc_ut backend
 (LEB/Skyfield, both DE440/DE441-based, expected agreement ~milliarcsec).
 
 Usage: .venv/bin/python scripts/verify_fix_horizons.py
+
+Provenance:
+    Project-authored live integration check against the public NASA/JPL Horizons
+    API and the registered local JPL pipeline. It verifies query and reduction
+    semantics at explicit dates; responses and differences are transient and
+    never persisted, fitted, or promoted to model constants.
 """
 
 from __future__ import annotations
@@ -41,6 +47,15 @@ CASES = [
 
 
 def main() -> int:
+    """Exercise reviewed Horizons query modes against the local JPL pipeline.
+
+    The fixed epoch, cases, and tolerances reproduce integration risks in query
+    frames and reductions.  Live responses remain transient verification data
+    and cannot be written into model constants or correction tables.
+
+    Returns:
+        Number-derived failure status: zero on success, one on any failed case.
+    """
     client = HorizonsClient()
     failures = 0
     for name, body, flags, tol_arcsec in CASES:

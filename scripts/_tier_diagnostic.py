@@ -10,6 +10,13 @@ It calculates positions for all supported celestial bodies and prints a
 detailed table showing ecliptic coordinates, equatorial coordinates,
 velocities, and whether each body uses DE4xx, SPK, Keplerian fallback,
 or analytical computation.
+
+Provenance:
+    Project-authored observability tool. All coordinates are requested from the
+    registered runtime backends and are printed, not transformed into tables or
+    coefficients. Tier labels and backend classifications are release/runtime
+    metadata. Diagnostic output must never become a scientific source or a
+    compatibility-fit input.
 """
 
 from __future__ import annotations
@@ -338,6 +345,7 @@ def _calc_body(jd: float, ipl: int) -> dict:
 
 
 def _print_separator(char: str = "\u2550", width: int = 160) -> None:
+    """Print a fixed-width visual separator for the human diagnostic report."""
     print(char * width)
 
 

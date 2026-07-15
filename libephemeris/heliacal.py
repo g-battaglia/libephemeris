@@ -21,9 +21,21 @@ Historical Note:
     positions without modern instruments.
 
 References:
-    - Schoch "Planets in Mesopotamian Astral Science"
-    - Ptolemy's criteria for heliacal visibility
-    - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+    - Schaefer, B.E. (1990), "Telescopic Limiting Magnitudes", PASP 102,
+      212-229, DOI 10.1086/132629; and Schaefer (1993), "Astronomy and the
+      Limits of Vision", Vistas in Astronomy 36, 311-361
+    - Yallop (1997), NAO Technical Note 69, lunar-crescent q criterion
+    - Kasten & Young (1989), "Revised optical air mass tables and
+      approximation formula", DOI 10.1364/AO.28.004735
+
+Provenance:
+    Body positions and photometry come from the registered ephemeris pipeline;
+    atmospheric extinction, sky brightness, contrast, observer optics, and the
+    lunar-crescent classes come from the cited public models. This module labels
+    all project decisions separately: event scan cadence, root tolerance,
+    neutral visibility margin, boundary clamps, fallback order, and fixed result
+    slots. No prose, constant table, or hidden visibility curve is imported from
+    another ephemeris implementation.
 """
 
 from __future__ import annotations
@@ -103,14 +115,15 @@ _HELIACAL_VIS_MARGIN = 0.0
 # SCHAEFER (1990) ATMOSPHERIC MODEL
 # =============================================================================
 #
-# Complete implementation of Schaefer's visibility model. Based on:
+# Project implementation of the cited Schaefer visibility-model family:
 #   - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
 #   - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
 #
 # The model calculates:
 #   1. Atmospheric extinction (Rayleigh + Aerosol + Ozone)
 #   2. Sky brightness (twilight + moonlight + airglow)
-#   3. Ptolemaic visibility thresholds (arcus visionis)
+#   3. Numerically solved arcus-visionis threshold over the limiting-magnitude
+#      model (historical terminology does not supply a coefficient table)
 #   4. Limiting visual magnitude for naked-eye observation
 # =============================================================================
 
@@ -155,8 +168,10 @@ class SchaeferConstants:
     # Visual limiting magnitude for perfect dark sky conditions
     PERFECT_SKY_LIM_MAG = 6.5
 
-    # Ptolemaic arcus visionis thresholds (degrees)
-    # Based on ancient observations and Schaefer (1990) visibility model
+    # Legacy descriptive defaults retained for callers inspecting this class.
+    # The active arcus-visionis calculation below root-solves the Schaefer
+    # limiting-magnitude model and does not read this mapping. These exact
+    # object values are project defaults, not a transcription from Ptolemy.
     ARCUS_VISIONIS = {
         "venus": 5.0,
         "mercury": 10.0,
@@ -298,16 +313,19 @@ def _vl_airmass(alt_deg: float) -> float:
 
 
 def _vl_airmass_gas(alt_deg: float) -> float:
+    """Return Schaefer VISLIMIT's gas/Rayleigh relative airmass."""
     c = math.cos((90.0 - alt_deg) * _RD)
     return 1.0 / (c + 0.0286 * math.exp(-10.5 * c))
 
 
 def _vl_airmass_aer(alt_deg: float) -> float:
+    """Return Schaefer VISLIMIT's aerosol relative airmass."""
     c = math.cos((90.0 - alt_deg) * _RD)
     return 1.0 / (c + 0.0123 * math.exp(-24.5 * c))
 
 
 def _vl_airmass_ozone(alt_deg: float) -> float:
+    """Return the spherical-shell ozone airmass used by VISLIMIT."""
     s = math.sin((90.0 - alt_deg) * _RD)
     val = 1.0 - (s / (1.0 + 20.0 / 6378.0)) ** 2
     return 1.0 / math.sqrt(val) if val > 0 else 40.0
@@ -717,7 +735,10 @@ class SchaeferModel:
         The arcus visionis is the minimum altitude difference between
         a celestial body and the Sun for the body to be visible.
 
-        Based on Ptolemaic criteria and Schaefer's analysis.
+        The historical term *arcus visionis* describes the requested angular
+        quantity. The numeric result is independently root-solved over the
+        cited Schaefer limiting-magnitude model; no Ptolemaic coefficient
+        table is used.
 
         Args:
             body_mag: Visual magnitude of the body
@@ -2352,8 +2373,14 @@ def _heliacal_ut_pythonic(
         >>> print(f"Heliacal rising at JD {jd_event:.5f}")
 
     References:
-        - Schoch "Planets in Mesopotamian Astral Science"
-        - Ptolemy's criteria for heliacal visibility
+        - Schaefer (1990), PASP 102, 212-229, DOI 10.1086/132629,
+          limiting-magnitude/observer model.
+        - Schaefer (1993), Vistas in Astronomy 36, 311-361, visibility
+          context and observer effects.
+        - Kasten & Young (1989), DOI 10.1364/AO.28.004735, optical airmass.
+
+        The historical note above is context only; it does not provide the
+        numerical event algorithm or its thresholds.
     """
     # --- LEB fast path ---
     from .state import get_leb_reader as _get_leb_reader
@@ -3810,7 +3837,11 @@ def _heliacal_pheno_ut_pythonic(
         >>> print(f"Object altitude: {dret[0]:.2f}, Sun altitude: {dret[4]:.2f}")
 
     References:
-        - Schoch "Planets in Mesopotamian Astral Science"
+        - Schaefer (1990), PASP 102, 212-229, DOI 10.1086/132629,
+          limiting-magnitude/observer model.
+        - Yallop (1997), NAO Technical Note 69, only for the lunar-crescent
+          q statistic and class boundaries placed in result slots 17-18.
+        - Kasten & Young (1989), DOI 10.1364/AO.28.004735, optical airmass.
     """
     # --- LEB fast path ---
     from .state import get_leb_reader as _get_leb_reader

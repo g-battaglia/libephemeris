@@ -12,6 +12,15 @@ This module defines all constants used for planetary calculations, including:
 
 Constants are organized into logical groups for easy navigation.
 Values match reference API v2.x for API compatibility.
+
+Provenance:
+    Numeric body IDs, flag bits, house/sidereal identifiers, and return-slot
+    indices are public interface tokens, not astronomical observations or
+    physical-model coefficients. NAIF target codes follow the public NAIF/SPK
+    conventions. Any physical constant used by a calculation is cited again at
+    its point of use so this compatibility namespace cannot become an implicit
+    scientific source. See ``docs/reference/flags.md`` and the canonical
+    provenance registry.
 """
 
 from __future__ import annotations

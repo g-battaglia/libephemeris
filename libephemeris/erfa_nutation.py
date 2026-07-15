@@ -21,6 +21,13 @@ References:
     - IERS Conventions 2010, Chapter 5
     - Capitaine, N. & Wallace, P.T., 2006, Astron.Astrophys. 450, 855
     - Mathews, P.M., Herring, T.A., Buffet, B.A. 2002, J.Geophys.Res.
+
+Provenance:
+    The numerical series are not copied into this project. Calls delegate to
+    pyerfa/ERFA, the permissively licensed SOFA-derived implementation of the
+    cited IAU standards. This wrapper contributes two-part-Julian-date handling,
+    native-float conversion, availability reporting, and caching only. Inputs
+    are TT and returned angles are radians as ERFA defines them.
 """
 
 from __future__ import annotations

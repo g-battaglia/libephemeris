@@ -8,9 +8,10 @@ are ephemeral: no returned value is stored in this page, a fixture, a
 coefficient, a table, or a generated artifact.
 
 This page therefore reports model classes and non-reconstructive aggregate
-behavior rather than per-date reference output. Exact tolerances for regression
-tests are derived from the relevant independent source and are documented next
-to those tests.
+behavior rather than per-date reference output. Exact regression tolerances
+are documented next to their tests and justified from the relevant source's
+accuracy, a propagated numerical error budget, or a declared project acceptance
+policy. A finite sampled test is not presented as proof of a continuous maximum.
 
 ## Precision summary
 

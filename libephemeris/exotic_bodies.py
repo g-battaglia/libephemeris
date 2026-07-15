@@ -20,6 +20,14 @@ extended tier; ``tno``/``centaur``/``mainbelt`` are integrable over millennia.
 
 Bennu is intentionally absent: JPL Horizons blocks SPK generation for it
 (see ``constants.SPK_AUTO_DOWNLOAD_BLOCKED``).
+
+Provenance:
+    Body and NAIF identifiers are public JPL metadata. Interval, polynomial
+    degree, and target error are project-authored LEB approximation parameters,
+    selected by the registered accuracy sweeps and interpreted only by the LEB
+    generator/compressor. They are not orbital elements and are never fitted to
+    another implementation's output. The canonical error derivation is in
+    ``docs/leb/algorithms.md``.
 """
 
 from __future__ import annotations

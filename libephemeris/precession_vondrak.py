@@ -9,18 +9,19 @@ It replaces the IAU 2006 precession polynomials previously used in
 
 Why Vondrák 2011
 ----------------
-The IAU 2006 precession (Capitaine et al. 2003) is a polynomial only valid for
-a few centuries around J2000.0; it diverges rapidly at remote epochs (e.g. ~36"
-for the Sun's longitude at year -3000). Long-term ephemeris work instead uses
-the model of
+The IAU 2006 precession polynomial is designed for the modern interval around
+J2000 and is not a long-term extrapolation model. Project regression probes
+showed material remote-epoch drift when it was extended across the full kernel.
+Long-term ephemeris work here instead uses the model of
 
     Vondrák, J., Capitaine, N. & Wallace, P. (2011),
     "New precession expressions, valid for long time intervals",
     Astronomy & Astrophysics 534, A22.  DOI: 10.1051/0004-6361/201117274
 
-which is fitted to a numerical integration and stays accurate over ±200,000
-years while agreeing with IAU 2006 to sub-milliarcsecond precision near J2000.
-Adopting it makes ancient/future positions scientifically correct.
+which is fitted to a numerical integration and is published for ±200,000 years
+while agreeing closely with the modern IAU model near J2000. Adopting it gives
+remote-epoch reductions a model whose stated validity covers LibEphemeris's
+kernel range; it is not a claim of exact celestial orientation at every epoch.
 
 How it is implemented
 ---------------------
@@ -33,21 +34,32 @@ transcribed by hand and not derived from any third-party application source:
     * ``erfa.numat``  -> the standard nutation rotation matrix.
 
 ERFA is the IAU SOFA-derived library distributed under a permissive BSD-3-Clause
-licence (pyerfa); it is already a hard dependency of libephemeris (we use
-``erfa.pmat06``/``nut06a``/``obl06`` elsewhere). Using ERFA's reference Vondrák
-routines gives bit-for-bit agreement with the published model.
+licence (pyerfa) and is a hard LibEphemeris dependency. Delegating the matrix
+evaluation to `ltp`/`ltpb` avoids a second local transcription of the published
+series. Numerical identity with ERFA follows from calling ERFA directly;
+fidelity to the paper remains the documented responsibility of that identified
+standards implementation, not an unsupported bit-for-bit claim about prose.
 
 The nutation angles (``dpsi``, ``deps``) are NOT computed here: callers pass in
 their own (LEB Chebyshev nutation on the fast path, IAU 2006/2000A on the
-reference path) so that the well-tuned modern nutation is preserved unchanged.
+direct JPL/Skyfield path) so that the same named modern nutation is retained.
 Only the precession and the of-date *mean* obliquity become Vondrák-based.
 
 The of-date mean obliquity is delegated to
 :mod:`libephemeris.sidereal_longterm`, which evaluates the Vondrák 2011 obliquity
 series directly. This is a single shared realization used by both the position
 pipeline and the house cusps, and it replaces the IAU 2006 obliquity polynomial
-(which diverges at remote epochs) — the term that closes the Sun's ~36"
-longitude gap at year -3000.
+(whose remote extrapolation is outside its intended role). The former ~36"
+Sun-longitude difference at year -3000 is a recorded project regression probe,
+not a universal accuracy certificate.
+
+Provenance:
+    The precession matrices are delegated to ERFA's permissively licensed
+    implementation of Vondrak, Capitaine & Wallace (2011), including the
+    documented ICRS frame-bias option. The of-date mean obliquity comes from the
+    same published pole geometry in ``sidereal_longterm.py``. This wrapper adds
+    TT-to-Julian-epoch conversion, tuple conversion, caching, and assembly with
+    caller-supplied nutation; it contains no recovered or fitted coefficients.
 """
 
 from __future__ import annotations

@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Parseable retirement stubs for legacy LEB1 release commands."""
+"""Parseable retirement stubs for legacy LEB1 release commands.
+
+Provenance:
+    Project-authored failure-only compatibility stubs. They perform no upload,
+    scientific generation, or numerical calculation.
+"""
 
 from __future__ import annotations
 

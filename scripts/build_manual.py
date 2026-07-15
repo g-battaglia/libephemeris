@@ -13,6 +13,13 @@ Usage:
     python scripts/build_manual.py --lang it --format epub  # Italian EPUB only
 
 Output goes to docs/build/.
+
+Provenance:
+    Project-authored documentation build orchestration over the repository's
+    reviewed Markdown sources. Pandoc/Tectonic perform presentation conversion;
+    this script defines no scientific content, numerical model, or data source.
+    Generated manuals inherit the citations and licensing boundaries of their
+    source documents.
 """
 
 from __future__ import annotations
@@ -199,6 +206,13 @@ def build_pdf(lang: str) -> bool:
 
 
 def main() -> None:
+    """Build selected language/format variants of the project manual.
+
+    The CLI validates external document-tool dependencies, creates the build
+    directory, and dispatches the deterministic EPUB/PDF assembly pipeline for
+    Italian, English, or both. A failed requested artifact causes a non-zero
+    process exit; source Markdown files are never modified.
+    """
     parser = argparse.ArgumentParser(
         description="Build LibEphemeris manuals (EPUB and PDF)"
     )

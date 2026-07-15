@@ -42,6 +42,14 @@ detector, not an external-output bound.
 
 This script is standalone (project convention: verification via standalone
 scripts, not the pytest suite).
+
+Provenance:
+    Project-authored verification of the independently implemented, published
+    Lieske E5 theory. ``compare`` uses a public NASA/JPL satellite SPK as
+    physical evidence. ``--dump`` records only this project's reviewed behavior
+    to prove a refactor is output-preserving; such snapshots are regression
+    evidence, not scientific sources or fitted coefficients, and contain no
+    output from a compatibility implementation.
 """
 
 from __future__ import annotations
@@ -89,6 +97,12 @@ VELOCITY_PAIR_JDS = [
 
 
 def iter_jds() -> list[float]:
+    """Return the ordered wide-range and velocity-sensitive regression epochs.
+
+    The 16-day grid, named golden epochs, and one-second pairs are project test
+    design.  They exercise published E5 series behavior but are not inputs to
+    its coefficients or a claim of continuous coverage.
+    """
     jds = [GRID_START_JD + GRID_STEP_DAYS * k for k in range(GRID_COUNT)]
     jds.extend(GOLDEN_JDS)
     jds.extend(VELOCITY_PAIR_JDS)
@@ -114,12 +128,14 @@ def evaluate(jd: float, ts) -> list[float]:
 
 
 def _timescale():
+    """Load Skyfield's public time-scale support for the verification process."""
     from skyfield.api import load
 
     return load.timescale()
 
 
 def _git_head() -> str:
+    """Return the current commit identifier for snapshot audit metadata."""
     try:
         out = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -134,6 +150,12 @@ def _git_head() -> str:
 
 
 def do_dump(path: str) -> int:
+    """Write a self-project behavior snapshot for refactor regression checks.
+
+    The payload contains only output of the reviewed local E5 implementation,
+    plus commit and module-hash metadata.  It is not an astronomical authority,
+    compatibility-target capture, or permissible source for new coefficients.
+    """
     ts = _timescale()
     data: dict[str, list[float]] = {}
     for jd in iter_jds():
@@ -155,6 +177,15 @@ def do_dump(path: str) -> int:
 
 
 def do_check(path: str, tol_km: float, tol_cob_au: float) -> int:
+    """Compare current local E5 behavior with a prior self-project snapshot.
+
+    Moon and center-of-body components use their separately declared units and
+    tolerances.  This detects accidental refactor drift; agreement says nothing
+    by itself about physical accuracy, which is handled by ``do_compare``.
+
+    Returns:
+        One if any epoch exceeds its threshold, otherwise zero.
+    """
     with open(path, encoding="utf-8") as fh:
         payload = json.load(fh)
     baseline = payload["cases"]
@@ -198,6 +229,11 @@ def do_check(path: str, tol_km: float, tol_cob_au: float) -> int:
 
 
 def _find_spk(explicit: str | None) -> Path | None:
+    """Find an optional public JPL Galilean-satellite SPK without downloading.
+
+    Search order is explicit argument, configured SPK directory, repository
+    root, then the user's LibEphemeris cache.  Discovery changes no files.
+    """
     candidates = []
     if explicit:
         candidates.append(Path(explicit))
@@ -257,6 +293,12 @@ def do_compare(spk_arg: str | None) -> int:
 
 
 def main() -> int:
+    """Dispatch local snapshot or public-SPK Galilean verification modes.
+
+    The command requires exactly one explicit mode and returns its status.  It
+    never treats regression snapshots as scientific data, and comparison mode
+    remains informational because E5 has its own published accuracy envelope.
+    """
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("mode", nargs="?", default=None, choices=["compare"])
     ap.add_argument("--dump", metavar="FILE")

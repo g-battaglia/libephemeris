@@ -13,6 +13,14 @@ Reference:
 - Orbital elements from NEP097 ephemeris
 
 Precision: ~20-50 km (sufficient for ~0.003 arcsec at Neptune's distance)
+
+Provenance:
+    Elements, physical scale, and system orientation are attributed to
+    Jacobson's published Neptune-system solution and the public NEP097 record.
+    Kepler propagation and J2-motivated nodal rate are independently expressed
+    in this module with units and epoch beside each constant. The mean-element
+    approximation and accuracy statement are explicit limits, not fitted
+    compatibility corrections.
 """
 
 from __future__ import annotations

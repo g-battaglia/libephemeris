@@ -2,6 +2,13 @@
 """
 Update orbital elements from JPL Small-Body Database (SBDB).
 
+Provenance:
+    Candidate elements and epochs come directly from NASA/JPL's public SBDB API.
+    Project code maps documented fields and reports or applies a textual update;
+    every applied change requires review of units, frame, epoch, uncertainty,
+    and targeted tests. Compatibility output and residual fitting are not
+    inputs to this maintenance path.
+
 This maintenance script fetches current orbital elements from the JPL SBDB API
 for all bodies in MINOR_BODY_ELEMENTS, compares with current values, and either
 updates minor_bodies.py directly or generates a report of needed changes.

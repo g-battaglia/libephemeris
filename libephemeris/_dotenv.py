@@ -24,6 +24,12 @@ Syntax supported::
 
 Existing environment variables are **not** overwritten unless
 *override=True* is passed.
+
+Provenance:
+    Project-authored configuration parsing built only from Python standard
+    library string, regular-expression, environment, and path operations. It
+    contains no astronomical model or numerical scientific constant. Parsing
+    and precedence are fully specified above and in the tests.
 """
 
 from __future__ import annotations

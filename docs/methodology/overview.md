@@ -27,6 +27,16 @@ argument (ΔT) and obliquity realization between body positions and house
 angles. Model accuracy depends on body class and source; the documented strict
 precision controls prevent an unnoticed minor-body downgrade.
 
+No numerical model is admitted only because it agrees with another software
+package. Each model, coefficient family, generated table, and public-data input
+has an explicit provenance boundary; every project-selected threshold or
+approximation is identified separately and justified by a mathematical
+invariant, convergence argument, or measured error budget. The complete,
+machine-checked inventory is
+[Algorithm and Data Provenance](algorithm-provenance.md). It also classifies
+infrastructure modules explicitly so that “no scientific content” cannot be
+confused with missing documentation.
+
 ## Method
 
 ### Ephemeris Foundation
@@ -145,3 +155,7 @@ see
 3. Lieske, J.H. (1998). "Galilean Satellites of Jupiter. Theory E5." *Astronomy & Astrophysics Supplement*, 129, 205-217.
 4. Vienne, A. & Duriez, L. (1995). "TASS1.6: Ephemerides of the major Saturnian satellites." *Astronomy & Astrophysics*, 297, 588-605.
 5. IERS Conventions (2010). IERS Technical Note No. 36, ed. Petit, G. & Luzum, B.
+
+This overview lists the principal foundations. The exhaustive per-module and
+per-generator bibliography is the
+[provenance registry](algorithm-provenance.md), not this short reference list.

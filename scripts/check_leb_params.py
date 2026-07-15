@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Check LEB file body parameters for Saturn."""
+"""Check LEB file body parameters for Saturn.
+
+Provenance:
+    Project-authored format diagnostic. It reads and reports project-native LEB
+    metadata through the registered reader; it neither changes the artifact nor
+    derives a coefficient. Reported interval and degree values are generation
+    parameters, not an independent scientific source.
+"""
 
 from __future__ import annotations
 import sys

@@ -18,6 +18,16 @@ File layout:
     variable     Section 3: Delta-T Sparse Table
     variable     Section 4: Star Catalog
     variable     Section 5: Orbital Elements (reserved)
+
+Provenance:
+    LEB1/LEB2 are project-native container formats; they do not reproduce an
+    external ephemeris format. Little-endian field layouts are specified here
+    with Python ``struct`` sizes, while coefficient evaluation follows Clenshaw
+    (1955), floating values use IEEE-754 binary64, and LEB2 payload compression
+    uses the public Zstandard format. Coordinate/channel meanings trace to the
+    registered JPL/IAU generator pipeline. Versioning, section IDs, chunk span,
+    body intervals, degrees, and corruption limits are project choices described
+    in ``docs/leb/algorithms.md`` and ``docs/leb/guide.md``.
 """
 
 from __future__ import annotations

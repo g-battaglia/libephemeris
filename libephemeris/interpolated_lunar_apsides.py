@@ -19,6 +19,14 @@ that another ephemeris uses the same interpolation.  The anomalistic period is
 derived from ERFA's BSD-licensed implementation of the IERS mean lunar anomaly.
 JPL DE440/DE441 are documented by Park et al. (2021):
 https://ssd.jpl.nasa.gov/doc/de440_de441.html
+
+Provenance:
+    Position and velocity samples come only from the active public JPL DE
+    kernel; the eccentricity vector is standard two-body geometry and the mean
+    anomalistic period derives from ERFA/IERS fundamental arguments. The
+    one-period symmetric boxcar, Gauss-Legendre order, and cache are explicitly
+    project-authored research choices. This module is not the public INTP model
+    and produces no checked-in table or compatibility fit.
 """
 
 from __future__ import annotations
@@ -59,6 +67,7 @@ LunarStateProvider = Callable[[float], tuple[CartesianVector, CartesianVector]]
 
 
 def _angle_delta(after: float, before: float) -> float:
+    """Return the signed principal difference of two radian angles."""
     return math.atan2(math.sin(after - before), math.cos(after - before))
 
 
@@ -83,6 +92,7 @@ def _active_jpl_context() -> _KernelContext:
 
 
 def _check_range(jd: float, body_id: int, context: _KernelContext) -> None:
+    """Reject non-finite or out-of-kernel epochs with body/source metadata."""
     path, start_jd, end_jd, _ = context
     body_name = (
         "interpolated lunar apogee"
@@ -170,6 +180,7 @@ def _smoothed_elements(
 
 
 def _icrs_to_ecliptic_of_date(vector: CartesianVector, jd: float) -> CartesianVector:
+    """Rotate an ICRS Cartesian direction into the true ecliptic of date."""
     from skyfield.framelib import ecliptic_frame
 
     from .cache import get_cached_time_tt
@@ -185,6 +196,13 @@ def _cartesian_position(
     context: _KernelContext,
     state_provider: LunarStateProvider = _moon_icrs_state,
 ) -> CartesianVector:
+    """Construct the smoothed apogee/perigee vector in ecliptic-of-date AU.
+
+    The one-anomalistic-month mean eccentricity vector supplies direction and
+    eccentricity; the mean semilatus rectum supplies the conic radius. Apogee
+    uses the antipodal eccentricity direction and denominator ``1-e``;
+    perigee uses the direct direction and ``1+e``.
+    """
     eccentricity_vector, semilatus_rectum = _smoothed_elements(
         jd, context, state_provider
     )

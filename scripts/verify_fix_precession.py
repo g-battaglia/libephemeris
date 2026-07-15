@@ -11,6 +11,12 @@ of zeta and z were transposed, giving ~1" error at +-5 cy and ~906" at
 <= 0.005" across +-50 centuries.
 
 Usage: .venv/bin/python scripts/verify_fix_precession.py
+
+Provenance:
+    Project-authored conformance test against ERFA's BSD-licensed implementation
+    of the published IAU 1976/Lieske matrix. ERFA supplies an independent
+    standard realization; sampled deltas merely accept or reject local algebra
+    and never become fitted precession coefficients.
 """
 
 from __future__ import annotations
@@ -67,6 +73,15 @@ def reference_precess(lon: float, lat: float, from_jd: float, to_jd: float):
 
 
 def main() -> int:
+    """Conformance-check local two-epoch precession against ERFA ``pmat76``.
+
+    The fixed century/coordinate matrix spans both ordinary and extreme
+    conditions.  ERFA is the independently licensed realization of the cited
+    IAU 1976/Lieske standard; measured deltas only decide this test verdict.
+
+    Returns:
+        Zero when the worst sampled error is at most 0.005 arcseconds.
+    """
     worst = 0.0
     worst_case = ""
     centuries = [-50, -20, -5, -1, 0.5, 1, 5, 20, 50]

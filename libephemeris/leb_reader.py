@@ -8,6 +8,15 @@ and evaluates precomputed Chebyshev polynomials for fast ephemeris lookups.
 
 All evaluation uses pure Python scalar math (no numpy) for optimal
 single-point performance (~1.5us per Clenshaw evaluation).
+
+Provenance:
+    Chebyshev series evaluation and derivative recurrences implement the public
+    Clenshaw (1955) method documented in ``docs/leb/algorithms.md``. Binary
+    layouts and units are defined by the project-native ``leb_format`` module;
+    coefficient provenance belongs to the generator and source attestation, not
+    this reader. Memory mapping, caches, boundary policy, validation limits, and
+    OS memory advice are project performance/safety choices that must not change
+    decoded numerical values.
 """
 
 from __future__ import annotations

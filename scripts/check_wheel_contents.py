@@ -13,6 +13,13 @@ stale ``build/lib`` is exactly how ``dev_cli/`` once leaked into a wheel.
 Usage:
     python scripts/check_wheel_contents.py            # build sdist+wheel
     python scripts/check_wheel_contents.py path.whl   # audit existing wheel
+
+Provenance:
+    Project-authored packaging-boundary gate. Expected paths, SPDX-bearing
+    vendored exceptions, and registered package-data entries define what may be
+    distributed; they do not define astronomy. The audit inspects archive names
+    and bytes for release integrity and never turns package contents into model
+    coefficients.
 """
 
 from __future__ import annotations
@@ -628,6 +635,7 @@ def _required_payload_hits(
 
 
 def audit(sdist: Path | None, wheel: Path) -> int:
+    """Audit archive identity, membership, metadata, and prohibited payloads."""
     problems = 0
 
     if sdist is not None:

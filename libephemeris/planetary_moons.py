@@ -32,7 +32,15 @@ SPK File Sources:
 
 References:
     - JPL NAIF: https://naif.jpl.nasa.gov/naif/
-    - Reference API 2.10+ moon support
+    - JPL satellite ephemeris solutions and kernels listed above
+
+Provenance:
+    Satellite target/center states come from public JPL SPK kernels interpreted
+    under the official NAIF format. This module applies project-authored target
+    lookup and the same registered light-time, aberration, precession/nutation,
+    observer, and output-frame conventions as planetary positions. Legacy IDs
+    and return slots are interface metadata only. Public compatibility checks do
+    not provide moon states, elements, or correction coefficients.
 """
 
 from __future__ import annotations

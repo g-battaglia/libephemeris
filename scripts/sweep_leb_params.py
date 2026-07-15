@@ -17,6 +17,13 @@ Usage:
 
     # Custom scan count:
     python scripts/sweep_leb_params.py --scan 1000
+
+Provenance:
+    Project-authored search over explicit LEB representation parameters. Truth
+    samples come from the registered JPL/IAU generator channel and errors are
+    evaluated off-node. A winning interval/degree pair is an engineering choice
+    accepted only after full-range validation; residuals never become physical
+    coefficients or compatibility fits.
 """
 
 from __future__ import annotations
@@ -117,6 +124,7 @@ PRECISION_TARGET = 0.0005
 
 
 def _chebyshev_nodes(n: int) -> np.ndarray:
+    """Return the standard ``n`` first-kind Gauss-Chebyshev nodes."""
     return np.cos(np.pi * (np.arange(n) + 0.5) / n)
 
 
@@ -286,6 +294,13 @@ def sweep_body(
 
 
 def main() -> None:
+    """Screen declared interval/degree candidates on reproducible segments.
+
+    Candidate matrices, target, scan size, and random seed are LibEphemeris
+    engineering choices recorded by this script.  A finite random scan is a
+    filter rather than a continuous accuracy proof; ``--scan-all`` enumerates
+    segments but still uses finite evaluation points within each segment.
+    """
     parser = argparse.ArgumentParser(description="LEB parameter sweep")
     parser.add_argument("--body", help="Single body name or ID (default: all)")
     parser.add_argument(

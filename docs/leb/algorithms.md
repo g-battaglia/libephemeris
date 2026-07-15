@@ -25,6 +25,7 @@
 14. [Delta-T (TT - UT1)](#14-delta-t-tt---ut1)
 15. [Error Analysis and Precision Budget](#15-error-analysis-and-precision-budget)
 16. [Historical Problems and Solutions](#16-historical-problems-and-solutions)
+17. [Sources and Project-Choice Boundary](#17-sources-and-project-choice-boundary)
 
 ---
 
@@ -44,30 +45,57 @@ This document explains each of these steps in mathematical detail.
 ### What is an Ephemeris?
 
 An *ephemeris* (plural: *ephemerides*) is a table or function that gives the
-positions of astronomical objects at specific times. The NASA JPL Development
-Ephemeris (DE440/DE441) is the gold standard: it encodes planetary positions
-as Chebyshev polynomial segments fitted to numerical integrations of the
-solar system's equations of motion.
+positions of astronomical objects at specific times. NASA JPL DE440/DE441 are
+the project's public high-precision state source. They encode planetary
+positions as Chebyshev polynomial segments fitted to numerical integrations of
+the Solar System's equations of motion.
 
-LEB applies the same technique one level higher: it fits Chebyshev polynomials
-to the *output* of the Skyfield/JPL pipeline (which itself evaluates JPL's
-Chebyshev polynomials, applies frame rotations, and computes apparent positions).
-This creates a purpose-built cache of pre-transformed results.
+LEB applies the same polynomial family one level higher: its generator samples
+the registered JPL/IAU project pipeline and fits a project-native segmented
+representation. The sampled values remain derived from the public JPL state
+and named frame/correction standards; they are not observations of an API
+compatibility target. This creates a purpose-built cache of reviewed state or
+pre-transformed channels.
+
+### Provenance contract
+
+The scientific authority and the numerical representation are deliberately
+separate:
+
+- NASA/JPL DE440/DE441 and registered public analytical models supply the
+  astronomical state being represented.
+- IERS/IAU/ERFA and the cited physical models supply frame and apparent-place
+  transformations.
+- Clenshaw (1955) supplies the series-evaluation recurrence; standard
+  Chebyshev identities supply the derivative recurrence.
+- LEB segment widths, degrees, channel selection, binary layout, compression
+  targets, chunk size, cache policy, verification grids, and failure behavior
+  are project-authored choices disclosed here and in the generators.
+
+Neither a segment parameter nor a retained coefficient is selected by fitting
+the output of another ephemeris implementation. Compatibility comparisons are
+regression checks only and are not generator inputs.
 
 ### Why Chebyshev Polynomials?
 
-Chebyshev polynomials are the optimal choice for function approximation because:
+Chebyshev polynomials are a strong practical choice for smooth finite-interval
+approximation because:
 
-- They minimize the maximum approximation error (minimax property)
-- They are numerically stable to evaluate (no Runge phenomenon)
+- Chebyshev-node interpolation often has near-minimax maximum-error behavior;
+  it is **not** automatically the exact minimax polynomial (which would require
+  a method such as Remez exchange).
+- Endpoint-clustered nodes strongly suppress the Runge oscillation associated
+  with high-degree interpolation on equally spaced nodes.
 - They can be evaluated efficiently via the Clenshaw algorithm
 - Their derivatives have a simple closed-form recurrence
-- They are the same technique used by JPL internally
+- Piecewise Chebyshev representations are also documented by JPL's public SPK
+  specification, although LEB's layout and fitted channels are project-native.
 
-The key insight is that celestial body positions are smooth, slowly-varying
-functions of time (with some exceptions noted below). A degree-13 Chebyshev
-polynomial over a 4-32 day interval can approximate these functions to
-better than 0.001 arcsecond accuracy.
+The key insight is that the registered barycentric state channels are smooth
+over short intervals (with exceptions noted below). Degree and interval cannot
+be assigned a universal angular accuracy: the reviewed artifact uses
+body-specific values and accepts them only after native-component and
+end-to-end angular validation.
 
 ---
 
@@ -104,9 +132,11 @@ A function f(x) on [-1, 1] can be approximated by a truncated Chebyshev series:
 f(x) ~ c_0 * T_0(x) + c_1 * T_1(x) + ... + c_N * T_N(x)
 ```
 
-where the coefficients c_k are chosen to minimize the approximation error.
-This is analogous to a Fourier series but for polynomial approximation on
-a finite interval.
+where the coefficients `c_k` depend on the chosen approximation procedure. In
+this project, `chebfit` solves the Chebyshev-basis system for values sampled at
+`N + 1` Chebyshev nodes. That square-node fit should not be described as a
+proof of the globally minimax polynomial. The series is analogous to a Fourier
+series but uses a polynomial basis on a finite interval.
 
 ### Domain Mapping
 
@@ -136,7 +166,7 @@ Standard power-series polynomials (a_0 + a_1*x + a_2*x^2 + ...) suffer from:
 3. **Poor conditioning**: The Vandermonde matrix used for fitting becomes
    nearly singular at high degree.
 
-Chebyshev polynomials avoid all three problems because:
+The selected Chebyshev construction mitigates those problems because:
 - They use Chebyshev nodes (cosine-spaced), which cluster near the boundaries
 - The Clenshaw recurrence uses only multiplication and addition (no powers)
 - The Chebyshev basis is orthogonal, producing well-conditioned least-squares fits
@@ -163,11 +193,12 @@ Result:
     f(tau) = c_0 + tau * b_1 - b_2
 ```
 
-This requires only 2 temporary variables and N multiply-add operations.
-No arrays are allocated. For degree 13, this is 13 iterations -- about
-0.5 microseconds in Python.
+This requires only two temporary variables and N multiply-add operations; no
+arrays are allocated. Historical profiling on one development machine measured
+about 0.5 microseconds for degree 13, but that number is workload, interpreter,
+and hardware dependent rather than a format guarantee.
 
-**Implementation** (`leb_reader.py:59-79`):
+**Implementation** (`libephemeris.leb_reader._clenshaw`):
 
 ```python
 def _clenshaw(coeffs: tuple[float, ...], tau: float) -> float:
@@ -198,7 +229,7 @@ instead.
 
 ### Chebyshev Nodes
 
-The generation process samples the reference function at **Chebyshev nodes**
+The generation process samples the registered source function at **Chebyshev nodes**
 (also called Chebyshev-Gauss points or Type I nodes):
 
 ```
@@ -208,8 +239,10 @@ x_k = cos(pi * (k + 0.5) / n)    for k = 0, 1, ..., n-1
 where n = degree + 1 (the number of nodes equals the number of coefficients).
 
 These nodes are not uniformly spaced -- they cluster near the boundaries of
-[-1, 1]. This clustering is precisely what prevents Runge's phenomenon and
-ensures near-optimal approximation.
+[-1, 1]. This clustering suppresses the severe endpoint oscillation associated
+with equally spaced high-degree interpolation. It supports good practical
+maximum-error behavior for smooth channels, but the artifact's validation—not
+the node name—decides whether a selected degree and interval are acceptable.
 
 **Mapped to Julian Days:**
 
@@ -221,16 +254,22 @@ jd_nodes = 0.5 * (jd_end - jd_start) * chebyshev_nodes + 0.5 * (jd_start + jd_en
 
 For each segment, the fitting process is:
 
-1. **Sample**: Evaluate the reference function (Skyfield, analytical formula,
-   or SPK kernel) at the n = degree + 1 Chebyshev nodes.
+1. **Sample**: Evaluate the registered source channel (direct JPL/Skyfield,
+   independently sourced analytical model, or public SPK kernel) at the
+   n = degree + 1 Chebyshev nodes.
 2. **Fit**: Compute coefficients using `numpy.polynomial.chebyshev.chebfit()`.
-   This solves the least-squares problem in the Chebyshev basis.
+   With `degree + 1` distinct nodes and the same number of coefficients, this
+   is an exactly determined Chebyshev-basis fit evaluated by NumPy's
+   least-squares machinery.
 3. **Verify**: Evaluate the fitted polynomial at 10 uniformly-spaced test
-   points (NOT on the Chebyshev nodes) and compare against the reference
-   function. Track maximum error.
+   points (NOT on the Chebyshev nodes) and compare against the registered
+   source channel. Track the maximum sampled error.
 
-The verification step is critical: it catches problems like longitude
-wrap-around, SPK boundary overshoot, or insufficient degree.
+The ten interior points are a deterministic *segment screening grid*. They
+catch many wrap, boundary, and insufficient-degree failures, but ten samples
+cannot prove a continuous supremum-error bound. Release generation therefore
+adds independent post-write sampling and end-to-end angular checks described
+in [Section 15](#15-error-analysis-and-precision-budget).
 
 ### Vectorized Evaluation
 
@@ -250,8 +289,10 @@ Step 2: Single vectorized Skyfield call:
 Step 3: Redistribute values and fit each segment independently
 ```
 
-This eliminates Skyfield's per-call overhead (time conversion, SPK segment
-lookup, Python function call dispatch) and achieves ~150x speedup for planets.
+This eliminates repeated per-call overhead (time conversion, SPK segment
+lookup, and Python dispatch). Historical development measurements observed
+roughly 150x faster generation for some planetary batches; that figure is a
+hardware/workload measurement, not an algorithmic guarantee.
 
 ### Segment Width Selection
 
@@ -264,7 +305,9 @@ and approximation accuracy:
 | More segments | Fewer segments |
 | Larger file | Smaller file |
 
-The optimal width depends on how rapidly the body's position changes:
+The selected width depends on how rapidly the stored channel changes. The
+values below are current project parameters validated for the named channel,
+not optima proved by a publication:
 
 - **Moon (4 days)**: Moves ~13 deg/day, orbital period 27.3 days.
   A 4-day segment spans ~52 degrees of lunar motion.
@@ -292,18 +335,22 @@ d_0     = d_2 / 2 + c_1
 
 The derivative polynomial is then evaluated via the same Clenshaw algorithm.
 
-**Implementation** (`leb_reader.py:82-112`):
+**Implementation** (`libephemeris.leb_reader._deriv_coeffs`):
 
 ```python
 def _deriv_coeffs(coeffs: tuple[float, ...]) -> tuple[float, ...]:
     n = len(coeffs) - 1
     if n == 0:
         return (0.0,)
+    if n == 1:
+        return (coeffs[1],)
     d = [0.0] * n
     d[n - 1] = 2.0 * n * coeffs[n]
     for k in range(n - 2, 0, -1):
-        d[k] = d[k + 2] + 2.0 * (k + 1) * coeffs[k + 1]
-    d[0] = d[2] / 2.0 + coeffs[1] if n >= 2 else coeffs[1]
+        d_k2 = d[k + 2] if k + 2 < n else 0.0
+        d[k] = d_k2 + 2.0 * (k + 1) * coeffs[k + 1]
+    d_2 = d[2] if n >= 3 else 0.0
+    d[0] = d_2 / 2.0 + coeffs[1]
     return tuple(d)
 ```
 
@@ -330,19 +377,25 @@ The previous approach computed velocity via central difference:
 v(t) = (f(t + dt) - f(t - dt)) / (2 * dt)
 ```
 
-This required **two additional pipeline evaluations** per velocity component
-(6 extra evaluations for 3D velocity with speed). The analytical derivative:
+This required **two additional pipeline evaluations** for a vector velocity
+request. The analytical derivative:
 
-- Is **3x faster** (1 pipeline run instead of 3)
-- Is **more precise** (no finite-difference truncation error)
-- Does **not amplify Chebyshev fitting errors** (the derivative is computed
-  from the polynomial itself, not from perturbed evaluations)
+- reduces the required pipeline evaluations from three to one (the wall-clock
+  speedup depends on body, cache state, degree, interpreter, and backend);
+- avoids the selected finite-difference step and its truncation/cancellation
+  trade-off; and
+- differentiates the represented polynomial consistently.
+
+Differentiation can amplify errors in high-order coefficients, so the
+derivative is not declared more accurate merely because it is analytical.
+Velocity precision requires its own source-state comparison and end-to-end
+tests.
 
 ---
 
 ## 6. Coordinate Systems and Storage Strategies
 
-### The Three Coordinate Types
+### The Five Coordinate Types
 
 LEB stores body positions in one of five coordinate frames, chosen to minimize
 runtime computation and maximize Chebyshev fitting accuracy:
@@ -380,8 +433,10 @@ Stores the **system barycenter** (the gravitational center of the planet plus
 all its moons) in ICRS AU. The Center-of-Body (COB) correction — the offset
 from system barycenter to planet center — is applied at runtime.
 
-This was the critical innovation that enabled <0.001" precision for outer
-planets. See [Section 12](#12-center-of-body-cob-corrections) for full details.
+This separation removes the high-frequency center offset from the stored
+system-barycenter polynomial. Artifact-scoped measurements, rather than the
+coordinate-type definition alone, establish the resulting precision. See
+[Section 12](#12-center-of-body-cob-corrections) for full details.
 
 #### COORD_ECLIPTIC (type 1) — Ecliptic of Date
 
@@ -401,36 +456,43 @@ type. Unsupported compatibility IDs must never be materialized into LEB data.
 
 #### COORD_GEO_ECLIPTIC (type 3) — Reserved
 
-Defined in the format but **not used by any body**. Originally planned for
-storing geocentric ecliptic positions, but abandoned because ecliptic
-coordinates have discontinuities at retrograde stations that Chebyshev
-polynomials cannot fit accurately.
+Defined in the format but **not used by any body**. It was originally planned
+for pre-transformed geocentric ecliptic positions. The design was abandoned
+because it couples the stored channel to observer, apparent-place, flag, and
+longitude-unwrapping conventions and was less compact on the project's test
+grid. A physical retrograde station is a smooth turning point, not a
+discontinuity; the difficulty was the angular representation's curvature and
+wrap handling, not an inability of polynomials to represent zero velocity.
 
 ### Why Not Store Everything in Ecliptic?
 
 Early versions of LEB attempted to store planet positions in geocentric
-ecliptic coordinates (`COORD_GEO_ECLIPTIC`). This failed because:
+ecliptic coordinates (`COORD_GEO_ECLIPTIC`). This was rejected because:
 
-1. **Retrograde cusps**: When a planet stations (changes from direct to
-   retrograde motion), its ecliptic longitude has a cusp — a sharp
-   reversal. Chebyshev polynomials, being smooth, cannot fit cusps.
-   The fitting error at stations was 3-5 arcseconds.
+1. **Angular-channel conditioning**: Around a station, apparent longitude has
+   a smooth turning point but can have substantially greater curvature than the
+   underlying barycentric Cartesian state. A fixed degree/interval therefore
+   used the coefficient budget less efficiently on the recorded test grid; the
+   observed fitting error at stations was 3--5 arcseconds.
 
-2. **Latitude sign changes**: Near opposition, a planet's ecliptic latitude
-   can change sign rapidly, creating another fitting challenge.
+2. **Coordinate conventions**: Longitude requires explicit unwrapping, and a
+   pre-transformed channel freezes observer/correction choices that callers may
+   legitimately change with flags. Latitude sign changes are continuous and
+   are not, by themselves, a mathematical discontinuity.
 
-The ICRS barycentric frame avoids both problems: planetary motion in ICRS
-is always smooth (no retrograde, no cusps). The coordinate transforms that
-produce the apparent ecliptic position are applied at runtime, after the
-smooth ICRS position has been accurately recovered from the Chebyshev fit.
+The ICRS barycentric frame keeps the stored state smooth and reusable. The
+coordinate transforms that produce the apparent ecliptic position are applied
+at runtime, after the Cartesian state has been recovered from the Chebyshev
+fit.
 
 ---
 
 ## 7. The ICRS Pipeline: From Barycentric to Apparent
 
 The ICRS pipeline (Pipeline A/A') transforms raw barycentric positions into
-apparent geocentric coordinates. This is the most complex part of LEB and
-replicates what Skyfield does internally.
+apparent geocentric coordinates. It implements the registered public
+apparent-place chain and is validated independently against the direct
+JPL/Skyfield path.
 
 ### Step-by-Step Pipeline
 
@@ -489,7 +551,7 @@ C_LIGHT_AU_DAY = 173.1446326846693  # AU/day
 # Initial geometric vector (no light-time)
 geo = body_pos - earth_pos
 
-# 3 fixed-point iterations (converges to ~1e-15 AU)
+# 3 fixed-point iterations (project choice; validated over supported channels)
 for _ in range(3):
     dist = sqrt(geo[0]**2 + geo[1]**2 + geo[2]**2)
     lt = dist / C_LIGHT_AU_DAY
@@ -497,10 +559,17 @@ for _ in range(3):
     geo = retarded_pos - earth_pos
 ```
 
-Three iterations are sufficient because:
+Three iterations are the project's fixed runtime choice because:
+
 - The speed of planets is ~1e-4 c (much less than light speed)
 - Each iteration reduces the error by a factor of ~v/c ~ 1e-4
-- After 3 iterations: error ~ (v/c)^3 ~ 1e-12, well below 0.001"
+- The contraction estimate after three updates is of order `(v/c)^3` times
+  the initial correction for ordinary Solar-System targets.
+
+That estimate motivates the choice but is not treated as a universal error
+certificate. Supported bodies/date ranges are checked against the registered
+JPL-backed pipeline; a future faster or close-approach channel must revalidate
+the iteration count.
 
 ### Light-Time for System Barycenters
 
@@ -520,38 +589,34 @@ substituted for a missing JPL center segment.
 ### Physical Basis
 
 General relativity predicts that massive bodies deflect light rays passing
-near them. The Sun deflects starlight by up to 1.75 arcseconds at the solar
-limb. For planets observed from Earth, the maximum deflection is:
+near them. The Sun deflects a distant source by about 1.75 arcseconds at the
+solar limb. Representative limiting scales are:
 
 | Deflector | Maximum deflection |
 |-----------|-------------------|
-| Sun | ~0.004" (for bodies near the Sun) |
+| Sun | ~1.75" at the limb for a distant source; finite-source geometry varies |
 | Jupiter | ~0.017" (for bodies near Jupiter's limb) |
 | Saturn | ~0.006" |
 
-These are small but significant compared to the 0.001" precision target.
+These effects matter in any sub-arcsecond error budget and therefore cannot be
+silently omitted.
 
-### PPN Formula
+### Finite-source PPN reduction
 
-The Parameterized Post-Newtonian (PPN) deflection formula, as implemented
-in Skyfield's `apparent()` method:
-
-```
-deflection = (1 + gamma) * G*M / (c^2 * d) * (e_hat x (e_hat x q_hat))
-```
-
-where:
-- gamma = 1 (general relativity)
-- G*M is the gravitational parameter of the deflector
-- c is the speed of light
-- d is the closest approach distance of the light ray to the deflector
-- e_hat is the unit vector from deflector to body
-- q_hat is the unit vector from deflector to observer
-- x denotes the vector cross product
+The runtime follows the finite-source point-mass reduction used by the
+MIT-licensed Skyfield relativity module and the cited IERS apparent-place
+foundation. For each deflector it constructs unit vectors from the deflector
+to observer and target, evaluates the deflector at the clamped closest-approach
+epoch, and applies the explicit dot-product form implemented in
+`fast_calc._apply_gravitational_deflection`. General relativity fixes the PPN
+parameter to `gamma = 1`; public gravitational parameters and the exact SI
+speed of light set the scale. The near-deflector guard (`0.01 AU`) is a
+project safety policy for observer-at-deflector geometries, not a published
+physical radius.
 
 ### Implementation in LEB
 
-**Deflectors** (`fast_calc.py:262`):
+**Deflectors** (`libephemeris.fast_calc._DEFLECTORS`):
 
 ```python
 _DEFLECTORS = (
@@ -571,11 +636,15 @@ where GM_sun = 1.32712440017987 x 10^20 m^3/s^2.
 **When applied:**
 - Only for `COORD_ICRS_BARY` and `COORD_ICRS_BARY_SYSTEM` bodies
 - Skipped for the Moon (too close; deflection formula breaks down)
-- Skipped for heliocentric, barycentric, true position, and no-aberration modes
+- Skipped for heliocentric, barycentric, true-position, and `FLG_NOGDEFL`
+  modes. `FLG_NOABERR` suppresses aberration only and does not suppress
+  deflection.
 
-**Historical note:** The absence of gravitational deflection in early LEB
-versions caused a 3.95" error for Saturn. Adding PPN deflection for Sun,
-Jupiter, and Saturn reduced all planet errors to <0.001".
+**Historical development measurement:** on the recorded Saturn stress case,
+omitting gravitational deflection produced a 3.95" residual. Restoring the
+documented Sun/Jupiter/Saturn reduction brought the reviewed finite validation
+grid below its 0.001" acceptance threshold; this is not a universal bound for
+arbitrary custom artifacts.
 
 ---
 
@@ -588,20 +657,26 @@ relative to the incoming light. It shifts the apparent position of a body
 in the direction of the observer's motion. The maximum annual aberration
 (due to Earth's orbital velocity of ~30 km/s) is about 20.5 arcseconds.
 
-### Classical First-Order Formula
+### Relativistic formula and compatibility fallback
 
-LEB uses the classical (first-order in v/c) aberration formula:
+Normal runtime calls carry a positive light time and use the full
+special-relativistic vector formula implemented by the MIT-licensed Skyfield
+`add_aberration()` routine, including the inverse Lorentz factor. The local
+implementation is written explicitly in `fast_calc._apply_aberration` and is
+validated against the registered JPL/Skyfield channel.
+
+Only an internal caller that omits light time takes the retained first-order
+Bradley fallback:
 
 ```
-u = geo / |geo|                   # unit vector to body
-v = earth_vel / c                 # Earth velocity in natural units
-u' = u + v - u * (u . v)         # aberrated direction
-result = normalize(u') * |geo|    # scale back to original distance
+u = geo / |geo|
+beta = observer_velocity / c
+u_first_order = normalize(u + beta - u * dot(u, beta))
 ```
 
-This matches the pyswisseph implementation. The rigorous special-relativistic
-formula differs by less than 1 milliarcsecond, which is negligible for our
-0.001" precision target.
+That branch is documented for backward compatibility; it is not the primary
+LEB apparent-place reduction and no compatibility-target implementation is its
+scientific authority.
 
 ### When Applied
 
@@ -663,19 +738,12 @@ These are used for:
 
 ### Mean Obliquity
 
-The mean obliquity of the ecliptic (the angle between the equator and
-ecliptic planes, ignoring nutation) is computed from the IAU 2006 polynomial:
-
-```python
-# Coefficients in arcseconds
-_OBLIQUITY_COEFFS = (84381.406, -46.836769, -0.0001831,
-                     0.00200340, -0.000000576, -0.0000000434)
-
-def _mean_obliquity_iau2006(jd_tt: float) -> float:
-    T = (jd_tt - 2451545.0) / 36525.0
-    eps_arcsec = sum(c * T**i for i, c in enumerate(_OBLIQUITY_COEFFS))
-    return eps_arcsec / 3600.0  # convert to degrees
-```
+The active mean obliquity is the angle between the Vondrák (2011) mean
+ecliptic and equator poles, evaluated by the shared long-term implementation
+in `sidereal_longterm.mean_obliquity_rad`. The same realization is used for
+body reductions and house geometry. The IAU 2006 polynomial remains only a
+modern-era helper where explicitly named; it is not the LEB path's general
+of-date obliquity over the extended tier.
 
 ### Ecliptic Rotation
 
@@ -706,16 +774,20 @@ center of the planet plus all its moons. For astrological calculations,
 we need the planet *center* — the physical center of the planet itself.
 
 The offset between system barycenter and planet center is the COB correction.
-For Jupiter, this offset can be up to ~0.01 AU (oscillating as Ganymede,
-Callisto, Io, and Europa orbit). These oscillations have periods of 1.77-16.7
-days and produce angular effects of 0.5-2 arcseconds.
+It is computed as a public JPL planet-center state relative to the matching
+system barycenter. Its amplitude and spectrum depend on the satellite-system
+solution and epoch; exact bounds belong to the tier kernel and its verification
+report, not to a hard-coded universal estimate. Although tiny beside a
+planet's heliocentric distance, it is material at a milliarcsecond error budget.
 
 ### Why COB Breaks Chebyshev Fitting
 
-The COB correction contains high-frequency oscillations from the inner moons.
-Fitting planet_center = barycenter + COB with Chebyshev polynomials requires
-very short intervals (< 1 day) to capture these oscillations. This would
-produce enormous files and still leave residual fitting errors of 0.1-1".
+The COB correction contains satellite-period oscillations much faster than the
+smooth system-barycenter trajectory. Project sweeps found that fitting
+`planet_center = barycenter + COB` at the long planetary segment widths either
+required materially larger artifacts or failed the angular storage budget.
+Separating the public center segment from the stored barycenter avoids making a
+particular unpublished fit the physical source.
 
 ### The Solution: Store Barycenters, Apply COB at Runtime
 
@@ -739,7 +811,7 @@ available:
 # Runtime approach (simplified):
 def _observe_from_bcrs(observer_pos, observer_t):
     # Light-time iteration on the selected center/barycenter target
-    for _ in range(10):
+    for _ in range(3):  # project iteration count, independently validated
         target = center_if_covered_else_barycenter(t_retarded)
         dist = |target - observer_pos|
         lt = dist / c
@@ -753,22 +825,12 @@ system barycenter instead of mixing center and barycenter samples.
 
 ### SPK Planet Center Segments
 
-High-precision COB data comes from `planet_centers_{tier}.bsp` files:
-
-| NAIF ID | Planet | Typical offset magnitude |
-|---------|--------|-------------------------|
-| 599 | Jupiter center | ~0.001-0.01 AU |
-| 699 | Saturn center | ~0.0001-0.001 AU |
-| 799 | Uranus center | ~0.00001 AU |
-| 899 | Neptune center | ~0.00001 AU |
-| 999 | Pluto center | ~0.0001 AU |
-
-These segments have limited date coverage per tier:
-
-| Tier | File | Coverage varies by planet |
-|------|------|---------------------------|
-| Base | `planet_centers_base.bsp` | ~1849-2150 |
-| Medium | `planet_centers_medium.bsp` | Jupiter 1600-2200; Pluto 1800-2200; Saturn/Uranus/Neptune cover 1550-2650 after regeneration |
+High-precision COB data comes from `planet_centers_{tier}.bsp` files for NAIF
+planet-center targets 599, 699, 799, 899, and 999 relative to barycenters
+5, 6, 7, 8, and 9. Coverage is target- and tier-specific. The authoritative
+intervals are the descriptors in the selected SPK, inspected at load time and
+verified by `scripts/generate_planet_centers_spk.py`; prose dates are avoided
+here because regenerated public kernels can legitimately change them.
 
 When the SPK segment does not cover the requested date, runtime explicitly uses
 the stored system barycenter. There is no analytical COB fallback.
@@ -825,8 +887,8 @@ This approach is transparent: the user always sees longitude in [0, 360).
 ### Verification
 
 The generator verifies that each segment correctly handles the wrap-around
-by evaluating at 10 intermediate test points and comparing with the reference
-function after re-wrapping. This catches cases where the unwrapping fails
+by evaluating at 10 intermediate test points and comparing with the registered
+source channel after re-wrapping. This catches cases where unwrapping fails
 (e.g., multiple 360-degree jumps within a single segment).
 
 ---
@@ -837,12 +899,10 @@ function after re-wrapping. This catches cases where the unwrapping fails
 
 Delta-T is the difference between Terrestrial Time (TT, a uniform time scale
 based on atomic clocks) and Universal Time (UT1, which tracks Earth's
-irregular rotation). Since UT1 depends on Earth's actual rotation speed,
-which is unpredictable, Delta-T cannot be computed analytically — it must
-be measured and tabulated.
-
-As of 2025, Delta-T is approximately 69.36 seconds. It was ~0 seconds around
-1900 and is increasing irregularly.
+irregular rotation). Since UT1 depends on that irregular rotation, Delta-T is
+assembled from observations for the measured era, historical reconstructions
+where direct measurements do not exist, and an explicitly identified
+extrapolation policy. It is not a timeless analytically predictable constant.
 
 ### Storage in LEB
 
@@ -865,16 +925,18 @@ t = (jd - jds[idx]) / (jds[idx+1] - jds[idx])
 delta_t = vals[idx] + t * (vals[idx+1] - vals[idx])
 ```
 
-With 30-day spacing, linear interpolation introduces up to ~0.004 seconds
-of error near epochs where Delta-T changes rapidly (e.g., around 1985).
+On the historical development probe that motivated the runtime change, 30-day
+linear interpolation differed by about 0.004 seconds near 1985. That is a
+sampled observation, not a universal interpolation bound.
 
 ### Delta-T Usage in fast_calc
 
 **Critical**: The `fast_calc_ut()` entry point does **not** use
 `reader.delta_t()` for the UT->TT conversion. Instead, it uses
 `deltat()` from `time_utils.py`, which provides the same high-precision
-Delta-T model used by the Skyfield reference pipeline. This ensures exact
-agreement with the reference:
+Delta-T model used by the direct JPL/Skyfield source pipeline. This keeps both
+project backends on one documented time realization without claiming that a
+finite-precision conversion is mathematically exact:
 
 ```python
 # fast_calc.py, fast_calc_ut():
@@ -891,6 +953,34 @@ jd_tt = tjd_ut + delta_t
 ---
 
 ## 15. Error Analysis and Precision Budget
+
+### Fitting, compression, and pipeline validation are different claims
+
+LEB1 fitting and LEB2 compression have separate error mechanisms:
+
+1. `generate_leb.py` samples `degree + 1` Chebyshev nodes and screens every
+   segment at ten independent interior points. Its optional post-generation
+   verifier defaults to 500 dates per body and compares the serialized reader
+   against the registered state source.
+2. `leb_compression.py` truncates each coefficient to a selected binary64
+   precision. If every coefficient error is bounded by `e_k`, then on
+   `x in [-1, 1]`, where `|T_k(x)| <= 1`, the native-component evaluation error
+   is conservatively bounded by `sum(e_k)`. The LEB2 verifier uses the still
+   more conservative `(degree + 1) * per_coefficient_target` when all orders
+   share one target.
+3. Reordering, byte shuffle, and Zstandard are reversible; they add no numeric
+   error after mantissa truncation. Corruption is a separate integrity failure,
+   not an accuracy tolerance.
+4. Native-component bounds do not by themselves prove apparent angular
+   accuracy: observer subtraction, small geocentric distance, differentiation,
+   light time, and frame transformations can amplify them. The focused
+   `scripts/test_leb2_precision.py` path therefore checks calculated angular
+   results, and release attestations record the exact artifact and test scope.
+
+The 10/500/200 sample counts (the last is the LEB2 verifier default), random
+seed, coefficient targets, and acceptance thresholds are project choices.
+They are evidence grids, not public astronomical constants and not a proof over
+unsampled continuous time.
 
 ### Error Sources
 
@@ -910,8 +1000,11 @@ independent contributions:
 
 ### Achieved Precision
 
-After all fixes, the local JPL/runtime verification for independently sourced
-bodies across the three tiers is summarized below:
+The following table records development measurements associated with the
+reviewed generators; it is not a timeless guarantee for an arbitrary custom
+file. The authoritative claim for a distributed artifact is its hash-scoped
+[build attestation](base-core-provenance.md), together with the exact command,
+date range, channels, and tolerances used to verify it.
 
 | Category | Base (<0.001") | Medium (<0.001") | Extended |
 |----------|---------------|------------------|----------|
@@ -928,9 +1021,10 @@ ecliptic body errors are <0.001".
 When computing **heliocentric** or **equatorial** positions from the
 geocentric ICRS data, errors can be amplified:
 
-- **Moon heliocentric**: Geocentric error is amplified by the ratio
-  heliocentric_distance / geocentric_distance ~ 390. A 0.0003" geocentric
-  error becomes ~0.01" heliocentric.
+- **Moon heliocentric**: A Cartesian error can be amplified by the ratio
+  heliocentric distance / geocentric distance, roughly 390 near the ordinary
+  Earth-Moon distance. A 0.0003" angular-equivalent scale can therefore become
+  roughly 0.12", although the exact amplification depends on vector direction.
 
 - **Nearby asteroid latitude velocity**: The ICRS->ecliptic coordinate
   transform involves division by geocentric distance, amplifying errors
@@ -946,16 +1040,18 @@ handled via relaxed tolerances in the secondary pipeline tests.
 This section documents the major precision problems encountered during
 LEB development and their solutions.
 
-### Problem 1: COORD_GEO_ECLIPTIC — Retrograde Cusps (v1)
+### Problem 1: COORD_GEO_ECLIPTIC conditioning (v1)
 
 **Symptom**: 3-5 arcsecond errors at planetary stations.
 
-**Cause**: Geocentric ecliptic coordinates have cusps at retrograde stations.
-Chebyshev polynomials cannot fit discontinuities in the derivative.
+**Cause**: The stored angular channel combined longitude unwrapping and the
+apparent observer geometry with relatively high curvature around stations. A
+station is mathematically smooth; the failure was representation efficiency at
+the selected fixed degree and interval, not a derivative discontinuity.
 
 **Solution**: Abandoned `COORD_GEO_ECLIPTIC` entirely. Store positions in
-ICRS barycentric coordinates (always smooth) and apply coordinate transforms
-at runtime.
+ICRS barycentric Cartesian coordinates and apply coordinate transforms at
+runtime.
 
 ### Problem 2: Missing Gravitational Deflection (v2)
 
@@ -967,8 +1063,9 @@ the Sun, Jupiter, and Saturn. Skyfield's `apparent()` method applies this
 correction automatically.
 
 **Solution**: Implemented `_apply_gravitational_deflection()` in `fast_calc.py`
-with three deflectors (Sun, Jupiter barycenter, Saturn barycenter), using the
-same PPN formula as Skyfield.
+with three deflectors (Sun, Jupiter barycenter, Saturn barycenter), from the
+documented PPN/IAU apparent-place geometry. Skyfield comparisons validate the
+independent implementation but do not supply its source expression.
 
 ### Problem 3: COB Oscillations in Chebyshev Data (v2)
 
@@ -1000,13 +1097,15 @@ both sides when the stencil crosses an outer edge.
 
 **Symptom**: 0.3-0.4 arcsecond systematic errors for all asteroids.
 
-**Cause**: The reference asteroid pipeline used ecliptic J2000 + manual
-precession + nutation, while the LEB pipeline used ICRS + Skyfield's
-precession-nutation matrix. The two approaches differ at the 0.3" level.
+**Cause**: an earlier project asteroid path used ecliptic J2000 plus separate
+precession/nutation, while the LEB path used the registered ICRS/Skyfield
+reduction. The two project paths differed at the 0.3" level on the recorded
+development grid.
 
 **Solution**: Created `_SpkType21Target` VectorFunction wrapper in `spk.py`
-that routes asteroids through Skyfield's observe/apparent pipeline (the same
-path used by the reference code).
+that routes asteroids through the project's registered Skyfield
+observe/apparent pipeline, keeping both project backends on the same named
+JPL/IAU reduction chain.
 
 ### Problem 6: Ecliptic Body Generation Bug (v3)
 
@@ -1028,5 +1127,36 @@ Bodies with non-standard params are routed to the scalar generation path.
 up to ~0.004 seconds of error near 1985. The Moon moves ~13 deg/day =
 0.00054 deg/sec, so a 0.004s error produces ~0.002" position error.
 
-**Solution**: `fast_calc_ut()` now uses `deltat()` (Skyfield's precise
-model) instead of `reader.delta_t()` for the UT->TT conversion.
+**Solution**: `fast_calc_ut()` now uses the project's canonical, separately
+source-mapped `deltat()` model instead of `reader.delta_t()` for the UT->TT
+conversion.
+
+---
+
+## 17. Sources and Project-Choice Boundary
+
+- Park, Folkner, Williams, and Boggs (2021), “The JPL Planetary and Lunar
+  Ephemerides DE440 and DE441,”
+  [AJ 161:105](https://doi.org/10.3847/1538-3881/abd414): astronomical source
+  states and DE440/DE441 context.
+- NASA/JPL NAIF,
+  [SPK Required Reading](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/spk.html):
+  public segmented ephemeris types, frames, centers, and Chebyshev storage
+  conventions. LEB is not an SPK clone and has its own format.
+- Clenshaw (1955), “A note on the summation of Chebyshev series,”
+  [MTAC 9, 118--120](https://doi.org/10.1090/S0025-5718-1955-0071856-0):
+  stable series-evaluation recurrence.
+- Petit and Luzum (eds.),
+  [IERS Conventions (2010), TN 36](https://iers-conventions.obspm.fr/content/tn36.pdf),
+  plus ERFA/IAU standards: time, frame, precession-nutation, and apparent-place
+  foundations used by the represented project pipeline.
+- IEEE 754 binary64 representation and the
+  [Zstandard format](https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md):
+  bit representation and final lossless byte compression.
+
+Everything else specific to LEB -- file headers, body/group IDs, segment
+parameters, coefficient layout, truncation policy, chunking, lazy mapping,
+caches, verification grids, thresholds, and fallbacks -- is project-authored
+and must remain documented and tested as such. The sources above explain the
+scientific inputs and published numerical building blocks; they do not endorse
+or prescribe this project's engineering parameters.

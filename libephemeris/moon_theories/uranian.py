@@ -25,6 +25,14 @@ moon positions are good to a few thousand km (phases and rounded nodes
 dominate).  Weighted by the ~1e-5 moon/planet mass ratios, the resulting
 COB offset error is tens of km, i.e. sub-milliarcsecond at Uranus
 opposition distance, far below the planet_centers SPK alternative.
+
+Provenance:
+    Mean elements and GM values come from the cited public JPL satellite data
+    and GUST86/Jacobson literature. This project intentionally uses circular
+    mean-orbit geometry rather than claiming the full GUST86 periodic theory;
+    the omitted terms and resulting center-of-body error are quantified above.
+    Coordinate assembly and mass weighting are independently written and no
+    compatibility output supplies an element.
 """
 
 from __future__ import annotations

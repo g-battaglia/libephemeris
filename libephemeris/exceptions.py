@@ -35,6 +35,11 @@ This hierarchy allows users to catch broad categories of errors or specific ones
     # Catch all libephemeris errors
     except Error:
         ...
+
+Provenance:
+    Project-authored error taxonomy and input validation infrastructure. It
+    contains no astronomical model, physical constant, or source-derived data.
+    Compatibility affects only the public base exception and error behavior.
 """
 
 from __future__ import annotations
