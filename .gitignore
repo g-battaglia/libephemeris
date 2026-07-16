@@ -59,3 +59,4 @@ docs/build/
 
 # JS tooling
 node_modules/
+/logs
