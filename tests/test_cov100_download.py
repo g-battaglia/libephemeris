@@ -1352,11 +1352,18 @@ def test_download_leb2_for_tier_invalid_tier():
 
 
 def test_published_wider_core_pins_match_reviewed_release_bytes():
+    # Definitive data-v2 cores (reviewed regeneration).
     assert dl.DATA_FILES["medium_core.leb2"]["sha256"] == (
-        "4655d490ed951bdfd214c0a94fc08e8113a724d99b5afb1a026400cc290e37ad"
+        "09072b315df5a2ec44c5320cca8bdd92cfd3ef0acb82baea3ca96fffc83522f6"
     )
     assert dl.DATA_FILES["extended_core.leb2"]["sha256"] == (
-        "38e244d2cbcbb216269f5ea97316b543966d368a8f62a507be669aae95003389"
+        "69f9d6972c6d54dacb50faadea6c0b9a50649dc3912b80a928b5a26bee16611a"
+    )
+    assert dl.DATA_FILES["medium_core.leb2"]["url"].endswith(
+        "data-v2rc1/medium_core.leb2"
+    )
+    assert dl.DATA_FILES["extended_core.leb2"]["url"].endswith(
+        "data-v2rc1/extended_core.leb2"
     )
 
 
