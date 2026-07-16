@@ -515,6 +515,14 @@ resolve_configuration() {
   [[ "$LEB2_VERIFY_SAMPLES" =~ ^[0-9]+$ ]] \
     || fatal "--leb2-verify-samples must be an integer"
 
+  # LEB2 is always converted from the merged main LEB1, so a run that skips
+  # the merge can never feed its own LEB2 conversion: without this guard it
+  # would only die at the freshness assertion AFTER hours of generation.
+  if ! ((ENABLE_MERGE)) && ((ENABLE_LEB2)); then
+    fatal "--no-merge leaves the main LEB1 file stale; combine it with" \
+      "--leb1-only (LEB2 is always converted from the merged main file)"
+  fi
+
   resolve_tier_selection
   resolve_leb1_group_selection
   resolve_leb2_group_selection
@@ -540,11 +548,15 @@ exotics_selected() {
 }
 
 nbody_required() {
+  # Only LEB1 generation integrates bodies; a LEB2-only run converts from an
+  # existing merged LEB1 and never touches the rebound/assist stack.
+  ((ENABLE_LEB1)) || return 1
   exotics_selected || return 1
   array_contains extended "${SELECTED_TIERS[@]}"
 }
 
 spk_network_needed() {
+  ((ENABLE_LEB1)) || return 1
   array_contains asteroids "${SELECTED_LEB1_GROUPS[@]}" \
     || array_contains exotics "${SELECTED_LEB1_GROUPS[@]}"
 }
@@ -720,8 +732,11 @@ backup_file_if_present() {
     return 0
   fi
 
-  mkdir -p "$backup_directory"
-  cp -p "$source_path" "$backup_path"
+  # The backup exists to survive a botched overwrite of the target: abort
+  # hard when it cannot be taken instead of proceeding to the overwrite.
+  if ! mkdir -p "$backup_directory" || ! cp -p "$source_path" "$backup_path"; then
+    fatal "backup failed: $source_path → $backup_path"
+  fi
   print_note "backed up $source_path → $backup_path"
 }
 
@@ -765,8 +780,12 @@ refresh_refitted_tno_spk_cache() {
         if ((DRY_RUN)); then
           print_dry_run "mv $(printf '%q' "$spk_path") $(printf '%q' "$backup_directory/$(basename "$spk_path")")"
         else
-          mkdir -p "$backup_directory"
-          mv "$spk_path" "$backup_directory/$(basename "$spk_path")"
+          # The whole point of this step is purging the stale kernels, so a
+          # failed move must stop the run rather than silently reuse them.
+          mkdir -p "$backup_directory" \
+            || fatal "cannot create SPK backup directory: $backup_directory"
+          mv "$spk_path" "$backup_directory/$(basename "$spk_path")" \
+            || fatal "cannot move stale SPK kernel: $spk_path"
         fi
         moved_file_count=$((moved_file_count + 1))
       done
@@ -938,7 +957,17 @@ def copy_mapped_range(
 
     while remaining_bytes:
         chunk_size = min(COPY_CHUNK_SIZE, remaining_bytes)
-        destination.write(source_map.read(chunk_size))
+        chunk = source_map.read(chunk_size)
+        if len(chunk) != chunk_size:
+            # mmap reads past EOF return short with no error; a truncated
+            # source must fail the rebuild instead of shipping a file whose
+            # section offsets no longer match its bytes.
+            raise ValueError(
+                f"short read: wanted {chunk_size} bytes at offset "
+                f"{source_map.tell() - len(chunk)}, got {len(chunk)} "
+                "(truncated source file?)"
+            )
+        destination.write(chunk)
         remaining_bytes -= chunk_size
 
 
@@ -1129,6 +1158,9 @@ def write_rebuilt_leb(
                         section.size,
                     )
 
+        # mkstemp creates the temp 0600 and os.replace() keeps it: restore
+        # the world-readable mode a freshly generated main file would have.
+        os.chmod(temporary_path, 0o644)
         os.replace(temporary_path, output_path)
     except Exception:
         temporary_path.unlink(missing_ok=True)
@@ -1151,9 +1183,16 @@ def replace_selected_bodies(
         )
         write_rebuilt_leb(main_file, body_sources, Path(output_path))
 
+        # Listing the ids makes a shrunken partial visible: a body of the
+        # regenerated group that no partial provided keeps its old entry
+        # (the overlay never deletes), and only this line reveals it.
+        replaced_ids = sorted(
+            {body_id for partial in partial_files for body_id in partial.bodies}
+        )
         print(
             f"updated {output_path}: bodies={len(body_sources)} "
             f"replaced_entries={replaced_entry_count} "
+            f"replaced_ids={replaced_ids} "
             f"partials={len(partial_files)}"
         )
     finally:
@@ -1258,8 +1297,19 @@ verify_leb1_for_tier() {
 
 process_leb1_for_tier() {
   local tier="$1"
+  local main_path
 
   print_header "LEB1 workflow" "tier: $tier"
+
+  # A partial-group update rebuilds the main file from itself, so the main
+  # must already exist. Check before the expensive generation, not after.
+  if ((ENABLE_MERGE)) && ! all_leb1_groups_selected && ! ((DRY_RUN)); then
+    main_path="$(leb1_main_path "$tier")"
+    [[ -f "$main_path" ]] \
+      || fatal "cannot update selected groups: missing main LEB1: $main_path —" \
+        "generate the complete tier first: ./regenerate-leb.sh $tier"
+  fi
+
   generate_leb1_partials_for_tier "$tier" || return 1
   merge_leb1_for_tier "$tier" || return 1
   verify_leb1_for_tier "$tier" || return 1
@@ -1378,15 +1428,21 @@ install_file() {
 
   if ! ((DRY_RUN)); then
     [[ -f "$source_path" ]] || fatal "install source not found: $source_path"
-    mkdir -p "$INSTALL_DIR"
+    if ! mkdir -p "$INSTALL_DIR"; then
+      record_failure "install: mkdir -p $(printf '%q' "$INSTALL_DIR")" 1
+      return 1
+    fi
   fi
 
   if [[ -e "$destination_path" ]]; then
     if ((DRY_RUN)); then
       print_dry_run "cp -p $(printf '%q' "$destination_path") $(printf '%q' "$backup_path")"
     else
-      mkdir -p "$backup_directory"
-      cp -p "$destination_path" "$backup_path"
+      if ! mkdir -p "$backup_directory" \
+        || ! cp -p "$destination_path" "$backup_path"; then
+        record_failure "install backup: $destination_path" 1
+        return 1
+      fi
       print_note "backup $destination_path → $backup_path"
     fi
   fi
@@ -1394,7 +1450,13 @@ install_file() {
   if ((DRY_RUN)); then
     print_dry_run "cp -p $(printf '%q' "$source_path") $(printf '%q' "$destination_path")"
   else
-    cp -p "$source_path" "$destination_path"
+    # A failed copy must reach the final summary and the exit code: an
+    # unchecked cp here would report "installed" while the destination still
+    # holds the previous (or a truncated) ephemeris.
+    if ! cp -p "$source_path" "$destination_path"; then
+      record_failure "install: $source_path → $destination_path" 1
+      return 1
+    fi
     printf '%s✓ installed%s  %s → %s\n' \
       "$C_GREEN" "$C_RESET" "$source_path" "$destination_path"
   fi
@@ -1833,7 +1895,12 @@ main() {
   acquire_lock
   print_configuration
 
+  # The function runs on the left side of a pipe (a subshell), so its fatal()
+  # can only exit that subshell: propagate the failure from PIPESTATUS here.
   refresh_refitted_tno_spk_cache | tee -a "$LOG_FILE"
+  if [[ "${PIPESTATUS[0]}" -ne 0 ]]; then
+    fatal "SPK cache refresh failed; stale TNO kernels may remain"
+  fi
 
   for tier in "${SELECTED_TIERS[@]}"; do
     if ((ENABLE_LEB1)); then
