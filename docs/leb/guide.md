@@ -2010,6 +2010,14 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 
 The table gives the base-tier inventory. Medium also has 31 exotics; extended
 contains exactly the 23 regular exotics and excludes all eight chaotic NEAs.
+Within the extended tier, 17 of those bodies are N-body integrated over the
+full ±5000-year span, while the six sb441-n16 perturber asteroids (Hygiea,
+Psyche, Europa, Sylvia, Davida, Interamnia) carry their SPK coverage window
+(~1600–2500) instead: a perturber cannot be integrated as a massless test
+particle against the force model that already contains it (see
+`EXOTIC_ASSIST_PERTURBER_IDS` in `libephemeris/exotic_bodies.py`). Outside a
+body's stored window the runtime falls back to Skyfield exactly as for the
+classic asteroids.
 
 The `exotics` group (`LEB2_GROUPS` in `libephemeris/leb_groups.py`) is by far
 the largest. It is a supported generated companion but is not currently a

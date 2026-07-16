@@ -166,6 +166,7 @@ from libephemeris.leb_format import (
     write_star_entry,
 )
 from libephemeris.exotic_bodies import (
+    EXOTIC_ASSIST_PERTURBER_IDS,
     EXOTIC_EXTENDED_IDS,
     EXOTIC_IDS,
     naif_map as _exotic_naif,
@@ -1628,9 +1629,13 @@ def generate_body_icrs_asteroid_nbody(
         sim = rebound.Simulation()
         extras = assist.Extras(sim, ephem)
         sim.add(m=0.0, **seed)
-        # Disable the ASTEROIDS force when the body IS one of the sb441-n16
-        # perturbers (Hygiea etc.) to avoid the self-singularity.
-        _assist_disable_self_perturber(
+        # A body that IS one of the sb441-n16 perturbers (Hygiea etc.) must
+        # never reach this worker: the only mitigation for the self-force
+        # singularity is dropping the whole ASTEROIDS group, and the omitted
+        # 15 other perturbers accumulate arcsecond-level drift over the
+        # centuries-long LEB span (fine for the short runtime propagations
+        # this helper was written for, wrong here).
+        hit = _assist_disable_self_perturber(
             extras,
             ephem,
             seed["x"],
@@ -1638,6 +1643,13 @@ def generate_body_icrs_asteroid_nbody(
             seed["z"],
             _NBODY_ANCHOR_JD - ephem.jd_ref,
         )
+        if hit is not None:
+            raise RuntimeError(
+                f"body {body_id} coincides with the ASSIST perturber '{hit}': "
+                "N-body LEB generation would omit the other asteroid "
+                "perturbers and drift by arcseconds. Add the body to "
+                "EXOTIC_ASSIST_PERTURBER_IDS so it is generated from its SPK."
+            )
         sim.t = _NBODY_ANCHOR_JD - ephem.jd_ref
         sim.integrator = "ias15"
         return sim, extras
@@ -2165,12 +2177,22 @@ def assemble_leb(
     if bodies is None:
         bodies = sorted(BODY_PARAMS.keys())
 
-    # Extended tier: route the 23 regular exotics through the N-body worker and
+    # Extended tier: route the regular exotics through the N-body worker and
     # drop the 8 chaotic NEA exotics. Their short-arc SPKs do not cover the
     # extended interval, and unconstrained integration diverges over millennia.
+    # Exotics that are themselves sb441-n16 asteroid perturbers cannot be
+    # N-body integrated (see EXOTIC_ASSIST_PERTURBER_IDS): they stay on the
+    # SPK path and get a per-body 1600-2500 range like the classic asteroids.
     nbody_ids: set[int] = set()
     if tier == "extended":
-        nbody_ids = set(EXOTIC_EXTENDED_IDS)
+        nbody_ids = set(EXOTIC_EXTENDED_IDS) - set(EXOTIC_ASSIST_PERTURBER_IDS)
+        spk_clamped = sorted(set(bodies) & set(EXOTIC_ASSIST_PERTURBER_IDS))
+        if spk_clamped and verbose:
+            names = ", ".join(BODY_NAMES.get(b, str(b)) for b in spk_clamped)
+            print(
+                f"  Extended tier: {len(spk_clamped)} perturber exotic(s) use "
+                f"the SPK path (1600-2500) instead of N-body: {names}"
+            )
         nea_ids = set(EXOTIC_IDS) - set(EXOTIC_EXTENDED_IDS)
         dropped = [b for b in bodies if b in nea_ids]
         if dropped:
@@ -3078,20 +3100,92 @@ def verify_leb(
 
     # Ensure asteroid SPKs cover each asteroid's actual date range in the LEB
     # (which may be narrower than the global file range for per-body coverage).
+    #
+    # N-body bodies (extended-tier exotics) store the FULL tier range, but no
+    # Horizons SPK can cover it: SPK generation is limited to ~1600-2500.
+    # For each SPK-verified body we therefore compute an effective verify
+    # window = (body range ∩ registered-SPK coverage) and sample only inside
+    # it. Outside that window there is no independent reference to compare
+    # against; the deep-time trajectory is validated at generation time by
+    # the N-body integration itself.
+    spk_verify_windows: dict[int, Tuple[float, float]] = {}
     asteroid_ids_in_file = [bid for bid in reader._bodies if bid in _ASTEROID_NAIF]
     if asteroid_ids_in_file:
-        from libephemeris.minor_bodies import auto_download_asteroid_spk
+        from libephemeris.minor_bodies import (
+            HORIZONS_SPK_JD_MAX,
+            HORIZONS_SPK_JD_MIN,
+            auto_download_asteroid_spk,
+        )
+        from libephemeris.state import _SPK_BODY_MAP
 
         if verbose:
             print("  Preparing asteroid SPKs for verification...")
         for bid in asteroid_ids_in_file:
             body = reader._bodies[bid]
             try:
-                auto_download_asteroid_spk(
-                    bid, jd_start=body.jd_start, jd_end=body.jd_end, force=True
+                registered = _SPK_BODY_MAP.get(bid)
+                covers = registered is not None and _spk_covers_range(
+                    registered[0], bid, body.jd_start, body.jd_end
                 )
+                if not covers:
+                    covering = _find_covering_cached_spk(
+                        bid, body.jd_start, body.jd_end
+                    )
+                    if covering is None:
+                        # No kernel spans the stored range (expected for
+                        # N-body extended bodies): fall back to the widest
+                        # Horizons-servable window before re-downloading.
+                        clamped_lo = max(body.jd_start, HORIZONS_SPK_JD_MIN)
+                        clamped_hi = min(body.jd_end, HORIZONS_SPK_JD_MAX)
+                        if clamped_lo < clamped_hi:
+                            covering = _find_covering_cached_spk(
+                                bid, clamped_lo, clamped_hi
+                            )
+                    if covering is not None:
+                        from libephemeris import spk as _spk
+
+                        _spk.register_spk_body(bid, covering, _ASTEROID_NAIF[bid])
+                    else:
+                        # auto_download clamps the request to the Horizons
+                        # servable window; force when a (too narrow) kernel is
+                        # already registered, since the helper short-circuits
+                        # on registered bodies.
+                        auto_download_asteroid_spk(
+                            bid,
+                            jd_start=body.jd_start,
+                            jd_end=body.jd_end,
+                            force=bid in _SPK_BODY_MAP,
+                        )
             except Exception:
                 pass  # Will show as FAIL if data is unavailable
+
+            spk_info = _SPK_BODY_MAP.get(bid)
+            if spk_info is None:
+                continue
+            spk_range = _get_asteroid_spk_range(spk_info[0], bid)
+            if spk_range is None:
+                continue
+            # 1-day inward margin for SPK boundary safety.
+            window_start = max(body.jd_start, spk_range[0] + 1.0)
+            window_end = min(body.jd_end, spk_range[1] - 1.0)
+            if window_end - window_start < 2.0:
+                continue
+            # The achieved window must cover the whole Horizons-servable part
+            # of the body range. Otherwise a narrow kernel left registered by
+            # an earlier same-process step (e.g. the J2000±400d anchor seed
+            # when the wide re-download fails) would silently shrink the
+            # verification to a self-referential sliver and report PASS.
+            # Without a window the body samples its full range and fails
+            # loudly on the missing reference instead.
+            target_lo = max(body.jd_start, HORIZONS_SPK_JD_MIN)
+            target_hi = min(body.jd_end, HORIZONS_SPK_JD_MAX)
+            boundary_tolerance_days = 30.0
+            if (
+                window_start > target_lo + boundary_tolerance_days
+                or window_end < target_hi - boundary_tolerance_days
+            ):
+                continue
+            spk_verify_windows[bid] = (window_start, window_end)
 
     all_pass = True
 
@@ -3124,13 +3218,19 @@ def verify_leb(
         # Use body-specific JD range if available
         body_jd_start = body.jd_start if hasattr(body, "jd_start") else jd_start
         body_jd_end = body.jd_end if hasattr(body, "jd_end") else jd_end
-        body_test_jds = test_jds[
-            (test_jds >= body_jd_start + 1) & (test_jds <= body_jd_end - 1)
-        ]
-        if len(body_test_jds) == 0:
-            body_test_jds = rng.uniform(
-                body_jd_start + 1, body_jd_end - 1, min(n_samples, 100)
-            )
+        sample_lo = body_jd_start + 1
+        sample_hi = body_jd_end - 1
+        # SPK-verified bodies can only be checked where the reference kernel
+        # has coverage (see spk_verify_windows above).
+        verify_window = spk_verify_windows.get(body_id)
+        if verify_window is not None:
+            sample_lo = max(sample_lo, verify_window[0])
+            sample_hi = min(sample_hi, verify_window[1])
+        body_test_jds = test_jds[(test_jds >= sample_lo) & (test_jds <= sample_hi)]
+        if len(body_test_jds) == 0 or (
+            verify_window is not None and len(body_test_jds) < min(n_samples, 100)
+        ):
+            body_test_jds = rng.uniform(sample_lo, sample_hi, min(n_samples, 100))
 
         for jd in body_test_jds:
             try:
@@ -3226,6 +3326,13 @@ def verify_leb(
                 yr_s = 2000.0 + (body.jd_start - 2451545.0) / 365.25
                 yr_e = 2000.0 + (body.jd_end - 2451545.0) / 365.25
                 range_note = f" [~{yr_s:.0f}-{yr_e:.0f}]"
+            if verify_window is not None and (
+                verify_window[0] > body.jd_start + 2.0
+                or verify_window[1] < body.jd_end - 2.0
+            ):
+                win_s = 2000.0 + (verify_window[0] - 2451545.0) / 365.25
+                win_e = 2000.0 + (verify_window[1] - 2451545.0) / 365.25
+                range_note += f" [SPK-verified ~{win_s:.0f}-{win_e:.0f}]"
             if error_unit == "AU":
                 detail = (
                     f"max Cartesian component = {max_error:.2e} AU "

@@ -98,6 +98,38 @@ EXOTIC_IDS: List[int] = sorted(EXOTIC_BODIES)
 # Bodies eligible for the future N-body extended tier (regular, non-chaotic).
 EXOTIC_EXTENDED_IDS: List[int] = sorted(b.body_id for b in _REGISTRY if b.cls != "nea")
 
+# The sb441-n16 asteroid perturber set used by the JPL/ASSIST force model.
+# Registry bodies in this set must NOT be integrated as massless test
+# particles: the only available mitigation for the self-interaction
+# singularity (disabling the whole ASTEROIDS force group) also drops the
+# other 15 perturbers, which accumulates arcsecond-level drift across the
+# 1600-2500 SPK window (measured 1.4"-56" for the six main-belt members).
+# Extended-tier generation therefore builds them from their SPK coverage
+# window instead, exactly like the classic asteroids.
+_ASSIST_PERTURBER_NAMES = frozenset(
+    {
+        "Camilla",
+        "Ceres",
+        "Cybele",
+        "Davida",
+        "Eunomia",
+        "Euphrosyne",
+        "Europa",
+        "Hygiea",
+        "Interamnia",
+        "Iris",
+        "Juno",
+        "Pallas",
+        "Psyche",
+        "Sylvia",
+        "Thisbe",
+        "Vesta",
+    }
+)
+EXOTIC_ASSIST_PERTURBER_IDS: List[int] = sorted(
+    b.body_id for b in _REGISTRY if b.name in _ASSIST_PERTURBER_NAMES
+)
+
 
 def naif_map() -> Dict[int, int]:
     """``body_id -> NAIF id`` for the SPK lookup table (``_ASTEROID_NAIF``)."""

@@ -3317,6 +3317,13 @@ def get_major_asteroid_info(
     return MAJOR_ASTEROID_SPK_INFO.get(body_id)
 
 
+# JPL Horizons only supports SPK generation for minor bodies in the range
+# ~1600-01-01 to ~2500-01-01 (empirically verified). Shared with the LEB
+# generation/verification tooling so both sides clamp identically.
+HORIZONS_SPK_JD_MIN = 2305448.5  # 1600-01-01 UTC
+HORIZONS_SPK_JD_MAX = 2634167.5  # 2500-01-01 UTC
+
+
 def auto_download_asteroid_spk(
     body_id: int,
     jd_start: Optional[float] = None,
@@ -3392,14 +3399,9 @@ def auto_download_asteroid_spk(
         if jd_end is None:
             jd_end = current_jd + 3652.5  # ~10 years after
 
-        # JPL Horizons only supports SPK generation for minor bodies in the
-        # range ~1600-01-01 to ~2500-01-01 (empirically verified).  Clamp the
-        # requested range so that callers (e.g. extended-tier LEB generation)
-        # don't produce date strings that Horizons cannot parse (negative
-        # years) or that fall outside the supported window.
-        HORIZONS_SPK_JD_MIN = 2305448.5  # 1600-01-01 UTC
-        HORIZONS_SPK_JD_MAX = 2634167.5  # 2500-01-01 UTC
-
+        # Clamp the requested range so that callers (e.g. extended-tier LEB
+        # generation) don't produce date strings that Horizons cannot parse
+        # (negative years) or that fall outside the supported window.
         if jd_start < HORIZONS_SPK_JD_MIN or jd_end > HORIZONS_SPK_JD_MAX:
             jd_start = max(jd_start, HORIZONS_SPK_JD_MIN)
             jd_end = min(jd_end, HORIZONS_SPK_JD_MAX)
