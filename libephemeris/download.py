@@ -81,24 +81,21 @@ def _is_valid_bsp(filepath: str) -> bool:
         return False
 
 
-# GitHub Releases URL for data files (single unified release)
+# GitHub Releases URL for data files. The definitive "Data Files v2" release is
+# the single source for every downloadable asset the library pins: the reviewed
+# regenerated LEB2 cores, the clean-room uranians companions, and the unchanged
+# planet-center BSP subsets (mirrored here so nothing depends on the earlier
+# release). The retired legacy assets that older library versions still pin live
+# on the earlier release and are deliberately not referenced here.
 GITHUB_RELEASES = (
-    "https://github.com/g-battaglia/libephemeris/releases/download/data-v1"
-)
-
-# The definitive data-v2 release hosts the reviewed regenerated LEB2 cores and
-# the clean-room uranians companions. data-v1 is kept only for the unchanged
-# planet-center BSP subsets (not regenerated for v2) and for the retired legacy
-# uranians assets that earlier library versions still pin and must not be
-# overwritten. New downloadable LEB2 assets are served from data-v2.
-GITHUB_RELEASES_DATA_V2 = (
     "https://github.com/g-battaglia/libephemeris/releases/download/data-v2rc1"
 )
 
 # Data file definitions: (filename, sha256 hash, description)
 DATA_FILES: dict[str, dict[str, Any]] = {
     # Planet-center BSP subsets are unchanged JPL-derived data (not part of the
-    # data-v2 LEB regeneration), so they stay on data-v1 (GITHUB_RELEASES).
+    # data-v2 LEB regeneration) but are mirrored onto the data-v2 release so no
+    # download depends on the earlier release.
     # Legacy destination name kept for API compatibility. It downloads the
     # exact pinned base-tier SPK; there is no unverified legacy release path.
     "planet_centers.bsp": {
@@ -151,14 +148,14 @@ DATA_FILES: dict[str, dict[str, Any]] = {
     # equivalent to the earlier data-v1 cores — same coefficients, re-packed
     # container). The bundled base core stays a package resource (below).
     "medium_core.leb2": {
-        "url": f"{GITHUB_RELEASES_DATA_V2}/medium_core.leb2",
+        "url": f"{GITHUB_RELEASES}/medium_core.leb2",
         "sha256": "09072b315df5a2ec44c5320cca8bdd92cfd3ef0acb82baea3ca96fffc83522f6",
         "size_mb": 38.8,
         "description": "LEB2 core bodies for 'medium' tier (1550-2650)",
         "dest_subdir": "leb",
     },
     "extended_core.leb2": {
-        "url": f"{GITHUB_RELEASES_DATA_V2}/extended_core.leb2",
+        "url": f"{GITHUB_RELEASES}/extended_core.leb2",
         "sha256": "69f9d6972c6d54dacb50faadea6c0b9a50649dc3912b80a928b5a26bee16611a",
         "size_mb": 338.7,
         "description": "LEB2 core bodies for 'extended' tier (-5000 to +5000)",
@@ -178,14 +175,14 @@ DATA_FILES: dict[str, dict[str, Any]] = {
         "dest_subdir": "leb",
     },
     "medium_uranians.leb2": {
-        "url": f"{GITHUB_RELEASES_DATA_V2}/medium_uranians.leb2",
+        "url": f"{GITHUB_RELEASES}/medium_uranians.leb2",
         "sha256": "21bc3267606d20ae59dd217bedad57ceb272eff1df81df6e6b2163993853496f",
         "size_mb": 0.17,
         "description": "LEB2 Hamburg bodies for 'medium' tier (1550-2650)",
         "dest_subdir": "leb",
     },
     "extended_uranians.leb2": {
-        "url": f"{GITHUB_RELEASES_DATA_V2}/extended_uranians.leb2",
+        "url": f"{GITHUB_RELEASES}/extended_uranians.leb2",
         "sha256": "67d4ea543e9a775a590ae8f910f351091653de3f78fab62384ddb05f46334f87",
         "size_mb": 1.51,
         "description": "LEB2 Hamburg bodies for 'extended' tier (-5000 to +5000)",
