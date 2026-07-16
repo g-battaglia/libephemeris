@@ -330,8 +330,10 @@ compatibility-model artifacts or oracle-output generators to rebuild. See
 ### `leph release` — Release management
 
 The historical LEB upload tasks are retired together with the former published
-LEB assets. The wheel bundles only the reviewed `base_core.leb2`; generate other
-LEB files locally and do not upload them through the legacy release workflow.
+LEB assets. The wheel bundles the reviewed `base_core.leb2` and
+`base_uranians.leb2`; the reviewed medium/extended cores and uranians
+companions are published as hash-pinned downloads. Generate other LEB files
+locally and do not upload them through the legacy release workflow.
 
 ### `leph manual` — Documentation builds
 
@@ -383,8 +385,10 @@ libephemeris download medium --quiet           # Suppress all output
 
 All commands that downloaded prebuilt LEB assets are retired because the former
 monolithic and modular release files do not satisfy the current provenance
-policy. The wheel bundles the reviewed `base_core.leb2`; generate every other
-LEB1/LEB2 file locally with `leph leb generate` / `leph leb2 convert`.
+policy. The wheel bundles the reviewed `base_core.leb2` and
+`base_uranians.leb2`; the reviewed medium/extended cores and uranians
+companions are hash-pinned downloads. Generate every other LEB1/LEB2 file
+locally with `leph leb generate` / `leph leb2 convert`.
 
 ### `libephemeris status` output
 
@@ -395,7 +399,7 @@ The `status` command shows a comprehensive overview:
 - **Planet Center Corrections**: per-tier BSP files, active tier marked with `*`
 - **Locally generated LEB1 Binary Ephemeris**: per-tier .leb files, active one marked with `*`
 - **LEB2 Compressed Ephemeris**: per-tier group counts
-  (core/asteroids/exotics/apogee)
+  (core/asteroids/exotics/apogee/uranians)
 - **SPK Asteroid Cache**: directory path, file count, total size
 - **ASSIST N-body Data**: planet ephemeris + asteroid perturbers
 - **IERS Earth Orientation Data**: finals2000A, leap seconds, delta T with age in days
@@ -403,9 +407,12 @@ The `status` command shows a comprehensive overview:
 
 ### Backward compatibility
 
-The reader can decode legacy LEB files that contain the retired hypothetical
-group, but active generation, conversion, and publication never create that
-group. Legacy `<tier>-uranians` conversion selectors fail closed.
+The reader can decode legacy LEB files that contain the hypothetical group but
+never serves their fictitious coefficients: the per-file SHA-256 pin gate
+applies at both companion attach and calculation sourcing, so only the
+regenerated, manifest-pinned `{tier}_uranians.leb2` is trusted. The
+`<tier>-uranians` selectors convert and verify that regenerated companion from
+its standalone LEB1 partial.
 
 Old colon-separated syntax still works:
 

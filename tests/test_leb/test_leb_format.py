@@ -255,8 +255,14 @@ class TestBodyParams:
 
     @pytest.mark.unit
     def test_reviewed_hypothetical_policy(self):
-        """Fictitious-body models must never enter persisted LEB data."""
-        assert not set(range(40, 59)).intersection(BODY_PARAMS)
+        """Only the independently sourced Hamburg bodies have persisted channels.
+
+        IDs 40-47 are fitted from the Neely (1980) runtime propagation and
+        ship as the pinned uranians companion; every other fictitious ID
+        (48-58) must never enter persisted LEB data.
+        """
+        assert set(range(40, 48)) <= set(BODY_PARAMS)
+        assert not set(range(48, 59)).intersection(BODY_PARAMS)
 
     @pytest.mark.unit
     def test_coord_types_valid(self):

@@ -77,8 +77,10 @@ documentation, algorithm, data file, generated artifact, or comparison output;
 the build regenerated the asset rather than converting a previously published
 LEB file. This attestation is scoped to the named build inputs and artifact. It
 does not make a claim about every historical repository revision.
-The retired hypothetical group was neither generated nor converted; active
-tooling excludes it from publication.
+The hypothetical group, retired at the time of this build, was neither
+generated into nor converted as part of this `base_core.leb2` artifact. The
+Hamburg bodies (40–47) now ship separately as the independently sourced,
+manifest-pinned `base_uranians.leb2` companion.
 
 This page is an external build record. The command, hash, input description,
 and clean-room attestation are not embedded as metadata inside the LEB2 format.

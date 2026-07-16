@@ -3547,9 +3547,117 @@ def _calc_body(
         is_j2000 = bool(iflag & FLG_J2000)
         is_sidereal = bool(iflag & FLG_SIDEREAL)
 
+        # Position sourcing. With an active LEB reader the expensive Skyfield
+        # Earth evaluation — and, when the serving file byte-matches its
+        # pinned manifest SHA-256, the body propagation itself — come from the
+        # reader. Every frame transform and finite-difference realization
+        # below is shared by both sources, so the public speed semantics do
+        # not depend on where the raw positions come from; the residual source
+        # delta is the LEB approximation class (~1e-12 deg for the body,
+        # <0.001" for Earth). Out-of-range dates fall back per sample.
+        from .state import get_leb_reader, leb_fictitious_source_trusted
+
+        # In mode="leb" get_leb_reader() raises when no global LEB resolves.
+        # A context calculation may carry its own LEB while the global one is
+        # absent; treat that as "no reader here" and fall back to the runtime
+        # model exactly as the pre-companion branch did, instead of surfacing
+        # the RuntimeError to the public caller.
+        try:
+            _reader = get_leb_reader()
+        except RuntimeError:
+            _reader = None
+
+        if _reader is not None and leb_fictitious_source_trusted(_reader, ipl):
+            # The body position is served from the manifest-pinned companion,
+            # so report LEB as the dispatch backend (mirrors the SPK branch).
+            _mark_dispatch_source("LEB")
+
+            def _uranian_pos(jd: float) -> Tuple[float, float, float]:
+                try:
+                    (u_lon, u_lat, u_dist), _ = _reader.eval_body(ipl, jd)
+                except (KeyError, ValueError):
+                    return hypothetical._calc_uranian_planet_raw(ipl, jd)
+                return u_lon, u_lat, u_dist
+
+        else:
+
+            def _uranian_pos(jd: float) -> Tuple[float, float, float]:
+                return hypothetical._calc_uranian_planet_raw(ipl, jd)
+
+        def _uranian_helio_state(
+            jd: float,
+        ) -> Tuple[float, float, float, float, float, float]:
+            # Same centered 1-day stencil and 0/360 unwrap as
+            # hypothetical.calc_uranian_planet: with the pure-model source the
+            # returned state is arithmetic-identical to that function.
+            u_lon, u_lat, u_dist = _uranian_pos(jd)
+            dt_step = 1.0
+            pos_prev = _uranian_pos(jd - dt_step)
+            pos_next = _uranian_pos(jd + dt_step)
+            u_dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
+            # 0/360 wrap: valid only because these bodies are slow
+            # (<<90 deg/day at dt_step=1); see calc_uranian_planet.
+            if u_dlon > 180.0 / (2.0 * dt_step):
+                u_dlon -= 360.0 / (2.0 * dt_step)
+            elif u_dlon < -180.0 / (2.0 * dt_step):
+                u_dlon += 360.0 / (2.0 * dt_step)
+            u_dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
+            u_ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
+            return (u_lon, u_lat, u_dist, u_dlon, u_dlat, u_ddist)
+
+        def _earth_helio_ecl_j2000_skyfield(jd: float) -> Tuple[float, float, float]:
+            ts_i = get_timescale()
+            t_i = ts_i.tt_jd(jd)
+            earth_h = planets["sun"].at(t_i).observe(planets["earth"])
+            exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
+            return float(exyz[0]), float(exyz[1]), float(exyz[2])
+
+        if _reader is not None and _reader.has_body(SUN) and _reader.has_body(EARTH):
+            from .fast_calc import C_LIGHT_AU_DAY
+
+            # The exact ICRS -> J2000-ecliptic matrix of the Skyfield frame
+            # used by the fallback path (constant for an inertial frame), so
+            # both Earth sources share the rotation to the last bit.
+            _ecl_m = ecliptic_J2000_frame.rotation_at(t)
+
+            def _earth_helio_ecl_j2000(jd: float) -> Tuple[float, float, float]:
+                try:
+                    (ex, ey, ez), _ = _reader.eval_body(EARTH, jd)
+                    (sx, sy, sz), _ = _reader.eval_body(SUN, jd)
+                except (KeyError, ValueError):
+                    return _earth_helio_ecl_j2000_skyfield(jd)
+                # Astrometric Earth-from-Sun: iterate the light time on the
+                # Earth sample (Sun frozen at jd), replicating the Skyfield
+                # observe() semantics of the fallback path above.
+                rx, ry, rz = ex - sx, ey - sy, ez - sz
+                lt = math.sqrt(rx * rx + ry * ry + rz * rz) / C_LIGHT_AU_DAY
+                for _ in range(10):
+                    try:
+                        (ex, ey, ez), _ = _reader.eval_body(EARTH, jd - lt)
+                    except (KeyError, ValueError):
+                        # A composite reader closed mid-calculation (e.g. a
+                        # concurrent set_leb_file/close) raises KeyError once
+                        # its body map is cleared; degrade to Skyfield like the
+                        # outer evals rather than escaping to the public caller.
+                        return _earth_helio_ecl_j2000_skyfield(jd)
+                    rx, ry, rz = ex - sx, ey - sy, ez - sz
+                    lt_next = math.sqrt(rx * rx + ry * ry + rz * rz) / C_LIGHT_AU_DAY
+                    converged = abs(lt_next - lt) < 1e-14
+                    lt = lt_next
+                    if converged:
+                        break
+                return (
+                    float(_ecl_m[0, 0] * rx + _ecl_m[0, 1] * ry + _ecl_m[0, 2] * rz),
+                    float(_ecl_m[1, 0] * rx + _ecl_m[1, 1] * ry + _ecl_m[1, 2] * rz),
+                    float(_ecl_m[2, 0] * rx + _ecl_m[2, 1] * ry + _ecl_m[2, 2] * rz),
+                )
+
+        else:
+            _earth_helio_ecl_j2000 = _earth_helio_ecl_j2000_skyfield
+
         if is_helio:
-            # Heliocentric: calc_uranian_planet returns heliocentric J2000 ecliptic
-            pos = hypothetical.calc_uranian_planet(ipl, jd_tt)
+            # Heliocentric J2000 ecliptic state (position + centered velocity)
+            pos = _uranian_helio_state(jd_tt)
             lon, lat, dist = pos[0], pos[1], pos[2]
             dlon, dlat, ddist = pos[3], pos[4], pos[5]
             # Zero the speed slots when FLG_SPEED is absent so callers never
@@ -3587,8 +3695,8 @@ def _calc_body(
             return _to_native_floats(result), iflag
 
         # Geocentric: convert heliocentric Keplerian orbit to geocentric
-        def _get_uranian_geo_j2000(jd, body_id):
-            h = hypothetical.calc_uranian_planet(body_id, jd)
+        def _get_uranian_geo_j2000(jd):
+            h = _uranian_pos(jd)
             lon_r = math.radians(h[0])
             lat_r = math.radians(h[1])
             cl = math.cos(lat_r)
@@ -3596,28 +3704,25 @@ def _calc_body(
             yh = h[2] * cl * math.sin(lon_r)
             zh = h[2] * math.sin(lat_r)
 
-            ts_i = get_timescale()
-            t_i = ts_i.tt_jd(jd)
-            earth_h = planets["sun"].at(t_i).observe(planets["earth"])
-            exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
-            xg = xh - float(exyz[0])
-            yg = yh - float(exyz[1])
-            zg = zh - float(exyz[2])
+            ex, ey, ez = _earth_helio_ecl_j2000(jd)
+            xg = xh - ex
+            yg = yh - ey
+            zg = zh - ez
             rg = math.sqrt(xg * xg + yg * yg + zg * zg)
             lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
             sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
             lat_g = math.degrees(math.asin(sin_lat))
             return lon_g, lat_g, rg
 
-        lon, lat, dist = _get_uranian_geo_j2000(jd_tt, ipl)
+        lon, lat, dist = _get_uranian_geo_j2000(jd_tt)
 
         # The central-difference stencil runs only when speeds are requested:
         # without FLG_SPEED the reference API returns zeroed speed slots, and
         # skipping the stencil saves two extra Earth-position evaluations.
         if iflag & FLG_SPEED:
             dt_v = 1.0
-            prev = _get_uranian_geo_j2000(jd_tt - dt_v, ipl)
-            nxt = _get_uranian_geo_j2000(jd_tt + dt_v, ipl)
+            prev = _get_uranian_geo_j2000(jd_tt - dt_v)
+            nxt = _get_uranian_geo_j2000(jd_tt + dt_v)
             dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
             # Unwrap a 0/360 boundary crossing. The longitudes are in [0, 360),
             # so a crossing is a ~360 deg jump in the raw difference; after

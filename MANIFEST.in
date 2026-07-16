@@ -8,6 +8,7 @@ recursive-include libephemeris *.py
 include libephemeris/py.typed
 include libephemeris/data/fictitious_orbits.csv
 include libephemeris/data/leb2/base_core.leb2
+include libephemeris/data/leb2/base_uranians.leb2
 
 # The leph dev CLI is repo tooling (repo-relative paths); it must not ship
 # in any artifact. setuptools' include-package-data (default true with

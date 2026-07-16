@@ -275,6 +275,19 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     18: (8, 13, COORD_ICRS_BARY, 3),  # PALLAS
     19: (8, 13, COORD_ICRS_BARY, 3),  # JUNO
     20: (8, 13, COORD_ICRS_BARY, 3),  # VESTA
+    # Hamburg-school hypothetical bodies: heliocentric J2000 ecliptic
+    # (lon, lat, dist) sampled from the runtime Keplerian propagation of the
+    # Neely (1980) element transcription in libephemeris.hypothetical (see
+    # docs/methodology/hypothetical-bodies.md). Two-body orbits are smooth:
+    # 10-year segments at degree 8 fit to ~1e-12 deg.
+    40: (3652.5, 8, COORD_HELIO_ECL, 3),  # CUPIDO
+    41: (3652.5, 8, COORD_HELIO_ECL, 3),  # HADES
+    42: (3652.5, 8, COORD_HELIO_ECL, 3),  # ZEUS
+    43: (3652.5, 8, COORD_HELIO_ECL, 3),  # KRONOS
+    44: (3652.5, 8, COORD_HELIO_ECL, 3),  # APOLLON
+    45: (3652.5, 8, COORD_HELIO_ECL, 3),  # ADMETOS
+    46: (3652.5, 8, COORD_HELIO_ECL, 3),  # VULKANUS
+    47: (3652.5, 8, COORD_HELIO_ECL, 3),  # POSEIDON
 }
 
 # Exotic minor bodies (centaurs / TNOs / NEAs) served from JPL SPK over their

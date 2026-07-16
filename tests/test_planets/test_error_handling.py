@@ -26,6 +26,7 @@ from libephemeris.constants import (
 from libephemeris.exceptions import (
     CoordinateError,
     PolarCircleError,
+    UnknownBodyError,
 )
 
 
@@ -48,14 +49,17 @@ class TestInvalidBodyIds:
             swe.calc_ut(jd, 999999, 0)
 
     @pytest.mark.unit
-    def test_body_id_49_returns_finite_result(self):
-        """Body ID 49 computes from the restored independently sourced orbit."""
-        jd = 2451545.0
-        result, _ = swe.calc_ut(jd, 49, 0)
+    def test_body_id_49_raises_unknown_body(self):
+        """Body ID 49 (Nibiru) stays fail-closed: no credible primary orbit.
 
-        assert len(result) == 6
-        assert all(type(value) is float for value in result)
-        assert all(math.isfinite(value) for value in result)
+        See docs/methodology/missing-hypothetical-models.md — the ID is
+        reserved for API compatibility but has no independently sourced
+        element set, so position requests raise UnknownBodyError like the
+        other unverified fictitious IDs (48, 54, 55, 57, 58).
+        """
+        jd = 2451545.0
+        with pytest.raises(UnknownBodyError):
+            swe.calc_ut(jd, 49, 0)
 
     @pytest.mark.unit
     def test_body_id_59_raises(self):

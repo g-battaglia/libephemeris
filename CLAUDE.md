@@ -11,7 +11,7 @@ The project is licensed AGPL-3.0-only.
 
 Development rules for new and modified code:
 
-- Do not inspect, retrieve, possess, read, translate, adapt, or copy Swiss
+- Never inspect, retrieve, possess, read, translate, adapt, or copy Swiss
   Ephemeris source code, source comments, documentation prose, algorithms, or
   data files. Reference-distribution files must not enter this repository.
 - The reference API may be used only for ephemeral behavioral comparison:
@@ -151,14 +151,22 @@ the declared inventory and per-body metadata against LEB1.
 | `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | ~8.7 MB |
 | `apogee` | OscuApog, IntpApog, IntpPerig (3) | ~11.4 MB |
 | `exotics` | Centaurs, TNOs, NEAs (31) | ~59.0 MB |
+| `uranians` | Hamburg bodies Cupido-Poseidon (40-47, 8) | ~46 KB |
 
-The former precomputed `uranians` LEB group is not shipped. Hypothetical bodies
-are evaluated by the analytical runtime registry; each row carries a source
-annotation checked by the integrity gate.
+`uranians` is companion-only: fitted from the runtime Neely (1980) propagation
+in `libephemeris.hypothetical` (never from legacy coefficients), generated from
+the standalone `ephemeris_{tier}_uranians.leb` partial (merged mains carry no
+fictitious IDs), and trusted at runtime only when the file byte-matches its
+`DATA_FILES` SHA-256 pin — both for companion attach and for calculation
+sourcing. With a trusted reader active, the Uranian branch in `planets.py`
+sources body and Earth positions from the LEB (same transform chain, ~4x
+faster geocentric speed); `fast_calc` still rejects IDs 40-58 from persisted
+channels. Other hypothetical bodies (48-58) remain runtime-only; each registry
+row carries a source annotation checked by the integrity gate.
 
 ### Per-body Precision Targets (`BODY_TARGET_AU` in `leb_compression.py`)
 
-Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amplifies errors through the pipeline (light-time, deflection, aberration). Inner planets use 1e-10 AU.
+Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amplifies errors through the pipeline (light-time, deflection, aberration). Inner planets use 1e-10 AU. Uranians (40-47) use 1e-12 because their channels store degrees natively, and the default AU-calibrated target would allow ~5e-9 deg of angular error.
 
 ### Key Commands
 
@@ -166,10 +174,15 @@ Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amp
 poe leb2:convert:base              # Convert LEB1 -> LEB2 (all 5 groups)
 ./leph leb2 convert base-core      # Core group only (~10.7 MB)
 ./leph leb2 convert base-exotics   # Exotic registry group only
+./leph leb2 convert base-uranians  # Hamburg companion (from the standalone partial)
 poe leb2:verify:base               # Verify base_core.leb2 against LEB1
+./leph leb2 verify base-uranians   # Verify the Hamburg companion (--group/--tier)
 ./leph test leb2-format all             # Unit tests (compression + reader)
 ./leph test leb2-format precision-base  # Fast precision test
 ./leph test leb2-format precision-all   # Core companions, all tiers
+
+# Regenerate the uranians partial (companion-only, never merged)
+python scripts/generate_leb.py --tier base --group uranians
 ```
 
 ### Full documentation
