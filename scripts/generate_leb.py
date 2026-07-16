@@ -229,6 +229,14 @@ BODY_NAMES = {
     20: "Vesta",
     21: "Interp Apogee",
     22: "Interp Perigee",
+    40: "Cupido",
+    41: "Hades",
+    42: "Zeus",
+    43: "Kronos",
+    44: "Apollon",
+    45: "Admetos",
+    46: "Vulkanus",
+    47: "Poseidon",
 }
 # Exotic minor bodies (centaurs/TNOs/NEAs) — labels from the registry.
 BODY_NAMES.update(_exotic_names())
@@ -321,6 +329,16 @@ BODY_GROUPS: dict[str, List[int]] = {
         for bid in BODY_PARAMS
         if bid not in _PLANET_MAP and bid not in _ASTEROID_NAIF and not 40 <= bid <= 49
     ),  # ecliptic/helio analytical bodies
+}
+
+# Companion-only groups: generated exclusively via an explicit --group and
+# shipped as a standalone {tier}_{group} companion. They are deliberately kept
+# out of BODY_GROUPS so full generation never merges them into the main LEB1
+# (main files carry no fictitious body IDs). The Hamburg bodies are sampled
+# from the runtime propagation of the Neely (1980) element transcription in
+# libephemeris.hypothetical — never from legacy coefficients.
+COMPANION_BODY_GROUPS: dict[str, List[int]] = {
+    "uranians": list(range(40, 48)),
 }
 
 
@@ -1748,11 +1766,36 @@ def generate_body_helio(
     label: str = "",
     verbose: bool = False,
 ) -> Tuple[List[np.ndarray], float]:
-    """Reject retired hypothetical-body coefficient generation."""
-    del jd_start, jd_end, interval_days, degree, label, verbose
-    raise ValueError(
-        f"No independently sourced heliocentric model is available for body "
-        f"{body_id}; hypothetical LEB generation is retired"
+    """Generate Chebyshev coefficients for a heliocentric-ecliptic body.
+
+    Covers the eight Hamburg-school hypothetical bodies (IDs 40-47) only.
+    The (lon, lat, dist) samples come exclusively from the project-owned
+    Keplerian propagation of the James Neely (1980) element transcription
+    (``libephemeris.hypothetical``; provenance in
+    docs/methodology/hypothetical-bodies.md). Handles longitude unwrapping
+    before fitting.
+    """
+    from libephemeris.constants import CUPIDO, POSEIDON
+    from libephemeris.hypothetical import _calc_uranian_planet_raw
+
+    if not CUPIDO <= body_id <= POSEIDON:
+        raise ValueError(
+            f"No independently sourced heliocentric model is available for body "
+            f"{body_id}; hypothetical LEB generation is retired"
+        )
+
+    def raw_func(jd: float) -> np.ndarray:
+        return np.array(_calc_uranian_planet_raw(body_id, jd))
+
+    return _generate_segments_unwrap(
+        raw_func,
+        jd_start,
+        jd_end,
+        interval_days,
+        degree,
+        3,
+        label=label,
+        verbose=verbose,
     )
 
 
@@ -2162,7 +2205,9 @@ def assemble_leb(
         output: Output file path.
         jd_start: Start Julian Day.
         jd_end: End Julian Day.
-        bodies: List of body IDs to include (None = all from BODY_PARAMS).
+        bodies: List of body IDs to include (None = all non-fictitious
+            bodies from BODY_PARAMS; companion-only IDs 40-58 must be
+            requested explicitly).
         workers: Number of parallel workers for body generation.
         verbose: Print progress messages.
         skip_aux: If True, skip nutation, Delta-T and star catalog generation.
@@ -2175,7 +2220,24 @@ def assemble_leb(
             the chaotic NEA exotics are excluded entirely.
     """
     if bodies is None:
-        bodies = sorted(BODY_PARAMS.keys())
+        # Fictitious bodies (40-58) are companion-only: they must be requested
+        # explicitly and never sweep into a merged main file by default.
+        bodies = sorted(bid for bid in BODY_PARAMS if not 40 <= bid <= 58)
+
+    # Defense in depth for design invariant: fictitious IDs (40-58) are
+    # companion-only and must never land in a merged main file. Any output
+    # carrying them has to use a companion-group suffix (e.g.
+    # ``ephemeris_base_uranians.leb``), so a stray ``--bodies cupido`` that
+    # resolves to the bare main path is rejected instead of clobbering it.
+    if any(40 <= bid <= 58 for bid in bodies):
+        stem = os.path.splitext(os.path.basename(output))[0]
+        allowed_suffixes = tuple(f"_{group}" for group in COMPANION_BODY_GROUPS)
+        if not stem.endswith(allowed_suffixes):
+            raise ValueError(
+                f"refusing to write fictitious bodies {sorted(b for b in bodies if 40 <= b <= 58)} "
+                f"to a non-companion output {output!r}; use a companion-suffixed "
+                f"path such as ephemeris_{{tier}}_uranians.leb (or --group uranians)"
+            )
 
     # Extended tier: route the regular exotics through the N-body worker and
     # drop the 8 chaotic NEA exotics. Their short-arc SPKs do not cover the
@@ -2520,8 +2582,9 @@ def assemble_leb(
             body_data[bid] = coeffs
             body_errors[bid] = error
 
-    # Heliocentric analytical bodies use the scalar path. The current reviewed
-    # group contains none; the branch remains generic for future sourced models.
+    # Heliocentric analytical bodies use the scalar path. The Hamburg bodies
+    # (40-47, the companion-only uranians group) flow through here, sourced
+    # from the runtime Neely (1980) propagation in libephemeris.hypothetical.
     if helio_body_ids:
         if verbose:
             print(
@@ -3384,8 +3447,18 @@ def _build_ecliptic_eval_funcs() -> dict:
 
 
 def _build_helio_eval_funcs() -> dict:
-    """Return no hypothetical evaluators after clean-room retirement."""
-    return {}
+    """Map heliocentric-ecliptic body IDs to their runtime analytical source.
+
+    The Hamburg bodies (40-47) verify against the same Neely (1980)
+    propagation that generated them; no other hypothetical ID has an
+    independently sourced evaluator.
+    """
+    from libephemeris.hypothetical import _calc_uranian_planet_raw
+
+    def _make(bid: int):
+        return lambda jd: np.array(_calc_uranian_planet_raw(bid, jd))
+
+    return {bid: _make(bid) for bid in range(40, 48)}
 
 
 def _verify_icrs_planet(body_id: int, jd: float, leb_pos: tuple) -> Tuple[float, float]:
@@ -3622,10 +3695,11 @@ def main():
     )
     parser.add_argument(
         "--group",
-        choices=["planets", "asteroids", "exotics", "analytical"],
+        choices=[*BODY_GROUPS, *COMPANION_BODY_GROUPS],
         default=None,
         help="Generate only a specific body group (partial file). "
-        "Use --merge to combine partial files afterward.",
+        "Use --merge to combine partial files afterward. Companion-only "
+        "groups (uranians) never enter the merged main file.",
     )
     parser.add_argument(
         "--merge",
@@ -3740,10 +3814,21 @@ def main():
             bodies = [_resolve_body_token(b) for b in args.bodies.split(",")]
         except ValueError as exc:
             parser.error(str(exc))
+        # Companion-only fictitious IDs (40-58) must never default into the
+        # bare main file path. --group auto-suffixes; --bodies does not, so
+        # require an explicit companion-suffixed --output here.
+        if any(40 <= bid <= 58 for bid in bodies) and args.output is None:
+            parser.error(
+                "fictitious bodies (40-58) are companion-only: pass --group "
+                "uranians, or an explicit companion-suffixed --output "
+                "(e.g. data/leb/ephemeris_base_uranians.leb); refusing to write "
+                "them to the merged main file"
+            )
     elif args.group:
-        if args.group not in BODY_GROUPS:
+        selectable_groups = {**BODY_GROUPS, **COMPANION_BODY_GROUPS}
+        if args.group not in selectable_groups:
             parser.error(f"Unknown group: {args.group}")
-        bodies = BODY_GROUPS[args.group]
+        bodies = selectable_groups[args.group]
         # Auto-suffix the output path when using --group without explicit --output
         if args.output is None:
             output = _group_output_path(output, args.group)

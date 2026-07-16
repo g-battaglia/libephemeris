@@ -1489,6 +1489,54 @@ def test_download_leb2_remote_asset_requires_and_passes_sha_pin(tmp_path, monkey
     ]
 
 
+def test_download_leb2_uranians_remote_asset_passes_sha_pin(tmp_path, monkeypatch):
+    """The medium/extended uranians companions download through the pinned path."""
+    monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
+    payload = b"synthetic reviewed uranians companion"
+    digest = hashlib.sha256(payload).hexdigest()
+    monkeypatch.setitem(
+        dl.DATA_FILES,
+        "medium_uranians.leb2",
+        {
+            "url": "https://example.invalid/medium_uranians.leb2",
+            "sha256": digest,
+            "size_mb": 0.17,
+            "description": "test",
+            "dest_subdir": "leb",
+        },
+    )
+    calls = []
+
+    def _download(url, dest_path, **kwargs):
+        calls.append((url, kwargs))
+        Path(dest_path).write_bytes(payload)
+        return True
+
+    monkeypatch.setattr(dl, "download_file", _download)
+    monkeypatch.setattr(dl, "_is_valid_leb", lambda path: True)
+
+    result = dl.download_leb2_for_tier(
+        "medium", groups=["uranians"], quiet=True, activate=False
+    )
+
+    assert result == [tmp_path / "leb" / "medium_uranians.leb2"]
+    assert calls == [
+        (
+            "https://example.invalid/medium_uranians.leb2",
+            {
+                "description": "medium_uranians.leb2",
+                "show_progress": True,
+                "expected_sha256": digest,
+            },
+        )
+    ]
+
+
+def test_download_leb2_default_groups_include_uranians() -> None:
+    """The tier download resolves uranians as a default (fifth) group."""
+    assert "uranians" in dl.LEB2_GROUPS
+
+
 def test_download_leb2_for_tier_default_groups_quiet(tmp_path, monkeypatch):
     """groups=None defaults to LEB2_GROUPS; quiet + no activation (1498-1549)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
@@ -1508,16 +1556,20 @@ def test_download_leb2_for_tier_default_groups_quiet(tmp_path, monkeypatch):
     downloaded = dl.download_leb2_for_tier(
         "base", groups=None, force=True, quiet=True, activate=False
     )
-    # Only the independently reviewed bundled core is available.
-    assert len(downloaded) == 1
+    # Exactly the independently reviewed bundled artifacts are available:
+    # the base core and the regenerated uranians companion.
+    assert sorted(p.name for p in downloaded) == [
+        "base_core.leb2",
+        "base_uranians.leb2",
+    ]
 
 
 def test_download_leb2_for_tier_quiet_arcs(tmp_path, monkeypatch):
-    """quiet mode never fetches retired companions.
+    """quiet mode never fetches unlisted companions.
 
     - bogus group skip (quiet)
-    - pre-existing retired file ignored
-    - reviewed bundled core installed
+    - pre-existing unlisted file ignored
+    - reviewed bundled artifacts (core + uranians) installed
     """
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     leb_dir = tmp_path / "leb"
@@ -1541,7 +1593,10 @@ def test_download_leb2_for_tier_quiet_arcs(tmp_path, monkeypatch):
     downloaded = dl.download_leb2_for_tier(
         "base", groups=groups, force=False, quiet=True, activate=True
     )
-    assert [p.name for p in downloaded] == ["base_core.leb2"]
+    assert sorted(p.name for p in downloaded) == [
+        "base_core.leb2",
+        "base_uranians.leb2",
+    ]
 
 
 def test_download_leb2_for_tier_invalid_cache_redownload(tmp_path, monkeypatch):

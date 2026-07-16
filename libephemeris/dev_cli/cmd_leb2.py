@@ -185,16 +185,17 @@ def base_apogee() -> None:
     )
 
 
-@convert_group.command(
-    "base-uranians",
-    short_help="Retired pending independently sourced elements.",
-)
-def base_uranians() -> None:
-    """Reject conversion of the retired hypothetical-body group."""
-    raise click.ClickException(
-        "Uranian LEB conversion is retired pending independently sourced "
-        "elements and clean-room regeneration."
-    )
+# Companion-only groups convert from their standalone LEB1 partial: merged
+# main files carry no fictitious body IDs. The regenerated group is sourced
+# from libephemeris.hypothetical (Neely 1980 transcription).
+_COMPANION_SOURCE_GROUPS = frozenset({"uranians"})
+
+
+def _group_source_path(tier: str, group: str) -> str:
+    """LEB1 source for a group: the merged main, or the standalone partial."""
+    if group in _COMPANION_SOURCE_GROUPS:
+        return f"data/leb/ephemeris_{tier}_{group}.leb"
+    return f"data/leb/ephemeris_{tier}.leb"
 
 
 def _make_group_converter(tier: str, group: str) -> click.Command:
@@ -203,13 +204,13 @@ def _make_group_converter(tier: str, group: str) -> click.Command:
     @click.command(
         name=f"{tier}-{group}",
         short_help=f"Convert {tier} tier {group} group only.",
-        help=f"Convert the {group} group from the {tier}-tier LEB1 file.",
+        help=f"Convert the {group} group from the {tier}-tier LEB1 source.",
     )
     def command() -> None:
         _leb2(
             [
                 "convert",
-                f"data/leb/ephemeris_{tier}.leb",
+                _group_source_path(tier, group),
                 "-o",
                 f"data/leb2/{tier}_{group}.leb2",
                 "--group",
@@ -226,7 +227,6 @@ _EXPLICIT_GROUP_COMMANDS = {
     "base-core",
     "base-asteroids",
     "base-apogee",
-    "base-uranians",
 }
 for _tier in ("base", "medium", "extended"):
     for _group in LEB2_GROUPS:
@@ -244,11 +244,14 @@ leb2_group.add_command(convert_group)
 
 @click.group(
     "verify",
-    short_help="Verify a tier's core LEB2 companion against LEB1.",
+    short_help="Verify a tier's LEB2 companions against LEB1.",
     help=(
-        "Verify one tier's core LEB2 companion against its LEB1 reference.\n\n"
-        "The exact 14-body inventory is required. Random dates are sampled for\n"
-        "each body and errors are reported in native stored component units."
+        "Verify LEB2 companions against their LEB1 reference.\n\n"
+        "The per-tier commands (base/medium/extended) check the core "
+        "companion.\nThe generated {tier}-{group} commands check one named "
+        "group; each\nrequires that group's exact canonical inventory. Random "
+        "dates are\nsampled per body and errors are reported in native stored "
+        "component units."
     ),
 )
 def verify_group() -> None:
@@ -319,6 +322,38 @@ def verify_extended() -> None:
             "extended",
         ]
     )
+
+
+def _make_group_verifier(tier: str, group: str) -> click.Command:
+    """Create a tier/group verification command from the canonical registry."""
+
+    @click.command(
+        name=f"{tier}-{group}",
+        short_help=f"Verify the {tier} tier {group} companion against LEB1.",
+        help=f"Verify {tier}_{group}.leb2 against its {tier}-tier LEB1 source.",
+    )
+    def command() -> None:
+        _leb2(
+            [
+                "verify",
+                f"data/leb2/{tier}_{group}.leb2",
+                "--reference",
+                _group_source_path(tier, group),
+                "--samples",
+                "500",
+                "--group",
+                group,
+                "--tier",
+                tier,
+            ]
+        )
+
+    return command
+
+
+for _tier in ("base", "medium", "extended"):
+    for _group in LEB2_GROUPS:
+        verify_group.add_command(_make_group_verifier(_tier, _group))
 
 
 leb2_group.add_command(verify_group)

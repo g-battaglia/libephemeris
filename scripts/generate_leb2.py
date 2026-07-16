@@ -102,6 +102,10 @@ LEB2_GROUPS = {
     "asteroids": sorted([15, 17, 18, 19, 20]),
     "exotics": list(EXOTIC_IDS),  # centaurs/TNOs/NEAs — registry source of truth
     "apogee": sorted([13, 21, 22]),
+    # Hamburg-school bodies, sourced from libephemeris.hypothetical (Neely
+    # 1980 transcription). Converted from the standalone LEB1 partial, never
+    # from a merged main file (mains carry no fictitious IDs).
+    "uranians": sorted(range(40, 48)),
 }
 assert tuple(LEB2_GROUPS) == CANONICAL_LEB2_GROUPS
 
@@ -110,9 +114,29 @@ _ALLOWED_GROUP_INVENTORIES: dict[str, tuple[frozenset[int], ...]] = {
     "asteroids": (frozenset(LEB2_GROUPS["asteroids"]),),
     "exotics": (frozenset(EXOTIC_IDS),),
     "apogee": (frozenset(LEB2_GROUPS["apogee"]),),
+    "uranians": (frozenset(LEB2_GROUPS["uranians"]),),
 }
 _ANGULAR_COORD_TYPES = {COORD_ECLIPTIC, COORD_HELIO_ECL, COORD_GEO_ECLIPTIC}
 _CARTESIAN_COORD_TYPES = {COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM}
+
+# Groups converted from a standalone LEB1 partial instead of the merged main
+# file (mains carry no fictitious body IDs).
+COMPANION_SOURCE_GROUPS = frozenset({"uranians"})
+
+
+def resolve_group_source(input_path: str, tier_name: str, group: str) -> str:
+    """Return the LEB1 source path for *group*.
+
+    Companion-only groups read the standalone sibling partial
+    (``{main_root}_{group}.leb`` next to *input_path*, e.g.
+    ``ephemeris_base_uranians.leb``); every other group reads the merged
+    main file itself.
+    """
+    del tier_name  # naming derives from the main file, tier kept for clarity
+    if group not in COMPANION_SOURCE_GROUPS:
+        return input_path
+    root, ext = os.path.splitext(input_path)
+    return f"{root}_{group}{ext}"
 
 
 def _group_inventory_error(
@@ -1077,14 +1101,20 @@ def convert_all_groups(
     tier_name: str,
     target_precision: float = DEFAULT_TARGET_AU,
     verbose: bool = True,
-) -> None:
+) -> list[str]:
     """Convert a LEB1 file into separate LEB2 files for each group.
 
-    Produces:
-      {output_dir}/{tier_name}_core.leb2
-      {output_dir}/{tier_name}_asteroids.leb2
-      {output_dir}/{tier_name}_exotics.leb2
-      {output_dir}/{tier_name}_apogee.leb2
+    Produces one ``{output_dir}/{tier_name}_{group}.leb2`` per registered
+    group. Groups whose bodies live in the merged main LEB1 convert from
+    ``input_path``; companion-only groups (``uranians``) convert from their
+    standalone sibling partial (``ephemeris_{tier}_{group}.leb`` next to the
+    main file) and are skipped with a visible message when that partial has
+    not been generated.
+
+    Returns:
+        The list of group names that were skipped because their source
+        partial was absent (empty when every group converted). Callers can
+        treat a non-empty list as a partial/incomplete conversion.
 
     Args:
         input_path: Source LEB1 file.
@@ -1099,6 +1129,8 @@ def convert_all_groups(
         print(f"=== Batch conversion: {input_path} -> {output_dir}/ ===\n")
 
     total_size = 0
+    converted = 0
+    skipped: list[str] = []
 
     for group_name in LEB2_GROUPS:
         output_path = os.path.join(output_dir, f"{tier_name}_{group_name}.leb2")
@@ -1106,8 +1138,18 @@ def convert_all_groups(
         if verbose:
             print(f"\n--- Group: {group_name} ---")
 
+        group_source = resolve_group_source(input_path, tier_name, group_name)
+        if not os.path.exists(group_source):
+            print(
+                f"  SKIPPED: {group_name} source partial not found: "
+                f"{group_source} (generate it with scripts/generate_leb.py "
+                f"--tier {tier_name} --group {group_name})"
+            )
+            skipped.append(group_name)
+            continue
+
         convert_leb1_to_leb2(
-            input_path=input_path,
+            input_path=group_source,
             output_path=output_path,
             group=group_name,
             expected_tier=tier_name,
@@ -1116,13 +1158,22 @@ def convert_all_groups(
         )
 
         total_size += os.path.getsize(output_path)
+        converted += 1
 
     input_size = os.path.getsize(input_path)
     if verbose:
         print("\n=== Summary ===")
         print(f"  Input:  {input_size / 1e6:.1f} MB ({os.path.basename(input_path)})")
-        print(f"  Output: {total_size / 1e6:.1f} MB (total, {len(LEB2_GROUPS)} files)")
-        print(f"  Ratio:  {input_size / total_size:.1f}x")
+        print(f"  Output: {total_size / 1e6:.1f} MB (total, {converted} files)")
+        if total_size:
+            print(f"  Ratio:  {input_size / total_size:.1f}x")
+        if skipped:
+            print(
+                f"  SKIPPED {len(skipped)} group(s) with no source partial: "
+                f"{', '.join(skipped)}"
+            )
+
+    return skipped
 
 
 # =============================================================================
@@ -1147,6 +1198,8 @@ def main():
             "  asteroids  : Chiron, Ceres, Pallas, Juno, Vesta (5 bodies)\n"
             "  exotics    : Centaurs, TNOs, and NEAs from the canonical registry\n"
             "  apogee     : Oscu Apogee, Interp Apogee/Perigee (3 bodies)\n"
+            "  uranians   : Hamburg bodies Cupido-Poseidon (8 bodies; converts\n"
+            "               from the standalone ephemeris_{tier}_uranians.leb partial)\n"
             "\nExamples:\n"
             "  # Convert base tier, core group only:\n"
             "  python generate_leb2.py convert data/leb/ephemeris_base.leb -o core_base.leb --group core --tier base\n"
@@ -1208,6 +1261,15 @@ def main():
         help=(
             "Numeric coefficient target in native stored units "
             f"(default: {DEFAULT_TARGET_AU})"
+        ),
+    )
+    p_all.add_argument(
+        "--allow-missing-companions",
+        action="store_true",
+        help=(
+            "Exit 0 even when a companion-only group (e.g. uranians) has no "
+            "source partial. By default a missing partial makes convert-all "
+            "fail so an incomplete tier is never mistaken for complete."
         ),
     )
     p_all.add_argument("-q", "--quiet", action="store_true")
@@ -1280,13 +1342,22 @@ def main():
         )
 
     elif args.command == "convert-all":
-        convert_all_groups(
+        skipped = convert_all_groups(
             input_path=args.input,
             output_dir=args.output_dir,
             tier_name=args.tier_name,
             target_precision=args.precision,
             verbose=not args.quiet,
         )
+        if skipped and not args.allow_missing_companions:
+            print(
+                f"ERROR: {len(skipped)} group(s) had no source partial "
+                f"({', '.join(skipped)}); the tier conversion is incomplete. "
+                f"Generate the missing partial(s) or pass "
+                f"--allow-missing-companions to accept a partial run.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     elif args.command == "generate":
         generate_and_compress(

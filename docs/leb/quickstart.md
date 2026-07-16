@@ -22,9 +22,12 @@ during generation if `LIBEPHEMERIS_AUTO_SPK=1`).
 
 ```bash
 # Group workflow (recommended — avoids macOS deadlocks, allows partial regen)
-leph leb generate base groups       # 4 groups + merge → ephemeris_base.leb
+leph leb generate base groups       # 4 merged groups → ephemeris_base.leb
 leph leb generate medium groups     # same for medium tier
 leph leb generate extended groups   # same for extended tier
+
+# Companion-only uranians partial (never merged into the main file)
+python scripts/generate_leb.py --tier base --group uranians
 ```
 
 ### Step-by-step group workflow
@@ -100,10 +103,16 @@ python scripts/generate_leb.py --tier base --merge \
 | `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | spktype21 scalar | ~15-60s |
 | `exotics` | Centaurs, TNOs, NEAs (31) | spktype21 scalar | ~2-5min |
 | `analytical` | Model-backed/true lunar points (6) | ERFA/IERS plus JPL geometry | range-dependent |
+| `uranians` | Hamburg bodies Cupido-Poseidon (8) | Runtime Neely propagation | <1s |
 
-The four groups total 53 registered bodies for base and medium. Extended
-generation deliberately excludes eight chaotic near-Earth asteroids, so its
-merged inventory contains 45 bodies.
+The four merged-main groups total 53 registered bodies for base and medium.
+Extended generation deliberately excludes eight chaotic near-Earth asteroids,
+so its merged inventory contains 45 bodies. The `uranians` group is
+companion-only: it is generated with an explicit
+`python scripts/generate_leb.py --tier <tier> --group uranians`, stays out of
+the merged main file, and ships as the standalone
+`ephemeris_{tier}_uranians.leb` partial feeding the `{tier}_uranians.leb2`
+companion.
 
 ---
 
@@ -117,12 +126,16 @@ merged inventory contains 45 bodies.
 ### Via leph
 
 ```bash
-# All 4 groups for a tier
-leph leb2 convert base              # → core, asteroids, exotics, apogee
+# All 5 groups for a tier
+leph leb2 convert base       # → core, asteroids, exotics, apogee, uranians
 
 # Medium / Extended
 leph leb2 convert medium
 leph leb2 convert extended
+
+# Uranians only (reads the standalone ephemeris_{tier}_uranians.leb partial)
+leph leb2 convert base-uranians
+leph leb2 verify base-uranians
 ```
 
 ### Direct CLI
@@ -229,11 +242,13 @@ pytest tests/test_leb/test_leb2_reader.py -v
 
 ## 4. Distribution policy
 
-The wheel bundles the reviewed `base_core.leb2` file. Exact SHA-256-pinned
-medium and extended cores are available through the compatibility commands
-`libephemeris download leb-medium` and `leb-extended` (or the corresponding
-`leb2-*` modular commands). Other modular companions remain unpublished;
-generate and verify them locally from NASA JPL data.
+The wheel bundles the reviewed `base_core.leb2` and `base_uranians.leb2`
+files. Exact SHA-256-pinned medium and extended cores and uranians companions
+are available through the compatibility commands `libephemeris download
+leb-medium` and `leb-extended` (or the corresponding `leb2-*` modular
+commands). The remaining modular companions (asteroids/apogee/exotics beyond
+the cores) stay unpublished; generate and verify them locally from NASA JPL
+data.
 
 ---
 

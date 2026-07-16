@@ -28,6 +28,7 @@ import hashlib
 import os
 import threading
 import warnings
+import weakref
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, overload
 from skyfield.api import Loader, Topos
@@ -340,6 +341,7 @@ def set_leb_file(filepath: Optional[str]) -> None:
 
         _fast_calc._reset_active_reader()
         _fast_calc._leb_frame_cache.clear()
+        _clear_fictitious_trust_caches()
 
 
 def _matches_pinned_data_file(path: str, manifest_name: str) -> bool:
@@ -384,6 +386,115 @@ def _is_reviewed_core(path: str) -> bool:
     if filename == "base_core.leb2":
         return _is_reviewed_base_core(path)
     return _matches_pinned_data_file(path, filename)
+
+
+def _has_pinned_sibling_companions(path: str) -> bool:
+    """Return whether a reviewed core has manifest-pinned sibling companions.
+
+    Only files that are themselves listed in the data manifest AND byte-match
+    their pinned SHA-256 qualify: the reviewed core stays a closed trust unit,
+    extended solely by equally reviewed artifacts (e.g. the regenerated
+    ``{tier}_uranians.leb2`` companion).
+    """
+    directory = os.path.dirname(os.path.abspath(path))
+    basename = os.path.basename(path)
+    name_no_ext = basename.rsplit(".", 1)[0]
+    parts = name_no_ext.split("_")
+    if len(parts) < 2:
+        return False
+    prefix = "_".join(parts[:-1])
+
+    from .download import DATA_FILES
+
+    for manifest_name in DATA_FILES:
+        if manifest_name == basename or not manifest_name.startswith(f"{prefix}_"):
+            continue
+        if not manifest_name.endswith((".leb", ".leb2")):
+            continue
+        candidate = os.path.join(directory, manifest_name)
+        if os.path.isfile(candidate) and _matches_pinned_data_file(
+            candidate, manifest_name
+        ):
+            return True
+    return False
+
+
+# Trust caches for fictitious-body sourcing. The per-reader cache pins the
+# decision to the reader instance (an open reader serves its original mmap
+# content regardless of later disk changes, so re-hashing per call would
+# guard nothing); the per-path fingerprint cache spares re-hashing the same
+# unchanged artifact across reader instances while a replaced or touched file
+# still forces a fresh SHA-256 check.
+_FICTITIOUS_TRUST_BY_READER: "weakref.WeakKeyDictionary[object, dict[int, bool]]" = (
+    weakref.WeakKeyDictionary()
+)
+_FICTITIOUS_SOURCE_CACHE: dict[str, tuple[tuple[int, int], bool]] = {}
+
+
+def _clear_fictitious_trust_caches() -> None:
+    """Drop the fictitious-body trust caches on any reader change.
+
+    The per-path cache is keyed by a (size, mtime) stat fingerprint, which is
+    a content proxy, not the content itself. Clearing it whenever the active
+    reader is swapped or closed keeps a stale verdict from surviving a
+    reconfigure/re-open of the same path (an in-place file replacement that
+    preserves size and mtime would otherwise reuse the old decision).
+    """
+    _FICTITIOUS_SOURCE_CACHE.clear()
+    _FICTITIOUS_TRUST_BY_READER.clear()
+
+
+def leb_fictitious_source_trusted(reader: object, body_id: int) -> bool:
+    """Return whether *reader* serves *body_id* from a manifest-pinned file.
+
+    Fictitious bodies (40-58) may be sourced from a persisted LEB channel only
+    when the specific file providing them byte-matches its reviewed manifest
+    SHA-256. Composite readers resolve the serving sub-reader first; a legacy
+    or locally modified artifact therefore never feeds a public calculation,
+    even when explicitly configured as the active LEB file.
+    """
+    try:
+        per_reader = _FICTITIOUS_TRUST_BY_READER.get(reader)
+    except TypeError:
+        per_reader = None
+    if per_reader is not None:
+        cached = per_reader.get(body_id)
+        if cached is not None:
+            return cached
+
+    body_map = getattr(reader, "_body_map", None)
+    if body_map is not None:
+        serving = body_map.get(body_id)
+        path = getattr(serving, "path", None) if serving is not None else None
+    else:
+        has_body = getattr(reader, "has_body", None)
+        if has_body is None or not has_body(body_id):
+            path = None
+        else:
+            path = getattr(reader, "path", None)
+
+    trusted = False
+    if isinstance(path, str):
+        try:
+            stat = os.stat(path)
+        except OSError:
+            stat = None
+        if stat is not None:
+            fingerprint = (stat.st_size, stat.st_mtime_ns)
+            cached_path = _FICTITIOUS_SOURCE_CACHE.get(path)
+            if cached_path is not None and cached_path[0] == fingerprint:
+                trusted = cached_path[1]
+            else:
+                trusted = _matches_pinned_data_file(path, os.path.basename(path))
+                _FICTITIOUS_SOURCE_CACHE[path] = (fingerprint, trusted)
+
+    if per_reader is None:
+        try:
+            per_reader = _FICTITIOUS_TRUST_BY_READER.setdefault(reader, {})
+        except TypeError:
+            return trusted
+    per_reader[body_id] = trusted
+    return trusted
 
 
 def _discover_leb_file() -> Optional[str]:
@@ -626,13 +737,21 @@ def _get_leb_reader_locked(mode):
                 basename = os.path.splitext(os.path.basename(path))[0]
                 # The reviewed bundled core must remain a closed trust unit:
                 # never attach arbitrary same-prefix companions left in the
-                # user's cache. Explicitly selected/generated non-pinned group
-                # files retain normal companion discovery.
+                # user's cache. Manifest-pinned siblings (the regenerated
+                # uranians companion) share the review bar and may join it.
+                # Explicitly selected/generated non-pinned group files retain
+                # normal companion discovery.
                 reviewed_core = _is_reviewed_core(path)
                 if "_" in basename and not reviewed_core:
                     from .leb_composite import CompositeLEBReader
 
                     _LEB_READER = CompositeLEBReader.from_file_with_companions(path)
+                elif reviewed_core and _has_pinned_sibling_companions(path):
+                    from .leb_composite import CompositeLEBReader
+
+                    _LEB_READER = CompositeLEBReader.from_file_with_companions(
+                        path, pinned_only=True
+                    )
                 else:
                     from .leb_reader import open_leb
 
@@ -940,6 +1059,7 @@ def _close_kernel_resources() -> None:
         from . import fast_calc as _fast_calc
 
         _fast_calc._reset_active_reader()
+        _clear_fictitious_trust_caches()
 
         if _PLANETS is not None:
             _release_when_unused(_PLANETS)
@@ -1069,6 +1189,7 @@ def set_precision_tier(tier: str) -> None:
 
         _fast_calc._reset_active_reader()
         _fast_calc._leb_frame_cache.clear()
+        _clear_fictitious_trust_caches()
 
         from .cache import clear_caches
 
@@ -2071,6 +2192,7 @@ def _close_inner() -> None:
     from . import fast_calc as _fast_calc
 
     _fast_calc._reset_active_reader()
+    _clear_fictitious_trust_caches()
 
     # The interpolated lunar-apsides model owns a separate mmap and chunk
     # cache. A full close releases it; reset_session() intentionally leaves it

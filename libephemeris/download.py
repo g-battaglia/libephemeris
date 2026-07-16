@@ -150,6 +150,33 @@ DATA_FILES: dict[str, dict[str, Any]] = {
         "description": "LEB2 core bodies for 'extended' tier (-5000 to +5000)",
         "dest_subdir": "leb",
     },
+    # Uranians (8 Hamburg bodies, 40-47): regenerated from the independently
+    # sourced Neely (1980) propagation in libephemeris.hypothetical, converted
+    # from the standalone LEB1 partial with a 1e-12 native-component target.
+    # Companion attach and calculation sourcing both require these exact pins.
+    "base_uranians.leb2": {
+        # Ships in every wheel; installed from package resources.
+        "url": None,
+        "bundled_resource": "data/leb2/base_uranians.leb2",
+        "sha256": "03e6c91f10bf5b07f13eb738ea943f5179af2a1967d23b2a6d51b4f6b7b6cbbf",
+        "size_mb": 0.05,
+        "description": "LEB2 Hamburg bodies for 'base' tier (1850-2150)",
+        "dest_subdir": "leb",
+    },
+    "medium_uranians.leb2": {
+        "url": f"{GITHUB_RELEASES}/medium_uranians.leb2",
+        "sha256": "21bc3267606d20ae59dd217bedad57ceb272eff1df81df6e6b2163993853496f",
+        "size_mb": 0.17,
+        "description": "LEB2 Hamburg bodies for 'medium' tier (1550-2650)",
+        "dest_subdir": "leb",
+    },
+    "extended_uranians.leb2": {
+        "url": f"{GITHUB_RELEASES}/extended_uranians.leb2",
+        "sha256": "67d4ea543e9a775a590ae8f910f351091653de3f78fab62384ddb05f46334f87",
+        "size_mb": 1.51,
+        "description": "LEB2 Hamburg bodies for 'extended' tier (-5000 to +5000)",
+        "dest_subdir": "leb",
+    },
 }
 
 

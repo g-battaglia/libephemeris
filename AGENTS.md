@@ -10,7 +10,7 @@ The project is licensed AGPL-3.0-only.
 
 Development rules for new and modified code:
 
-- Do not inspect, retrieve, possess, read, translate, adapt, or copy Swiss
+- Never inspect, retrieve, possess, read, translate, adapt, or copy Swiss
   Ephemeris source code, source comments, documentation prose, algorithms, or
   data files. Reference-distribution files must not enter this repository.
 - The reference API may be used only for ephemeral behavioral comparison:

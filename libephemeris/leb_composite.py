@@ -166,17 +166,27 @@ class CompositeLEBReader:
         return cls(readers)
 
     @classmethod
-    def from_file_with_companions(cls, path: str) -> "CompositeLEBReader":
+    def from_file_with_companions(
+        cls, path: str, pinned_only: bool = False
+    ) -> "CompositeLEBReader":
         """Open a .leb/.leb2 file and discover companion files in the same directory.
 
         Companion files share a common tier prefix. For example, if the primary
         file is ``base_core.leb2``, companions would be ``base_asteroids.leb2``,
         ``base_apogee.leb2``, and ``base_exotics.leb2``.
 
+        Fictitious-carrying companions (``*_uranians.leb2``) attach only when
+        they byte-match their reviewed manifest SHA-256, regardless of
+        ``pinned_only``: an arbitrary same-named artifact on disk is skipped
+        with a log message and never serves coefficients.
+
         If no companions are found, returns a composite with a single reader.
 
         Args:
             path: Path to the primary .leb or .leb2 file.
+            pinned_only: When True (the reviewed-core closed trust unit),
+                EVERY companion must byte-match its manifest SHA-256 to
+                attach, not just the fictitious-carrying ones.
 
         Returns:
             CompositeLEBReader wrapping the primary and companion readers.
@@ -197,9 +207,10 @@ class CompositeLEBReader:
         # is complete on its own — a bare first-token prefix match would
         # pull in other tiers ("ephemeris_medium.leb", ...) and stale
         # partials, silently mixing tiers in one composite.
-        # Keep recognizing the retired suffix so a legacy file cannot evade the
-        # mixed-tier guard. Public calculations reject its fictitious channels.
         _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians", "exotics"}
+        # Groups whose files carry fictitious-body channels. Their trust is
+        # per-file: only the regenerated, manifest-pinned artifact may attach.
+        _FICTITIOUS_GROUP_SUFFIXES = {"uranians"}
 
         if len(parts) >= 2 and parts[-1] in _GROUP_SUFFIXES:
             prefix = "_".join(parts[:-1])  # e.g., "base"
@@ -212,11 +223,27 @@ class CompositeLEBReader:
                 cparts = cname.split("_")
                 if cparts[:-1] != parts[:-1] or cparts[-1] not in _GROUP_SUFFIXES:
                     continue
-                if os.path.abspath(companion_path) != os.path.abspath(path):
-                    try:
-                        readers.append(open_leb(companion_path))
-                    except (ValueError, OSError):
+                if os.path.abspath(companion_path) == os.path.abspath(path):
+                    continue
+                if pinned_only or cparts[-1] in _FICTITIOUS_GROUP_SUFFIXES:
+                    # Lazy import: state also imports this module lazily, so
+                    # there is no module-level cycle.
+                    from .logging_config import get_logger
+                    from .state import _matches_pinned_data_file
+
+                    if not _matches_pinned_data_file(
+                        companion_path, os.path.basename(companion_path)
+                    ):
+                        get_logger().warning(
+                            "Skipping unreviewed LEB companion %s: it does not "
+                            "match its pinned manifest SHA-256",
+                            companion_path,
+                        )
                         continue
+                try:
+                    readers.append(open_leb(companion_path))
+                except (ValueError, OSError):
+                    continue
 
         return cls(readers)
 

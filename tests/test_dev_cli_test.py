@@ -207,8 +207,8 @@ def test_leb2_root_help_preserves_separate_examples() -> None:
     result = CliRunner().invoke(cmd_leb2.leb2_group, ["--help"])
 
     assert result.exit_code == 0
-    assert "all 4 body groups" in result.output
-    assert ("exotics, apogee\n    leph leb2 verify base") in result.output
+    assert "all 5 body groups" in result.output
+    assert ("exotics, apogee, uranians\n    leph leb2 verify base") in result.output
 
 
 def test_leb2_dynamic_group_command_uses_matching_paths() -> None:
@@ -232,12 +232,48 @@ def test_leb2_dynamic_group_command_uses_matching_paths() -> None:
     )
 
 
-def test_leb2_uranian_conversion_is_retired_fail_closed() -> None:
-    """Legacy hypothetical coefficients cannot be copied into a new artifact."""
-    result = CliRunner().invoke(cmd_leb2.convert_group, ["base-uranians"])
+def test_leb2_uranian_conversion_reads_standalone_partial() -> None:
+    """The regenerated group converts from its partial, never a merged main."""
+    runner = CliRunner()
+    with patch.object(cmd_leb2, "_leb2") as run_leb2:
+        result = runner.invoke(cmd_leb2.convert_group, ["base-uranians"])
 
-    assert result.exit_code != 0
-    assert "retired pending independently sourced elements" in result.output
+    assert result.exit_code == 0
+    run_leb2.assert_called_once_with(
+        [
+            "convert",
+            "data/leb/ephemeris_base_uranians.leb",
+            "-o",
+            "data/leb2/base_uranians.leb2",
+            "--group",
+            "uranians",
+            "--tier",
+            "base",
+        ]
+    )
+
+
+def test_leb2_uranian_verify_authenticates_partial_reference() -> None:
+    """Verification compares against the standalone partial with group + tier."""
+    runner = CliRunner()
+    with patch.object(cmd_leb2, "_leb2") as run_leb2:
+        result = runner.invoke(cmd_leb2.verify_group, ["medium-uranians"])
+
+    assert result.exit_code == 0
+    run_leb2.assert_called_once_with(
+        [
+            "verify",
+            "data/leb2/medium_uranians.leb2",
+            "--reference",
+            "data/leb/ephemeris_medium_uranians.leb",
+            "--samples",
+            "500",
+            "--group",
+            "uranians",
+            "--tier",
+            "medium",
+        ]
+    )
 
 
 def test_leb2_conversion_rejects_empty_named_group(monkeypatch, tmp_path) -> None:
@@ -333,7 +369,8 @@ def test_leb2_verify_help_describes_core_component_check() -> None:
     result = CliRunner().invoke(cmd_leb2.verify_group, ["--help"])
 
     assert result.exit_code == 0
-    assert "core LEB2 companion" in result.output
+    assert "core companion" in result.output
+    assert "{tier}-{group}" in result.output
     assert "native stored component units" in result.output
     assert "arcsecond" not in result.output
 

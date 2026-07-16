@@ -28,6 +28,9 @@ from __future__ import annotations
 LEB1_GROUPS = ("planets", "asteroids", "exotics", "analytical")
 
 # LEB2 distribution partition → ``{tier}_{group}.leb2`` companion files.
-# The former ``uranians`` group is deliberately absent: the bundled
-# hypothetical elements were retired during the clean-room audit.
-LEB2_GROUPS = ("core", "asteroids", "exotics", "apogee")
+# ``uranians`` carries the eight Hamburg-school bodies (IDs 40-47),
+# regenerated from the independently sourced Neely (1980) transcription in
+# ``libephemeris.hypothetical``. Runtime trust is per-file: a companion is
+# attached only when it matches its pinned manifest SHA-256, so pre-existing
+# artifacts with the same name remain unused.
+LEB2_GROUPS = ("core", "asteroids", "exotics", "apogee", "uranians")

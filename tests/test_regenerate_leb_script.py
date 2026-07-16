@@ -9,6 +9,11 @@ from pathlib import Path
 
 from libephemeris.leb_groups import LEB2_GROUPS
 
+# Groups the Bash orchestrator handles: exactly the ones converted from the
+# merged main LEB1. Companion-only groups (uranians) are generated and
+# converted from their standalone partial via the Python tooling instead.
+MAIN_FILE_LEB2_GROUPS = tuple(g for g in LEB2_GROUPS if g != "uranians")
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PROJECT_ROOT / "regenerate-leb.sh"
 
@@ -38,12 +43,12 @@ def test_script_parses_cleanly() -> None:
 
 
 def test_shell_leb2_groups_match_canonical_python_registry() -> None:
-    """The standalone Bash entrypoint cannot retain a retired companion."""
+    """The standalone Bash entrypoint converts exactly the merged-main groups."""
     source = SCRIPT.read_text(encoding="utf-8")
     match = re.search(r"^LEB2_GROUPS=\(([^)]*)\)$", source, flags=re.MULTILINE)
 
     assert match is not None
-    assert tuple(match.group(1).split()) == tuple(LEB2_GROUPS)
+    assert tuple(match.group(1).split()) == MAIN_FILE_LEB2_GROUPS
 
 
 def test_all_selects_only_canonical_leb2_groups() -> None:
@@ -54,7 +59,7 @@ def test_all_selects_only_canonical_leb2_groups() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert tuple(result.stdout.splitlines()) == tuple(LEB2_GROUPS)
+    assert tuple(result.stdout.splitlines()) == MAIN_FILE_LEB2_GROUPS
 
 
 def test_retired_uranians_group_is_rejected() -> None:

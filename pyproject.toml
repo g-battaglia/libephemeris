@@ -146,6 +146,7 @@ libephemeris = [
     "py.typed",
     "data/fictitious_orbits.csv",
     "data/leb2/base_core.leb2",
+    "data/leb2/base_uranians.leb2",
 ]
 
 # ---------------------------------------------------------------------------
