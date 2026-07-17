@@ -7,7 +7,7 @@ Every command name makes it explicit WHAT is being tested and HOW (which backend
 
 Naming convention:
   - ``skyfield``      = unit tests using Skyfield/DE440 backend
-  - ``leb-backend``   = unit tests using LEB precomputed backend
+  - ``leb-backend``   = sealed-runtime tests using LEB precomputed data
   - ``lunar``         = lunar module (nodes, apsides, Lilith)
   - ``leb-format``    = LEB binary format (reader/writer/precision)
   - ``leb2-format``   = LEB2 compressed format
@@ -65,7 +65,7 @@ def _skyfield_pytest(args: list[str]) -> None:
 @click.group(
     "test",
     short_help="Run tests: unit, lunar, LEB, Horizons, coverage.",
-    help="Run tests: unit, lunar, LEB format, Horizons, coverage.\n\nEach subgroup specifies WHAT is tested and WHICH backend is used.\nUse TAB completion to explore: leph test <TAB>\n\nRecommended for daily development:\n\n  leph test skyfield essential       # ~900 tests, ~20s\n  leph test leb-backend unit-fast    # ~16,000 tests, ~1 min\n\nNever run the full test suite -- always pick a targeted subcommand.",
+    help="Run tests: unit, lunar, LEB format, Horizons, coverage.\n\nEach subgroup specifies WHAT is tested and WHICH backend is used.\nUse TAB completion to explore: leph test <TAB>\n\nRecommended for daily development:\n\n  leph test skyfield essential       # broad JPL/Skyfield sanity check\n  leph test leb-backend unit-fast    # sealed LEB contract, parallel\n\nNever run the full test suite -- always pick a targeted subcommand.",
 )
 def test_group() -> None:
     """Test runner with clear backend/target naming."""
@@ -270,79 +270,104 @@ test_group.add_command(skyfield_group)
 
 _LEB_ENV = {"LIBEPHEMERIS_LEB": "libephemeris/data/leb2/base_core.leb2"}
 
+# The generic test tree contains intentional JPL-only APIs, dates outside the
+# bundled base tier, and assertions about concrete planet-centre SPKs. Running
+# that tree under a process-wide ``--calc-mode leb`` used to work only because
+# forced LEB silently crossed into Skyfield. Keep the sealed suite explicit:
+# broad compatibility remains the responsibility of ``skyfield unit-fast``;
+# this list proves that product-facing LEB surfaces stay source-pure.
+_LEB_ESSENTIAL_FILES = [
+    "tests/test_leb/test_no_kernel_load.py",
+    "tests/test_leb/test_leb_vector_ephemeris.py",
+    "tests/test_leb_inventory.py",
+    "tests/test_leb_skyfield_fallback.py",
+    "tests/test_sealed_network_policy.py",
+]
+
+_LEB_BACKEND_FILES = _LEB_ESSENTIAL_FILES + [
+    "tests/test_leb/test_fast_calc.py",
+    "tests/test_leb/test_context_leb.py",
+    "tests/test_leb/test_uranians_companion.py",
+    "tests/test_leb/compare/test_compare_leb_pctr_nodaps.py",
+    "tests/test_planets/test_nod_aps.py",
+    "tests/test_fixed_stars/test_fixstar2.py",
+    "tests/test_heliacal.py",
+    "tests/test_rise_trans.py",
+]
+
 
 @click.group(
     "leb-backend",
-    short_help="Unit tests via LEB precomputed Chebyshev backend (~14x faster).",
-    help="Unit tests that calculate positions via the LEB precomputed Chebyshev backend.\n\n"
-    "Instead of computing positions from DE440 kernels in real time (Skyfield),\n"
-    "these tests use precomputed Chebyshev polynomial approximations stored in\n"
-    ".leb files. ~14x faster than Skyfield at runtime.\n\n"
-    "Uses the hash-pinned reviewed base_core.leb2 bundled in this tree.\n\n"
+    short_help="Sealed-runtime tests via the LEB Chebyshev backend.",
+    help="Tests the source-sealed LEB runtime with the reviewed bundled core.\n\n"
+    "The selected files cover no-JPL routing, vector adapters, fixed stars,\n"
+    "events, minor-body models, inventory, network sealing, and precision.\n"
+    "Generic JPL-only compatibility tests belong to the skyfield group.\n\n"
     "Recommended for everyday development:\n\n"
-    "  leph test leb-backend unit-fast   # ~16,000 tests, ~1 min, parallel",
+    "  leph test leb-backend unit-fast   # sealed contract, parallel",
 )
 def leb_backend_group() -> None:
-    """Unit tests using LEB as the calculation backend."""
+    """Source-sealed runtime tests using LEB as the calculation backend."""
 
 
 @leb_backend_group.command(
     "essential",
-    short_help="Quick sanity check in LEB mode: ~900 tests, parallel (~20s).",
+    short_help="Quick sealed LEB source-purity check, parallel.",
 )
 def leb_essential() -> None:
-    """Quick sanity check in LEB mode: 1 test file per major module, parallel (~900 tests, ~20s).
-
-    Same file set as 'leph test skyfield essential' but positions are read from
-    precomputed Chebyshev polynomials instead of computed from DE440.
-    Uses the reviewed bundled base core; unsupported bodies and dates fall
-    through to the independent Skyfield backend.
-    """
+    """Run the smallest sealed LEB routing and provisioning contract."""
     _pytest(
-        ["-n", "auto", "-m", "not slow", "--calc-mode", "leb", *_ESSENTIAL_FILES],
+        [
+            "-n",
+            "auto",
+            "-m",
+            "not slow",
+            "--calc-mode",
+            "leb",
+            *_LEB_ESSENTIAL_FILES,
+        ],
         env=_LEB_ENV,
     )
 
 
 @leb_backend_group.command(
     "unit",
-    short_help="Run unit tests sequentially in LEB mode, verbose output.",
+    short_help="Run the sealed LEB contract sequentially, verbose.",
 )
 def leb_unit() -> None:
-    """Run unit tests sequentially in LEB mode with verbose output.
-
-    Same test suite as 'leph test skyfield unit' but positions are read from
-    precomputed Chebyshev polynomials instead of computed from DE440.
-    Uses the reviewed bundled base core.
-    """
-    _pytest(["tests/", "-v", "-m", "not slow", "--calc-mode", "leb"], env=_LEB_ENV)
+    """Run the curated sealed LEB contract sequentially."""
+    _pytest(
+        ["-v", "-m", "not slow", "--calc-mode", "leb", *_LEB_BACKEND_FILES],
+        env=_LEB_ENV,
+    )
 
 
 @leb_backend_group.command(
     "unit-full",
-    short_help="Run ALL unit tests in LEB mode including @slow, sequentially.",
+    short_help="Run the sealed LEB contract including its @slow tests.",
 )
 def leb_unit_full() -> None:
-    """Run ALL unit tests in LEB mode including @slow markers, sequentially.
-
-    Very slow. Use for thorough pre-release validation.
-    """
-    _pytest(["tests/", "-v", "--calc-mode", "leb"], env=_LEB_ENV)
+    """Run the curated sealed LEB contract including slow-marked cases."""
+    _pytest(["-v", "--calc-mode", "leb", *_LEB_BACKEND_FILES], env=_LEB_ENV)
 
 
 @leb_backend_group.command(
     "unit-fast",
-    short_help="RECOMMENDED: run unit tests in LEB mode, parallel (~1 min).",
+    short_help="RECOMMENDED: run the sealed LEB contract in parallel.",
 )
 def leb_unit_fast() -> None:
-    """RECOMMENDED: run unit tests in LEB mode, parallel across CPU cores (~1 min).
-
-    Best balance of speed and coverage for everyday development.
-    Runs ~16,000 tests in ~1 minute using pytest-xdist parallelism.
-    Uses the reviewed bundled base core; unsupported cases fall through.
-    """
+    """Run the curated sealed LEB contract across available CPU cores."""
     _pytest(
-        ["tests/", "-n", "auto", "-m", "not slow", "--calc-mode", "leb"], env=_LEB_ENV
+        [
+            "-n",
+            "auto",
+            "-m",
+            "not slow",
+            "--calc-mode",
+            "leb",
+            *_LEB_BACKEND_FILES,
+        ],
+        env=_LEB_ENV,
     )
 
 

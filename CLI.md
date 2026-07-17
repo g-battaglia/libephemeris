@@ -155,16 +155,18 @@ leph test skyfield all-full-fast  # everything including @slow, parallel
 leph test skyfield progress       # dots-only output (CI-friendly)
 ```
 
-#### `leph test leb-backend` — Unit tests via LEB precomputed backend
+#### `leph test leb-backend` — Sealed runtime via LEB precomputed data
 
-Same test suite but positions come from precomputed Chebyshev polynomials (~14x faster).
-Requires `data/leb/ephemeris_medium.leb` (generate it with `leph leb generate medium groups`).
+This curated suite verifies the source-sealed LEB contract: no-JPL routing,
+vector adapters, product minor bodies, fixed stars, events, inventory, network
+policy, and comparison precision. The generic tree deliberately remains under
+`skyfield`; it contains JPL-only APIs and dates outside the bundled base tier.
 
 ```bash
-leph test leb-backend essential   # ~900 tests, ~20s — fast sanity check (parallel)
-leph test leb-backend unit        # Sequential, verbose
-leph test leb-backend unit-fast   # Parallel (~1 min) [RECOMMENDED for daily dev]
-leph test leb-backend unit-full   # Including @slow
+leph test leb-backend essential   # Minimal sealed contract (parallel)
+leph test leb-backend unit        # Curated contract, sequential and verbose
+leph test leb-backend unit-fast   # Curated contract, parallel [RECOMMENDED]
+leph test leb-backend unit-full   # Curated contract including @slow
 ```
 
 #### `leph test lunar` — Lunar module
@@ -514,9 +516,9 @@ poe test:skyfield:fast                  # -> leph test skyfield unit-fast (~16,0
 poe test:skyfield:full                  # -> leph test skyfield all-full-fast (+@slow)
 
 # LEB backend: core / fast / full
-poe test:leb:core                       # -> leph test leb-backend essential (~900, ~20s)
-poe test:leb:fast                       # -> leph test leb-backend unit-fast [RECOMMENDED]
-poe test:leb:full                       # -> leph test leb-backend unit-full (+@slow)
+poe test:leb:core                       # -> minimal sealed LEB contract
+poe test:leb:fast                       # -> curated sealed contract [RECOMMENDED]
+poe test:leb:full                       # -> curated contract (+@slow)
 
 # Horizons backend: core / fast / full
 poe test:horizons:core                  # -> leph test horizons precision-quick (~15s)

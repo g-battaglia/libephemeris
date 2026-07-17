@@ -62,6 +62,11 @@ LibEphemeris uses JPL state data when a physical planet-center segment covers
 the requested epoch. It does not synthesize a missing center from analytical
 satellite theories.
 
+This method applies to `auto`, `skyfield`, and explicit JPL workflows. In
+sealed `leb` mode the planet-center kernel is deliberately disabled: the
+runtime returns the Jupiter-through-Pluto system barycentres already stored in
+the LEB core and never opens an auxiliary BSP.
+
 ### JPL center segments
 
 The generator extracts planet-center segments from JPL satellite SPK files and

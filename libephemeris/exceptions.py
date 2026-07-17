@@ -808,17 +808,13 @@ class NetworkSealedError(ConfigurationError, RuntimeError):
 class LEBCorruptionError(ValueError):
     """A LEB/LEB2 binary ephemeris file is corrupted or truncated.
 
-    Deliberately subclasses ``ValueError`` (not :class:`Error`) so the
-    existing LEB -> Skyfield fallback handlers, which catch ``ValueError``
-    from the LEB layer, keep working unchanged. The distinct type lets the
-    fallback logging report genuine corruption at WARNING while routine
-    out-of-range fallbacks stay at DEBUG — classifying by type instead of
-    by message substring, which misclassified legitimate fallbacks (e.g.
-    "outside nutation range", "No Delta-T data in this LEB file").
+    Deliberately subclasses ``ValueError`` for compatibility with existing
+    reader callers. Source dispatchers nevertheless catch this distinct type
+    first and treat it as a fatal provisioning error; corruption must never be
+    confused with an ordinary range miss or trigger a source fallback.
 
-    This is an internal robustness signal for the binary readers rather
-    than a user-facing API exception; it is not re-exported from the
-    package root.
+    This is an internal robustness signal for the binary readers rather than
+    a user-facing API exception; it is not re-exported from the package root.
     """
 
 
@@ -930,9 +926,8 @@ def validate_jd_range(
         EphemerisRangeError: If the Julian Day is outside the ephemeris range
 
     Note:
-        This function requires the ephemeris to be loaded first. If the
-        ephemeris is not loaded, it will be loaded automatically when
-        get_current_file_data() is called via get_planets().
+        In LEB mode the stored per-body header is authoritative and no JPL
+        kernel is opened. Other modes validate against the active DE kernel.
 
     Example:
         >>> from libephemeris.exceptions import validate_jd_range
@@ -969,11 +964,23 @@ def validate_jd_range(
             body_name=body_name,
         )
 
-    # Ensure ephemeris is loaded so we can get range information
-    state.get_planets()
+    if state.get_calc_mode() == "leb" and body_id is not None:
+        from .inventory import get_body_coverage
 
-    # Get ephemeris file information
-    path, start_jd, end_jd, denum = state.get_current_file_data(0)
+        coverage = get_body_coverage(body_id)
+        if coverage is None:
+            # The downstream LEB dispatcher distinguishes a legitimate local
+            # model from a missing required state. Do not inspect a DE kernel
+            # merely to validate a body it will not serve.
+            return
+        path = coverage.data_file or ""
+        start_jd = coverage.jd_start
+        end_jd = coverage.jd_end
+        denum = 0
+    else:
+        # Ensure the selected JPL ephemeris is loaded before inspecting range.
+        state.get_planets()
+        path, start_jd, end_jd, denum = state.get_current_file_data(0)
 
     # If we couldn't get range information, skip validation
     # (this allows fallback behavior for special cases)

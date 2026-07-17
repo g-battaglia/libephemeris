@@ -35,7 +35,10 @@ from libephemeris.constants import (
     FLG_J2000,
     FLG_NONUT,
     NODBIT_OSCU,
+    NODBIT_MEAN,
+    FLG_TOPOCTR,
 )
+from libephemeris.fixed_stars import fixstar
 
 from .conftest import CompareHelper, lon_error_arcsec
 
@@ -93,3 +96,34 @@ def test_nod_aps_nonut_node_invariant(compare: CompareHelper, body: int, bname: 
                     f"{mode_name} nod_aps({bname}) node[{idx}] moved under NONUT: "
                     f'Δ={err:.4f}" @JD{jd:.0f}'
                 )
+
+
+def test_source_sealed_vector_paths_stay_within_precision_budget(
+    compare: CompareHelper,
+):
+    """The adapter changes only the vector source, not the reduction pipeline."""
+    dates = [
+        ephem.julday(year, 1, 1, 12.0)
+        for year in (1860, 1900, 1950, 2000, 2050, 2100, 2140)
+    ]
+    ephem.set_topo(12.5, 41.9, 0.0)
+    try:
+        for jd in dates:
+            sky_pctr, _ = compare.skyfield(ephem.calc_pctr, jd, MOON, MARS, 0)
+            leb_pctr, _ = compare.leb_only(ephem.calc_pctr, jd, MOON, MARS, 0)
+            assert lon_error_arcsec(sky_pctr[0], leb_pctr[0]) < 0.02
+            assert abs(sky_pctr[1] - leb_pctr[1]) * 3600.0 < 0.02
+
+            for method in (NODBIT_MEAN, NODBIT_OSCU):
+                sky_points = compare.skyfield(ephem.nod_aps, jd, MARS, method, 0)
+                leb_points = compare.leb_only(ephem.nod_aps, jd, MARS, method, 0)
+                for sky_point, leb_point in zip(sky_points, leb_points):
+                    assert lon_error_arcsec(sky_point[0], leb_point[0]) < 0.02
+                    assert abs(sky_point[1] - leb_point[1]) * 3600.0 < 0.02
+
+            sky_star = compare.skyfield(fixstar, "Regulus", jd, FLG_TOPOCTR)[0]
+            leb_star = compare.leb_only(fixstar, "Regulus", jd, FLG_TOPOCTR)[0]
+            assert lon_error_arcsec(sky_star[0], leb_star[0]) < 0.02
+            assert abs(sky_star[1] - leb_star[1]) * 3600.0 < 0.02
+    finally:
+        ephem.set_topo(0.0, 0.0, 0.0)

@@ -344,7 +344,12 @@ docstring = "detailed"
 [[component]]
 id = "planetary-reduction-pipelines"
 category = "scientific-pipeline"
-paths = ["libephemeris/fast_calc.py", "libephemeris/horizons_backend.py", "libephemeris/planets.py"]
+paths = [
+  "libephemeris/fast_calc.py",
+  "libephemeris/horizons_backend.py",
+  "libephemeris/leb_vector.py",
+  "libephemeris/planets.py",
+]
 scientific_content = true
 origin = "JPL states reduced through documented light-time, deflection, aberration, frame, and time-scale operations using IAU/ERFA and Skyfield foundations. Backend dispatch and differentiation steps are project choices."
 sources = ["JPL_DE", "JPL_HORIZONS", "IERS_2010", "ERFA", "SKYFIELD", "PHOTOMETRY"]

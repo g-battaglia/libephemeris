@@ -85,9 +85,12 @@ from .constants import (
     ECL_3RD_VISIBLE,
     ECL_4TH_VISIBLE,
 )
-from .exceptions import Error
+from .exceptions import Error, LEBCorruptionError
 from .planets import calc_ut
-from .state import get_timescale
+from .state import get_calc_mode, get_timescale
+
+
+_ACTIVE_LEB_READER = object()
 
 
 def _get_leb_reader_safe():
@@ -109,7 +112,7 @@ def _is_leb_out_of_range(exc: BaseException) -> bool:
 
 
 def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
-    """Run ``impl(reader=...)``, retrying with ``reader=None`` on LEB out-of-range.
+    """Run ``impl(reader=...)`` with mode-aware range handling.
 
     Eclipse / occultation / rise-transit search loops define LEB-backed inner
     closures inside ``if reader is not None`` blocks. If a search probe lands
@@ -120,35 +123,41 @@ def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
     Behaviour:
         - If no LEB reader is available, run ``impl(reader=None)`` directly.
         - Otherwise, run ``impl(reader=reader)`` first.
-        - If it raises an LEB out-of-range error, retry with ``reader=None``
-          to force the Skyfield path. Any other exception is re-raised.
+        - In ``auto`` mode, an LEB range miss retries with ``reader=None`` so
+          the normal JPL/Skyfield path can run.
+        - In ``leb`` mode, a range miss is re-raised: the sealed runtime must
+          never switch persisted ephemeris source.
+        - Corruption and all unrelated exceptions are always re-raised.
 
-    Standard LEB files (base 1849-2150, medium 1550-2650, extended ±13000) all
-    accommodate the search windows in this module, so the fallback only fires
-    for custom files. The retry restarts computation from scratch (no shared
-    intermediate state), which is acceptable for the rare-fallback case.
+    Canonical LEB core tiers cover approximately 1850-2150, 1550-2650, or
+    -5000 to +5000. In ``auto`` mode the retry restarts computation from
+    scratch and shares no intermediate state.
     """
     reader = _get_leb_reader_safe()
     if reader is not None:
         try:
             return impl(*args, reader=reader, **kwargs)
+        except LEBCorruptionError:
+            raise
         except (KeyError, ValueError) as exc:
             if not _is_leb_out_of_range(exc):
+                raise
+            if get_calc_mode() == "leb":
                 raise
     return impl(*args, reader=None, **kwargs)
 
 
 def _reraise_if_leb_range_error(exc: BaseException) -> None:
-    """Re-raise ``exc`` when it signals LEB out-of-range coverage.
+    """Re-raise ``exc`` for LEB corruption or out-of-range coverage.
 
     Defensive ``except`` blocks inside eclipse implementations must not
     swallow LEB coverage errors: doing so converts an out-of-range probe
     into fabricated zeros/sentinels and prevents
-    ``_call_with_leb_skyfield_fallback`` from retrying on the Skyfield
-    path. Call this first in any broad except that would otherwise
+    ``_call_with_leb_skyfield_fallback`` from applying its mode-aware
+    range policy. Call this first in any broad except that would otherwise
     degrade gracefully.
     """
-    if _is_leb_out_of_range(exc):
+    if isinstance(exc, LEBCorruptionError) or _is_leb_out_of_range(exc):
         raise exc
 
 
@@ -2786,8 +2795,8 @@ def _calculate_local_eclipse_phases(
 ) -> Tuple[float, float, float, float, float, float, float, float, float, float]:
     """Calculate eclipse phase times as seen from a specific location.
 
-    Wrapper around :func:`_calculate_local_eclipse_phases_impl` that adds
-    LEB→Skyfield fallback for partial/custom LEB files. See the impl
+    Wrapper around :func:`_calculate_local_eclipse_phases_impl` that applies
+    mode-aware handling for partial/custom LEB files. See the implementation
     docstring for the full API contract.
     """
     return _call_with_leb_skyfield_fallback(
@@ -3799,9 +3808,8 @@ def sol_eclipse_where(
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """Find where a solar eclipse is central or maximal at a given time.
 
-    Wrapper around :func:`_sol_eclipse_where_impl` that adds LEB->Skyfield
-    fallback for partial/custom LEB files. See the impl docstring for the
-    full API contract.
+    Wrapper around :func:`_sol_eclipse_where_impl` that applies mode-aware LEB
+    range handling. See the implementation docstring for the full API contract.
     """
     return _call_with_leb_skyfield_fallback(_sol_eclipse_where_impl, tjdut, flags)
 
@@ -5328,7 +5336,7 @@ def _lun_eclipse_when_loc_pythonic(
     flags: int = FLG_SWIEPH,
     backwards: bool = False,
     *,
-    reader=None,
+    reader=_ACTIVE_LEB_READER,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """Find the next lunar eclipse observable from a geographic position.
 
@@ -5350,6 +5358,9 @@ def _lun_eclipse_when_loc_pythonic(
         Error: if no observable eclipse is found within the
             search limit.
     """
+    if reader is _ACTIVE_LEB_READER:
+        reader = _get_leb_reader_safe()
+
     from .constants import (
         BIT_DISC_BOTTOM,
         CALC_RISE,
@@ -5547,7 +5558,7 @@ def _lun_eclipse_how_pythonic(
     altitude: float = 0.0,
     flags: int = FLG_SWIEPH,
     *,
-    reader=None,
+    reader=_ACTIVE_LEB_READER,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate the circumstances of a lunar eclipse at a specific location and time.
@@ -5617,7 +5628,10 @@ def _lun_eclipse_how_pythonic(
         _lun_how_core shadow model, so they match lun_eclipse_how(); only the
         topocentric azimuth/altitude (attr[4..6]) are computed locally here.
     """
-    # reader is provided by the caller (None forces Skyfield path)
+    # Direct callers get the active mode's reader; explicit internal callers
+    # can still provide one to keep an event search on a single source.
+    if reader is _ACTIVE_LEB_READER:
+        reader = _get_leb_reader_safe()
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -6412,7 +6426,7 @@ def lun_occult_when_loc(
         else int(backwards)
     )
 
-    # Call the internal implementation with LEB→Skyfield fallback
+    # Call the implementation with mode-aware LEB range handling.
     ecl_type, times, attr = _call_with_leb_skyfield_fallback(
         _lun_occult_when_loc_pythonic,
         tjdut,
@@ -6527,8 +6541,8 @@ def rise_trans(
 ) -> Tuple[int, Tuple[float, ...]]:
     """Calculate rise, set, or transit time for a celestial body.
 
-    Wrapper around :func:`_rise_trans_impl` that adds LEB→Skyfield fallback
-    for partial/custom LEB files. See the impl docstring for the full API.
+    Wrapper around :func:`_rise_trans_impl` that applies mode-aware LEB range
+    handling for partial/custom files. See the implementation docstring.
     """
     return _call_with_leb_skyfield_fallback(
         _rise_trans_impl,

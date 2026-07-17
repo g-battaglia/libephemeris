@@ -252,16 +252,15 @@ auto-discovered first. For backward compatibility, the standard LEB1 names
 bundled base fallback. Other independently generated local files remain
 supported through `set_leb_file()` or `LIBEPHEMERIS_LEB`.
 
-### Automatic Fallback
+### Mode-aware routing
 
-Not all bodies and flag combinations are supported by LEB. In particular, LEB does **not** support:
-
-- `FLG_TOPOCTR` (topocentric positions)
-- `FLG_XYZ` (Cartesian coordinates)
-- `FLG_RADIANS` (angles in radians)
-- `FLG_NONUT` (without nutation)
-
-When you encounter one of these cases, the library automatically falls back to Skyfield without errors — the transition is transparent.
+The direct Chebyshev reducer handles the common position and output flags.
+Vector-only paths such as planet-centric positions and topocentric fixed stars
+reuse the same algorithms through an LEB-backed vector adapter. In `auto`, a
+genuine LEB coverage miss may continue through the normal JPL chain. In forced
+`leb`, no flag is permission to open Skyfield/JPL: core range misses fail
+explicitly, while curated bodies without a meaningful persisted channel use a
+traced local `Keplerian` or `Analytical` model.
 
 ### Three LEB Tiers
 
@@ -316,11 +315,15 @@ Sun (Skyfield forced): 19.140437°
 
 ### `"leb"`
 
-Requires a valid LEB file. The library tries the configured file, the active
+Requires valid LEB data. The library tries the configured file, the active
 tier's installed pinned core, and the bundled range-limited base core. Core
 installation is explicit (`libephemeris download leb-medium`); calculation
-never starts a surprise download. Bodies not present in the selected file still
-fall back to Skyfield:
+never starts a surprise download. LEB is the only persistent ephemeris source:
+the runtime does not open DE/BSP, Horizons, registered or automatic SPK files,
+planet-center kernels, or ASSIST. Curated bodies for which an LEB channel is
+not scientifically meaningful may use an existing deterministic local model,
+reported as `Keplerian` or `Analytical`. Core range misses raise
+`EphemerisRangeError`:
 
 ```python
 import libephemeris as ephem
@@ -512,10 +515,11 @@ ephem.download_for_tier("medium")
 
 ### Additional LEB files
 
-The wheel contains `base_core.leb2`; hash-pinned medium and extended cores are
-available through `download_leb_for_tier()` / `download_leb2_for_tier()`.
-Additional groups can be generated and verified locally. Historical `.leb`
-files remain readable when selected explicitly.
+The sealed runtime inventory consists only of five hash-pinned LEB2 groups per
+tier: `core`, `asteroids`, `exotics`, `apogee`, and `uranians`. No DE kernel or
+planet-center BSP is required in `leb` mode. Historical `.leb` files remain
+readable when selected explicitly; production readiness should validate all
+five canonical groups before accepting traffic.
 
 ### Data Directory
 

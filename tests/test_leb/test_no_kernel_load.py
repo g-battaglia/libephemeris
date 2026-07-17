@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 import pytest
 
+from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS
+
 
 def _block_get_planets(*args, **kwargs):
     raise RuntimeError(
@@ -119,6 +121,158 @@ class TestFixedStarsNoKernel:
         _pos, _, _ = fixstar_ut("Regulus", jd, FLG_NOABERR)
         assert state._PLANETS is None
 
+    def test_swe_fixstar_ut_topocentric_no_kernel(self, leb_mode):
+        from libephemeris import set_topo, state
+        from libephemeris.constants import FLG_TOPOCTR
+        from libephemeris.fixed_stars import fixstar_ut
+        from libephemeris.time_utils import julday
+        from libephemeris.tracing import get_trace_results, start_tracing
+
+        jd = julday(2024, 6, 15, 12.0)
+        set_topo(12.5, 41.9, 0.0)
+        token = start_tracing()
+        try:
+            pos, _name, _flags = fixstar_ut("Regulus", jd, FLG_TOPOCTR)
+            traces = get_trace_results()
+        finally:
+            token.var.reset(token)
+        assert state._PLANETS is None
+        assert 140 < pos[0] < 160
+        assert set(traces.values()) == {"LEB"}
+
+
+class TestVectorEntrypointsNoKernel:
+    """Vector-based public APIs must consume LEB states, never a DE kernel."""
+
+    def test_calc_pctr_no_kernel_and_traced(self, leb_mode):
+        from libephemeris import MARS, MOON, calc_pctr, state
+        from libephemeris.time_utils import julday
+        from libephemeris.tracing import get_trace_results, start_tracing
+
+        jd = julday(2024, 6, 15, 12.0)
+        token = start_tracing()
+        try:
+            position, _flags = calc_pctr(jd, MOON, MARS, 0)
+            traces = get_trace_results()
+        finally:
+            token.var.reset(token)
+        assert state._PLANETS is None
+        assert position[2] > 0.0
+        assert traces[MOON] == "LEB"
+
+    def test_outer_planet_never_loads_center_bsp(self, leb_mode, monkeypatch):
+        from libephemeris import JUPITER, calc_ut, state
+        from libephemeris.time_utils import julday
+
+        def forbidden(*_args, **_kwargs):
+            raise AssertionError("planet-center BSP loader was consulted")
+
+        monkeypatch.setattr(state, "_get_planet_centers_locked", forbidden)
+        position, _flags = calc_ut(julday(2024, 6, 15, 12.0), JUPITER, 0)
+
+        assert state._PLANET_CENTERS is None
+        assert position[2] > 0.0
+
+    @pytest.mark.parametrize("body", [1, 4])
+    @pytest.mark.parametrize("method", [0, 2])
+    def test_nod_aps_no_kernel(self, leb_mode, body, method):
+        from libephemeris import nod_aps, state
+        from libephemeris.time_utils import julday
+
+        jd = julday(2024, 6, 15, 12.0)
+        points = nod_aps(jd, body, method, 0)
+        assert state._PLANETS is None
+        assert len(points) == 4
+        assert all(len(point) == 6 for point in points)
+
+    def test_nod_aps_topocentric_no_kernel(self, leb_mode):
+        from libephemeris import FLG_TOPOCTR, MARS, nod_aps, set_topo, state
+        from libephemeris.time_utils import julday
+
+        set_topo(12.5, 41.9, 0.0)
+        points = nod_aps(julday(2024, 6, 15, 12.0), MARS, 2, FLG_TOPOCTR)
+
+        assert state._PLANETS is None
+        assert all(len(point) == 6 for point in points)
+
+    def test_orbital_elements_no_kernel(self, leb_mode):
+        from libephemeris import MARS, get_orbital_elements, state
+        from libephemeris.time_utils import julday
+
+        elements = get_orbital_elements(julday(2024, 6, 15, 12.0), MARS, 0)
+
+        assert state._PLANETS is None
+        assert len(elements) == 50
+        assert elements[0] > 1.0
+
+    def test_curated_minor_fallback_skips_every_persisted_source(
+        self, leb_mode, monkeypatch
+    ):
+        import libephemeris as ephem
+        from libephemeris import rebound_integration, spk, state
+        from libephemeris.time_utils import julday
+        from libephemeris.tracing import get_trace_results, start_tracing
+
+        def forbidden(*_args, **_kwargs):
+            raise AssertionError("persisted non-LEB source was consulted")
+
+        monkeypatch.setattr(spk, "get_spk_type21_target", forbidden)
+        monkeypatch.setattr(spk, "calc_spk_body_position", forbidden)
+        monkeypatch.setattr(
+            rebound_integration, "check_assist_data_available", forbidden
+        )
+
+        previous_strict = state.get_strict_precision()
+        state.set_strict_precision(True)
+        token = start_tracing()
+        try:
+            position, _flags = ephem.calc_ut(julday(2024, 6, 15, 12.0), ephem.CHIRON, 0)
+            traces = get_trace_results()
+        finally:
+            token.var.reset(token)
+            state.set_strict_precision(previous_strict)
+        assert state._PLANETS is None
+        assert position[2] > 0.0
+        assert traces[ephem.CHIRON] == "Keplerian"
+
+    @pytest.mark.parametrize("body", sorted(MINOR_BODY_ELEMENTS))
+    def test_product_minor_catalog_has_traced_local_value_without_companions(
+        self, leb_mode, body
+    ):
+        """Every curated minor body remains available without BSP data."""
+        import libephemeris as ephem
+        from libephemeris.time_utils import julday
+        from libephemeris.tracing import get_trace_results, start_tracing
+
+        token = start_tracing()
+        try:
+            position, _flags = ephem.calc_ut(julday(2024, 6, 15, 12.0), body, 0)
+            traces = get_trace_results()
+        finally:
+            token.var.reset(token)
+
+        assert position[2] > 0.0
+        assert traces[body] == "Keplerian"
+
+    @pytest.mark.parametrize("body", range(40, 48))
+    def test_product_uranian_catalog_has_analytical_value_without_companion(
+        self, leb_mode, body
+    ):
+        """The existing local Uranian models stay available and explicit."""
+        import libephemeris as ephem
+        from libephemeris.time_utils import julday
+        from libephemeris.tracing import get_trace_results, start_tracing
+
+        token = start_tracing()
+        try:
+            position, _flags = ephem.calc_ut(julday(2024, 6, 15, 12.0), body, 0)
+            traces = get_trace_results()
+        finally:
+            token.var.reset(token)
+
+        assert position[2] > 0.0
+        assert traces[body] == "Analytical"
+
 
 class TestPhenoNoKernel:
     """Phase 3: pheno_ut must not load DE kernel."""
@@ -155,6 +309,15 @@ class TestPhenoNoKernel:
         result = pheno_ut(jd, SUN, 0)
         assert state._PLANETS is None
         assert result[0] == 0.0  # phase angle for Sun = 0
+
+    def test_pheno_unsupported_direct_flags_use_leb_vector(self, leb_mode):
+        from libephemeris import FLG_NOABERR, MARS, pheno_ut, state
+        from libephemeris.time_utils import julday
+
+        result = pheno_ut(julday(2024, 6, 15, 12.0), MARS, FLG_NOABERR)
+
+        assert state._PLANETS is None
+        assert result[2] > 0.0
 
 
 class TestHeliacalNoKernel:
@@ -268,6 +431,31 @@ class TestEclipseNoKernel:
         ecl_type, _tret = lun_eclipse_when(jd)
         assert state._PLANETS is None
         assert ecl_type != 0
+
+    def test_lun_eclipse_how_no_kernel(self, leb_mode):
+        from libephemeris import state
+        from libephemeris.eclipse import lun_eclipse_how, lun_eclipse_when
+        from libephemeris.time_utils import julday
+
+        _kind, times = lun_eclipse_when(julday(2024, 1, 1, 0.0))
+        result = lun_eclipse_how(times[0], [12.5, 41.9, 0.0])
+
+        assert state._PLANETS is None
+        assert len(result[1]) == 20
+
+    def test_lun_eclipse_when_loc_no_kernel(self, leb_mode):
+        from libephemeris import state
+        from libephemeris.eclipse import lun_eclipse_when_loc
+        from libephemeris.time_utils import julday
+
+        kind, times, attributes = lun_eclipse_when_loc(
+            julday(2024, 1, 1, 0.0), [12.5, 41.9, 0.0]
+        )
+
+        assert state._PLANETS is None
+        assert kind != 0
+        assert times[0] > 0.0
+        assert len(attributes) == 20
 
     def test_swe_sol_eclipse_how_no_kernel(self, leb_mode):
         from libephemeris import state

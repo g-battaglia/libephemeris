@@ -179,6 +179,11 @@ LibEphemeris uses a physical planet-center segment when the active JPL data
 covers the epoch. Otherwise it explicitly uses the planetary system
 barycenter; no analytical satellite theory is substituted.
 
+In sealed `leb` mode no planet-center BSP is opened. Jupiter through Pluto are
+therefore exactly the system barycentres stored in the selected LEB core, with
+`LEB` provenance. This is a source contract, not an implicit precision
+fallback. `auto` and `skyfield` retain the JPL center-segment behavior below.
+
 #### Tier 1: SPK-based planet centers (<0.001 arcsec)
 
 An auto-downloaded planet-centers kernel (`planet_centers_{tier}.bsp` per precision tier, legacy name `planet_centers.bsp`; not shipped in the wheel) contains precise center-of-body segments for NAIF IDs 599 (Jupiter), 699 (Saturn), 799 (Uranus), 899 (Neptune), and 999 (Pluto). A regenerated medium build uses the widest published JPL center products:

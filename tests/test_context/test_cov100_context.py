@@ -158,6 +158,7 @@ class TestCalcTtLebPath:
         ctx = EphemerisContext()
         ctx._leb_file = None
         ctx._leb_reader = None
+        monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
 
         # Force the global reader to None deterministically (the line
         # 567-569 branch that consults state.get_leb_reader()).
@@ -185,6 +186,7 @@ class TestCalcTtLebPath:
         ctx.set_topo(ROME_LON, ROME_LAT, 0.0)
 
         sentinel = object()
+        monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
         monkeypatch.setattr(state, "get_leb_reader", lambda: sentinel)
 
         def _raise(*args, **kwargs):
@@ -208,6 +210,7 @@ class TestCalcTtLebPath:
         ctx.set_topo(ROME_LON, ROME_LAT, 0.0)
 
         sentinel = object()
+        monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
         monkeypatch.setattr(state, "get_leb_reader", lambda: sentinel)
 
         def _raise(*args, **kwargs):

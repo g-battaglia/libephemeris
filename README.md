@@ -185,7 +185,7 @@ Choose your trade-off between speed, locality, and setup. The same `calc_ut()` i
 |------|---------|-------|----------|
 | `"auto"` | LEB -> Horizons -> Skyfield | adaptive | **Default.** Best onboarding; resolves local or remote data transparently |
 | `"skyfield"` | JPL DE440/DE441 via Skyfield | ~120 us | High-precision local JPL workflow |
-| `"leb"` | Precomputed Chebyshev polynomials | ~5 us | Maximum throughput for repeated calculations |
+| `"leb"` | Sealed LEB plus declared local models | ~5 us | Offline, source-pure repeated calculations; never opens JPL/BSP |
 | `"horizons"` | NASA JPL Horizons REST API | ~300 ms | No local ephemeris files required |
 
 ```python

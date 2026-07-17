@@ -58,7 +58,7 @@ from .constants import (
     HELFLAG_VISLIM_SCOTOPIC,
 )
 
-from .exceptions import Error
+from .exceptions import Error, LEBCorruptionError
 
 # Inner planets (orbit inside Earth's orbit)
 # These have both inferior conjunction (between Earth and Sun)
@@ -2403,10 +2403,14 @@ def _heliacal_ut_pythonic(
                 met_range,
                 observer,
             )
+        except LEBCorruptionError:
+            raise
         except (KeyError, ValueError) as _leb_err:
-            # Fall back to Skyfield for missing bodies, out-of-range dates
-            # AND corrupted/truncated LEB data, same convention as the
-            # calc_ut()/fixed-star paths (corruption logs a WARNING).
+            from .state import get_calc_mode
+
+            if get_calc_mode() == "leb":
+                raise
+            # Auto mode may continue through its normal backend chain.
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("heliacal", _leb_err)
@@ -3864,10 +3868,14 @@ def _heliacal_pheno_ut_pythonic(
                 met_range,
                 observer,
             )
+        except LEBCorruptionError:
+            raise
         except (KeyError, ValueError) as _leb_err:
-            # Fall back to Skyfield for missing bodies, out-of-range dates
-            # AND corrupted/truncated LEB data, same convention as the
-            # calc_ut()/fixed-star paths (corruption logs a WARNING).
+            from .state import get_calc_mode
+
+            if get_calc_mode() == "leb":
+                raise
+            # Auto mode may continue through its normal backend chain.
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("heliacal", _leb_err)
@@ -4343,10 +4351,14 @@ def vis_limit_mag(
                 objname,
                 flags,
             )
+        except LEBCorruptionError:
+            raise
         except (KeyError, ValueError) as _leb_err:
-            # Fall back to Skyfield for missing bodies, out-of-range dates
-            # AND corrupted/truncated LEB data, same convention as the
-            # calc_ut()/fixed-star paths (corruption logs a WARNING).
+            from .state import get_calc_mode
+
+            if get_calc_mode() == "leb":
+                raise
+            # Auto mode may continue through its normal backend chain.
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("heliacal", _leb_err)

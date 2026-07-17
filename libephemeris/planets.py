@@ -99,7 +99,7 @@ from .ayanamsha_definitions import (
     VALENS_MOON_T0_UT,
 )
 
-from .exceptions import EphemerisRangeError
+from .exceptions import EphemerisRangeError, LEBCorruptionError
 
 if TYPE_CHECKING:
     pass
@@ -236,7 +236,12 @@ from .constants import (
 
 # Import all sidereal mode constants (SIDM_*)
 from .constants import *  # noqa: F403, F401
-from .state import get_planets, get_timescale, get_topo, get_sid_mode
+from .state import (
+    _get_computation_ephemeris,
+    get_sid_mode,
+    get_timescale,
+    get_topo,
+)
 
 # Planet mapping: Primary names for planets
 # For outer planets, uses planet center (NAIF x99) if available in ephemeris,
@@ -349,14 +354,23 @@ def _log_successful_source(
 
 
 def _raise_leb_range_miss(body_id: int, jd: float) -> None:
-    """Fail closed when a body exists in LEB but not at the requested date."""
+    """Fail closed for core states outside the active LEB tier.
+
+    Companion minor bodies can have scientifically meaningful stored windows
+    narrower than the core tier.  Their miss is allowed to reach the declared
+    local model; core states must never be synthesized beyond their LEB range.
+    """
     from .inventory import get_body_coverage
     from .state import get_calc_mode
 
     if get_calc_mode() != "leb":
         return
     body_coverage = get_body_coverage(body_id)
-    if body_coverage is None or body_coverage.contains(jd):
+    if (
+        body_coverage is None
+        or body_coverage.contains(jd)
+        or body_coverage.group != "core"
+    ):
         return
     raise EphemerisRangeError(
         message=(
@@ -1722,6 +1736,8 @@ def calc_ut(
             _log_successful_source(get_logger(), requested_planet, tjdut, "LEB")
             _record(requested_planet, "LEB")
             return pos_out, retflag_out
+        except LEBCorruptionError:
+            raise
         except (KeyError, ValueError) as _leb_err:
             _raise_leb_range_miss(planet, tjdut)
             from .leb_reader import log_leb_fallback
@@ -1983,6 +1999,8 @@ def calc(
             _log_successful_source(get_logger(), requested_planet, tjdet, "LEB")
             _record(requested_planet, "LEB")
             return pos_out, retflag_out
+        except LEBCorruptionError:
+            raise
         except (KeyError, ValueError) as _leb_err:
             _raise_leb_range_miss(planet, tjdet)
             from .leb_reader import log_leb_fallback
@@ -2152,10 +2170,17 @@ def calc_pctr(
 
     t = get_cached_time_tt(tjdet)
     try:
-        return _run_pctr_pipeline(
+        result = _run_pctr_pipeline(
             lambda calc_iflag: _calc_body_pctr(t, planet, center, calc_iflag),
             flags,
         )
+        from .state import get_calc_mode
+        from .logging_config import get_logger
+
+        source = "LEB" if get_calc_mode() == "leb" else "Skyfield"
+        _log_successful_source(get_logger(), planet, tjdet, source)
+        _record(planet, source)
+        return result
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
 
@@ -2180,7 +2205,9 @@ def _calc_body_pctr(
     """
     from skyfield.positionlib import ICRF
 
-    planets = get_planets()
+    from .state import _get_computation_ephemeris
+
+    planets = _get_computation_ephemeris()
 
     # Validate that both bodies are in _PLANET_MAP (standard planets only for now)
     if ipl not in _PLANET_MAP:
@@ -2886,7 +2913,7 @@ def _keplerian_position_at(
         jd_tt: Julian Day in Terrestrial Time.
         ipl: Minor body ID (CHIRON, CERES, etc.).
         iflag: Calculation flags (FLG_HELCTR checked).
-        planets_dict: Skyfield planets dict from get_planets().
+        planets_dict: Vector ephemeris resolved for the active mode.
 
     Returns:
         Tuple of (longitude_deg, latitude_deg, distance_au).
@@ -2962,6 +2989,43 @@ def _keplerian_position_at(
         lon = (lon - math.degrees(dpsi_rad)) % 360.0
 
     return lon, lat, r_geo
+
+
+def _calc_keplerian_fallback(t, ipl: int, iflag: int, planets):
+    """Return the existing curated code-model result with honest provenance."""
+    jd_tt = t.tt
+    lon, lat, dist = _keplerian_position_at(jd_tt, ipl, iflag, planets)
+
+    speed_lon = 0.0
+    speed_lat = 0.0
+    speed_dist = 0.0
+    if iflag & FLG_SPEED:
+        dt = 1.0 / 86400.0
+        lon_prev, lat_prev, dist_prev = _keplerian_position_at(
+            jd_tt - dt, ipl, iflag, planets
+        )
+        lon_next, lat_next, dist_next = _keplerian_position_at(
+            jd_tt + dt, ipl, iflag, planets
+        )
+        speed_lon = (lon_next - lon_prev) / (2.0 * dt)
+        speed_lat = (lat_next - lat_prev) / (2.0 * dt)
+        speed_dist = (dist_next - dist_prev) / (2.0 * dt)
+
+        if speed_lon > 180.0 / (2.0 * dt):
+            speed_lon -= 360.0 / (2.0 * dt)
+        if speed_lon < -180.0 / (2.0 * dt):
+            speed_lon += 360.0 / (2.0 * dt)
+
+    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
+
+    result = _to_native_floats(
+        _maybe_equatorial_convert(
+            (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
+        )
+    )
+    _mark_dispatch_source("Keplerian")
+    return result, iflag
 
 
 def _assist_state_at(jd_tt: float, ipl: int):
@@ -3248,7 +3312,9 @@ def _calc_body(
     )
     from .state import get_angles_cache
 
-    planets = get_planets()
+    from .state import _get_computation_ephemeris
+
+    planets = _get_computation_ephemeris()
 
     # Sun heliocentric = Sun from Sun = trivially (0,0,0). A sidereal ecliptic
     # request still subtracts the ayanamsha (see _degenerate_origin_result) so
@@ -3263,6 +3329,15 @@ def _calc_body(
 
     # Handle planetary moons (Galilean moons, Titan, etc.)
     if planetary_moons.is_planetary_moon(ipl):
+        from .state import get_calc_mode
+
+        if get_calc_mode() == "leb":
+            from .exceptions import Error
+
+            raise Error(
+                "planetary-moon SPK access is disabled in calculation mode 'leb'; "
+                "no declared LEB or analytical model serves this body"
+            )
         result = planetary_moons.calc_moon_position(t, ipl, iflag)
         if result is not None:
             result = _maybe_equatorial_convert(result, t.tt, iflag)
@@ -3592,7 +3667,7 @@ def _calc_body(
         is_j2000 = bool(iflag & FLG_J2000)
         is_sidereal = bool(iflag & FLG_SIDEREAL)
 
-        # Position sourcing. With an active LEB reader the expensive Skyfield
+        # Position sourcing. With an active LEB reader the vector-resolver
         # Earth evaluation — and, when the serving file byte-matches its
         # pinned manifest SHA-256, the body propagation itself — come from the
         # reader. Every frame transform and finite-difference realization
@@ -3620,6 +3695,8 @@ def _calc_body(
             def _uranian_pos(jd: float) -> Tuple[float, float, float]:
                 try:
                     (u_lon, u_lat, u_dist), _ = _reader.eval_body(ipl, jd)
+                except LEBCorruptionError:
+                    raise
                 except (KeyError, ValueError):
                     return hypothetical._calc_uranian_planet_raw(ipl, jd)
                 return u_lon, u_lat, u_dist
@@ -3650,7 +3727,7 @@ def _calc_body(
             u_ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
             return (u_lon, u_lat, u_dist, u_dlon, u_dlat, u_ddist)
 
-        def _earth_helio_ecl_j2000_skyfield(jd: float) -> Tuple[float, float, float]:
+        def _earth_helio_ecl_j2000_vector(jd: float) -> Tuple[float, float, float]:
             ts_i = get_timescale()
             t_i = ts_i.tt_jd(jd)
             earth_h = planets["sun"].at(t_i).observe(planets["earth"])
@@ -3669,8 +3746,10 @@ def _calc_body(
                 try:
                     (ex, ey, ez), _ = _reader.eval_body(EARTH, jd)
                     (sx, sy, sz), _ = _reader.eval_body(SUN, jd)
+                except LEBCorruptionError:
+                    raise
                 except (KeyError, ValueError):
-                    return _earth_helio_ecl_j2000_skyfield(jd)
+                    return _earth_helio_ecl_j2000_vector(jd)
                 # Astrometric Earth-from-Sun: iterate the light time on the
                 # Earth sample (Sun frozen at jd), replicating the Skyfield
                 # observe() semantics of the fallback path above.
@@ -3679,12 +3758,14 @@ def _calc_body(
                 for _ in range(10):
                     try:
                         (ex, ey, ez), _ = _reader.eval_body(EARTH, jd - lt)
+                    except LEBCorruptionError:
+                        raise
                     except (KeyError, ValueError):
                         # A composite reader closed mid-calculation (e.g. a
                         # concurrent set_leb_file/close) raises KeyError once
-                        # its body map is cleared; degrade to Skyfield like the
-                        # outer evals rather than escaping to the public caller.
-                        return _earth_helio_ecl_j2000_skyfield(jd)
+                        # its body map is cleared; use the mode-aware vector
+                        # resolver rather than crossing the backend boundary.
+                        return _earth_helio_ecl_j2000_vector(jd)
                     rx, ry, rz = ex - sx, ey - sy, ez - sz
                     lt_next = math.sqrt(rx * rx + ry * ry + rz * rz) / C_LIGHT_AU_DAY
                     converged = abs(lt_next - lt) < 1e-14
@@ -3698,7 +3779,7 @@ def _calc_body(
                 )
 
         else:
-            _earth_helio_ecl_j2000 = _earth_helio_ecl_j2000_skyfield
+            _earth_helio_ecl_j2000 = _earth_helio_ecl_j2000_vector
 
         if is_helio:
             # Heliocentric J2000 ecliptic state (position + centered velocity)
@@ -4128,6 +4209,22 @@ def _calc_body(
     # Keplerian elements (curated table or JPL SBDB) -> UnknownBodyError.
     _spk_type21_target = None
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS or (AST_OFFSET < ipl < FIXSTAR_OFFSET):
+        from .state import get_calc_mode
+
+        if get_calc_mode() == "leb":
+            if ipl not in minor_bodies.MINOR_BODY_ELEMENTS:
+                from .exceptions import UnknownBodyError
+
+                raise UnknownBodyError(
+                    message=(
+                        f"Asteroid {ipl - AST_OFFSET} (body ID {ipl}) has no "
+                        "curated local model and online/SPK sources are disabled "
+                        "in calculation mode 'leb'."
+                    ),
+                    body_id=ipl,
+                )
+            return _calc_keplerian_fallback(t, ipl, iflag, planets)
+
         from . import spk
         from .state import get_auto_spk_download, get_strict_precision
         from .exceptions import SPKRequiredError
@@ -4269,46 +4366,8 @@ def _calc_body(
             except (ImportError, RuntimeError, ValueError, FileNotFoundError):
                 pass
 
-            # Keplerian as last resort — reduced precision, warn the user.
-            # Measured vs JPL: the unperturbed two-body fit drifts to ~1-2 deg
-            # outside the SPK window (it omits planetary perturbations), not
-            # arcminutes — state that honestly so callers don't trust it.
-            lon, lat, dist = _keplerian_position_at(jd_tt, ipl, iflag, planets)
-
-            speed_lon = 0.0
-            speed_lat = 0.0
-            speed_dist = 0.0
-            if iflag & FLG_SPEED:
-                dt = 1.0 / 86400.0
-                lon_prev, lat_prev, dist_prev = _keplerian_position_at(
-                    jd_tt - dt, ipl, iflag, planets
-                )
-                lon_next, lat_next, dist_next = _keplerian_position_at(
-                    jd_tt + dt, ipl, iflag, planets
-                )
-                speed_lon = (lon_next - lon_prev) / (2.0 * dt)
-                speed_lat = (lat_next - lat_prev) / (2.0 * dt)
-                speed_dist = (dist_next - dist_prev) / (2.0 * dt)
-
-                if speed_lon > 180.0 / (2.0 * dt):
-                    speed_lon -= 360.0 / (2.0 * dt)
-                if speed_lon < -180.0 / (2.0 * dt):
-                    speed_lon += 360.0 / (2.0 * dt)
-
-            # Sidereal offset (ecliptic only) — the Keplerian fallback likewise
-            # dropped FLG_SIDEREAL, returning tropical for sidereal requests.
-            if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
-                lon, speed_lon = _apply_sidereal_correction(
-                    lon, speed_lon, t.ut1, iflag
-                )
-
-            result = _to_native_floats(
-                _maybe_equatorial_convert(
-                    (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
-                )
-            )
-            _mark_dispatch_source("Keplerian")
-            return result, iflag
+            # Keplerian as the final, explicitly traced approximation.
+            return _calc_keplerian_fallback(t, ipl, iflag, planets)
 
     # Handle fixed stars — delegate to the fixstar_ut() computation so every
     # flag (FLG_SIDEREAL, FLG_EQUATORIAL, FLG_SPEED, ...) gets the exact same
@@ -5215,7 +5274,11 @@ def _galcent_ra_of_date(tjd_tt: float) -> float:
     time = get_timescale().tt_jd(tjd_tt)
     try:
         vector = np.array(
-            get_planets()["earth"].at(time).observe(star).apparent().position.au
+            _get_computation_ephemeris()["earth"]
+            .at(time)
+            .observe(star)
+            .apparent()
+            .position.au
         )
     except _RANGE_ERRORS as error:
         raise _wrap_ephemeris_range_error(error, tjd_tt) from error
@@ -5377,7 +5440,9 @@ def _star_position_ecliptic_uncached(
 
     # Use Skyfield pipeline: observe -> apparent (includes aberration)
     # then transform to ecliptic of date (includes precession + nutation)
-    planets = get_planets()
+    from .state import _get_computation_ephemeris
+
+    planets = _get_computation_ephemeris()
     ts = get_timescale()
     t = ts.tt_jd(tjd_tt)
     earth = planets["earth"]
@@ -5873,7 +5938,7 @@ def _apply_nodaps_topocentric(
 
     ts = get_timescale()
     t = ts.tt_jd(jd_tt)
-    earth = get_planets()["earth"]
+    earth = _get_computation_ephemeris()["earth"]
     topocenter = (earth + observer_topo).at(t)
     geocenter = earth.at(t)
     observer_position: tuple[float, float, float] = (
@@ -6352,7 +6417,9 @@ def _calc_nod_aps(
             _with_speed_c(now[3], prev[3], nxt[3]),
         )
 
-    planets = get_planets()
+    from .state import _get_computation_ephemeris
+
+    planets = _get_computation_ephemeris()
     jd_tt = t.tt
 
     # --- ICRS → ecliptic of date rotation (Vondrák 2011, matching calc()) ---
@@ -7014,7 +7081,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     Returns:
         Flat tuple of 50 floats with orbital elements (padded with 0.0)
     """
-    planets = get_planets()
+    planets = _get_computation_ephemeris()
     zero_elements = tuple([0.0] * 50)
 
     # Sun and Earth don't have heliocentric orbital elements
@@ -7389,7 +7456,7 @@ def _emb_osculating_ecliptic_elements(t, jd_tt: float) -> Tuple[float, ...]:
     Returns:
         The shared 50-slot osculating-element tuple for the EMB.
     """
-    planets = get_planets()
+    planets = _get_computation_ephemeris()
     sun = planets["sun"]
     emb = planets["earth barycenter"]
 
@@ -7602,7 +7669,7 @@ def _calc_nod_aps_osculating(
     These are the "true" instantaneous orbital parameters that include short-term
     perturbations from other planets.
     """
-    planets = get_planets()
+    planets = _get_computation_ephemeris()
     zero_pos: PosTuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     target_name = _PLANET_MAP.get(ipl)
@@ -8335,7 +8402,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
     from .cache import get_cached_observer_at
 
-    planets = get_planets()
+    planets = _get_computation_ephemeris()
 
     # Initialize return values
     phase_angle = 0.0

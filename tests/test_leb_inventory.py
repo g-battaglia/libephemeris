@@ -57,7 +57,9 @@ def test_runtime_requirements_follow_manifest_and_canonical_groups(
         "apogee",
         "uranians",
     ]
-    assert requirements[-1].name == "planet_centers_extended.bsp"
+    assert requirements[-1].name == "extended_uranians.leb2"
+    assert len(requirements) == 5
+    assert all(item.kind == "leb2" for item in requirements)
     assert all(len(item.sha256) == 64 for item in requirements)
     assert requirements[0].path == str(tmp_path / "leb" / "extended_core.leb2")
 
@@ -70,3 +72,26 @@ def test_leb_mode_fails_closed_outside_known_body_range() -> None:
     assert caught.value.start_jd == sun.jd_start
     assert caught.value.end_jd == sun.jd_end
     assert "does not silently substitute" in str(caught.value)
+
+
+def test_auto_mode_prefers_leb_before_other_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A usable LEB state wins before any JPL loader in auto mode."""
+    from libephemeris import state
+    from libephemeris.tracing import get_trace_results, start_tracing
+
+    def forbidden_jpl():
+        raise AssertionError("auto mode consulted JPL before a usable LEB state")
+
+    state.set_calc_mode("auto")
+    monkeypatch.setattr(state, "get_planets", forbidden_jpl)
+    token = start_tracing()
+    try:
+        position, _flags = eph.calc_ut(eph.julday(2024, 6, 15, 12.0), eph.SUN, 0)
+        traces = get_trace_results()
+    finally:
+        token.var.reset(token)
+
+    assert position[2] > 0.0
+    assert traces[eph.SUN] == "LEB"

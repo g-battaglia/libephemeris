@@ -91,20 +91,6 @@ def get_runtime_data_requirements(
             )
         )
 
-    centers_name = f"planet_centers_{active_tier}.bsp"
-    centers_info = DATA_FILES.get(centers_name)
-    centers_sha256 = centers_info.get("sha256") if centers_info is not None else None
-    if not isinstance(centers_sha256, str) or not centers_sha256:
-        raise RuntimeError(f"Reviewed manifest pin missing for {centers_name}")
-    requirements.append(
-        RuntimeDataRequirement(
-            name=centers_name,
-            kind="planet_centers",
-            group=None,
-            path=str(data_dir / centers_name),
-            sha256=centers_sha256,
-        )
-    )
     return tuple(requirements)
 
 

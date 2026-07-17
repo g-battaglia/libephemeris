@@ -335,6 +335,15 @@ class CompareHelper:
         finally:
             ephem.set_calc_mode(None)
 
+    def leb_only(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
+        """Call fn through the source-sealed LEB vector boundary."""
+        ephem.set_leb_file(self.leb_path)
+        ephem.set_calc_mode("leb")
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            ephem.set_calc_mode(None)
+
 
 # =============================================================================
 # FIXTURES

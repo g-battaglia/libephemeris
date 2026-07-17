@@ -131,9 +131,9 @@ planets.py: calc_ut()
   |     |-- Sidereal correction (if FLG_SIDEREAL)
   |     |-- Return (lon, lat, dist, dlon, dlat, ddist), iflag
   |     |
-  |     |-- [KeyError/ValueError] -> fall through to Skyfield
+  |     |-- [KeyError/ValueError] -> apply the active mode's source policy
   |
-  |-- [Skyfield fallback] _calc_body(t, ipl, iflag)
+  |-- [mode-aware resolver] LEB vector adapter / JPL / local model
 ```
 
 ### Activation
@@ -182,14 +182,14 @@ variable.
 |------|----------|
 | `auto` (default) | LEB if configured, then Horizons (if no local DE440), then Skyfield |
 | `skyfield` | Always use Skyfield, even if a `.leb` file is configured |
-| `leb` | Require the bundled, configured, or locally generated LEB; unsupported bodies/flags fall back to Skyfield |
+| `leb` | Require LEB as the sole persistent ephemeris source; allow only traced local analytical/Keplerian models where no meaningful LEB channel exists |
 | `horizons` | Prefer Horizons API; unsupported bodies/flags fall back to Skyfield |
 
 ```python
 from libephemeris import set_calc_mode, get_calc_mode
 
 set_calc_mode("skyfield")  # Force Skyfield for benchmarking/validation
-set_calc_mode("leb")       # Require LEB (error if unavailable)
+set_calc_mode("leb")       # Sealed LEB; never open JPL/Horizons/SPK
 set_calc_mode("horizons")  # Prefer Horizons API
 set_calc_mode("auto")      # Default behavior
 set_calc_mode(None)        # Reset to env var / default
@@ -202,9 +202,12 @@ export LIBEPHEMERIS_MODE=horizons   # Prefer Horizons API
 export LIBEPHEMERIS_MODE=auto       # Default (same as unset)
 ```
 
-In `leb` mode, bodies not present in the `.leb` file still fall through to
-Skyfield (the mode only requires that a valid `.leb` file is loaded, not
-that every body is in it).
+In `leb` mode, a core body outside the active file's stored interval raises
+`EphemerisRangeError`; it is never extrapolated or silently recomputed from
+JPL. Curated minor bodies without useful LEB coverage may use an existing
+deterministic local model, and tracing reports `Keplerian` or `Analytical`.
+Missing or corrupt canonical group files are provisioning failures and must be
+caught by the sealed-runtime inventory/readiness check.
 
 ---
 
@@ -568,7 +571,8 @@ def fast_calc_tt(reader, tjd_tt, ipl, iflag, *,
 ```
 
 Both functions:
-1. Check for unsupported flags and raise `KeyError` to trigger fallback.
+1. Check for flags unsupported by the direct reducer and raise `KeyError` so
+   the caller can apply the active mode's source policy.
 2. Snapshot sidereal state at entry (thread-safe).
 3. Convert UT to TT via `deltat()` from `time_utils` (high-precision
    Skyfield model, **not** `reader.delta_t()` which uses linear interpolation
@@ -580,11 +584,11 @@ Both functions:
 
 ### 5.2 Flag Handling
 
-**Flags that trigger immediate Skyfield fallback (raise KeyError):**
+**Flags that leave the direct reducer (raise `KeyError`):**
 
 | Flag | Reason |
 |------|--------|
-| `FLG_ICRS` | ICRS output frame not implemented on the LEB path |
+| `FLG_ICRS` | ICRS output is completed by the mode-aware vector path; in `leb` mode that path uses `LEBVectorEphemeris`, not JPL |
 
 **Flags handled natively by LEB:**
 
@@ -771,8 +775,8 @@ dlon -= prec_rate
 
 - Supports **29 formula-based sidereal modes** (stored in `_AYANAMSHA_J2000` dict)
 - Supports `SIDM_USER` (mode 255) with custom t0/ayan_t0
-- **Star-based modes** (17, 27-36, 39-40, 42) raise `KeyError` to trigger
-  Skyfield fallback
+- **Star-based modes** (17, 27-36, 39-40, 42) raise `KeyError` so the
+  catalogue-backed, mode-aware path can complete the calculation
 - True ayanamsa = mean ayanamsa + nutation in longitude (from LEB nutation data)
 
 ### 5.7 Utility Functions
@@ -968,8 +972,10 @@ body_jd_ranges[bid] = (eff_start, eff_end)
 ```
 
 **At runtime:** when a body's JD is outside its per-body range, `eval_body()`
-raises `ValueError`, which `calc_ut()`/`calc()` catches to fall
-through to Skyfield. This is transparent to the caller.
+raises `ValueError`. A core-body miss in forced `leb` mode becomes an explicit
+`EphemerisRangeError`; a curated companion body may use its declared local
+Keplerian model and is traced as `source=Keplerian`. In `auto` mode the normal
+LEB → JPL/SPK → local-model order applies.
 
 **Coverage by tier:**
 
@@ -1226,7 +1232,7 @@ _VALID_CALC_MODES = ("auto", "skyfield", "leb", "horizons")
 - Creates `LEBReader(path)` on first access
 - Logs warning and returns `None` if file is invalid/corrupt (in `auto` mode)
 
-### 7.2 Dispatch in `calc_ut()` (`planets.py:772-782`)
+### 7.2 Dispatch in `calc_ut()`
 
 ```python
 def calc_ut(tjd_ut, ipl, iflag):
@@ -1238,10 +1244,11 @@ def calc_ut(tjd_ut, ipl, iflag):
         try:
             return fast_calc.fast_calc_ut(reader, tjd_ut, ipl, iflag)
         except (KeyError, ValueError):
-            pass  # fall through to Skyfield
+            pass  # apply the active mode's source policy
     # --- END LEB fast path ---
 
-    # Full Skyfield pipeline
+    # In mode=leb, _calc_body uses LEBVectorEphemeris or a declared local
+    # model. Other modes retain their configured JPL/Skyfield routing.
     return _calc_body(t, ipl, iflag)
 ```
 
@@ -1259,7 +1266,7 @@ if reader is not None:
         from .fast_calc import _calc_ayanamsa_from_leb
         return _calc_ayanamsa_from_leb(reader, jd_tt, sid_mode)
     except KeyError:
-        pass  # star-based mode, fall back to Skyfield
+        pass  # continue through the mode-aware catalogue/vector path
 ```
 
 ### 7.4 Exported API
@@ -1320,7 +1327,7 @@ class EphemerisContext:
                 sid_t0=self.sidereal_t0,             # thread-safe
                 sid_ayan_t0=self.sidereal_ayan_t0,   # thread-safe
             )
-        # ... Skyfield fallback ...
+        # ... mode-aware vector path ...
 ```
 
 **Critical:** Sidereal parameters are passed as **keyword arguments** to
@@ -1423,22 +1430,23 @@ orbital motion due to Earth's own motion and parallax effects.
 - **Nutation (interval=16, degree=16):** Halved from 32 days to reduce
   obliquity error, which affects latitude of all bodies.
 
-### 9.3 Bodies NOT in LEB (Skyfield Fallback)
+### 9.3 Bodies not stored as LEB coefficients
 
-When LEB is active and a body is **not** present in the loaded `.leb`
-file, the library raises `KeyError`/`ValueError` internally, which is
-caught by `calc_ut()` / `calc()`, and the request falls through to the
-full Skyfield pipeline. This is completely transparent to the caller.
+A miss in the direct LEB reducer is resolved according to the selected mode;
+it is not an unconditional Skyfield/JPL fallback:
 
-The same fallback is triggered by:
+- `leb`: the vector adapter continues to use the active LEB reader. Curated
+  minor bodies without meaningful coefficient coverage may use the bundled
+  deterministic model and are traced as `Keplerian` or `Analytical`. A core
+  date outside the active tier raises `EphemerisRangeError`.
+- `auto`: tries LEB first, then JPL/SPK, then an allowed local model.
+- `skyfield`/`jpl`: uses the configured JPL source and never selects LEB
+  implicitly.
 
-- **Unsupported flags:** `FLG_ICRS` (the only flag that always falls
-  back; `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS` and `FLG_NONUT` are
-  handled on the LEB path — see §5.2)
-- **JD out of range:** Julian Day outside the body's coverage in the file
-- **Live catalog sidereal modes:** these delegate only the ayanamsha geometry
-  to the direct catalogue pipeline; the body itself remains on LEB. Epoch and
-  formula modes use the same shared defining table on both backends.
+`FLG_ICRS`, topocentric fixed stars, `calc_pctr()`, and `nod_aps()` use the
+LEB vector adapter in forced `leb` mode. Live-catalogue sidereal modes delegate
+only catalogue geometry; their planetary vectors remain on the selected
+backend.
 
 #### Exotic minor bodies (served from LEB when present)
 
@@ -1458,12 +1466,11 @@ LEB `exotics` group (`ephemeris_{tier}_exotics.leb` for LEB1,
 
 When the loaded LEB file contains the `exotics` group these bodies are
 served **directly from LEB** (SPK-derived Chebyshev coefficients over
-each object's JPL SPK coverage window). They fall back to the
-SPK → Skyfield pipeline **only** when the loaded file lacks the body —
-e.g. the exotics group was not generated/downloaded, the requested JD is
-outside the object's SPK window, or on the extended tier, where the 8
-chaotic NEAs are intentionally excluded from generation
-(`EXOTIC_EXTENDED_IDS` keeps the 23 regular exotics only).
+each object's JPL SPK coverage window). If a curated body is absent or the JD
+is outside that window, forced `leb` mode uses its declared local Keplerian
+model and traces that source. `auto` may use a registered SPK before that local
+model. The extended tier intentionally excludes the eight chaotic NEAs from
+generation (`EXOTIC_EXTENDED_IDS` keeps the 23 regular exotics only).
 
 #### Bodies not stored as LEB coefficients
 
@@ -1473,13 +1480,14 @@ These are never stored as LEB Chebyshev data:
 |----------|--------|-----|-------|--------------|
 | Historical hypothetical | 13 source-backed models; 6 names-only IDs | 40–58 | 19 IDs | IDs 40–47, 50–53, and 56 use reviewed runtime models; IDs 48, 49, 54, 55, 57, and 58 raise `UnknownBodyError` |
 | Fixed stars | full star catalog (Regulus, Spica, Aldebaran, …) | FIXSTAR_OFFSET + n | 1447 | `fixed_stars.py` (see §9.4) |
-| Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | MOON_OFFSET + n | 21 | SPK via `planetary_moons.py` |
+| Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | MOON_OFFSET + n | 21 | SPK via `planetary_moons.py`; unavailable in sealed `leb` mode |
 | Astrological angles | Ascendant, MC, Descendant, IC, Vertex, Antivertex | 9000–9005 | 6 | `angles.py` (house-based) |
 | Arabic parts | Pars Fortunae, Pars Spiritus, Pars Amoris, Pars Fidei | 9100–9103 | 4 | `arabic_parts.py` (derived) |
 | Nutation/obliquity | ECL_NUT | -1 | 1 | LEB nutation section (§9.4) |
 
-Any minor body outside the `exotics` registry (e.g. Bennu) likewise falls
-back to the SPK → Skyfield pipeline.
+Minor bodies outside the curated registry (for example Bennu) require an SPK
+in `auto`/`skyfield` mode. They fail explicitly in sealed `leb` mode because
+there is neither a LEB coefficient stream nor a reviewed local model.
 
 IDs 40–58 do not use LEB coefficients. The dispatcher uses local,
 primary-source runtime models for IDs 40–47, 50–53, and 56 and fails closed
@@ -1491,14 +1499,11 @@ stars + 21 moons + 10 angles/parts + 1 nutation).
 **Why the core/exotics split:** the frequently used compressed LEB2 `core`
 group is small enough (~10.7 MB for the bundled base artifact). The 31
 **exotic** bodies are SPK-derived and much larger on disk (a generated base
-`exotics` group is ~59 MB compressed). The format and generator support that
-separate companion, but no exotics file is currently published in the release
-download manifest; users must generate or provide it themselves. Fixed stars,
-planetary moons, and chart angles/parts stay on the Skyfield pipeline — they
-are cheap to compute analytically or vary with observer/house settings, so
-precomputing them would add size with little benefit. The Skyfield fallback
-provides identical accuracy at the cost of ~120 µs per evaluation (vs ~8 µs
-for LEB bodies).
+`exotics` group is ~59 MB compressed), so they remain a separate companion.
+Fixed stars use their local catalogue plus the active backend's Earth vector;
+chart angles and parts are derived locally from chart inputs. Planetary moons
+still require their dedicated SPK and are deliberately outside the sealed LEB
+product surface.
 
 ### 9.4 Auxiliary LEB Sections (Non-Chebyshev Data)
 
@@ -1545,10 +1550,10 @@ that doesn't benefit from polynomial approximation.
 - **Format:** per-star entries with RA, Dec, pmRA, pmDec, parallax, radial
   velocity, visual magnitude
 - **Access:** `reader.get_star(hip_number)` → star data dict
-- **Note:** Fixed star calculations still go through the full Skyfield
-  pipeline when called via `calc_ut()`. The star catalog in LEB is
-  used internally for sidereal ayanamsha calculations involving reference
-  stars.
+- **Note:** In sealed `leb` mode, topocentric and apparent fixed-star
+  calculations combine the local catalogue with Earth vectors from
+  `LEBVectorEphemeris`; they do not open a JPL kernel. The catalogue is also
+  used for sidereal ayanamsha calculations involving reference stars.
 
 ---
 
@@ -2020,16 +2025,14 @@ Psyche, Europa, Sylvia, Davida, Interamnia) carry their SPK coverage window
 (~1600–2500) instead: a perturber cannot be integrated as a massless test
 particle against the force model that already contains it (see
 `EXOTIC_ASSIST_PERTURBER_IDS` in `libephemeris/exotic_bodies.py`). Outside a
-body's stored window the runtime falls back to Skyfield exactly as for the
-classic asteroids.
+body's stored window, sealed `leb` mode uses the declared local Keplerian
+model and records that provenance; `auto` may use JPL/SPK first.
 
 The `exotics` group (`LEB2_GROUPS` in `libephemeris/leb_groups.py`) is by far
-the largest. It is a supported generated companion but is not currently a
-published download. The wheel bundles the independently generated
-`base_core.leb2` and `base_uranians.leb2`; mean lunar points and smoothed
-apsides require no standalone lunar model binary. Wider cores are accepted
-only through artifact-specific URL and SHA-256 manifest entries; companion
-groups without such entries remain local-generation only.
+the largest. All five groups are versioned companions with immutable URL and
+SHA-256 manifest entries for every supported tier. The wheel also bundles the
+base core and base uranians artifacts; mean lunar points and smoothed apsides
+require no standalone lunar model binary.
 
 The `uranians` group is **companion-only**: its coefficients are fitted from
 the runtime Neely (1980) propagation in `libephemeris.hypothetical`, its
@@ -2218,17 +2221,21 @@ itself.
 
 The body is absent from the loaded file's inventory. Base and medium local
 generation can include up to 53 registered bodies; extended generation omits
-eight chaotic NEAs and contains 45. The published pinned core assets contain a
-smaller core inventory. The calculation pipeline falls back according to the
-selected mode when a body is absent.
+eight chaotic NEAs and contains 45. Verify that all five pinned companions for
+the selected tier are installed and valid. If the body is intentionally not a
+LEB coefficient stream, the calculation follows the selected mode's declared
+local/JPL policy; missing or corrupt required companions are provisioning
+errors.
 
 ### 14.2 "JD outside range"
 
 The requested date is outside the body's coverage range in the LEB file.
-Falls back to Skyfield silently. Note that different bodies may have
-different date ranges — asteroids typically cover ~1600-2500 CE (limited
-by JPL Horizons SPK availability), while planets cover the full tier range.
-Check `reader._bodies[body_id].jd_start` and `.jd_end` for per-body ranges.
+Different bodies may have different date ranges — asteroids typically cover
+~1600-2500 CE (limited by source-SPK availability), while planets cover the
+full tier range. In sealed `leb` mode a core miss raises
+`EphemerisRangeError`; a curated companion miss may return its traced
+Keplerian model. Check `reader._bodies[body_id].jd_start` and `.jd_end` for
+per-body ranges.
 
 ### 14.3 Large Asteroid Errors (~1500")
 
@@ -2250,9 +2257,8 @@ leph leb generate base groups
 - Ensure `set_leb_file()` is called before any `calc_ut()` calls
 - Check that `get_leb_reader()` returns a non-None value
 - Verify the body you're computing is in the LEB file
-- If using `FLG_ICRS`, LEB always falls back to Skyfield
-  (`FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS` and `FLG_NONUT` are handled
-  on the LEB path)
+- `FLG_ICRS` deliberately leaves the direct reducer, but sealed `leb` mode
+  completes it through `LEBVectorEphemeris`; it does not open Skyfield/JPL
 
 ---
 

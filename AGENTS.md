@@ -28,7 +28,7 @@ uv run ./leph code format               # Ruff formatter
 uv run ./leph code typecheck            # mypy
 
 uv run ./leph test skyfield essential   # ~900 tests, ~20s (fast sanity check)
-uv run ./leph test leb-backend unit-fast # ~16,000 tests, ~1 min [RECOMMENDED]
+uv run ./leph test leb-backend unit-fast # sealed LEB contract [RECOMMENDED]
 pytest tests/test_file.py -v            # Single file
 pytest tests/test_file.py::test_name -v # Single test
 ```
@@ -49,7 +49,12 @@ TAB completion setup): see `CLI.md`.
 
 Three tiers: `base` (de440s, 1849-2150), `medium` (de440, 1550-2650, **default**), `extended` (de441, -13200 to +17191).
 
-Four calc modes (`set_calc_mode()` / `LIBEPHEMERIS_MODE`): `auto` (default: LEB->Horizons->Skyfield), `leb`, `horizons`, `skyfield`.
+Four calc modes (`set_calc_mode()` / `LIBEPHEMERIS_MODE`): `auto` (default: LEB->Horizons->Skyfield), sealed `leb`, `horizons`, and `skyfield`.
+
+The generic test tree includes JPL-only APIs and dates outside the bundled LEB
+tier. Use `skyfield unit-fast` for broad compatibility and `leb-backend
+unit-fast` for the curated source-purity/runtime contract; never force the
+entire tree through sealed LEB mode.
 
 LEB = precomputed Chebyshev polynomials (~14x speedup). Set via `set_leb_file()` or `LIBEPHEMERIS_LEB` env var.
 

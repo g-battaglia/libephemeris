@@ -369,7 +369,7 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
     \b
     What gets downloaded depends on your config:
       auto mode     LEB2 files + DE kernel + planet_centers + SPK
-      leb mode      LEB2 files + planet_centers
+      leb mode      LEB2 files only
       skyfield      DE kernel + planet_centers + SPK
       horizons      planet_centers (optional)
 
@@ -424,7 +424,7 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
                 show_progress=not no_progress,
                 quiet=quiet,
             )
-        elif mode in ("leb", "horizons"):
+        elif mode == "horizons":
             if not quiet:
                 click.echo(_d("  Planet centers..."))
             from ..download import _download_planet_centers_for_tier

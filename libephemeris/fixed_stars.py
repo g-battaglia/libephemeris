@@ -208,7 +208,7 @@ from .constants import (
 )
 from .utils import cotrans
 from .cache import get_true_obliquity, get_mean_obliquity
-from .exceptions import Error
+from .exceptions import Error, LEBCorruptionError
 from .planets import _wrap_ephemeris_range_error
 
 _fixed_star_source: ContextVar[str | None] = ContextVar(
@@ -2435,10 +2435,10 @@ def _calc_star_position_skyfield(
     Raises:
         ValueError: If star_id not in catalog
     """
-    from .state import get_planets, get_timescale
+    from .state import _get_computation_ephemeris, get_timescale
 
     t = get_timescale().tt_jd(jd_tt)
-    planets = get_planets()
+    planets = _get_computation_ephemeris()
     if center == FLG_HELCTR:
         # Heliocentric: observe from the Sun (no aberration/deflection —
         # the caller forces noaberr=nogdefl=True, so the geometric branch runs).
@@ -2525,20 +2525,21 @@ def _calc_fixed_star_position_with_source(
     center: int = 0,
 ) -> tuple[Tuple[float, float, float], str]:
     """Return a fixed-star position together with its actual backend tag."""
-    from .state import get_leb_reader
+    from .state import get_calc_mode, get_leb_reader
 
-    # The LEB star path is geocentric; topocentric requests go through
-    # Skyfield (same convention as the planet pipeline).
+    # The direct LEB star path is geocentric. Topocentric requests reuse the
+    # Skyfield vector algorithm, backed by LEB states in sealed LEB mode.
     if topo is None and get_leb_reader() is not None:
         try:
             position = _calc_star_position_leb(
                 star_id, jd_tt, noaberr, nogdefl, j2000_frame, center
             )
             return position, "LEB"
+        except LEBCorruptionError:
+            raise
         except (KeyError, ValueError) as _leb_err:
-            # Fall back to Skyfield for missing bodies, out-of-range dates
-            # AND corrupted/truncated LEB data, mirroring the planet path.
-            # Corruption logs a WARNING.
+            # Missing bodies and range misses continue through the mode-aware
+            # vector resolver. Actual LEB corruption was re-raised above.
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("star", _leb_err)
@@ -2546,7 +2547,8 @@ def _calc_fixed_star_position_with_source(
         position = _calc_star_position_skyfield(
             star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo, center=center
         )
-        return position, "Skyfield"
+        source = "LEB" if get_calc_mode() == "leb" else "Skyfield"
+        return position, source
     except SkyfieldRangeError as e:
         # Wrap once here: every star entry point (fixstar_ut, fixstar,
         # fixstar2*, velocity, calc_ut dispatch) funnels through this
@@ -3476,9 +3478,11 @@ def batch_fixstars_ut(
                 )
                 results[index] = (result, canonical_name, ret_flags)
             _leb_ok = True
+        except LEBCorruptionError:
+            raise
         except (KeyError, ValueError) as _leb_err:
-            # Fall back to Skyfield for missing bodies, out-of-range dates
-            # AND corrupted/truncated LEB data (see calc_fixed_star_position).
+            # Missing bodies and range misses continue through the mode-aware
+            # vector resolver. Actual LEB corruption was re-raised above.
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("star batch", _leb_err)
@@ -3488,12 +3492,13 @@ def batch_fixstars_ut(
             _record_fixed_star_success(star_id, jd_tt, "LEB")
         return tuple(results)
 
-    # Skyfield fallback path. Heliocentric/barycentric requests observe from
-    # the Sun/SSB instead of the Earth (center resolved above); the forced
-    # noaberr=nogdefl=True then selects the geometric branch.
-    from .state import get_planets
+    # Shared vector path. In sealed LEB mode its state vectors come from the
+    # active LEB adapter; other modes resolve their normal JPL/Skyfield source.
+    # Heliocentric/barycentric requests observe from the Sun/SSB instead of
+    # Earth; forced noaberr=nogdefl=True then selects the geometric branch.
+    from .state import _get_computation_ephemeris, get_calc_mode
 
-    _planets = get_planets()
+    _planets = _get_computation_ephemeris()
     if center == FLG_HELCTR:
         _obs_at = _planets["sun"].at
     elif center == FLG_BARYCTR:
@@ -3552,9 +3557,10 @@ def batch_fixstars_ut(
                 continue
             raise Error(str(e)) from e
 
+    trace_source = "LEB" if get_calc_mode() == "leb" else "Skyfield"
     for index, star_id, _canonical_name in resolved:
         if results[index] is not None:
-            _record_fixed_star_success(star_id, jd_tt, "Skyfield")
+            _record_fixed_star_success(star_id, jd_tt, trace_source)
     return tuple(results)
 
 

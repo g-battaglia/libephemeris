@@ -35,8 +35,13 @@ def test_leb_file(tmp_path_factory):
         1,  # MOON
         3,  # VENUS  (needed by heliacal no-kernel tests)
         4,  # MARS
+        5,  # JUPITER system barycenter (apparent-place deflector)
+        6,  # SATURN system barycenter (apparent-place deflector)
         14,  # EARTH
         10,  # MEAN_NODE
+        11,  # TRUE_NODE
+        12,  # MEAN_APOG
+        13,  # OSCU_APOG
     ]
 
     assemble_leb(

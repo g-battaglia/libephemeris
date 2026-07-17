@@ -2205,10 +2205,12 @@ def fast_calc_ut(
         Same as calc_ut(): ((lon, lat, dist, dlon, dlat, ddist), iflag)
 
     Raises:
-        KeyError: If body is not in the .leb file (caller should fall back).
+        KeyError: If the body/flag is not handled by this direct LEB reducer;
+            the caller applies the active mode's source policy.
         ValueError: If JD is outside the .leb file's range.
     """
-    # FLG_ICRS: not yet implemented in LEB — fall back to Skyfield
+    # FLG_ICRS is not handled by this direct reducer. The caller's mode-aware
+    # vector resolver performs it without crossing the LEB source boundary.
     if iflag & FLG_ICRS:
         raise KeyError("FLG_ICRS not supported in LEB mode")
 

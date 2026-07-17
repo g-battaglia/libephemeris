@@ -639,15 +639,15 @@ class LEBReader:
 
 
 def log_leb_fallback(context: str, err: Exception) -> None:
-    """Log a LEB -> Skyfield fallback with severity matched to the cause.
+    """Log departure from a direct LEB fast path with cause-aware severity.
 
     KeyError (body not in the file) and plain ValueError (out-of-range
     dates, missing sections, unsupported flags) are routine, by-design
-    fallbacks (DEBUG). LEBCorruptionError means corrupted/truncated data,
-    which the caller silently absorbs by recomputing via Skyfield on every
-    call — that deserves a visible WARNING (same rationale as the Horizons
-    fetch_batch logging). Classification is by exception type: matching on
-    message substrings misclassified legitimate fallbacks.
+    dispatch events in ``auto`` mode (DEBUG). Sealed ``leb`` mode reports
+    them at WARNING because only another LEB-backed algorithm or an explicitly
+    declared local model may continue. ``LEBCorruptionError`` is always a
+    visible provisioning failure. Classification is by exception type rather
+    than fragile message matching.
 
     Args:
         context: Short label of the calling path (e.g. "star", "pheno").

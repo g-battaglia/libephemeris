@@ -92,7 +92,7 @@ def test_sealed_open_url_stops_before_socket(monkeypatch: pytest.MonkeyPatch) ->
 def test_leb_loader_cannot_implicitly_download_kernel(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Skyfield's Loader is gated before its missing-file download path."""
+    """Sealed LEB mode rejects JPL before consulting Skyfield's Loader."""
     attempts: list[str] = []
 
     def _blocked_connect(*args, **kwargs):  # type: ignore[no-untyped-def]
@@ -107,7 +107,7 @@ def test_leb_loader_cannot_implicitly_download_kernel(
     monkeypatch.setattr(socket, "getaddrinfo", _blocked_dns)
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
 
-    with pytest.raises(NetworkSealedError, match="de440s.bsp"):
+    with pytest.raises(RuntimeError, match="JPL/SPICE ephemeris access is disabled"):
         state.get_planets()
     assert attempts == []
 
@@ -115,7 +115,7 @@ def test_leb_loader_cannot_implicitly_download_kernel(
 def test_context_loader_cannot_bypass_sealed_policy(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """The context API uses the same policy-aware Skyfield download path."""
+    """The context API cannot bypass the sealed LEB source boundary."""
     attempts: list[str] = []
 
     def _blocked_connect(*_args, **_kwargs):  # type: ignore[no-untyped-def]
@@ -131,7 +131,7 @@ def test_context_loader_cannot_bypass_sealed_policy(
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
 
     eph.EphemerisContext.close()
-    with pytest.raises(NetworkSealedError, match="Skyfield data download"):
+    with pytest.raises(RuntimeError, match="JPL/SPICE ephemeris access is disabled"):
         eph.EphemerisContext(ephe_file="missing-context-kernel.bsp").get_planets()
     assert attempts == []
 

@@ -18,7 +18,7 @@ or the `LIBEPHEMERIS_MODE` environment variable:
 | Mode | Behavior | Fails when |
 |------|----------|-----------|
 | `"auto"` (default) | LEB → Horizons (if no DE440) → Skyfield | never |
-| `"leb"` | Require the bundled, configured, or locally auto-discovered LEB; unsupported bodies/flags fall back to Skyfield | no LEB resolvable |
+| `"leb"` | Sealed LEB-only persistent data; only traced local analytical/Keplerian models are allowed where LEB has no meaningful channel | no LEB resolvable, corrupt/missing required data, or core range miss |
 | `"horizons"` | Prefer Horizons; unsupported bodies/flags fall back to Skyfield | no internet |
 | `"skyfield"` | Always Skyfield/DE440 | DE440 not available |
 
@@ -39,6 +39,12 @@ calc_ut(jd, body, flags)
         |-> success: return result
         |-> exception: propagate to caller
 ```
+
+This flow describes `auto`. Forced `leb` mode stops at the LEB boundary: it
+does not create a Horizons client, open a DE kernel or planet-center BSP, use a
+registered/automatic SPK, or invoke ASSIST. A curated body that is intentionally
+served by an in-code model is returned with explicit `Keplerian` or
+`Analytical` provenance.
 
 ### Configuration
 

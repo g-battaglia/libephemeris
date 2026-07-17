@@ -37,6 +37,8 @@ from typing import Callable, List, Optional, Tuple
 import numpy as np
 from numpy.polynomial.chebyshev import chebfit, chebval
 
+from libephemeris.state import _allow_jpl_source
+
 
 # =============================================================================
 # PROGRESS BAR
@@ -2189,6 +2191,7 @@ def generate_single_body(
     return body_id, coeffs, error
 
 
+@_allow_jpl_source()
 def assemble_leb(
     output: str,
     jd_start: float,

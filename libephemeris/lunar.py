@@ -49,7 +49,7 @@ from .mean_lunar_apse import (
     _mean_lunar_node_position_unchecked,
     lunar_delaunay_arguments,
 )
-from .state import get_timescale, get_planets
+from .state import _get_computation_ephemeris, get_planets, get_timescale
 from .exceptions import EphemerisRangeError
 
 try:
@@ -1601,7 +1601,7 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
 
     from .cache import get_cached_time_tt
 
-    planets = get_planets()
+    planets = _get_computation_ephemeris()
     t = get_cached_time_tt(jd_tt)
 
     earth = planets["earth"]
@@ -1733,7 +1733,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
 
     from .cache import get_cached_time_tt
 
-    planets = get_planets()
+    planets = _get_computation_ephemeris()
     t = get_cached_time_tt(jd_tt)
 
     earth = planets["earth"]
@@ -1868,7 +1868,7 @@ def calc_osculating_perigee(jd_tt: float) -> Tuple[float, float, float]:
 
     from .cache import get_cached_time_tt
 
-    planets = get_planets()
+    planets = _get_computation_ephemeris()
     t = get_cached_time_tt(jd_tt)
 
     earth = planets["earth"]

@@ -19,8 +19,10 @@ Calculation backend:
       DE440), then Skyfield.
     - ``"skyfield"``: always use Skyfield/DE440.
     - ``"leb"``: require a valid LEB file (configured, auto-discovered, or
-      auto-downloaded). Raises ``RuntimeError`` if none can be resolved.
-      Bodies/flags not in the LEB file fall back to Skyfield.
+      auto-downloaded). LEB is the only persistent ephemeris source: JPL/BSP,
+      Horizons, ASSIST, and network lookup are disabled. Curated bodies that
+      have no meaningful LEB channel may use a traced local analytical or
+      Keplerian model; core range misses raise ``EphemerisRangeError``.
     - ``"horizons"``: prefer NASA JPL Horizons API (requires internet).
       Bodies/flags not supported by Horizons fall back to Skyfield.
 

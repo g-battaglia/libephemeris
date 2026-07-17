@@ -178,9 +178,9 @@ typecheck = {cmd = "python -m libephemeris.dev_cli code typecheck", help = "Type
 "test:skyfield:full" = {cmd = "python -m libephemeris.dev_cli test skyfield all-full-fast", help = "Skyfield ALL tests including @slow (parallel)"}
 
 # --- LEB backend: core / fast / full ---
-"test:leb:core" = {cmd = "python -m libephemeris.dev_cli test leb-backend essential", help = "LEB essential ~900 tests, ~20s (parallel)"}
-"test:leb:fast" = {cmd = "python -m libephemeris.dev_cli test leb-backend unit-fast", help = "LEB unit tests ~16,000, ~1 min (parallel, no @slow) [RECOMMENDED]"}
-"test:leb:full" = {cmd = "python -m libephemeris.dev_cli test leb-backend unit-full", help = "LEB ALL unit tests including @slow (sequential)"}
+"test:leb:core" = {cmd = "python -m libephemeris.dev_cli test leb-backend essential", help = "Sealed LEB essential contract (parallel)"}
+"test:leb:fast" = {cmd = "python -m libephemeris.dev_cli test leb-backend unit-fast", help = "Sealed LEB runtime contract (parallel, no @slow) [RECOMMENDED]"}
+"test:leb:full" = {cmd = "python -m libephemeris.dev_cli test leb-backend unit-full", help = "Sealed LEB runtime contract including @slow (sequential)"}
 
 # --- Horizons backend: core / fast / full ---
 "test:horizons:core" = {cmd = "python -m libephemeris.dev_cli test horizons precision-quick", help = "Horizons quick precision check, 50 dates (~15s)"}

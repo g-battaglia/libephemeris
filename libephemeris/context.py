@@ -48,6 +48,7 @@ from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
 
 from .net import PolicyAwareLoader as Loader
+from .exceptions import LEBCorruptionError
 
 if TYPE_CHECKING:
     from .leb_composite import CompositeLEBReader
@@ -200,7 +201,16 @@ class EphemerisContext:
 
         Raises:
             FileNotFoundError: If ephemeris file cannot be found or downloaded
+            RuntimeError: If calculation mode ``leb`` seals JPL/BSP access.
         """
+        from .state import get_calc_mode
+
+        if get_calc_mode() == "leb":
+            raise RuntimeError(
+                "JPL/SPICE ephemeris access is disabled in calculation mode "
+                "'leb'; use the active LEB reader or a declared analytical model"
+            )
+
         global _SHARED_PLANETS
         if _SHARED_PLANETS is None:
             with _SHARED_LOCK:
@@ -229,8 +239,9 @@ class EphemerisContext:
         """Set the .leb file path for binary ephemeris mode.
 
         When a .leb file is configured, calc_ut() and calc() will attempt
-        to use precomputed Chebyshev polynomials for fast evaluation before
-        falling back to the Skyfield pipeline.
+        to use precomputed Chebyshev polynomials for fast evaluation. Any
+        subsequent source choice is governed by the process calculation mode;
+        ``leb`` mode never opens a JPL/BSP source.
 
         Args:
             filepath: Path to a .leb file, or None to disable binary mode.
@@ -246,8 +257,9 @@ class EphemerisContext:
     def get_leb_reader(self) -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
         """Get the active LEBReader for this context, if any.
 
-        If the .leb file path is invalid or the file is corrupted,
-        logs a warning and returns None (silent fallback to Skyfield).
+        If the .leb file path is invalid or corrupted, logs a warning and
+        returns None. The process calculation mode decides whether that is a
+        provisioning error or whether another backend may be tried.
 
         Returns:
             LEBReader instance if a .leb file is configured and valid,
@@ -523,8 +535,8 @@ class EphemerisContext:
         Thread-safe calculation using this context's state.
 
         If a .leb file is configured (via set_leb_file()), uses the fast
-        binary ephemeris path first, falling back to Skyfield when the body
-        is not in the .leb file or the JD is out of range.
+        binary ephemeris path first. Subsequent source selection follows the
+        process calculation mode; sealed ``leb`` never opens Skyfield/JPL.
 
         Args:
             tjd_ut: Julian Day in Universal Time (UT1)
@@ -552,8 +564,8 @@ class EphemerisContext:
         Thread-safe calculation using this context's state.
 
         If a .leb file is configured (via set_leb_file()), uses the fast
-        binary ephemeris path first, falling back to Skyfield when the body
-        is not in the .leb file or the JD is out of range.
+        binary ephemeris path first. Subsequent source selection follows the
+        process calculation mode; sealed ``leb`` never opens Skyfield/JPL.
 
         Args:
             tjd: Julian Day in Terrestrial Time (TT/ET)
@@ -757,10 +769,9 @@ class EphemerisContext:
             reader = state.get_leb_reader()
 
         # The reference treats Earth as the exact coordinate origin even for
-        # a topocentric request.  The LEB topocentric reducer would otherwise
-        # expose the geocentre-from-observer offset, so use the shared
-        # Skyfield path for this degenerate case (as the module entry points
-        # do).
+        # a topocentric request. The LEB topocentric reducer would otherwise
+        # expose the geocentre-from-observer offset, so use the shared vector
+        # path for this degenerate case (LEB-backed in sealed LEB mode).
         from .constants import EARTH, FLG_TOPOCTR
 
         if ipl == EARTH and (iflag & FLG_TOPOCTR):
@@ -801,6 +812,8 @@ class EphemerisContext:
                 )
                 _record(requested_ipl, "LEB")
                 return pos_out, retflag_out
+            except LEBCorruptionError:
+                raise
             except (KeyError, ValueError) as _leb_err:
                 # missing body / out-of-range -> DEBUG, corruption -> WARNING
                 from .leb_reader import log_leb_fallback

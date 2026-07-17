@@ -29,6 +29,8 @@ import os
 import threading
 import warnings
 import weakref
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, overload
 from skyfield.api import Topos
@@ -212,6 +214,9 @@ _HORIZONS_WARNED: bool = False
 _CALC_MODE: Optional[str] = None  # None = check env var
 _CALC_MODE_ENV_VAR = "LIBEPHEMERIS_MODE"
 _VALID_CALC_MODES = ("auto", "skyfield", "leb", "horizons")
+_JPL_SOURCE_ACCESS: ContextVar[bool] = ContextVar(
+    "libephemeris_jpl_source_access", default=False
+)
 
 if TYPE_CHECKING:
     from .horizons_backend import HorizonsClient
@@ -232,8 +237,9 @@ def set_calc_mode(mode: Optional[str]) -> None:
       available locally.
     - ``"leb"``: Require a valid explicitly configured LEB file, a
       hash-pinned cached tier core, or the bundled base-core fallback. Raises
-      RuntimeError if none can be resolved.
-      Bodies not in the .leb file fall through to Skyfield.
+      RuntimeError if none can be resolved. LEB remains the sole persistent
+      ephemeris source; only explicitly traced local analytical or Keplerian
+      models are allowed for curated bodies without a meaningful LEB channel.
     - ``"horizons"``: Always use NASA JPL Horizons API (requires internet).
       Bodies not supported by Horizons fall through to Skyfield.
 
@@ -310,12 +316,27 @@ def get_calc_mode() -> str:
     return "auto"
 
 
+@contextmanager
+def _allow_jpl_source():
+    """Open the JPL source boundary for an explicit offline provisioner.
+
+    Runtime calculations never enter this context.  LEB generators do because
+    reading their registered source kernels is the purpose of that offline
+    operation, even when the surrounding service configuration selects LEB.
+    """
+    token = _JPL_SOURCE_ACCESS.set(True)
+    try:
+        yield
+    finally:
+        _JPL_SOURCE_ACCESS.reset(token)
+
+
 def set_leb_file(filepath: Optional[str]) -> None:
     """Set the .leb file path for binary ephemeris mode.
 
-    When a .leb file is configured, calc_ut() and calc() will
-    attempt to use precomputed Chebyshev polynomials for fast evaluation
-    before falling back to the Skyfield pipeline.
+    When a .leb file is configured, calc_ut() and calc() attempt to use
+    precomputed Chebyshev polynomials first. Subsequent source selection follows
+    the active calculation mode; forced ``leb`` never opens a JPL/BSP source.
 
     Args:
         filepath: Path to a .leb file, or None to disable binary mode.
@@ -343,6 +364,9 @@ def set_leb_file(filepath: Optional[str]) -> None:
         _fast_calc._reset_active_reader()
         _fast_calc._leb_frame_cache.clear()
         _clear_fictitious_trust_caches()
+        from .leb_vector import reset_leb_vector_ephemeris
+
+        reset_leb_vector_ephemeris()
 
 
 def _matches_pinned_data_file(path: str, manifest_name: str) -> bool:
@@ -510,8 +534,8 @@ def _discover_leb_file() -> Optional[str]:
     The current tier's reviewed cached/bundled core wins, followed by the
     standard local LEB1 paths. Until a wider core has been installed, the
     bundled base core is a safe fallback for every tier; its own header range
-    still gates evaluation, so dates outside 1850--2150 fall through instead
-    of being extrapolated.
+    still gates evaluation, so dates outside 1850--2150 are handled by the
+    active mode's range policy instead of being extrapolated.
 
     Returns:
         Path to a discovered LEB file, or None when none is available.
@@ -680,9 +704,9 @@ def get_leb_reader() -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
     3. Auto-discovery of the hash-pinned reviewed active-tier core
     4. Bundled reviewed base core as a range-limited fallback
 
-    If the .leb file path is invalid or the file is corrupted,
-    logs a warning and returns None (silent fallback to Skyfield),
-    unless mode is ``"leb"`` in which case RuntimeError is raised.
+    If the .leb file path is invalid or the file is corrupted, ``auto`` mode
+    logs a warning and returns None so its normal backend chain can continue.
+    In ``leb`` mode the provisioning error raises ``RuntimeError``.
 
     Returns:
         LEBReader instance if a .leb file is configured and valid,
@@ -760,7 +784,12 @@ def _get_leb_reader_locked(mode):
                 # Inventory consumers must not re-hash up to a gigabyte on
                 # every health request. Record the trust decision already made
                 # while resolving and attaching the reader.
-                setattr(_LEB_READER, "_manifest_verified", reviewed_core)
+                try:
+                    setattr(_LEB_READER, "_manifest_verified", reviewed_core)
+                except (AttributeError, TypeError):
+                    # Lightweight third-party/test reader proxies can expose
+                    # the reader protocol without permitting attributes.
+                    pass
                 if reviewed_core:
                     for child in getattr(_LEB_READER, "_readers", ()):
                         setattr(child, "_manifest_verified", True)
@@ -1286,6 +1315,8 @@ def get_planets() -> SpiceKernel:
 
     Raises:
         FileNotFoundError: If ephemeris file cannot be found or downloaded
+        RuntimeError: If called while calculation mode ``leb`` seals JPL/BSP
+            access. Offline LEB generation uses a private, scoped override.
 
     Note:
         Uses the ephemeris file determined by (in priority order):
@@ -1295,6 +1326,12 @@ def get_planets() -> SpiceKernel:
 
         Searches in _EPHEMERIS_PATH if set, then ~/.libephemeris (downloads if missing).
     """
+    if get_calc_mode() == "leb" and not _JPL_SOURCE_ACCESS.get():
+        raise RuntimeError(
+            "JPL/SPICE ephemeris access is disabled in calculation mode 'leb'; "
+            "use the active LEB reader or a declared analytical model"
+        )
+
     global _PLANETS, _EPHEMERIS_FILE
     logger = get_logger()
     if _PLANETS is None:
@@ -1320,40 +1357,6 @@ def get_planets() -> SpiceKernel:
                     logger.debug("Using cached ephemeris: %s", bsp_path)
                     _PLANETS = load(bsp_path)
                     logger.info("Ephemeris loaded: %s", bsp_path)
-                elif get_calc_mode() == "leb":
-                    # In LEB mode, the DE kernel is only needed for
-                    # internal Skyfield calls (True Node, houses, etc.).
-                    # Try lighter alternatives before downloading the
-                    # full tier kernel (e.g., de441.bsp at 3.1 GB).
-                    _fallback_files = ["de440s.bsp", "de440.bsp", "de441.bsp"]
-                    loaded = False
-                    for fb in _fallback_files:
-                        fb_path = os.path.join(data_dir, fb)
-                        if os.path.exists(fb_path):
-                            logger.info(
-                                "LEB mode: using available %s instead of %s",
-                                fb,
-                                _EPHEMERIS_FILE,
-                            )
-                            _PLANETS = load(fb_path)
-                            # Reflect the kernel actually loaded so
-                            # get_current_file_data() reports the matching DE
-                            # number and date range instead of the requested
-                            # tier file we did not load.
-                            _EPHEMERIS_FILE = fb
-                            loaded = True
-                            break
-                    if not loaded:
-                        # No DE kernel at all — download the smallest one
-                        from .net import require_network
-
-                        require_network("Skyfield de440s.bsp fallback download")
-                        logger.info(
-                            "LEB mode: downloading de440s.bsp (31 MB) for "
-                            "internal calculations..."
-                        )
-                        _PLANETS = load("de440s.bsp")
-                        _EPHEMERIS_FILE = "de440s.bsp"
                 else:
                     from .net import require_network
 
@@ -1362,6 +1365,18 @@ def get_planets() -> SpiceKernel:
                     _PLANETS = load(_EPHEMERIS_FILE)
                     logger.info("Ephemeris downloaded to: %s", data_dir)
     return _PLANETS
+
+
+def _get_computation_ephemeris():
+    """Resolve vector states without crossing the active backend boundary."""
+    if get_calc_mode() == "leb":
+        reader = get_leb_reader()
+        if reader is None:  # get_leb_reader() normally raises in forced mode.
+            raise RuntimeError("Calculation mode 'leb' has no active LEB reader")
+        from .leb_vector import get_leb_vector_ephemeris
+
+        return get_leb_vector_ephemeris(reader)
+    return get_planets()
 
 
 def get_planet_centers() -> Optional[SpiceKernel]:
@@ -1386,10 +1401,15 @@ def get_planet_centers() -> Optional[SpiceKernel]:
         SpiceKernel containing planet center segments, or None if not available.
 
     Note:
+        In calculation mode ``leb`` this function always returns None. Outer
+        planets then retain the system barycentres stored in the LEB files.
         The planet_centers files are generated using the
         scripts/generate_planet_centers_spk.py script and provide <0.001 arcsec
         precision for planet center positions.
     """
+    if get_calc_mode() == "leb":
+        return None
+
     global _PLANET_CENTERS, _PLANET_CENTERS_TIER
 
     current_tier = get_precision_tier()
@@ -2207,6 +2227,9 @@ def _close_inner() -> None:
 
     _fast_calc._reset_active_reader()
     _clear_fictitious_trust_caches()
+    from .leb_vector import reset_leb_vector_ephemeris
+
+    reset_leb_vector_ephemeris()
 
     # The interpolated lunar-apsides model owns a separate mmap and chunk
     # cache. A full close releases it; reset_session() intentionally leaves it

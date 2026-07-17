@@ -391,14 +391,14 @@ The calculation mode controls which backend is used:
 |------|----------|
 | `"auto"` **(default)** | Try LEB first, then Horizons API (if no local DE440), then Skyfield |
 | `"skyfield"` | Always Skyfield/DE440 |
-| `"leb"` | Require the bundled, configured, or locally generated LEB; unsupported bodies/flags fall back to Skyfield |
+| `"leb"` | Require LEB and keep it as the only persistent ephemeris source; curated non-LEB bodies may use a traced local analytical/Keplerian model |
 | `"horizons"` | Prefer Horizons API (requires internet); unsupported bodies/flags fall back to Skyfield |
 
 ```python
 from libephemeris import set_calc_mode
 
 set_calc_mode("skyfield")   # Force pure JPL/Skyfield
-set_calc_mode("leb")        # Require LEB (error if unavailable)
+set_calc_mode("leb")        # Sealed LEB (never JPL/Horizons/SPK)
 set_calc_mode("horizons")   # Force Horizons API
 set_calc_mode("auto")       # Default: LEB -> Horizons -> Skyfield
 ```

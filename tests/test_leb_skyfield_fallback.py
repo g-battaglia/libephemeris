@@ -1,5 +1,5 @@
 """
-Integration tests for LEB→Skyfield fallback in eclipse/occultation functions.
+Integration tests for mode-aware LEB range handling in event functions.
 
 These tests verify the fallback path added by GitHub issue #19. The fallback
 activates when the LEB file's coverage is smaller than the search window of
@@ -8,7 +8,7 @@ medium, extended) the fallback never fires; these tests simulate the
 out-of-range condition by mocking _topo_ecliptic to raise ValueError.
 
 Coverage:
-- Unit-level: helper _call_with_leb_skyfield_fallback behaviour
+- Unit-level: helper _call_with_leb_skyfield_fallback behaviour in auto/LEB modes
 - Integration: each refactored public function falls back correctly and
   produces a result close to the baseline (within search-precision tolerance).
 """
@@ -21,6 +21,7 @@ import pytest
 
 from libephemeris import julday
 from libephemeris.eclipse import _call_with_leb_skyfield_fallback
+from libephemeris.exceptions import LEBCorruptionError
 
 
 # =============================================================================
@@ -75,8 +76,12 @@ class TestCallWithLebSkyfieldFallback:
                 )
             return "skyfield_ok"
 
-        with patch(
-            "libephemeris.eclipse._get_leb_reader_safe", return_value=mock_reader
+        with (
+            patch(
+                "libephemeris.eclipse._get_leb_reader_safe",
+                return_value=mock_reader,
+            ),
+            patch("libephemeris.eclipse.get_calc_mode", return_value="auto"),
         ):
             result = _call_with_leb_skyfield_fallback(fake_impl, 1)
 
@@ -96,8 +101,12 @@ class TestCallWithLebSkyfieldFallback:
                 )
             return "skyfield_ok"
 
-        with patch(
-            "libephemeris.eclipse._get_leb_reader_safe", return_value=mock_reader
+        with (
+            patch(
+                "libephemeris.eclipse._get_leb_reader_safe",
+                return_value=mock_reader,
+            ),
+            patch("libephemeris.eclipse.get_calc_mode", return_value="auto"),
         ):
             result = _call_with_leb_skyfield_fallback(fake_impl, 1)
 
@@ -130,13 +139,51 @@ class TestCallWithLebSkyfieldFallback:
                 raise KeyError("Body 10 outside range")
             return "ok"
 
-        with patch(
-            "libephemeris.eclipse._get_leb_reader_safe", return_value=mock_reader
+        with (
+            patch(
+                "libephemeris.eclipse._get_leb_reader_safe",
+                return_value=mock_reader,
+            ),
+            patch("libephemeris.eclipse.get_calc_mode", return_value="auto"),
         ):
             result = _call_with_leb_skyfield_fallback(fake_impl, 1)
 
         assert result == "ok"
         assert received == [mock_reader, None]
+
+    def test_leb_mode_outside_range_never_retries_jpl_path(self):
+        """Sealed LEB mode propagates range misses without a source switch."""
+        received = []
+        mock_reader = MagicMock(name="LEBReader")
+
+        def fake_impl(*args, reader, **kwargs):
+            received.append(reader)
+            raise ValueError("JD 99999.0 outside range [1.0, 2.0] for body 10")
+
+        with (
+            patch(
+                "libephemeris.eclipse._get_leb_reader_safe",
+                return_value=mock_reader,
+            ),
+            patch("libephemeris.eclipse.get_calc_mode", return_value="leb"),
+        ):
+            with pytest.raises(ValueError, match="outside range"):
+                _call_with_leb_skyfield_fallback(fake_impl, 1)
+
+        assert received == [mock_reader]
+
+    def test_corrupt_leb_is_never_treated_as_a_range_fallback(self):
+        """Provisioning corruption is fatal even if its message says outside."""
+        mock_reader = MagicMock(name="LEBReader")
+
+        def fake_impl(*args, reader, **kwargs):
+            raise LEBCorruptionError("corrupt entry outside valid bounds")
+
+        with patch(
+            "libephemeris.eclipse._get_leb_reader_safe", return_value=mock_reader
+        ):
+            with pytest.raises(LEBCorruptionError, match="corrupt entry"):
+                _call_with_leb_skyfield_fallback(fake_impl, 1)
 
 
 # =============================================================================
@@ -151,6 +198,18 @@ def _raising_topo_ecliptic(reader, jd_tt, jd_ut1, ipl, geopos, iflag=0):
 
 class TestEclipseFallback:
     """Integration tests: refactored public functions fall back to Skyfield."""
+
+    @pytest.fixture(autouse=True)
+    def _force_auto_mode(self):
+        """Exercise the auto fallback contract, independent of local config."""
+        from libephemeris import state
+
+        previous_mode = state._CALC_MODE
+        state.set_calc_mode("auto")
+        try:
+            yield
+        finally:
+            state.set_calc_mode(previous_mode)
 
     def test_sol_eclipse_when_loc_falls_back_to_skyfield(self):
         """When LEB topocentric calculation raises out-of-range, Skyfield path runs."""

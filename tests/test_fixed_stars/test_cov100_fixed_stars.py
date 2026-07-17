@@ -287,7 +287,8 @@ def test_calc_star_position_skyfield_topo():
 
 
 def test_calc_position_leb_keyerror_falls_back(monkeypatch):
-    """KeyError from LEB path falls back to Skyfield (2380)."""
+    """In auto mode, a direct LEB KeyError continues to the JPL path."""
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
     monkeypatch.setattr(state, "get_leb_reader", lambda: object())
 
     def raise_key(*a, **k):
@@ -299,7 +300,8 @@ def test_calc_position_leb_keyerror_falls_back(monkeypatch):
 
 
 def test_calc_position_leb_outside_range_falls_back(monkeypatch):
-    """ValueError 'outside range' logs and falls back to Skyfield (2384-2386)."""
+    """In auto mode, a direct LEB range miss continues to the JPL path."""
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
     monkeypatch.setattr(state, "get_leb_reader", lambda: object())
 
     def raise_oor(*a, **k):
@@ -311,13 +313,12 @@ def test_calc_position_leb_outside_range_falls_back(monkeypatch):
 
 
 def test_calc_position_leb_valueerror_falls_back(monkeypatch):
-    """Any LEB ValueError (out-of-range OR corruption) falls back to Skyfield,
-    mirroring the planet path (calc_ut catches ValueError from the LEB
-    reader and falls through)."""
+    """In auto mode, an ordinary LEB ValueError can continue to JPL."""
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
     monkeypatch.setattr(state, "get_leb_reader", lambda: object())
 
     def raise_other(*a, **k):
-        raise ValueError("Corrupted LEB2 data: simulated")
+        raise ValueError("unsupported direct LEB reduction")
 
     monkeypatch.setattr(fs, "_calc_star_position_leb", raise_other)
     lon, lat, dist = fs.calc_fixed_star_position(REGULUS, JD)
@@ -555,6 +556,7 @@ def test_batch_skyfield_wraparound_positive(monkeypatch):
         (1.0, 0.0, 1e6),  # prev
         (359.0, 0.0, 1e6),  # next -> 358 -> -2
     ]
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     monkeypatch.setattr(state, "get_leb_reader", lambda: None)
     monkeypatch.setattr(fs, "_calc_star_position_from_observer", fake)
     results = fs.batch_fixstars_ut(["Regulus"], JD, FLG_SPEED)
@@ -572,6 +574,7 @@ def test_batch_skyfield_wraparound_negative(monkeypatch):
         (359.0, 0.0, 1e6),  # prev
         (1.0, 0.0, 1e6),  # next -> -358 -> +2
     ]
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     monkeypatch.setattr(state, "get_leb_reader", lambda: None)
     monkeypatch.setattr(fs, "_calc_star_position_from_observer", fake)
     results = fs.batch_fixstars_ut(["Regulus"], JD, FLG_SPEED)
@@ -584,6 +587,7 @@ def test_batch_skyfield_error_skip(monkeypatch):
     def raise_val(*a, **k):
         raise ValueError("boom")
 
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     monkeypatch.setattr(state, "get_leb_reader", lambda: None)
     monkeypatch.setattr(fs, "_calc_star_position_from_observer", raise_val)
     results = fs.batch_fixstars_ut(["Regulus"], JD, 0, skip_errors=True)
@@ -596,6 +600,7 @@ def test_batch_skyfield_error_raise(monkeypatch):
     def raise_val(*a, **k):
         raise ValueError("boom")
 
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     monkeypatch.setattr(state, "get_leb_reader", lambda: None)
     monkeypatch.setattr(fs, "_calc_star_position_from_observer", raise_val)
     with pytest.raises(Error):
@@ -608,6 +613,7 @@ def test_batch_skyfield_error_passthrough(monkeypatch):
     def raise_err(*a, **k):
         raise Error("calc failed")
 
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     monkeypatch.setattr(state, "get_leb_reader", lambda: None)
     monkeypatch.setattr(fs, "_calc_star_position_from_observer", raise_err)
     with pytest.raises(Error, match="calc failed"):
@@ -620,6 +626,7 @@ def test_batch_skyfield_error_skip_continue(monkeypatch):
     def raise_err(*a, **k):
         raise Error("calc failed")
 
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     monkeypatch.setattr(state, "get_leb_reader", lambda: None)
     monkeypatch.setattr(fs, "_calc_star_position_from_observer", raise_err)
     results = fs.batch_fixstars_ut(["Regulus"], JD, 0, skip_errors=True)
@@ -627,7 +634,8 @@ def test_batch_skyfield_error_skip_continue(monkeypatch):
 
 
 def test_batch_leb_keyerror_falls_back(monkeypatch):
-    """KeyError on the LEB batch path falls back to Skyfield (2948-2949)."""
+    """Auto mode lets a direct LEB batch KeyError continue to JPL."""
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
     monkeypatch.setattr(state, "get_leb_reader", lambda: object())
 
     def raise_key(*a, **k):
@@ -639,7 +647,8 @@ def test_batch_leb_keyerror_falls_back(monkeypatch):
 
 
 def test_batch_leb_outside_range_falls_back(monkeypatch):
-    """ValueError 'outside range' on the LEB batch path falls back (2950-2952)."""
+    """Auto mode lets a direct LEB batch range miss continue to JPL."""
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
     monkeypatch.setattr(state, "get_leb_reader", lambda: object())
 
     def raise_oor(*a, **k):
@@ -651,12 +660,12 @@ def test_batch_leb_outside_range_falls_back(monkeypatch):
 
 
 def test_batch_leb_valueerror_falls_back(monkeypatch):
-    """Any LEB ValueError on the batch path falls back to Skyfield
-    (out-of-range AND corrupted/truncated data alike)."""
+    """Auto mode lets an ordinary LEB batch ValueError continue to JPL."""
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "auto")
     monkeypatch.setattr(state, "get_leb_reader", lambda: object())
 
     def raise_other(*a, **k):
-        raise ValueError("Corrupted LEB2 data: simulated")
+        raise ValueError("unsupported direct LEB batch reduction")
 
     monkeypatch.setattr(fs, "_calc_star_position_leb", raise_other)
     results = fs.batch_fixstars_ut(["Regulus"], JD, 0)

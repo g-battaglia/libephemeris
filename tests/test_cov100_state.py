@@ -722,6 +722,7 @@ def test_get_planets_cached(monkeypatch):
     """_PLANETS already set on outer check -> return immediately."""
     sentinel = object()
     monkeypatch.setattr(state, "_PLANETS", sentinel)
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     assert state.get_planets() is sentinel
 
 
@@ -730,6 +731,7 @@ def test_get_planets_double_checked_race(monkeypatch):
     monkeypatch.setattr(state, "_PLANETS", None)
     sentinel = object()
     monkeypatch.setattr(state, "_INIT_LOCK", _SettingLock("_PLANETS", sentinel))
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     assert state.get_planets() is sentinel
 
 
@@ -753,8 +755,8 @@ def test_get_planets_custom_path_missing_falls_to_data_dir(monkeypatch, tmp_path
     assert fake_loader.calls == [str(data_dir / "de440.bsp")]
 
 
-def test_get_planets_leb_mode_fallback_existing(monkeypatch, tmp_path):
-    """LEB mode + tier kernel missing + fallback exists (987-999)."""
+def test_get_planets_leb_mode_rejects_existing_kernel(monkeypatch, tmp_path):
+    """LEB runtime never opens a local DE kernel, even when it exists."""
     monkeypatch.setattr(state, "_PLANETS", None)
     monkeypatch.setattr(state, "_EPHEMERIS_PATH", None)
     monkeypatch.setattr(state, "_get_effective_ephemeris_file", lambda: "de441.bsp")
@@ -769,13 +771,13 @@ def test_get_planets_leb_mode_fallback_existing(monkeypatch, tmp_path):
     fake_loader = _FakeLoader(kernel="fb-kernel")
     monkeypatch.setattr(state, "get_loader", lambda: fake_loader)
 
-    result = state.get_planets()
-    assert result == "fb-kernel"
-    assert fake_loader.calls == [str(data_dir / "de440.bsp")]
+    with pytest.raises(RuntimeError, match="disabled"):
+        state.get_planets()
+    assert fake_loader.calls == []
 
 
-def test_get_planets_leb_mode_download_smallest(monkeypatch, tmp_path):
-    """LEB mode + no DE kernel at all -> download de440s (1000-1006)."""
+def test_get_planets_leb_mode_never_downloads_kernel(monkeypatch, tmp_path):
+    """LEB runtime fails before a loader can download a DE kernel."""
     monkeypatch.setattr(state, "_PLANETS", None)
     monkeypatch.setattr(state, "_EPHEMERIS_PATH", None)
     monkeypatch.setattr(state, "_get_effective_ephemeris_file", lambda: "de441.bsp")
@@ -788,9 +790,9 @@ def test_get_planets_leb_mode_download_smallest(monkeypatch, tmp_path):
     fake_loader = _FakeLoader(kernel="dl-kernel")
     monkeypatch.setattr(state, "get_loader", lambda: fake_loader)
 
-    result = state.get_planets()
-    assert result == "dl-kernel"
-    assert fake_loader.calls == ["de440s.bsp"]
+    with pytest.raises(RuntimeError, match="disabled"):
+        state.get_planets()
+    assert fake_loader.calls == []
 
 
 # ===========================================================================
@@ -857,6 +859,7 @@ def test_rejected_planet_center_hash_and_warning_are_cached(monkeypatch, tmp_pat
     monkeypatch.setattr(state, "_PLANET_CENTER_REJECTED_FILES", set())
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
     monkeypatch.setattr(state, "get_precision_tier", lambda: "medium")
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     monkeypatch.setattr(state, "get_loader", lambda: _FakeLoader())
     logger = Mock()
     monkeypatch.setattr(state, "get_logger", lambda: logger)
@@ -883,6 +886,7 @@ def test_replaced_planet_center_file_retries_hash_and_load(monkeypatch, tmp_path
     monkeypatch.setattr(state, "_PLANET_CENTER_REJECTED_FILES", set())
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
     monkeypatch.setattr(state, "get_precision_tier", lambda: "medium")
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     fake_loader = _FakeLoader(kernel="replacement-kernel")
     monkeypatch.setattr(state, "get_loader", lambda: fake_loader)
     matcher = Mock(side_effect=[False, True])
