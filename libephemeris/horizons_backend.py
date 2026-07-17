@@ -29,9 +29,6 @@ from __future__ import annotations
 import json
 import logging
 import threading
-import urllib.error
-import urllib.parse
-import urllib.request
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
@@ -43,6 +40,7 @@ from .constants import (
     WALDEMATH,
     WHITE_MOON,
 )
+from .net import Request, open_url, quote
 
 logger = logging.getLogger("libephemeris")
 
@@ -221,9 +219,7 @@ class HorizonsClient:
         # server read as a parameter separator (HTTP 400 on every asteroid
         # fetch). quote() with safe="" also encodes the quotes Horizons
         # expects to receive percent-encoded.
-        query = "&".join(
-            f"{k}={urllib.parse.quote(str(v), safe='')}" for k, v in params.items()
-        )
+        query = "&".join(f"{k}={quote(str(v), safe='')}" for k, v in params.items())
         url = f"{API_URL}?{query}"
 
         # Fetch with retry
@@ -312,12 +308,15 @@ class HorizonsClient:
         last_err = None
         for attempt in range(max_retries + 1):
             try:
-                req = urllib.request.Request(
+                req = Request(
                     url,
                     headers={"User-Agent": "libephemeris/1.0"},
                 )
-                with urllib.request.urlopen(
-                    req, timeout=self._timeout, context=ssl_ctx
+                with open_url(
+                    req,
+                    purpose=f"Horizons state vector for {command}",
+                    timeout=self._timeout,
+                    context=ssl_ctx,
                 ) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
 

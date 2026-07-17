@@ -2860,8 +2860,6 @@ def fetch_orbital_elements_from_sbdb(
     """
     import json
     import ssl
-    import urllib.error
-    import urllib.request
 
     import certifi
 
@@ -2874,13 +2872,18 @@ def fetch_orbital_elements_from_sbdb(
     url = f"{SBDB_API_URL}?{params}"
 
     try:
-        request = urllib.request.Request(
+        from .net import HTTPError, Request, URLError, open_url
+
+        request = Request(
             url,
             headers={"User-Agent": "libephemeris/1.0 (Python)"},
         )
         _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        with urllib.request.urlopen(
-            request, timeout=timeout, context=_ssl_ctx
+        with open_url(
+            request,
+            purpose=f"SBDB orbital elements for asteroid {asteroid_number}",
+            timeout=timeout,
+            context=_ssl_ctx,
         ) as response:
             data = json.loads(response.read().decode("utf-8"))
 
@@ -2933,7 +2936,7 @@ def fetch_orbital_elements_from_sbdb(
 
         return orbital_elements
 
-    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+    except (URLError, HTTPError, json.JSONDecodeError):
         return None
     except (KeyError, ValueError, TypeError):
         return None
@@ -3057,9 +3060,6 @@ def get_asteroid_number(name: str, timeout: float = 30.0) -> Optional[int]:
     """
     import json
     import ssl
-    import urllib.error
-    import urllib.parse
-    import urllib.request
 
     import certifi
 
@@ -3078,17 +3078,22 @@ def get_asteroid_number(name: str, timeout: float = 30.0) -> Optional[int]:
 
     # Query JPL SBDB API by name
     # The API accepts names in the sstr parameter
-    params = f"sstr={urllib.parse.quote(name)}&phys-par=false"
+    from .net import HTTPError, Request, URLError, open_url, quote
+
+    params = f"sstr={quote(name)}&phys-par=false"
     url = f"{SBDB_API_URL}?{params}"
 
     try:
-        request = urllib.request.Request(
+        request = Request(
             url,
             headers={"User-Agent": "libephemeris/1.0 (Python)"},
         )
         _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        with urllib.request.urlopen(
-            request, timeout=timeout, context=_ssl_ctx
+        with open_url(
+            request,
+            purpose=f"SBDB asteroid name lookup for {name}",
+            timeout=timeout,
+            context=_ssl_ctx,
         ) as response:
             data = json.loads(response.read().decode("utf-8"))
 
@@ -3142,7 +3147,7 @@ def get_asteroid_number(name: str, timeout: float = 30.0) -> Optional[int]:
 
         return asteroid_number
 
-    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+    except (URLError, HTTPError, json.JSONDecodeError):
         return None
     except (KeyError, ValueError, TypeError):
         return None
@@ -3320,6 +3325,8 @@ def get_major_asteroid_info(
 # JPL Horizons only supports SPK generation for minor bodies in the range
 # ~1600-01-01 to ~2500-01-01 (empirically verified). Shared with the LEB
 # generation/verification tooling so both sides clamp identically.
+HORIZONS_SPK_DATE_MIN = "1600-01-01"
+HORIZONS_SPK_DATE_MAX = "2500-01-01"
 HORIZONS_SPK_JD_MIN = 2305448.5  # 1600-01-01 UTC
 HORIZONS_SPK_JD_MAX = 2634167.5  # 2500-01-01 UTC
 

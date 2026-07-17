@@ -5,8 +5,8 @@ Data file download utilities for libephemeris.
 
 This module provides functionality to download optional data files that enhance
 precision for certain calculations. Pinned, tier-specific planet-center SPKs
-provide precise outer-planet center positions. The only installable precomputed
-LEB asset is the reviewed core bundled in the wheel.
+provide precise outer-planet center positions. Reviewed LEB cores and companion
+groups are installed only from package resources or immutable manifest URLs.
 
 Usage:
     # From command line
@@ -36,12 +36,10 @@ Provenance:
 from __future__ import annotations
 
 import hashlib
-import http.client
 import os
 import ssl
 import sys
 import tempfile
-import urllib.request
 from importlib import resources
 from pathlib import Path
 from typing import Any, Optional
@@ -50,6 +48,7 @@ import certifi
 
 from .leb_groups import LEB2_GROUPS as _CANONICAL_LEB2_GROUPS
 from .logging_config import get_logger
+from .net import HTTPError, HTTPException, Request, open_url
 
 
 def _is_valid_bsp(filepath: str) -> bool:
@@ -132,7 +131,6 @@ DATA_FILES: dict[str, dict[str, Any]] = {
     # LEB2 compressed modular files. Every distributable core must name an
     # immutable source and exact SHA-256. The regenerated base core ships in
     # the wheel; medium/extended are pinned release assets.
-    # Unlisted companion artifacts remain unavailable.
     # Core (14 bodies): Sun-Pluto, Earth, Mean/True Node, Mean Apogee
     "base_core.leb2": {
         # Ships in every wheel; installed from package resources.
@@ -159,6 +157,79 @@ DATA_FILES: dict[str, dict[str, Any]] = {
         "sha256": "69f9d6972c6d54dacb50faadea6c0b9a50649dc3912b80a928b5a26bee16611a",
         "size_mb": 338.7,
         "description": "LEB2 core bodies for 'extended' tier (-5000 to +5000)",
+        "dest_subdir": "leb",
+    },
+    # Reviewed companion groups. These files are generated from the same
+    # provenance-gated data-v2 run as the cores and are immutable release
+    # assets. Listing them here makes download and runtime attachment one
+    # closed trust unit: a same-named cache file is never accepted unless its
+    # SHA-256 matches this manifest.
+    # Asteroids: Chiron, Ceres, Pallas, Juno, Vesta. Per-body coverage is read
+    # from the file (the extended group is intentionally narrower than core).
+    "base_asteroids.leb2": {
+        "url": f"{GITHUB_RELEASES}/base_asteroids.leb2",
+        "sha256": "f9965566f463a5d27d7d73a1ca59f75d12d8d75a98e7b059c3bef0409ff5f196",
+        "size_mb": 8.76,
+        "description": "LEB2 major asteroids for 'base' tier",
+        "dest_subdir": "leb",
+    },
+    "medium_asteroids.leb2": {
+        "url": f"{GITHUB_RELEASES}/medium_asteroids.leb2",
+        "sha256": "486f782b67ebc5a96474c4c8e0aed070bb68371fbebbb63a8d48618c39f4e086",
+        "size_mb": 29.31,
+        "description": "LEB2 major asteroids for 'medium' tier",
+        "dest_subdir": "leb",
+    },
+    "extended_asteroids.leb2": {
+        "url": f"{GITHUB_RELEASES}/extended_asteroids.leb2",
+        "sha256": "4a46a301808bfda449aa18bea963ff7c90ca3bcb6b94802364f0db2c5c913836",
+        "size_mb": 86.31,
+        "description": "LEB2 major asteroids for 'extended' tier (1600-2500)",
+        "dest_subdir": "leb",
+    },
+    # Lunar apsides: Osculating Apogee, Interpolated Apogee and Perigee.
+    "base_apogee.leb2": {
+        "url": f"{GITHUB_RELEASES}/base_apogee.leb2",
+        "sha256": "a44a96a5524e0390229c3e55921747e1f91950587ac98965dd3dd7b9137128a4",
+        "size_mb": 11.79,
+        "description": "LEB2 lunar apsides for 'base' tier",
+        "dest_subdir": "leb",
+    },
+    "medium_apogee.leb2": {
+        "url": f"{GITHUB_RELEASES}/medium_apogee.leb2",
+        "sha256": "305559dbca47ebf5ef4d1444786d21cb65f60e9a75e09655554bce113c409b96",
+        "size_mb": 43.33,
+        "description": "LEB2 lunar apsides for 'medium' tier",
+        "dest_subdir": "leb",
+    },
+    "extended_apogee.leb2": {
+        "url": f"{GITHUB_RELEASES}/extended_apogee.leb2",
+        "sha256": "521257504690d48e156a70ab9961fb14df03a47d7a964ecbb52c027e01262ee4",
+        "size_mb": 485.22,
+        "description": "LEB2 lunar apsides for 'extended' tier",
+        "dest_subdir": "leb",
+    },
+    # Centaurs, trans-Neptunians and other curated minor bodies. Coverage is
+    # stored per body; callers must query it rather than assume the tier range.
+    "base_exotics.leb2": {
+        "url": f"{GITHUB_RELEASES}/base_exotics.leb2",
+        "sha256": "354a716e1b98fa62a42bb34f2d174e06a6029a32d0829b0e5655dd28d0ee2faf",
+        "size_mb": 59.01,
+        "description": "LEB2 curated minor bodies for 'base' tier",
+        "dest_subdir": "leb",
+    },
+    "medium_exotics.leb2": {
+        "url": f"{GITHUB_RELEASES}/medium_exotics.leb2",
+        "sha256": "2576a5b5735958069eedd94d971cdc19ade23a7f39f9beef761fc61716cf746a",
+        "size_mb": 194.75,
+        "description": "LEB2 curated minor bodies for 'medium' tier",
+        "dest_subdir": "leb",
+    },
+    "extended_exotics.leb2": {
+        "url": f"{GITHUB_RELEASES}/extended_exotics.leb2",
+        "sha256": "dc2711aa8c12fa48568921fb905f4dcfa06901d4653fc541fd518acab5c9fa81",
+        "size_mb": 224.55,
+        "description": "LEB2 curated minor bodies for 'extended' tier",
         "dest_subdir": "leb",
     },
     # Uranians (8 Hamburg bodies, 40-47): regenerated from the independently
@@ -380,7 +451,7 @@ def download_file(
 
     try:
         # Open URL and get content length
-        req = urllib.request.Request(
+        req = Request(
             url,
             headers={"User-Agent": "libephemeris-download/1.0"},
         )
@@ -388,7 +459,12 @@ def download_file(
         logger.info("Downloading %s...", description)
 
         _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx) as response:
+        with open_url(
+            req,
+            purpose=f"download {description}",
+            timeout=timeout,
+            context=_ssl_ctx,
+        ) as response:
             total_size = int(response.headers.get("Content-Length", 0))
 
             if total_size > 0:
@@ -435,10 +511,10 @@ def download_file(
         logger.info("Download complete: %s", dest_path.name)
         return True
 
-    # http.client.HTTPException (e.g. IncompleteRead when the server closes
+    # HTTPException (e.g. IncompleteRead when the server closes
     # the connection mid-body) is NOT an OSError, so it must be caught
     # explicitly to clean up the temp file instead of orphaning it.
-    except (OSError, ValueError, KeyError, RuntimeError, http.client.HTTPException):
+    except (OSError, ValueError, KeyError, RuntimeError, HTTPException):
         # Close the temp fd if it was never handed to os.fdopen (e.g. urlopen
         # raised first); otherwise it leaks until the process exits.
         if temp_fd != -1:
@@ -587,7 +663,7 @@ def download_planet_centers(
 
         return dest_path
 
-    except urllib.error.HTTPError as e:
+    except HTTPError as e:
         if e.code == 404:
             print(
                 "\nError: Data file not found on server.",
@@ -730,9 +806,9 @@ def print_data_status(as_json: bool = False, verbose: int = 0) -> None:
         if not path.exists():
             # Check Skyfield's default location
             try:
-                from skyfield.api import Loader
+                from .net import PolicyAwareLoader
 
-                loader = Loader(str(data_dir))
+                loader = PolicyAwareLoader(str(data_dir))
                 sf_path = Path(loader.directory) / filename
                 if sf_path.exists():
                     path = sf_path

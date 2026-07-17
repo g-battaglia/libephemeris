@@ -561,7 +561,7 @@ wheels = [
 
 [[package]]
 name = "libephemeris"
-version = "3.0.0rc12"
+version = "3.0.0rc13"
 source = { editable = "." }
 dependencies = [
     { name = "certifi" },

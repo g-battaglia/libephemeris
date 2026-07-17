@@ -55,9 +55,6 @@ import re
 import ssl
 import tempfile
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from typing import Optional, Union
 
 import certifi
@@ -68,6 +65,7 @@ from skyfield.framelib import ecliptic_frame
 from .download import _is_valid_bsp
 from .exceptions import SPKNotFoundError
 from .logging_config import format_file_size, get_logger
+from .net import HTTPError, Request, URLError, open_url, urlencode
 from .state import get_timescale
 
 # Vendored spktype21 for SPK type 21 support (upstream unmaintained since 2018).
@@ -333,7 +331,7 @@ def _build_horizons_url(
     Returns:
         URL string for Horizons API request.
     """
-    # URL-encode parameters properly using urllib.parse.urlencode.
+    # URL-encode parameters through the central network module.
     # This is critical for body names containing special characters like
     # "Ceres;" where the semicolon must be encoded as %3B.
     params = {
@@ -347,7 +345,7 @@ def _build_horizons_url(
         "STOP_TIME": f"'{end}'",
     }
 
-    query = urllib.parse.urlencode(params, safe="'@")
+    query = urlencode(params, safe="'@")
     return f"{HORIZONS_API_URL}?{query}"
 
 
@@ -471,11 +469,14 @@ def download_spk(
             ssl_context = ssl.create_default_context(cafile=certifi.where())
 
             # First request: get SPK file URL from Horizons
-            req = urllib.request.Request(url)
+            req = Request(url)
             req.add_header("User-Agent", "libephemeris/0.1")
 
-            with urllib.request.urlopen(
-                req, timeout=timeout, context=ssl_context
+            with open_url(
+                req,
+                purpose=f"Horizons SPK generation for {body}",
+                timeout=timeout,
+                context=ssl_context,
             ) as response:
                 data = json.loads(response.read().decode("utf-8"))
 
@@ -526,7 +527,7 @@ def download_spk(
             logger.info("SPK saved: %s (%s)", filepath, size_str)
             return filepath
 
-        except urllib.error.HTTPError as e:
+        except HTTPError as e:
             last_error = e
             if e.code == 400:
                 # Bad request - likely invalid body name
@@ -557,7 +558,7 @@ def download_spk(
                     f"Failed to download SPK after {max_retries + 1} attempts: {e}"
                 ) from e
 
-        except urllib.error.URLError as e:
+        except URLError as e:
             last_error = e
             if attempt < max_retries:
                 logger.warning(

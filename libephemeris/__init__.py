@@ -85,6 +85,7 @@ from .exceptions import (
     ConvergenceError,
     # Category: Configuration errors
     ConfigurationError,
+    NetworkSealedError,
     # Validation helpers
     validate_latitude,
     validate_longitude,
@@ -208,6 +209,21 @@ from .state import (
     get_spk_date_range_for_tier,
     # Page cache management (containerised environments)
     release_data_cache,
+)
+from .net import (
+    NETWORK_POLICY_ENV,
+    get_configured_network_policy,
+    get_network_policy,
+    set_network_policy,
+)
+from .inventory import (
+    BodyCoverage,
+    RuntimeDataRequirement,
+    coverage,
+    get_body_coverage,
+    get_leb_inventory,
+    get_runtime_data_requirements,
+    inspect_leb_file,
 )
 from .iers_data import (
     # IERS data download functions
@@ -650,7 +666,7 @@ from ._dotenv import load_dotenv
 # Extended astrology helpers submodule
 from . import contrib
 
-__version__ = "3.0.0rc12"
+__version__ = "3.0.0rc13"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0-only"
@@ -693,6 +709,7 @@ __all__ = [
     "ConvergenceError",
     # Exceptions - Configuration Category
     "ConfigurationError",
+    "NetworkSealedError",
     # Lunar calculation warnings/errors
     "MeeusPolynomialWarning",
     "MeeusRangeError",
@@ -808,6 +825,18 @@ __all__ = [
     "get_leb_reader",
     "set_calc_mode",
     "get_calc_mode",
+    # Network policy and LEB coverage inventory
+    "NETWORK_POLICY_ENV",
+    "set_network_policy",
+    "get_configured_network_policy",
+    "get_network_policy",
+    "BodyCoverage",
+    "RuntimeDataRequirement",
+    "coverage",
+    "get_body_coverage",
+    "get_leb_inventory",
+    "get_runtime_data_requirements",
+    "inspect_leb_file",
     # Crossings
     "solcross_ut",
     "solcross",

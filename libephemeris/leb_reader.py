@@ -358,6 +358,13 @@ class LEBReader:
         """Check if a body is available in this .leb file."""
         return body_id in self._bodies
 
+    def body_coverage(self, body_id: int) -> Optional[Tuple[float, float]]:
+        """Return the stored per-body JD range, or ``None`` when absent."""
+        entry = self._bodies.get(body_id)
+        if entry is None:
+            return None
+        return (float(entry.jd_start), float(entry.jd_end))
+
     def eval_body(
         self, body_id: int, jd: float
     ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
@@ -648,10 +655,14 @@ def log_leb_fallback(context: str, err: Exception) -> None:
     """
     from .logging_config import get_logger
 
+    from .state import get_calc_mode
+
     if isinstance(err, LEBCorruptionError):
         get_logger().warning(
             "LEB %s fallback (corrupted or truncated LEB data): %s", context, err
         )
+    elif get_calc_mode() == "leb":
+        get_logger().warning("LEB %s unavailable in sealed mode: %s", context, err)
     else:
         get_logger().debug("LEB %s fallback: %s", context, err)
 

@@ -23,6 +23,8 @@ import pytest
 
 import libephemeris.download as dl
 
+pytestmark = pytest.mark.usefixtures("allow_mocked_network")
+
 
 # ---------------------------------------------------------------------------
 # Test doubles
@@ -457,8 +459,8 @@ def test_check_data_status(tmp_path, monkeypatch):
     assert status["planet_centers_base.bsp"]["size"] == 5
     assert status["base_core.leb2"]["exists"] is True
     assert status["base_core.leb2"]["size"] == 7
-    # Retired release companions are absent from the active manifest.
-    assert "base_asteroids.leb2" not in status
+    # Reviewed companions are now first-class manifest entries.
+    assert status["base_asteroids.leb2"]["exists"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -1414,12 +1416,12 @@ def test_install_bundled_file_rejects_hash_mismatch(tmp_path, monkeypatch):
 
 
 def test_download_leb2_for_tier_full(tmp_path, monkeypatch, capsys):
-    """Only the reviewed bundled core is installed and activated."""
+    """Every reviewed companion is installed and the core is activated."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     leb_dir = tmp_path / "leb"
     leb_dir.mkdir()
 
-    # A retired companion in the cache is never treated as installable data.
+    # A stale companion with the right name is replaced because its hash fails.
     (leb_dir / "base_asteroids.leb2").write_bytes(b"ast")
 
     def _is_valid(p):
@@ -1430,7 +1432,7 @@ def test_download_leb2_for_tier_full(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(
         dl,
         "download_file",
-        lambda *args, **kwargs: pytest.fail("remote LEB download attempted"),
+        lambda url, dest_path, **kwargs: Path(dest_path).write_bytes(b"reviewed"),
     )
 
     from libephemeris import state
@@ -1439,7 +1441,7 @@ def test_download_leb2_for_tier_full(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(state, "set_leb_file", lambda p: activated.update(path=p))
 
     # Include a bogus group to hit the "not in DATA_FILES" SKIP arm.
-    groups = ["core", "asteroids", "apogee", "uranians", "bogus"]
+    groups = ["core", "asteroids", "exotics", "apogee", "uranians", "bogus"]
     downloaded = dl.download_leb2_for_tier(
         "base", groups=groups, force=False, quiet=False, activate=True
     )
@@ -1447,10 +1449,17 @@ def test_download_leb2_for_tier_full(tmp_path, monkeypatch, capsys):
     assert "[SKIP]" in out
     assert "already exists" not in out
     assert "[FAIL]" not in out
-    assert "base_apogee.leb2: not in DATA_FILES" in out
+    assert "base_bogus.leb2: not in DATA_FILES" in out
     # core was downloaded -> activation should have happened.
     assert activated["path"].endswith("base_core.leb2")
     assert any(str(p).endswith("base_core.leb2") for p in downloaded)
+    assert {p.name for p in downloaded} == {
+        "base_core.leb2",
+        "base_asteroids.leb2",
+        "base_exotics.leb2",
+        "base_apogee.leb2",
+        "base_uranians.leb2",
+    }
 
 
 def test_download_leb2_remote_asset_requires_and_passes_sha_pin(tmp_path, monkeypatch):
@@ -1563,33 +1572,35 @@ def test_download_leb2_for_tier_default_groups_quiet(tmp_path, monkeypatch):
     downloaded = dl.download_leb2_for_tier(
         "base", groups=None, force=True, quiet=True, activate=False
     )
-    # Exactly the independently reviewed bundled artifacts are available:
-    # the base core and the regenerated uranians companion.
+    # Every canonical group has an independently reviewed distribution asset.
     assert sorted(p.name for p in downloaded) == [
+        "base_apogee.leb2",
+        "base_asteroids.leb2",
         "base_core.leb2",
+        "base_exotics.leb2",
         "base_uranians.leb2",
     ]
 
 
 def test_download_leb2_for_tier_quiet_arcs(tmp_path, monkeypatch):
-    """quiet mode never fetches unlisted companions.
+    """quiet mode installs reviewed companions and skips unknown groups.
 
     - bogus group skip (quiet)
-    - pre-existing unlisted file ignored
-    - reviewed bundled artifacts (core + uranians) installed
+    - pre-existing hash-mismatched file replaced
+    - reviewed core and requested companions installed
     """
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     leb_dir = tmp_path / "leb"
     leb_dir.mkdir()
 
-    # A cached retired companion must not enter the result.
+    # A cached same-name file must not be trusted without the pinned hash.
     (leb_dir / "base_asteroids.leb2").write_bytes(b"ast")
     monkeypatch.setattr(dl, "_is_valid_leb", lambda p: True)
 
     monkeypatch.setattr(
         dl,
         "download_file",
-        lambda *args, **kwargs: pytest.fail("remote LEB download attempted"),
+        lambda url, dest_path, **kwargs: Path(dest_path).write_bytes(b"reviewed"),
     )
 
     from libephemeris import state
@@ -1601,6 +1612,8 @@ def test_download_leb2_for_tier_quiet_arcs(tmp_path, monkeypatch):
         "base", groups=groups, force=False, quiet=True, activate=True
     )
     assert sorted(p.name for p in downloaded) == [
+        "base_apogee.leb2",
+        "base_asteroids.leb2",
         "base_core.leb2",
         "base_uranians.leb2",
     ]

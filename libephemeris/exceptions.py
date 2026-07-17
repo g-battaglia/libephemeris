@@ -495,14 +495,15 @@ class SPKRequiredError(DataNotFoundError):
         lines = [
             f"SPK kernel required for {body_name} (strict precision mode is enabled).",
             "",
-            "The Keplerian fallback for this body can have errors of 1-10 degrees.",
+            "The available Keplerian approximation is body- and date-dependent "
+            "and is not classified as ephemeris-grade.",
             "For accurate calculations, you must either:",
             "",
             "1. Download and register SPK:",
             f'   >>> eph.download_and_register_spk("{horizons_id}", eph.{body_name.upper()}, '
             f'"1900-01-01", "2100-01-01")',
             "",
-            "2. Enable automatic SPK download:",
+            "2. Outside sealed mode, enable automatic SPK download:",
             "   >>> eph.set_auto_spk_download(True)",
             "",
             "3. Disable strict precision mode (not recommended):",
@@ -781,6 +782,27 @@ class ConfigurationError(Error):
             f"missing_config={self.missing_config!r}, "
             f"suggestion={self.suggestion!r})"
         )
+
+
+class NetworkSealedError(ConfigurationError, RuntimeError):
+    """Raised before network I/O when the process policy is ``sealed``.
+
+    ``RuntimeError`` is retained as a secondary base so existing optional
+    downloader fallbacks that already catch runtime failures remain compatible.
+    Callers that need to distinguish policy from transport failure should catch
+    :class:`NetworkSealedError` or :class:`ConfigurationError`.
+    """
+
+    def __init__(self, message: str, purpose: str | None = None):
+        super().__init__(
+            message=message,
+            missing_config="network_policy",
+            suggestion="Provision data explicitly or select network_policy='allow'.",
+        )
+        self.purpose = purpose
+
+    def __repr__(self) -> str:
+        return f"NetworkSealedError({self.message!r}, purpose={self.purpose!r})"
 
 
 class LEBCorruptionError(ValueError):

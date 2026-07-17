@@ -461,6 +461,7 @@ Generated file example:
 [libephemeris]
 precision = "extended"       # base | medium | extended
 mode = "leb"                 # auto | skyfield | leb | horizons
+network_policy = "sealed"    # auto | allow | sealed (LEB defaults sealed)
 auto_spk = true              # auto-download SPK for minor bodies
 strict_precision = true      # require SPK for major asteroids
 iers_auto_download = false   # auto-download IERS data
@@ -471,6 +472,12 @@ mmap_preload = false         # pre-fault mmap pages for a date range
 mmap_preload_start = 1800    # start year (when mmap_preload = true)
 mmap_preload_end = 2200      # end year (when mmap_preload = true)
 ```
+
+`network_policy = "sealed"` blocks every calculation-time HTTP path before
+DNS or socket work. Explicit `libephemeris download ...` commands are the
+provisioning boundary and remain authorized. Use `libephemeris leb info FILE`
+to inspect the exact bodies and per-body Julian Day ranges stored in an
+artifact.
 
 ### Configuration resolution order
 

@@ -438,6 +438,13 @@ class LEB2Reader:
     def has_body(self, body_id: int) -> bool:
         return body_id in self._bodies
 
+    def body_coverage(self, body_id: int) -> Optional[Tuple[float, float]]:
+        """Return the stored per-body JD range, or ``None`` when absent."""
+        entry = self._bodies.get(body_id)
+        if entry is None:
+            return None
+        return (float(entry.jd_start), float(entry.jd_end))
+
     def eval_body(
         self, body_id: int, jd: float
     ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:

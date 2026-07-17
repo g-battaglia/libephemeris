@@ -43,9 +43,11 @@ from .tracing import (
     _restore_record,
     _snapshot_record,
 )
-from skyfield.api import Loader, Topos
+from skyfield.api import Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
+
+from .net import PolicyAwareLoader as Loader
 
 if TYPE_CHECKING:
     from .leb_composite import CompositeLEBReader

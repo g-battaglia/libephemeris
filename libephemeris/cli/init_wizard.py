@@ -397,6 +397,8 @@ def _generate_toml(config: Dict[str, Any]) -> str:
     mode = config.get("mode", "auto")
     lines.append(f'precision = "{_toml_str(prec)}"')
     lines.append(f'mode = "{_toml_str(mode)}"')
+    network_policy = config.get("network_policy", "sealed" if mode == "leb" else "auto")
+    lines.append(f'network_policy = "{_toml_str(network_policy)}"')
     lines.append("")
 
     # --- Minor Bodies ---
@@ -651,6 +653,7 @@ def run_wizard(
         config: Dict[str, Any] = {
             "precision": "medium",
             "mode": "auto",
+            "network_policy": "auto",
             "auto_spk": True,
             "strict_precision": True,
             "iers_auto_download": False,
@@ -675,6 +678,7 @@ def run_wizard(
         config = {
             "precision": "medium",
             "mode": "auto",
+            "network_policy": "auto",
             "auto_spk": True,
             "strict_precision": True,
             "iers_auto_download": False,
@@ -726,6 +730,7 @@ def run_wizard(
         default=0,
     )
     config["mode"] = mode
+    config["network_policy"] = "sealed" if mode == "leb" else "auto"
 
     # ── 3. Minor bodies (adaptive) ───────────────────────────────
     click.echo()
@@ -749,14 +754,10 @@ def run_wizard(
     auto_spk = click.confirm(f"  {_bc('>')} auto_spk", default=auto_spk_default)
     config["auto_spk"] = auto_spk
 
-    if auto_spk:
-        click.echo(_d("  Raise an error if a minor body has no SPK kernel available?"))
-        click.echo(_d("  If disabled, silently falls back to Keplerian approximation."))
-        strict = click.confirm(f"  {_bc('>')} strict_precision", default=True)
-        config["strict_precision"] = strict
-    else:
-        config["strict_precision"] = False
-        click.echo(_d("  (strict_precision skipped \u2014 no effect without auto_spk)"))
+    click.echo(_d("  Require an ephemeris-grade source for mapped minor bodies?"))
+    click.echo(_d("  If disabled, a declared Keplerian approximation may be used."))
+    strict = click.confirm(f"  {_bc('>')} strict_precision", default=True)
+    config["strict_precision"] = strict
 
     # ── 4. Time precision (adaptive) ─────────────────────────────
     click.echo()

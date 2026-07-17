@@ -10,6 +10,8 @@ import math
 import pytest
 from unittest.mock import patch, MagicMock
 
+pytestmark = pytest.mark.usefixtures("allow_mocked_network")
+
 from libephemeris.minor_bodies import (
     calc_asteroid_by_number,
     fetch_orbital_elements_from_sbdb,

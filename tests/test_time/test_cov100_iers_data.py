@@ -18,6 +18,8 @@ from unittest import mock
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("allow_mocked_network")
+
 from libephemeris import iers_data
 
 

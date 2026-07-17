@@ -221,12 +221,14 @@ paths = [
   "libephemeris/_dotenv.py",
   "libephemeris/cache.py",
   "libephemeris/exceptions.py",
+  "libephemeris/inventory.py",
   "libephemeris/logging_config.py",
+  "libephemeris/net.py",
   "libephemeris/profiling.py",
   "libephemeris/tracing.py",
 ]
 scientific_content = false
-origin = "Project-authored configuration, caching, diagnostics, exceptions, and observability. These modules contain no astronomical model or scientific coefficient."
+origin = "Project-authored configuration, caching, diagnostics, exceptions, network policy, active-data inventory, and observability. These modules contain no astronomical model or scientific coefficient."
 sources = []
 documentation = ["docs/development/architecture-overview.md", "docs/guides/tracing.md"]
 docstring = "detailed"

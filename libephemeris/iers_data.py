@@ -37,18 +37,16 @@ Provenance:
 
 from __future__ import annotations
 
-import http.client
 import math
 import os
 import threading
 import time
-import urllib.request
-import urllib.error
 from typing import Optional, Union
 from dataclasses import dataclass
 
 
 from .logging_config import get_logger
+from .net import HTTPException, URLError
 
 # =============================================================================
 # MODULE CONFIGURATION
@@ -319,13 +317,13 @@ def _download_file(url: str, output_path: str, timeout: int = 30) -> bool:
             timeout=timeout,
         )
     except (
-        urllib.error.URLError,
+        URLError,
         OSError,
         ValueError,
         KeyError,
         RuntimeError,
         TimeoutError,
-        http.client.HTTPException,
+        HTTPException,
     ):
         return False
 

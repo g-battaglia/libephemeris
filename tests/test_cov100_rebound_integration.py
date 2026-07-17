@@ -23,6 +23,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("allow_mocked_network")
+
 from libephemeris import rebound_integration as ri
 from libephemeris.constants import CERES
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS

@@ -315,7 +315,6 @@ def _download_single_file(
     """
     import hashlib
     import tempfile
-    import urllib.request
 
     ssl_context = _create_ssl_context()
 
@@ -323,11 +322,18 @@ def _download_single_file(
     temp_fd, temp_path = tempfile.mkstemp(dir=dest.parent, suffix=".download")
 
     try:
-        req = urllib.request.Request(
-            url, headers={"User-Agent": "libephemeris-download/1.0"}
-        )
+        from .net import Request
 
-        with urllib.request.urlopen(req, timeout=300, context=ssl_context) as response:
+        req = Request(url, headers={"User-Agent": "libephemeris-download/1.0"})
+
+        from .net import open_url
+
+        with open_url(
+            req,
+            purpose=f"ASSIST data download: {description}",
+            timeout=300,
+            context=ssl_context,
+        ) as response:
             total_size = int(response.headers.get("Content-Length", 0))
 
             if not quiet and total_size > 0:

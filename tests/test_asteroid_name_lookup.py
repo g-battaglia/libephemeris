@@ -9,6 +9,8 @@ Tests verify:
 """
 
 import pytest
+
+pytestmark = pytest.mark.usefixtures("allow_mocked_network")
 from unittest.mock import patch, MagicMock
 import json
 

@@ -25,6 +25,8 @@ from unittest import mock
 
 import pytest
 
+pytestmark = pytest.mark.usefixtures("allow_mocked_network")
+
 from libephemeris import horizons_backend as hb
 from libephemeris.horizons_backend import (
     HorizonsClient,

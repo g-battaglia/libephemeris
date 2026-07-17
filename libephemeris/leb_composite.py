@@ -284,6 +284,23 @@ class CompositeLEBReader:
     def has_body(self, body_id: int) -> bool:
         return body_id in self._body_map
 
+    def body_coverage(self, body_id: int) -> Optional[Tuple[float, float]]:
+        """Return coverage from the reader that actually serves ``body_id``."""
+        reader = self._body_map.get(body_id)
+        if reader is None:
+            return None
+        coverage = getattr(reader, "body_coverage", None)
+        if coverage is not None:
+            return coverage(body_id)
+        entry = getattr(reader, "_bodies", {}).get(body_id)
+        if entry is None:
+            return None
+        return (float(entry.jd_start), float(entry.jd_end))
+
+    def body_reader(self, body_id: int) -> Optional[Any]:
+        """Return the constituent reader selected for a body."""
+        return self._body_map.get(body_id)
+
     def eval_body(
         self, body_id: int, jd: float
     ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:

@@ -20,6 +20,8 @@ import sys
 import pytest
 from unittest.mock import patch
 
+pytestmark = pytest.mark.usefixtures("allow_mocked_network")
+
 import libephemeris.minor_bodies as mb
 from libephemeris import state
 from libephemeris.constants import (

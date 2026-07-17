@@ -10,6 +10,14 @@ import pytest
 import libephemeris as ephem
 
 
+@pytest.fixture
+def allow_mocked_network():
+    """Authorize unit tests whose transport is fully replaced by a fake."""
+    ephem.set_network_policy("allow")
+    yield
+    ephem.set_network_policy(None)
+
+
 # ============================================================================
 # --calc-mode CLI flag
 # ============================================================================

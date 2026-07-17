@@ -31,11 +31,12 @@ import warnings
 import weakref
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, overload
-from skyfield.api import Loader, Topos
+from skyfield.api import Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
 
 from .logging_config import get_logger
+from .net import PolicyAwareLoader as Loader
 
 
 # =============================================================================
@@ -756,6 +757,13 @@ def _get_leb_reader_locked(mode):
                     from .leb_reader import open_leb
 
                     _LEB_READER = open_leb(path)
+                # Inventory consumers must not re-hash up to a gigabyte on
+                # every health request. Record the trust decision already made
+                # while resolving and attaching the reader.
+                setattr(_LEB_READER, "_manifest_verified", reviewed_core)
+                if reviewed_core:
+                    for child in getattr(_LEB_READER, "_readers", ()):
+                        setattr(child, "_manifest_verified", True)
                 # Register the raw handles with a weakref finalizer as soon as
                 # the process-global reader is created. Finalizers run during
                 # normal garbage collection and at interpreter shutdown, so a
@@ -1337,6 +1345,9 @@ def get_planets() -> SpiceKernel:
                             break
                     if not loaded:
                         # No DE kernel at all — download the smallest one
+                        from .net import require_network
+
+                        require_network("Skyfield de440s.bsp fallback download")
                         logger.info(
                             "LEB mode: downloading de440s.bsp (31 MB) for "
                             "internal calculations..."
@@ -1344,6 +1355,9 @@ def get_planets() -> SpiceKernel:
                         _PLANETS = load("de440s.bsp")
                         _EPHEMERIS_FILE = "de440s.bsp"
                 else:
+                    from .net import require_network
+
+                    require_network(f"Skyfield {_EPHEMERIS_FILE} ephemeris download")
                     logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
                     _PLANETS = load(_EPHEMERIS_FILE)
                     logger.info("Ephemeris downloaded to: %s", data_dir)

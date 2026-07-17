@@ -13,6 +13,7 @@ Usage:
     libephemeris download leb2-base     Install reviewed LEB2 assets for 'base'
     libephemeris download leb2-medium   Install reviewed LEB2 assets for 'medium'
     libephemeris download leb2-extended Install reviewed LEB2 assets for 'extended'
+    libephemeris download iers          Refresh IERS data explicitly
     libephemeris download assist        Download ASSIST n-body data files (~714 MB)
     libephemeris status                 Show comprehensive library and data status
     libephemeris --version              Show version
@@ -97,6 +98,7 @@ Examples:
   libephemeris download base          Lightweight, modern-era data
   libephemeris download extended      Full range (-13200 to +17191 CE)
   libephemeris download leb2-base     Install reviewed modular LEB2 assets
+  libephemeris download iers          Refresh mutable IERS observations
   libephemeris download assist        ASSIST n-body data (~714 MB)
   libephemeris status                 Show comprehensive library and data status
 
@@ -126,12 +128,20 @@ def cli() -> None:
     "Available data:\n\n"
     "  Tier data (base/medium/extended)   DE440/441 kernels + asteroid SPKs\n"
     "  LEB2 files (leb2-base/medium/ext)  Independently reviewed modular assets\n"
+    "  IERS data                          Earth-orientation observations\n"
     "  ASSIST data                        N-body integration files (~714 MB)\n\n"
     "Historical leb-* commands install the pinned core in the current format.\n\n"
     "Most users need only: libephemeris download medium",
 )
 def download_group() -> None:
-    """Download subcommands."""
+    """Download subcommands.
+
+    Entering this explicit provisioning boundary authorizes network access even
+    when the calculation configuration itself is sealed.
+    """
+    from ..net import set_network_policy
+
+    set_network_policy("allow")
 
 
 # --- Common download options ---
@@ -253,6 +263,42 @@ def _make_leb2_download(tier: str) -> click.Command:
 
 for _tier in TIER_INFO:
     download_group.add_command(_make_leb2_download(_tier))
+
+
+# --- Mutable IERS observations (explicit provisioning only) ---
+
+
+@download_group.command(
+    "iers",
+    short_help="Refresh cached IERS Earth-orientation observations.",
+)
+@click.option(
+    "--force", "-f", is_flag=True, help="Refresh even when the cache is fresh."
+)
+@click.option("--quiet", "-q", is_flag=True, help="Suppress progress output.")
+def download_iers(force: bool, quiet: bool) -> None:
+    """Provision IERS files without enabling calculation-time network access."""
+    from ..iers_data import (
+        download_delta_t_data,
+        download_iers_finals,
+        download_leap_seconds,
+    )
+
+    downloads = (
+        ("finals2000A.data", download_iers_finals),
+        ("leap_seconds.dat", download_leap_seconds),
+        ("deltat.data", download_delta_t_data),
+    )
+    try:
+        for label, downloader in downloads:
+            path = downloader(force=force)
+            if not quiet:
+                click.echo(f"  [OK] {label}: {path}")
+    except KeyboardInterrupt:
+        click.echo("\nDownload cancelled.")
+        raise click.exceptions.Exit(130)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 # --- ASSIST download ---
@@ -524,6 +570,54 @@ def download_all(force: bool, no_progress: bool, quiet: bool, yes: bool) -> None
 
 
 cli.add_command(download_group)
+
+
+# ---------------------------------------------------------------------------
+# leb info — inspect the body/range contract stored in an artifact
+# ---------------------------------------------------------------------------
+
+
+@cli.group(
+    "leb",
+    short_help="Inspect LEB/LEB2 data files.",
+)
+def leb_group() -> None:
+    """Inspect binary ephemeris artifacts without activating them."""
+
+
+@leb_group.command(
+    "info",
+    short_help="Show bodies and per-body Julian Day coverage in a LEB file.",
+)
+@click.argument(
+    "path",
+    type=click.Path(exists=True, dir_okay=False, readable=True, path_type=str),
+)
+@click.option("--json", "as_json", is_flag=True, help="Output machine-readable JSON.")
+def leb_info(path: str, as_json: bool) -> None:
+    """Show the file identity and exact coverage encoded in PATH."""
+    import json
+
+    from ..inventory import inspect_leb_file
+
+    try:
+        info = inspect_leb_file(path)
+    except (OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if as_json:
+        click.echo(json.dumps(info, indent=2))
+        return
+
+    click.echo(f"{info['name']} ({info['body_count']} bodies)")
+    click.echo(f"Path: {info['path']}")
+    if info["size_bytes"] is not None:
+        click.echo(f"Size: {info['size_bytes']} bytes")
+    click.echo("Body ID       JD start         JD end")
+    for body in info["bodies"]:
+        click.echo(
+            f"{body['body_id']:>7}  {body['jd_start']:>15.6f}  {body['jd_end']:>15.6f}"
+        )
 
 
 # ---------------------------------------------------------------------------

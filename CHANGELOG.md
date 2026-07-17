@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Restored the reviewed modular LEB2 distribution set: asteroids, exotics and
+  lunar-apsides companions for base, medium and extended tiers are now pinned
+  by immutable URL, exact SHA-256 and size alongside core and uranians.
+- Clamped automatic Horizons SPK requests to its supported 1600-2500 window;
+  extended-tier padding can no longer construct a deterministically invalid
+  request.
+- Strict precision no longer treats a failed download attempt as proof that a
+  lower-precision fallback is acceptable. Keplerian diagnostics now report
+  multi- vs single-epoch provenance and avoid unsupported universal error
+  claims.
+
+### Added
+
+- Added a process network policy (`auto`, `allow`, `sealed`). `auto` resolves
+  LEB mode to sealed, all runtime URL opens share one policy gate, and implicit
+  Skyfield kernel downloads are gated before socket work. Explicit CLI download
+  commands remain an authorized provisioning boundary.
+- Added per-body `coverage()` / `get_body_coverage()`, full active
+  `get_leb_inventory()`, and `libephemeris leb info FILE` so readiness can be
+  evaluated from actual file groups and date ranges instead of a core boolean.
+- Added static and socket-level regression tests for the sealed-mode invariant.
+
 ## [3.0.0rc11] - 2026-07-15
 
 The candidate that completes the v3 independence remediation alongside the

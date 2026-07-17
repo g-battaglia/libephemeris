@@ -322,16 +322,54 @@ def _log_successful_source(
         return
     suffix = " (context)" if context else ""
     if source == "Keplerian":
+        from . import minor_bodies
+
+        entries = minor_bodies._merged_epoch_entries(body_id)
+        if entries:
+            nearest = min(entries, key=lambda item: abs(jd - item.epoch))
+            offset_years = abs(jd - nearest.epoch) / 365.25
+            detail = (
+                "multi-epoch approximation, "
+                f"nearest-anchor-offset={offset_years:.2f}y, "
+                f"anchor-range=[{entries[0].epoch:.1f}, {entries[-1].epoch:.1f}]"
+            )
+        else:
+            detail = "single-epoch approximation"
         logger.warning(
-            "body=%d jd=%.1f source=Keplerian (fallback)%s. "
-            "Precision is degraded (~1-2 degrees; unperturbed two-body). "
-            "Install SPK kernels or enable auto-download for higher accuracy.",
+            "body=%d jd=%.1f source=Keplerian(%s)%s. "
+            "Precision is body- and date-dependent; this source is not "
+            "classified as ephemeris-grade.",
             body_id,
             jd,
+            detail,
             suffix,
         )
     else:
         logger.debug("body=%d jd=%.1f source=%s%s", body_id, jd, source, suffix)
+
+
+def _raise_leb_range_miss(body_id: int, jd: float) -> None:
+    """Fail closed when a body exists in LEB but not at the requested date."""
+    from .inventory import get_body_coverage
+    from .state import get_calc_mode
+
+    if get_calc_mode() != "leb":
+        return
+    body_coverage = get_body_coverage(body_id)
+    if body_coverage is None or body_coverage.contains(jd):
+        return
+    raise EphemerisRangeError(
+        message=(
+            f"Body {body_id} at JD {jd:.6f} is outside active LEB coverage range "
+            f"[{body_coverage.jd_start:.6f}, {body_coverage.jd_end:.6f}]. "
+            "LEB mode does not silently substitute a lower-precision source."
+        ),
+        requested_jd=jd,
+        start_jd=body_coverage.jd_start,
+        end_jd=body_coverage.jd_end,
+        body_id=body_id,
+        ephemeris_file=body_coverage.data_file,
+    )
 
 
 # Fallback mapping when planet center not available in ephemeris
@@ -1399,11 +1437,12 @@ def _spk_out_of_coverage_error(ipl: int, spk_info, jd_tt: float):
         lines.append("but its coverage does not include this epoch.")
     lines += [
         "",
-        "The Keplerian fallback for this body can have errors of 1-10 degrees.",
+        "The available Keplerian approximation is body- and date-dependent "
+        "and is not classified as ephemeris-grade.",
         "For accurate calculations at this epoch, you must either:",
         "",
         "1. Register a kernel whose coverage includes this epoch,",
-        "2. Enable automatic SPK download:",
+        "2. Outside sealed mode, enable automatic SPK download:",
         "   >>> eph.set_auto_spk_download(True)",
         "3. Install ASSIST N-body data for a high-precision fallback, or",
         "4. Disable strict precision mode (not recommended):",
@@ -1433,7 +1472,7 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         This function uses spk.download_and_register_spk() which communicates
         directly with JPL Horizons API via HTTP. No astroquery dependency.
     """
-    from . import spk
+    from . import minor_bodies, spk
     from .constants import SPK_AUTO_DOWNLOAD_BLOCKED, SPK_BODY_NAME_MAP
     from .logging_config import get_logger
 
@@ -1458,8 +1497,14 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         from .state import get_spk_date_range_for_tier
 
         start_date, end_date = get_spk_date_range_for_tier()
-        request_start = _pad_iso_date(start_date, -45)
-        request_end = _pad_iso_date(end_date, 45)
+        request_start = max(
+            _pad_iso_date(start_date, -45),
+            minor_bodies.HORIZONS_SPK_DATE_MIN,
+        )
+        request_end = min(
+            _pad_iso_date(end_date, 45),
+            minor_bodies.HORIZONS_SPK_DATE_MAX,
+        )
 
         body_name = spk._get_body_name(ipl) or horizons_id
         logger.info("Auto-downloading SPK for %s from JPL Horizons...", body_name)
@@ -1678,7 +1723,7 @@ def calc_ut(
             _record(requested_planet, "LEB")
             return pos_out, retflag_out
         except (KeyError, ValueError) as _leb_err:
-            # missing body / out-of-range -> DEBUG, corruption -> WARNING
+            _raise_leb_range_miss(planet, tjdut)
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback(f"body={planet} jd={tjdut:.1f}", _leb_err)
@@ -1939,7 +1984,7 @@ def calc(
             _record(requested_planet, "LEB")
             return pos_out, retflag_out
         except (KeyError, ValueError) as _leb_err:
-            # missing body / out-of-range -> DEBUG, corruption -> WARNING
+            _raise_leb_range_miss(planet, tjdet)
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback(f"body={planet} jd={tjdet:.1f}", _leb_err)
@@ -4092,11 +4137,9 @@ def _calc_body(
         # First check if already registered
         _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
 
-        _auto_download_attempted = False
         if _spk_type21_target is None:
             # Not registered yet — try auto-download, then check again
             if get_auto_spk_download():
-                _auto_download_attempted = True
                 try:
                     # _try_auto_spk_download registers the SPK as a side effect
                     _try_auto_spk_download(t, ipl, iflag)
@@ -4136,9 +4179,8 @@ def _calc_body(
 
             # In strict precision mode, require an SPK-grade source for all
             # downloadable bodies. Bodies blocked from auto-download are exempt
-            # (no SPK obtainable). Bodies whose auto-download was attempted but
-            # failed are also exempt (the attempt is honoured, Keplerian is
-            # allowed rather than blocking the calculation entirely).
+            # (no SPK obtainable). A failed network attempt is never evidence
+            # of precision and therefore cannot exempt strict mode.
             #
             # The remaining decision keys off whether a source BETTER than the
             # Keplerian fallback actually exists for this epoch -- never off the
@@ -4149,10 +4191,7 @@ def _calc_body(
             # the truth about why (kernel registered but out of coverage, vs no
             # kernel registered at all).
             if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
-                if (
-                    ipl not in SPK_AUTO_DOWNLOAD_BLOCKED
-                    and not _auto_download_attempted
-                ):
+                if ipl not in SPK_AUTO_DOWNLOAD_BLOCKED:
                     spk_info = spk.get_spk_body_info(ipl)
                     if _strict_source_better_than_keplerian(ipl):
                         # A high-precision N-body fallback (ASSIST) is available

@@ -19,6 +19,7 @@ The file must contain a ``[libephemeris]`` section.  Example::
     mode = "leb"
     auto_spk = true
     strict_precision = true
+    network_policy = "sealed"
 
 Resolution order (highest to lowest priority):
 
@@ -91,6 +92,7 @@ _VALID_KEYS: Dict[str, type] = {
     "auto_spk": bool,
     "spk_dir": str,
     "strict_precision": bool,
+    "network_policy": str,
     "iers_auto_download": bool,
     "iers_delta_t": bool,
     "deltat_model": str,

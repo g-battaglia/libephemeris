@@ -16,6 +16,8 @@ are skipped by default. Set LIBEPHEMERIS_TEST_SPK_DOWNLOAD=1 to run them.
 import json
 import os
 import pytest
+
+pytestmark = pytest.mark.usefixtures("allow_mocked_network")
 from unittest.mock import patch, MagicMock
 from packaging import version
 
