@@ -32,7 +32,7 @@ monolithic LEB1 release assets are retired and must not be used as test inputs.
 |------|-----------|-------|------------|
 | `base` | de440s.bsp | 1850–2150 | `ephemeris_base.leb` (up to 53 bodies) |
 | `medium` | de440.bsp | 1550–2650 | `ephemeris_medium.leb` (up to 53 bodies) |
-| `extended` | de441.bsp | -5000–+5000 | `ephemeris_extended.leb` (up to 45 bodies) |
+| `extended` | de441.bsp | exact shared kernel interval (approximately -13200–+17191) | `ephemeris_extended.leb` (up to 45 bodies) |
 
 ### Dependencies
 

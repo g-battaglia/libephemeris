@@ -14,6 +14,19 @@ uv pip install -e ".[dev]"
 For asteroids, JPL Horizons SPK files are needed (downloaded automatically
 during generation if `LIBEPHEMERIS_AUTO_SPK=1`).
 
+For a release-quality regeneration, use the repository entrypoint rather than
+invoking individual groups by hand:
+
+```bash
+./regenerate-leb.sh --doctor
+./regenerate-leb.sh all
+```
+
+This regenerates, merges, verifies, and converts every tier and all five LEB2
+groups. Extended core uses the exact shared DE441 interval; the operation can
+take many hours. Partial commands below remain useful during development but
+are not a substitute for the complete release run.
+
 ---
 
 ## 1. Generate LEB1 Files
@@ -93,7 +106,7 @@ python scripts/generate_leb.py --tier base --merge \
 |------|------|--------|----------|
 | Base | `data/leb/ephemeris_base.leb` | up to 53 | 1850-2150 |
 | Medium | `data/leb/ephemeris_medium.leb` | up to 53 | 1550-2650 |
-| Extended | `data/leb/ephemeris_extended.leb` | up to 45 | -5000 / +5000 |
+| Extended | `data/leb/ephemeris_extended.leb` | up to 45 | exact shared DE441 interval (approximately -13200 to +17191) |
 
 ### LEB1 body groups
 
@@ -167,7 +180,8 @@ python scripts/generate_leb2.py generate --tier base --group core \
 | asteroids | `data/leb2/base_asteroids.leb2` | Chiron, Ceres, Pallas, Juno, Vesta (5) |
 | exotics | `data/leb2/base_exotics.leb2` | Generated locally from JPL data |
 | apogee | `data/leb2/base_apogee.leb2` | OscuApog, IntpApog, IntpPerig (3) |
-| **Total** | | generated locally | **53 bodies** |
+| uranians | `data/leb2/base_uranians.leb2` | Cupido through Poseidon (8) |
+| **Total** | | body IDs can overlap groups; inspect the stored inventory rather than summing this table |
 
 ### LEB2 groups vs LEB1 groups
 

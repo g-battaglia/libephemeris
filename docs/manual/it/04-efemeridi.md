@@ -12,7 +12,11 @@ Un'**efemeride** è una tabella che dice "a questa data, questo corpo celeste si
 
 Un'efemeride cartacea tipica ha una riga per ogni giorno e una colonna per ogni pianeta. Un'efemeride digitale è la stessa idea, ma con precisione molto maggiore e la capacità di interpolare tra i punti tabulati per ottenere la posizione a qualsiasi istante.
 
-Le efemeridi moderne non sono semplici tabelle: sono file binari che contengono **polinomi di Chebyshev** — funzioni matematiche che approssimano la traiettoria di ogni corpo celeste con errori sub-millimetrici. Dato un istante qualsiasi, la libreria valuta questi polinomi e ottiene la posizione esatta.
+Le efemeridi moderne non sono semplici tabelle: sono file binari che contengono
+**polinomi di Chebyshev** per interpolare una traiettoria integrata
+numericamente. L'accuratezza dipende da sorgente, corpo, data e budget di
+interpolazione; il valore calcolato non è letteralmente una posizione fisica
+priva di errore.
 
 ---
 
@@ -41,6 +45,10 @@ La scelta del livello di precisione determina quale file di efemeridi viene usat
 - **`base`** (DE440s): leggero (~31 MB), copre 1849–2150. Ideale per astrologia moderna e applicazioni mobile.
 - **`medium`** (DE440): bilanciato (~114 MB), copre 1550–2650. Il **default**. Va bene per quasi tutti gli usi.
 - **`extended`** (DE441): massimo (~3.1 GB), copre -13200 a +17191. Per ricerca storica e date antiche/future.
+
+In modalità LEB revisionata il tier è cumulativo, non un downgrade forzato: per
+ogni corpo/data vengono provati prima base, poi medium, poi extended. Il massimo
+configurato amplia quindi la copertura mantenendo DE440s/DE440 dove applicabili.
 
 ```python
 import libephemeris as ephem

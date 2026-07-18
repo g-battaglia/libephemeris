@@ -1,7 +1,7 @@
 # LEB (LibEphemeris Binary) — Complete Technical Guide
 
 > **Last verified:** July 2026
-> **Status:** Production-ready (LEB1 and LEB2 formats). The bundled base core and manifest-pinned medium/extended cores are distributable; additional groups are generated and verified locally from provenance-approved sources.
+> **Status:** Production-ready formats; the cumulative data-v3 artifact set is a release candidate until all fifteen regenerated LEB2 files are published and pinned.
 > **Source of truth:** This document. See also [Algorithms & Theory](algorithms.md) for detailed mathematical foundations.
 > **Quick reference:** [Generation Quickstart](quickstart.md) — step-by-step commands for generating LEB1 and LEB2 files.
 > **Bundled artifact:** [Base-core build provenance](base-core-provenance.md).
@@ -45,19 +45,19 @@ astrological chart calculations.
 - **Small required runtime stack.** LEB1 parsing is based on `mmap` and
   `struct`; LEB2 decompression uses the package's required `numpy` and
   `zstandard` dependencies.
-- **Silent transparent fallback.** If a body is not in the `.leb` file, or
-  the Julian Day is out of range, or an unsupported flag combination is
-  requested, the request continues through the configured fallback chain:
-  Horizons when `auto` mode has no local DE kernel, then Skyfield. Callers
-  never need to know whether LEB is active.
-- **API-transparent.** The public API (`calc_ut`, `calc`, `calc_ut`,
-  `calc`, `EphemerisContext.calc_ut`, etc.) remains unchanged. LEB is
+- **Mode-aware source boundaries.** `auto` tries reviewed LEB data first and
+  may continue through its configured JPL/local-source chain. `leb` is sealed:
+  it never opens a DE/BSP/Horizons source and permits only an explicitly traced
+  deterministic local model where a persistent LEB channel has no scientific
+  meaning. `skyfield` and `horizons` never select LEB implicitly.
+- **API-transparent.** The public API (`calc_ut`, `calc`,
+  `EphemerisContext.calc_ut`, etc.) remains unchanged. LEB is
   activated by setting a file path; no code changes are needed.
 - **Locked mutable caches.** Memory-mapped coefficient data is read-only.
   Reader evaluation/decompression caches are mutable and protected by the
   reader's locks; the LEB2 chunk cache is bounded.
 
-### Three Data Paths
+### Persistent data paths
 
 | Path | Data Source | Activation | Speed |
 |------|------------|------------|-------|
@@ -65,9 +65,12 @@ astrological chart calculations.
 | **Skyfield path** | JPL DE440/DE441 via Skyfield | Final fallback | ~120 µs/eval |
 | **LEB path** | Locally generated `.leb` or reviewed `.leb2` file | `set_leb_file()` or auto-discovery | ~5-8 µs/eval |
 
-The default `auto` mode uses the bundled, configured, or locally generated LEB
-path when available, then Horizons when no local DE kernel exists, and finally
-Skyfield.
+The default `auto` mode uses a configured or manifest-reviewed LEB first. With
+`precision=extended`, reviewed auto-discovery opens all eligible tiers and
+chooses independently for each body/date in the fixed order base (DE440s),
+medium (DE440), then extended (DE441). If LEB cannot serve a request, `auto`
+continues through the non-LEB chain allowed by its configuration. Sealed `leb`
+mode never does.
 
 ---
 
@@ -92,7 +95,10 @@ scripts/
 data/leb/
   ephemeris_base.leb      Locally generated base tier (de440s, 1850-2150)
   ephemeris_medium.leb    Locally generated medium tier (de440, 1550-2650)
-  ephemeris_extended.leb  Locally generated extended tier (de441, -5000 to 5000)
+  ephemeris_extended.leb  Locally generated extended tier (exact shared DE441 interval)
+
+data/leb2/
+  {base,medium,extended}_{core,asteroids,exotics,apogee,uranians}.leb2
 
 tests/test_leb/
   test_leb_format.py      Format constants and serialization
@@ -138,10 +144,12 @@ planets.py: calc_ut()
 
 ### Activation
 
-The wheel's reviewed `base_core.leb2` is available automatically, including as
-a range-limited fast path for the default medium tier. A reviewed downloaded
-`{tier}_core.leb2` takes priority when present. Every implicitly selected file
-must match its SHA-256 entry in the distribution manifest.
+The wheel's reviewed `base_core.leb2` is available automatically. The data-v3
+manifest defines five files for every tier. An active precision tier is
+cumulative: base opens base, medium opens base+medium, and extended opens all
+three. Every implicitly selected file must match its SHA-256 entry in the
+distribution manifest; missing or corrupt required groups are provisioning
+errors in sealed deployments.
 
 ```python
 # Method 1: Programmatic or per-context
@@ -164,7 +172,8 @@ export LIBEPHEMERIS_LEB=/path/to/ephemeris.leb
 1. `EphemerisContext._leb_file` (per-context)
 2. Global `set_leb_file()` call
 3. `LIBEPHEMERIS_LEB` environment variable
-4. Auto-discovery of the active tier's reviewed, SHA-256-pinned core
+4. Auto-discovery of every eligible tier's reviewed, SHA-256-pinned core,
+   composed as base → medium → extended per body/date
 5. Standard local LEB1 names (`{tier}_core.leb`, `ephemeris_{tier}.leb`)
 6. The bundled, SHA-256-pinned `base_core.leb2` as a range-limited fallback
 
@@ -180,7 +189,7 @@ variable.
 
 | Mode | Behavior |
 |------|----------|
-| `auto` (default) | LEB if configured, then Horizons (if no local DE440), then Skyfield |
+| `auto` (default) | Best-by-date reviewed LEB first; then the configured non-LEB JPL/local-source chain |
 | `skyfield` | Always use Skyfield, even if a `.leb` file is configured |
 | `leb` | Require LEB as the sole persistent ephemeris source; allow only traced local analytical/Keplerian models where no meaningful LEB channel exists |
 | `horizons` | Prefer Horizons API; unsupported bodies/flags fall back to Skyfield |
@@ -202,10 +211,12 @@ export LIBEPHEMERIS_MODE=horizons   # Prefer Horizons API
 export LIBEPHEMERIS_MODE=auto       # Default (same as unset)
 ```
 
-In `leb` mode, a core body outside the active file's stored interval raises
+In `leb` mode, a core body outside every eligible file's stored interval raises
 `EphemerisRangeError`; it is never extrapolated or silently recomputed from
-JPL. Curated minor bodies without useful LEB coverage may use an existing
-deterministic local model, and tracing reports `Keplerian` or `Analytical`.
+JPL. Curated minor bodies without meaningful LEB coverage may use an existing
+deterministic local model, and tracing reports its real source as `Keplerian`
+or `Analytical`. Stored LEB trajectories generated by a reviewed numerical
+model remain `source=LEB` and declare `precision_class=numerical-model`.
 Missing or corrupt canonical group files are provisioning failures and must be
 caught by the sealed-runtime inventory/readiness check.
 

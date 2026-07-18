@@ -12,7 +12,10 @@ An **ephemeris** is a table that says "on this date, this celestial body is loca
 
 A typical printed ephemeris has a row for each day and a column for each planet. A digital ephemeris is the same idea, but with much greater precision and the ability to interpolate between tabulated points to obtain the position at any given instant.
 
-Modern ephemerides are not simple tables: they are binary files containing **Chebyshev polynomials** — mathematical functions that approximate the trajectory of every celestial body with sub-millimeter errors. Given any instant, the library evaluates these polynomials and obtains the exact position.
+Modern ephemerides are not simple tables: they are binary files containing
+**Chebyshev polynomials** that interpolate a numerically integrated trajectory.
+Their accuracy depends on the source, body, date, and interpolation budget; an
+evaluated value is not literally an error-free physical position.
 
 ---
 
@@ -41,6 +44,11 @@ The choice of precision tier determines which ephemeris file is used:
 - **`base`** (DE440s): lightweight (~31 MB), covers 1849–2150. Ideal for modern astrology and mobile applications.
 - **`medium`** (DE440): balanced (~114 MB), covers 1550–2650. The **default**. Good for almost all uses.
 - **`extended`** (DE441): maximum (~3.1 GB), covers -13200 to +17191. For historical research and ancient/future dates.
+
+In reviewed LEB mode the tier is cumulative rather than a forced downgrade:
+base is tried first for each body/date, then medium, then extended. The
+configured maximum therefore expands coverage while preserving the narrower
+DE440s/DE440 source wherever it applies.
 
 ```python
 import libephemeris as ephem

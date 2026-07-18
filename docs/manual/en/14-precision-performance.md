@@ -190,7 +190,11 @@ Skyfield (the underlying calculation engine) is extremely precise, but every sin
 
 **LEB** (LibEphemeris Binary) is a precomputed ephemeris format that stores approximations with **Chebyshev polynomials** for every celestial body and every time interval. The `.leb` file contains optimized coefficients that allow calculating positions with a single polynomial evaluation, skipping the entire Skyfield pipeline.
 
-LEB precision is **identical** to Skyfield's — the differences are under a milliarcsecond:
+LEB does not invent a second orbit. Direct ephemeris channels are fitted from
+the pinned DE/SPK source and release validation enforces their declared error
+budget (0.02 arcseconds for the data-v3 direct-source gate). Analytical and
+numerical-model channels retain their own precision class; no single bound is
+claimed for every body and date.
 
 ```python
 import libephemeris as ephem
@@ -247,10 +251,11 @@ export LIBEPHEMERIS_LEB=/path/to/file/ephemeris_medium.leb
 ### Auto-discovery
 
 Exact manifest-pinned tier cores under `~/.libephemeris/leb/` are
-auto-discovered first. For backward compatibility, the standard LEB1 names
-`{tier}_core.leb` and `ephemeris_{tier}.leb` are then discovered before the
-bundled base fallback. Other independently generated local files remain
-supported through `set_leb_file()` or `LIBEPHEMERIS_LEB`.
+auto-discovered first. Precision tiers are cumulative: medium opens
+base+medium, and extended opens base+medium+extended. The reader selects the
+first tier that covers each body/date, so modern requests keep DE440s/DE440
+instead of being downgraded merely because DE441 is also installed. Explicit
+LEB1 files remain supported through `set_leb_file()` or `LIBEPHEMERIS_LEB`.
 
 ### Mode-aware routing
 
@@ -268,7 +273,7 @@ Like the JPL ephemerides, LEB files also exist in three versions:
 
 - **`base` core** (~10.8 MB) — covers 1850–2150
 - **`medium` core** (~38.3 MB) — covers 1550–2650
-- **`extended` core** (~334.9 MB) — covers -5000 to +5000
+- **`extended` core** — covers the exact shared DE441 interval (approximately -13200 to +17191)
 
 ---
 
@@ -278,7 +283,7 @@ The library supports four calculation modes, which can be controlled with `set_c
 
 ### `"auto"` (default)
 
-Tries LEB first if a `.leb` file is configured (or auto-discovered), then falls back to the Horizons API if no local DE440 file is available, then to Skyfield. This is the recommended mode for normal use:
+Tries the best-by-date reviewed LEB first, then continues through the configured non-LEB JPL/local-source chain. This is the recommended mode for normal use:
 
 ```python
 import libephemeris as ephem
@@ -315,9 +320,8 @@ Sun (Skyfield forced): 19.140437°
 
 ### `"leb"`
 
-Requires valid LEB data. The library tries the configured file, the active
-tier's installed pinned core, and the bundled range-limited base core. Core
-installation is explicit (`libephemeris download leb-medium`); calculation
+Requires valid LEB data. The library tries the configured file or the complete
+manifest-pinned cumulative tier set. Installation is explicit; calculation
 never starts a surprise download. LEB is the only persistent ephemeris source:
 the runtime does not open DE/BSP, Horizons, registered or automatic SPK files,
 planet-center kernels, or ASSIST. Curated bodies for which an LEB channel is
@@ -515,11 +519,11 @@ ephem.download_for_tier("medium")
 
 ### Additional LEB files
 
-The sealed runtime inventory consists only of five hash-pinned LEB2 groups per
-tier: `core`, `asteroids`, `exotics`, `apogee`, and `uranians`. No DE kernel or
+The sealed runtime inventory consists of five hash-pinned LEB2 groups per
+eligible tier: `core`, `asteroids`, `exotics`, `apogee`, and `uranians`. An
+extended deployment therefore validates fifteen files. No DE kernel or
 planet-center BSP is required in `leb` mode. Historical `.leb` files remain
-readable when selected explicitly; production readiness should validate all
-five canonical groups before accepting traffic.
+readable when selected explicitly.
 
 ### Data Directory
 
@@ -598,10 +602,10 @@ Identical result: True
 
 ## Summary
 
-- **Sub-arcsecond precision** for all bodies in the 1900–2100 range — no compromises for modern use
+- **Source-specific precision** — direct DE/SPK-derived LEB channels are release-validated to their stated budget; local and analytical models are labelled separately
 - **Three precision tiers**: `base` (1849–2150, 31 MB), `medium` (1550–2650, 114 MB), `extended` (-13200 to +17191, 3.1 GB)
-- **LEB** (precomputed binary ephemerides): the wheel bundles a reviewed base core as the zero-configuration fast path; wider cores are accepted only through SHA-256-pinned manifest entries
-- **Four calculation modes**: `auto` (default — LEB, then Horizons, then Skyfield), `skyfield` (forces Skyfield), `leb` (requires LEB), `horizons` (NASA JPL Horizons API, requires internet)
+- **LEB** (precomputed binary ephemerides): the wheel bundles reviewed base resources; cumulative wider tiers are accepted only through SHA-256-pinned manifest entries
+- **Four calculation modes**: `auto` (best-by-date LEB first), `skyfield` (forces local JPL/Skyfield), `leb` (sealed LEB-only persistent data), `horizons` (NASA JPL Horizons API, requires internet)
 - **EphemerisContext**: thread-safe context for parallel calculations, with isolated state for observer, sidereal mode, and cache
 - **Automatic JPL/SPK data management** on first use; unpinned LEB assets remain rejected by auto-discovery
 - **`reset_session()`** for lightweight between-job state reset while keeping reusable resources open

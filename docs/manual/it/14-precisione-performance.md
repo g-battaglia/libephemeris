@@ -190,7 +190,11 @@ Skyfield (il motore di calcolo sottostante) è estremamente preciso, ma ogni sin
 
 **LEB** (LibEphemeris Binary) è un formato di efemeridi precompilate che memorizza approssimazioni con **polinomi di Chebyshev** per ogni corpo celeste, ogni intervallo temporale. Il file `.leb` contiene coefficienti ottimizzati che permettono di calcolare le posizioni con una sola valutazione polinomiale, saltando tutto il pipeline di Skyfield.
 
-La precisione LEB è **identica** a quella di Skyfield — le differenze sono sotto il milliarcsecondo:
+LEB non inventa una seconda orbita. I canali di effemeride diretti sono
+interpolati dalla sorgente DE/SPK fissata e la validazione di rilascio impone il
+budget dichiarato (0,02 secondi d'arco per il gate data-v3 delle sorgenti
+dirette). I canali analitici e numerici mantengono la propria classe di
+precisione: non esiste un unico limite valido per ogni corpo e data.
 
 ```python
 import libephemeris as ephem
@@ -249,9 +253,12 @@ export LIBEPHEMERIS_LEB=/percorso/al/file/ephemeris_medium.leb
 
 ### Auto-discovery
 
-Il core base incluso e i file generati localmente sotto
-`~/.libephemeris/leb/` vengono trovati automaticamente. I file locali possono
-anche essere selezionati con `set_leb_file()` o `LIBEPHEMERIS_LEB`.
+I core con hash fissato sotto `~/.libephemeris/leb/` vengono trovati
+automaticamente. I tier sono cumulativi: medium apre base+medium ed extended
+apre base+medium+extended. Il reader sceglie il primo tier che copre ciascun
+corpo/data, così una richiesta moderna continua a usare DE440s/DE440 anche se è
+installato DE441. I file locali espliciti restano selezionabili con
+`set_leb_file()` o `LIBEPHEMERIS_LEB`.
 
 ### Routing dipendente dalla modalità
 
@@ -270,7 +277,7 @@ Come le efemeridi JPL, anche i file LEB esistono in tre versioni:
 
 - **`base`** (~53 MB) — copre 1850–2150
 - **`medium`** (~175 MB) — copre 1550–2650
-- **`extended`** (~1.6 GB) — copre -5000 a +5000
+- **`extended`** — copre l'intervallo condiviso esatto di DE441 (circa -13200 a +17191)
 
 ---
 
@@ -280,7 +287,7 @@ La libreria supporta quattro modalità di calcolo, controllabili con `set_calc_m
 
 ### `"auto"` (predefinita)
 
-Prova prima LEB se un file `.leb` è configurato (o auto-scoperto), poi l'API Horizons se non è disponibile un file DE440 locale, infine Skyfield. È la modalità raccomandata per l'uso normale:
+Prova prima il miglior LEB revisionato per corpo/data, poi prosegue nella catena non-LEB JPL/modello locale consentita dalla configurazione. È la modalità raccomandata per l'uso normale:
 
 ```python
 import libephemeris as ephem
@@ -317,9 +324,9 @@ Sole (Skyfield forzato): 19.140437°
 
 ### `"leb"`
 
-Richiede dati LEB validi. La libreria prova il file configurato, il core base
-incluso quando applicabile e l'auto-discovery locale. Non scarica un LEB
-precompilato durante il calcolo. LEB è l'unica sorgente persistente: il runtime
+Richiede dati LEB validi. La libreria prova il file configurato oppure il set
+cumulativo completo fissato nel manifest. Non scarica dati durante il calcolo.
+LEB è l'unica sorgente persistente: il runtime
 non apre DE/BSP, Horizons, SPK registrati o automatici, kernel dei centri
 planetari o ASSIST. I corpi curati per cui un canale LEB non ha significato
 scientifico possono usare un modello locale deterministico già esistente,
@@ -516,11 +523,10 @@ ephem.download_for_tier("medium")
 
 ### File LEB aggiuntivi
 
-L'inventario del runtime sigillato comprende soltanto cinque gruppi LEB2 con
-hash verificato per tier: `core`, `asteroids`, `exotics`, `apogee` e
-`uranians`. In modalità `leb` non servono kernel DE né BSP dei centri
-planetari. La readiness di produzione deve validare tutti e cinque i gruppi
-prima di accettare traffico.
+L'inventario del runtime sigillato comprende cinque gruppi LEB2 con hash
+verificato per ciascun tier eleggibile: `core`, `asteroids`, `exotics`,
+`apogee` e `uranians`. Un deploy extended valida quindi quindici file. In
+modalità `leb` non servono kernel DE né BSP dei centri planetari.
 
 ### Directory dei dati
 
@@ -599,12 +605,12 @@ Risultato identico: True
 
 ## Riepilogo
 
-- **Precisione sub-arcsecondo** per tutti i corpi nell'intervallo 1900–2100 — nessun compromesso per l'uso moderno
+- **Precisione specifica per sorgente** — i canali LEB derivati direttamente da DE/SPK sono validati al budget dichiarato; modelli locali e analitici sono classificati separatamente
 - **Tre tier di precisione**: `base` (1849–2150, 31 MB), `medium` (1550–2650, 114 MB), `extended` (-13200 a +17191, 3.1 GB)
-- **LEB** (effemeridi binarie precompilate): il wheel include un core base revisionato; attiva gli altri file generati localmente con `set_leb_file()`
-- **Quattro modalità di calcolo**: `auto` (predefinita — LEB, poi Horizons, poi Skyfield), `skyfield` (forza Skyfield), `leb` (richiede LEB), `horizons` (API NASA JPL Horizons, richiede connessione internet)
+- **LEB** (effemeridi binarie precompilate): il wheel include risorse base revisionate; i tier cumulativi più ampi sono accettati solo tramite manifest con SHA-256 fissato
+- **Quattro modalità di calcolo**: `auto` (miglior LEB per data per primo), `skyfield` (forza JPL/Skyfield locale), `leb` (dati persistenti solo LEB sigillati), `horizons` (API NASA JPL Horizons, richiede connessione internet)
 - **EphemerisContext**: contesto thread-safe per calcoli paralleli, con stato isolato per osservatore, modo siderale e cache
-- **Gestione automatica dei dati JPL/SPK** al primo utilizzo; i download LEB precompilati sono ritirati
+- **Provisioning esplicito dei dati** tramite il manifest; il calcolo sigillato non avvia download
 - **`reset_session()`** per un reset leggero tra lavori, mantenendo aperte le risorse riutilizzabili
 - **`close()`** per rilasciare file, kernel e stato di sessione preservando la configurazione di processo
 
@@ -614,7 +620,7 @@ Risultato identico: True
 - `set_calc_mode(mode)` / `get_calc_mode()` — imposta la modalità di calcolo (`"auto"`, `"skyfield"`, `"leb"`, `"horizons"`)
 - `set_leb_file(filepath)` — attiva le efemeridi binarie precompilate
 - `download_for_tier(tier)` — scarica tutti i dati per un tier
-- `download_leb_for_tier(tier)` / `download_leb2_for_tier(tier)` — API mantenute che rifiutano i download LEB precompilati ritirati e indicano la generazione locale
+- `download_leb_for_tier(tier)` / `download_leb2_for_tier(tier)` — installano i gruppi LEB2 con hash fissato per i tier eleggibili
 - `EphemerisContext()` — contesto isolato per calcoli thread-safe
 - `EphemerisContext.calc_ut(jd, body, flag)` — calcolo posizione nel contesto
 - `EphemerisContext.houses(jd, lat, lon, hsys)` — case nel contesto
