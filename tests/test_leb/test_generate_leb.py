@@ -184,6 +184,25 @@ def test_de_backed_minor_body_uses_source_safe_segment_grid() -> None:
     assert float(np.max(all_jds)) < source_end
 
 
+def test_generation_spk_request_pads_both_fitting_edges() -> None:
+    assert generate_leb._generation_spk_request_range(100.0, 200.0) == (
+        99.0,
+        201.0,
+    )
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [(float("nan"), 200.0), (100.0, float("inf")), (100.0, 100.0)],
+)
+def test_generation_spk_request_rejects_invalid_ranges(
+    start: float,
+    end: float,
+) -> None:
+    with pytest.raises(ValueError, match="SPK request"):
+        generate_leb._generation_spk_request_range(start, end)
+
+
 def test_skyfield_vector_evaluator_accepts_source_backed_nodes() -> None:
     class Timescale:
         def __init__(self) -> None:

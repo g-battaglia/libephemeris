@@ -484,6 +484,11 @@ def verify_segment(
 N_VERIFY = 10  # Number of verification points per segment
 EPHEMERIS_VERIFY_LIMIT_ARCSEC = 0.02
 NUMERICAL_MODEL_VERIFY_LIMIT_ARCSEC = 1.0
+# Horizons can return an SPK whose nominal final epoch differs from the request
+# by floating-point conversion noise. Generation asks for one source day on
+# each side so an otherwise full-coverage body is not shortened by a complete
+# Chebyshev segment merely to retain the separate one-day partial-source guard.
+GENERATION_SPK_PADDING_DAYS = 1.0
 
 
 def _compute_all_segment_jds(
@@ -1114,6 +1119,21 @@ def _source_backed_body_config(
         safe_start,
         safe_end,
         (safe_interval, params[1], params[2], params[3]),
+    )
+
+
+def _generation_spk_request_range(
+    fitting_start: float,
+    fitting_end: float,
+) -> Tuple[float, float]:
+    """Add deterministic edge padding to an offline Horizons request."""
+    if not math.isfinite(fitting_start) or not math.isfinite(fitting_end):
+        raise ValueError("SPK request bounds must be finite")
+    if fitting_end <= fitting_start:
+        raise ValueError("SPK request range must have positive width")
+    return (
+        fitting_start - GENERATION_SPK_PADDING_DAYS,
+        fitting_end + GENERATION_SPK_PADDING_DAYS,
     )
 
 
@@ -2653,10 +2673,14 @@ def assemble_leb(
                         print(f"    {name}: cached SPK too narrow, re-downloading...")
 
             try:
+                download_start, download_end = _generation_spk_request_range(
+                    body_start,
+                    required_fit_end,
+                )
                 auto_download_asteroid_spk(
                     bid,
-                    jd_start=body_start,
-                    jd_end=required_fit_end,
+                    jd_start=download_start,
+                    jd_end=download_end,
                     force=need_force,
                 )
             except Exception as exc:
