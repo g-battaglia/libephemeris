@@ -8,6 +8,7 @@ Tests that the generator produces valid .leb files and that round-trip
 from __future__ import annotations
 
 import os
+import struct
 import sys
 from argparse import Namespace
 from types import SimpleNamespace
@@ -59,24 +60,62 @@ def test_explicit_extended_year_override_keeps_calendar_semantics(monkeypatch) -
     assert jd_end == generate_leb._year_to_jd(5000)
 
 
-def test_extended_nbody_coverage_is_clamped_to_assist_de441() -> None:
+def test_extended_nbody_coverage_uses_guarded_common_sources(
+    monkeypatch,
+) -> None:
     requested_start = generate_leb._year_to_jd(-13200)
     requested_end = generate_leb._year_to_jd(17191)
+    config = SimpleNamespace(planets_file="planets.441", asteroids_file="sb441.bsp")
+    monkeypatch.setattr(generate_leb, "_resolve_assist_config_for_range", lambda *_: config)
+    monkeypatch.setattr(
+        generate_leb,
+        "_ephemeris_file_coverage",
+        lambda path: (
+            (-3027215.5, 7930192.5)
+            if path == "planets.441"
+            else (-1200525.5, 5008242.5)
+        ),
+    )
 
     actual_start, actual_end = generate_leb._nbody_coverage_for_range(
         requested_start, requested_end
     )
 
-    assert actual_start == generate_leb._year_to_jd(-13000)
-    assert actual_end == generate_leb._year_to_jd(17000)
+    assert actual_start == -1200493.5
+    assert actual_end == 5008210.5
 
 
-def test_nbody_coverage_rejects_non_overlapping_range() -> None:
+def test_nbody_coverage_rejects_non_overlapping_range(monkeypatch) -> None:
+    config = SimpleNamespace(planets_file="planets.441", asteroids_file="sb441.bsp")
+    monkeypatch.setattr(generate_leb, "_resolve_assist_config_for_range", lambda *_: config)
+    monkeypatch.setattr(
+        generate_leb,
+        "_ephemeris_file_coverage",
+        lambda _path: (-1200525.5, 5008242.5),
+    )
     with pytest.raises(ValueError, match="does not overlap"):
         generate_leb._nbody_coverage_for_range(
-            generate_leb._year_to_jd(17001),
+            5008242.5,
             generate_leb._year_to_jd(17191),
         )
+
+
+def test_native_assist_planet_coverage_is_read_from_header(tmp_path) -> None:
+    source = tmp_path / "linux_m13000p17000.441"
+    payload = bytearray(generate_leb._ASSIST_ASCII_COVERAGE_OFFSET + 16)
+    struct.pack_into(
+        "<dd",
+        payload,
+        generate_leb._ASSIST_ASCII_COVERAGE_OFFSET,
+        -3027215.5,
+        7930192.5,
+    )
+    source.write_bytes(payload)
+
+    assert generate_leb._ephemeris_file_coverage(str(source)) == (
+        -3027215.5,
+        7930192.5,
+    )
 
 
 def test_required_fit_end_includes_the_complete_final_segment() -> None:
@@ -172,6 +211,34 @@ def test_de_backed_minor_body_uses_source_safe_segment_grid() -> None:
     )
 
     assert (actual_start, actual_end) == (requested_start, requested_end)
+    assert params_override is not None
+    interval, degree, _, _ = params_override
+    all_jds, _, _ = generate_leb._compute_all_segment_jds(
+        actual_start,
+        actual_end,
+        interval,
+        degree,
+    )
+    assert float(np.min(all_jds)) >= source_start
+    assert float(np.max(all_jds)) < source_end
+
+
+def test_partial_spk_safe_window_keeps_its_complete_public_range() -> None:
+    body_id = 30000
+    source_start = 2305446.5
+    source_end = 2634167.5
+    safe_start = source_start + generate_leb.GENERATION_SPK_PADDING_DAYS
+    safe_end = source_end - generate_leb.GENERATION_SPK_PADDING_DAYS
+
+    actual_start, actual_end, params_override = generate_leb._source_backed_body_config(
+        body_id,
+        safe_start,
+        safe_end,
+        safe_start,
+        safe_end,
+    )
+
+    assert (actual_start, actual_end) == (safe_start, safe_end)
     assert params_override is not None
     interval, degree, _, _ = params_override
     all_jds, _, _ = generate_leb._compute_all_segment_jds(

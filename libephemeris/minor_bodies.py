@@ -3336,6 +3336,7 @@ def auto_download_asteroid_spk(
     jd_start: Optional[float] = None,
     jd_end: Optional[float] = None,
     force: bool = False,
+    boundary_padding_days: float = 0.0,
 ) -> Optional[str]:
     """
     Automatically download SPK kernel for a minor body if not cached.
@@ -3356,6 +3357,10 @@ def auto_download_asteroid_spk(
         jd_end: End Julian Day for SPK coverage. If None, uses 10 years
             after current date.
         force: If True, re-download even if SPK is already cached.
+        boundary_padding_days: Extend the normal Horizons request clamp by
+            this many days on both sides. This is reserved for offline fitting
+            workflows that discard the same margin before publishing data;
+            runtime callers should keep the default ``0.0``.
 
     Returns:
         str: Path to the SPK file if download successful or already cached.
@@ -3406,12 +3411,19 @@ def auto_download_asteroid_spk(
         if jd_end is None:
             jd_end = current_jd + 3652.5  # ~10 years after
 
+        if not math.isfinite(boundary_padding_days) or boundary_padding_days < 0.0:
+            raise ValueError("boundary_padding_days must be a non-negative finite value")
+        clamp_start = HORIZONS_SPK_JD_MIN - boundary_padding_days
+        clamp_end = HORIZONS_SPK_JD_MAX + boundary_padding_days
+
         # Clamp the requested range so that callers (e.g. extended-tier LEB
         # generation) don't produce date strings that Horizons cannot parse
-        # (negative years) or that fall outside the supported window.
-        if jd_start < HORIZONS_SPK_JD_MIN or jd_end > HORIZONS_SPK_JD_MAX:
-            jd_start = max(jd_start, HORIZONS_SPK_JD_MIN)
-            jd_end = min(jd_end, HORIZONS_SPK_JD_MAX)
+        # (negative years) or that fall outside the supported window. Offline
+        # fitting may request a small, explicit guard interval which it removes
+        # again before serializing public coverage.
+        if jd_start < clamp_start or jd_end > clamp_end:
+            jd_start = max(jd_start, clamp_start)
+            jd_end = min(jd_end, clamp_end)
             if jd_start >= jd_end:
                 logger.warning(
                     "Requested date range for %s is entirely outside "

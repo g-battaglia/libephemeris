@@ -676,6 +676,29 @@ def test_auto_download_range_clamped_but_valid(monkeypatch):
     assert result == "/clamped.bsp"
 
 
+def test_auto_download_offline_padding_extends_calendar_clamp(monkeypatch):
+    """Offline fitting can obtain and later discard one safe boundary day."""
+    state._SPK_BODY_MAP.pop(CERES, None)
+    received = {}
+
+    def _download(**kwargs):
+        received.update(kwargs)
+        return "/padded.bsp"
+
+    monkeypatch.setattr("libephemeris.spk.download_and_register_spk", _download)
+
+    result = mb.auto_download_asteroid_spk(
+        CERES,
+        jd_start=2200000.0,
+        jd_end=2800000.0,
+        boundary_padding_days=1.0,
+    )
+
+    assert result == "/padded.bsp"
+    assert received["start"] == "1599-12-31"
+    assert received["end"] == "2500-01-02"
+
+
 def test_auto_download_value_error_returns_none(monkeypatch):
     """A ValueError from the downloader is caught and returns None (3346-3348)."""
     state._SPK_BODY_MAP.pop(CERES, None)

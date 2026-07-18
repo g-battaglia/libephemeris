@@ -1693,18 +1693,92 @@ def generate_body_icrs_asteroid(
 _NBODY_ANCHOR_JD = 2451545.0
 # DE440 planet ephemeris coverage (linux_p1550p2650.440), JD ~1550..2650.
 _DE440_JD_LO, _DE440_JD_HI = 2287184.5, 2688976.5
-_ASSIST_DE441_START_YEAR = -13000
-_ASSIST_DE441_END_YEAR = 17000
+# JPL's native binary header stores the absolute coverage bounds at this fixed
+# offset.  ASSIST reads the same fields in ``assist_ascii_init()``.
+_ASSIST_ASCII_COVERAGE_OFFSET = 0x0A5C
+# IAS15 evaluates force stages ahead of the last accepted state.  Direct
+# integrations with the shipped DE441 + sb441-n16 sources show that one
+# maximum-width LEB segment (32 days) keeps both forward and backward stage
+# evaluations inside the common source interval.  The serialized body range
+# therefore excludes this guard instead of claiming the raw file boundary.
+_ASSIST_INTEGRATION_GUARD_DAYS = 32.0
+
+
+def _ephemeris_file_coverage(path: str) -> tuple[float, float]:
+    """Read the common absolute-JD coverage of one ASSIST source file.
+
+    Planet files may be JPL's native ``.440``/``.441`` binaries or NAIF SPKs;
+    asteroid perturbers are SPKs.  For an SPK, every target used by the file
+    must have contiguous coverage and the returned interval is their
+    intersection, matching ASSIST's all-forces requirement.
+    """
+    if not path or not os.path.isfile(path):
+        raise RuntimeError(f"ASSIST ephemeris source is missing: {path!r}")
+
+    if path.lower().endswith(".bsp"):
+        from jplephem.spk import SPK
+
+        kernel = SPK.open(path)
+        try:
+            by_target: dict[int, list[tuple[float, float]]] = {}
+            for segment in kernel.segments:
+                by_target.setdefault(int(segment.target), []).append(
+                    (float(segment.start_jd), float(segment.end_jd))
+                )
+        finally:
+            kernel.close()
+        if not by_target:
+            raise RuntimeError(f"ASSIST SPK contains no target segments: {path}")
+
+        target_ranges: list[tuple[float, float]] = []
+        for target, segments in by_target.items():
+            ordered = sorted(segments)
+            target_start, target_end = ordered[0]
+            for segment_start, segment_end in ordered[1:]:
+                if segment_start > target_end:
+                    raise RuntimeError(
+                        f"ASSIST SPK target {target} has a coverage gap in {path}"
+                    )
+                target_end = max(target_end, segment_end)
+            target_ranges.append((target_start, target_end))
+        start = max(bounds[0] for bounds in target_ranges)
+        end = min(bounds[1] for bounds in target_ranges)
+    else:
+        with open(path, "rb") as source:
+            source.seek(_ASSIST_ASCII_COVERAGE_OFFSET)
+            raw_bounds = source.read(16)
+        if len(raw_bounds) != 16:
+            raise RuntimeError(f"ASSIST planet ephemeris header is truncated: {path}")
+        start, end = struct.unpack("<dd", raw_bounds)
+
+    if not math.isfinite(start) or not math.isfinite(end) or start >= end:
+        raise RuntimeError(
+            f"ASSIST ephemeris has invalid coverage JD {start}..{end}: {path}"
+        )
+    return float(start), float(end)
 
 
 def _nbody_coverage_for_range(jd_start: float, jd_end: float) -> tuple[float, float]:
-    """Intersect a requested tier interval with the long ASSIST DE441 source."""
-    start = max(jd_start, _year_to_jd(_ASSIST_DE441_START_YEAR))
-    end = min(jd_end, _year_to_jd(_ASSIST_DE441_END_YEAR))
+    """Intersect a request with every source consumed by ASSIST integration."""
+    cfg = _resolve_assist_config_for_range(jd_start, jd_end)
+    if not cfg.planets_file:
+        raise RuntimeError("N-body LEB generation requires an ASSIST planet source")
+    if not cfg.asteroids_file:
+        raise RuntimeError(
+            "N-body LEB generation requires sb441-n16 asteroid perturbers; "
+            "a planets-only trajectory is not accepted as ephemeris-quality"
+        )
+
+    planet_start, planet_end = _ephemeris_file_coverage(cfg.planets_file)
+    asteroid_start, asteroid_end = _ephemeris_file_coverage(cfg.asteroids_file)
+    source_start = max(planet_start, asteroid_start)
+    source_end = min(planet_end, asteroid_end)
+    start = max(jd_start, source_start + _ASSIST_INTEGRATION_GUARD_DAYS)
+    end = min(jd_end, source_end - _ASSIST_INTEGRATION_GUARD_DAYS)
     if start >= end:
         raise ValueError(
-            "Requested extended range does not overlap ASSIST DE441 "
-            f"coverage ({_ASSIST_DE441_START_YEAR}..+{_ASSIST_DE441_END_YEAR})"
+            "Requested extended range does not overlap the guarded common "
+            f"ASSIST source interval (JD {source_start}..{source_end})"
         )
     return start, end
 
@@ -2518,11 +2592,11 @@ def assemble_leb(
                         "or declared local model covers the remaining edge"
                     )
 
-    # The long ASSIST DE441 distribution intentionally stops just inside the
-    # planetary DE441 kernel edges.  Persist only the interval the N-body
-    # source can actually evaluate; the few extreme-edge centuries remain a
-    # truthful local-model fallback rather than failed generation or
-    # extrapolated coefficients.
+    # ASSIST consumes both the selected planet ephemeris and the sb441-n16
+    # asteroid-perturber SPK. Persist only their guarded common interval; the
+    # broader planet-only DE441 range is not a valid claim for the complete
+    # force model. Dates outside this body-specific window remain a truthful
+    # local-model fallback rather than failed generation or extrapolated data.
     if nbody_ids:
         nbody_start, nbody_end = _nbody_coverage_for_range(jd_start, jd_end)
         for body_id in set(bodies).intersection(nbody_ids):
@@ -2682,6 +2756,7 @@ def assemble_leb(
                     jd_start=download_start,
                     jd_end=download_end,
                     force=need_force,
+                    boundary_padding_days=GENERATION_SPK_PADDING_DAYS,
                 )
             except Exception as exc:
                 if verbose:
@@ -2720,23 +2795,30 @@ def assemble_leb(
                 continue
 
             spk_jd_start, spk_jd_end = spk_range
-            # Intersect SPK range with the tier, retain a one-day boundary
-            # margin, and align down to a complete fixed-width segment.  This
-            # makes the body record truthful without frozen edge nodes.
+            # Intersect SPK range with the tier and retain a one-day boundary
+            # margin. If that complete safe overlap is not divisible by the
+            # preferred width, adjust the file-local interval minutely instead
+            # of discarding a whole final segment. This makes the body record
+            # truthful and maximally covered without frozen edge nodes.
             try:
-                eff_start, eff_end = _align_body_range_to_source(
-                    body_start,
-                    body_end,
-                    spk_jd_start,
-                    spk_jd_end,
-                    interval_days,
-                    margin_days=1.0,
+                safe_source_start = spk_jd_start + GENERATION_SPK_PADDING_DAYS
+                safe_source_end = spk_jd_end - GENERATION_SPK_PADDING_DAYS
+                overlap_start = max(body_start, safe_source_start)
+                overlap_end = min(body_end, safe_source_end)
+                eff_start, eff_end, params_override = _source_backed_body_config(
+                    bid,
+                    overlap_start,
+                    overlap_end,
+                    safe_source_start,
+                    safe_source_end,
                 )
             except ValueError:
                 excluded_asteroids.append(bid)
                 if verbose:
                     print(f"    {name}: SPK overlap has no complete segment (EXCLUDED)")
                 continue
+            if params_override is not None:
+                body_param_overrides[bid] = params_override
             eff_days = eff_end - eff_start
 
             if eff_days < MIN_ASTEROID_COVERAGE_DAYS:
