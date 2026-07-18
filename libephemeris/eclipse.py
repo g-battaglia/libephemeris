@@ -47,6 +47,7 @@ Provenance:
 from __future__ import annotations
 
 import math
+import re
 from typing import Sequence, Tuple, Union, cast
 
 from .constants import (
@@ -111,6 +112,71 @@ def _is_leb_out_of_range(exc: BaseException) -> bool:
     return isinstance(exc, (KeyError, ValueError)) and ("outside" in str(exc).lower())
 
 
+# Reader coverage-miss messages ("JD <x> outside range [<a>, <b>] for body <n>"
+# and "JD <x> outside nutation range [<a>, <b>]") carry the bounds needed to
+# build the typed public error without inventing values.
+_LEB_RANGE_MISS_RE = re.compile(
+    r"JD (?P<jd>[-+0-9.eE]+) outside (?:nutation )?range "
+    r"\[(?P<start>[-+0-9.eE]+), (?P<end>[-+0-9.eE]+)\]"
+)
+_LEB_RANGE_MISS_BODY_RE = re.compile(r"for body (?P<body>\d+)")
+_LEB_BODY_MISS_RE = re.compile(
+    r"Body (?P<body>\d+) not in (?:any )?(?:LEB file|installed LEB tier)"
+)
+
+
+def _raise_if_sealed_leb_miss(exc: BaseException) -> None:
+    """Apply the sealed-mode error contract to an LEB fast-path failure.
+
+    Shared by the eclipse fallback wrapper and the heliacal LEB fast paths.
+    In sealed ``leb`` mode a reader ``KeyError``/``ValueError`` must never
+    escape to callers: ``calc_ut``/``calc`` already surface coverage misses
+    as :class:`EphemerisRangeError`, and the search/dispatch layers must
+    speak the same documented type.
+
+    - A coverage miss (see :func:`_is_leb_out_of_range`) raises
+      :class:`EphemerisRangeError`; the requested JD and coverage bounds
+      are carried over when the reader message includes them.
+    - A ``KeyError`` for a body absent from the file's body map raises
+      :class:`UnknownBodyError` naming the missing body — the same type
+      ``planets._raise_leb_range_miss`` uses for an unstored core body —
+      without fabricated bounds.
+    - Anything else is re-raised verbatim, so genuine validation errors
+      keep their type and sealed mode still never continues past the LEB
+      path.
+
+    In every other mode the function returns without raising so each call
+    site keeps its own fallback policy (Skyfield retry, fallback logging).
+    """
+    if get_calc_mode() != "leb":
+        return
+    from .exceptions import EphemerisRangeError, UnknownBodyError
+
+    text = str(exc)
+    sealed_note = "LEB mode does not silently substitute a lower-precision source."
+    if _is_leb_out_of_range(exc):
+        range_match = _LEB_RANGE_MISS_RE.search(text)
+        body_match = _LEB_RANGE_MISS_BODY_RE.search(text)
+        raise EphemerisRangeError(
+            message=f"{text.strip()}. {sealed_note}",
+            requested_jd=float(range_match["jd"]) if range_match else None,
+            start_jd=float(range_match["start"]) if range_match else None,
+            end_jd=float(range_match["end"]) if range_match else None,
+            body_id=int(body_match["body"]) if body_match else None,
+        ) from exc
+    body_miss = _LEB_BODY_MISS_RE.search(text)
+    if isinstance(exc, KeyError) and body_miss is not None:
+        raise UnknownBodyError(
+            message=(
+                f"Body {body_miss['body']} is not stored in the active "
+                f"LEB file. LEB mode does not silently substitute a "
+                f"non-LEB source for a missing body."
+            ),
+            body_id=int(body_miss["body"]),
+        ) from exc
+    raise exc
+
+
 def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
     """Run ``impl(reader=...)`` with mode-aware range handling.
 
@@ -125,7 +191,10 @@ def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
         - Otherwise, run ``impl(reader=reader)`` first.
         - In ``auto`` mode, an LEB range miss retries with ``reader=None`` so
           the normal JPL/Skyfield path can run.
-        - In ``leb`` mode, a range miss is re-raised: the sealed runtime must
+        - In ``leb`` mode, a range miss raises the documented
+          :class:`EphemerisRangeError` and a body absent from the file's
+          body map raises :class:`UnknownBodyError` (see
+          :func:`_raise_if_sealed_leb_miss`): the sealed runtime must
           never switch persisted ephemeris source.
         - Corruption and all unrelated exceptions are always re-raised.
 
@@ -140,9 +209,10 @@ def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
         except LEBCorruptionError:
             raise
         except (KeyError, ValueError) as exc:
+            # Sealed leb mode never returns here: the miss surfaces as the
+            # documented typed error (or re-raises verbatim).
+            _raise_if_sealed_leb_miss(exc)
             if not _is_leb_out_of_range(exc):
-                raise
-            if get_calc_mode() == "leb":
                 raise
     return impl(*args, reader=None, **kwargs)
 
@@ -5359,7 +5429,18 @@ def _lun_eclipse_when_loc_pythonic(
             search limit.
     """
     if reader is _ACTIVE_LEB_READER:
-        reader = _get_leb_reader_safe()
+        # Direct callers (this pythonic API is re-exported) get the same
+        # mode-aware dispatch as the public wrapper: LEB first, Skyfield
+        # retry on a range miss in auto mode, typed error in sealed mode.
+        return _call_with_leb_skyfield_fallback(
+            _lun_eclipse_when_loc_pythonic,
+            jd_start,
+            lat,
+            lon,
+            altitude,
+            flags,
+            backwards,
+        )
 
     from .constants import (
         BIT_DISC_BOTTOM,
@@ -5628,10 +5709,20 @@ def _lun_eclipse_how_pythonic(
         _lun_how_core shadow model, so they match lun_eclipse_how(); only the
         topocentric azimuth/altitude (attr[4..6]) are computed locally here.
     """
-    # Direct callers get the active mode's reader; explicit internal callers
-    # can still provide one to keep an event search on a single source.
+    # Direct callers (this pythonic API is re-exported) get the same
+    # mode-aware dispatch as the public wrapper: LEB first, Skyfield retry
+    # on a range miss in auto mode, typed error in sealed mode. Explicit
+    # internal callers still provide a reader to keep an event search on a
+    # single source.
     if reader is _ACTIVE_LEB_READER:
-        reader = _get_leb_reader_safe()
+        return _call_with_leb_skyfield_fallback(
+            _lun_eclipse_how_pythonic,
+            jd,
+            lat,
+            lon,
+            altitude,
+            flags,
+        )
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -5644,6 +5735,9 @@ def _lun_eclipse_how_pythonic(
             jd_tt = jd + deltat(jd)
             moon_topo = _topo_ecliptic(reader, jd_tt, jd, MOON, _gp)
         except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            # Sealed mode must not fabricate a "no eclipse" result for a
+            # body the active LEB file cannot serve.
+            _raise_if_sealed_leb_miss(_exc)
             _reraise_if_leb_range_error(_exc)
             return 0, tuple([0.0] * 20)
 
@@ -7060,7 +7154,15 @@ def _rise_trans_true_hor_impl(
 
             if not is_fixed_star:
                 _fc_rt.fast_calc_ut(_reader_rt, jd_start, cast(int, body), FLG_SPEED)
-        except (KeyError, ValueError):
+        except (KeyError, ValueError) as _probe_exc:
+            # A coverage miss must reach the mode-aware wrapper (typed error
+            # in sealed mode, Skyfield retry in auto), not silently degrade
+            # to the kernel path that sealed mode forbids. A body-map miss in
+            # sealed mode must surface as the typed error too: the kernel
+            # path below would only convert it into get_planets()'s
+            # RuntimeError.
+            _raise_if_sealed_leb_miss(_probe_exc)
+            _reraise_if_leb_range_error(_probe_exc)
             _use_leb_rt = False
 
     if _use_leb_rt:

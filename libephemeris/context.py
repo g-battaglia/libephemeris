@@ -764,6 +764,7 @@ class EphemerisContext:
 
         mode = state.get_calc_mode()
         reader = self.get_leb_reader() if mode in ("auto", "leb") else None
+        _ctx_local_reader = reader
         if reader is None:
             # Fall back to global reader if context has no .leb
             reader = state.get_leb_reader()
@@ -815,6 +816,14 @@ class EphemerisContext:
             except LEBCorruptionError:
                 raise
             except (KeyError, ValueError) as _leb_err:
+                # Same sealed-mode guard as the module-level entry points: a
+                # core body the active LEB configuration cannot serve must
+                # raise the declared error here, never a downstream KeyError.
+                # A context-local file classifies its own miss: the global
+                # reader only decides whether the vector path may still serve.
+                from .planets import _raise_leb_range_miss
+
+                _raise_leb_range_miss(ipl, tjd, context_reader=_ctx_local_reader)
                 # missing body / out-of-range -> DEBUG, corruption -> WARNING
                 from .leb_reader import log_leb_fallback
 

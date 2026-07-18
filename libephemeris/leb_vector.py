@@ -35,7 +35,7 @@ from .constants import (
     URANUS,
     VENUS,
 )
-from .exceptions import EphemerisRangeError, LEBCorruptionError
+from .exceptions import EphemerisRangeError, LEBCorruptionError, UnknownBodyError
 
 if TYPE_CHECKING:
     from .leb2_reader import LEB2Reader
@@ -150,6 +150,7 @@ class LEBVectorEphemeris:
     def __init__(self, reader: LEBReaderLike) -> None:
         self.reader = reader
         self._targets: dict[str | int, _LEBVectorTarget] = {}
+        self._missing: dict[str | int, tuple[int, str]] = {}
         self._install_reader_target(SUN, 10, "sun", ("sun", 10))
         self._install_reader_target(MOON, 301, "moon", ("moon", 301))
         self._install_reader_target(
@@ -178,19 +179,20 @@ class LEBVectorEphemeris:
         )
         self._install_reader_target(EARTH, 399, "earth", ("earth", 399))
 
+        emb_aliases: tuple[str | int, ...] = (
+            "earth barycenter",
+            "earth-moon barycenter",
+            "earth moon barycenter",
+            3,
+        )
         if reader.has_body(EARTH) and reader.has_body(MOON):
             emb = _LEBVectorTarget(
                 self, 3, self._eval_earth_barycenter, "earth barycenter"
             )
-            self._install_aliases(
-                emb,
-                (
-                    "earth barycenter",
-                    "earth-moon barycenter",
-                    "earth moon barycenter",
-                    3,
-                ),
-            )
+            self._install_aliases(emb, emb_aliases)
+        else:
+            absent = EARTH if not reader.has_body(EARTH) else MOON
+            self._record_missing(absent, "earth barycenter", emb_aliases)
 
     def _install_reader_target(
         self,
@@ -200,6 +202,7 @@ class LEBVectorEphemeris:
         aliases: tuple[str | int, ...],
     ) -> None:
         if not self.reader.has_body(body_id):
+            self._record_missing(body_id, name, aliases)
             return
 
         def evaluate(jd_tt: float, body: int = body_id):
@@ -207,6 +210,18 @@ class LEBVectorEphemeris:
 
         target = _LEBVectorTarget(self, target_id, evaluate, name)
         self._install_aliases(target, aliases)
+
+    def _record_missing(
+        self, body_id: int, name: str, aliases: tuple[str | int, ...]
+    ) -> None:
+        """Remember which stored body a recognized-but-absent alias needs.
+
+        Lookups of these aliases raise the declared missing-body error instead
+        of the raw ``KeyError`` a silently skipped target would produce.
+        """
+        for alias in aliases:
+            key = alias.lower() if isinstance(alias, str) else alias
+            self._missing[key] = (body_id, name)
 
     def _install_aliases(
         self, target: _LEBVectorTarget, aliases: tuple[str | int, ...]
@@ -237,7 +252,23 @@ class LEBVectorEphemeris:
         return key.lower().strip() if isinstance(key, str) else key
 
     def __getitem__(self, key: str | int) -> _LEBVectorTarget:
-        return self._targets[self._key(key)]
+        normalized = self._key(key)
+        try:
+            return self._targets[normalized]
+        except KeyError:
+            missing = self._missing.get(normalized)
+            if missing is None:
+                raise
+            body_id, name = missing
+            raise UnknownBodyError(
+                message=(
+                    f"LEB vector target {name!r} requires body {body_id}, "
+                    "which is not stored in the active LEB file. LEB mode "
+                    "does not silently substitute a non-LEB source for a "
+                    "missing core body."
+                ),
+                body_id=body_id,
+            ) from None
 
     def __contains__(self, key: object) -> bool:
         if not isinstance(key, (str, int)):

@@ -186,7 +186,19 @@ def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | N
         return None
     if reader is None:
         return None
+    return get_reader_body_coverage(reader, body_id, jd)
 
+
+def get_reader_body_coverage(
+    reader: Any, body_id: int, jd: float | None = None
+) -> BodyCoverage | None:
+    """Return ``reader``'s coverage for ``body_id`` and optionally ``jd``.
+
+    Same contract as :func:`get_body_coverage`, but against an explicitly
+    supplied reader (e.g. a context-local file) instead of the active global
+    one, so failures can be classified against the file that actually served
+    the attempt.
+    """
     selected_fn = getattr(reader, "selected_body_reader", None)
     selected = (
         selected_fn(int(body_id), float(jd))

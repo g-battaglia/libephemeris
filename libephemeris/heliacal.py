@@ -2406,10 +2406,11 @@ def _heliacal_ut_pythonic(
         except LEBCorruptionError:
             raise
         except (KeyError, ValueError) as _leb_err:
-            from .state import get_calc_mode
+            from .eclipse import _raise_if_sealed_leb_miss
 
-            if get_calc_mode() == "leb":
-                raise
+            # Sealed leb mode raises the documented typed error and never
+            # continues past the LEB path.
+            _raise_if_sealed_leb_miss(_leb_err)
             # Auto mode may continue through its normal backend chain.
             from .leb_reader import log_leb_fallback
 
@@ -3871,10 +3872,11 @@ def _heliacal_pheno_ut_pythonic(
         except LEBCorruptionError:
             raise
         except (KeyError, ValueError) as _leb_err:
-            from .state import get_calc_mode
+            from .eclipse import _raise_if_sealed_leb_miss
 
-            if get_calc_mode() == "leb":
-                raise
+            # Sealed leb mode raises the documented typed error and never
+            # continues past the LEB path.
+            _raise_if_sealed_leb_miss(_leb_err)
             # Auto mode may continue through its normal backend chain.
             from .leb_reader import log_leb_fallback
 
@@ -4354,10 +4356,11 @@ def vis_limit_mag(
         except LEBCorruptionError:
             raise
         except (KeyError, ValueError) as _leb_err:
-            from .state import get_calc_mode
+            from .eclipse import _raise_if_sealed_leb_miss
 
-            if get_calc_mode() == "leb":
-                raise
+            # Sealed leb mode raises the documented typed error and never
+            # continues past the LEB path.
+            _raise_if_sealed_leb_miss(_leb_err)
             # Auto mode may continue through its normal backend chain.
             from .leb_reader import log_leb_fallback
 

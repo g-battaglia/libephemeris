@@ -21,7 +21,7 @@ import pytest
 
 from libephemeris import julday
 from libephemeris.eclipse import _call_with_leb_skyfield_fallback
-from libephemeris.exceptions import LEBCorruptionError
+from libephemeris.exceptions import EphemerisRangeError, LEBCorruptionError
 
 
 # =============================================================================
@@ -167,10 +167,12 @@ class TestCallWithLebSkyfieldFallback:
             ),
             patch("libephemeris.eclipse.get_calc_mode", return_value="leb"),
         ):
-            with pytest.raises(ValueError, match="outside range"):
+            with pytest.raises(EphemerisRangeError, match="outside range") as excinfo:
                 _call_with_leb_skyfield_fallback(fake_impl, 1)
 
         assert received == [mock_reader]
+        assert excinfo.value.start_jd == 1.0
+        assert excinfo.value.end_jd == 2.0
 
     def test_corrupt_leb_is_never_treated_as_a_range_fallback(self):
         """Provisioning corruption is fatal even if its message says outside."""

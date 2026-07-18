@@ -99,7 +99,7 @@ from .ayanamsha_definitions import (
     VALENS_MOON_T0_UT,
 )
 
-from .exceptions import EphemerisRangeError, LEBCorruptionError
+from .exceptions import EphemerisRangeError, LEBCorruptionError, UnknownBodyError
 
 if TYPE_CHECKING:
     pass
@@ -239,6 +239,12 @@ from .constants import (
 # the same fail-closed range policy as ``<tier>_core.leb2``.
 _LEB_CORE_BODY_IDS = frozenset(range(SUN, MEAN_APOG + 1)) | {EARTH}
 
+# Core bodies whose only sealed source is their own stored LEB channel.  The
+# node/apsis points are excluded: the vector pipeline derives them from Moon
+# states, and the mean points have runtime analytical models, so a file that
+# omits their legacy channels can still serve them without leaving LEB.
+_LEB_STORED_STATE_BODY_IDS = frozenset(range(SUN, PLUTO + 1)) | {EARTH}
+
 # Import all sidereal mode constants (SIDM_*)
 from .constants import *  # noqa: F403, F401
 from .state import (
@@ -358,25 +364,48 @@ def _log_successful_source(
         logger.debug("body=%d jd=%.1f source=%s%s", body_id, jd, source, suffix)
 
 
-def _raise_leb_range_miss(body_id: int, jd: float) -> None:
-    """Fail closed for core states outside the active LEB tier.
+def _raise_leb_range_miss(
+    body_id: int, jd: float, context_reader: object | None = None
+) -> None:
+    """Fail closed for core states the active LEB configuration cannot serve.
 
     Companion minor bodies can have scientifically meaningful stored windows
     narrower than the core tier.  Their miss is allowed to reach the declared
     local model; core states must never be synthesized beyond their LEB range.
+    A core body absent from the active reader (custom/partial file) is a
+    declared missing-body condition, not a date-range one: without this the
+    sealed vector path fails later with an undeclared ``KeyError``.
+
+    ``context_reader`` is the context-local reader that actually served the
+    failing attempt, when it differs from the global one.  The global reader
+    keeps deciding whether the miss may fall through (it can still serve the
+    state), but when it cannot, the typed error must describe the file that
+    failed rather than misreport the global configuration.
     """
-    from .inventory import get_body_coverage
+    from .inventory import get_body_coverage, get_reader_body_coverage
     from .state import get_calc_mode
 
-    if get_calc_mode() != "leb":
+    if get_calc_mode() != "leb" or body_id not in _LEB_CORE_BODY_IDS:
         return
     body_coverage = get_body_coverage(body_id, jd)
-    if (
-        body_id not in _LEB_CORE_BODY_IDS
-        or body_coverage is None
-        or body_coverage.contains(jd)
-    ):
+    if body_coverage is not None and body_coverage.contains(jd):
         return
+    if context_reader is not None:
+        local_coverage = get_reader_body_coverage(context_reader, body_id, jd)
+        if local_coverage is not None and local_coverage.contains(jd):
+            return
+        body_coverage = local_coverage
+    if body_coverage is None:
+        if body_id not in _LEB_STORED_STATE_BODY_IDS:
+            return
+        raise UnknownBodyError(
+            message=(
+                f"Body {body_id} ({_PLANET_NAMES.get(body_id, 'unnamed')}) is "
+                "not stored in the active LEB file. LEB mode does not silently "
+                "substitute a non-LEB source for a missing core body."
+            ),
+            body_id=body_id,
+        )
     raise EphemerisRangeError(
         message=(
             f"Body {body_id} at JD {jd:.6f} is outside active LEB coverage range "
