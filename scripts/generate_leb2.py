@@ -583,6 +583,8 @@ def convert_leb1_to_leb2(
         input_path: Path to source LEB1 file.
         output_path: Path to output LEB2 file.
         group: Optional body group filter (core/asteroids/exotics/apogee).
+            Named companion groups contain body channels only; shared
+            nutation, Delta-T, and star-catalog sections belong to ``core``.
         expected_tier: Optional tier used to authenticate tier-specific inventory.
         target_precision: Numeric coefficient target in native stored units.
         verbose: Print progress.
@@ -675,10 +677,20 @@ def convert_leb1_to_leb2(
             f"  {'TOTAL':<16s}  {total_raw / 1024:>8.1f}  {total_compressed / 1024:>8.1f}  {ratio:>5.1f}x"
         )
 
-    # Get auxiliary data
-    nutation_data = src.get_section_data(SECTION_NUTATION)
-    delta_t_data = src.get_section_data(SECTION_DELTA_T)
-    star_data = src.get_section_data(SECTION_STARS)
+    # Shared runtime tables belong to the core artifact.  Copying them into
+    # every named companion would duplicate the same large nutation table four
+    # times per tier (especially expensive over the full DE441 interval) while
+    # CompositeLEBReader already resolves auxiliary data through its primary
+    # core reader.  An unfiltered monolithic conversion keeps the historical
+    # self-contained behavior.
+    include_auxiliary = group in (None, "core")
+    nutation_data = (
+        src.get_section_data(SECTION_NUTATION) if include_auxiliary else None
+    )
+    delta_t_data = (
+        src.get_section_data(SECTION_DELTA_T) if include_auxiliary else None
+    )
+    star_data = src.get_section_data(SECTION_STARS) if include_auxiliary else None
 
     # Write LEB2 v2 (chunked)
     write_leb2_chunked(

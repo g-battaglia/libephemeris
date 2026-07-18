@@ -33,7 +33,12 @@ from libephemeris.constants import (
 from libephemeris.exceptions import UnknownBodyError
 from libephemeris.hypothetical import _calc_uranian_planet_raw
 from libephemeris.leb_composite import CompositeLEBReader
-from libephemeris.leb_format import BODY_PARAMS, COORD_HELIO_ECL
+from libephemeris.leb_format import (
+    BODY_PARAMS,
+    COORD_HELIO_ECL,
+    SECTION_BODY_INDEX,
+    SECTION_COMPRESSED_CHEBYSHEV,
+)
 from libephemeris.leb_groups import LEB2_GROUPS
 from libephemeris.leb_reader import open_leb
 from libephemeris.time_utils import julday
@@ -66,7 +71,9 @@ def uranians_leb1(tmp_path_factory):
         bodies=list(range(40, 48)),
         workers=1,
         verbose=False,
-        skip_aux=True,
+        # Real regeneration includes shared sections in the LEB1 partial; the
+        # LEB2 companion converter must strip those duplicates.
+        skip_aux=False,
     )
     return str(path)
 
@@ -175,6 +182,18 @@ def test_leb2_conversion_keeps_precision_and_inventory(uranians_leb2) -> None:
                 assert lon == pytest.approx(ref_lon, abs=1e-9)
                 assert lat == pytest.approx(ref_lat, abs=1e-9)
                 assert dist == pytest.approx(ref_dist, abs=1e-10)
+    finally:
+        reader.close()
+
+
+def test_leb2_companion_omits_shared_core_sections(uranians_leb2) -> None:
+    """Named companions contain body channels, never duplicated core tables."""
+    reader = open_leb(uranians_leb2)
+    try:
+        assert set(reader._sections) == {
+            SECTION_BODY_INDEX,
+            SECTION_COMPRESSED_CHEBYSHEV,
+        }
     finally:
         reader.close()
 
