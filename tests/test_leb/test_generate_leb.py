@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import sys
 from argparse import Namespace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -96,6 +97,110 @@ def test_partial_source_range_is_aligned_to_complete_segments() -> None:
     assert actual_start == 110.0
     assert actual_end == 182.0
     assert (actual_end - actual_start) % 8.0 == 0.0
+
+
+def test_source_backed_grid_retains_exact_kernel_range() -> None:
+    start = generate_leb.DE441_START_JD
+    end = generate_leb.DE441_END_JD
+
+    actual_start, actual_end, interval = generate_leb._source_backed_fit_grid(
+        start,
+        end,
+        start,
+        end,
+        64.0,
+    )
+
+    assert actual_start == start
+    assert actual_end == end
+    assert interval <= 64.0
+    segment_count = int(np.ceil((end - start) / interval))
+    assert abs((start + segment_count * interval) - end) < 1e-6
+
+
+def test_source_backed_grid_narrows_request_that_exceeds_source() -> None:
+    actual_start, actual_end, interval = generate_leb._source_backed_fit_grid(
+        100.0,
+        201.0,
+        99.0,
+        200.0,
+        8.0,
+    )
+
+    assert (actual_start, actual_end, interval) == (100.0, 196.0, 8.0)
+
+
+def test_source_backed_grid_keeps_every_fit_node_inside_source() -> None:
+    start = 100.0
+    end = 201.0
+    actual_start, actual_end, interval = generate_leb._source_backed_fit_grid(
+        start,
+        end,
+        start,
+        end,
+        8.0,
+    )
+
+    all_jds, segment_count, _ = generate_leb._compute_all_segment_jds(
+        actual_start,
+        actual_end,
+        interval,
+        degree=12,
+    )
+
+    assert segment_count == 13
+    assert float(np.min(all_jds)) >= start
+    assert float(np.max(all_jds)) < end
+
+
+def test_skyfield_vector_evaluator_accepts_source_backed_nodes() -> None:
+    class Timescale:
+        def __init__(self) -> None:
+            self.received: np.ndarray | None = None
+
+        def tt_jd(self, jds: np.ndarray) -> np.ndarray:
+            self.received = np.asarray(jds)
+            return self.received
+
+    class Target:
+        def at(self, jds: np.ndarray) -> SimpleNamespace:
+            positions = np.vstack((jds, jds + 1.0, jds + 2.0))
+            return SimpleNamespace(position=SimpleNamespace(au=positions))
+
+    jds = np.array([100.25, 101.5, 199.75])
+    timescale = Timescale()
+
+    values = generate_leb._eval_target_vectorized(
+        Target(),
+        jds,
+        timescale,
+        100.0,
+        200.0,
+    )
+
+    assert np.array_equal(timescale.received, jds)
+    assert values.shape == (3, 3)
+    assert np.array_equal(values[:, 0], jds)
+
+
+@pytest.mark.parametrize(
+    "jds",
+    [
+        np.array([99.999, 100.5]),
+        np.array([199.5, 200.0]),
+    ],
+)
+def test_skyfield_vector_evaluator_rejects_nodes_outside_source(
+    jds: np.ndarray,
+) -> None:
+    with pytest.raises(ValueError, match="exceed the selected JPL source"):
+        generate_leb._eval_target_vectorized(
+            object(),
+            jds,
+            object(),
+            100.0,
+            200.0,
+        )
 
 
 def test_spk_coverage_gate_has_no_calendar_tolerance(monkeypatch) -> None:

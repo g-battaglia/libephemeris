@@ -1015,6 +1015,77 @@ def _align_body_range_to_source(
     return effective_start, effective_end
 
 
+def _source_backed_fit_grid(
+    requested_start: float,
+    requested_end: float,
+    source_start: float,
+    source_end: float,
+    preferred_interval_days: float,
+) -> Tuple[float, float, float]:
+    """Choose a complete fixed-width grid without sampling outside a source.
+
+    If the requested closed interval is wholly source-backed but its span is
+    not an exact multiple of the preferred segment width, shorten the width by
+    a negligible amount so the final segment ends at the source boundary.  A
+    Chebyshev fit then retains the complete public interval without clamped or
+    extrapolated nodes.  If the request itself exceeds the source, keep the
+    preferred width and return the largest aligned source-backed subrange; a
+    broader reviewed tier must cover the omitted core edge.
+
+    Returns:
+        ``(jd_start, jd_end, interval_days)`` for generation and storage.
+    """
+    if not all(
+        math.isfinite(value)
+        for value in (
+            requested_start,
+            requested_end,
+            source_start,
+            source_end,
+            preferred_interval_days,
+        )
+    ):
+        raise ValueError("fit-grid inputs must be finite")
+    if requested_end <= requested_start or source_end <= source_start:
+        raise ValueError("fit-grid ranges must have positive width")
+    if preferred_interval_days <= 0.0:
+        raise ValueError("preferred interval must be positive")
+
+    requested_is_source_backed = (
+        requested_start >= source_start and requested_end <= source_end
+    )
+    preferred_fit_end = _required_fit_end(
+        requested_start,
+        requested_end,
+        preferred_interval_days,
+    )
+    if requested_is_source_backed and preferred_fit_end <= source_end:
+        return requested_start, requested_end, preferred_interval_days
+
+    if requested_is_source_backed:
+        span = requested_end - requested_start
+        segment_count = int(math.ceil(span / preferred_interval_days))
+        # Bias upward by one representable float so ceil(span / interval)
+        # cannot turn an integer quotient into N+1 through round-off.  The
+        # resulting nominal end differs from the source boundary by far less
+        # than one microsecond, while every Chebyshev node remains strictly
+        # inside the source interval.
+        adjusted_interval = math.nextafter(
+            span / segment_count,
+            math.inf,
+        )
+        return requested_start, requested_end, adjusted_interval
+
+    aligned_start, aligned_end = _align_body_range_to_source(
+        requested_start,
+        requested_end,
+        source_start,
+        source_end,
+        preferred_interval_days,
+    )
+    return aligned_start, aligned_end, preferred_interval_days
+
+
 def _spk_covers_range(
     spk_file: str,
     body_id: int,
@@ -1160,14 +1231,12 @@ def _eval_target_vectorized(
     spk_jd_min: float,
     spk_jd_max: float,
 ) -> np.ndarray:
-    """Evaluate a Skyfield target at all JDs, with linear extrapolation for
-    JDs outside the SPK ephemeris range.
+    """Evaluate a Skyfield target only where its SPK source is valid.
 
-    Last Chebyshev segments may extend their fit nodes a few days beyond
-    jd_end (to keep full-width segment alignment with the reader).
-    Instead of clamping (which corrupts the polynomial fit), out-of-range
-    nodes are extrapolated linearly using position + velocity at the boundary.
-    This preserves fit quality for in-range dates.
+    Generation must never manufacture fitting nodes by clamping or linearly
+    extrapolating a DE kernel boundary. Callers are responsible for selecting
+    a source-backed body range and, when necessary, a segment width that tiles
+    that range exactly.
 
     Args:
         target: Skyfield VectorFunction (planet, barycenter, etc.)
@@ -1179,59 +1248,27 @@ def _eval_target_vectorized(
     Returns:
         Array of shape (N, 3) with positions in AU.
     """
-    margin = 1.0  # days of safety margin from SPK boundary
-    lo = spk_jd_min + margin
-    hi = spk_jd_max - margin
+    jds = _validated_finite_array(
+        all_jds,
+        (len(all_jds),),
+        "Skyfield fitting JDs",
+    )
+    minimum_jd = float(np.min(jds))
+    maximum_jd = float(np.max(jds))
+    if minimum_jd < spk_jd_min or maximum_jd >= spk_jd_max:
+        raise ValueError(
+            "Chebyshev fitting nodes exceed the selected JPL source: "
+            f"nodes JD {minimum_jd:.9f}–{maximum_jd:.9f}, "
+            f"source JD {spk_jd_min:.9f}–{spk_jd_max:.9f}"
+        )
 
-    in_range = (all_jds >= lo) & (all_jds <= hi)
-
-    if np.all(in_range):
-        # Fast path: everything in range
-        t_arr = ts.tt_jd(all_jds)
-        return np.asarray(target.at(t_arr).position.au).T  # (N, 3)
-
-    # Split: evaluate in-range vectorized, extrapolate out-of-range
-    all_values = np.empty((len(all_jds), 3))
-
-    # In-range: vectorized evaluation
-    in_idx = np.where(in_range)[0]
-    if len(in_idx) > 0:
-        t_in = ts.tt_jd(all_jds[in_idx])
-        pos_in = np.asarray(target.at(t_in).position.au)  # (3, N_in)
-        all_values[in_idx] = pos_in.T
-
-    # Out-of-range: linear extrapolation from boundary
-    out_idx = np.where(~in_range)[0]
-    if len(out_idx) > 0:
-        # Determine if overshoot is at start or end
-        over_end = all_jds[out_idx] > hi
-        over_start = ~over_end
-
-        # Extrapolate from end boundary
-        end_idx = out_idx[over_end]
-        if len(end_idx) > 0:
-            t_bnd = ts.tt_jd(hi)
-            bnd_pos = target.at(t_bnd)
-            p = np.asarray(bnd_pos.position.au).ravel()  # (3,)
-            v = np.asarray(bnd_pos.velocity.au_per_d).ravel()  # (3,)
-            dt = all_jds[end_idx] - hi  # days past boundary
-            all_values[end_idx, 0] = p[0] + v[0] * dt
-            all_values[end_idx, 1] = p[1] + v[1] * dt
-            all_values[end_idx, 2] = p[2] + v[2] * dt
-
-        # Extrapolate from start boundary
-        start_idx = out_idx[over_start]
-        if len(start_idx) > 0:
-            t_bnd = ts.tt_jd(lo)
-            bnd_pos = target.at(t_bnd)
-            p = np.asarray(bnd_pos.position.au).ravel()
-            v = np.asarray(bnd_pos.velocity.au_per_d).ravel()
-            dt = all_jds[start_idx] - lo
-            all_values[start_idx, 0] = p[0] + v[0] * dt
-            all_values[start_idx, 1] = p[1] + v[1] * dt
-            all_values[start_idx, 2] = p[2] + v[2] * dt
-
-    return all_values
+    t_arr = ts.tt_jd(jds)
+    values = np.asarray(target.at(t_arr).position.au).T
+    return _validated_finite_array(
+        values,
+        (len(jds), 3),
+        "Skyfield target positions",
+    )
 
 
 def _eval_body_icrs_vectorized(
@@ -1251,9 +1288,10 @@ def _eval_body_icrs_vectorized(
     are used for JDs outside that range. This ensures the stored Chebyshev
     data matches what calc() produces at runtime.
 
-    JDs that extend beyond the SPK ephemeris range (from last-segment
-    overshoot) are linearly extrapolated using position + velocity at
-    the boundary. This preserves Chebyshev fit quality for in-range dates.
+    Every fitting JD must remain inside the selected DE kernel.  The caller
+    chooses a source-backed range and segment grid before reaching this
+    function; any residual overshoot is rejected by the shared vector
+    evaluator instead of being clamped or extrapolated.
 
     Args:
         target_name: Planet name from _PLANET_MAP (e.g., 'jupiter', 'sun')
@@ -2198,6 +2236,7 @@ def generate_single_body(
     jd_end: float,
     verbose: bool = False,
     nbody: bool = False,
+    params: Optional[Tuple[float, int, int, int]] = None,
 ) -> Tuple[int, List[np.ndarray], float]:
     """Generate Chebyshev data for a single body.
 
@@ -2208,8 +2247,8 @@ def generate_single_body(
     Returns:
         (body_id, coefficients_list, max_error)
     """
-    params = BODY_PARAMS[body_id]
-    interval_days, degree, coord_type, components = params
+    resolved_params = BODY_PARAMS[body_id] if params is None else params
+    interval_days, degree, coord_type, components = resolved_params
     label = BODY_NAMES.get(body_id, f"Body {body_id}")
 
     if coord_type == COORD_ICRS_BARY:
@@ -2377,34 +2416,55 @@ def assemble_leb(
     # Per-body date ranges: body_id -> (jd_start, jd_end)
     # Non-asteroids use the global range; asteroids use their SPK range.
     body_jd_ranges: dict[int, Tuple[float, float]] = {}
+    # A planet whose source interval is complete but not divisible by the
+    # default segment width receives a file-local interval override.  The
+    # public BODY_PARAMS table remains immutable for other runs and callers.
+    body_param_overrides: dict[int, Tuple[float, int, int, int]] = {}
 
     # A core kernel can end inside the fixed-width segment needed to evaluate
-    # the final advertised days.  Never let the vector evaluator clamp those
-    # fitting nodes.  Narrow only the affected body record to the last complete
-    # source-backed segment; the tiered reader will transparently select the
-    # next reviewed core artifact for the small uncovered edge.
+    # the final advertised days. Never let the vector evaluator clamp or
+    # extrapolate those fitting nodes. If the whole requested interval exists
+    # in the source (notably exact-range DE441), adjust the local segment width
+    # so it tiles the range exactly. Otherwise narrow to complete segments and
+    # let the next reviewed tier cover the omitted edge.
     planet_ids = set(bodies).intersection(_PLANET_MAP)
     if planet_ids:
         from libephemeris.state import get_planets
 
         source_start, source_end = _get_spk_jd_range(get_planets())
         for body_id in planet_ids:
-            interval_days = BODY_PARAMS[body_id][0]
-            fit_end = _required_fit_end(jd_start, jd_end, interval_days)
-            if jd_start < source_start or fit_end > source_end:
-                body_jd_ranges[body_id] = _align_body_range_to_source(
-                    jd_start,
-                    jd_end,
-                    source_start,
-                    source_end,
-                    interval_days,
+            params = BODY_PARAMS[body_id]
+            safe_start, safe_end, safe_interval = _source_backed_fit_grid(
+                jd_start,
+                jd_end,
+                source_start,
+                source_end,
+                params[0],
+            )
+            if safe_start != jd_start or safe_end != jd_end:
+                body_jd_ranges[body_id] = (safe_start, safe_end)
+            if safe_interval != params[0]:
+                body_param_overrides[body_id] = (
+                    safe_interval,
+                    params[1],
+                    params[2],
+                    params[3],
                 )
-                if verbose:
-                    safe_start, safe_end = body_jd_ranges[body_id]
+            if verbose and (
+                body_id in body_jd_ranges or body_id in body_param_overrides
+            ):
+                name = BODY_NAMES.get(body_id, body_id)
+                if body_id in body_param_overrides:
                     print(
-                        f"  {BODY_NAMES.get(body_id, body_id)}: core source "
-                        f"supports complete LEB segments through JD {safe_end:.1f}; "
-                        "the next reviewed tier covers the remaining edge"
+                        f"  {name}: adjusted segment width "
+                        f"{params[0]:.9f} → {safe_interval:.9f} days to retain "
+                        "the complete source-backed core interval"
+                    )
+                else:
+                    print(
+                        f"  {name}: core source supports complete LEB segments "
+                        f"through JD {safe_end:.1f}; the next reviewed tier "
+                        "covers the remaining edge"
                     )
 
     # The long ASSIST DE441 distribution intentionally stops just inside the
@@ -2681,8 +2741,13 @@ def assemble_leb(
     if planet_bodies and verbose:
         print("  --- Planets (vectorized Skyfield) ---")
     for bid in planet_bodies:
+        planet_start, planet_end = body_jd_ranges.get(bid, (jd_start, jd_end))
         bid, coeffs, error = generate_single_body(
-            bid, jd_start, jd_end, verbose=verbose
+            bid,
+            planet_start,
+            planet_end,
+            verbose=verbose,
+            params=body_param_overrides.get(bid),
         )
         body_data[bid] = coeffs
         body_errors[bid] = error
@@ -2832,7 +2897,7 @@ def assemble_leb(
     # Chebyshev data size (sum of all body segments)
     chebyshev_size = 0
     for bid in bodies:
-        params = BODY_PARAMS[bid]
+        params = body_param_overrides.get(bid, BODY_PARAMS[bid])
         interval_days, degree, coord_type, components = params
         seg_size = segment_byte_size(degree, components)
         chebyshev_size += len(body_data[bid]) * seg_size
@@ -2891,7 +2956,7 @@ def assemble_leb(
     # Asteroids may have per-body date ranges narrower than the global range.
     coeff_write_offset = chebyshev_offset
     for idx, bid in enumerate(sorted(bodies)):
-        params = BODY_PARAMS[bid]
+        params = body_param_overrides.get(bid, BODY_PARAMS[bid])
         interval_days, degree, coord_type, components = params
         seg_size = segment_byte_size(degree, components)
         n_segments = len(body_data[bid])
@@ -2998,7 +3063,7 @@ def assemble_leb(
         for bid in sorted(bodies):
             name = BODY_NAMES.get(bid, f"Body {bid}")
             error = body_errors[bid]
-            params = BODY_PARAMS[bid]
+            params = body_param_overrides.get(bid, BODY_PARAMS[bid])
             coord_type = params[2]
             # Show per-body range annotation if different from global
             range_note = ""
