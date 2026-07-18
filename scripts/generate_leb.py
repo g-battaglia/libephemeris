@@ -16,7 +16,7 @@ analytical functions and fitting Chebyshev polynomials to the results.
 Usage:
     python scripts/generate_leb.py --output ephemeris.leb
     python scripts/generate_leb.py --tier medium
-    python scripts/generate_leb.py --tier extended --start -5000 --end 5000
+    python scripts/generate_leb.py --tier extended --start -13200 --end 17191
     python scripts/generate_leb.py --start 1550 --end 2650 --output de440_full.leb
     python scripts/generate_leb.py --output ephemeris.leb --verify --verify-samples 500
     python scripts/generate_leb.py --output ephemeris.leb --workers 8
@@ -190,8 +190,15 @@ DEFAULT_END_YEAR = 2100
 TIER_CONFIGS = {
     "base": ("de440s.bsp", 1850, 2150, "ephemeris_base.leb"),
     "medium": ("de440.bsp", 1550, 2650, "ephemeris_medium.leb"),
-    "extended": ("de441.bsp", -5000, 5000, "ephemeris_extended.leb"),
+    "extended": ("de441.bsp", -13200, 17191, "ephemeris_extended.leb"),
 }
+
+# Exact shared DE441 segment boundaries from the published kernel.  The
+# marketing year label (-13200..+17191) is not a pair of January-1 boundaries:
+# January 1 -13200 precedes the first segment by about 126 days.  Full-range
+# generation therefore uses these JDs rather than claiming unsupported dates.
+DE441_START_JD = -3100015.5
+DE441_END_JD = 8000016.5
 
 # Default output directory for tier-based generation
 DEFAULT_LEB_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "leb")
@@ -475,6 +482,8 @@ def verify_segment(
 # =============================================================================
 
 N_VERIFY = 10  # Number of verification points per segment
+EPHEMERIS_VERIFY_LIMIT_ARCSEC = 0.02
+NUMERICAL_MODEL_VERIFY_LIMIT_ARCSEC = 1.0
 
 
 def _compute_all_segment_jds(
@@ -953,6 +962,59 @@ def _get_spk_jd_range(planets) -> Tuple[float, float]:
     return min(starts), max(ends)
 
 
+def _required_fit_end(
+    jd_start: float,
+    jd_end: float,
+    interval_days: float,
+) -> float:
+    """Return the source-coverage end required by fixed-width LEB segments.
+
+    A body record can advertise an end date inside its last segment, but the
+    coefficients for that segment are fitted on the whole fixed-width
+    interval consumed by :class:`LEBReader`.  The reference source must
+    therefore remain valid through the end of that interval; clamping the
+    final Chebyshev nodes silently distorts the last few output days.
+    """
+    if not math.isfinite(interval_days) or interval_days <= 0.0:
+        raise ValueError("interval_days must be a positive finite value")
+    if not math.isfinite(jd_start) or not math.isfinite(jd_end):
+        raise ValueError("JD range must be finite")
+    if jd_end <= jd_start:
+        raise ValueError("jd_end must be greater than jd_start")
+    segment_count = int(math.ceil((jd_end - jd_start) / interval_days))
+    return jd_start + segment_count * interval_days
+
+
+def _align_body_range_to_source(
+    requested_start: float,
+    requested_end: float,
+    source_start: float,
+    source_end: float,
+    interval_days: float,
+    *,
+    margin_days: float = 0.0,
+) -> Tuple[float, float]:
+    """Return a source-backed range made of complete LEB segments.
+
+    This helper is used only when a source cannot cover the fitting domain of
+    the entire requested range.  The returned end is aligned down from the
+    effective start, so no final segment needs clamped or extrapolated source
+    values.  The omitted edge is then handled by the next LEB tier (core) or
+    by the explicitly traced local model (companion bodies).
+    """
+    if margin_days < 0.0 or not math.isfinite(margin_days):
+        raise ValueError("margin_days must be a non-negative finite value")
+    effective_start = max(requested_start, source_start + margin_days)
+    effective_limit = min(requested_end, source_end - margin_days)
+    if effective_limit <= effective_start:
+        raise ValueError("requested and source ranges do not overlap")
+    segment_count = int(math.floor((effective_limit - effective_start) / interval_days))
+    if segment_count < 1:
+        raise ValueError("source overlap is shorter than one LEB segment")
+    effective_end = effective_start + segment_count * interval_days
+    return effective_start, effective_end
+
+
 def _spk_covers_range(
     spk_file: str,
     body_id: int,
@@ -997,9 +1059,12 @@ def _spk_covers_range(
         seg_start = min(T0 + seg.start_second / 86400.0 for seg in target_segs)
         seg_end = max(T0 + seg.end_second / 86400.0 for seg in target_segs)
 
-        # Allow 2-day tolerance: Horizons SPK boundaries can be off by ~1 day
-        # from the requested range, and generation clamps to SPK range anyway.
-        return seg_start <= jd_start + 2.0 and seg_end >= jd_end - 2.0
+        # Generation is deliberately strict.  A one-day-short kernel used to
+        # be accepted here and the final Chebyshev nodes were then clamped,
+        # producing 6-127 arcsecond edge errors despite sub-microarcsecond
+        # fits everywhere else.  Calendar-rounding tolerance belongs in the
+        # downloader, never in the numerical source-coverage gate.
+        return seg_start <= jd_start and seg_end >= jd_end
     finally:
         kernel.close()
 
@@ -1430,8 +1495,8 @@ def generate_body_icrs_asteroid(
         center_id = kernel.segments[0].center  # typically 10 (Sun)
         target_id = kernel.segments[0].target
 
-        # Check if the asteroid SPK covers the full requested range
-        # (with some margin for last-segment overshoot)
+        # Check the whole fixed-width fitting domain, not only the public body
+        # range.  The last segment can extend beyond jd_end.
         T0_SPK = 2451545.0
         ast_jd_min = min(
             T0_SPK + seg.start_second / 86400.0
@@ -1444,11 +1509,13 @@ def generate_body_icrs_asteroid(
             if seg.target == target_id
         )
 
-        if ast_jd_min > jd_start + 2.0 or ast_jd_max < jd_end - 2.0:
+        required_fit_end = _required_fit_end(jd_start, jd_end, interval_days)
+        if ast_jd_min > jd_start or ast_jd_max < required_fit_end:
             kernel.close()
             raise RuntimeError(
                 f"SPK for {ast_name} covers JD {ast_jd_min:.1f}–{ast_jd_max:.1f} "
-                f"but requested range is JD {jd_start:.1f}–{jd_end:.1f}. "
+                f"but fitting JD {jd_start:.1f}–{required_fit_end:.1f} is "
+                f"required for output through JD {jd_end:.1f}. "
                 f"Cannot generate LEB data — SPK coverage is insufficient. "
                 f"Use a narrower date range or exclude this body."
             )
@@ -1485,8 +1552,13 @@ def generate_body_icrs_asteroid(
         sun = planets["sun"]
         sun_bary = _eval_target_vectorized(sun, all_jds, ts, spk_min, spk_max)  # (N, 3)
 
-        # Clamp to asteroid SPK range for spktype21 calls
-        ast_clamped = np.clip(all_jds, ast_jd_lo + 0.01, ast_jd_hi - 0.01)
+        if float(np.min(all_jds)) < ast_jd_lo or float(np.max(all_jds)) > ast_jd_hi:
+            raise RuntimeError(
+                f"SPK for {ast_name} does not cover all Chebyshev nodes: "
+                f"nodes JD {float(np.min(all_jds)):.6f}–"
+                f"{float(np.max(all_jds)):.6f}, SPK JD "
+                f"{ast_jd_lo:.6f}–{ast_jd_hi:.6f}"
+            )
 
         # Compute asteroid heliocentric positions via spktype21 (scalar loop)
         AU_KM = 149597870.7
@@ -1498,9 +1570,7 @@ def generate_body_icrs_asteroid(
             enabled=verbose,
         )
         for i in range(len(all_jds)):
-            pos_km, _ = kernel.compute_type21(
-                center_id, target_id, float(ast_clamped[i])
-            )
+            pos_km, _ = kernel.compute_type21(center_id, target_id, float(all_jds[i]))
             # helio km -> helio AU -> + Sun bary = SSB bary (ICRS)
             all_values[i, 0] = pos_km[0] / AU_KM + sun_bary[i, 0]
             all_values[i, 1] = pos_km[1] / AU_KM + sun_bary[i, 1]
@@ -1534,6 +1604,20 @@ def generate_body_icrs_asteroid(
 _NBODY_ANCHOR_JD = 2451545.0
 # DE440 planet ephemeris coverage (linux_p1550p2650.440), JD ~1550..2650.
 _DE440_JD_LO, _DE440_JD_HI = 2287184.5, 2688976.5
+_ASSIST_DE441_START_YEAR = -13000
+_ASSIST_DE441_END_YEAR = 17000
+
+
+def _nbody_coverage_for_range(jd_start: float, jd_end: float) -> tuple[float, float]:
+    """Intersect a requested tier interval with the long ASSIST DE441 source."""
+    start = max(jd_start, _year_to_jd(_ASSIST_DE441_START_YEAR))
+    end = min(jd_end, _year_to_jd(_ASSIST_DE441_END_YEAR))
+    if start >= end:
+        raise ValueError(
+            "Requested extended range does not overlap ASSIST DE441 "
+            f"coverage ({_ASSIST_DE441_START_YEAR}..+{_ASSIST_DE441_END_YEAR})"
+        )
+    return start, end
 
 
 def _resolve_assist_config_for_range(jd_start: float, jd_end: float):
@@ -2219,8 +2303,9 @@ def assemble_leb(
             later (merge takes aux data from the first file that has it).
         tier: Precision tier ("base"/"medium"/"extended"). On the extended
             tier the regular exotic bodies (EXOTIC_EXTENDED_IDS) are generated
-            via N-body instead of SPK (their SPK only covers 1600-2500), and
-            the chaotic NEA exotics are excluded entirely.
+            via N-body over the interval supported by the bundled ASSIST
+            ephemeris instead of SPK (their SPK only covers 1600-2500), and the
+            chaotic NEA exotics are excluded entirely.
     """
     if bodies is None:
         # Fictitious bodies (40-58) are companion-only: they must be requested
@@ -2284,13 +2369,59 @@ def assemble_leb(
     # Asteroids may have SPK coverage narrower than the tier range.
     # Instead of excluding them, we include them with their actual SPK range.
     # The LEB format already supports per-body jd_start/jd_end, and the
-    # reader raises ValueError for out-of-range JDs, which calc_ut()
-    # catches to fall through to Skyfield.
+    # reader raises ValueError for out-of-range JDs.  The sealed dispatcher
+    # then uses only the body's declared deterministic local model; it never
+    # opens Skyfield/JPL in LEB mode.
     asteroid_bodies = [b for b in bodies if b in _ASTEROID_NAIF]
     excluded_asteroids: List[int] = []
     # Per-body date ranges: body_id -> (jd_start, jd_end)
     # Non-asteroids use the global range; asteroids use their SPK range.
     body_jd_ranges: dict[int, Tuple[float, float]] = {}
+
+    # A core kernel can end inside the fixed-width segment needed to evaluate
+    # the final advertised days.  Never let the vector evaluator clamp those
+    # fitting nodes.  Narrow only the affected body record to the last complete
+    # source-backed segment; the tiered reader will transparently select the
+    # next reviewed core artifact for the small uncovered edge.
+    planet_ids = set(bodies).intersection(_PLANET_MAP)
+    if planet_ids:
+        from libephemeris.state import get_planets
+
+        source_start, source_end = _get_spk_jd_range(get_planets())
+        for body_id in planet_ids:
+            interval_days = BODY_PARAMS[body_id][0]
+            fit_end = _required_fit_end(jd_start, jd_end, interval_days)
+            if jd_start < source_start or fit_end > source_end:
+                body_jd_ranges[body_id] = _align_body_range_to_source(
+                    jd_start,
+                    jd_end,
+                    source_start,
+                    source_end,
+                    interval_days,
+                )
+                if verbose:
+                    safe_start, safe_end = body_jd_ranges[body_id]
+                    print(
+                        f"  {BODY_NAMES.get(body_id, body_id)}: core source "
+                        f"supports complete LEB segments through JD {safe_end:.1f}; "
+                        "the next reviewed tier covers the remaining edge"
+                    )
+
+    # The long ASSIST DE441 distribution intentionally stops just inside the
+    # planetary DE441 kernel edges.  Persist only the interval the N-body
+    # source can actually evaluate; the few extreme-edge centuries remain a
+    # truthful local-model fallback rather than failed generation or
+    # extrapolated coefficients.
+    if nbody_ids:
+        nbody_start, nbody_end = _nbody_coverage_for_range(jd_start, jd_end)
+        for body_id in set(bodies).intersection(nbody_ids):
+            body_jd_ranges[body_id] = _align_body_range_to_source(
+                nbody_start,
+                nbody_end,
+                nbody_start,
+                nbody_end,
+                BODY_PARAMS[body_id][0],
+            )
 
     # Smoothed lunar apsides require active JPL Moon-state coverage. Clamp only
     # these body records to that independently sourced range rather than
@@ -2310,7 +2441,13 @@ def assemble_leb(
                 "lunar-apsides model range"
             )
         for body_id in interpolated_ids:
-            body_jd_ranges[body_id] = (apsides_start, apsides_end)
+            body_jd_ranges[body_id] = _align_body_range_to_source(
+                apsides_start,
+                apsides_end,
+                apsides_start,
+                apsides_end,
+                BODY_PARAMS[body_id][0],
+            )
 
     # Minimum useful SPK coverage (years). Asteroids with less than this
     # are excluded — too narrow to be worth including.
@@ -2337,8 +2474,10 @@ def assemble_leb(
 
             # N-body (extended) bodies: the SPK is used ONLY to seed the
             # integration at the J2000 anchor, so a modest anchor-covering
-            # kernel suffices (Horizons cannot serve the -5000..+5000 range).
-            # Register such a kernel, then claim the FULL extended range.
+            # kernel suffices (Horizons cannot serve the deep-time range).
+            # Register such a kernel, then retain the ASSIST-supported range
+            # established above.  Do not advertise dates beyond the N-body
+            # source data merely because the core DE441 kernel covers them.
             if bid in nbody_ids:
                 a_lo, a_hi = _NBODY_ANCHOR_JD - 400.0, _NBODY_ANCHOR_JD + 400.0
                 if not (
@@ -2372,9 +2511,12 @@ def assemble_leb(
                     if verbose:
                         print(f"    {name}: no anchor SPK available (EXCLUDED)")
                     continue
-                body_jd_ranges[bid] = (jd_start, jd_end)
                 if verbose:
-                    print(f"    {name}: N-body over full tier range (anchor SPK ok)")
+                    nbody_start, nbody_end = body_jd_ranges[bid]
+                    print(
+                        f"    {name}: N-body over ASSIST-supported range "
+                        f"JD {nbody_start:.1f}–{nbody_end:.1f} (anchor SPK ok)"
+                    )
                 continue
 
             # Check if an already-cached SPK covers the full range.
@@ -2382,35 +2524,39 @@ def assemble_leb(
             # already registered, even if its coverage is too narrow (e.g.
             # a previously downloaded ±10yr SPK).  We detect that here and
             # force a re-download with the full tier range.
+            interval_days = BODY_PARAMS[bid][0]
+            required_fit_end = _required_fit_end(jd_start, jd_end, interval_days)
             need_force = False
-            if bid in _SPK_BODY_MAP:
-                cached_file, _ = _SPK_BODY_MAP[bid]
-                if not _spk_covers_range(cached_file, bid, jd_start, jd_end):
-                    # The registered kernel is too narrow — prefer a wider one
-                    # already in the cache over a forced (slow, timeout-prone)
-                    # re-download of the whole tier range.
-                    covering = _find_covering_cached_spk(bid, jd_start, jd_end)
-                    if covering is not None:
-                        from libephemeris import spk as _spk
+            registered = _SPK_BODY_MAP.get(bid)
+            registered_covers = registered is not None and _spk_covers_range(
+                registered[0], bid, jd_start, required_fit_end
+            )
+            if not registered_covers:
+                # Prefer a wider file already in the cache even when nothing
+                # has been registered in this process yet.  Delegating that
+                # first selection to auto_download can pick an exact-range
+                # kernel that covers the public end but not the final fitting
+                # nodes.
+                covering = _find_covering_cached_spk(bid, jd_start, required_fit_end)
+                if covering is not None:
+                    from libephemeris import spk as _spk
 
-                        _spk.register_spk_body(bid, covering, _ASTEROID_NAIF[bid])
-                        if verbose:
-                            print(
-                                f"    {name}: using cached wider SPK "
-                                f"{os.path.basename(covering)}"
-                            )
-                    else:
-                        need_force = True
-                        if verbose:
-                            print(
-                                f"    {name}: cached SPK too narrow, re-downloading..."
-                            )
+                    _spk.register_spk_body(bid, covering, _ASTEROID_NAIF[bid])
+                    if verbose:
+                        print(
+                            f"    {name}: using cached fitting-domain SPK "
+                            f"{os.path.basename(covering)}"
+                        )
+                else:
+                    need_force = registered is not None
+                    if verbose and registered is not None:
+                        print(f"    {name}: cached SPK too narrow, re-downloading...")
 
             try:
                 auto_download_asteroid_spk(
                     bid,
                     jd_start=jd_start,
-                    jd_end=jd_end,
+                    jd_end=required_fit_end,
                     force=need_force,
                 )
             except Exception as exc:
@@ -2425,11 +2571,15 @@ def assemble_leb(
 
             spk_file, _ = _SPK_BODY_MAP[bid]
 
-            # Full coverage?
-            if _spk_covers_range(spk_file, bid, jd_start, jd_end):
+            # Full fitting-domain coverage?  Checking only the public body end
+            # is insufficient when the final fixed-width segment extends a
+            # few days farther.
+            if _spk_covers_range(spk_file, bid, jd_start, required_fit_end):
                 body_jd_ranges[bid] = (jd_start, jd_end)
                 if verbose:
-                    print(f"    {name}: SPK covers full tier range (spk21)")
+                    print(
+                        f"    {name}: SPK covers the full tier fitting domain (spk21)"
+                    )
                 continue
 
             # Partial coverage — discover the actual SPK range
@@ -2441,9 +2591,23 @@ def assemble_leb(
                 continue
 
             spk_jd_start, spk_jd_end = spk_range
-            # Intersect SPK range with tier range
-            eff_start = max(spk_jd_start, jd_start)
-            eff_end = min(spk_jd_end, jd_end)
+            # Intersect SPK range with the tier, retain a one-day boundary
+            # margin, and align down to a complete fixed-width segment.  This
+            # makes the body record truthful without frozen edge nodes.
+            try:
+                eff_start, eff_end = _align_body_range_to_source(
+                    jd_start,
+                    jd_end,
+                    spk_jd_start,
+                    spk_jd_end,
+                    interval_days,
+                    margin_days=1.0,
+                )
+            except ValueError:
+                excluded_asteroids.append(bid)
+                if verbose:
+                    print(f"    {name}: SPK overlap has no complete segment (EXCLUDED)")
+                continue
             eff_days = eff_end - eff_start
 
             if eff_days < MIN_ASTEROID_COVERAGE_DAYS:
@@ -2456,8 +2620,7 @@ def assemble_leb(
                     )
                 continue
 
-            # Use per-body range (with 1-day inward margin for SPK boundary safety)
-            body_jd_ranges[bid] = (eff_start + 1.0, eff_end - 1.0)
+            body_jd_ranges[bid] = (eff_start, eff_end)
             if verbose:
                 eff_start_yr = 2000.0 + (eff_start - 2451545.0) / 365.25
                 eff_end_yr = 2000.0 + (eff_end - 2451545.0) / 365.25
@@ -2477,7 +2640,8 @@ def assemble_leb(
                 )
                 print(
                     "  Excluded asteroids will NOT be in the LEB file. "
-                    "They will use live Skyfield/SPK at runtime."
+                    "Sealed LEB mode will use their declared deterministic "
+                    "local model outside stored coverage."
                 )
             # Fail fast on an UNEXPECTED exotic drop: every registry body is
             # supposed to have an obtainable SPK over its coverage window, so a
@@ -3125,6 +3289,7 @@ def merge_leb_files(
 # =============================================================================
 
 
+@_allow_jpl_source()
 def verify_leb(
     leb_path: str,
     n_samples: int = 500,
@@ -3167,8 +3332,9 @@ def verify_leb(
     # Ensure asteroid SPKs cover each asteroid's actual date range in the LEB
     # (which may be narrower than the global file range for per-body coverage).
     #
-    # N-body bodies (extended-tier exotics) store the FULL tier range, but no
-    # Horizons SPK can cover it: SPK generation is limited to ~1600-2500.
+    # N-body bodies (extended-tier exotics) store the ASSIST-supported range,
+    # but no Horizons SPK can cover it: SPK generation is limited to
+    # ~1600-2500.
     # For each SPK-verified body we therefore compute an effective verify
     # window = (body range ∩ registered-SPK coverage) and sample only inside
     # it. Outside that window there is no independent reference to compare
@@ -3298,6 +3464,23 @@ def verify_leb(
         ):
             body_test_jds = rng.uniform(sample_lo, sample_hi, min(n_samples, 100))
 
+        # Random grids are excellent for broad regression coverage but can
+        # miss the exact first/last segment where source-boundary mistakes are
+        # concentrated.  Always probe both effective edges deterministically.
+        sample_span = sample_hi - sample_lo
+        if sample_span <= 0.0:
+            raise ValueError(f"Body {body_id} has no verifiable JD interval")
+        interval_days = float(getattr(body, "interval_days", sample_span))
+        edge_span = min(interval_days, sample_span / 2.0)
+        edge_count = max(16, int(getattr(body, "degree", 0)) + 2)
+        edge_jds = np.concatenate(
+            (
+                np.linspace(sample_lo, sample_lo + edge_span, edge_count),
+                np.linspace(sample_hi - edge_span, sample_hi, edge_count),
+            )
+        )
+        body_test_jds = np.unique(np.concatenate((body_test_jds, edge_jds)))
+
         for jd in body_test_jds:
             try:
                 pos, vel = reader.eval_body(body_id, jd)
@@ -3365,18 +3548,32 @@ def verify_leb(
                 max_distance_error = float("inf")
                 break
 
-        # Convert to arcseconds and determine pass/fail
+        # Direct ephemeris and analytical artifacts must remain inside the
+        # product's 0.02-arcsecond generation budget.  Extended exotic bodies
+        # whose stored source is an independently integrated ASSIST trajectory
+        # are explicitly classified as ``numerical-model`` and use a separate
+        # one-arcsecond agreement gate against the finite Horizons window.
+        nbody_model = body_id in (
+            set(EXOTIC_EXTENDED_IDS) - set(EXOTIC_ASSIST_PERTURBER_IDS)
+        ) and (body_jd_start < HORIZONS_SPK_JD_MIN or body_jd_end > HORIZONS_SPK_JD_MAX)
+        angular_limit_arcsec = (
+            NUMERICAL_MODEL_VERIFY_LIMIT_ARCSEC
+            if nbody_model
+            else EPHEMERIS_VERIFY_LIMIT_ARCSEC
+        )
+
+        # Convert to arcseconds and determine pass/fail.
         if error_unit == "AU":
             # Convert AU error to angular error
             if worst_dist > 0.001:
                 arcsec = (max_error / worst_dist) * 206265.0
             else:
                 arcsec = max_error * 206265.0
-            passed = arcsec < 1.0
+            passed = arcsec < angular_limit_arcsec
         elif error_unit == "deg":
             # Angular components are degrees; distance remains AU.
             arcsec = max_error * 3600.0
-            passed = arcsec < 1.0 and max_distance_error <= 5e-6
+            passed = arcsec < angular_limit_arcsec and max_distance_error <= 5e-6
         else:
             arcsec = float("inf")
             passed = False
@@ -3588,6 +3785,11 @@ def _resolve_tier(args) -> Tuple[float, float, str]:
     Returns:
         (jd_start, jd_end, output_path)
     """
+    if (args.start_jd is not None or args.end_jd is not None) and (
+        args.start is not None or args.end is not None
+    ):
+        raise SystemExit("--start-jd/--end-jd cannot be combined with --start/--end")
+
     if args.tier:
         ephem_file, tier_start, tier_end, tier_output = TIER_CONFIGS[args.tier]
 
@@ -3610,8 +3812,28 @@ def _resolve_tier(args) -> Tuple[float, float, str]:
         start_year = args.start if args.start is not None else DEFAULT_START_YEAR
         end_year = args.end if args.end is not None else DEFAULT_END_YEAR
 
-    jd_start = _year_to_jd(start_year)
-    jd_end = _year_to_jd(end_year)
+    exact_tier_start = None
+    exact_tier_end = None
+    if args.tier == "extended" and args.start is None and args.end is None:
+        exact_tier_start = DE441_START_JD
+        exact_tier_end = DE441_END_JD
+
+    jd_start = (
+        float(args.start_jd)
+        if args.start_jd is not None
+        else exact_tier_start
+        if exact_tier_start is not None
+        else _year_to_jd(start_year)
+    )
+    jd_end = (
+        float(args.end_jd)
+        if args.end_jd is not None
+        else exact_tier_end
+        if exact_tier_end is not None
+        else _year_to_jd(end_year)
+    )
+    if jd_start >= jd_end:
+        raise SystemExit("generation start must be before generation end")
     return jd_start, jd_end, output
 
 
@@ -3656,7 +3878,7 @@ def main():
         choices=["base", "medium", "extended"],
         default=None,
         help="Precision tier: base (de440s, 1850-2150), medium (de440, 1550-2650), "
-        "extended (de441, -5000 to 5000). Sets ephemeris file, date range, "
+        "extended (de441, -13200 to 17191). Sets ephemeris file, date range, "
         "and output path automatically.",
     )
     parser.add_argument(
@@ -3670,6 +3892,18 @@ def main():
         type=int,
         default=None,
         help=f"End year (default: from --tier, or {DEFAULT_END_YEAR})",
+    )
+    parser.add_argument(
+        "--start-jd",
+        type=float,
+        default=None,
+        help="Exact start Julian Day (mutually exclusive with --start/--end)",
+    )
+    parser.add_argument(
+        "--end-jd",
+        type=float,
+        default=None,
+        help="Exact end Julian Day (mutually exclusive with --start/--end)",
     )
     parser.add_argument(
         "--workers",
@@ -3858,6 +4092,10 @@ def main():
             base_cmd += ["--start", str(args.start)]
         if args.end is not None:
             base_cmd += ["--end", str(args.end)]
+        if args.start_jd is not None:
+            base_cmd += ["--start-jd", str(args.start_jd)]
+        if args.end_jd is not None:
+            base_cmd += ["--end-jd", str(args.end_jd)]
         base_cmd += ["--workers", str(args.workers)]
         if args.quiet:
             base_cmd.append("--quiet")

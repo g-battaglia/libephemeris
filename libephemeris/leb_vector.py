@@ -39,10 +39,10 @@ from .exceptions import EphemerisRangeError, LEBCorruptionError
 
 if TYPE_CHECKING:
     from .leb2_reader import LEB2Reader
-    from .leb_composite import CompositeLEBReader
+    from .leb_composite import CompositeLEBReader, TieredLEBReader
     from .leb_reader import LEBReader
 
-    LEBReaderLike = LEBReader | LEB2Reader | CompositeLEBReader
+    LEBReaderLike = LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader
 else:
     LEBReaderLike = Any
 
@@ -50,10 +50,18 @@ else:
 _EMRAT = 81.3005691
 
 
-def _serving_path(reader: LEBReaderLike, body_id: int) -> str | None:
+def _serving_path(
+    reader: LEBReaderLike, body_id: int, jd_tt: float | None = None
+) -> str | None:
     """Return the concrete file serving a body, when the reader exposes it."""
     body_reader = getattr(reader, "body_reader", None)
-    serving = body_reader(body_id) if body_reader is not None else reader
+    if body_reader is None:
+        serving = reader
+    else:
+        try:
+            serving = body_reader(body_id, jd_tt)
+        except TypeError:
+            serving = body_reader(body_id)
     path = getattr(serving, "path", None)
     return str(path) if path is not None else None
 
@@ -82,7 +90,7 @@ def _eval_reader_body(
                     start_jd=jd_start,
                     end_jd=jd_end,
                     body_id=body_id,
-                    ephemeris_file=_serving_path(reader, body_id),
+                    ephemeris_file=_serving_path(reader, body_id, jd_tt),
                 ) from exc
         raise
 

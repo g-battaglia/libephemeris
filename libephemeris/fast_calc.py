@@ -102,10 +102,12 @@ if TYPE_CHECKING:
     from typing import Protocol, Union
 
     from .leb2_reader import LEB2Reader
-    from .leb_composite import CompositeLEBReader
+    from .leb_composite import CompositeLEBReader, TieredLEBReader
     from .leb_reader import LEBReader
 
-    LEBReaderLike = Union[LEBReader, LEB2Reader, CompositeLEBReader]
+    LEBReaderLike = Union[
+        LEBReader, LEB2Reader, CompositeLEBReader, TieredLEBReader
+    ]
 
     class _DeflectorSource(Protocol):
         """Structural type for anything that can supply deflector states.

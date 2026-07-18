@@ -370,7 +370,7 @@ def _raise_leb_range_miss(body_id: int, jd: float) -> None:
 
     if get_calc_mode() != "leb":
         return
-    body_coverage = get_body_coverage(body_id)
+    body_coverage = get_body_coverage(body_id, jd)
     if (
         body_id not in _LEB_CORE_BODY_IDS
         or body_coverage is None

@@ -29,8 +29,9 @@ readonly LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-60}"
 # Supported values. Keep LEB2 groups in the same order as
 # `libephemeris.leb_groups.LEB2_GROUPS`.
 TIERS=(base medium extended)
-LEB1_GROUPS=(planets asteroids exotics analytical)
-LEB2_GROUPS=(core asteroids exotics apogee)
+LEB1_MERGED_GROUPS=(planets asteroids exotics analytical)
+LEB1_GROUPS=(planets asteroids exotics analytical uranians)
+LEB2_GROUPS=(core asteroids exotics apogee uranians)
 
 # These seven TNO kernels must be refreshed before exotics regeneration unless
 # the operator explicitly opts into reusing the SPK cache.
@@ -43,7 +44,7 @@ TNO_SPK_IDS=(
   90482   # Orcus
   50000   # Quaoar
 )
-readonly TIERS LEB1_GROUPS LEB2_GROUPS TNO_SPK_IDS
+readonly TIERS LEB1_MERGED_GROUPS LEB1_GROUPS LEB2_GROUPS TNO_SPK_IDS
 
 # ==============================================================================
 # Terminal formatting and UI helpers
@@ -175,7 +176,8 @@ Tier selection:
   base|medium|extended|all may also be passed positionally.
 
 LEB1 group selection:
-  --group GROUP           planets, asteroids, exotics, analytical, or all.
+  --group GROUP           planets, asteroids, exotics, analytical, uranians,
+                          or all.
   --groups LIST           Comma-separated groups, e.g. planets,exotics.
   --no-merge              Generate partial LEB1 files without updating the main
                           data/leb/ephemeris_<tier>.leb file.
@@ -184,8 +186,8 @@ LEB2 selection:
   --leb1-only             Generate, merge, and verify LEB1 only.
   --leb2-only             Convert and verify LEB2 from existing LEB1 files only.
   --leb2-groups LIST      Comma-separated groups: core, asteroids, exotics,
-                          apogee, or all. When omitted, groups are inferred from
-                          the selected LEB1 groups.
+                          apogee, uranians, or all. When omitted, groups are
+                          inferred from the selected LEB1 groups.
 
 Verification:
   --no-verify             Skip LEB1 and LEB2 verification.
@@ -222,7 +224,8 @@ Examples:
   ./regenerate-leb.sh base --doctor
 
 Notes:
-  - Extended generation can take hours.
+  - Extended core generation covers the full DE441 interval
+    (-13200..+17191) and can take many hours.
   - Extended exotics require rebound, assist, and the ASSIST data files.
   - LEB1 “planets” and LEB2 “core” are not equivalent groups. LEB2 group
     inference is deliberately conservative.
@@ -429,7 +432,7 @@ resolve_leb1_group_selection() {
   IFS=',' read -r -a requested_groups <<< "$normalized_selection"
   for requested_group in "${requested_groups[@]}"; do
     case "$requested_group" in
-      planets|asteroids|exotics|analytical)
+      planets|asteroids|exotics|analytical|uranians)
         candidates=("$requested_group")
         ;;
       all)
@@ -462,9 +465,11 @@ infer_leb2_groups_from_leb1() {
         ;;
       analytical)
         # Public analytical bodies are split across LEB2 core and apogee.
-        # The historical “uranians” output was intentionally retired.
         append_unique_leb2_group core
         append_unique_leb2_group apogee
+        ;;
+      uranians)
+        append_unique_leb2_group uranians
         ;;
     esac
   done
@@ -492,7 +497,7 @@ resolve_leb2_group_selection() {
   IFS=',' read -r -a requested_groups <<< "$normalized_selection"
   for requested_group in "${requested_groups[@]}"; do
     case "$requested_group" in
-      core|asteroids|exotics|apogee)
+      core|asteroids|exotics|apogee|uranians)
         candidates=("$requested_group")
         ;;
       all)
@@ -515,17 +520,21 @@ resolve_configuration() {
   [[ "$LEB2_VERIFY_SAMPLES" =~ ^[0-9]+$ ]] \
     || fatal "--leb2-verify-samples must be an integer"
 
-  # LEB2 is always converted from the merged main LEB1, so a run that skips
-  # the merge can never feed its own LEB2 conversion: without this guard it
-  # would only die at the freshness assertion AFTER hours of generation.
-  if ! ((ENABLE_MERGE)) && ((ENABLE_LEB2)); then
-    fatal "--no-merge leaves the main LEB1 file stale; combine it with" \
-      "--leb1-only (LEB2 is always converted from the merged main file)"
-  fi
-
   resolve_tier_selection
   resolve_leb1_group_selection
   resolve_leb2_group_selection
+
+  # Every LEB2 group except the companion-only Uranians reads from the merged
+  # main LEB1. Reject a stale conversion plan before expensive generation.
+  if ! ((ENABLE_MERGE)) && ((ENABLE_LEB2)); then
+    local leb2_group
+    for leb2_group in "${SELECTED_LEB2_GROUPS[@]}"; do
+      if [[ "$leb2_group" != "uranians" ]]; then
+        fatal "--no-merge leaves the main LEB1 file stale; combine it with" \
+          "--leb1-only or select only --leb2-groups uranians"
+      fi
+    done
+  fi
 }
 
 array_contains() {
@@ -540,7 +549,19 @@ array_contains() {
 }
 
 all_leb1_groups_selected() {
-  [[ "${#SELECTED_LEB1_GROUPS[@]}" -eq "${#LEB1_GROUPS[@]}" ]]
+  local group
+  for group in "${LEB1_MERGED_GROUPS[@]}"; do
+    array_contains "$group" "${SELECTED_LEB1_GROUPS[@]}" || return 1
+  done
+  return 0
+}
+
+merged_leb1_group_selected() {
+  local group
+  for group in "${LEB1_MERGED_GROUPS[@]}"; do
+    array_contains "$group" "${SELECTED_LEB1_GROUPS[@]}" && return 0
+  done
+  return 1
 }
 
 exotics_selected() {
@@ -667,6 +688,15 @@ select_python_interpreter() {
   export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 }
 
+enable_generation_network_boundary() {
+  # A regeneration command is an explicit provisioning operation. Runtime LEB
+  # calculations remain sealed, but generator subprocesses must be allowed to
+  # refresh JPL Horizons SPKs after the audited cache purge above. Without this
+  # process-local override a repository whose normal config is mode=leb would
+  # delete the stale kernels and then forbid their replacements.
+  export LIBEPHEMERIS_NETWORK_POLICY="allow"
+}
+
 # ==============================================================================
 # Lock lifecycle
 # ==============================================================================
@@ -708,6 +738,38 @@ leb2_output_path() {
   local tier="$1"
   local group="$2"
   printf 'data/leb2/%s_%s.leb2\n' "$tier" "$group"
+}
+
+tier_start_year() {
+  case "$1" in
+    base) printf '1850\n' ;;
+    medium) printf '1550\n' ;;
+    extended) printf '%s\n' '-13200' ;;
+    *) fatal "unknown tier: $1" ;;
+  esac
+}
+
+tier_end_year() {
+  case "$1" in
+    base) printf '2150\n' ;;
+    medium) printf '2650\n' ;;
+    extended) printf '17191\n' ;;
+    *) fatal "unknown tier: $1" ;;
+  esac
+}
+
+tier_start_jd() {
+  case "$1" in
+    extended) printf '%s\n' '-3100015.5' ;;
+    *) fatal "tier $1 has no exact-JD generation boundary" ;;
+  esac
+}
+
+tier_end_jd() {
+  case "$1" in
+    extended) printf '8000016.5\n' ;;
+    *) fatal "tier $1 has no exact-JD generation boundary" ;;
+  esac
 }
 
 ensure_directory() {
@@ -822,6 +884,17 @@ generate_leb1_partials_for_tier() {
       --group "$group"
       --output "$output_path"
     )
+    if [[ "$tier" == "extended" ]]; then
+      command_args+=(
+        --start-jd "$(tier_start_jd "$tier")"
+        --end-jd "$(tier_end_jd "$tier")"
+      )
+    else
+      command_args+=(
+        --start "$(tier_start_year "$tier")"
+        --end "$(tier_end_year "$tier")"
+      )
+    fi
     ((QUIET)) && command_args+=(--quiet)
 
     run_logged "$PYTHON" "${command_args[@]}" || return 1
@@ -847,6 +920,7 @@ replace_leb1_groups_from_partials() {
   fi
 
   for group in "${SELECTED_LEB1_GROUPS[@]}"; do
+    array_contains "$group" "${LEB1_MERGED_GROUPS[@]}" || continue
     partial_path="$(leb1_partial_path "$tier" "$group")"
     partial_paths+=("$partial_path")
 
@@ -854,6 +928,11 @@ replace_leb1_groups_from_partials() {
       [[ -f "$partial_path" ]] || fatal "missing generated partial: $partial_path"
     fi
   done
+
+  if ((${#partial_paths[@]} == 0)); then
+    print_note "main LEB1 unchanged (only companion-only groups selected)"
+    return 0
+  fi
 
   backup_file_if_present "$main_path"
   description="replace selected LEB1 bodies in $main_path"
@@ -1233,8 +1312,13 @@ merge_leb1_for_tier() {
 
   main_path="$(leb1_main_path "$tier")"
 
+  if ! merged_leb1_group_selected; then
+    print_note "main LEB1 unchanged (only companion-only groups selected)"
+    return 0
+  fi
+
   if all_leb1_groups_selected; then
-    for group in "${SELECTED_LEB1_GROUPS[@]}"; do
+    for group in "${LEB1_MERGED_GROUPS[@]}"; do
       partial_paths+=("$(leb1_partial_path "$tier" "$group")")
     done
 
@@ -1264,7 +1348,7 @@ verify_leb1_for_tier() {
     return 0
   fi
 
-  if ((ENABLE_MERGE)); then
+  if ((ENABLE_MERGE)) && merged_leb1_group_selected; then
     target_path="$(leb1_main_path "$tier")"
     command_args=(
       scripts/generate_leb.py
@@ -1276,11 +1360,14 @@ verify_leb1_for_tier() {
     ((QUIET)) && command_args+=(--quiet)
 
     run_logged "$PYTHON" "${command_args[@]}" || return 1
-    return 0
   fi
 
-  # Without a merge, each freshly generated partial is verified independently.
+  # Companion-only partials are never represented in the merged main. Without
+  # a merge, every freshly generated partial is verified independently.
   for group in "${SELECTED_LEB1_GROUPS[@]}"; do
+    if ((ENABLE_MERGE)) && [[ "$group" != "uranians" ]]; then
+      continue
+    fi
     target_path="$(leb1_partial_path "$tier" "$group")"
     command_args=(
       scripts/generate_leb.py
@@ -1303,7 +1390,8 @@ process_leb1_for_tier() {
 
   # A partial-group update rebuilds the main file from itself, so the main
   # must already exist. Check before the expensive generation, not after.
-  if ((ENABLE_MERGE)) && ! all_leb1_groups_selected && ! ((DRY_RUN)); then
+  if ((ENABLE_MERGE)) && merged_leb1_group_selected \
+    && ! all_leb1_groups_selected && ! ((DRY_RUN)); then
     main_path="$(leb1_main_path "$tier")"
     [[ -f "$main_path" ]] \
       || fatal "cannot update selected groups: missing main LEB1: $main_path —" \
@@ -1328,11 +1416,12 @@ assert_leb1_main_is_fresh() {
   [[ -f "$main_path" ]] \
     || fatal "cannot convert LEB2: missing LEB1 source: $main_path"
 
-  # LEB2 is always converted from the merged main LEB1. A newer partial means
-  # somebody regenerated groups with --no-merge, so converting now would use
-  # stale data. Fail loudly instead of silently shipping inconsistent output.
+  # Main-file LEB2 groups are converted from the merged LEB1. A newer merged
+  # partial means somebody used --no-merge, so conversion would ship stale
+  # data. The standalone Uranian companion is intentionally ignored here.
   for partial_path in data/leb/ephemeris_"$tier"_*.leb; do
     [[ -e "$partial_path" ]] || continue
+    [[ "$partial_path" == *_uranians.leb ]] && continue
 
     if [[ -z "$newest_partial" || "$partial_path" -nt "$newest_partial" ]]; then
       newest_partial="$partial_path"
@@ -1357,10 +1446,20 @@ convert_leb2_for_tier() {
 
   source_path="$(leb1_main_path "$tier")"
   if ! ((DRY_RUN)); then
-    assert_leb1_main_is_fresh "$tier" "$source_path"
+    for group in "${SELECTED_LEB2_GROUPS[@]}"; do
+      if [[ "$group" != "uranians" ]]; then
+        assert_leb1_main_is_fresh "$tier" "$source_path"
+        break
+      fi
+    done
   fi
 
   for group in "${SELECTED_LEB2_GROUPS[@]}"; do
+    if [[ "$group" == "uranians" ]]; then
+      source_path="$(leb1_partial_path "$tier" uranians)"
+    else
+      source_path="$(leb1_main_path "$tier")"
+    fi
     output_path="$(leb2_output_path "$tier" "$group")"
     backup_file_if_present "$output_path"
 
@@ -1391,9 +1490,12 @@ verify_leb2_for_tier() {
     return 0
   fi
 
-  reference_path="$(leb1_main_path "$tier")"
-
   for group in "${SELECTED_LEB2_GROUPS[@]}"; do
+    if [[ "$group" == "uranians" ]]; then
+      reference_path="$(leb1_partial_path "$tier" uranians)"
+    else
+      reference_path="$(leb1_main_path "$tier")"
+    fi
     input_path="$(leb2_output_path "$tier" "$group")"
     command_args=(
       scripts/generate_leb2.py
@@ -1499,6 +1601,10 @@ print_configuration() {
   printf '  %s%-13s%s %s\n' "$C_DIM" "Repo:" "$C_RESET" "$SCRIPT_DIR"
   printf '  %s%-13s%s %s\n' "$C_DIM" "Python:" "$C_RESET" "$PYTHON"
   printf '  %s%-13s%s %s\n' "$C_DIM" "Tiers:" "$C_RESET" "$(join_with_commas "${SELECTED_TIERS[@]}")"
+  if array_contains extended "${SELECTED_TIERS[@]}"; then
+    printf '  %s%-13s%s %s\n' "$C_DIM" "Ext. range:" "$C_RESET" \
+      "JD $(tier_start_jd extended)..$(tier_end_jd extended) (exact DE441 bounds)"
+  fi
   printf '  %s%-13s%s %s (%s)\n' "$C_DIM" "LEB1:" "$C_RESET" \
     "$(yes_or_no "$ENABLE_LEB1")" "$(join_with_commas "${SELECTED_LEB1_GROUPS[@]}")"
   printf '  %s%-13s%s %s (%s)\n' "$C_DIM" "LEB2:" "$C_RESET" \
@@ -1577,6 +1683,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import ssl
 import sys
 import urllib.request
 from collections.abc import Iterable
@@ -1678,8 +1785,8 @@ def check_assist_data() -> None:
         required_files = (
             ("planet ephemeris", config.planets_file),
             ("asteroid perturbers", config.asteroids_file),
-            # Extended (-5000..+5000) exceeds DE440's 1550..2650 window, so
-            # generation resolves to this exact deep-time DE441 file.
+            # Full extended generation exceeds DE440's 1550..2650 window, so
+            # N-body companions resolve to this exact deep-time DE441 file.
             (
                 "deep-time DE441",
                 str(_ASSIST_DEFAULT_DIR / "linux_m13000p17000.441"),
@@ -1748,7 +1855,12 @@ def check_horizons_network() -> None:
     url = "https://ssd.jpl.nasa.gov/"
 
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:
+        import certifi
+
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        with urllib.request.urlopen(
+            url, timeout=5, context=ssl_context
+        ) as response:
             report_ok(f"reachable ({response.status} {url})")
     except Exception as error:
         report_warning(
@@ -1885,6 +1997,8 @@ main() {
     run_preflight --report
     exit $?
   fi
+
+  enable_generation_network_boundary
 
   if ! ((SKIP_PREFLIGHT)); then
     # In dry-run mode a failing preflight returns non-zero but intentionally does

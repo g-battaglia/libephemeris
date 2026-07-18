@@ -24,8 +24,14 @@ Provenance:
 
 from __future__ import annotations
 
-# LEB1 generation/merge partition (order = generation + merge order).
+# LEB1 merged-main partition (order = generation + merge order).
 LEB1_GROUPS = ("planets", "asteroids", "exotics", "analytical")
+
+# Standalone LEB1 companions that must be generated and verified but never
+# merged into ``ephemeris_<tier>.leb``.  They are independent conversion
+# sources for the matching LEB2 companion.
+LEB1_COMPANION_GROUPS = ("uranians",)
+LEB1_GENERATION_GROUPS = LEB1_GROUPS + LEB1_COMPANION_GROUPS
 
 # LEB2 distribution partition → ``{tier}_{group}.leb2`` companion files.
 # ``uranians`` carries the eight Hamburg-school bodies (IDs 40-47),

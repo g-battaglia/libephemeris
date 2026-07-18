@@ -368,8 +368,8 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
 
     \b
     What gets downloaded depends on your config:
-      auto mode     LEB2 files + DE kernel + planet_centers + SPK
-      leb mode      LEB2 files only
+      auto mode     best-by-date LEB2 tiers + DE kernel + planet_centers + SPK
+      leb mode      best-by-date LEB2 tiers only
       skyfield      DE kernel + planet_centers + SPK
       horizons      planet_centers (optional)
 
@@ -402,13 +402,23 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
                 click.echo(_d("  LEB2 ephemeris files..."))
             from ..download import download_leb2_for_tier
 
-            download_leb2_for_tier(
-                tier_name=tier,
-                force=force,
-                show_progress=not no_progress,
-                quiet=quiet,
-                activate=True,
-            )
+            tier_order = ("base", "medium", "extended")
+            eligible_tiers = tier_order[: tier_order.index(tier) + 1]
+            for eligible_tier in eligible_tiers:
+                download_leb2_for_tier(
+                    tier_name=eligible_tier,
+                    force=force,
+                    show_progress=not no_progress,
+                    quiet=quiet,
+                    activate=False,
+                )
+
+            # Do not pin the last downloaded core as an explicit single file.
+            # Clear any prior activation so state auto-discovery can compose
+            # the eligible tiers and select the best source for each date.
+            from ..state import set_leb_file
+
+            set_leb_file(None)
             if not quiet:
                 click.echo()
 

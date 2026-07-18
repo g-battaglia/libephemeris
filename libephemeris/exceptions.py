@@ -975,7 +975,7 @@ def validate_jd_range(
         else:
             from .inventory import get_body_coverage
 
-            coverage = get_body_coverage(body_id)
+            coverage = get_body_coverage(body_id, jd)
             if coverage is None:
                 # The downstream LEB dispatcher distinguishes a legitimate
                 # local model from a missing required state. Do not inspect a

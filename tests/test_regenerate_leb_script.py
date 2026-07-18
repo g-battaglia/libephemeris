@@ -7,12 +7,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from libephemeris.leb_groups import LEB2_GROUPS
-
-# Groups the Bash orchestrator handles: exactly the ones converted from the
-# merged main LEB1. Companion-only groups (uranians) are generated and
-# converted from their standalone partial via the Python tooling instead.
-MAIN_FILE_LEB2_GROUPS = tuple(g for g in LEB2_GROUPS if g != "uranians")
+from libephemeris.leb_groups import LEB1_GENERATION_GROUPS, LEB2_GROUPS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PROJECT_ROOT / "regenerate-leb.sh"
@@ -43,12 +38,20 @@ def test_script_parses_cleanly() -> None:
 
 
 def test_shell_leb2_groups_match_canonical_python_registry() -> None:
-    """The standalone Bash entrypoint converts exactly the merged-main groups."""
+    """The Bash entrypoint converts every canonical distribution group."""
     source = SCRIPT.read_text(encoding="utf-8")
     match = re.search(r"^LEB2_GROUPS=\(([^)]*)\)$", source, flags=re.MULTILINE)
 
     assert match is not None
-    assert tuple(match.group(1).split()) == MAIN_FILE_LEB2_GROUPS
+    assert tuple(match.group(1).split()) == LEB2_GROUPS
+
+
+def test_shell_leb1_generation_groups_include_standalone_companions() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    match = re.search(r"^LEB1_GROUPS=\(([^)]*)\)$", source, flags=re.MULTILINE)
+
+    assert match is not None
+    assert tuple(match.group(1).split()) == LEB1_GENERATION_GROUPS
 
 
 def test_all_selects_only_canonical_leb2_groups() -> None:
@@ -59,17 +62,17 @@ def test_all_selects_only_canonical_leb2_groups() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert tuple(result.stdout.splitlines()) == MAIN_FILE_LEB2_GROUPS
+    assert tuple(result.stdout.splitlines()) == LEB2_GROUPS
 
 
-def test_retired_uranians_group_is_rejected() -> None:
-    """A stale caller must fail before attempting to generate a bogus file."""
+def test_uranians_group_is_accepted_as_standalone_companion() -> None:
     result = _run_sourced_script(
-        "parse_arguments --leb2-only --leb2-groups uranians; resolve_configuration"
+        "parse_arguments --leb2-only --leb2-groups uranians; "
+        "resolve_configuration; printf '%s\\n' \"${SELECTED_LEB2_GROUPS[@]}\""
     )
 
-    assert result.returncode == 2
-    assert "invalid LEB2 group: uranians" in result.stderr
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "uranians"
 
 
 def test_analytical_leb1_affects_only_surviving_leb2_groups() -> None:
@@ -100,6 +103,38 @@ def test_no_merge_with_leb1_only_is_accepted() -> None:
     assert result.stdout.strip().endswith("OK")
 
 
+def test_no_merge_can_convert_standalone_uranians() -> None:
+    result = _run_sourced_script(
+        "parse_arguments --no-merge --group uranians --leb2-groups uranians; "
+        "resolve_configuration; echo OK"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().endswith("OK")
+
+
+def test_extended_generation_uses_the_full_de441_range() -> None:
+    result = _run_sourced_script(
+        "printf '%s..%s\\n' \"$(tier_start_jd extended)\" "
+        "\"$(tier_end_jd extended)\""
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "-3100015.5..8000016.5"
+
+
+def test_extended_generation_command_uses_exact_julian_boundaries() -> None:
+    result = _run_sourced_script(
+        "PYTHON=python; DRY_RUN=1; QUIET=0; SELECTED_LEB1_GROUPS=(planets); "
+        "generate_leb1_partials_for_tier extended"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--start-jd -3100015.5" in result.stdout
+    assert "--end-jd 8000016.5" in result.stdout
+    assert "--start -13200" not in result.stdout
+
+
 def test_leb2_only_does_not_require_the_nbody_stack() -> None:
     """Conversion from an existing LEB1 never imports rebound/assist."""
     result = _run_sourced_script(
@@ -119,3 +154,14 @@ def test_extended_exotics_generation_requires_the_nbody_stack() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "NBODY=yes" in result.stdout
+
+
+def test_generation_is_an_explicit_network_provisioning_boundary() -> None:
+    result = _run_sourced_script(
+        "LIBEPHEMERIS_NETWORK_POLICY=sealed; "
+        "enable_generation_network_boundary; "
+        "printf '%s\\n' \"$LIBEPHEMERIS_NETWORK_POLICY\""
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "allow"

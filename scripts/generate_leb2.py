@@ -707,7 +707,7 @@ def convert_leb1_to_leb2(
 TIER_CONFIGS = {
     "base": ("de440s.bsp", 1850, 2150, "ephemeris_base"),
     "medium": ("de440.bsp", 1550, 2650, "ephemeris_medium"),
-    "extended": ("de441.bsp", -5000, 5000, "ephemeris_extended"),
+    "extended": ("de441.bsp", -13200, 17191, "ephemeris_extended"),
 }
 
 DEFAULT_LEB_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "leb")

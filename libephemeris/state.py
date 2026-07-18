@@ -221,7 +221,7 @@ _JPL_SOURCE_ACCESS: ContextVar[bool] = ContextVar(
 if TYPE_CHECKING:
     from .horizons_backend import HorizonsClient
     from .leb2_reader import LEB2Reader
-    from .leb_composite import CompositeLEBReader
+    from .leb_composite import CompositeLEBReader, TieredLEBReader
     from .leb_reader import LEBReader
     from .vendor.spktype21 import SPKType21
 
@@ -588,6 +588,46 @@ def _discover_leb_file() -> Optional[str]:
     return None
 
 
+def _discover_reviewed_leb_tier_cores() -> dict[str, str]:
+    """Return reviewed core paths eligible for best-by-date LEB routing.
+
+    The configured precision tier remains the maximum requested coverage:
+    ``base`` admits only base, ``medium`` admits base+medium, and ``extended``
+    admits all three.  Only byte-matching manifest assets participate.  Legacy
+    or explicitly configured files retain their historical single-reader
+    semantics and are resolved by :func:`_discover_leb_file` instead.
+    """
+    active_tier = get_precision_tier()
+    priority = ("base", "medium", "extended")
+    eligible = priority[: priority.index(active_tier) + 1]
+    leb_dir = os.path.join(_get_data_dir(), "leb")
+    package_dir = os.path.join(os.path.dirname(__file__), "data", "leb2")
+    discovered: dict[str, str] = {}
+
+    for tier in eligible:
+        filename = f"{tier}_core.leb2"
+        cached = os.path.join(leb_dir, filename)
+        if _is_reviewed_tier_core(cached, tier):
+            discovered[tier] = cached
+            continue
+        if os.path.isfile(cached):
+            get_logger().warning(
+                "Ignoring unreviewed cached LEB core %s; it cannot participate "
+                "in best-by-date routing",
+                cached,
+            )
+
+        bundled = os.path.join(package_dir, filename)
+        if _is_reviewed_tier_core(bundled, tier):
+            discovered[tier] = bundled
+        elif os.path.isfile(bundled):
+            get_logger().error(
+                "Bundled LEB core failed its pinned SHA-256: %s", bundled
+            )
+
+    return discovered
+
+
 def _year_to_jd(year: int) -> float:
     """Convert a Gregorian year to a Julian Day (Jan 1, 12:00 TT).
 
@@ -685,7 +725,9 @@ def release_data_cache() -> None:
                         pass
 
 
-def get_leb_reader() -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
+def get_leb_reader() -> Optional[
+    "LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader"
+]:
     """Get the active LEBReader, if any.
 
     Respects the calculation mode set via set_calc_mode() or the
@@ -740,6 +782,7 @@ def _get_leb_reader_locked(mode):
     global _LEB_READER
     if _LEB_READER is None:
         path = _LEB_FILE or os.environ.get("LIBEPHEMERIS_LEB")
+        tier_cores: dict[str, str] = {}
 
         # TOML config fallback
         if path is None:
@@ -749,7 +792,9 @@ def _get_leb_reader_locked(mode):
 
         # Auto-discover if no explicit path configured
         if path is None:
-            path = _discover_leb_file()
+            tier_cores = _discover_reviewed_leb_tier_cores()
+            active_tier = get_precision_tier()
+            path = tier_cores.get(active_tier) or _discover_leb_file()
             if path is not None:
                 logger = get_logger()
                 logger.debug("Auto-discovered LEB file: %s", path)
@@ -767,7 +812,12 @@ def _get_leb_reader_locked(mode):
                 # Explicitly selected/generated non-pinned group files retain
                 # normal companion discovery.
                 reviewed_core = _is_reviewed_core(path)
-                if "_" in basename and not reviewed_core:
+                active_tier = get_precision_tier()
+                if tier_cores.get(active_tier) == path and len(tier_cores) > 1:
+                    from .leb_composite import TieredLEBReader
+
+                    _LEB_READER = TieredLEBReader.from_tier_cores(tier_cores)
+                elif "_" in basename and not reviewed_core:
                     from .leb_composite import CompositeLEBReader
 
                     _LEB_READER = CompositeLEBReader.from_file_with_companions(path)

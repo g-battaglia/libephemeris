@@ -420,6 +420,49 @@ def test_download_all_includes_iers_downloads(monkeypatch):
     ]
 
 
+def test_download_auto_extended_installs_all_eligible_leb_tiers(monkeypatch):
+    calls: list[tuple[object, ...]] = []
+
+    monkeypatch.setattr(state_module, "get_precision_tier", lambda: "extended")
+    monkeypatch.setattr(state_module, "get_calc_mode", lambda: "leb")
+    monkeypatch.setattr(
+        state_module,
+        "set_leb_file",
+        lambda path: calls.append(("activate", path)),
+    )
+
+    def fake_download_leb2_for_tier(**kwargs: object) -> None:
+        calls.append(
+            (
+                "leb2",
+                kwargs["tier_name"],
+                kwargs["force"],
+                kwargs["show_progress"],
+                kwargs["quiet"],
+                kwargs["activate"],
+            )
+        )
+
+    monkeypatch.setattr(
+        download_module,
+        "download_leb2_for_tier",
+        fake_download_leb2_for_tier,
+    )
+
+    result = CliRunner().invoke(
+        cli_module.cli,
+        ["download", "auto", "--force", "--no-progress", "--quiet"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [
+        ("leb2", "base", True, False, True, False),
+        ("leb2", "medium", True, False, True, False),
+        ("leb2", "extended", True, False, True, False),
+        ("activate", None),
+    ]
+
+
 def test_status_verbose_levels(monkeypatch, tmp_path):
     home_dir = tmp_path / "home"
     data_dir = home_dir / ".libephemeris"

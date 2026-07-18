@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+from argparse import Namespace
 
 import numpy as np
 import pytest
@@ -24,6 +25,104 @@ from libephemeris.leb_format import (
 from libephemeris.leb_reader import LEBReader
 from libephemeris.time_utils import julday
 from scripts import generate_leb
+
+
+def _tier_args(**overrides: object) -> Namespace:
+    values: dict[str, object] = {
+        "tier": "extended",
+        "start": None,
+        "end": None,
+        "start_jd": None,
+        "end_jd": None,
+        "output": "extended.leb",
+    }
+    values.update(overrides)
+    return Namespace(**values)
+
+
+def test_extended_tier_defaults_to_exact_de441_boundaries(monkeypatch) -> None:
+    monkeypatch.setattr("libephemeris.set_jpl_file", lambda _path: None)
+
+    jd_start, jd_end, _ = generate_leb._resolve_tier(_tier_args())
+
+    assert jd_start == generate_leb.DE441_START_JD
+    assert jd_end == generate_leb.DE441_END_JD
+
+
+def test_explicit_extended_year_override_keeps_calendar_semantics(monkeypatch) -> None:
+    monkeypatch.setattr("libephemeris.set_jpl_file", lambda _path: None)
+
+    jd_start, jd_end, _ = generate_leb._resolve_tier(_tier_args(start=-5000, end=5000))
+
+    assert jd_start == generate_leb._year_to_jd(-5000)
+    assert jd_end == generate_leb._year_to_jd(5000)
+
+
+def test_extended_nbody_coverage_is_clamped_to_assist_de441() -> None:
+    requested_start = generate_leb._year_to_jd(-13200)
+    requested_end = generate_leb._year_to_jd(17191)
+
+    actual_start, actual_end = generate_leb._nbody_coverage_for_range(
+        requested_start, requested_end
+    )
+
+    assert actual_start == generate_leb._year_to_jd(-13000)
+    assert actual_end == generate_leb._year_to_jd(17000)
+
+
+def test_nbody_coverage_rejects_non_overlapping_range() -> None:
+    with pytest.raises(ValueError, match="does not overlap"):
+        generate_leb._nbody_coverage_for_range(
+            generate_leb._year_to_jd(17001),
+            generate_leb._year_to_jd(17191),
+        )
+
+
+def test_required_fit_end_includes_the_complete_final_segment() -> None:
+    assert generate_leb._required_fit_end(100.0, 121.0, 8.0) == 124.0
+    assert generate_leb._required_fit_end(100.0, 124.0, 8.0) == 124.0
+
+
+def test_partial_source_range_is_aligned_to_complete_segments() -> None:
+    actual_start, actual_end = generate_leb._align_body_range_to_source(
+        100.0,
+        200.0,
+        109.0,
+        190.0,
+        8.0,
+        margin_days=1.0,
+    )
+
+    assert actual_start == 110.0
+    assert actual_end == 182.0
+    assert (actual_end - actual_start) % 8.0 == 0.0
+
+
+def test_spk_coverage_gate_has_no_calendar_tolerance(monkeypatch) -> None:
+    from libephemeris.vendor.spktype21 import SPKType21
+
+    target = generate_leb._ASTEROID_NAIF[15]
+
+    class Segment:
+        center = 10
+
+        def __init__(self, start_jd: float, end_jd: float) -> None:
+            self.target = target
+            self.start_second = (start_jd - 2451545.0) * 86400.0
+            self.end_second = (end_jd - 2451545.0) * 86400.0
+
+    class Kernel:
+        def __init__(self, end_jd: float) -> None:
+            self.segments = [Segment(100.0, end_jd)]
+
+        def close(self) -> None:
+            pass
+
+    kernel = Kernel(199.0)
+    monkeypatch.setattr(SPKType21, "open", lambda _path: kernel)
+
+    assert generate_leb._spk_covers_range("source.bsp", 15, 100.0, 199.0)
+    assert not generate_leb._spk_covers_range("source.bsp", 15, 100.0, 200.0)
 
 
 class TestAssembleLeb:
@@ -275,6 +374,41 @@ class TestGeneratorValidation:
         with pytest.raises(ValueError, match="n_samples must be at least 1"):
             generate_leb.verify_leb("unused.leb", n_samples=0, verbose=False)
 
+    def test_post_verifier_opens_offline_jpl_source_boundary(self, monkeypatch) -> None:
+        import libephemeris
+        from libephemeris import leb_reader, state
+
+        class Body:
+            coord_type = generate_leb.COORD_ICRS_BARY
+            jd_start = 0.0
+            jd_end = 10.0
+
+        class Reader:
+            _bodies = {SUN: Body()}
+            jd_range = (0.0, 10.0)
+
+            def __init__(self, _path: str) -> None:
+                pass
+
+            def eval_body(self, _body_id: int, _jd: float):
+                return (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
+
+            def close(self) -> None:
+                pass
+
+        def verify_source_boundary(_body_id: int, _jd: float, _position):
+            assert state._JPL_SOURCE_ACCESS.get() is True
+            return 0.0, 1.0
+
+        monkeypatch.setattr(leb_reader, "LEBReader", Reader)
+        monkeypatch.setattr(libephemeris, "set_auto_spk_download", lambda _on: None)
+        monkeypatch.setattr(generate_leb, "_build_ecliptic_eval_funcs", lambda: {})
+        monkeypatch.setattr(generate_leb, "_build_helio_eval_funcs", lambda: {})
+        monkeypatch.setattr(generate_leb, "_verify_icrs_planet", verify_source_boundary)
+
+        assert generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)
+        assert state._JPL_SOURCE_ACCESS.get() is False
+
     def test_post_verifier_rejects_non_finite_reader_output(self, monkeypatch) -> None:
         import libephemeris
         from libephemeris import leb_reader
@@ -301,6 +435,42 @@ class TestGeneratorValidation:
         monkeypatch.setattr(libephemeris, "set_auto_spk_download", lambda _on: None)
         monkeypatch.setattr(generate_leb, "_build_ecliptic_eval_funcs", lambda: {})
         monkeypatch.setattr(generate_leb, "_build_helio_eval_funcs", lambda: {})
+
+        assert not generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)
+
+    def test_post_verifier_always_samples_body_edges(self, monkeypatch) -> None:
+        import libephemeris
+        from libephemeris import leb_reader
+
+        class Body:
+            coord_type = generate_leb.COORD_ICRS_BARY
+            jd_start = 0.0
+            jd_end = 10.0
+            interval_days = 2.0
+            degree = 3
+
+        class Reader:
+            _bodies = {SUN: Body()}
+            jd_range = (0.0, 10.0)
+
+            def __init__(self, _path: str) -> None:
+                pass
+
+            def eval_body(self, _body_id: int, jd: float):
+                edge_error = 0.1 if jd >= 9.0 else 0.0
+                return (edge_error, 0.0, 0.0), (0.0, 0.0, 0.0)
+
+            def close(self) -> None:
+                pass
+
+        def compare(_body_id: int, _jd: float, position):
+            return abs(float(position[0])), 1.0
+
+        monkeypatch.setattr(leb_reader, "LEBReader", Reader)
+        monkeypatch.setattr(libephemeris, "set_auto_spk_download", lambda _on: None)
+        monkeypatch.setattr(generate_leb, "_build_ecliptic_eval_funcs", lambda: {})
+        monkeypatch.setattr(generate_leb, "_build_helio_eval_funcs", lambda: {})
+        monkeypatch.setattr(generate_leb, "_verify_icrs_planet", compare)
 
         assert not generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)
 

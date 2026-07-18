@@ -51,17 +51,15 @@ def test_runtime_requirements_follow_manifest_and_canonical_groups(
     requirements = eph.get_runtime_data_requirements("extended")
 
     assert [item.group for item in requirements if item.kind == "leb2"] == [
-        "core",
-        "asteroids",
-        "exotics",
-        "apogee",
-        "uranians",
+        group
+        for _tier in ("base", "medium", "extended")
+        for group in ("core", "asteroids", "exotics", "apogee", "uranians")
     ]
     assert requirements[-1].name == "extended_uranians.leb2"
-    assert len(requirements) == 5
+    assert len(requirements) == 15
     assert all(item.kind == "leb2" for item in requirements)
     assert all(len(item.sha256) == 64 for item in requirements)
-    assert requirements[0].path == str(tmp_path / "leb" / "extended_core.leb2")
+    assert requirements[0].path == str(tmp_path / "leb" / "base_core.leb2")
 
 
 def test_leb_mode_fails_closed_outside_known_body_range() -> None:

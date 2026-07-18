@@ -128,8 +128,12 @@ class TestGetSetPrecisionTier:
 
     def test_set_clears_planets_cache(self):
         """Changing the tier should clear _PLANETS so the new file is loaded."""
-        # Load planets
-        state.get_planets()
+        # Loading a raw DE kernel is intentionally blocked by the repository's
+        # default sealed LEB configuration.  This test exercises the explicit
+        # offline-generator boundary because it is testing cache invalidation,
+        # not calculation-source routing.
+        with state._allow_jpl_source():
+            state.get_planets()
         assert state._PLANETS is not None
 
         set_precision_tier("base")

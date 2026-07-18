@@ -73,23 +73,26 @@ def get_runtime_data_requirements(
     if active_tier not in ("base", "medium", "extended"):
         raise ValueError(f"Unsupported precision tier: {active_tier!r}")
 
+    tier_order = ("base", "medium", "extended")
+    eligible_tiers = tier_order[: tier_order.index(active_tier) + 1]
     data_dir = get_data_dir()
     requirements: list[RuntimeDataRequirement] = []
-    for group in LEB2_GROUPS:
-        name = f"{active_tier}_{group}.leb2"
-        info = DATA_FILES.get(name)
-        sha256 = info.get("sha256") if info is not None else None
-        if not isinstance(sha256, str) or not sha256:
-            raise RuntimeError(f"Reviewed manifest pin missing for {name}")
-        requirements.append(
-            RuntimeDataRequirement(
-                name=name,
-                kind="leb2",
-                group=group,
-                path=str(data_dir / "leb" / name),
-                sha256=sha256,
+    for eligible_tier in eligible_tiers:
+        for group in LEB2_GROUPS:
+            name = f"{eligible_tier}_{group}.leb2"
+            info = DATA_FILES.get(name)
+            sha256 = info.get("sha256") if info is not None else None
+            if not isinstance(sha256, str) or not sha256:
+                raise RuntimeError(f"Reviewed manifest pin missing for {name}")
+            requirements.append(
+                RuntimeDataRequirement(
+                    name=name,
+                    kind="leb2",
+                    group=group,
+                    path=str(data_dir / "leb" / name),
+                    sha256=sha256,
+                )
             )
-        )
 
     return tuple(requirements)
 
@@ -104,21 +107,76 @@ def _group_from_path(path: str | None) -> str | None:
     return stem.rsplit("_", 1)[-1]
 
 
-def _serving_reader(reader: Any, body_id: int) -> Any | None:
+def _leb_precision_class(
+    body_id: int,
+    path: str | None,
+    *,
+    reviewed: bool,
+) -> str:
+    """Describe the numerical origin stored in a selected LEB artifact."""
+    if not reviewed:
+        return "unverified-local"
+
+    from .constants import (
+        INTP_APOG,
+        INTP_PERG,
+        MEAN_APOG,
+        MEAN_NODE,
+        OSCU_APOG,
+        TRUE_NODE,
+    )
+
+    if (
+        int(body_id)
+        in {
+            MEAN_NODE,
+            TRUE_NODE,
+            MEAN_APOG,
+            OSCU_APOG,
+            INTP_APOG,
+            INTP_PERG,
+        }
+        or 40 <= int(body_id) <= 58
+    ):
+        return "analytical"
+
+    from .exotic_bodies import (
+        EXOTIC_ASSIST_PERTURBER_IDS,
+        EXOTIC_EXTENDED_IDS,
+    )
+
+    nbody_ids = set(EXOTIC_EXTENDED_IDS) - set(EXOTIC_ASSIST_PERTURBER_IDS)
+    if int(body_id) in nbody_ids:
+        if path is None:
+            # A date-less union covers direct-SPK base/medium intervals and
+            # the extended numerical trajectory, so no single class applies.
+            return "mixed"
+        tokens = set(Path(path).stem.split("_"))
+        if "extended" in tokens:
+            return "numerical-model"
+
+    return "ephemeris"
+
+
+def _serving_reader(reader: Any, body_id: int, jd: float | None = None) -> Any | None:
     """Return the concrete reader serving ``body_id`` from a composite."""
     body_reader = getattr(reader, "body_reader", None)
     if body_reader is not None:
-        return body_reader(body_id)
+        try:
+            return body_reader(body_id, jd)
+        except TypeError:
+            return body_reader(body_id)
     return reader if getattr(reader, "has_body", lambda _body: False)(body_id) else None
 
 
-def get_body_coverage(body_id: int) -> BodyCoverage | None:
-    """Return active LEB coverage for ``body_id``, independent of target date.
+def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | None:
+    """Return active LEB coverage for ``body_id`` and optionally ``jd``.
 
     ``None`` means that the active LEB reader does not contain the body. It
-    does not imply that an analytical or online fallback exists. Callers in
-    sealed LEB mode should treat a miss for an optional minor body as an
-    unavailable capability rather than probing a fallback.
+    does not imply that an analytical or online fallback exists.  With a
+    date-aware tiered reader, a covered ``jd`` reports the concrete selected
+    tier file; a date outside every stored interval reports the union coverage
+    without pretending that one file served the request.
     """
     from .state import get_leb_reader
 
@@ -129,26 +187,39 @@ def get_body_coverage(body_id: int) -> BodyCoverage | None:
     if reader is None:
         return None
 
-    serving = _serving_reader(reader, int(body_id))
-    if serving is None:
-        return None
-    coverage_fn = getattr(serving, "body_coverage", None)
+    selected_fn = getattr(reader, "selected_body_reader", None)
+    selected = (
+        selected_fn(int(body_id), float(jd))
+        if jd is not None and selected_fn is not None
+        else None
+    )
+    serving = selected or _serving_reader(reader, int(body_id), jd)
+    coverage_owner = selected if selected is not None else reader
+    coverage_fn = getattr(coverage_owner, "body_coverage", None)
     if coverage_fn is None:
         return None
     bounds = coverage_fn(int(body_id))
     if bounds is None:
         return None
 
-    path = getattr(serving, "path", None)
-    reviewed = bool(
-        getattr(serving, "_manifest_verified", False)
-        or getattr(reader, "_manifest_verified", False)
+    # When a tiered reader has no covering candidate, ``serving`` is merely
+    # the priority fallback used to raise ValueError.  Do not mislabel that
+    # file as the source of an out-of-range result.
+    if selected_fn is not None and (jd is None or selected is None):
+        path = None
+    else:
+        path = getattr(serving, "path", None) if serving is not None else None
+    serving_reviewed = (
+        bool(getattr(serving, "_manifest_verified", False))
+        if serving is not None
+        else False
     )
+    reviewed = serving_reviewed or bool(getattr(reader, "_manifest_verified", False))
     path_str = str(path) if path is not None else None
     return BodyCoverage(
         body_id=int(body_id),
         source="LEB",
-        precision_class="ephemeris" if reviewed else "unverified-local",
+        precision_class=_leb_precision_class(int(body_id), path_str, reviewed=reviewed),
         jd_start=float(bounds[0]),
         jd_end=float(bounds[1]),
         data_file=path_str,
@@ -157,9 +228,9 @@ def get_body_coverage(body_id: int) -> BodyCoverage | None:
     )
 
 
-def coverage(body_id: int) -> BodyCoverage | None:
+def coverage(body_id: int, jd: float | None = None) -> BodyCoverage | None:
     """Concise alias for :func:`get_body_coverage`."""
-    return get_body_coverage(body_id)
+    return get_body_coverage(body_id, jd)
 
 
 def _reader_file_info(reader: Any, *, inherited_verified: bool) -> dict[str, Any]:
