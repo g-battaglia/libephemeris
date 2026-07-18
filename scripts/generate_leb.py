@@ -1330,14 +1330,16 @@ def _eval_body_icrs_vectorized(
 ) -> np.ndarray:
     """Get vectorized ICRS barycentric positions for a planet.
 
-    Handles inner planets (direct Skyfield target) and outer planets
-    (barycenter + SPK center offset or COB correction) transparently.
+    Handles inner planets as direct Skyfield targets and stores outer planets
+    as the system barycentres supplied by the selected DE kernel.  The latter
+    is an explicit LEB format contract (``COORD_ICRS_BARY_SYSTEM``): a runtime
+    may add an independently sourced JPL planet-centre offset when available,
+    but the persisted LEB channel itself must remain the pure DE state.
 
-    For outer planets, uses a **hybrid per-JD approach** that matches the
-    runtime behavior of _SpkCenterTarget: SPK center offsets are used for
-    JDs within the planet_centers.bsp coverage, and analytical COB corrections
-    are used for JDs outside that range. This ensures the stored Chebyshev
-    data matches what calc() produces at runtime.
+    In particular, generation must not depend on whether an optional
+    ``planet_centers_*.bsp`` happens to exist in the maintainer's data
+    directory, and must not bake an analytical centre-of-body model into a
+    channel declared to be JPL-backed.
 
     Every fitting JD must remain inside the selected DE kernel.  The caller
     chooses a source-backed range and segment grid before reaching this
@@ -1353,8 +1355,7 @@ def _eval_body_icrs_vectorized(
     Returns:
         Array of shape (N, 3) with ICRS barycentric positions in AU.
     """
-    from libephemeris.planets import _PLANET_FALLBACK, _PLANET_CENTER_NAIF_IDS
-    from libephemeris.state import get_planet_center_segment
+    from libephemeris.planets import _PLANET_FALLBACK
 
     spk_min, spk_max = _get_spk_jd_range(planets)
 
@@ -1365,64 +1366,14 @@ def _eval_body_icrs_vectorized(
     except KeyError:
         pass
 
-    # Outer planet: needs barycenter + center offset
+    # Outer planets are intentionally persisted as the DE system barycentre.
     bary_name = _PLANET_FALLBACK.get(target_name)
     if bary_name is None:
         raise ValueError(f"No target or fallback for {target_name}")
 
     barycenter = planets[bary_name]
 
-    # Get barycenter positions for ALL JDs (vectorized, always available)
-    bary_vals = _eval_target_vectorized(barycenter, all_jds, ts, spk_min, spk_max)
-
-    # Hybrid SPK/COB approach: use SPK center where in range, analytical COB
-    # where out of range. This matches _SpkCenterTarget's runtime behavior.
-    if target_name in _PLANET_CENTER_NAIF_IDS:
-        naif_id = _PLANET_CENTER_NAIF_IDS[target_name]
-        center_segment = get_planet_center_segment(naif_id)
-        if center_segment is not None:
-            # Get the SPK center segment's JD range
-            spk_seg = center_segment.spk_segment
-            center_jd_min = spk_seg.start_jd
-            center_jd_max = spk_seg.end_jd
-            margin = 1.0  # days safety margin
-            clo = center_jd_min + margin
-            chi = center_jd_max - margin
-
-            in_spk = (all_jds >= clo) & (all_jds <= chi)
-            in_spk_idx = np.where(in_spk)[0]
-            out_spk_idx = np.where(~in_spk)[0]
-
-            # Apply SPK center offset for in-range JDs (vectorized)
-            if len(in_spk_idx) > 0:
-                t_in = ts.tt_jd(all_jds[in_spk_idx])
-                offset_pos = np.asarray(center_segment.at(t_in).position.au)  # (3, N)
-                bary_vals[in_spk_idx] += offset_pos.T
-
-            # Apply analytical COB for out-of-range JDs (scalar)
-            if len(out_spk_idx) > 0:
-                from libephemeris.moon_theories import get_cob_offset
-
-                for i in out_spk_idx:
-                    t_single = ts.tt_jd(float(all_jds[i]))
-                    offset = get_cob_offset(bary_name, t_single)
-                    bary_vals[i, 0] += offset[0]
-                    bary_vals[i, 1] += offset[1]
-                    bary_vals[i, 2] += offset[2]
-
-            return bary_vals
-
-    # No SPK center available at all: pure analytical COB fallback
-    from libephemeris.moon_theories import get_cob_offset
-
-    for i in range(len(all_jds)):
-        t_single = ts.tt_jd(float(all_jds[i]))
-        offset = get_cob_offset(bary_name, t_single)
-        bary_vals[i, 0] += offset[0]
-        bary_vals[i, 1] += offset[1]
-        bary_vals[i, 2] += offset[2]
-
-    return bary_vals
+    return _eval_target_vectorized(barycenter, all_jds, ts, spk_min, spk_max)
 
 
 def generate_body_icrs(
@@ -1456,7 +1407,7 @@ def generate_body_icrs(
         jd_start, jd_end, interval_days, degree
     )
 
-    # Single vectorized evaluation (handles COB correction for outer planets)
+    # Single vectorized evaluation of the declared DE source channel.
     all_values = _eval_body_icrs_vectorized(target_name, all_jds, planets, ts)
 
     return _fit_and_verify_from_values(
@@ -1636,7 +1587,7 @@ def generate_body_icrs_asteroid(
             jd_start, jd_end, interval_days, degree
         )
 
-        # Get Sun barycentric positions with extrapolation for overshoot
+        # Get source-backed Sun barycentric positions without extrapolation.
         spk_min, spk_max = _get_spk_jd_range(planets)
         sun = planets["sun"]
         sun_bary = _eval_target_vectorized(sun, all_jds, ts, spk_min, spk_max)  # (N, 3)
@@ -3885,16 +3836,20 @@ def _build_helio_eval_funcs() -> dict:
 def _verify_icrs_planet(body_id: int, jd: float, leb_pos: tuple) -> Tuple[float, float]:
     """Verify an ICRS planet against Skyfield. Returns (max_err_au, dist_au)."""
     from libephemeris.state import get_planets, get_timescale
-    from libephemeris.planets import get_planet_target
 
     planets = get_planets()
     ts = get_timescale()
 
     target_name = _PLANET_MAP[body_id]
-    target = get_planet_target(planets, target_name)
-    t = ts.tt_jd(jd)
     ref_pos = _validated_finite_array(
-        target.at(t).position.au, (3,), f"ICRS reference for body {body_id}"
+        _eval_body_icrs_vectorized(
+            target_name,
+            np.asarray([jd], dtype=np.float64),
+            planets,
+            ts,
+        )[0],
+        (3,),
+        f"ICRS reference for body {body_id}",
     )
     leb_pos_array = _validated_finite_array(
         leb_pos, (3,), f"LEB ICRS position for body {body_id}"

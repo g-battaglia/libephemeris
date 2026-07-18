@@ -19,7 +19,7 @@ import pytest
 # Ensure scripts directory is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 
-from libephemeris.constants import EARTH, MOON, SUN
+from libephemeris.constants import EARTH, JUPITER, MOON, SUN
 from libephemeris.leb_format import (
     BODY_PARAMS,
     MAGIC,
@@ -298,6 +298,77 @@ def test_skyfield_vector_evaluator_accepts_source_backed_nodes() -> None:
     assert np.array_equal(timescale.received, jds)
     assert values.shape == (3, 3)
     assert np.array_equal(values[:, 0], jds)
+
+
+def test_outer_planet_generation_persists_the_pure_de_barycentre(
+    monkeypatch,
+) -> None:
+    """Optional centre files and analytical models cannot change LEB bytes."""
+
+    class Timescale:
+        def tt_jd(self, jds: np.ndarray) -> np.ndarray:
+            return np.asarray(jds)
+
+    class Target:
+        def __init__(self, offset: float) -> None:
+            self.offset = offset
+
+        def at(self, jds: np.ndarray) -> SimpleNamespace:
+            values = np.asarray(jds) + self.offset
+            positions = np.vstack((values, values + 1.0, values + 2.0))
+            return SimpleNamespace(position=SimpleNamespace(au=positions))
+
+    planets = {
+        "jupiter barycenter": Target(10.0),
+    }
+    monkeypatch.setattr(
+        generate_leb,
+        "_get_spk_jd_range",
+        lambda _planets: (100.0, 200.0),
+    )
+
+    jds = np.array([110.0, 150.0, 190.0])
+    actual = generate_leb._eval_body_icrs_vectorized(
+        "jupiter",
+        jds,
+        planets,
+        Timescale(),
+    )
+
+    expected = np.column_stack((jds + 10.0, jds + 11.0, jds + 12.0))
+    assert np.array_equal(actual, expected)
+
+
+def test_outer_planet_verifier_uses_the_same_pure_de_channel(monkeypatch) -> None:
+    """Verification cannot switch to an optional planet-centre target."""
+
+    class Timescale:
+        def tt_jd(self, jds: np.ndarray) -> np.ndarray:
+            return np.asarray(jds)
+
+    class Target:
+        def at(self, jds: np.ndarray) -> SimpleNamespace:
+            values = np.asarray(jds)
+            positions = np.vstack((values, values + 1.0, values + 2.0))
+            return SimpleNamespace(position=SimpleNamespace(au=positions))
+
+    import libephemeris.state as state
+
+    planets = {"jupiter barycenter": Target()}
+    monkeypatch.setattr(state, "get_planets", lambda: planets)
+    monkeypatch.setattr(state, "get_timescale", Timescale)
+    monkeypatch.setattr(
+        generate_leb,
+        "_get_spk_jd_range",
+        lambda _planets: (100.0, 200.0),
+    )
+
+    jd = 150.0
+    leb_pos = (jd, jd + 1.0, jd + 2.0)
+    error, distance = generate_leb._verify_icrs_planet(JUPITER, jd, leb_pos)
+
+    assert error == 0.0
+    assert distance == pytest.approx(np.linalg.norm(leb_pos))
 
 
 @pytest.mark.parametrize(
