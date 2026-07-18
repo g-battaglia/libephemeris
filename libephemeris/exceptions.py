@@ -964,19 +964,27 @@ def validate_jd_range(
             body_name=body_name,
         )
 
-    if state.get_calc_mode() == "leb" and body_id is not None:
-        from .inventory import get_body_coverage
+    if state.get_calc_mode() == "leb":
+        if body_id is None:
+            reader = state.get_leb_reader()
+            if reader is None:
+                return
+            path = str(getattr(reader, "path", ""))
+            start_jd, end_jd = reader.jd_range
+            denum = 0
+        else:
+            from .inventory import get_body_coverage
 
-        coverage = get_body_coverage(body_id)
-        if coverage is None:
-            # The downstream LEB dispatcher distinguishes a legitimate local
-            # model from a missing required state. Do not inspect a DE kernel
-            # merely to validate a body it will not serve.
-            return
-        path = coverage.data_file or ""
-        start_jd = coverage.jd_start
-        end_jd = coverage.jd_end
-        denum = 0
+            coverage = get_body_coverage(body_id)
+            if coverage is None:
+                # The downstream LEB dispatcher distinguishes a legitimate
+                # local model from a missing required state. Do not inspect a
+                # DE kernel merely to validate a body it will not serve.
+                return
+            path = coverage.data_file or ""
+            start_jd = coverage.jd_start
+            end_jd = coverage.jd_end
+            denum = 0
     else:
         # Ensure the selected JPL ephemeris is loaded before inspecting range.
         state.get_planets()

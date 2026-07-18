@@ -234,6 +234,11 @@ from .constants import (
     NODBIT_FOPOINT,
 )
 
+# Persisted core identities are semantic, not a filename convention.  This is
+# intentionally body-based so a monolithic ``ephemeris_<tier>.leb`` receives
+# the same fail-closed range policy as ``<tier>_core.leb2``.
+_LEB_CORE_BODY_IDS = frozenset(range(SUN, MEAN_APOG + 1)) | {EARTH}
+
 # Import all sidereal mode constants (SIDM_*)
 from .constants import *  # noqa: F403, F401
 from .state import (
@@ -367,9 +372,9 @@ def _raise_leb_range_miss(body_id: int, jd: float) -> None:
         return
     body_coverage = get_body_coverage(body_id)
     if (
-        body_coverage is None
+        body_id not in _LEB_CORE_BODY_IDS
+        or body_coverage is None
         or body_coverage.contains(jd)
-        or body_coverage.group != "core"
     ):
         return
     raise EphemerisRangeError(
@@ -4233,10 +4238,12 @@ def _calc_body(
 
         # First check if already registered
         _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
+        auto_download_attempted = False
 
         if _spk_type21_target is None:
             # Not registered yet — try auto-download, then check again
             if get_auto_spk_download():
+                auto_download_attempted = True
                 try:
                     # _try_auto_spk_download registers the SPK as a side effect
                     _try_auto_spk_download(t, ipl, iflag)
@@ -4274,20 +4281,21 @@ def _calc_body(
                 _mark_dispatch_source("SPK")
                 return result, iflag
 
-            # In strict precision mode, require an SPK-grade source for all
-            # downloadable bodies. Bodies blocked from auto-download are exempt
-            # (no SPK obtainable). A failed network attempt is never evidence
-            # of precision and therefore cannot exempt strict mode.
+            # In strict precision mode, require an SPK-grade source when the
+            # caller disabled auto-download.  ``auto``/``skyfield`` historically
+            # attempt provisioning and then remain available through the local
+            # model when the network is unavailable; preserve that public
+            # contract outside sealed LEB mode.  LEB never reaches this branch.
             #
-            # The remaining decision keys off whether a source BETTER than the
-            # Keplerian fallback actually exists for this epoch -- never off the
-            # irrelevant network attempt. If a kernel is already registered but
-            # simply does not cover this epoch (including the light-time-retarded
-            # coverage edges), and ASSIST can integrate the body from local data,
-            # prefer ASSIST silently; otherwise refuse with a message that tells
-            # the truth about why (kernel registered but out of coverage, vs no
-            # kernel registered at all).
-            if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
+            # When no download was attempted, key the decision off whether a
+            # source better than Keplerian exists for this epoch. If a kernel is
+            # registered but out of coverage and ASSIST is unavailable, report
+            # that exact condition instead of asking for a kernel already there.
+            if (
+                get_strict_precision()
+                and not auto_download_attempted
+                and ipl in SPK_BODY_NAME_MAP
+            ):
                 if ipl not in SPK_AUTO_DOWNLOAD_BLOCKED:
                     spk_info = spk.get_spk_body_info(ipl)
                     if _strict_source_better_than_keplerian(ipl):

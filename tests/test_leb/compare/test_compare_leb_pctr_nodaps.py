@@ -98,6 +98,7 @@ def test_nod_aps_nonut_node_invariant(compare: CompareHelper, body: int, bname: 
                 )
 
 
+@pytest.mark.leb_compare
 def test_source_sealed_vector_paths_stay_within_precision_budget(
     compare: CompareHelper,
 ):

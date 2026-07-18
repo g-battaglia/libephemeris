@@ -30,6 +30,7 @@ def cleanup(monkeypatch):
     monkeypatch.setattr(state, "_LEB_FILE", None)
     monkeypatch.setattr(state, "_LEB_READER", None)
     monkeypatch.setattr(state, "_discover_leb_file", lambda: None)
+    monkeypatch.setattr(state, "_discover_reviewed_leb_tier_cores", lambda: {})
     eph.set_calc_mode("auto")
     eph.set_strict_precision(None)
     eph.set_auto_spk_download(None)
@@ -117,10 +118,17 @@ class TestAutoDownloadInStrictMode:
         eph.set_strict_precision(True)
         eph.set_auto_spk_download(True)
 
-        with patch("libephemeris.spk.download_and_register_spk") as mock_download:
+        with (
+            patch("libephemeris.spk.download_and_register_spk") as mock_download,
+            patch(
+                "libephemeris.rebound_integration.check_assist_data_available",
+                return_value=False,
+            ),
+        ):
             mock_download.side_effect = RuntimeError("Network error")
 
             pos, flags = eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
+            mock_download.assert_called_once()
             assert 0 <= pos[0] < 360
             assert pos[2] > 0
 
