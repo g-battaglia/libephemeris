@@ -1086,6 +1086,37 @@ def _source_backed_fit_grid(
     return aligned_start, aligned_end, preferred_interval_days
 
 
+def _source_backed_body_config(
+    body_id: int,
+    requested_start: float,
+    requested_end: float,
+    source_start: float,
+    source_end: float,
+) -> Tuple[float, float, Optional[Tuple[float, int, int, int]]]:
+    """Resolve a body's range and optional params override for one source.
+
+    The helper deliberately applies to every body whose generator consumes the
+    source, not merely to bodies stored directly from it.  A heliocentric
+    minor-body SPK, for example, still needs a DE-backed barycentric Sun state
+    at every fitting node.
+    """
+    params = BODY_PARAMS[body_id]
+    safe_start, safe_end, safe_interval = _source_backed_fit_grid(
+        requested_start,
+        requested_end,
+        source_start,
+        source_end,
+        params[0],
+    )
+    if safe_interval == params[0]:
+        return safe_start, safe_end, None
+    return (
+        safe_start,
+        safe_end,
+        (safe_interval, params[1], params[2], params[3]),
+    )
+
+
 def _spk_covers_range(
     spk_file: str,
     body_id: int,
@@ -2416,55 +2447,55 @@ def assemble_leb(
     # Per-body date ranges: body_id -> (jd_start, jd_end)
     # Non-asteroids use the global range; asteroids use their SPK range.
     body_jd_ranges: dict[int, Tuple[float, float]] = {}
-    # A planet whose source interval is complete but not divisible by the
-    # default segment width receives a file-local interval override.  The
+    # A DE-backed body whose source interval is complete but not divisible by
+    # the default segment width receives a file-local interval override.  The
     # public BODY_PARAMS table remains immutable for other runs and callers.
     body_param_overrides: dict[int, Tuple[float, int, int, int]] = {}
 
-    # A core kernel can end inside the fixed-width segment needed to evaluate
-    # the final advertised days. Never let the vector evaluator clamp or
-    # extrapolate those fitting nodes. If the whole requested interval exists
-    # in the source (notably exact-range DE441), adjust the local segment width
-    # so it tiles the range exactly. Otherwise narrow to complete segments and
-    # let the next reviewed tier cover the omitted edge.
+    # A DE kernel can end inside the fixed-width segment needed to evaluate the
+    # final advertised days. This applies both to core planets and to every
+    # SPK minor body whose heliocentric state is translated with the DE-backed
+    # barycentric Sun. Never clamp or extrapolate those fitting nodes. If the
+    # whole requested interval exists in the source (notably exact-range
+    # DE441), adjust the local segment width so it tiles the range exactly.
+    # Otherwise narrow to complete segments and let the next reviewed tier or
+    # declared local model cover the omitted edge.
     planet_ids = set(bodies).intersection(_PLANET_MAP)
-    if planet_ids:
+    de_backed_minor_ids = set(asteroid_bodies) - nbody_ids
+    de_backed_ids = planet_ids | de_backed_minor_ids
+    if de_backed_ids:
         from libephemeris.state import get_planets
 
         source_start, source_end = _get_spk_jd_range(get_planets())
-        for body_id in planet_ids:
+        for body_id in de_backed_ids:
             params = BODY_PARAMS[body_id]
-            safe_start, safe_end, safe_interval = _source_backed_fit_grid(
+            safe_start, safe_end, params_override = _source_backed_body_config(
+                body_id,
                 jd_start,
                 jd_end,
                 source_start,
                 source_end,
-                params[0],
             )
             if safe_start != jd_start or safe_end != jd_end:
                 body_jd_ranges[body_id] = (safe_start, safe_end)
-            if safe_interval != params[0]:
-                body_param_overrides[body_id] = (
-                    safe_interval,
-                    params[1],
-                    params[2],
-                    params[3],
-                )
+            if params_override is not None:
+                body_param_overrides[body_id] = params_override
             if verbose and (
                 body_id in body_jd_ranges or body_id in body_param_overrides
             ):
                 name = BODY_NAMES.get(body_id, body_id)
                 if body_id in body_param_overrides:
+                    safe_interval = body_param_overrides[body_id][0]
                     print(
                         f"  {name}: adjusted segment width "
                         f"{params[0]:.9f} → {safe_interval:.9f} days to retain "
-                        "the complete source-backed core interval"
+                        "the complete DE-backed interval"
                     )
                 else:
                     print(
-                        f"  {name}: core source supports complete LEB segments "
+                        f"  {name}: DE source supports complete LEB segments "
                         f"through JD {safe_end:.1f}; the next reviewed tier "
-                        "covers the remaining edge"
+                        "or declared local model covers the remaining edge"
                     )
 
     # The long ASSIST DE441 distribution intentionally stops just inside the
@@ -2584,12 +2615,17 @@ def assemble_leb(
             # already registered, even if its coverage is too narrow (e.g.
             # a previously downloaded ±10yr SPK).  We detect that here and
             # force a re-download with the full tier range.
-            interval_days = BODY_PARAMS[bid][0]
-            required_fit_end = _required_fit_end(jd_start, jd_end, interval_days)
+            body_start, body_end = body_jd_ranges.get(bid, (jd_start, jd_end))
+            interval_days = body_param_overrides.get(bid, BODY_PARAMS[bid])[0]
+            required_fit_end = _required_fit_end(
+                body_start,
+                body_end,
+                interval_days,
+            )
             need_force = False
             registered = _SPK_BODY_MAP.get(bid)
             registered_covers = registered is not None and _spk_covers_range(
-                registered[0], bid, jd_start, required_fit_end
+                registered[0], bid, body_start, required_fit_end
             )
             if not registered_covers:
                 # Prefer a wider file already in the cache even when nothing
@@ -2597,7 +2633,11 @@ def assemble_leb(
                 # first selection to auto_download can pick an exact-range
                 # kernel that covers the public end but not the final fitting
                 # nodes.
-                covering = _find_covering_cached_spk(bid, jd_start, required_fit_end)
+                covering = _find_covering_cached_spk(
+                    bid,
+                    body_start,
+                    required_fit_end,
+                )
                 if covering is not None:
                     from libephemeris import spk as _spk
 
@@ -2615,7 +2655,7 @@ def assemble_leb(
             try:
                 auto_download_asteroid_spk(
                     bid,
-                    jd_start=jd_start,
+                    jd_start=body_start,
                     jd_end=required_fit_end,
                     force=need_force,
                 )
@@ -2634,8 +2674,13 @@ def assemble_leb(
             # Full fitting-domain coverage?  Checking only the public body end
             # is insufficient when the final fixed-width segment extends a
             # few days farther.
-            if _spk_covers_range(spk_file, bid, jd_start, required_fit_end):
-                body_jd_ranges[bid] = (jd_start, jd_end)
+            if _spk_covers_range(
+                spk_file,
+                bid,
+                body_start,
+                required_fit_end,
+            ):
+                body_jd_ranges[bid] = (body_start, body_end)
                 if verbose:
                     print(
                         f"    {name}: SPK covers the full tier fitting domain (spk21)"
@@ -2656,8 +2701,8 @@ def assemble_leb(
             # makes the body record truthful without frozen edge nodes.
             try:
                 eff_start, eff_end = _align_body_range_to_source(
-                    jd_start,
-                    jd_end,
+                    body_start,
+                    body_end,
                     spk_jd_start,
                     spk_jd_end,
                     interval_days,
@@ -2760,7 +2805,12 @@ def assemble_leb(
     for bid in asteroid_bodies_gen:
         ast_start, ast_end = body_jd_ranges.get(bid, (jd_start, jd_end))
         bid, coeffs, error = generate_single_body(
-            bid, ast_start, ast_end, verbose=verbose, nbody=(bid in nbody_ids)
+            bid,
+            ast_start,
+            ast_end,
+            verbose=verbose,
+            nbody=(bid in nbody_ids),
+            params=body_param_overrides.get(bid),
         )
         body_data[bid] = coeffs
         body_errors[bid] = error

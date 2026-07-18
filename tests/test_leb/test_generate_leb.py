@@ -153,6 +153,37 @@ def test_source_backed_grid_keeps_every_fit_node_inside_source() -> None:
     assert float(np.max(all_jds)) < end
 
 
+def test_de_backed_minor_body_uses_source_safe_segment_grid() -> None:
+    # Varuna is heliocentric in its Horizons SPK, but its persisted ICRS state
+    # adds the DE440s barycentric Sun. Its 32-day segments therefore obey the
+    # planetary source boundary just like a core planet.
+    body_id = 30000
+    requested_start = generate_leb._year_to_jd(1850)
+    requested_end = generate_leb._year_to_jd(2150)
+    source_start = 2396752.5
+    source_end = 2506352.5
+
+    actual_start, actual_end, params_override = generate_leb._source_backed_body_config(
+        body_id,
+        requested_start,
+        requested_end,
+        source_start,
+        source_end,
+    )
+
+    assert (actual_start, actual_end) == (requested_start, requested_end)
+    assert params_override is not None
+    interval, degree, _, _ = params_override
+    all_jds, _, _ = generate_leb._compute_all_segment_jds(
+        actual_start,
+        actual_end,
+        interval,
+        degree,
+    )
+    assert float(np.min(all_jds)) >= source_start
+    assert float(np.max(all_jds)) < source_end
+
+
 def test_skyfield_vector_evaluator_accepts_source_backed_nodes() -> None:
     class Timescale:
         def __init__(self) -> None:
