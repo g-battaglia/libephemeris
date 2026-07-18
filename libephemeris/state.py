@@ -743,7 +743,9 @@ def get_leb_reader() -> Optional[
 
     1. Explicit path via ``set_leb_file()``
     2. ``LIBEPHEMERIS_LEB`` environment variable
-    3. Auto-discovery of the hash-pinned reviewed active-tier core
+    3. Auto-discovery of the hash-pinned reviewed tier cores (best-by-date
+       routing across every reviewed core up to the configured tier, even
+       when the active tier's own core is not installed)
     4. Bundled reviewed base core as a range-limited fallback
 
     If the .leb file path is invalid or the file is corrupted, ``auto`` mode
@@ -794,10 +796,27 @@ def _get_leb_reader_locked(mode):
         if path is None:
             tier_cores = _discover_reviewed_leb_tier_cores()
             active_tier = get_precision_tier()
-            path = tier_cores.get(active_tier) or _discover_leb_file()
+            path = tier_cores.get(active_tier)
+            if path is None:
+                path = _discover_leb_file()
+                # The active tier's own core is an optional download. A
+                # user-owned legacy file at a standard path keeps its
+                # historical single-reader win, but when discovery falls
+                # back to a reviewed core (the bundled base) or to nothing,
+                # the reviewed wider tiers already found must not be
+                # discarded in favour of narrower coverage.
+                if tier_cores and (path is None or _is_reviewed_core(path)):
+                    path = next(reversed(tier_cores.values()))
             if path is not None:
                 logger = get_logger()
-                logger.debug("Auto-discovered LEB file: %s", path)
+                if len(tier_cores) > 1 and path in tier_cores.values():
+                    logger.debug(
+                        "Auto-discovered reviewed LEB tier cores for "
+                        "best-by-date routing: %s",
+                        ", ".join(tier_cores),
+                    )
+                else:
+                    logger.debug("Auto-discovered LEB file: %s", path)
 
         if path is not None:
             # Expand a leading ~ from env/TOML/explicit config (the shell
@@ -812,8 +831,7 @@ def _get_leb_reader_locked(mode):
                 # Explicitly selected/generated non-pinned group files retain
                 # normal companion discovery.
                 reviewed_core = _is_reviewed_core(path)
-                active_tier = get_precision_tier()
-                if tier_cores.get(active_tier) == path and len(tier_cores) > 1:
+                if len(tier_cores) > 1 and path in tier_cores.values():
                     from .leb_composite import TieredLEBReader
 
                     _LEB_READER = TieredLEBReader.from_tier_cores(tier_cores)

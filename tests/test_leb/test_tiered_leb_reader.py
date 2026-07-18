@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from libephemeris import state
 from libephemeris.inventory import get_body_coverage, get_runtime_data_requirements
 from libephemeris.leb_composite import CompositeLEBReader, TieredLEBReader
 from libephemeris.leb_format import COORD_ICRS_BARY
@@ -198,3 +199,98 @@ def test_sealed_runtime_requirements_include_every_more_precise_tier(
 
     assert len(requirements) == expected_count
     assert requirements[-1].name == f"{tier}_uranians.leb2"
+
+
+def _patch_auto_discovery(
+    monkeypatch,
+    tier_cores: dict[str, str],
+    fallback: str | None,
+    reviewed: set[str],
+) -> None:
+    monkeypatch.delenv("LIBEPHEMERIS_LEB", raising=False)
+    monkeypatch.setattr(state, "_LEB_FILE", None)
+    monkeypatch.setattr(state, "_LEB_READER", None)
+    monkeypatch.setattr("libephemeris._config_toml.get_str", lambda key: None)
+    monkeypatch.setattr(state, "get_precision_tier", lambda: "extended")
+    monkeypatch.setattr(
+        state, "_discover_reviewed_leb_tier_cores", lambda: dict(tier_cores)
+    )
+    monkeypatch.setattr(state, "_discover_leb_file", lambda: fallback)
+    monkeypatch.setattr(state, "_is_reviewed_core", lambda path: path in reviewed)
+    monkeypatch.setattr(state, "_release_when_unused", lambda reader: None)
+    monkeypatch.setattr(state, "_maybe_warm_reader", lambda reader: None)
+
+
+def test_missing_active_core_still_routes_through_lower_reviewed_tiers(
+    monkeypatch,
+) -> None:
+    base_path = "/reviewed/base_core.leb2"
+    medium_path = "/reviewed/medium_core.leb2"
+    bundled_base = "/bundled/base_core.leb2"
+    _patch_auto_discovery(
+        monkeypatch,
+        {"base": base_path, "medium": medium_path},
+        fallback=bundled_base,
+        reviewed={base_path, medium_path, bundled_base},
+    )
+    readers = {
+        base_path: _Reader(base_path, {0: (100.0, 200.0)}, 1.0),
+        medium_path: _Reader(medium_path, {0: (50.0, 250.0)}, 2.0),
+    }
+    built: list[dict[str, str]] = []
+
+    def _from_tier_cores(cores):
+        built.append(dict(cores))
+        return TieredLEBReader(
+            {tier: CompositeLEBReader([readers[path]]) for tier, path in cores.items()}
+        )
+
+    monkeypatch.setattr(TieredLEBReader, "from_tier_cores", _from_tier_cores)
+
+    reader = state._get_leb_reader_locked("leb")
+
+    assert isinstance(reader, TieredLEBReader)
+    assert built == [{"base": base_path, "medium": medium_path}]
+    # JD 225 lies outside the base core (100-200); only medium covers it.
+    assert reader.selected_tier(0, 225.0) == "medium"
+    assert reader.eval_body(0, 225.0)[0][0] == 2.0
+    assert reader._manifest_verified is True
+
+
+def test_no_reviewed_cores_preserves_existing_fallback(monkeypatch) -> None:
+    _patch_auto_discovery(monkeypatch, {}, fallback=None, reviewed=set())
+
+    assert state._get_leb_reader_locked("auto") is None
+
+    monkeypatch.setattr(state, "_LEB_READER", None)
+    with pytest.raises(RuntimeError, match="no .leb file configured"):
+        state._get_leb_reader_locked("leb")
+
+
+def test_legacy_standard_path_keeps_single_reader_semantics(
+    monkeypatch,
+) -> None:
+    base_path = "/reviewed/base_core.leb2"
+    medium_path = "/reviewed/medium_core.leb2"
+    legacy = "/home/user/.libephemeris/leb/extended_core.leb"
+    _patch_auto_discovery(
+        monkeypatch,
+        {"base": base_path, "medium": medium_path},
+        fallback=legacy,
+        reviewed={base_path, medium_path},
+    )
+    sentinel = _Reader(legacy, {0: (0.0, 300.0)}, 9.0)
+    opened: list[str] = []
+    monkeypatch.setattr(
+        CompositeLEBReader,
+        "from_file_with_companions",
+        lambda path, **kwargs: opened.append(path) or sentinel,
+    )
+    monkeypatch.setattr(
+        TieredLEBReader,
+        "from_tier_cores",
+        lambda cores: pytest.fail("legacy discovery must not build tiered routing"),
+    )
+
+    assert state._get_leb_reader_locked("auto") is sentinel
+    assert opened == [legacy]

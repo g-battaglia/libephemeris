@@ -372,8 +372,15 @@ class TestCalcMode:
             ephem.set_leb_file(None)
             ephem.state._LEB_READER = None
             set_calc_mode("leb")
-            # Prevent auto-discovery from ~/.libephemeris/leb/
-            with patch("libephemeris.state._discover_leb_file", return_value=None):
+            # Block both auto-discovery channels: a discovered reviewed tier
+            # core would legitimately serve instead of raising.
+            with (
+                patch("libephemeris.state._discover_leb_file", return_value=None),
+                patch(
+                    "libephemeris.state._discover_reviewed_leb_tier_cores",
+                    return_value={},
+                ),
+            ):
                 with pytest.raises(RuntimeError, match="no .leb file configured"):
                     get_leb_reader()
         finally:
