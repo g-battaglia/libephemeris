@@ -177,6 +177,85 @@ def test_explicit_iers_cli_uses_provisioning_boundary(
     assert eph.get_network_policy() == "allow"
 
 
+def test_invalid_env_network_policy_fails_loudly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A typo in the env policy must not silently widen the boundary."""
+    from libephemeris import net
+
+    eph.set_network_policy(None)
+    monkeypatch.setenv(net.NETWORK_POLICY_ENV, "seales")
+
+    with pytest.raises(ValueError, match="'seales'") as excinfo:
+        eph.get_configured_network_policy()
+    assert "['auto', 'allow', 'sealed']" in str(excinfo.value)
+    assert net.NETWORK_POLICY_ENV in str(excinfo.value)
+
+
+def test_invalid_env_policy_propagates_through_effective_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No caller between config and enforcement may swallow the error."""
+    from libephemeris import net
+
+    eph.set_network_policy(None)
+    monkeypatch.setenv(net.NETWORK_POLICY_ENV, "seales")
+
+    with pytest.raises(ValueError, match="'seales'"):
+        eph.get_network_policy()
+
+
+def test_invalid_toml_network_policy_fails_loudly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from libephemeris import _config_toml, net
+
+    eph.set_network_policy(None)
+    monkeypatch.delenv(net.NETWORK_POLICY_ENV, raising=False)
+    monkeypatch.setattr(
+        _config_toml,
+        "get_str",
+        lambda key: "sealde" if key == "network_policy" else None,
+    )
+
+    with pytest.raises(ValueError, match="'sealde'") as excinfo:
+        eph.get_configured_network_policy()
+    assert "network_policy" in str(excinfo.value)
+
+
+def test_absent_and_blank_configured_policy_resolve_to_auto(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from libephemeris import _config_toml, net
+
+    eph.set_network_policy(None)
+    monkeypatch.delenv(net.NETWORK_POLICY_ENV, raising=False)
+    monkeypatch.setattr(_config_toml, "get_str", lambda _key: None)
+    assert eph.get_configured_network_policy() == "auto"
+
+    monkeypatch.setenv(net.NETWORK_POLICY_ENV, "   ")
+    monkeypatch.setattr(_config_toml, "get_str", lambda _key: "")
+    assert eph.get_configured_network_policy() == "auto"
+
+
+def test_configured_policy_normalizes_case_and_whitespace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from libephemeris import _config_toml, net
+
+    eph.set_network_policy(None)
+    monkeypatch.setenv(net.NETWORK_POLICY_ENV, "  SEALED ")
+    assert eph.get_configured_network_policy() == "sealed"
+
+    monkeypatch.delenv(net.NETWORK_POLICY_ENV, raising=False)
+    monkeypatch.setattr(
+        _config_toml,
+        "get_str",
+        lambda key: " Allow" if key == "network_policy" else None,
+    )
+    assert eph.get_configured_network_policy() == "allow"
+
+
 def test_extended_auto_spk_padding_is_clamped_to_horizons_limits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -96,20 +96,35 @@ def set_network_policy(policy: NetworkPolicy | None) -> None:
     _NETWORK_POLICY = policy
 
 
+def _validated_policy(value: str, source: str) -> NetworkPolicy:
+    """Normalize a configured policy value, rejecting unknown spellings.
+
+    A typo in a security-relevant boundary must not silently widen it to
+    ``"auto"``/``"allow"``; this mirrors :func:`set_network_policy`.
+    """
+    normalized = value.lower().strip()
+    if normalized not in _VALID_NETWORK_POLICIES:
+        raise ValueError(
+            f"Invalid network policy from {source}: {value!r}. Must be one "
+            f"of: {list(_VALID_NETWORK_POLICIES)}"
+        )
+    return normalized  # type: ignore[return-value]
+
+
 def get_configured_network_policy() -> NetworkPolicy:
     """Return the configured policy before resolving ``"auto"``."""
     if _NETWORK_POLICY is not None:
         return _NETWORK_POLICY
 
-    env_value = os.environ.get(NETWORK_POLICY_ENV, "").lower().strip()
-    if env_value in _VALID_NETWORK_POLICIES:
-        return env_value  # type: ignore[return-value]
+    env_value = os.environ.get(NETWORK_POLICY_ENV, "")
+    if env_value.strip():
+        return _validated_policy(env_value, NETWORK_POLICY_ENV)
 
     from ._config_toml import get_str
 
-    toml_value = (get_str("network_policy") or "").lower().strip()
-    if toml_value in _VALID_NETWORK_POLICIES:
-        return toml_value  # type: ignore[return-value]
+    toml_value = get_str("network_policy") or ""
+    if toml_value.strip():
+        return _validated_policy(toml_value, "TOML key 'network_policy'")
     return "auto"
 
 

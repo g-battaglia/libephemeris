@@ -872,3 +872,86 @@ def test_init_wizard_prefers_reviewed_leb2_in_selected_directory(
     (tmp_path / "ephemeris_medium.leb").touch()
 
     assert init_wizard._resolve_leb_entry(str(tmp_path), "medium") == str(reviewed)
+
+
+def test_init_wizard_declining_auto_spk_defaults_strict_precision_false(
+    tmp_path: Path,
+) -> None:
+    """auto_spk=No defaults strict_precision to false with an honest warning."""
+    out = tmp_path / "config.toml"
+    answers = [
+        "n",  # Use defaults? -> full wizard
+        "",  # precision tier -> medium
+        "",  # calculation mode -> auto
+        "n",  # auto_spk -> declined
+        "",  # strict_precision -> default (no)
+        "",  # download IERS data -> default (no)
+        str(tmp_path),  # data directory
+        "",  # customize sub-paths -> no
+        "n",  # download missing files now -> no
+    ]
+    result = CliRunner().invoke(
+        user_cli, ["init", "-o", str(out)], input="\n".join(answers) + "\n"
+    )
+
+    assert result.exit_code == 0
+    content = out.read_text(encoding="utf-8")
+    assert "auto_spk = false" in content
+    assert "strict_precision = false" in content
+    assert "> strict_precision" in result.output
+    assert "SPKRequiredError" in result.output
+
+
+def test_init_wizard_declining_auto_spk_allows_strict_opt_in(
+    tmp_path: Path,
+) -> None:
+    """Pre-provisioned offline deployments may still opt into strict mode."""
+    out = tmp_path / "config.toml"
+    answers = [
+        "n",  # Use defaults? -> full wizard
+        "",  # precision tier -> medium
+        "",  # calculation mode -> auto
+        "n",  # auto_spk -> declined
+        "y",  # strict_precision -> explicit opt-in
+        "",  # download IERS data -> default (no)
+        str(tmp_path),  # data directory
+        "",  # customize sub-paths -> no
+        "n",  # download missing files now -> no
+    ]
+    result = CliRunner().invoke(
+        user_cli, ["init", "-o", str(out)], input="\n".join(answers) + "\n"
+    )
+
+    assert result.exit_code == 0
+    content = out.read_text(encoding="utf-8")
+    assert "auto_spk = false" in content
+    assert "strict_precision = true" in content
+
+
+def test_init_wizard_accepting_auto_spk_prompts_for_strict_precision(
+    tmp_path: Path,
+) -> None:
+    """auto_spk=Yes keeps the normal strict_precision prompt and default."""
+    out = tmp_path / "config.toml"
+    answers = [
+        "n",  # Use defaults? -> full wizard
+        "",  # precision tier -> medium
+        "",  # calculation mode -> auto
+        "y",  # auto_spk -> accepted
+        "",  # strict_precision -> default (yes)
+        "",  # download IERS data -> default (no)
+        str(tmp_path),  # data directory
+        "",  # customize sub-paths -> no
+        "n",  # download missing files now -> no
+    ]
+    result = CliRunner().invoke(
+        user_cli, ["init", "-o", str(out)], input="\n".join(answers) + "\n"
+    )
+
+    assert result.exit_code == 0
+    content = out.read_text(encoding="utf-8")
+    assert "auto_spk = true" in content
+    assert "strict_precision = true" in content
+    assert "> strict_precision" in result.output
+    assert "Require an ephemeris-grade source" in result.output
+    assert "strict_precision skipped" not in result.output

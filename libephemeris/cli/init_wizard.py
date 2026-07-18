@@ -754,10 +754,25 @@ def run_wizard(
     auto_spk = click.confirm(f"  {_bc('>')} auto_spk", default=auto_spk_default)
     config["auto_spk"] = auto_spk
 
-    click.echo(_d("  Require an ephemeris-grade source for mapped minor bodies?"))
-    click.echo(_d("  If disabled, a declared Keplerian approximation may be used."))
-    strict = click.confirm(f"  {_bc('>')} strict_precision", default=True)
-    config["strict_precision"] = strict
+    if auto_spk:
+        click.echo(_d("  Require an ephemeris-grade source for mapped minor bodies?"))
+        click.echo(_d("  If disabled, a declared Keplerian approximation may be used."))
+        strict = click.confirm(f"  {_bc('>')} strict_precision", default=True)
+        config["strict_precision"] = strict
+    else:
+        # Without auto-download, strict precision raises SPKRequiredError for
+        # mapped minor bodies unless local SPK kernels are already
+        # provisioned, so the safe default is the declared Keplerian
+        # approximation; pre-provisioned offline deployments may still
+        # opt in.
+        click.echo(
+            _d("  Without auto-download, strict precision raises SPKRequiredError")
+        )
+        click.echo(
+            _d("  for mapped minor bodies unless local SPK kernels are provisioned.")
+        )
+        strict = click.confirm(f"  {_bc('>')} strict_precision", default=False)
+        config["strict_precision"] = strict
 
     # ── 4. Time precision (adaptive) ─────────────────────────────
     click.echo()
