@@ -139,6 +139,25 @@ class TestGetSetPrecisionTier:
         set_precision_tier("base")
         assert state._PLANETS is None
 
+    def test_offline_source_boundary_bypasses_leb_vector_routing(
+        self, monkeypatch
+    ):
+        """Generators must sample the selected DE kernel, never cached LEB."""
+
+        state.set_calc_mode("leb")
+        fake_reader = object()
+        monkeypatch.setattr(state, "get_leb_reader", lambda: fake_reader)
+        monkeypatch.setattr(state, "get_planets", lambda: "jpl-source")
+        monkeypatch.setattr(
+            "libephemeris.leb_vector.get_leb_vector_ephemeris",
+            lambda reader: "leb-source" if reader is fake_reader else "wrong-reader",
+        )
+
+        assert state._get_computation_ephemeris() == "leb-source"
+        with state._allow_jpl_source():
+            assert state._get_computation_ephemeris() == "jpl-source"
+        assert state._get_computation_ephemeris() == "leb-source"
+
 
 # =============================================================================
 # TIER CHANGE INVALIDATES THE LEB READER (regression)

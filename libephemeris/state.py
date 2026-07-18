@@ -1419,7 +1419,12 @@ def get_planets() -> SpiceKernel:
 
 def _get_computation_ephemeris():
     """Resolve vector states without crossing the active backend boundary."""
-    if get_calc_mode() == "leb":
+    # Offline LEB generation/verification deliberately opens the JPL source
+    # boundary.  Respect that scoped capability here as well as in
+    # ``get_planets()``: otherwise lunar analytical generators that consume
+    # vector states would silently sample an already-installed LEB while
+    # claiming to validate against the selected DE kernel.
+    if get_calc_mode() == "leb" and not _JPL_SOURCE_ACCESS.get():
         reader = get_leb_reader()
         if reader is None:  # get_leb_reader() normally raises in forced mode.
             raise RuntimeError("Calculation mode 'leb' has no active LEB reader")
