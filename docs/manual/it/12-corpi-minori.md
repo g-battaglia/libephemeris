@@ -79,7 +79,7 @@ Eris: 24.74°
 
 Quando chiedi la posizione di un corpo minore, la libreria prova diversi metodi in ordine, dal più preciso al meno preciso:
 
-**0. LEB precomputato** — Se è caricata un'effemeride binaria LEB che contiene il corpo, vengono usati direttamente i suoi polinomi di Chebyshev precomputati (nessuna connessione, nessuna lettura SPK per chiamata). È il percorso più veloce. Il formato e gli strumenti di generazione supportano un companion opzionale `{tier}_exotics.leb2` per circa 31 centauri, TNO e asteroidi near-Earth, ma al momento nessun companion `exotics` è pubblicato nel manifest di download della release: deve essere generato o fornito separatamente. Se manca, o fuori dall'intervallo di copertura del corpo, la catena prosegue con i metodi seguenti.
+**0. LEB precomputato** — Se è caricata un'effemeride binaria LEB che contiene il corpo, vengono usati direttamente i suoi polinomi di Chebyshev precomputati (nessuna connessione, nessuna lettura SPK per chiamata). È il percorso più veloce. Il manifest data-v3 contiene un companion `{tier}_exotics.leb2` per ogni tier; inventario e routing rispettano comunque l'intervallo realmente memorizzato per ciascun corpo. Se manca, è corrotto o la data è esterna a quell'intervallo, la catena prosegue secondo la modalità attiva.
 
 **1. Kernel SPK** — Se un file binario JPL (formato SPK/BSP) è registrato per quel corpo, lo usa. Precisione: sub-secondo d'arco. È il metodo gold standard.
 
@@ -87,7 +87,7 @@ Quando chiedi la posizione di un corpo minore, la libreria prova diversi metodi 
 
 **3. Controllo precisione strict** — Con la modalità strict precision (abilitata di default), viene sollevato `SPKRequiredError` per i corpi mappati quando nessun SPK è disponibile, per evitare perdite di precisione silenti. Usa `set_strict_precision(False)` per permettere i fallback a precisione inferiore.
 
-**4. ASSIST n-body** — Se `libephemeris[nbody]` è installato con i file dati, REBOUND/ASSIST fornisce precisione sub-secondo d'arco per qualsiasi corpo con elementi orbitali.
+**4. ASSIST n-body** — Se `libephemeris[nbody]` è installato con i dati richiesti, REBOUND/ASSIST offre un fallback numerico più fedele per le orbite supportate. Non è un'effemeride JPL diretta del corpo minore: accuratezza e copertura della sorgente dipendono da corpo e data.
 
 **5. Fallback kepleriano** — Usa le leggi di Keplero con correzioni per le perturbazioni dei pianeti giganti. Meno preciso (arcminuti su scale di anni), ma funziona senza connessione a Internet.
 

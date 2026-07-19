@@ -34,7 +34,7 @@ _GROUP_WORKFLOW = "/".join(LEB1_GROUPS)
 _TIER_INFO = {
     "base": "de440s, 1850-2150",
     "medium": "de440, 1550-2650",
-    "extended": "de441, -5000 to 5000",
+    "extended": "de441, exact kernel interval (-13200 to +17191)",
 }
 
 # Partial files merged into the final {tier}.leb — derived from the canonical
@@ -67,7 +67,7 @@ DE kernels via Skyfield.
 Current full-registry generation presets:
   base      de440s, 1850-2150       53 independently sourced bodies
   medium    de440,  1550-2650       53 independently sourced bodies (default)
-  extended  de441, -5000 to +5000  45 bodies (8 NEAs excluded)
+  extended  de441, exact kernel interval  45 bodies (8 NEAs excluded)
 
 \b
 Recommended workflow (avoids macOS multiprocessing deadlocks):

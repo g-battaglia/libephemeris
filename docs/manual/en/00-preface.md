@@ -54,11 +54,12 @@ Chapter 15 — the Cookbook — is designed for those in a hurry: copy-paste rec
 pip install libephemeris
 ```
 
-The PyPI wheel includes a bundled LEB2 base-tier core for the 14 main bodies (1850–2150). For broader coverage, you can download a full precision tier:
+The PyPI wheel includes the LEB2 base-tier core for the 14 main bodies plus the
+Hamburg-body companion (1850–2150). In `auto` or sealed `leb` mode, install the
+reviewed data-v3 groups cumulatively through your configured tier with:
 
-```python
-import libephemeris as ephem
-ephem.download_for_tier("medium")
+```bash
+libephemeris download auto
 ```
 
 The three precision tiers — `base`, `medium`, `extended` — differ in the time range covered and file size. The `medium` tier (default) covers the years 1550–2650 and is fine for the vast majority of uses. We will talk about it in detail in Chapter 4.

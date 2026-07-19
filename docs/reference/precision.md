@@ -43,7 +43,11 @@ LibEphemeris uses NASA JPL DE440 and DE441, the most recent planetary ephemeride
 | Lunar Laser Ranging fit | ~1 milliarcsecond | ~1 milliarcsecond | ~1 milliarcsecond |
 | Planetary radar fit | ~10 m (inner planets) | ~10 m (inner planets) | ~10 m (inner planets) |
 
-DE440 and DE441 have identical precision -- DE441 is simply the extended-range version. DE440s is a reduced-size subset of DE440 with no loss of precision within its range.
+DE440s is a reduced-size subset of DE440 with no loss of precision within its
+range. DE441 is the long-span integration in the same modern ephemeris family,
+but it is not numerically identical to DE440 throughout their overlap. The
+runtime therefore prefers DE440s/DE440 where they cover a body/date and uses
+DE441 to extend the time span.
 
 ### Precision tiers
 

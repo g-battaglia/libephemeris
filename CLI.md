@@ -331,11 +331,11 @@ compatibility-model artifacts or oracle-output generators to rebuild. See
 
 ### `leph release` — Release management
 
-The historical LEB upload tasks are retired together with the former published
-LEB assets. The wheel bundles the reviewed `base_core.leb2` and
-`base_uranians.leb2`; the reviewed medium/extended cores and uranians
-companions are published as hash-pinned downloads. Generate other LEB files
-locally and do not upload them through the legacy release workflow.
+The historical LEB upload tasks are retired. The cumulative `data-v3` GitHub
+release contains all five SHA-256-pinned LEB2 groups for base, medium, and extended;
+the wheel bundles byte-identical copies of `base_core.leb2` and
+`base_uranians.leb2`. Maintainers rebuild the complete matrix with
+`./regenerate-leb.sh all`; the legacy release workflow must not be used.
 
 ### `leph manual` — Documentation builds
 
@@ -361,6 +361,7 @@ For end-users: download data files and check library status.
 
 ```bash
 # Download data
+libephemeris download auto              # Exactly what the configured mode/tier needs
 libephemeris download base              # DE440s + planet centers + SPKs (1850-2150)
 libephemeris download medium            # DE440 + planet centers + SPKs (default)
 libephemeris download extended          # DE441 + planet centers + SPKs
@@ -385,12 +386,11 @@ libephemeris download medium --no-progress     # Suppress progress bars
 libephemeris download medium --quiet           # Suppress all output
 ```
 
-All commands that downloaded prebuilt LEB assets are retired because the former
-monolithic and modular release files do not satisfy the current provenance
-policy. The wheel bundles the reviewed `base_core.leb2` and
-`base_uranians.leb2`; the reviewed medium/extended cores and uranians
-companions are hash-pinned downloads. Generate every other LEB1/LEB2 file
-locally with `leph leb generate` / `leph leb2 convert`.
+The historical monolithic LEB download commands remain retired. In `auto` or
+`leb` mode, `libephemeris download auto` installs every SHA-256-pinned LEB2
+group cumulatively through the configured tier: 5 files for base, 10 through
+medium, or 15 through extended. The wheel supplies the two bundled base
+resources and the remaining files come from the immutable `data-v3` release.
 
 ### `libephemeris status` output
 

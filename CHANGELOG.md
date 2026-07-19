@@ -7,21 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0rc14] - 2026-07-18
+
+The release candidate that makes sealed LEB mode source-autonomous, routes
+every body/date through the highest-priority pinned LEB tier that actually covers
+it, and publishes the complete fifteen-file cumulative `data-v3` artifact set.
+
+### Breaking
+
+- `mode=leb` no longer opens or falls through to DE/BSP kernels, registered or
+  automatically downloaded SPKs, Horizons, ASSIST, planet-center kernels, or
+  any network source. Missing/corrupt required groups are provisioning errors;
+  core requests outside all available LEB intervals raise
+  `EphemerisRangeError` instead of changing source silently.
+
 ### Fixed
 
-- Restored the reviewed modular LEB2 distribution set: asteroids, exotics and
-  lunar-apsides companions for base, medium and extended tiers are now pinned
-  by immutable URL, exact SHA-256 and size alongside core and uranians.
+- Made the core range guard depend on body identity rather than artifact
+  filename, so modular LEB2 and legacy monolithic LEB1 layouts fail closed in
+  the same way.
+- Preserved established `auto`/`skyfield` availability after an enabled SPK
+  auto-download fails. Explicitly disabling auto-download still enforces strict
+  SPK requirements; sealed LEB mode never enters this fallback path.
+- Removed source extrapolation from LEB generation. Fit grids and serialized
+  per-body coverage are now bounded by the real source interval, including
+  minor bodies translated through a finite DE Sun channel.
+- Made outer-planet LEB channels persist the pure DE system barycentres
+  declared by `COORD_ICRS_BARY_SYSTEM`. Optional planet-centre files and
+  analytical centre-of-body models can no longer make official artifact bytes
+  depend on a maintainer's local configuration.
+- Made extended N-body companion coverage use the guarded intersection of the
+  DE441 planet file and every target in `sb441-n16.bsp`. The wider planet-only
+  interval is no longer advertised as coverage for the complete ASSIST force
+  model.
+- Padded explicit offline Horizons requests at both boundaries so numerical
+  edge guards do not discard the final Chebyshev segment of an otherwise
+  fully-covered tier.
 - Clamped automatic Horizons SPK requests to its supported 1600-2500 window;
-  extended-tier padding can no longer construct a deterministically invalid
-  request.
-- Strict precision no longer treats a failed download attempt as proof that a
-  lower-precision fallback is acceptable. Keplerian diagnostics now report
-  multi- vs single-epoch provenance and avoid unsupported universal error
-  claims.
+  extended-tier padding can no longer construct an invalid request.
+- Made offline generator verification open its declared JPL source explicitly
+  without weakening the sealed runtime policy.
+- Made Keplerian diagnostics report multi- versus single-epoch provenance and
+  removed unsupported universal error claims.
 
 ### Added
 
+- Added `LEBVectorEphemeris`, a Skyfield-compatible in-memory vector adapter
+  backed only by the active LEB reader. Topocentric fixed stars, `calc_pctr()`,
+  `nod_aps()`, eclipse/event paths, and other vector consumers can now reuse
+  their existing algorithms without opening a JPL kernel.
 - Added a process network policy (`auto`, `allow`, `sealed`). `auto` resolves
   LEB mode to sealed, all runtime URL opens share one policy gate, and implicit
   Skyfield kernel downloads are gated before socket work. Explicit CLI download
@@ -30,6 +64,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `get_leb_inventory()`, and `libephemeris leb info FILE` so readiness can be
   evaluated from actual file groups and date ranges instead of a core boolean.
 - Added static and socket-level regression tests for the sealed-mode invariant.
+
+### Changed
+
+- Manifest-authenticated LEB discovery is cumulative. Base (DE440s) is preferred when it
+  covers the requested body/date, then medium (DE440), then extended (DE441).
+  Selection occurs independently per body and date; file order can no longer
+  make a broader, lower-priority tier shadow a more precise one.
+- Regenerated all five LEB2 groups for base, medium, and extended from their
+  pinned sources. The `data-v3` manifest treats the resulting fifteen files as
+  one immutable, hash-verified provisioning unit; the bundled base core and
+  base uranians are byte-identical to their release assets.
+- Named companion LEB2 files now contain only their body channels. Shared
+  nutation, Delta-T, and star-catalog tables live once in each tier's core,
+  avoiding four redundant copies—especially material across full-range DE441.
+- `regenerate-leb.sh all` is the supported end-to-end build: it refreshes the
+  curated TNO SPKs, generates every LEB1 group, merges/verifies each tier,
+  converts all five LEB2 groups, and verifies the final artifacts.
+
+### Documentation
+
+- Documented sealed source boundaries, best-by-date cumulative tier routing,
+  exact DE441 limits, per-body companion coverage, generator provenance, and
+  the first-deploy provisioning contract.
 
 ## [3.0.0rc11] - 2026-07-15
 

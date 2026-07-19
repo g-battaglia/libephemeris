@@ -16,7 +16,7 @@ Vediamo il dettaglio per categoria.
 
 ### Pianeti principali
 
-LibEphemeris usa direttamente le efemeridi **JPL DE440** (o DE441 per date estese), le stesse prodotte dal Jet Propulsion Laboratory della NASA per le missioni spaziali. Non stiamo "approssimando" le posizioni dei pianeti: stiamo leggendo gli stessi dati che la NASA usa per navigare le sonde.
+LibEphemeris ricava gli stati planetari e lunari da **JPL DE440** (o DE441 per date estese). Il percorso Skyfield/JPL valuta direttamente quei kernel; il percorso LEB ne memorizza una rappresentazione Chebyshev compatta, accettata soltanto dopo i gate numerici documentati. Un risultato LEB è quindi equivalente alla sorgente entro il budget misurato, non una pretesa di valutazione byte-per-byte del kernel.
 
 La precisione è **sub-milliarcsecondo** per Sole, Luna e pianeti — il massimo ottenibile con la tecnologia attuale:
 
@@ -275,9 +275,9 @@ curati senza un canale persistente sensato usano un modello locale tracciato
 
 Come le efemeridi JPL, anche i file LEB esistono in tre versioni:
 
-- **`base`** (~53 MB) — copre 1850–2150
-- **`medium`** (~175 MB) — copre 1550–2650
-- **`extended`** — copre l'intervallo condiviso esatto di DE441 (circa -13200 a +17191)
+- **`base`** (~52 MB nei cinque gruppi) — copre 1850–2150
+- **`medium`** (~172 MB nei cinque gruppi) — copre 1550–2650
+- **`extended`** (~2.9 GB nei cinque gruppi) — copre l'intervallo condiviso esatto di DE441 (circa -13200 a +17191)
 
 ---
 

@@ -91,7 +91,7 @@ The library has four calculation modes (default: `auto`):
 
 1. **Auto mode** (default): tries a bundled, auto-discovered, or reviewed LEB2 installation, then Horizons API (if no local DE440), then Skyfield.
 2. **Skyfield mode**: queries Skyfield in real time (SPK + frame rotation + nutation). Precise but slower (~120µs/call).
-3. **LEB mode**: requires a valid locally generated LEB1 or reviewed LEB2 file (configured or auto-discovered). Calls served from precomputed Chebyshev coefficients (~2µs/call, ~14x speedup). Falls back to Skyfield for unsupported bodies/flags.
+3. **LEB mode**: requires a valid locally generated LEB1 or manifest-pinned LEB2 inventory (configured or auto-discovered). Persisted ephemeris states are served only from its precomputed Chebyshev coefficients (~2µs/call, ~14x speedup); Skyfield/JPL, SPK, Horizons, ASSIST and network sources are sealed out. A declared local analytical or Keplerian model remains possible only where a persistent LEB channel is not meaningful, and tracing exposes that source.
 4. **Horizons mode**: prefers NASA JPL Horizons REST API. Falls back to Skyfield for unsupported bodies/flags.
 
 ### Goal
@@ -103,12 +103,13 @@ Make the library fully transparent without LEB. A user can use `libephemeris` by
 - **3.1 Verify LEB-free mode is complete** — Already implemented. `_LEB_FILE` and `_LEB_READER` initialize to `None`; `get_leb_reader()` returns `None` when no LEB is configured; the `if reader is not None:` guard in `calc_ut()`/`calc()` skips the entire LEB block. All non-LEB tests exercise this path.
 - **3.2 Document both modes** — Documented in `README.md` (new "Binary Ephemeris Mode (LEB)" section) and `docs/leb/guide.md` (Calculation Mode section with mode table, examples, env var documentation).
 - **3.3 Environment variable for explicit mode** — Implemented `LIBEPHEMERIS_MODE` with four values: `auto` (default: LEB → Horizons → Skyfield), `skyfield` (force Skyfield), `leb` (require LEB with auto-discovery), `horizons` (prefer Horizons API). Added `set_calc_mode()`/`get_calc_mode()` in `state.py`, exported in `__init__.py`, reset in `close()`.
-- **3.4 Graceful handling of missing LEB** — Already implemented. `get_leb_reader()` handles all edge cases: missing file (warning + `None`), corrupt file (warning + `None`), range too narrow (`ValueError` caught for per-body fallback), no file specified (`None` without warning).
+- **3.4 Mode-aware handling of missing LEB** — `auto` can continue through its independent non-LEB source chain when no LEB is configured. Sealed `leb` treats a missing or corrupt canonical group as a provisioning failure, fails core range misses explicitly, and permits only a source-labelled local model for a companion body outside its meaningful stored interval.
 - **3.5 Distribution of pre-generated LEB files** — The wheel bundles the
-  reviewed, hash-pinned base core. `download_leb_for_tier()` and
-  `download_leb2_for_tier()` install pinned base, medium, and extended core
-  assets; locally generated LEB1 and LEB2 files remain available through
-  explicit configuration.
+  manifest-pinned base core and Hamburg-body companion. The cumulative
+  `data-v3` manifest supplies all five groups for base, medium, and extended;
+  `download auto` installs every eligible tier so routing remains per body and
+  date. Locally generated LEB1 and LEB2 files remain available through explicit
+  configuration.
 
 ---
 

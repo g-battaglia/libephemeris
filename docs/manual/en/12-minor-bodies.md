@@ -79,7 +79,7 @@ Eris: 24.74°
 
 When you request the position of a minor body, the library tries different methods in order, from most precise to least precise:
 
-**0. Precomputed LEB** — If a LEB binary ephemeris is loaded and contains the body, its precomputed Chebyshev polynomials are used directly (no Internet, no per-call SPK read). This is the fastest path. The format and generation tools support an optional `{tier}_exotics.leb2` companion for ~31 centaurs, TNOs, and near-Earth asteroids, but no exotics companion is currently published in the release download manifest. It must be generated or supplied separately. When absent, or outside a body's coverage interval, the chain continues below.
+**0. Precomputed LEB** — If a LEB binary ephemeris is loaded and contains the body, its precomputed Chebyshev polynomials are used directly (no Internet, no per-call SPK read). This is the fastest path. The data-v3 manifest contains an `{tier}_exotics.leb2` companion for every tier; inventory and routing still honor each body's actual stored interval. When absent, corrupt, or outside that interval, the chain continues according to the active mode.
 
 **1. SPK Kernel** — If a JPL binary file (SPK/BSP format) is registered for that body, it uses it. Precision: sub-arcsecond. It is the gold standard method.
 
@@ -87,7 +87,7 @@ When you request the position of a minor body, the library tries different metho
 
 **3. Strict precision check** — With strict precision mode (enabled by default), `SPKRequiredError` is raised for mapped bodies when no SPK is available, preventing silent precision loss. Use `set_strict_precision(False)` to allow lower-precision fallbacks.
 
-**4. ASSIST n-body** — If `libephemeris[nbody]` is installed with data files, REBOUND/ASSIST provides sub-arcsecond precision for any body with orbital elements.
+**4. ASSIST n-body** — If `libephemeris[nbody]` is installed with the required data, REBOUND/ASSIST provides a higher-fidelity numerical fallback for supported orbits. It is not a direct minor-body JPL ephemeris; accuracy and source coverage are body/date dependent.
 
 **5. Keplerian fallback** — Uses Kepler's laws with corrections for giant planet perturbations. Less precise (arcminutes over year scales), but works without an Internet connection.
 

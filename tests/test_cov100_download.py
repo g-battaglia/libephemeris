@@ -66,9 +66,9 @@ class _FakeResponse:
 
 
 def _make_urlopen(data: bytes, content_length):
-    """Build a fake ``urlopen`` that ignores args and returns a response."""
+    """Build a fake ``net.open_url`` that ignores args and returns a response."""
 
-    def _fake_urlopen(req, timeout=None, context=None):
+    def _fake_urlopen(req, timeout=None, context=None, **kwargs):
         return _FakeResponse(data, content_length)
 
     return _fake_urlopen
@@ -205,7 +205,7 @@ def test_get_progress_bar_import_error_fallback(monkeypatch):
 def test_download_file_with_progress(tmp_path, monkeypatch):
     """total_size>0 + show_progress drives the progress branch (358-416)."""
     data = b"hello world payload" * 10
-    monkeypatch.setattr(dl.urllib.request, "urlopen", _make_urlopen(data, len(data)))
+    monkeypatch.setattr(dl, "open_url", _make_urlopen(data, len(data)))
 
     captured = {}
 
@@ -237,7 +237,7 @@ def test_download_file_with_progress(tmp_path, monkeypatch):
 def test_download_file_no_progress_zero_length(tmp_path, monkeypatch):
     """total_size==0 and show_progress False -> progress is None (382-386)."""
     data = b"payload"
-    monkeypatch.setattr(dl.urllib.request, "urlopen", _make_urlopen(data, 0))
+    monkeypatch.setattr(dl, "open_url", _make_urlopen(data, 0))
     dest = tmp_path / "nop.bin"
     ok = dl.download_file("http://x", dest, show_progress=False)
     assert ok is True
@@ -248,7 +248,7 @@ def test_download_file_hash_match(tmp_path, monkeypatch):
     """Matching expected_sha256 passes verification and replaces (404-414)."""
     data = b"verify me"
     digest = hashlib.sha256(data).hexdigest()
-    monkeypatch.setattr(dl.urllib.request, "urlopen", _make_urlopen(data, len(data)))
+    monkeypatch.setattr(dl, "open_url", _make_urlopen(data, len(data)))
     dest = tmp_path / "v.bin"
     ok = dl.download_file("http://x", dest, expected_sha256=digest, show_progress=False)
     assert ok is True
@@ -258,7 +258,7 @@ def test_download_file_hash_match(tmp_path, monkeypatch):
 def test_download_file_hash_mismatch_unlinks_temp(tmp_path, monkeypatch):
     """Mismatch raises ValueError, unlinks temp, leaves no dest (407-411, 418-422)."""
     data = b"verify me"
-    monkeypatch.setattr(dl.urllib.request, "urlopen", _make_urlopen(data, len(data)))
+    monkeypatch.setattr(dl, "open_url", _make_urlopen(data, len(data)))
     dest = tmp_path / "bad.bin"
     with pytest.raises(ValueError, match="Hash mismatch"):
         dl.download_file(
@@ -276,10 +276,10 @@ def test_download_file_oserror_cleans_temp(tmp_path, monkeypatch):
         def read(self, size):
             raise OSError("network boom")
 
-    def _boom_urlopen(req, timeout=None, context=None):
+    def _boom_urlopen(req, timeout=None, context=None, **kwargs):
         return _BoomResponse(b"", 100)
 
-    monkeypatch.setattr(dl.urllib.request, "urlopen", _boom_urlopen)
+    monkeypatch.setattr(dl, "open_url", _boom_urlopen)
     dest = tmp_path / "boom.bin"
     with pytest.raises(OSError, match="network boom"):
         dl.download_file("http://x", dest, show_progress=False)
@@ -1354,19 +1354,27 @@ def test_download_leb2_for_tier_invalid_tier():
 
 
 def test_published_wider_core_pins_match_reviewed_release_bytes():
-    # Definitive data-v2 cores (reviewed regeneration).
+    # Cumulative data-v3 cores (reviewed regeneration).
     assert dl.DATA_FILES["medium_core.leb2"]["sha256"] == (
-        "09072b315df5a2ec44c5320cca8bdd92cfd3ef0acb82baea3ca96fffc83522f6"
+        "4d88ec9a79add7e3af9e75ac3ceabe5462a4af440447578a5ccba69a3e0a55b6"
     )
     assert dl.DATA_FILES["extended_core.leb2"]["sha256"] == (
-        "69f9d6972c6d54dacb50faadea6c0b9a50649dc3912b80a928b5a26bee16611a"
+        "ecb8dd43a4934e74324d9c38274a72360ef6821d96607679ef5248d47c9d7afc"
     )
-    assert dl.DATA_FILES["medium_core.leb2"]["url"].endswith(
-        "data-v2rc1/medium_core.leb2"
-    )
+    assert dl.DATA_FILES["medium_core.leb2"]["url"].endswith("data-v3/medium_core.leb2")
     assert dl.DATA_FILES["extended_core.leb2"]["url"].endswith(
-        "data-v2rc1/extended_core.leb2"
+        "data-v3/extended_core.leb2"
     )
+
+
+def test_leb_and_planet_center_release_families_stay_separate():
+    """New LEB bytes must not silently repoint unchanged legacy BSP assets."""
+    for filename, metadata in dl.DATA_FILES.items():
+        url = metadata.get("url")
+        if filename.endswith(".leb2") and url is not None:
+            assert "/data-v3/" in url
+        if filename.startswith("planet_centers") and filename.endswith(".bsp"):
+            assert "/data-v2rc1/" in url
 
 
 def test_regenerated_medium_planet_centers_pin_matches_reviewed_bytes():
@@ -1673,7 +1681,7 @@ def test_download_leb2_replaces_valid_but_unreviewed_bundled_core(
     assert installed == [
         (
             "data/leb2/base_core.leb2",
-            "e5a9730b09f4a21dd35c7adcc938767644eb242145807bd8a6bf7e6042f5b420",
+            "5d708bdbe3e799e0802ba575984e57a3c5e44720dbfa1b4a01cf826640e0cb82",
         )
     ]
     assert "replacing unreviewed cached core" in capsys.readouterr().out

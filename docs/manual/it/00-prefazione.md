@@ -54,11 +54,13 @@ Il Capitolo 15 — il Ricettario — è pensato per chi ha fretta: ricette copia
 pip install libephemeris
 ```
 
-Il pacchetto PyPI include un LEB2 base-tier bundled per i 14 corpi principali (1850–2150). Per una copertura più ampia, puoi scaricare un tier di precisione completo:
+Il pacchetto PyPI include il core LEB2 base per i 14 corpi principali e il
+companion dei corpi di Amburgo (1850–2150). In modalità `auto` o `leb`
+sigillata, installa cumulativamente i gruppi data-v3 verificati fino al tier
+configurato con:
 
-```python
-import libephemeris as ephem
-ephem.download_for_tier("medium")
+```bash
+libephemeris download auto
 ```
 
 I tre livelli di precisione — `base`, `medium`, `extended` — si differenziano per l'intervallo temporale coperto e la dimensione dei file. Il livello `medium` (default) copre gli anni 1550–2650 e va bene per la stragrande maggioranza degli usi. Ne parleremo nel dettaglio al Capitolo 4.

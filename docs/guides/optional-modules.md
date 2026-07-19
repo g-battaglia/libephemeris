@@ -30,7 +30,7 @@ precision and requirements:
 | Backend | Precision | Requirements | Bodies |
 |---------|-----------|--------------|--------|
 | **SPK kernel** | Sub-arcsecond | Downloaded SPK file per body | All 37 mapped asteroids/TNOs |
-| **ASSIST n-body** | Sub-arcsecond | `libephemeris[nbody]` + ~714 MB data | Any body with orbital elements |
+| **ASSIST n-body** | Numerical model; validated accuracy is body/date dependent | `libephemeris[nbody]` + source files | Bodies with a supported orbit and source interval |
 | **Keplerian** | ~1-10 arcminutes | None (built-in) | Any body with orbital elements |
 
 For planets, the LEB (LibEphemeris Binary) and Horizons API backends are
@@ -110,10 +110,11 @@ extension). Together they propagate asteroid orbits accounting for:
 - Earth/Sun gravitational harmonics (J2, J3, J4)
 - General relativistic corrections
 
-**When you need it:** When you require sub-arcsecond precision for
-asteroids or TNOs and don't want to manage individual SPK files. Also
-useful for bodies like Bennu where JPL does not provide auto-downloadable
-SPK kernels (see [Known Limitations](#known-limitations)).
+**When you need it:** When a numerical perturbation model is preferable to a
+Keplerian fallback and no direct body SPK is available. It is not equivalent to
+a direct JPL minor-body trajectory, and accuracy cannot be generalized across
+all bodies or arbitrarily long propagation spans. The complete source interval
+is the intersection of the selected planet and asteroid-perturber files.
 
 **Data files** (~714 MB total, downloaded separately):
 
@@ -125,6 +126,11 @@ libephemeris download assist
 |------|------|---------|
 | `linux_p1550p2650.440` | ~98 MB | Planet ephemeris for ASSIST |
 | `sb441-n16.bsp` | ~616 MB | 16 asteroid perturbers |
+
+Extended offline LEB generation also uses
+`linux_m13000p17000.441` (~2.6 GB), but its complete N-body interval remains
+bounded by `sb441-n16.bsp`. The data-v3 generator reads both headers and applies
+an integration guard before publishing per-body coverage.
 
 See [REBOUND Integration](../methodology/rebound-integration.md) for
 technical details and precision benchmarks.

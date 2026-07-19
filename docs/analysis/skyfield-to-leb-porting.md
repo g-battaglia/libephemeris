@@ -7,7 +7,10 @@
 > attuale vedere [Architecture Overview](../development/architecture-overview.md)
 > e [LEB Technical Guide](../leb/guide.md).
 
-**Stato:** Implementato — porting funzionale completo, fallback Skyfield attivo per date/corpi fuori copertura LEB.
+**Stato:** Superato da 3.0.0rc14 — i consumer vettoriali usano
+`LEBVectorEphemeris`; in modalità `leb` non esiste più alcun fallback
+Skyfield/JPL. Il fallback descritto nel testo storico riguarda soltanto la
+precedente architettura e il routing non sigillato.
 **Versione libephemeris:** 1.3.0+
 **Data:** 2026-05-08 (analisi), 2026-05-08 (implementazione)
 **Autore:** Giacomo Battaglia + Claude

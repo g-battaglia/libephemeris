@@ -45,12 +45,31 @@ _DE_KERNELS: Dict[str, tuple] = {
 _PC_SIZES: Dict[str, float] = {"base": 25.4, "medium": 191.25, "extended": 222.6}
 
 _LEB2_GROUPS = list(LEB2_GROUPS)
-# Only reviewed core assets currently have distributable sizes. Optional
-# companion groups remain absent until their clean-room regeneration review.
+# Display metadata for the cumulative data-v3 release: all five reviewed
+# groups ship for every tier. Values track the release manifest
+# (libephemeris/download.py) and do not enter calculations.
 _LEB2_SIZES: Dict[str, Dict[str, float]] = {
-    "base": {"core": 10.8},
-    "medium": {"core": 38.3},
-    "extended": {"core": 334.9},
+    "base": {
+        "core": 10.23,
+        "asteroids": 2.15,
+        "exotics": 29.38,
+        "apogee": 9.78,
+        "uranians": 0.05,
+    },
+    "medium": {
+        "core": 37.28,
+        "asteroids": 6.48,
+        "exotics": 92.33,
+        "apogee": 36.19,
+        "uranians": 0.17,
+    },
+    "extended": {
+        "core": 1153.9,
+        "asteroids": 6.48,
+        "exotics": 234.01,
+        "apogee": 1481.19,
+        "uranians": 4.67,
+    },
 }
 
 _TIER_RANGES: Dict[str, str] = {

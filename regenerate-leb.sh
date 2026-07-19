@@ -226,7 +226,9 @@ Examples:
 Notes:
   - Extended core generation covers the full DE441 interval
     (-13200..+17191) and can take many hours.
-  - Extended exotics require rebound, assist, and the ASSIST data files.
+  - Extended exotics require rebound, assist, the long DE441 planet file, and
+    the sb441-n16 perturber SPK. Their stored range is the guarded intersection
+    of those two sources, not the wider planet-only DE441 interval.
   - LEB1 “planets” and LEB2 “core” are not equivalent groups. LEB2 group
     inference is deliberately conservative.
 EOF
@@ -1781,16 +1783,11 @@ def check_assist_data() -> None:
             AssistEphemConfig,
         )
 
-        config = AssistEphemConfig()
+        deep_planets = str(_ASSIST_DEFAULT_DIR / "linux_m13000p17000.441")
+        config = AssistEphemConfig(planets_file=deep_planets)
         required_files = (
-            ("planet ephemeris", config.planets_file),
+            ("deep-time planet ephemeris", config.planets_file),
             ("asteroid perturbers", config.asteroids_file),
-            # Full extended generation exceeds DE440's 1550..2650 window, so
-            # N-body companions resolve to this exact deep-time DE441 file.
-            (
-                "deep-time DE441",
-                str(_ASSIST_DEFAULT_DIR / "linux_m13000p17000.441"),
-            ),
         )
 
         for label, path in required_files:
@@ -1801,6 +1798,32 @@ def check_assist_data() -> None:
             display_name = os.path.basename(path) if path else label
             report_missing(f"{label}: {display_name}", "nbody")
             assist_data_missing = True
+
+        if not assist_data_missing:
+            from scripts.generate_leb import (
+                _ASSIST_INTEGRATION_GUARD_DAYS,
+                _ephemeris_file_coverage,
+            )
+
+            planet_start, planet_end = _ephemeris_file_coverage(config.planets_file)
+            asteroid_start, asteroid_end = _ephemeris_file_coverage(
+                config.asteroids_file
+            )
+            common_start = max(planet_start, asteroid_start)
+            common_end = min(planet_end, asteroid_end)
+            guarded_start = common_start + _ASSIST_INTEGRATION_GUARD_DAYS
+            guarded_end = common_end - _ASSIST_INTEGRATION_GUARD_DAYS
+            if guarded_start >= guarded_end:
+                report_missing(
+                    "ASSIST planet/perturber sources have no guarded overlap",
+                    "nbody",
+                )
+                assist_data_missing = True
+            else:
+                report_ok(
+                    "guarded common source coverage: "
+                    f"JD {guarded_start:.1f}..{guarded_end:.1f}"
+                )
 
     except Exception as error:
         report_missing(

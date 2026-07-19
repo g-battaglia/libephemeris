@@ -229,8 +229,10 @@ Different JPL Development Ephemeris (DE) files provide different date ranges and
 | **de440.bsp** | 1550-2650 | ~114 MB | **Default**, ICRF 3.0 |
 | **de441.bsp** | -13200-17191 | ~3.4 GB | Extended version of DE440 |
 
-DE440 and DE441 have identical precision — DE441 is simply the extended-range version.
-DE440s is a reduced-size subset of DE440 with no loss of precision within its range.
+DE440s is a reduced-size subset of DE440 with no loss of precision within its
+range. DE441 is the long-span integration from the same modern ephemeris
+family, not a byte- or trajectory-identical extension of DE440. Prefer DE440
+inside its interval and DE441 when the requested date needs the wider span.
 
 ### Precision Tiers
 

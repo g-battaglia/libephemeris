@@ -852,7 +852,7 @@ python scripts/generate_leb.py --output custom.leb --start 1900 --end 2100
 |------|-----------|-------|--------|---------------------------|
 | `base` | de440s.bsp | 1850-2150 | `ephemeris_base.leb` | up to 53 bodies |
 | `medium` | de440.bsp | 1550-2650 | `ephemeris_medium.leb` | up to 53 bodies |
-| `extended` | de441.bsp | -5000 to 5000 | `ephemeris_extended.leb` | up to 45 bodies |
+| `extended` | de441.bsp | exact shared interval (JD -3100015.5 to 8000016.5) | `ephemeris_extended.leb` | up to 45 bodies |
 
 File size is measured from the selected artifact. LEB1 files are generated
 locally; reviewed SHA-256-pinned LEB2 cores are published for base, medium, and
@@ -896,11 +896,11 @@ target = planets[target_name]
 t_arr = ts.tt_jd(all_jds)                    # vectorized Time
 positions = target.at(t_arr).position.au.T    # (N, 3) in one call
 
-# For outer planets (Mars, Jupiter, Saturn, Uranus, Neptune, Pluto):
-# Barycenter + SPK center offset or COB correction
+# For outer planets stored as COORD_ICRS_BARY_SYSTEM:
+# Persist the pure DE system barycenter. A runtime can apply a separately
+# sourced JPL center offset after reading the LEB state.
 bary_vals = barycenter.at(t_arr).position.au.T
-offset_vals = center_segment.at(t_arr).position.au.T
-positions = bary_vals + offset_vals
+positions = bary_vals
 ```
 
 **Step 3 — Batch fit and verify** (`_fit_and_verify_from_values`, line 374):
@@ -914,24 +914,25 @@ For each segment:
 This eliminates the per-JD overhead of Skyfield's time conversion, SPK
 evaluation, and Python function call overhead. Speedup: **~150x for planets**.
 
-### 6.6 SPK Boundary Overshoot
+### 6.6 Source-bound segment grids
 
-**Problem:** The last Chebyshev segment may extend its fit nodes beyond
-`jd_end`. For example, Uranus with 128-day intervals: if the last segment
-starts at JD X, its nodes extend to X+128. If de440s.bsp ends at JD 2506352.5
-(~2150-01-22), nodes can overshoot by up to 128 days.
+The last preferred-width Chebyshev segment can extend beyond the requested
+date or even beyond the source kernel. Generation must not fill those nodes by
+clamping or linear extrapolation: either operation would make a channel claim
+coverage for values that were not supplied by its declared source.
 
-**Solution: Linear extrapolation** (`_eval_target_vectorized`, line 517):
-- Identify which JDs are outside the SPK valid range (with 1-day safety margin)
-- For in-range JDs: vectorized Skyfield evaluation
-- For out-of-range JDs: evaluate position + velocity at the boundary, then
-  extrapolate: `pos(jd) = pos(boundary) + vel(boundary) * (jd - boundary)`
+`_source_backed_fit_grid()` resolves the fitting grid before evaluation:
 
-**Why not clamp?** Clamping (replacing out-of-range JDs with the boundary
-value) would move the Chebyshev nodes, corrupting the polynomial fit for
-the entire segment. Linear extrapolation preserves the node positions and
-produces smooth, reasonable values for the short extrapolation distance
-(up to ~128 days).
+- when the complete requested interval exists in the source, it adjusts the
+  segment width by a negligible amount so the last segment ends at the exact
+  public boundary;
+- when the source is genuinely narrower, it retains the preferred width and
+  stores only the largest complete source-backed interval;
+- `_eval_target_vectorized()` rejects any residual node outside the source.
+
+The runtime then selects a broader LEB tier for a core edge or a declared,
+traced local model for an uncovered companion body. No generated LEB channel
+contains a source extrapolation.
 
 ### 6.7 Asteroid Generation
 
@@ -958,7 +959,8 @@ excludes asteroids without SPK rather than producing inaccurate data.
 **Problem:** JPL Horizons SPK files for minor bodies cover approximately
 1600-2500 CE. For the base tier (1850-2150), this is sufficient. For the
 medium tier (1550-2650), SPK coverage may be slightly narrower at the edges.
-For the extended tier (-5000 to 5000), asteroids cannot cover the full range.
+For the extended tier (the exact shared DE441 interval), asteroids cannot cover
+the full core range.
 
 Previously, asteroids were excluded entirely if their SPK didn't cover the
 full tier range. Now, the generator uses **per-body date ranges**: each
@@ -967,19 +969,22 @@ bodies cover the full tier range.
 
 **How it works** (`assemble_leb`, step 0):
 
-1. For each asteroid, attempt to download SPK for the full tier range
-2. If the SPK covers the full range → use global `jd_start`/`jd_end`
-3. If the SPK is narrower → discover actual range via `_get_asteroid_spk_range()`
-4. Intersect SPK range with tier range (with 1-day safety margin)
-5. If overlap is less than 20 years → exclude the asteroid
-6. Otherwise → generate with the per-body range and write it to `BodyEntry`
+1. Request a Horizons SPK with one day of deterministic padding around the
+   fitting range when Horizons supports that interval.
+2. Discover the actual target coverage via `_get_asteroid_spk_range()`.
+3. Intersect the target SPK, selected DE Sun channel, and tier ranges.
+4. Resolve a complete source-backed segment grid inside that intersection.
+5. If overlap is less than 20 years, exclude the asteroid.
+6. Otherwise, write the exact per-body range to `BodyEntry`.
 
 ```python
-# Per-body range discovery:
-spk_range = _get_asteroid_spk_range(spk_file, bid)
-eff_start = max(spk_jd_start, jd_start) + 1.0  # safety margin
-eff_end = min(spk_jd_end, jd_end) - 1.0
-body_jd_ranges[bid] = (eff_start, eff_end)
+# Per-body range discovery (schematic):
+spk_start, spk_end = _get_asteroid_spk_range(spk_file, bid)
+source_start = max(spk_start, de_start, tier_start)
+source_end = min(spk_end, de_end, tier_end)
+body_jd_ranges[bid] = _source_backed_fit_grid(
+    source_start, source_end, source_start, source_end, interval_days
+)[:2]
 ```
 
 **At runtime:** when a body's JD is outside its per-body range, `eval_body()`
@@ -994,7 +999,7 @@ LEB → JPL/SPK → local-model order applies.
 |------|---------|-----------|------------|
 | Base (1850-2150) | Full | Full (SPK covers) | Full |
 | Medium (1550-2650) | Full | ~1600-2500 (per-body) | Full |
-| Extended (-5000 to 5000) | Full | ~1600-2500 (per-body) | Active JPL-kernel range |
+| Extended (exact DE441 interval) | Full | ~1600-2500 (per-body) | Active JPL-kernel range |
 
 ### 6.9 Ecliptic Body Generation
 
@@ -1500,17 +1505,18 @@ Minor bodies outside the curated registry (for example Bennu) require an SPK
 in `auto`/`skyfield` mode. They fail explicitly in sealed `leb` mode because
 there is neither a LEB coefficient stream nor a reviewed local model.
 
-IDs 40–58 do not use LEB coefficients. The dispatcher uses local,
-primary-source runtime models for IDs 40–47, 50–53, and 56 and fails closed
-for the six IDs without independently reviewed complete definitions.
+IDs 40–47 can use the manifest-trusted `uranians` LEB2 companion and otherwise
+fall back to the same primary-source runtime model. IDs 50–53 and 56 use local
+primary-source models; the six IDs without independently reviewed complete
+definitions fail closed.
 
-**Total bodies NOT in LEB Chebyshev data:** ~1498 (19 hypothetical + 1447
+**Total bodies NOT in LEB Chebyshev data:** ~1490 (11 hypothetical + 1447
 stars + 21 moons + 10 angles/parts + 1 nutation).
 
 **Why the core/exotics split:** the frequently used compressed LEB2 `core`
-group is small enough (~10.7 MB for the bundled base artifact). The 31
-**exotic** bodies are SPK-derived and much larger on disk (a generated base
-`exotics` group is ~59 MB compressed), so they remain a separate companion.
+group is small enough (~10.23 MB for the bundled data-v3 base artifact). The 31
+**exotic** bodies are source-dependent and larger on disk (the data-v3 base
+`exotics` group is ~29.38 MB compressed), so they remain a separate companion.
 Fixed stars use their local catalogue plus the active backend's Earth vector;
 chart angles and parts are derived locally from chart inputs. Planetary moons
 still require their dedicated SPK and are deliberately outside the sealed LEB
@@ -1518,9 +1524,10 @@ product surface.
 
 ### 9.4 Auxiliary LEB Sections (Non-Chebyshev Data)
 
-In addition to the Chebyshev polynomial coefficients for its bodies, each
-`.leb` file contains three auxiliary data sections that accelerate other
-parts of the calculation pipeline:
+In addition to body coefficients, a merged LEB1 file and each canonical LEB2
+`core` contain three auxiliary data sections that accelerate other parts of
+the calculation pipeline. Named LEB2 companions omit these shared tables;
+`CompositeLEBReader` obtains them from the core once.
 
 #### Nutation (Section 2)
 
@@ -1628,7 +1635,7 @@ flags, and native sidereal modes against the direct independent pipeline.
 Verification covers the generated planet/asteroid/lunar channels and their
 reference-free downstream invariants.
 
-#### Extended Tier (-5000 to 5000 CE, verified)
+#### Extended comparison window (-5000 to +5000 CE, verified)
 
 | Group | Bodies | Worst Case Body | Max Error |
 |-------|--------|-----------------|-----------|
@@ -1640,8 +1647,10 @@ reference-free downstream invariants.
 Mean points use ERFA/IERS arguments; smoothed and osculating points are limited
 by active JPL state coverage.
 
-Verification includes velocities, lunar channels, flags, ancient/future
-sub-ranges, and boundary dates against the direct independent pipeline.
+This retained comparison grid measures velocities, lunar channels, flags,
+ancient/future sub-ranges, and its own boundary dates against the direct
+independent pipeline. The release generator separately samples every body's
+actual stored interval, including the full DE441 core boundaries.
 
 The extended full-registry size is reported by the local generator/verifier.
 Historical monolithic size claims and downloads are retired.
@@ -1684,8 +1693,10 @@ Asteroid precision depends entirely on how the LEB file was generated:
 - **With scalar calc() fallback:** Position errors can reach ~1500" — unacceptable
 - **With Keplerian fallback (no SPK):** Even worse
 
-Always ensure asteroid SPK files cover the full tier date range before
-generating. Use `_spk_covers_range()` to verify.
+Always ensure each stored body interval is covered by both its asteroid SPK
+and the DE Sun channel used to translate heliocentric states to the SSB. The
+generator enforces this per body; a companion need not cover the wider core
+tier range.
 
 ---
 
@@ -1887,9 +1898,9 @@ Offset      Content                          Size
 0x0040      Section Directory                N × 24 bytes
 variable    Section 0: Body Index            body_count × 68 bytes (CompressedBodyEntry)
 variable    Section 6: Compressed Chebyshev  per-body chunk indexes and compressed chunks
-variable    Section 2: Nutation Data         uncompressed (same as LEB1)
-variable    Section 3: Delta-T Table         uncompressed (same as LEB1)
-variable    Section 4: Star Catalog          uncompressed (same as LEB1)
+variable    Section 2: Nutation Data         optional; core only
+variable    Section 3: Delta-T Table         optional; core only
+variable    Section 4: Star Catalog          optional; core only
 ```
 
 **Key differences from LEB1:**
@@ -1898,7 +1909,8 @@ variable    Section 4: Star Catalog          uncompressed (same as LEB1)
 - Body index uses `CompressedBodyEntry` (68 bytes) instead of `BodyEntry` (52 bytes)
 - Chebyshev data is in section 6 (`SECTION_COMPRESSED_CHEBYSHEV`) instead of section 1
 - Header `flags` field encodes `COMPRESSION_ZSTD_TRUNC_SHUFFLE = 1`
-- Auxiliary sections (nutation, delta-T, stars) remain uncompressed
+- Core auxiliary sections (nutation, delta-T, stars) remain uncompressed;
+  named companions do not duplicate them
 
 ### 13.3 CompressedBodyEntry (68 bytes)
 
@@ -2030,17 +2042,21 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 
 The table gives the base-tier inventory. Medium also has 31 exotics; extended
 contains exactly the 23 regular exotics and excludes all eight chaotic NEAs.
-Within the extended tier, 17 of those bodies are N-body integrated over the
-full ±5000-year span, while the six sb441-n16 perturber asteroids (Hygiea,
-Psyche, Europa, Sylvia, Davida, Interamnia) carry their SPK coverage window
-(~1600–2500) instead: a perturber cannot be integrated as a massless test
-particle against the force model that already contains it (see
+Within the extended tier, N-body bodies use the guarded intersection of both
+ASSIST inputs: the long DE441 planet file and every target in the
+`sb441-n16.bsp` perturber file. For the pinned data-v3 inputs that interval is
+JD -1200493.5 through 5008210.5; it is deliberately narrower than planet-only
+DE441. These rows remain `source=LEB` but declare
+`precision_class=numerical-model`. The six sb441-n16 perturber asteroids
+(Hygiea, Psyche, Europa, Sylvia, Davida, Interamnia) instead carry their direct
+SPK coverage window (~1600–2500): a perturber cannot be integrated as a
+massless test particle against the force model that already contains it (see
 `EXOTIC_ASSIST_PERTURBER_IDS` in `libephemeris/exotic_bodies.py`). Outside a
 body's stored window, sealed `leb` mode uses the declared local Keplerian
 model and records that provenance; `auto` may use JPL/SPK first.
 
-The `exotics` group (`LEB2_GROUPS` in `libephemeris/leb_groups.py`) is by far
-the largest. All five groups are versioned companions with immutable URL and
+The `exotics` group (`LEB2_GROUPS` in `libephemeris/leb_groups.py`) is often
+the largest. All five groups are versioned artifacts with immutable URL and
 SHA-256 manifest entries for every supported tier. The wheel also bundles the
 base core and base uranians artifacts; mean lunar points and smoothed apsides
 require no standalone lunar model binary.
@@ -2291,9 +2307,11 @@ LibEphemeris uses three explicit target strategies:
    the stored system barycenter is used directly. No analytical COB correction
    is synthesized.
 
-The generator and runtime select the physical JPL center when available and the
-system barycenter otherwise. Light time is based on the observer-to-selected-
-target vector on geocentric, heliocentric, and barycentric paths.
+The generator always persists the pure system barycenter for these channels.
+A non-sealed runtime may add the physical JPL center offset when an independent
+segment covers the epoch; sealed `leb` mode retains the stored barycenter.
+Light time is based on the observer-to-selected-target vector on geocentric,
+heliocentric, and barycentric paths.
 
 ### 15.2 _PLANET_FALLBACK Map
 
@@ -2390,9 +2408,8 @@ reduction is required.
 
 ### 15.8 Full Segment Width Invariant
 
-**Critical implementation detail:** All segments have the same width
-(`interval_days`), including the last segment. The last segment may extend
-beyond `jd_end` by up to `interval_days` worth. This is necessary because
+**Critical implementation detail:** All segments for one body have the same
+width (`interval_days`), including the last segment. This is necessary because
 the reader's O(1) segment lookup assumes uniform width:
 
 ```python
@@ -2400,10 +2417,15 @@ seg_idx = int((jd - body.jd_start) / body.interval_days)
 ```
 
 If the last segment were truncated, the tau mapping would be wrong for all
-dates in that segment. The generator handles this by:
-- Using full-width segments for fitting (nodes extend beyond jd_end)
-- Verifying only within `[seg_start, min(seg_end, jd_end)]`
-- Using linear extrapolation for SPK overshoot
+dates in that segment. The generator instead resolves a uniform source-backed
+grid before fitting:
+
+- when the entire requested range is source-backed, it can adjust the common
+  interval minutely so an integer number of full segments ends at `jd_end`;
+- when a source is narrower, it stores the largest aligned range containing
+  only complete preferred-width segments;
+- every fitting and verification node must remain inside the declared source,
+  otherwise generation fails.
 
 ---
 

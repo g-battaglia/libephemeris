@@ -16,7 +16,7 @@ Let's look at the details by category.
 
 ### Main Planets
 
-LibEphemeris directly uses the **JPL DE440** ephemerides (or DE441 for extended dates), the same ones produced by NASA's Jet Propulsion Laboratory for space missions. We are not "approximating" the planets' positions: we are reading the exact same data that NASA uses to navigate its space probes.
+LibEphemeris sources planetary and lunar states from **JPL DE440** (or DE441 for extended dates). The Skyfield/JPL path evaluates those kernels directly; the LEB path stores a compact Chebyshev representation generated from them and accepted only after the documented numerical verification gates. A LEB result is therefore source-equivalent within its measured budget, not a claim of byte-for-byte kernel evaluation.
 
 The precision is **sub-milliarcsecond** for the Sun, Moon, and planets — the maximum achievable with current technology:
 
@@ -271,9 +271,9 @@ traced local `Keplerian` or `Analytical` model.
 
 Like the JPL ephemerides, LEB files also exist in three versions:
 
-- **`base` core** (~10.8 MB) — covers 1850–2150
-- **`medium` core** (~38.3 MB) — covers 1550–2650
-- **`extended` core** — covers the exact shared DE441 interval (approximately -13200 to +17191)
+- **`base` core** (~10.2 MB) — covers 1850–2150
+- **`medium` core** (~37.3 MB) — covers 1550–2650
+- **`extended` core** (~1.15 GB) — covers the exact shared DE441 interval (approximately -13200 to +17191)
 
 ---
 

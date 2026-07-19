@@ -201,12 +201,13 @@ set_calc_mode("leb")  # or via env: LIBEPHEMERIS_MODE=leb
 pip install libephemeris
 ```
 
-Out of the box, the wheel includes a bundled LEB2 base-tier core for the 14
-core bodies (1850–2150). Mean lunar points come from ERFA/IERS arguments;
+Out of the box, the wheel includes the LEB2 base-tier core for the 14 core
+bodies plus the lightweight Hamburg-body companion (1850–2150). Mean lunar
+points come from ERFA/IERS arguments;
 interpolated apsides are anchored to the actual JPL DE440 apsis passages
 (documented in the [lunar methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/interpolated-perigee.md)).
-Reviewed, SHA-256-pinned medium and extended LEB2 cores are available through
-the normal tier download commands, while local LEB1 files remain supported.
+The remaining versioned, SHA-256-pinned data-v3 groups are available through the
+normal tier download commands, while local LEB1 files remain supported.
 
 Recommended first-time setup:
 
@@ -221,7 +222,7 @@ Prefer to install a tier directly? Use one of these:
 ```bash
 libephemeris download base         # 1850-2150, lightweight
 libephemeris download medium       # 1550-2650, ~200 MB (recommended)
-libephemeris download extended     # -13200 to +17191 CE, full range
+libephemeris download extended     # DE441 core span; minor-body ranges vary
 ```
 
 **Optional extras:** `pip install libephemeris[stars]` for star-catalog tooling, `[nbody]` for REBOUND/ASSIST n-body integration (GPL-3.0-or-later components — explicit opt-in), `[all]` for every permissive-licensed runtime extra. [Details](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md#optional-extras).

@@ -1,38 +1,40 @@
-# Bundled LEB2 base-core provenance
+# Bundled base-tier LEB2 provenance
 
-This is the build attestation for the only tracked prebuilt LEB artifact in the
-repository.
+This is the build attestation for the two tracked prebuilt LEB artifacts in the
+repository: the base core and the small Hamburg-body companion.
 
-## Artifact
+## Core artifact
 
 - Path: `libephemeris/data/leb2/base_core.leb2`
-- Build date: 2026-07-15
-- Size: 10,841,639 bytes
-- SHA-256: `e5a9730b09f4a21dd35c7adcc938767644eb242145807bd8a6bf7e6042f5b420`
+- Build date: 2026-07-18
+- Size: 10,232,283 bytes
+- SHA-256: `5d708bdbe3e799e0802ba575984e57a3c5e44720dbfa1b4a01cf826640e0cb82`
 - Body IDs: 0–12 and 14
 - Format: LEB2 v2; populated section types 0, 2, 3, 4, and 6
 
-The artifact was generated with:
+The complete data-v3 matrix, including this artifact, was generated with:
 
 ```bash
-uv run python scripts/generate_leb2.py generate --tier base --group core --workers 8 --output /tmp/libephemeris-base-core-clean.leb2
+./regenerate-leb.sh all -q
 ```
 
-The reviewed result was then installed at
-`libephemeris/data/leb2/base_core.leb2`.
+For the base core, that workflow generated and merged the LEB1 body groups,
+verified 500 samples per body, converted the `core` group to LEB2, and verified
+another 200 samples per body. The reviewed result was then installed at
+`libephemeris/data/leb2/base_core.leb2` byte-for-byte.
 
 Exact generation-input pins:
 
 - DE440s SPK SHA-256:
   `c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2`;
 - `scripts/generate_leb.py` SHA-256:
-  `a6b7376393f1431711d7fc63480bda580519aea94b4805fcc753c0484f05a322`;
+  `85c8574c9acaea21b91d5dabb856800c29b717a36f1f592eab481da6c45458d5`;
 - `scripts/generate_leb2.py` SHA-256:
-  `8bcbcd70d3972b78bc4fce00980531c897c446152c8f8d38a108b24db7af518d`;
+  `8db3ff23e1f93d0b8b0af4c5937a2da8a8eb777638164af42b0ab9c210d3c4ea`;
 - `libephemeris/mean_lunar_apse.py` SHA-256:
-  `ee2cfe81464e950da9760fed1942b4003178f7069fd75c058aa38a882d06b068`;
+  `23285afe9817498b9bdd0f9daa1ea2403c4beb676068af2f20250620cdb55a9b`;
 - `libephemeris/lunar.py` SHA-256:
-  `83e48a4cf6c9eb18c088e91f4862bb781e68a53d3a942e005f2612919d5199af`.
+  `9bb440497c9cf25f3eb43a3a425f84b940662bbf9bc4f14eb9a28c10529f83dc`.
 
 These pins identify the bytes used for this artifact even if later commits
 change a generator or lunar model. The source kernel remains an external JPL
@@ -72,6 +74,23 @@ The attestation covers every payload in the file, not only the body channels:
   generated entirely by the repository's LEB2 serializer from the body and
   auxiliary values described above.
 
+## Hamburg-body companion
+
+- Path: `libephemeris/data/leb2/base_uranians.leb2`
+- Build date: 2026-07-18
+- Size: 46,148 bytes
+- SHA-256: `2b052321672f995a2c2f6c6c3abe4dd623e2721eb17f7319873d0c8b0d65ee8c`
+- Body IDs: 40–47
+- Coverage: JD 2396758.5–2506331.5 (1850–2150)
+- Format: LEB2 v2; populated section types 0 and 6
+
+The standalone `ephemeris_base_uranians.leb` partial is generated from the
+independently sourced Neely (1980) propagation in
+`libephemeris.hypothetical`, verified over 500 samples per body, converted with
+the `1e-12` native-component target, and verified over another 200 samples per
+body. Shared nutation, Delta-T, and star-catalog tables are intentionally owned
+by the core and are not duplicated in this or any other named companion.
+
 The recorded build inputs contain no reference-distribution source,
 documentation, algorithm, data file, generated artifact, or comparison output;
 the build regenerated the asset rather than converting a previously published
@@ -82,5 +101,5 @@ generated into nor converted as part of this `base_core.leb2` artifact. The
 Hamburg bodies (40–47) now ship separately as the independently sourced,
 manifest-pinned `base_uranians.leb2` companion.
 
-This page is an external build record. The command, hash, input description,
+This page is an external build record. The command, hashes, input description,
 and clean-room attestation are not embedded as metadata inside the LEB2 format.

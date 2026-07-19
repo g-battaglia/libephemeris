@@ -6,19 +6,20 @@
 pip install libephemeris
 ```
 
-The PyPI wheel includes a bundled LEB2 base-tier core (~10.7 MB, 1850–2150).
-SHA-256-pinned medium and extended cores can be installed with
-`libephemeris download leb-medium` / `leb-extended`; additional modular groups
-are generated locally. Historical LEB1 files remain readable and their standard
-tier filenames are auto-discovered. JPL tier files can still be downloaded
-normally.
+The PyPI wheel includes the bundled LEB2 base-tier core (~10.23 MB) and
+Hamburg-body companion (~46 KB), covering 1850–2150. The immutable `data-v3`
+release supplies all five SHA-256-pinned groups for every tier. In `auto` or
+`leb` mode, `libephemeris download auto` installs them cumulatively through the
+configured tier (5, 10, or 15 files). Historical LEB1 files remain readable and
+their standard tier filenames are auto-discovered.
 
-For full offline coverage, download a complete precision tier (DE kernel + planet centers + minor-body SPKs):
+For a traditional JPL/Skyfield workflow, download its DE kernel, planet-center
+data and minor-body SPKs directly:
 
 ```bash
 libephemeris download medium       # 1550-2650, >300 MB plus SPKs — recommended
 libephemeris download base         # 1850-2150, lightweight
-libephemeris download extended     # -13200 to +17191, full range
+libephemeris download extended     # DE441 core span; minor-body ranges vary
 ```
 
 ### Optional Extras
@@ -40,7 +41,11 @@ pip install libephemeris[all,nbody]  # ... plus the GPL-licensed N-body extra (p
 | `medium` | de440.bsp | 1550-2650 | ~114 MB | General purpose **(default)** |
 | `extended` | de441.bsp | -13200 to +17191 | ~3.1 GB | Historical/far-future |
 
-DE440 and DE441 have identical precision -- DE441 is the extended-range version.
+DE440s is a reduced-size subset of DE440 with no loss inside its stored range.
+DE441 shares the same modern observational lineage but is the long-span
+integration; it must not be described as numerically identical to DE440 over
+their overlap. The best-by-date LEB router therefore prefers DE440s/DE440 and
+uses DE441 for dates the shorter integration does not cover.
 
 ```python
 import libephemeris as swe

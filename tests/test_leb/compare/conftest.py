@@ -192,7 +192,8 @@ TIER_DEFAULTS: dict[str, dict[str, float]] = {
         "ASTEROID_SPEED_DIST_AU_DAY": 5e-3,  # ICRS pipeline
     },
     "extended": {
-        # Extended tier (de441, -5000 to 5000 CE, 10,000 years).
+        # Retained extended comparison window (de441, -5000 to 5000 CE).
+        # The data-v3 core itself spans the exact shared DE441 interval.
         # ICRS barycentric storage with COORD_ICRS_BARY_SYSTEM for outer
         # planets, gravitational deflection + SR aberration pipeline.
         # Measured precision: all planets <0.001", asteroids <0.001".

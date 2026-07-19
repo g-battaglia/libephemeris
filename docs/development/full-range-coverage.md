@@ -8,7 +8,12 @@
 > available, and ASSIST configuration is documented. The major-planet DE441
 > range remains about -13200 to +17191. All former published LEB downloads are
 > retired; the bundled base core and locally generated LEB1/LEB2 files are the
-> supported accelerated paths.
+> supported accelerated paths. A later data-v3 audit corrected one important
+> assumption in this historical plan: the complete ASSIST force model is
+> bounded by the intersection with `sb441-n16.bsp`, not by planet-only DE441.
+> The pinned guarded interval is JD -1200493.5 through 5008210.5, and generated
+> rows are classified as a numerical model rather than a direct minor-body
+> ephemeris.
 
 Historical plan for extending minor-body coverage across the DE441 range.
 
@@ -35,16 +40,16 @@ Keplerian propagation (~10-30 arcsec error) outside a narrow SPK window.
 | SPK (on disk, `*_190001_210001`) | 1900-2100 | Sub-arcsecond | Registered (by chance) |
 | SPK (on disk, `*_185001_215001`) | 1850-2150 | Sub-arcsecond | Present but **ignored** |
 | SPK (max from JPL Horizons) | 1600-2500 | Sub-arcsecond | **Not downloaded** |
-| ASSIST (n-body, with DE441) | -13000 to +17000 | Sub-arcsecond | **Not configured** |
-| Keplerian fallback | Unlimited | 10-30 arcsec | Active everywhere else |
+| ASSIST (DE441 + sb441-n16 common interval) | JD -1200493.5 to 5008210.5 after guard | Numerical model; body/date dependent | Configured for data-v3 generation |
+| Keplerian fallback | Model-dependent | Accuracy is body/date dependent; no universal bound | Traced outside stored/source-backed intervals where a curated model exists |
 
 ## Target Coverage
 
 ```
 DE441 range:   -13200 ==============================================> +17191
 SPK (Horizons):            |1600 ============ 2500|
-ASSIST (DE441):    -13000 ========================================> +17000
-Keplerian:      only outside -13000/+17000 (very rare use case)
+ASSIST complete model:       |-1200493.5 ============== 5008210.5|
+Keplerian:        outside each body's stored/source-backed interval
 ```
 
 ## Bugs Found During Investigation
@@ -155,13 +160,15 @@ Bodies (from `libephemeris/constants.py`):
 "spk:download:maxrange" = "python scripts/download_max_range_spk.py"
 ```
 
-### Step 5: Document ASSIST configuration for full DE441 range
+### Step 5: Document ASSIST configuration (historical proposal)
 
 **Status:** Pending
 
-ASSIST with DE441 data covers -13000 to +17000. The fallback chain in
-`planets.py:1612-1644` already works — it just needs ASSIST installed and
-configured.
+The original proposal assumed that adding the long DE441 planet file extended
+the complete force model to -13000..+17000. That is false: ASSIST also consumes
+the asteroid perturber SPK, and its narrower coverage is binding. Current LEB
+generation reads both files, reserves an IAS15 boundary guard, and serializes
+only their common interval.
 
 **Requirements:**
 
@@ -196,8 +203,11 @@ leph diag positions-extended
 
 Expected results:
 - Dates 1600-2500: all minor bodies show **SPK**
-- Dates outside 1600-2500 but within -13000/+17000: show **ASSIST** (if installed)
-- Dates outside -13000/+17000: show **Keplerian** (only extreme edges of DE441)
+- Dates inside the guarded common ASSIST source interval may show **ASSIST** or
+  a stored `numerical-model` LEB trajectory, depending on mode and body.
+- Dates outside the actual per-body source interval show **Keplerian** when the
+  curated deterministic model exists; they are never inferred from the
+  planet-only DE441 range.
 
 ## JPL Horizons SPK Limits
 

@@ -89,7 +89,8 @@ def _get_data_dir() -> str:
 # Three tiers with different date ranges and file sizes:
 # - base: de440s.bsp (1849-2150, ~31 MB) - lightweight, modern usage
 # - medium: de440.bsp (1549-2650, ~114 MB) - general purpose (DEFAULT)
-# - extended: de441.bsp (-13198 to +17191, ~3.1 GB) - historical research
+# - extended: de441.bsp (exact shared JD interval, approximately
+#   -13200 to +17191, ~3.1 GB) - historical research
 
 
 @dataclass(frozen=True)

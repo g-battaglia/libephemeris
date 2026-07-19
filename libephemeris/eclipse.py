@@ -198,9 +198,9 @@ def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
           never switch persisted ephemeris source.
         - Corruption and all unrelated exceptions are always re-raised.
 
-    Canonical LEB core tiers cover approximately 1850-2150, 1550-2650, or
-    -5000 to +5000. In ``auto`` mode the retry restarts computation from
-    scratch and shares no intermediate state.
+    Canonical LEB core tiers cover 1850-2150, 1550-2650, or the exact shared
+    DE441 interval (JD -3100015.5 to 8000016.5). In ``auto`` mode the retry
+    restarts computation from scratch and shares no intermediate state.
     """
     reader = _get_leb_reader_safe()
     if reader is not None:
