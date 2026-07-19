@@ -603,7 +603,6 @@ def test_degenerate_origins_report_analytical_source(
     monkeypatch, caplog, api_kind, method, body, flags
 ):
     """Local zero conventions must not claim a Skyfield vector evaluation."""
-    from libephemeris import planets
     from libephemeris.logging_config import get_logger
 
     class _NoVectorEvaluation:
@@ -613,9 +612,9 @@ def test_degenerate_origins_report_analytical_source(
     monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
     monkeypatch.setattr(state, "get_leb_reader", lambda: None)
     monkeypatch.setattr(state, "get_horizons_client", lambda: None)
-    monkeypatch.setattr(
-        planets, "get_planets", lambda: {"earth": _NoVectorEvaluation()}
-    )
+    # The sealed refactor moved the kernel accessor into libephemeris.state
+    # (planets.py consumes it via state._get_computation_ephemeris).
+    monkeypatch.setattr(state, "get_planets", lambda: {"earth": _NoVectorEvaluation()})
     monkeypatch.setattr(get_logger(), "propagate", True)
 
     api = le if api_kind == "module" else le.EphemerisContext()

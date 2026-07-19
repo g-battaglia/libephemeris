@@ -459,6 +459,11 @@ def test_reviewed_core_attaches_only_pinned_siblings(
     shutil.copy(uranians_leb2, tmp_path / "base_asteroids.leb2")
 
     _clear_trust_caches()
+    # Discovery is defined for LEB-permitting modes only: under a forced
+    # skyfield/horizons backend get_leb_reader() returns None by contract,
+    # so select 'auto' explicitly (as trusted_composite/_activate do; the
+    # autouse reset_ephemeris_state fixture restores the previous mode).
+    ephem.set_calc_mode("auto")
     ephem.set_leb_file(str(core))
     reader = state.get_leb_reader()
     try:

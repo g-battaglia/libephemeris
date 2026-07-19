@@ -855,11 +855,29 @@ def test_init_wizard_does_not_require_unpublished_exotics() -> None:
 
 
 def test_init_wizard_estimates_only_reviewed_artifacts() -> None:
-    """Only manifest-pinned core sizes are presented as active estimates."""
+    """Size estimates pin the cumulative data-v3 manifest: 5 groups per tier."""
     assert init_wizard._LEB2_SIZES == {
-        "base": {"core": 10.8},
-        "medium": {"core": 38.3},
-        "extended": {"core": 334.9},
+        "base": {
+            "core": 10.23,
+            "asteroids": 2.15,
+            "exotics": 29.38,
+            "apogee": 9.78,
+            "uranians": 0.05,
+        },
+        "medium": {
+            "core": 37.28,
+            "asteroids": 6.48,
+            "exotics": 92.33,
+            "apogee": 36.19,
+            "uranians": 0.17,
+        },
+        "extended": {
+            "core": 1153.9,
+            "asteroids": 6.48,
+            "exotics": 234.01,
+            "apogee": 1481.19,
+            "uranians": 4.67,
+        },
     }
 
 

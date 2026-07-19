@@ -555,4 +555,12 @@ APOGEE_CORRECTIONS: tuple = (
 
 
 if __name__ == "__main__":
+    from libephemeris import set_calc_mode
+
+    # This offline generator reads the reviewed DE440 source kernel by
+    # definition; the sealed 'leb' runtime mode (bundled base core or
+    # LIBEPHEMERIS_MODE=leb) must not leak into the dev pipeline, so the
+    # source backend is selected explicitly. The override is process-scoped
+    # and ends with the run.
+    set_calc_mode("skyfield")
     raise SystemExit(main())

@@ -36,6 +36,10 @@ def reset_state(monkeypatch):
     monkeypatch.setattr(state, "_LEB_FILE", None)
     monkeypatch.setattr(state, "_LEB_READER", None)
     monkeypatch.setattr(state, "_discover_leb_file", lambda: None)
+    # The reviewed tier-core discovery (bundled base core included) is a
+    # separate seam: without this, auto mode still resolves to LEB and
+    # _PLANETS never loads, so get_current_file_data() would return "".
+    monkeypatch.setattr(state, "_discover_reviewed_leb_tier_cores", lambda: {})
     close()
     set_ephemeris_file("de440.bsp")
     set_ephe_path(None)

@@ -92,9 +92,13 @@ class TestUnregisteredMoonsRaise:
 @pytest.mark.unit
 def test_failed_registered_moon_conversion_does_not_record_success(monkeypatch):
     """A failed post-SPK conversion must not overwrite the previous trace."""
-    from libephemeris import planets
+    from libephemeris import planets, state
 
-    monkeypatch.setattr(planets, "get_planets", lambda: {})
+    # Pin the mode: the moon path is sealed off in "leb" mode, and the kernel
+    # accessor now lives in libephemeris.state (planets.py consumes it via
+    # state._get_computation_ephemeris).
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "skyfield")
+    monkeypatch.setattr(state, "get_planets", lambda: {})
     monkeypatch.setattr(
         planetary_moons, "is_planetary_moon", lambda body: body == MOON_IO
     )

@@ -75,6 +75,35 @@ def disable_auto_spk_download_for_tests():
 
 
 # ============================================================================
+# EXPLICIT BACKEND SELECTION - dev-pipeline JPL verification modules
+# ============================================================================
+# The lunar apse generation/verification tests read the DE440 kernel directly
+# (get_planets() and the JPL-backed interpolated-apsides reader). Since the
+# reviewed base core ships with the package, the ambient calculation mode can
+# resolve to sealed 'leb', where JPL/SPICE access raises by contract. Dev
+# pipelines therefore select their source backend explicitly instead of
+# relying on ambient mode resolution: this fixture is autouse for every
+# module in tests/test_lunar/ (see its conftest.py) and attached via
+# pytestmark in tests/test_interpolated_lunar_apsides.py.
+
+
+@pytest.fixture(scope="module")
+def skyfield_dev_backend():
+    """Select the Skyfield/DE440 backend explicitly for a dev-pipeline module.
+
+    Module-scoped so that module-scoped fixtures calling get_planets() (e.g.
+    terminal_passage_errors) also run under the explicit backend; the
+    previous mode override is restored when the module finishes.
+    """
+    from libephemeris import state
+
+    saved = state._CALC_MODE
+    ephem.set_calc_mode("skyfield")
+    yield
+    ephem.set_calc_mode(saved)
+
+
+# ============================================================================
 # TEST DATA FIXTURES
 # ============================================================================
 

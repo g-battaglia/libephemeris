@@ -25,6 +25,11 @@ from libephemeris.interpolated_lunar_apsides import (
 
 J2000 = 2451545.0
 
+# This module verifies the JPL-backed smoothed-apsides pipeline against the
+# DE440 kernel directly; the backend is selected explicitly because the
+# sealed 'leb' calculation mode forbids JPL/SPICE access by contract.
+pytestmark = pytest.mark.usefixtures("skyfield_dev_backend")
+
 
 def _unit(vector: tuple[float, float, float]) -> tuple[float, float, float]:
     magnitude = math.sqrt(sum(value * value for value in vector))

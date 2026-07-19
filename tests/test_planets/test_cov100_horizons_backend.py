@@ -12,9 +12,10 @@ Two seams are mocked:
    returns canned :class:`StateVector` objects from ``fetch_state_vector`` and
    a dict from ``fetch_batch``.
 2. The HTTP client (:class:`HorizonsClient`, ``_fetch_with_retry``,
-   ``_parse_response``) is driven by patching ``urllib.request.urlopen`` with
-   a fake context manager whose ``.read()`` returns canned JSON bytes, and by
-   patching ``time.sleep`` so retry backoff is instantaneous.
+   ``_parse_response``) is driven by patching the policy-gated ``net.open_url``
+   choke point (imported into ``horizons_backend``) with a fake context manager
+   whose ``.read()`` returns canned JSON bytes, and by patching ``time.sleep``
+   so retry backoff is instantaneous.
 """
 
 from __future__ import annotations
@@ -213,7 +214,7 @@ class TestFetchStateVector:
         client = HorizonsClient(max_cache_size=4)
         with (
             mock.patch.object(
-                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+                hb, "open_url", return_value=_FakeResp(_good_json_bytes())
             ) as op,
             mock.patch.object(hb, "_get_ssl_context", return_value=None),
         ):
@@ -228,7 +229,7 @@ class TestFetchStateVector:
         client = HorizonsClient(max_cache_size=1)
         with (
             mock.patch.object(
-                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+                hb, "open_url", return_value=_FakeResp(_good_json_bytes())
             ),
             mock.patch.object(hb, "_get_ssl_context", return_value=None),
         ):
@@ -248,7 +249,7 @@ class TestFetchBatch:
         client = HorizonsClient(max_workers=2)
         with (
             mock.patch.object(
-                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+                hb, "open_url", return_value=_FakeResp(_good_json_bytes())
             ),
             mock.patch.object(hb, "_get_ssl_context", return_value=None),
         ):
@@ -262,7 +263,7 @@ class TestFetchBatch:
         client = HorizonsClient()
         with (
             mock.patch.object(
-                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+                hb, "open_url", return_value=_FakeResp(_good_json_bytes())
             ),
             mock.patch.object(hb, "_get_ssl_context", return_value=None),
         ):
@@ -291,9 +292,7 @@ class TestFetchWithRetry:
         client = HorizonsClient()
         payload = json.dumps({"error": "No matches found"}).encode("utf-8")
         with (
-            mock.patch.object(
-                hb.urllib.request, "urlopen", return_value=_FakeResp(payload)
-            ) as op,
+            mock.patch.object(hb, "open_url", return_value=_FakeResp(payload)) as op,
             mock.patch.object(hb, "_get_ssl_context", return_value=None),
         ):
             with pytest.raises(KeyError):
@@ -313,7 +312,7 @@ class TestFetchWithRetry:
             return item
 
         with (
-            mock.patch.object(hb.urllib.request, "urlopen", side_effect=_urlopen),
+            mock.patch.object(hb, "open_url", side_effect=_urlopen),
             mock.patch.object(hb, "_get_ssl_context", return_value=None),
             mock.patch("time.sleep", return_value=None),
         ):
@@ -323,9 +322,7 @@ class TestFetchWithRetry:
     def test_all_attempts_fail_raises_connectionerror(self):
         client = HorizonsClient()
         with (
-            mock.patch.object(
-                hb.urllib.request, "urlopen", side_effect=OSError("down")
-            ),
+            mock.patch.object(hb, "open_url", side_effect=OSError("down")),
             mock.patch.object(hb, "_get_ssl_context", return_value=None),
             mock.patch("time.sleep", return_value=None),
         ):
@@ -373,7 +370,7 @@ class TestClearCache:
         client = HorizonsClient()
         with (
             mock.patch.object(
-                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+                hb, "open_url", return_value=_FakeResp(_good_json_bytes())
             ),
             mock.patch.object(hb, "_get_ssl_context", return_value=None),
         ):

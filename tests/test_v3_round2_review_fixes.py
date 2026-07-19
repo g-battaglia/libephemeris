@@ -121,6 +121,11 @@ class TestReaderResourceSafety:
         stub.write_bytes(b"")
 
         for reader_cls in (LEBReader, LEB2Reader):
+            # Drain garbage accumulated by earlier tests in this process
+            # first: under xdist their finalizers would otherwise emit
+            # unrelated ResourceWarnings inside the recording block below
+            # and be blamed on the reader under test.
+            gc.collect()
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
                 with pytest.raises((ValueError, OSError)):
