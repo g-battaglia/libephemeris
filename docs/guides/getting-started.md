@@ -3,7 +3,9 @@
 ## Installation
 
 ```bash
-pip install libephemeris
+# 3.0.0 is a pre-release: a plain `pip install libephemeris` resolves to the
+# 2.x stable line, which lacks the LEB2/typed-error APIs described below.
+pip install --pre libephemeris==3.0.0rc14
 ```
 
 The PyPI wheel includes the bundled LEB2 base-tier core (~10.23 MB) and

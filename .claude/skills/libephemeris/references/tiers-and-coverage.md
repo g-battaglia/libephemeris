@@ -105,20 +105,35 @@ else:
 
 ```bash
 libephemeris init                 # optional interactive wizard -> libephemeris-config.toml
-libephemeris download auto        # exactly what the configured mode/tier needs
-libephemeris download base        # or a specific tier ...
-libephemeris download medium
-libephemeris download extended
+libephemeris download auto        # what the configured mode/tier needs (mode-dependent!)
+libephemeris download leb2-base   # or the LEB2 groups for one tier ...
+libephemeris download leb2-medium
+libephemeris download leb2-extended
 libephemeris status               # verify installed data + active config
 libephemeris status --json        # machine-readable
 ```
 
-`download auto` installs every SHA-256-pinned LEB2 group cumulatively through
-the configured tier: **5 files for base, 10 through medium, 15 through extended**.
-The wheel supplies the two bundled base resources; the rest come from the
-immutable `data-v3` release. Flags on every download command: `--force`,
-`--no-progress`, `--quiet`. Relocate the data root with `LIBEPHEMERIS_DATA_DIR`
-(default `~/.libephemeris`).
+The `leb2-*` commands install the SHA-256-pinned LEB2 groups cumulatively
+through the named tier: **5 files for base, 10 through medium, 15 through
+extended**. The wheel supplies the two bundled base resources; the rest come
+from the immutable `data-v3` release.
+
+`download auto` resolves against the *configured mode*:
+
+- `mode = "leb"` — LEB2 only: exactly the 5/10/15 files for the configured tier.
+- `mode = "auto"` (the default) — the same LEB2 groups **plus** the DE kernel,
+  `planet_centers.bsp` and the minor-body SPKs; that is multi-GB at `extended`.
+- `mode = "skyfield"` — DE kernel + SPKs only, no LEB2.
+
+> **`download base|medium|extended` does not provision LEB2.** Those tier
+> subcommands download the DE kernel, planet centres and minor-body SPKs and
+> install zero LEB2 groups. A sealed-`leb` deployment that runs
+> `libephemeris download medium` fetches JPL kernels sealed mode never opens
+> and still fails with a provisioning error. Use `leb2-medium` (or `auto` under
+> `mode = "leb"`).
+
+Flags on every download command: `--force`, `--no-progress`, `--quiet`.
+Relocate the data root with `LIBEPHEMERIS_DATA_DIR` (default `~/.libephemeris`).
 
 A generated `libephemeris-config.toml` (committable) captures the same settings:
 
@@ -134,9 +149,13 @@ strict_precision = true
 ## The typed error contract (rc14)
 
 rc14's headline: **no silent substitution to a lower-precision or different
-source on a miss.** Failures are typed and loud. All inherit from
-`libephemeris.Error` (itself an `Exception`), so `except swe.Error` still catches
-everything the reference API would.
+source on a miss.** Failures are typed and loud. Every exception in the table
+below inherits from `libephemeris.Error` (itself an `Exception`) — so
+`except swe.Error` catches what the reference API would — **with one
+exception: `LEBCorruptionError` subclasses `ValueError` only**, so it is *not*
+caught by `except swe.Error`. Catch it explicitly (or add `ValueError`) if a
+truncated/corrupt `.leb2` must not crash the process; see the note under the
+table.
 
 | Exception | Raised when | Key attributes |
 |-----------|-------------|----------------|

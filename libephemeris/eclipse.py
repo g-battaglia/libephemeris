@@ -1631,8 +1631,16 @@ def _calc_gamma(jd: float) -> float:
             sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SUN)
             moon_pos = _apparent_icrs_cartesian(reader, jd_tt, MOON)
             _leb_ok = True
-        except (KeyError, ValueError):
-            pass
+        except (KeyError, ValueError) as _exc:
+            # Sealed leb mode must surface a coverage/body miss as the
+            # documented typed error (EphemerisRangeError/UnknownBodyError):
+            # the fallback below would only convert it into get_planets()'s
+            # RuntimeError, which the sealed contract forbids. In every other
+            # mode this is a no-op and the Skyfield fallback runs unchanged.
+            # _calc_gamma is not wrapped by _call_with_leb_skyfield_fallback
+            # (its fallback is the inline branch below), so a range miss must
+            # NOT be re-raised here in auto mode.
+            _raise_if_sealed_leb_miss(_exc)
     if not _leb_ok:
         from .state import get_planets, get_timescale
 
@@ -2925,7 +2933,15 @@ def _calculate_local_eclipse_phases_impl(
                 SUN,
                 (lon, lat, altitude),
             )
-        except (KeyError, ValueError):
+        except (KeyError, ValueError) as _probe_exc:
+            # A coverage miss must reach the mode-aware wrapper
+            # (_calculate_local_eclipse_phases): typed error in sealed mode,
+            # Skyfield retry with reader=None in auto. Degrading straight to
+            # the kernel branch below would only convert a sealed-mode miss
+            # into get_planets()'s RuntimeError. A body-map miss in sealed
+            # mode must surface as the typed error for the same reason.
+            _raise_if_sealed_leb_miss(_probe_exc)
+            _reraise_if_leb_range_error(_probe_exc)
             reader = None
 
     if reader is not None:

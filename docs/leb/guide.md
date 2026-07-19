@@ -1456,8 +1456,10 @@ it is not an unconditional Skyfield/JPL fallback:
   deterministic model and are traced as `Keplerian` or `Analytical`. A core
   date outside the active tier raises `EphemerisRangeError`.
 - `auto`: tries LEB first, then JPL/SPK, then an allowed local model.
-- `skyfield`/`jpl`: uses the configured JPL source and never selects LEB
-  implicitly.
+- `skyfield`: uses the configured local JPL source and never selects LEB
+  implicitly. (There is no `jpl` mode — the valid values are `auto`,
+  `skyfield`, `leb` and `horizons`; anything else raises `ValueError`.
+  "Local JPL" is `skyfield`, "remote JPL" is `horizons`.)
 
 `FLG_ICRS`, topocentric fixed stars, `calc_pctr()`, and `nod_aps()` use the
 LEB vector adapter in forced `leb` mode. Live-catalogue sidereal modes delegate

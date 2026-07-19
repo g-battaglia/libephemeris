@@ -35,7 +35,10 @@ Key facts to anchor on (verified against the installed package, `3.0.0rc14`):
 ## Quick start
 
 ```bash
-pip install libephemeris          # wheel already bundles the base-tier core:
+# 3.0.0 is still a pre-release: plain `pip install libephemeris` resolves to
+# the 2.x stable line, which has none of the APIs this skill documents.
+pip install --pre libephemeris==3.0.0rc14
+                                  # wheel already bundles the base-tier core:
                                   # the 14 core bodies + Hamburg/Uranian companion,
                                   # JD range 1850–2150. No download needed for
                                   # that slice.
@@ -157,11 +160,23 @@ and the full typed error contract.
 
 ```bash
 libephemeris init          # optional interactive config -> libephemeris-config.toml
-libephemeris download auto # exactly what the active mode/tier needs:
-                           # 5 files (base), 10 (medium), or 15 (extended), SHA-256 pinned
-libephemeris download base|medium|extended   # a specific tier
+libephemeris download auto # what the active mode/tier needs (see the caveat below)
+libephemeris download leb2-base|leb2-medium|leb2-extended
+                           # the SHA-256-pinned LEB2 groups for one tier,
+                           # cumulative: 5 files (base), 10 (medium), 15 (extended)
 libephemeris status        # verify installed data + active config (add --json)
 ```
+
+**`download auto` is mode-dependent.** Under `mode = "leb"` it fetches only the
+5/10/15 LEB2 files for the configured tier. Under the default `mode = "auto"`
+it *also* downloads the DE kernel, `planet_centers.bsp` and the minor-body SPKs
+— multi-GB at `extended`. Set the mode before running it in a sealed
+deployment.
+
+**Do not use `libephemeris download base|medium|extended` to provision LEB2.**
+Those subcommands download DE kernels + SPKs and install **zero** LEB2 groups,
+so a sealed-`leb` runtime fetches hundreds of MB it will never open and still
+fails provisioning. The LEB2 commands are the `leb2-` prefixed ones above.
 
 In `leb` mode you do **not** need `planet_centers.bsp`: outer-planet channels
 store system barycentres directly; only a non-sealed runtime may apply a JPL
