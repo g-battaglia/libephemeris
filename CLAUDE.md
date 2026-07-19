@@ -80,7 +80,7 @@ Three precision tiers: `base` (de440s.bsp, 1849-2150), `medium` (de440.bsp, 1550
 
 LEB Chebyshev approximation error vs Skyfield reference, per body group and tier:
 
-| Body Group | Base (1860-2140) | Medium (1560-2640) | Extended (-5000 to +5000) |
+| Body Group | Base (1860-2140) | Medium (1560-2640) | Extended (-13200 to +17191) |
 |---|---|---|---|
 | **Planets** (Sun-Pluto, Earth) | <0.001" | <0.001" | <0.001" |
 | **Moon** | <0.001" (0.000332") | <0.001" (0.000325") | <0.001" |
@@ -106,7 +106,7 @@ repository.
 
 ## Binary Ephemeris Mode (LEB)
 
-Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags — the only flag that always falls back is `FLG_ICRS`; `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS` and `FLG_NONUT` are handled on the LEB path (some body classes may still fall back per body).
+Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). In non-sealed `auto` mode unsupported bodies/flags can fall back to Skyfield, and `FLG_ICRS` is completed via the in-memory `LEBVectorEphemeris` adapter; `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS` and `FLG_NONUT` are handled on the LEB path. In sealed `leb` mode there is **no** fallback: a core body outside coverage raises `EphemerisRangeError`, an absent core body raises `UnknownBodyError`, and unsupported bodies (moons, fixed stars) fail explicitly rather than opening JPL/Skyfield.
 
 ```python
 from libephemeris import set_leb_file
@@ -147,10 +147,10 @@ the declared inventory and per-body metadata against LEB1.
 
 | Group | Bodies | Base size |
 |-------|--------|-----------|
-| `core` | Sun-Pluto, Earth, Mean/True Node, Mean Apogee (14) | ~10.7 MB |
-| `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | ~8.7 MB |
-| `apogee` | OscuApog, IntpApog, IntpPerig (3) | ~11.4 MB |
-| `exotics` | Centaurs, TNOs, NEAs (31) | ~59.0 MB |
+| `core` | Sun-Pluto, Earth, Mean/True Node, Mean Apogee (14) | ~10.2 MB |
+| `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | ~2.15 MB |
+| `apogee` | OscuApog, IntpApog, IntpPerig (3) | ~9.8 MB |
+| `exotics` | Centaurs, TNOs, NEAs (31) | ~29.4 MB |
 | `uranians` | Hamburg bodies Cupido-Poseidon (40-47, 8) | ~46 KB |
 
 `uranians` is companion-only: fitted from the runtime Neely (1980) propagation
@@ -172,7 +172,7 @@ Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amp
 
 ```bash
 poe leb2:convert:base              # Convert LEB1 -> LEB2 (all 5 groups)
-./leph leb2 convert base-core      # Core group only (~10.7 MB)
+./leph leb2 convert base-core      # Core group only (~10.2 MB)
 ./leph leb2 convert base-exotics   # Exotic registry group only
 ./leph leb2 convert base-uranians  # Hamburg companion (from the standalone partial)
 poe leb2:verify:base               # Verify base_core.leb2 against LEB1
@@ -199,7 +199,7 @@ Zero-install ephemeris via NASA JPL Horizons REST API. Used automatically in `"a
 | Mode | Flow | Fails when |
 |------|------|-----------|
 | `"auto"` (default) | LEB → Horizons (if no DE440) → Skyfield | never (always has fallback) |
-| `"leb"` | Require an explicitly configured LEB or the hash-pinned bundled base core; unsupported bodies/flags fall back to Skyfield | no LEB resolvable |
+| `"leb"` | **Sealed** — LEB only, no fallback to Skyfield/JPL/BSP/network. `FLG_ICRS` and the event paths are completed in-memory via `LEBVectorEphemeris`; a core range miss raises `EphemerisRangeError`, an absent core body raises `UnknownBodyError`; unsupported bodies (moons, fixed stars) fail explicitly | a canonical group is missing/corrupted, or the request is outside every LEB interval |
 | `"horizons"` | Prefer Horizons; unsupported bodies/flags fall back to Skyfield | no internet |
 | `"skyfield"` | Always Skyfield/DE440 | DE440 not downloaded |
 

@@ -221,7 +221,7 @@ Prefer to install a tier directly? Use one of these:
 
 ```bash
 libephemeris download base         # 1850-2150, lightweight
-libephemeris download medium       # 1550-2650, ~200 MB (recommended)
+libephemeris download medium       # 1550-2650, >300 MB plus SPKs (recommended)
 libephemeris download extended     # DE441 core span; minor-body ranges vary
 ```
 

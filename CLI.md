@@ -265,7 +265,7 @@ leph leb verify extended
 leph leb2 convert base              # All active groups (includes exotics)
 leph leb2 convert medium
 leph leb2 convert extended
-leph leb2 convert base-core         # One group only (~10.7 MB, for PyPI)
+leph leb2 convert base-core         # One group only (~10.2 MB, for PyPI)
 leph leb2 convert base-exotics      # The exotic registry group only
 leph leb2 convert medium-apogee     # Any tier/group combination is available
 

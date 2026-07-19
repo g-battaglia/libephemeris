@@ -1862,7 +1862,7 @@ magic bytes (`LEB1` vs `LEB2`), and the runtime API is identical.
 **Motivation:** LEB1 files are too large to bundle in a wheel: the retired
 historical base asset was about 53 MB, while the current full-registry merged base
 artifact is about 375 MB. LEB2 compresses the 14-body core companion to about
-10.7 MB, enabling `pip install libephemeris` to include precomputed ephemeris
+10.2 MB, enabling `pip install libephemeris` to include precomputed ephemeris
 with zero additional downloads.
 
 **Dependency:** `zstandard` (required, ~200 KB wheel).
@@ -2034,10 +2034,10 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 
 | Group | Bodies | Base size | Description |
 |-------|--------|-----------|-------------|
-| `core` | 14 | 10.7 MB | Sun-Pluto, Earth, Mean/True Node, Mean Apogee |
-| `asteroids` | 5 | 8.7 MB | Chiron, Ceres, Pallas, Juno, Vesta |
-| `exotics` | 31 | 59.0 MB | Centaurs, TNOs, main-belt & NEA minor bodies (Pholus, Eris, …) |
-| `apogee` | 3 | 11.4 MB | Oscu Apogee, Interp Apogee/Perigee |
+| `core` | 14 | 10.2 MB | Sun-Pluto, Earth, Mean/True Node, Mean Apogee |
+| `asteroids` | 5 | 2.15 MB | Chiron, Ceres, Pallas, Juno, Vesta |
+| `exotics` | 31 | 29.4 MB | Centaurs, TNOs, main-belt & NEA minor bodies (Pholus, Eris, …) |
+| `apogee` | 3 | 9.8 MB | Oscu Apogee, Interp Apogee/Perigee |
 | `uranians` | 8 | 46 KB | Hamburg bodies Cupido-Poseidon (IDs 40-47) |
 
 The table gives the base-tier inventory. Medium also has 31 exotics; extended
