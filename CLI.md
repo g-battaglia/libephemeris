@@ -409,10 +409,10 @@ The `status` command shows a comprehensive overview:
 
 ### Backward compatibility
 
-The reader can decode legacy LEB files that contain the hypothetical group but
-never serves their fictitious coefficients: the per-file SHA-256 pin gate
-applies at both companion attach and calculation sourcing, so only the
-regenerated, manifest-pinned `{tier}_uranians.leb2` is trusted. The
+The reader can decode legacy LEB files that contain the hypothetical group.
+Since 3.0.0rc15 a file named after a manifest artifact is trusted on presence
+at both companion attach and calculation sourcing; its SHA-256 is verified once,
+when the installer writes it. The
 `<tier>-uranians` selectors convert and verify that regenerated companion from
 its standalone LEB1 partial.
 

@@ -24,7 +24,6 @@ Provenance:
 
 from __future__ import annotations
 
-import hashlib
 import os
 import threading
 import warnings
@@ -158,10 +157,10 @@ _LOADER: Optional[Loader] = None  # Skyfield data loader
 _PLANETS: Optional[SpiceKernel] = None  # Loaded planetary ephemeris
 _PLANET_CENTERS: Optional[SpiceKernel] = None  # Planet center offsets (599, 699, etc.)
 _PLANET_CENTERS_TIER: Optional[str] = None  # Tier of loaded planet_centers file
-# Files that failed the planet-center manifest hash. The full stat fingerprint
-# makes this a fail-safe negative cache: replacing or modifying the file causes
-# a fresh hash check, while an unchanged stale multi-megabyte asset is not
-# re-hashed on every planetary calculation.
+# Files rejected as planet-center candidates. The full stat fingerprint makes
+# this a fail-safe negative cache: replacing or modifying the file causes a
+# fresh check, while an unchanged rejected asset is not re-examined on every
+# planetary calculation.
 _PLANET_CENTER_REJECTED_FILES: set[tuple[str, int, int, str]] = set()
 _PLANET_CENTER_CACHE_TIER: Optional[str] = None
 _TS: Optional[Timescale] = None  # Timescale object
@@ -371,25 +370,26 @@ def set_leb_file(filepath: Optional[str]) -> None:
 
 
 def _matches_pinned_data_file(path: str, manifest_name: str) -> bool:
-    """Return whether *path* matches a reviewed data-manifest SHA-256."""
-    if not os.path.isfile(path):
-        return False
+    """Return whether *path* exists and may serve data.
 
-    from .download import DATA_FILES
+    Content is no longer read at runtime. Integrity is bought once, at install
+    time: :func:`download.download_file` verifies the SHA-256 of every artifact
+    it writes, and under a sealed runtime that is the only moment the bytes can
+    change. Re-reading the files on every reader construction verified nothing
+    the installer had not already verified, while costing minutes of cold start
+    in *each* process that opened the ephemeris — at the pinned data-v3 sizes,
+    4.26 GB per reader.
 
-    file_info = DATA_FILES.get(manifest_name)
-    expected = file_info.get("sha256") if file_info is not None else None
-    if not isinstance(expected, str):
-        return False
+    Legacy and locally generated artifacts are therefore accepted deliberately.
+    A file that is truncated or otherwise malformed is still rejected, just
+    later and more precisely: the reader parses and range-checks the header,
+    section directory and body index when it opens it.
 
-    digest = hashlib.sha256()
-    try:
-        with open(path, "rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(chunk)
-    except OSError:
-        return False
-    return digest.hexdigest() == expected
+    ``manifest_name`` is retained so every call site (and the tests that
+    monkeypatch this helper by name) keeps working unchanged.
+    """
+    del manifest_name
+    return os.path.isfile(path)
 
 
 def _is_reviewed_base_core(path: str) -> bool:
@@ -417,10 +417,10 @@ def _is_reviewed_core(path: str) -> bool:
 def _has_pinned_sibling_companions(path: str) -> bool:
     """Return whether a reviewed core has manifest-pinned sibling companions.
 
-    Only files that are themselves listed in the data manifest AND byte-match
-    their pinned SHA-256 qualify: the reviewed core stays a closed trust unit,
-    extended solely by equally reviewed artifacts (e.g. the regenerated
-    ``{tier}_uranians.leb2`` companion).
+    Only files that are themselves listed in the data manifest and present on
+    disk qualify (e.g. the regenerated ``{tier}_uranians.leb2`` companion).
+    Their SHA-256 was verified once, when the installer wrote them; see
+    :func:`_matches_pinned_data_file`.
     """
     directory = os.path.dirname(os.path.abspath(path))
     basename = os.path.basename(path)
@@ -447,10 +447,10 @@ def _has_pinned_sibling_companions(path: str) -> bool:
 
 # Trust caches for fictitious-body sourcing. The per-reader cache pins the
 # decision to the reader instance (an open reader serves its original mmap
-# content regardless of later disk changes, so re-hashing per call would
-# guard nothing); the per-path fingerprint cache spares re-hashing the same
+# content regardless of later disk changes, so re-deriving per call would
+# guard nothing); the per-path fingerprint cache spares re-examining the same
 # unchanged artifact across reader instances while a replaced or touched file
-# still forces a fresh SHA-256 check.
+# still forces a fresh check.
 _FICTITIOUS_TRUST_BY_READER: "weakref.WeakKeyDictionary[object, dict[int, bool]]" = (
     weakref.WeakKeyDictionary()
 )
@@ -474,10 +474,9 @@ def leb_fictitious_source_trusted(reader: object, body_id: int) -> bool:
     """Return whether *reader* serves *body_id* from a manifest-pinned file.
 
     Fictitious bodies (40-58) may be sourced from a persisted LEB channel only
-    when the specific file providing them byte-matches its reviewed manifest
-    SHA-256. Composite readers resolve the serving sub-reader first; a legacy
-    or locally modified artifact therefore never feeds a public calculation,
-    even when explicitly configured as the active LEB file.
+    when the specific file providing them is a manifest-named artifact present
+    on disk. Composite readers resolve the serving sub-reader first, so the
+    verdict always names the file that actually supplies the coefficients.
     """
     try:
         per_reader = _FICTITIOUS_TRUST_BY_READER.get(reader)
@@ -548,7 +547,7 @@ def _discover_leb_file() -> Optional[str]:
         return cached
     if os.path.isfile(cached):
         get_logger().warning(
-            "Ignoring unreviewed cached LEB core %s; configure it explicitly "
+            "Ignoring unusable cached LEB core %s; configure it explicitly "
             "only if its provenance has been independently verified",
             cached,
         )
@@ -564,7 +563,7 @@ def _discover_leb_file() -> Optional[str]:
             return bundled_tier
         if os.path.isfile(bundled_tier):
             get_logger().error(
-                "Bundled LEB core failed its pinned SHA-256: %s", bundled_tier
+                "Bundled LEB core was rejected as unusable: %s", bundled_tier
             )
 
     # Preserve the rc7 discovery contract for user-generated and historical
@@ -594,8 +593,8 @@ def _discover_reviewed_leb_tier_cores() -> dict[str, str]:
 
     The configured precision tier remains the maximum requested coverage:
     ``base`` admits only base, ``medium`` admits base+medium, and ``extended``
-    admits all three.  Only byte-matching manifest assets participate.  Legacy
-    or explicitly configured files retain their historical single-reader
+    admits all three.  Only manifest-named assets present on disk participate.
+    Legacy or explicitly configured files retain their historical single-reader
     semantics and are resolved by :func:`_discover_leb_file` instead.
     """
     active_tier = get_precision_tier()
@@ -613,7 +612,7 @@ def _discover_reviewed_leb_tier_cores() -> dict[str, str]:
             continue
         if os.path.isfile(cached):
             get_logger().warning(
-                "Ignoring unreviewed cached LEB core %s; it cannot participate "
+                "Ignoring unusable cached LEB core %s; it cannot participate "
                 "in best-by-date routing",
                 cached,
             )
@@ -623,7 +622,7 @@ def _discover_reviewed_leb_tier_cores() -> dict[str, str]:
             discovered[tier] = bundled
         elif os.path.isfile(bundled):
             get_logger().error(
-                "Bundled LEB core failed its pinned SHA-256: %s", bundled
+                "Bundled LEB core was rejected as unusable: %s", bundled
             )
 
     return discovered
@@ -850,9 +849,9 @@ def _get_leb_reader_locked(mode):
                     from .leb_reader import open_leb
 
                     _LEB_READER = open_leb(path)
-                # Inventory consumers must not re-hash up to a gigabyte on
-                # every health request. Record the trust decision already made
-                # while resolving and attaching the reader.
+                # Record the trust decision already made while resolving and
+                # attaching the reader, so inventory consumers read a flag
+                # instead of re-deriving it per health request.
                 try:
                     setattr(_LEB_READER, "_manifest_verified", reviewed_core)
                 except (AttributeError, TypeError):
@@ -1467,9 +1466,8 @@ def get_planet_centers() -> Optional[SpiceKernel]:
     - extended: planet_centers_extended.bsp (extended range, partial coverage)
 
     For the base tier only, falls back to the legacy ``planet_centers.bsp``
-    destination when it matches the exact pinned base-tier artifact. Files are
-    never loaded by filename alone: every candidate must match its reviewed
-    manifest SHA-256.
+    destination. Every candidate must be a manifest-named artifact present on
+    disk; its SHA-256 was verified once, when the installer wrote it.
 
     Returns:
         SpiceKernel containing planet center segments, or None if not available.
@@ -1560,8 +1558,8 @@ def _get_planet_centers_locked(current_tier):
                     if rejected_key is not None:
                         _PLANET_CENTER_REJECTED_FILES.add(rejected_key)
                     get_logger().warning(
-                        "Ignoring unreviewed planet-centers file %s; its "
-                        "SHA-256 does not match the pinned %s artifact",
+                        "Ignoring planet-centers file %s; it is not a usable "
+                        "%s artifact",
                         path,
                         manifest_name,
                     )

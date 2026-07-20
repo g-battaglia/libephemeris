@@ -106,16 +106,21 @@ def test_set_leb_file_close_raises(monkeypatch):
 # ===========================================================================
 
 
-def test_reviewed_base_core_hash_gate(tmp_path):
-    """The packaged core passes and a structurally arbitrary file does not."""
+def test_reviewed_base_core_presence_gate(tmp_path):
+    """The packaged core passes; a path with nothing at it does not.
+
+    Since 3.0.0rc15 the gate is presence, not content: an arbitrary file under
+    the expected name passes too, deliberately. Only absence is rejected.
+    """
     bundled = os.path.join(
         os.path.dirname(state.__file__), "data", "leb2", "base_core.leb2"
     )
-    unreviewed = tmp_path / "base_core.leb2"
-    unreviewed.write_bytes(b"not the reviewed artifact")
+    arbitrary = tmp_path / "base_core.leb2"
+    arbitrary.write_bytes(b"not the reviewed artifact")
 
     assert state._is_reviewed_base_core(bundled)
-    assert not state._is_reviewed_base_core(str(unreviewed))
+    assert state._is_reviewed_base_core(str(arbitrary))
+    assert not state._is_reviewed_base_core(str(tmp_path / "absent.leb2"))
 
 
 def test_discover_leb_file_reviewed_cached_core(monkeypatch, tmp_path):
@@ -201,7 +206,7 @@ def test_discover_leb_file_unreviewed_cache_falls_back_to_bundle(monkeypatch, tm
     monkeypatch.setattr(state, "get_logger", lambda: logger)
 
     assert state._discover_leb_file() == bundled
-    assert "Ignoring unreviewed cached LEB core" in logger.warning.call_args.args[0]
+    assert "Ignoring unusable cached LEB core" in logger.warning.call_args.args[0]
 
 
 def test_discover_leb_file_rejects_bad_bundle(monkeypatch, tmp_path):
@@ -837,22 +842,33 @@ def test_get_planet_centers_locked_base_legacy_loads_when_pinned(monkeypatch, tm
     assert state._PLANET_CENTERS_TIER == "base"
 
 
-def test_get_planet_centers_locked_rejects_unreviewed_cache(monkeypatch, tmp_path):
-    """A stale cache with the expected filename is not implicitly trusted."""
+def test_get_planet_centers_locked_loads_the_named_cache(monkeypatch, tmp_path):
+    """A cache under the expected filename is loaded without a content check.
+
+    Content verification moved to install time in 3.0.0rc15, so presence under
+    a manifest name is the whole requirement here. A file that is not a usable
+    SPK still fails — just later and more precisely, when the loader raises and
+    the caller falls through to the next candidate.
+    """
     monkeypatch.setattr(state, "_PLANET_CENTERS", None)
     monkeypatch.setattr(state, "_PLANET_CENTERS_TIER", None)
     monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path))
     candidate = tmp_path / "planet_centers_medium.bsp"
-    candidate.write_bytes(b"unreviewed")
-    fake_loader = _FakeLoader(kernel="must-not-load")
+    candidate.write_bytes(b"arbitrary bytes")
+    fake_loader = _FakeLoader(kernel="pc-kernel")
     monkeypatch.setattr(state, "get_loader", lambda: fake_loader)
 
-    assert state._get_planet_centers_locked("medium") is None
-    assert fake_loader.calls == []
+    assert state._get_planet_centers_locked("medium") == "pc-kernel"
+    assert fake_loader.calls == [str(candidate)]
 
 
-def test_rejected_planet_center_hash_and_warning_are_cached(monkeypatch, tmp_path):
-    """An unchanged stale SPK is hashed and warned about only once."""
+def test_rejected_planet_center_check_and_warning_are_cached(monkeypatch, tmp_path):
+    """An unchanged rejected SPK is examined and warned about only once.
+
+    The rejection path is now reachable only for a candidate that exists but
+    is not a usable regular file, so the predicate is forced here; what is
+    under test is the negative cache around it, which still guards the retry.
+    """
     monkeypatch.setattr(state, "_PLANET_CENTERS", None)
     monkeypatch.setattr(state, "_PLANET_CENTERS_TIER", None)
     monkeypatch.setattr(state, "_PLANET_CENTER_CACHE_TIER", None)
@@ -866,8 +882,7 @@ def test_rejected_planet_center_hash_and_warning_are_cached(monkeypatch, tmp_pat
     candidate = tmp_path / "planet_centers_medium.bsp"
     candidate.write_bytes(b"stale planet-center bytes")
 
-    real_matcher = state._matches_pinned_data_file
-    matcher = Mock(wraps=real_matcher)
+    matcher = Mock(return_value=False)
     monkeypatch.setattr(state, "_matches_pinned_data_file", matcher)
 
     assert state.get_planet_centers() is None

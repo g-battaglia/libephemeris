@@ -175,18 +175,18 @@ class CompositeLEBReader:
         file is ``base_core.leb2``, companions would be ``base_asteroids.leb2``,
         ``base_apogee.leb2``, and ``base_exotics.leb2``.
 
-        Fictitious-carrying companions (``*_uranians.leb2``) attach only when
-        they byte-match their reviewed manifest SHA-256, regardless of
-        ``pinned_only``: an arbitrary same-named artifact on disk is skipped
-        with a log message and never serves coefficients.
+        Fictitious-carrying companions (``*_uranians.leb2``) are checked
+        against the manifest regardless of ``pinned_only``; a candidate that
+        does not resolve is skipped with a log message and never serves
+        coefficients.
 
         If no companions are found, returns a composite with a single reader.
 
         Args:
             path: Path to the primary .leb or .leb2 file.
-            pinned_only: When True (the reviewed-core closed trust unit),
-                EVERY companion must byte-match its manifest SHA-256 to
-                attach, not just the fictitious-carrying ones.
+            pinned_only: When True (the reviewed-core trust unit), EVERY
+                companion is checked against the manifest to attach, not just
+                the fictitious-carrying ones.
 
         Returns:
             CompositeLEBReader wrapping the primary and companion readers.
@@ -235,8 +235,8 @@ class CompositeLEBReader:
                         companion_path, os.path.basename(companion_path)
                     ):
                         get_logger().warning(
-                            "Skipping unreviewed LEB companion %s: it does not "
-                            "match its pinned manifest SHA-256",
+                            "Skipping LEB companion %s: it is not a usable "
+                            "manifest artifact",
                             companion_path,
                         )
                         continue

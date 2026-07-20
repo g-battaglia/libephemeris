@@ -14,7 +14,6 @@ Covers the full chain introduced with the regenerated ``uranians`` group:
 
 from __future__ import annotations
 
-import hashlib
 import math
 import os
 import shutil
@@ -89,11 +88,6 @@ def uranians_leb2(uranians_leb1, tmp_path_factory):
         verbose=False,
     )
     return str(path)
-
-
-def _pin(monkeypatch, path: str, name: str = "base_uranians.leb2") -> None:
-    digest = hashlib.sha256(open(path, "rb").read()).hexdigest()
-    monkeypatch.setitem(download.DATA_FILES, name, {"sha256": digest})
 
 
 def _clear_trust_caches() -> None:
@@ -224,8 +218,17 @@ def test_leb2_conversion_rejects_partial_inventory(tmp_path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_unpinned_companion_is_skipped(uranians_leb2, test_leb_file, tmp_path) -> None:
-    """An arbitrary same-named uranians artifact never joins a composite."""
+def test_companion_attaches_without_a_content_check(
+    uranians_leb2, test_leb_file, tmp_path
+) -> None:
+    """A manifest-named companion attaches on presence alone.
+
+    Runtime content verification was removed in 3.0.0rc15: integrity is bought
+    once, when the installer writes the file (see
+    ``state._matches_pinned_data_file``). An artifact this test never pinned
+    therefore attaches and serves its fictitious channels — the deliberate
+    inverse of the previous trust gate.
+    """
     primary = tmp_path / "base_core.leb"
     shutil.copy(test_leb_file, primary)
     shutil.copy(uranians_leb2, tmp_path / "base_uranians.leb2")
@@ -233,21 +236,20 @@ def test_unpinned_companion_is_skipped(uranians_leb2, test_leb_file, tmp_path) -
     _clear_trust_caches()
     composite = CompositeLEBReader.from_file_with_companions(str(primary))
     try:
-        assert not composite.has_body(40)
-        assert not state.leb_fictitious_source_trusted(composite, 40)
+        assert composite.has_body(40)
+        assert state.leb_fictitious_source_trusted(composite, 40)
     finally:
         composite.close()
 
 
-def test_pinned_companion_attaches_and_is_trusted(
-    uranians_leb2, test_leb_file, tmp_path, monkeypatch
+def test_companion_channels_are_trusted_without_leaking_sideways(
+    uranians_leb2, test_leb_file, tmp_path
 ) -> None:
-    """The manifest-pinned companion attaches and its channels become trusted."""
+    """The companion's own channels are trusted; the primary's are not."""
     primary = tmp_path / "base_core.leb"
     shutil.copy(test_leb_file, primary)
     companion = tmp_path / "base_uranians.leb2"
     shutil.copy(uranians_leb2, companion)
-    _pin(monkeypatch, str(companion))
 
     _clear_trust_caches()
     composite = CompositeLEBReader.from_file_with_companions(str(primary))
@@ -263,14 +265,11 @@ def test_pinned_companion_attaches_and_is_trusted(
         _clear_trust_caches()
 
 
-def test_trust_requires_manifest_match(uranians_leb2, monkeypatch) -> None:
-    """A direct un-pinned reader over fictitious channels stays untrusted."""
+def test_trust_no_longer_depends_on_content(uranians_leb2) -> None:
+    """A direct reader over fictitious channels is trusted on presence alone."""
     _clear_trust_caches()
     reader = open_leb(uranians_leb2)
     try:
-        assert not state.leb_fictitious_source_trusted(reader, 40)
-        _pin(monkeypatch, uranians_leb2)
-        _clear_trust_caches()
         assert state.leb_fictitious_source_trusted(reader, 40)
     finally:
         reader.close()
@@ -284,8 +283,7 @@ def test_trust_requires_manifest_match(uranians_leb2, monkeypatch) -> None:
 
 @pytest.fixture
 def trusted_composite(uranians_leb2, test_leb_file, monkeypatch):
-    """Activate a composite (aux bodies + pinned uranians) as the LEB reader."""
-    _pin(monkeypatch, uranians_leb2)
+    """Activate a composite (aux bodies + uranians) as the LEB reader."""
     _clear_trust_caches()
     composite = CompositeLEBReader([open_leb(test_leb_file), open_leb(uranians_leb2)])
     with state._INIT_LOCK:
@@ -373,11 +371,10 @@ def _count_body_evals(composite, body_id, monkeypatch):
     return counter
 
 
-def test_pinned_reader_is_consulted_for_the_body(
+def test_reader_is_consulted_for_the_body(
     uranians_leb2, test_leb_file, monkeypatch
 ) -> None:
-    """Under a valid pin the body channel is read from the reader (not the model)."""
-    _pin(monkeypatch, uranians_leb2)
+    """The body channel is read from the reader, not from the runtime model."""
     _clear_trust_caches()
     composite = CompositeLEBReader([open_leb(test_leb_file), open_leb(uranians_leb2)])
     calls = _count_body_evals(composite, 40, monkeypatch)
@@ -389,15 +386,16 @@ def test_pinned_reader_is_consulted_for_the_body(
         _deactivate(composite)
 
 
-def test_unpinned_reader_is_never_consulted_for_the_body(
+def test_reader_absent_from_the_manifest_still_serves_the_body(
     uranians_leb2, test_leb_file, monkeypatch
 ) -> None:
-    """Without a matching pin the reader's fictitious channel is never read.
+    """A file the manifest does not even list serves its fictitious channels.
 
-    This is the security-relevant direction: an arbitrary artifact carrying
-    40-47 channels must not serve coefficients through the public calc path,
-    and the output must equal the runtime model exactly (proving the fallback,
-    not a silent serve).
+    The pre-3.0.0rc15 gate refused to read 40-47 from an artifact whose bytes
+    did not match a pin, falling back to the runtime model. That gate is gone
+    by design: presence is now the whole requirement, and this test pins the
+    new contract in the strongest available form — the manifest entry itself
+    is deleted, and the channel is still consulted.
     """
     monkeypatch.delitem(download.DATA_FILES, "base_uranians.leb2", raising=False)
     _clear_trust_caches()
@@ -406,15 +404,8 @@ def test_unpinned_reader_is_never_consulted_for_the_body(
     _activate(composite)
     try:
         filebacked, _ = ephem.calc_ut(SAMPLE_JDS[0], 40, FLG_SWIEPH | FLG_SPEED)
-        assert calls["n"] == 0, "untrusted channel must never serve the body"
-        ephem.set_calc_mode("skyfield")
-        runtime, _ = ephem.calc_ut(SAMPLE_JDS[0], 40, FLG_SWIEPH | FLG_SPEED)
-        ephem.set_calc_mode("auto")
-        # calls["n"] == 0 already proves the body was not served; the value
-        # match (within the LEB class — the Earth vector is still LEB-sourced,
-        # which is trust-independent) confirms the runtime-model fallback ran.
-        for got, want in zip(filebacked, runtime):
-            assert got == pytest.approx(want, abs=1e-9)
+        assert calls["n"] > 0, "the channel must serve the body"
+        assert all(math.isfinite(v) for v in filebacked)
     finally:
         _deactivate(composite)
 
@@ -437,25 +428,25 @@ def test_stencil_mixes_reader_and_model_at_range_edges(trusted_composite) -> Non
             assert got == pytest.approx(want, abs=1e-9)
 
 
-def test_reviewed_core_attaches_only_pinned_siblings(
-    uranians_leb2, tmp_path, monkeypatch
+def test_reviewed_core_attaches_every_same_prefix_sibling(
+    uranians_leb2, tmp_path
 ) -> None:
-    """Discovery: a reviewed core attaches its pinned uranians sibling only.
+    """Discovery: a reviewed core attaches all its same-prefix siblings.
 
     Exercises the production wiring (_has_pinned_sibling_companions +
-    pinned_only=True) that the injected-reader fixtures bypass: the reviewed
-    base core opens as a closed unit extended solely by manifest-pinned
-    siblings, so an unpinned same-prefix companion is rejected.
+    pinned_only=True) that the injected-reader fixtures bypass. Since runtime
+    content verification was removed, ``pinned_only`` no longer narrows the
+    set: every same-prefix group file present on disk attaches, including one
+    whose bytes belong to a different group entirely.
     """
     bundled_core = os.path.join(
         os.path.dirname(state.__file__), "data", "leb2", "base_core.leb2"
     )
     core = tmp_path / "base_core.leb2"
-    shutil.copy(bundled_core, core)  # matches the real manifest pin
+    shutil.copy(bundled_core, core)
     uran = tmp_path / "base_uranians.leb2"
     shutil.copy(uranians_leb2, uran)
-    _pin(monkeypatch, str(uran))  # pin the companion to this file's bytes
-    # An unpinned same-prefix companion (not in the manifest) must be skipped.
+    # Same-prefix companion carrying the wrong group's bytes: it attaches too.
     shutil.copy(uranians_leb2, tmp_path / "base_asteroids.leb2")
 
     _clear_trust_caches()
@@ -467,10 +458,10 @@ def test_reviewed_core_attaches_only_pinned_siblings(
     ephem.set_leb_file(str(core))
     reader = state.get_leb_reader()
     try:
-        assert reader.has_body(40), "pinned uranians sibling must attach"
+        assert reader.has_body(40), "uranians sibling must attach"
         assert state.leb_fictitious_source_trusted(reader, 40)
-        # core + uranians only; the unpinned asteroids sibling is rejected.
-        assert len(reader._readers) == 2
+        # core + uranians + asteroids: presence is the only requirement now.
+        assert len(reader._readers) == 3
     finally:
         ephem.set_leb_file(None)
         _clear_trust_caches()

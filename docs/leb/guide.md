@@ -147,9 +147,10 @@ planets.py: calc_ut()
 The wheel's reviewed `base_core.leb2` is available automatically. The data-v3
 manifest defines five files for every tier. An active precision tier is
 cumulative: base opens base, medium opens base+medium, and extended opens all
-three. Every implicitly selected file must match its SHA-256 entry in the
-distribution manifest; missing or corrupt required groups are provisioning
-errors in sealed deployments.
+three. Every implicitly selected file must be named in the distribution
+manifest and present on disk; its SHA-256 is verified once, when the installer
+writes it. Missing or corrupt required groups are provisioning errors in sealed
+deployments.
 
 ```python
 # Method 1: Programmatic or per-context
@@ -172,10 +173,10 @@ export LIBEPHEMERIS_LEB=/path/to/ephemeris.leb
 1. `EphemerisContext._leb_file` (per-context)
 2. Global `set_leb_file()` call
 3. `LIBEPHEMERIS_LEB` environment variable
-4. Auto-discovery of every eligible tier's reviewed, SHA-256-pinned core,
-   composed as base → medium → extended per body/date
+4. Auto-discovery of every eligible tier's reviewed core, composed as
+   base → medium → extended per body/date
 5. Standard local LEB1 names (`{tier}_core.leb`, `ephemeris_{tier}.leb`)
-6. The bundled, SHA-256-pinned `base_core.leb2` as a range-limited fallback
+6. The bundled `base_core.leb2` as a range-limited fallback
 
 Other cached filenames are never selected implicitly. Independently generated
 files remain fully supported through the standard LEB1 names or one of the

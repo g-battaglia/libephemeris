@@ -156,9 +156,9 @@ the declared inventory and per-body metadata against LEB1.
 `uranians` is companion-only: fitted from the runtime Neely (1980) propagation
 in `libephemeris.hypothetical` (never from legacy coefficients), generated from
 the standalone `ephemeris_{tier}_uranians.leb` partial (merged mains carry no
-fictitious IDs), and trusted at runtime only when the file byte-matches its
-`DATA_FILES` SHA-256 pin — both for companion attach and for calculation
-sourcing. With a trusted reader active, the Uranian branch in `planets.py`
+fictitious IDs). Since 3.0.0rc15 the runtime trusts it on presence under a
+`DATA_FILES` name; its SHA-256 is verified once, by the installer that writes
+it. With a trusted reader active, the Uranian branch in `planets.py`
 sources body and Earth positions from the LEB (same transform chain, ~4x
 faster geocentric speed); `fast_calc` still rejects IDs 40-58 from persisted
 channels. Other hypothetical bodies (48-58) remain runtime-only; each registry

@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0rc15] - 2026-07-21
+
+Moves artifact integrity verification from every reader construction to the one
+moment the bytes can actually change: installation.
+
+### Changed
+
+- **Runtime SHA-256 verification of the LEB2 inventory is removed.**
+  `_matches_pinned_data_file` now answers presence (`os.path.isfile`) instead of
+  re-reading the file and digesting it. `download.py` still verifies the SHA-256
+  of every artifact it writes, and that pin remains the published contract for
+  the data release — it is simply no longer re-checked on every open.
+- Trust semantics follow from that. `reviewed`, `precision_class` and
+  `source_reviewed` now mean "served by an artifact named in the manifest and
+  present on disk", not "byte-identical to its pin". Legacy and locally
+  generated artifacts under a manifest name are accepted deliberately, at both
+  companion attach and calculation sourcing (including the fictitious 40-47
+  channels, which previously required a byte match).
+- A truncated or malformed artifact is still rejected, later and more
+  precisely: the reader parses and range-checks the header, section directory
+  and body index when it opens the file.
+
+### Performance
+
+- Constructing a reader at `precision = "extended"` hashed **4.26 GB** across 16
+  passes: three tier cores, twelve companions, plus `extended_core.leb2` a
+  second time (`_is_reviewed_core` was evaluated before the branch that consumes
+  it). It now performs 16 `stat` calls.
+- Measured against the `data-v3` inventory on a warm local SSD,
+  `get_leb_inventory()` goes from **1792 ms to 128 ms**. The gain is far larger
+  on network-backed container volumes, where the same work ran at ~66 MB/s: a
+  sealed deployment paying it in the provisioning validator, in each worker's
+  pre-warm and in each coverage-backfill probe spent roughly 21 GB of reads and
+  over five minutes per cold start, none of it downloading anything.
+
 ## [3.0.0rc14] - 2026-07-18
 
 The release candidate that makes sealed LEB mode source-autonomous, routes
