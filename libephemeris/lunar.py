@@ -1932,7 +1932,30 @@ def _get_ephemeris_range() -> Tuple[float, float]:
         - de440s.bsp: 1849 to 2150
         - de440.bsp (default): 1550 to 2650
         - de441.bsp: -13200 to 17191 (split into two segments)
+
+        In sealed calculation mode ``leb`` the range comes from the active
+        LEB reader (Moon/Earth channel intersection) instead of opening the
+        JPL kernel, mirroring ``_get_computation_ephemeris``.
     """
+    from .state import _JPL_SOURCE_ACCESS, get_calc_mode, get_leb_reader
+
+    if get_calc_mode() == "leb" and not _JPL_SOURCE_ACCESS.get():
+        try:
+            reader = get_leb_reader()
+        except RuntimeError:
+            reader = None
+        if reader is not None:
+            from .inventory import get_reader_body_coverage
+
+            moon_cov = get_reader_body_coverage(reader, 1)
+            earth_cov = get_reader_body_coverage(reader, 14)
+            if moon_cov is not None and earth_cov is not None:
+                return (
+                    max(moon_cov.jd_start, earth_cov.jd_start),
+                    min(moon_cov.jd_end, earth_cov.jd_end),
+                )
+        return (2415020.0, 2471184.0)
+
     planets = get_planets()
     ts = get_timescale()
 

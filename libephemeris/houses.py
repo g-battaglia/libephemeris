@@ -1251,6 +1251,53 @@ def houses_armc_with_fallback(
         return cusps, ascmc, True, warning
 
 
+def _sunshine_makransky_armc_colure_fixup(
+    cusps: list[float], armc_deg: float, lat: float, sun_dec: float
+) -> None:
+    """Match the reference armc-path 'i' cusps at exact colure hits.
+
+    In the armc entry points the Sun's declination defaults to 0, so the
+    eight Sunshine division points sit at exact multiples of 30 degrees
+    from the meridians and their right ascension W can land exactly on the
+    equinoctial (0/180) or solstitial (90/270) colures.  Behavioral
+    comparison with the reference API (armc grid 0-355, lat -89..89,
+    eps 22-24.5) shows isolated-point outputs at those exact hits, while
+    off the boundary both implementations agree and are continuous:
+
+    * W == 180 with lat >= 0, or W == 0 with lat < 0 (i.e. W == 180 in
+      the hemisphere working frame): the antipode of the continuous limit;
+    * W == 90 or 270 with lat < 0: the mirror 360 - x of the continuous
+      limit;
+    * every other exact hit equals the continuous limit.
+    """
+    tan_product = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
+    if abs(tan_product) >= 1.0:
+        return
+    ascensional_difference = math.degrees(math.asin(tan_product))
+    night_third = (90.0 - ascensional_difference) / 3.0
+    day_third = (90.0 + ascensional_difference) / 3.0
+    offsets = (
+        (2, True, -2.0 * night_third),
+        (3, True, -night_third),
+        (5, True, night_third),
+        (6, True, 2.0 * night_third),
+        (8, False, -2.0 * day_third),
+        (9, False, -day_third),
+        (11, False, day_third),
+        (12, False, 2.0 * day_third),
+    )
+    southern = lat < 0.0
+    for cusp, nocturnal, offset in offsets:
+        w = (armc_deg + (180.0 if nocturnal else 0.0) + offset) % 360.0
+        if w % 90.0 != 0.0:
+            continue
+        if w % 180.0 == 0.0:
+            if (w == 0.0) == southern:
+                cusps[cusp] = (cusps[cusp] + 180.0) % 360.0
+        elif southern:
+            cusps[cusp] = (360.0 - cusps[cusp]) % 360.0
+
+
 def houses_armc(
     armc: float, lat: float, eps: float, hsys: int = ord("P"), ascmc9: float = 0.0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
@@ -1537,6 +1584,7 @@ def houses_armc(
     elif hsys_char == "i":  # Sunshine (Makransky)
         cusps = _houses_sunshine_makransky(armc_active, lat, eps, asc, mc, ascmc9)
         ascmc[1] = cusps[10]
+        _sunshine_makransky_armc_colure_fixup(cusps, armc_deg, lat, ascmc9)
     elif hsys_char == "J":  # Savard-A
         cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
     else:
@@ -1693,13 +1741,15 @@ def _houses_fixed_epoch_sidereal(
     resulting cusp arcs are measured from the mean equinox of t0 along the
     t0 ecliptic.
 
-    The reported ARMC slot keeps the tropical geometric ARMC. ``N`` (Aries)
+    The reported ARMC slot carries the node-rebased ``armc_p`` the
+    construction runs on (measured, like the reference, from the ascending
+    node of the t0 ecliptic on the true equator of date). ``N`` (Aries)
     cusps stay anchored at zero degrees Aries, like the general sidereal path.
     """
     import numpy as np
 
     from .precession_vondrak import vondrak_pn_matrix, vondrak_precession_matrix
-    from .sidereal_epoch import FIXED_EPOCH_T0
+    from .sidereal_epoch import FIXED_EPOCH_LON_OFFSET, FIXED_EPOCH_T0
 
     import erfa
 
@@ -1708,6 +1758,10 @@ def _houses_fixed_epoch_sidereal(
         return np.array([[1.0, 0.0, 0.0], [0.0, c, s], [0.0, -s, c]])
 
     t0 = FIXED_EPOCH_T0[sid_mode]
+    # Modes like SIDM_GALALIGN_MARDYKS carry a constant ecliptic-longitude
+    # offset of the t0 frame (their defining ayanamsha at t0): cusp arcs are
+    # measured from the offset zero point along the t0 ecliptic.
+    lon_offset = FIXED_EPOCH_LON_OFFSET.get(sid_mode, 0.0)
     jd_tt = tjdut + _deltat(tjdut)
     dpsi, deps = get_cached_nutation(jd_tt)
     pn_tuples, _eps_true = vondrak_pn_matrix(jd_tt, dpsi, deps)
@@ -1725,6 +1779,12 @@ def _houses_fixed_epoch_sidereal(
     n_eq = m @ n_t0
     ang_n = math.degrees(math.atan2(float(n_eq[1]), float(n_eq[0]))) % 360.0
     armc_p = (trop_ascmc[2] - ang_n) % 360.0
+    # The reference orients the anchor arc by the sign of (t - t0), not by
+    # its true sign: within the interval where nutation puts the node on
+    # the other side of the t0 equinox, the anchor reflects. The ARMC above
+    # is NOT reflected (measured reference behavior).
+    d_node = lon_node if lon_node <= 180.0 else lon_node - 360.0
+    lon_node = -abs(d_node) if jd_tt >= t0 else abs(d_node)
 
     # Sun declination of date for the Sunshine systems. Unlike the
     # ayanamsha-based sidereal modes, the fixed-epoch modes keep ``i`` as a
@@ -1749,12 +1809,13 @@ def _houses_fixed_epoch_sidereal(
         # Aries houses stay anchored at 0 deg of the zodiac in use.
         cusps = tuple(float(i * 30) for i in range(12))
     else:
-        cusps = tuple((lon_node + c) % 360.0 for c in eng_cusps)
+        cusps = tuple((lon_node - lon_offset + c) % 360.0 for c in eng_cusps)
 
     ascmc_list = list(trop_ascmc)
     for i in (0, 1, 3, 4, 5, 6, 7):
-        ascmc_list[i] = (lon_node + eng_ascmc[i]) % 360.0
-    # ascmc[2] (ARMC) keeps the tropical value (see docstring).
+        ascmc_list[i] = (lon_node - lon_offset + eng_ascmc[i]) % 360.0
+    # ascmc[2] (ARMC) reports the node-rebased armc_p (see docstring).
+    ascmc_list[2] = armc_p
     return cusps, tuple(ascmc_list)
 
 

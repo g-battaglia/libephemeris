@@ -4066,11 +4066,12 @@ def _calc_body(
     # Route the non-Uranian historical compatibility IDs through the local
     # hypothetical-body layer.  Only the entries admitted by that layer's
     # reviewed provenance registry can return a state: Selena (56) is the
-    # source-backed geocentric symbolic construction, and IDs 50--53 are the
-    # independently transcribed heliocentric predicted-planet models.  IDs 49,
-    # 54, 55, 57, and 58 remain in this dispatcher so every public constant
-    # reaches one deterministic error boundary; their calculation functions
-    # raise UnknownBodyError before any unavailable element could be used.
+    # source-backed geocentric symbolic construction, and IDs 48, 50--55 and
+    # 57 carry heliocentric predicted-planet models transcribed from their
+    # published sources.  IDs 49 and 58 remain in this dispatcher so every
+    # public constant reaches one deterministic error boundary; their
+    # calculation functions raise UnknownBodyError before any unavailable
+    # element could be used.
     #
     # The heliocentric/geocentric classification below is therefore also a
     # coordinate-routing declaration for future provenance-complete models,
@@ -5646,7 +5647,11 @@ def _get_true_ayanamsa(tjd_ut: float, sid_mode: int | None = None) -> float:
             Horizons) avoid swapping the global sidereal mode.
 
     Returns:
-        True ayanamsha in degrees (mean ayanamsha + nutation in longitude)
+        True ayanamsha in degrees: the mean ayanamsha normalized to
+        [0, 360) plus the signed nutation in longitude. The sum is NOT
+        re-normalized — near a zero crossing the value may be slightly
+        negative or slightly above 360, matching the reference convention
+        (e.g. -0.0039 at J2000 for SIDM_J2000 rather than 359.9961).
     """
     if sid_mode is None:
         sid_mode = get_sid_mode()
@@ -5661,7 +5666,7 @@ def _get_true_ayanamsa(tjd_ut: float, sid_mode: int | None = None) -> float:
     dpsi_rad, _ = erfa.nut06a(2451545.0, t_obj.tt - 2451545.0)
     nutation_deg = math.degrees(dpsi_rad)
 
-    return (mean_ayanamsa + nutation_deg) % 360.0
+    return mean_ayanamsa + nutation_deg
 
 
 def _get_ayanamsa_for_flags(
@@ -8441,6 +8446,10 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
     planets = _get_computation_ephemeris()
 
+    # The reference ignores FLG_HELCTR in pheno: every quantity is
+    # Earth-based regardless of the observer flag (measured behavior).
+    iflag &= ~FLG_HELCTR
+
     # Initialize return values
     phase_angle = 0.0
     phase = 1.0
@@ -8502,24 +8511,19 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         attr = (0.0,) * 20
         return attr
 
-    # Observer depends on flags
-    if iflag & FLG_HELCTR:
-        observer = sun
-    else:
-        observer = earth
+    observer = earth
 
-    # Get apparent positions
+    # Get observed positions
     obs_at_t = get_cached_observer_at(observer, t)
     if iflag & FLG_TRUEPOS:
-        # Geometric position (no light time)
-        target_pos_geo = obs_at_t.observe(target)
-        sun_pos_geo = obs_at_t.observe(sun) if ipl != MOON else None
+        # True geometric positions at t on BOTH legs: observe() would still
+        # retard the target by light time, which the reference removes.
+        target_pos_geo = (target - observer).at(t)
+        sun_pos_geo = (sun - observer).at(t)
     else:
-        # Apparent position
+        # Apparent positions
         target_pos_geo = obs_at_t.observe(target).apparent()
-        sun_pos_geo = (
-            obs_at_t.observe(sun).apparent() if not (iflag & FLG_HELCTR) else None
-        )
+        sun_pos_geo = obs_at_t.observe(sun).apparent()
 
     # Get heliocentric position of target for phase calculations
     target_helio = get_cached_observer_at(sun, t).observe(target)
@@ -8530,8 +8534,9 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
     # Special handling for Moon
     if ipl == MOON:
-        # For Moon, we need Sun position from Earth
-        sun_from_earth = get_cached_observer_at(earth, t).observe(sun).apparent()
+        # Sun position from Earth, same flavor (geometric/apparent) as the
+        # Moon leg above.
+        sun_from_earth = sun_pos_geo
 
         # Get RA/Dec of Moon and Sun
         moon_ra, moon_dec, moon_dist = target_pos_geo.radec()
@@ -8600,99 +8605,46 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         return attr
 
     # For planets: calculate elongation, phase angle, etc.
-    if sun_pos_geo is not None:
-        # Get RA/Dec of planet and Sun
-        planet_ra, planet_dec, planet_dist = target_pos_geo.radec()
-        sun_ra, sun_dec, sun_dist = sun_pos_geo.radec()
+    # Get RA/Dec of planet and Sun
+    planet_ra, planet_dec, planet_dist = target_pos_geo.radec()
+    sun_ra, sun_dec, sun_dist = sun_pos_geo.radec()
 
-        # Elongation: angular distance between planet and Sun
-        planet_ra_rad = planet_ra.radians
-        planet_dec_rad = planet_dec.radians
-        sun_ra_rad = sun_ra.radians
-        sun_dec_rad = sun_dec.radians
+    # Elongation: angular distance between planet and Sun
+    planet_ra_rad = planet_ra.radians
+    planet_dec_rad = planet_dec.radians
+    sun_ra_rad = sun_ra.radians
+    sun_dec_rad = sun_dec.radians
 
-        cos_elong = math.sin(planet_dec_rad) * math.sin(sun_dec_rad) + math.cos(
-            planet_dec_rad
-        ) * math.cos(sun_dec_rad) * math.cos(planet_ra_rad - sun_ra_rad)
-        cos_elong = max(-1.0, min(1.0, cos_elong))
-        elongation = math.degrees(math.acos(cos_elong))
+    cos_elong = math.sin(planet_dec_rad) * math.sin(sun_dec_rad) + math.cos(
+        planet_dec_rad
+    ) * math.cos(sun_dec_rad) * math.cos(planet_ra_rad - sun_ra_rad)
+    cos_elong = max(-1.0, min(1.0, cos_elong))
+    elongation = math.degrees(math.acos(cos_elong))
 
-        # Phase angle: angle at the planet vertex between the planet→Sun and
-        # planet→Earth directions. The illuminating leg is evaluated at the
-        # target emission epoch; under FLG_TRUEPOS both legs are geometric at t.
-        P = target_pos_geo.position.au  # Planet position (geocentric)
-        S = sun_pos_geo.position.au  # Sun position (geocentric)
+    # Phase angle: angle at the planet vertex between the planet→Sun and
+    # planet→Earth directions. The illuminating leg is evaluated at the
+    # target emission epoch; under FLG_TRUEPOS both legs are geometric at t.
+    P = target_pos_geo.position.au  # Planet position (geocentric)
+    S = sun_pos_geo.position.au  # Sun position (geocentric)
 
-        vec_planet_to_earth = -P
-        mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
+    vec_planet_to_earth = -P
+    mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
 
-        if iflag & FLG_TRUEPOS:
-            vec_planet_to_sun = S - P
-        else:
-            tau = mag_pe / 173.1446326846693
-            vec_planet_to_sun = _pheno_body_to_sun_direction(t, target, sun, tau)
-
-        dot_prod = sum(a * b for a, b in zip(vec_planet_to_sun, vec_planet_to_earth))
-        mag_ps = math.sqrt(sum(x**2 for x in vec_planet_to_sun))
-
-        if mag_ps > 0 and mag_pe > 0:
-            cos_phase = dot_prod / (mag_ps * mag_pe)
-            cos_phase = max(-1.0, min(1.0, cos_phase))
-            phase_angle = math.degrees(math.acos(cos_phase))
-        else:
-            phase_angle = 0.0
+    if iflag & FLG_TRUEPOS:
+        vec_planet_to_sun = S - P
     else:
-        # Heliocentric case: phase angle and elongation are geometric
-        # properties of the Sun-Planet-Earth triangle, computed from
-        # Earth's perspective regardless of observer flag.
-        earth_at_t = get_cached_observer_at(earth, t)
-        if iflag & FLG_TRUEPOS:
-            _earth_target = earth_at_t.observe(target)
-            _earth_sun = earth_at_t.observe(sun)
-        else:
-            _earth_target = earth_at_t.observe(target).apparent()
-            _earth_sun = earth_at_t.observe(sun).apparent()
+        tau = mag_pe / 173.1446326846693
+        vec_planet_to_sun = _pheno_body_to_sun_direction(t, target, sun, tau)
 
-        planet_ra, planet_dec, _ = _earth_target.radec()
-        sun_ra, sun_dec, _ = _earth_sun.radec()
+    dot_prod = sum(a * b for a, b in zip(vec_planet_to_sun, vec_planet_to_earth))
+    mag_ps = math.sqrt(sum(x**2 for x in vec_planet_to_sun))
 
-        planet_ra_rad = planet_ra.radians
-        planet_dec_rad = planet_dec.radians
-        sun_ra_rad = sun_ra.radians
-        sun_dec_rad = sun_dec.radians
-
-        cos_elong = math.sin(planet_dec_rad) * math.sin(sun_dec_rad) + math.cos(
-            planet_dec_rad
-        ) * math.cos(sun_dec_rad) * math.cos(planet_ra_rad - sun_ra_rad)
-        cos_elong = max(-1.0, min(1.0, cos_elong))
-        elongation = math.degrees(math.acos(cos_elong))
-
-        # Phase angle using 3D vectors from Earth, with the same retarded
-        # illumination geometry as the geocentric branch above.
-        P = _earth_target.position.au
-        S = _earth_sun.position.au
-
-        vec_planet_to_earth = -P
-        mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
-
-        if iflag & FLG_TRUEPOS:
-            vec_planet_to_sun = S - P
-        else:
-            tau = mag_pe / 173.1446326846693
-            vec_planet_to_sun = _pheno_body_to_sun_direction(t, target, sun, tau)
-
-        dot_prod = sum(a * b for a, b in zip(vec_planet_to_sun, vec_planet_to_earth))
-        mag_ps = math.sqrt(sum(x**2 for x in vec_planet_to_sun))
-
-        if mag_ps > 0 and mag_pe > 0:
-            cos_phase = dot_prod / (mag_ps * mag_pe)
-            cos_phase = max(-1.0, min(1.0, cos_phase))
-            phase_angle = math.degrees(math.acos(cos_phase))
-        else:
-            phase_angle = 0.0
-
-        # Fix geocentric distance (target_geo_dist was heliocentric above)
-        target_geo_dist = math.sqrt(sum(x**2 for x in _earth_target.position.au))
+    if mag_ps > 0 and mag_pe > 0:
+        cos_phase = dot_prod / (mag_ps * mag_pe)
+        cos_phase = max(-1.0, min(1.0, cos_phase))
+        phase_angle = math.degrees(math.acos(cos_phase))
+    else:
+        phase_angle = 0.0
 
     # Phase (illuminated fraction)
     phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0

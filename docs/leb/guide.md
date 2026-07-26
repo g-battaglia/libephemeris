@@ -1803,6 +1803,8 @@ python scripts/generate_leb.py --tier base --group planets
 python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --group exotics
 python scripts/generate_leb.py --tier base --group analytical
+# Companion-only partial: generated separately, never merged into the main
+python scripts/generate_leb.py --tier base --group uranians
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
@@ -1833,8 +1835,8 @@ reader.close()
 
 The wheel contains the reviewed `libephemeris/data/leb2/base_core.leb2` file.
 The downloader also supports artifact-specific remote entries only when the
-manifest supplies both a reviewed URL and SHA-256. Former release objects that
-lack the current clean-room build attestation remain retired.
+manifest supplies both a reviewed URL and SHA-256. Release objects absent from
+the current manifest are never downloaded or auto-discovered.
 
 LEB1 and LEB2 remain supported as local generation formats. Generate the desired
 tier from the configured NASA JPL kernel, verify it against the direct JPL path,
@@ -2164,16 +2166,23 @@ LEB2 files are produced by **converting** existing LEB1 files. The conversion
 applies the compression pipeline (§13.4) to each body's raw coefficients.
 
 **Prerequisites:** a locally generated full-registry LEB1 file for the target
-tier must exist in `data/leb/`. Historical smaller monolithic release assets
-are retired and must not be used as conversion inputs.
+tier must exist in `data/leb/`. The `uranians` group additionally needs the
+standalone `ephemeris_{tier}_uranians.leb` partial (it is companion-only and
+never merges into the main file); `convert-all` exits non-zero when a
+companion partial is missing unless `--allow-missing-companions` is passed.
+Smaller historical monolithic release assets do not contain the full registry
+and cannot be used as conversion inputs.
 
 **Recommended workflow (base tier):**
 
 ```bash
-# Step 1: Generate LEB1 (if not already present)
+# Step 1: Generate LEB1 (if not already present).
+# The group workflow produces the four mergeable groups + the merged main;
+# the uranians partial is generated separately.
 leph leb generate base groups
+python scripts/generate_leb.py --tier base --group uranians
 
-# Step 2: Convert LEB1 → LEB2 (all 5 groups)
+# Step 2: Convert LEB1 → LEB2 (all 5 groups; uranians reads its partial)
 leph leb2 convert base
 
 # Step 3: Verify the core LEB2 companion against its LEB1 reference

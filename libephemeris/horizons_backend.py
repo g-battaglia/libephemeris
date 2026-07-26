@@ -1046,7 +1046,9 @@ def _calc_analytical(
 
     from .time_utils import deltat
     from .constants import (
+        FLG_BARYCTR,
         FLG_SIDEREAL,
+        FLG_HELCTR,
         FLG_NONUT,
         FLG_J2000,
         FLG_EQUATORIAL,
@@ -1054,6 +1056,13 @@ def _calc_analytical(
         FLG_SPEED3,
         FLG_TOPOCTR,
     )
+
+    # Public convention for Moon-derived abstract points under HELCTR/BARYCTR
+    # (same rule as planets._calc_body): nodes/apses have no heliocentric or
+    # barycentric place, so return the all-zero position while echoing the
+    # normal retflag.
+    if iflag & (FLG_HELCTR | FLG_BARYCTR):
+        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag)
     from .planets import (
         _apply_output_flags,
         _apply_sidereal_correction,

@@ -551,6 +551,33 @@ def _is_leap_second_date(year: int, month: int, day: int) -> bool:
     return (year, month, day) in _LEAP_SECOND_DATES
 
 
+def _days_in_month(year: int, month: int, cal: int) -> int:
+    """Return the number of days in a calendar month.
+
+    The leap-year rule is calendar-aware, using astronomical year numbering
+    (year 0 exists, and e.g. -100 is divisible by 4): the Julian calendar
+    intercalates every 4th year, the proleptic Gregorian calendar skips
+    century years not divisible by 400.
+
+    Args:
+        year: Astronomical year number.
+        month: Month (1-12).
+        cal: GREG_CAL or JUL_CAL.
+
+    Returns:
+        Number of days (28-31).
+    """
+    if month in (4, 6, 9, 11):
+        return 30
+    if month != 2:
+        return 31
+    if cal == GREG_CAL:
+        leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    else:
+        leap = year % 4 == 0
+    return 29 if leap else 28
+
+
 def utc_to_jd(
     year: int,
     month: int,
@@ -581,6 +608,13 @@ def utc_to_jd(
             - jd_et: Julian Day in TT (Terrestrial Time / Ephemeris Time)
             - jd_ut: Julian Day in UT1 (Universal Time)
 
+    Raises:
+        Error: If the date does not exist in the requested calendar
+            ("invalid date: ...") or the clock time is out of range
+            ("invalid time: ..."); seconds 60.0-60.999... are accepted
+            only at 23:59 on an IERS leap-second date.
+        ValueError: If calendar is neither GREG_CAL nor JUL_CAL.
+
     Note:
         - UTC includes leap seconds while UT1 follows Earth's rotation
         - ``abs(UTC - UT1)`` is always less than 0.9 seconds by definition
@@ -601,6 +635,28 @@ def utc_to_jd(
     # Julian in julday() but Gregorian here (and even flip interpretation
     # across the 1972 boundary, where the pre-UTC branch defers to julday).
     _validate_calendar(calendar, "utc_to_jd")
+
+    # Reference-API parity: validate the calendar date before the clock time
+    # (a bad date wins even when the time is also invalid), against the raw
+    # input fields in the requested calendar. Rejection, not normalization:
+    # month 13 or Feb 30 must not roll over into the next month.
+    if (
+        month < 1
+        or month > 12
+        or day < 1
+        or day > _days_in_month(year, month, calendar)
+    ):
+        from .exceptions import Error
+
+        raise Error(f"invalid date: year = {year}, month = {month}, day = {day}")
+
+    # Reference-API parity: reject out-of-range clock fields (hour 24 included).
+    # Seconds in [60, 61) are provisionally admitted here; the leap-second
+    # check below decides whether such a 23:59:60.x label really exists.
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59 or second < 0.0:
+        from .exceptions import Error
+
+        raise Error(f"invalid time: {hour}:{minute}:{second:.2f}")
 
     # Leap-second dates and the beginning of the UTC era are defined in the
     # Gregorian calendar.  Map a Julian-calendar label to that physical
@@ -628,11 +684,9 @@ def utc_to_jd(
         # label on a date without an IERS leap-second insertion. Pre-1972 dates
         # have no leap-second UTC and therefore fall in the former category.
         if second >= 61.0 or hour != 23 or minute != 59 or greg_year < 1972:
-            raise Error(f"invalid time: {hour}:{minute}:{second:05.2f}")
+            raise Error(f"invalid time: {hour}:{minute}:{second:.2f}")
         if not _is_leap_second_date(greg_year, greg_month, greg_day):
-            raise Error(
-                f"invalid time (no leap second!): {hour}:{minute}:{second:05.2f}"
-            )
+            raise Error(f"invalid time (no leap second!): {hour}:{minute}:{second:.2f}")
 
     # Before 1972 UTC (with leap seconds) did not exist; the reference API
     # treats the input as UT1 directly: jd_ut1 is the literal calendar JD

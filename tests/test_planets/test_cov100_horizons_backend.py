@@ -414,14 +414,14 @@ class TestCalcUtDispatch:
 
     @pytest.mark.parametrize(
         "body",
-        [48, 49, 54, 55, 57],
+        [49],
     )
     def test_unverified_heliocentric_hypothetical_ids_fail_closed(self, body):
         with pytest.raises(UnknownBodyError) as raised:
             horizons_calc_ut(None, JD, body, FLG_SWIEPH | FLG_HELCTR)
         assert raised.value.body_id == body
 
-    @pytest.mark.parametrize("body", [*range(40, 48), 50, 51, 52, 53])
+    @pytest.mark.parametrize("body", [*range(40, 49), *range(50, 56), 57])
     def test_reviewed_heliocentric_hypothetical_ids_are_finite(self, body):
         data, _flags = horizons_calc_ut(
             None, JD, body, FLG_SWIEPH | FLG_HELCTR | FLG_SPEED

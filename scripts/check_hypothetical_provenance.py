@@ -67,14 +67,21 @@ _REVIEWED_SOURCE_LOCATORS = {
     ),
 }
 
-_SUPPORTED = {
+_PRIMARY_TRANSCRIPTIONS = {
     *range(hyp.CUPIDO, hyp.POSEIDON + 1),
     hyp.HARRINGTON,
     hyp.NEPTUNE_LEVERRIER,
     hyp.NEPTUNE_ADAMS,
     hyp.PLUTO_LOWELL,
-    hyp.WHITE_MOON,
+    hyp.PLUTO_PICKERING,
 }
+_PUBLISHED_MODELS = {
+    hyp.ISIS,
+    hyp.VULCAN,
+    hyp.WHITE_MOON,
+    hyp.PROSERPINA,
+}
+_SUPPORTED = _PRIMARY_TRANSCRIPTIONS | _PUBLISHED_MODELS
 _ALL_IDS = set(range(hyp.CUPIDO, hyp.WALDEMATH + 1))
 _UNSUPPORTED = _ALL_IDS - _SUPPORTED
 
@@ -250,13 +257,115 @@ def _check_runtime_registries(problems: list[str]) -> None:
             hyp.NEPTUNE_LEVERRIER,
             hyp.NEPTUNE_ADAMS,
             hyp.PLUTO_LOWELL,
+            hyp.PLUTO_PICKERING,
         },
-        "classical-prediction registry differs from IDs 50-53 excluding 54",
+        "classical-prediction registry differs from IDs 50-54",
     )
     _check(
         problems,
-        not hyp.HYPOTHETICAL_ELEMENTS,
-        "unreviewed generic Keplerian registry is not empty",
+        set(hyp.HYPOTHETICAL_ELEMENTS) == {hyp.ISIS, hyp.PROSERPINA},
+        "generic Keplerian registry differs from the documented {48, 57} set",
+    )
+
+    # Transpluto: Hawkins 1978, p. 79 (Sevin/Landscheidt lineage).  Every
+    # runtime field must re-derive from the printed quantities.
+    transpluto = hyp.TRANSPLUTO_KEPLERIAN_ELEMENTS
+    _check(
+        problems,
+        hyp.HYPOTHETICAL_ELEMENTS.get(hyp.ISIS) is transpluto,
+        "Transpluto registry row is not the exported published container",
+    )
+    for field_name, actual, expected in (
+        ("epoch", transpluto.epoch, 2415020.0),
+        ("a", transpluto.a, 77.755),
+        ("e", transpluto.e, 0.3),
+        ("i", transpluto.i, 0.0),
+        ("omega", transpluto.omega, 0.0438748),
+        ("Omega", transpluto.Omega, 0.0),
+        ("M0", transpluto.M0, 66.806096),
+        ("n", transpluto.n, 360.0 / (685.65 * 365.25)),
+    ):
+        _check(
+            problems,
+            _close(actual, expected),
+            f"Transpluto {field_name} differs from the Hawkins transcription",
+        )
+    _check(
+        problems,
+        abs((1900.0 - 1772.76) * (360.0 / 685.65) - transpluto.M0) < 0.002,
+        "Transpluto M0 does not re-derive from the printed perihelion year",
+    )
+
+    # Proserpina: documented circular published-model realization.
+    proserpina = hyp.HYPOTHETICAL_ELEMENTS[hyp.PROSERPINA]
+    for field_name, actual, expected in (
+        ("epoch", proserpina.epoch, 2415020.0),
+        ("a", proserpina.a, 79.22563),
+        ("e", proserpina.e, 0.0),
+        ("i", proserpina.i, 0.0),
+        ("omega", proserpina.omega, 0.0),
+        ("Omega", proserpina.Omega, 0.0),
+        ("M0", proserpina.M0, 170.73),
+        ("n", proserpina.n, 0.9856076686 / 79.22563**1.5),
+    ):
+        _check(
+            problems,
+            _close(actual, expected),
+            f"Proserpina {field_name} differs from the documented realization",
+        )
+
+    # Pickering: Annals of Harvard College Observatory 82 (1919), p. 59.
+    pickering = hyp.FICTITIOUS_ORBITAL_ELEMENTS[hyp.PLUTO_PICKERING]
+    _check(
+        problems,
+        _close(pickering.epoch_jd, 2451545.0 - 280.0 * 365.25)
+        and pickering.equinox_jd is not None
+        and _close(pickering.equinox_jd, 2451545.0 - 80.0 * 365.25)
+        and _close(pickering.mean_anomaly.constant, 0.0)
+        and _close(pickering.semi_axis, 55.1)
+        and _close(pickering.eccentricity.constant, 0.31)
+        and _close(pickering.arg_perihelion.constant, 280.0 - 100.0)
+        and _close(pickering.asc_node.constant, 100.0)
+        and _close(pickering.inclination.constant, 15.0),
+        "Pickering row differs from the Annals 82 p. 59 transcription",
+    )
+
+    # Vulcan: Weston's printed table re-expressed as the J1900 linear set;
+    # the perihelion/node rates must cancel and keep omega+Omega = 10 deg.
+    vulcan = hyp.VULCAN_ELEMENTS
+    _check(
+        problems,
+        _close(vulcan.epoch, 2415020.0)
+        and _close(vulcan.a, 0.13744)
+        and _close(vulcan.e, 0.019)
+        and _close(vulcan.i, 7.5)
+        and _close(vulcan.omega0 + vulcan.Omega0, 370.0)
+        and _close(vulcan.omega_rate + vulcan.Omega_rate, 0.0)
+        and _close(vulcan.M0, 252.8987988)
+        and _close(vulcan.n_century, 707550.7341),
+        "Vulcan container differs from the documented Weston parameterization",
+    )
+    _check(
+        problems,
+        abs(360.0 / (vulcan.n_century / 36525.0) - 18.58415) < 0.001,
+        "Vulcan mean motion does not reproduce Weston's printed 18.58415-day period",
+    )
+
+    # Lowell's public container reports the memoir's stated ~10 deg
+    # inclination expectation; the runtime registry stays planar because no
+    # node was published to orient that plane.
+    _check(
+        problems,
+        _close(hyp.LOWELL_PLANET_X_ELEMENTS.i, 10.0),
+        "Lowell container inclination is not the memoir's stated 10 deg",
+    )
+    _check(
+        problems,
+        _close(
+            hyp.FICTITIOUS_ORBITAL_ELEMENTS[hyp.PLUTO_LOWELL].inclination.constant,
+            0.0,
+        ),
+        "Lowell runtime propagation must stay planar (no published node)",
     )
 
     # The primary Neely table prints rounded rates.  The runtime's standard
@@ -264,14 +373,29 @@ def _check_runtime_registries(problems: list[str]) -> None:
     for body_id, source in hyp._NEELY_SOURCE_ROWS.items():
         runtime = hyp.URANIAN_KEPLERIAN_ELEMENTS[body_id]
         _check(problems, runtime.name == source.name, f"body {body_id}: name drift")
-        for field_name, actual, expected in (
-            ("a", runtime.a, source.a),
-            ("e", runtime.e, source.e),
-            ("i", runtime.i, source.i),
-            ("omega", runtime.omega, source.omega),
-            ("node", runtime.Omega, source.node),
-            ("M0", runtime.M0, source.mean_anomaly),
-        ):
+        if source.e == 0.0 and source.i == 0.0:
+            # Degenerate circular coplanar rows: only M+omega+node is
+            # observable; the runtime stores that phase in M0 (Neely's own
+            # text defines the printed value as the body's position at the
+            # epoch).  The propagation is identical to the literal placement.
+            expected_fields = (
+                ("a", runtime.a, source.a),
+                ("e", runtime.e, 0.0),
+                ("i", runtime.i, 0.0),
+                ("omega", runtime.omega, 0.0),
+                ("node", runtime.Omega, 0.0),
+                ("M0", runtime.M0, source.mean_longitude),
+            )
+        else:
+            expected_fields = (
+                ("a", runtime.a, source.a),
+                ("e", runtime.e, source.e),
+                ("i", runtime.i, source.i),
+                ("omega", runtime.omega, source.omega),
+                ("node", runtime.Omega, source.node),
+                ("M0", runtime.M0, source.mean_anomaly),
+            )
+        for field_name, actual, expected in expected_fields:
             _check(
                 problems,
                 _close(actual, expected),
@@ -419,7 +543,9 @@ def _check_fail_closed_behavior(problems: list[str]) -> None:
     for body_id in sorted(_SUPPORTED):
         status, reason = hyp.HYPOTHETICAL_PROVENANCE.get(body_id, ("", ""))
         expected_status = (
-            "published-model" if body_id == hyp.WHITE_MOON else "primary-transcription"
+            "published-model"
+            if body_id in _PUBLISHED_MODELS
+            else "primary-transcription"
         )
         _check(
             problems,
@@ -456,17 +582,27 @@ def _check_fail_closed_behavior(problems: list[str]) -> None:
         else:
             problems.append(f"unsupported body {body_id} unexpectedly calculated")
 
-    public_sentinels = (
+    # Waldemath is the single remaining explicit sentinel: Waltemath's 1898
+    # announcements publish no complete element set, so its container must
+    # stay NaN.  The other legacy containers are now populated from the
+    # documented publications and must be fully finite.
+    _check(
+        problems,
+        _all_numeric_fields_are_nan(hyp.WALDEMATH_ELEMENTS),
+        "unsupported public container WaldemathElements contains data",
+    )
+    for value in (
         hyp.TRANSPLUTO_KEPLERIAN_ELEMENTS,
         hyp.PICKERING_PLANET_X_ELEMENTS,
         hyp.VULCAN_ELEMENTS,
-        hyp.WALDEMATH_ELEMENTS,
-    )
-    for value in public_sentinels:
+    ):
         _check(
             problems,
-            _all_numeric_fields_are_nan(value),
-            f"unsupported public container {type(value).__name__} contains data",
+            all(
+                item.name == "name" or math.isfinite(getattr(value, item.name))
+                for item in fields(value)
+            ),
+            f"published container {type(value).__name__} has non-finite fields",
         )
 
 

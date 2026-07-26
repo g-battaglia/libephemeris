@@ -297,8 +297,10 @@ even in code paths where the primary velocity already used central difference.
 | `spk.py` | SPK Type 2/3 fallback | Forward 1s | Central 1s |
 | `planetary_moons.py` | Planetary moons | Forward 1s | Central 1s |
 
-The earlier table included unsupported hypothetical-body implementations. Those
-rows and their numerical models were retired during the clean-room review.
+An earlier version of the table also listed hypothetical bodies whose complete
+numerical model is not available from a primary publication; those IDs are no
+longer computed (see
+[missing hypothetical models](../methodology/missing-hypothetical-models.md)).
 
 Example transformation (schematic):
 
@@ -458,13 +460,12 @@ Mallama–Hilton values.
 
 #### Apparent Diameter — IAU 2015 Equatorial Radii (Intentional Divergence)
 
-**Investigation:** LibEphemeris uses **IAU 2015 equatorial radii**, the selected
-independent convention for maximum apparent angular diameter. Mean volumetric
-radii answer a different geometric question and are not substituted merely to
-reduce a compatibility delta.
+**Investigation:** LibEphemeris uses **IAU 2015 equatorial radii** as the
+convention for maximum apparent angular diameter. Mean volumetric radii answer
+a different geometric question.
 
-**Decision: NOT CHANGED.** The equatorial-radius convention remains explicit
-and independently sourced. No radius is inferred from black-box output.
+**Decision: NOT CHANGED.** The equatorial-radius convention is explicit and
+sourced from IAU 2015 Resolution B3.
 
 ---
 

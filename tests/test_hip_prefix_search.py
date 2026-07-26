@@ -1,177 +1,71 @@
 """
-Unit tests for HIP prefix search functionality in star lookup.
+Unit tests: HIP-number search strings do NOT resolve in the v2 star search.
 
-Tests the ability to search for stars using "HIP NNNNN" format,
-which is required for reference ephemeris fixstar2 compatibility.
+Measured reference behavior: the v2 family (fixstar2/fixstar2_ut/
+fixstar2_mag) resolves traditional names, comma-prefixed nomenclature,
+sequential catalog numbers and trailing-'%' wildcards — never Hipparcos
+numbers. "HIP 49669" fails as an unknown name, ",49669" fails as an
+unknown nomenclature, and a bare "49669" reads as an (out-of-range)
+sequential index.
 
-Examples:
-    - "HIP 49669" -> Regulus
-    - "HIP 65474" -> Spica
-    - "HIP65474" -> Spica (no space)
+HIP numbers remain available through the library-specific helpers
+(get_hip_from_star_name / STAR_NAME_TO_HIP), not through the
+reference-named fixstar functions.
 """
 
 import pytest
+from libephemeris.exceptions import Error
 from libephemeris.fixed_stars import _resolve_star2, fixstar2_ut
 
 
 @pytest.mark.unit
-class TestHipPrefixSearch:
-    """Tests for HIP prefix search in _resolve_star2."""
-
-    def test_hip_prefix_with_space_regulus(self):
-        """Test HIP 49669 resolves to Regulus."""
-        entry, err = _resolve_star2("HIP 49669")
-        assert err is None, f"Unexpected error: {err}"
-        assert entry is not None
-        assert entry.name == "Regulus"
-        assert entry.hip_number == 49669
-
-    def test_hip_prefix_with_space_spica(self):
-        """Test HIP 65474 resolves to Spica."""
-        entry, err = _resolve_star2("HIP 65474")
-        assert err is None, f"Unexpected error: {err}"
-        assert entry is not None
-        assert entry.name == "Spica"
-        assert entry.hip_number == 65474
-
-    def test_hip_prefix_without_space(self):
-        """Test HIP65474 (no space) resolves to Spica."""
-        entry, err = _resolve_star2("HIP65474")
-        assert err is None, f"Unexpected error: {err}"
-        assert entry is not None
-        assert entry.name == "Spica"
-        assert entry.hip_number == 65474
-
-    def test_hip_prefix_lowercase(self):
-        """Test hip 49669 (lowercase) resolves to Regulus."""
-        entry, err = _resolve_star2("hip 49669")
-        assert err is None, f"Unexpected error: {err}"
-        assert entry is not None
-        assert entry.name == "Regulus"
-        assert entry.hip_number == 49669
-
-    def test_hip_prefix_mixed_case(self):
-        """Test Hip 49669 (mixed case) resolves to Regulus."""
-        entry, err = _resolve_star2("Hip 49669")
-        assert err is None, f"Unexpected error: {err}"
-        assert entry is not None
-        assert entry.name == "Regulus"
-        assert entry.hip_number == 49669
-
-    def test_hip_prefix_with_whitespace(self):
-        """Test HIP prefix with leading/trailing whitespace."""
-        entry, err = _resolve_star2("  HIP 49669  ")
-        assert err is None, f"Unexpected error: {err}"
-        assert entry is not None
-        assert entry.name == "Regulus"
-
-    def test_hip_prefix_multiple_spaces(self):
-        """Test HIP prefix with multiple spaces between HIP and number."""
-        entry, err = _resolve_star2("HIP   49669")
-        assert err is None, f"Unexpected error: {err}"
-        assert entry is not None
-        assert entry.name == "Regulus"
-
-    def test_hip_prefix_unknown_number(self):
-        """Test HIP prefix with unknown HIP number returns error."""
-        entry, err = _resolve_star2("HIP 999999999")
-        assert entry is None
-        assert err is not None
-        assert "999999999" in err
-
-    def test_hip_prefix_with_invalid_number(self):
-        """Test HIP prefix with non-numeric value doesn't match HIP pattern."""
-        # "HIP abc" should not match the HIP pattern and fall through to other searches
-        entry, err = _resolve_star2("HIP abc")
-        # This should attempt to find a star named "HIP abc" and fail
-        assert entry is None
-        assert err is not None
-
-
-@pytest.mark.unit
-class TestHipPrefixWithFixstar2:
-    """Tests for HIP prefix search via fixstar2_ut."""
-
-    def test_swe_fixstar2_ut_hip_prefix_regulus(self):
-        """Test fixstar2_ut with HIP 49669 returns Regulus."""
-        jd = 2451545.0  # J2000.0
-        pos, name, retflag = fixstar2_ut("HIP 49669", jd, 0)
-        assert "Regulus" in name
-        assert pos[0] > 0  # Longitude should be positive
-
-    def test_swe_fixstar2_ut_hip_prefix_spica(self):
-        """Test fixstar2_ut with HIP 65474 returns Spica."""
-        jd = 2451545.0  # J2000.0
-        pos, name, retflag = fixstar2_ut("HIP 65474", jd, 0)
-        assert "Spica" in name
-        assert pos[0] > 0
-
-    def test_swe_fixstar2_ut_hip_prefix_no_space(self):
-        """Test fixstar2_ut with HIP65474 (no space) returns Spica."""
-        jd = 2451545.0  # J2000.0
-        pos, name, retflag = fixstar2_ut("HIP65474", jd, 0)
-        assert "Spica" in name
-
-
-@pytest.mark.unit
-class TestHipPrefixCatalogStars:
-    """Tests for HIP prefix with various catalog stars."""
+class TestHipPrefixRejected:
+    """ "HIP NNNNN" strings are unknown names for _resolve_star2."""
 
     @pytest.mark.parametrize(
-        "hip_number,expected_name",
+        "query",
         [
-            (49669, "Regulus"),
-            (65474, "Spica"),
-            (21421, "Aldebaran"),
-            (80763, "Antares"),
-            (32349, "Sirius"),
-            (91262, "Vega"),
-            (69673, "Arcturus"),
-            (24608, "Capella"),
-            (37279, "Procyon"),
-            (37826, "Pollux"),
-            (11767, "Polaris"),
-            (27989, "Betelgeuse"),
-            (24436, "Rigel"),
+            "HIP 49669",
+            "HIP 65474",
+            "HIP65474",
+            "hip 49669",
+            "Hip 49669",
+            "  HIP 49669  ",
+            "HIP   49669",
+            "HIP 999999999",
+            "HIP abc",
         ],
     )
-    def test_hip_prefix_major_stars(self, hip_number, expected_name):
-        """Test HIP prefix for major catalog stars."""
-        entry, err = _resolve_star2(f"HIP {hip_number}")
-        assert err is None, f"Error for HIP {hip_number}: {err}"
-        assert entry is not None, f"No entry for HIP {hip_number}"
-        assert entry.name == expected_name
-        assert entry.hip_number == hip_number
+    def test_hip_prefix_never_resolves(self, query):
+        """Any HIP-prefixed string fails as an unknown traditional name."""
+        entry, err = _resolve_star2(query)
+        assert entry is None
+        assert err is not None
+        assert "could not find star name" in err
+
+    def test_hip_prefix_error_echoes_normalized_name(self):
+        """The error echoes the lowercased, space-stripped search key."""
+        entry, err = _resolve_star2("HIP 49669")
+        assert entry is None
+        assert err == "could not find star name hip49669"
 
 
 @pytest.mark.unit
-class TestHipPrefixConsistency:
-    """Tests for consistency between HIP prefix and numeric search."""
+class TestHipFormsViaFixstar2:
+    """The public fixstar2_ut rejects every HIP-style form."""
 
-    def test_hip_prefix_matches_numeric_search(self):
-        """Test that HIP prefix search returns same result as numeric search."""
-        # Search with HIP prefix
-        entry_hip, err_hip = _resolve_star2("HIP 49669")
-        # Search with just number
-        entry_num, err_num = _resolve_star2("49669")
+    JD = 2451545.0  # J2000.0
 
-        assert err_hip is None
-        assert err_num is None
-        assert entry_hip is not None
-        assert entry_num is not None
-        assert entry_hip.name == entry_num.name
-        assert entry_hip.hip_number == entry_num.hip_number
+    def test_fixstar2_ut_hip_prefix_raises(self):
+        with pytest.raises(Error, match="could not find star name hip49669"):
+            fixstar2_ut("HIP 49669", self.JD, 0)
 
-    def test_hip_prefix_matches_comma_prefix_search(self):
-        """Test that HIP prefix search returns same result as comma prefix search."""
-        # Search with HIP prefix
-        entry_hip, err_hip = _resolve_star2("HIP 65474")
-        # Search with comma prefix (reference ephemeris HIP format)
-        entry_comma, err_comma = _resolve_star2(",65474")
+    def test_fixstar2_ut_comma_number_raises(self):
+        """A comma form keys on the nomenclature, never on a HIP number."""
+        with pytest.raises(Error, match="could not find star name ,65474"):
+            fixstar2_ut(",65474", self.JD, 0)
 
-        assert err_hip is None
-        assert err_comma is None
-        assert entry_hip is not None
-        assert entry_comma is not None
-        assert entry_hip.name == entry_comma.name
-        assert entry_hip.hip_number == entry_comma.hip_number
+    def test_fixstar2_ut_bare_number_is_sequential(self):
+        """A bare number is a sequential index (here: out of range)."""
+        with pytest.raises(Error, match="sequential fixed star number"):
+            fixstar2_ut("49669", self.JD, 0)

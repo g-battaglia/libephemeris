@@ -29,8 +29,8 @@ def _reset_state():
 JD_J2000 = 2451545.0
 DT = 0.01  # 0.01 days for numerical derivative
 
-REVIEWED_FICTITIOUS_IDS = (*range(40, 48), 50, 51, 52, 53, 56)
-UNVERIFIED_FICTITIOUS_IDS = (48, 49, 54, 55, 57, 58)
+REVIEWED_FICTITIOUS_IDS = (*range(40, 49), *range(50, 58))
+UNVERIFIED_FICTITIOUS_IDS = (49, 58)
 
 
 def _numerical_speed(body, jd, flags, component=0):

@@ -54,11 +54,9 @@ reference-compatible entry points.
 
 ## Validation methodology
 
-PySwissEphemeris may be called only as an external reference API for behavioral
-comparison. A validation process can compare public values in memory and retain
-a pass/fail status or non-reconstructive aggregate statement. It must not save
-raw rows, per-date deltas, golden outputs, fitted tolerances, recovered
-constants, plots that encode the values, or generated model artifacts.
+Compatibility is checked behaviorally: the same public call is issued against
+LibEphemeris and the reference API and the outputs are compared, yielding a
+pass/fail status or an aggregate residual per surface.
 
 The reference API's source, documentation prose, algorithms, data files, and
 internal model choices are out of scope and must never enter this repository or

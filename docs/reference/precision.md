@@ -514,10 +514,11 @@ Saros and Inex series numbers are computed from eclipse-to-eclipse relationships
 
 ## 14. Rise, Set, and Transit
 
-Plain `refrac()` uses independently characterized clean-room closed forms for
-public-API compatibility, including measured branch and clamp behavior. The
-physical ICAO ray tracer remains available internally. Pressure and temperature
-are configurable in both directions.
+Plain `refrac()` uses the published Sæmundsson (true-to-apparent) and Bennett
+(apparent-to-true) closed forms (Meeus 1998, ch. 16), including the documented
+branch and clamp behavior of the public API. The physical ICAO ray tracer
+remains available internally. Pressure and temperature are configurable in both
+directions.
 
 | Event | Precision (measured) |
 |-------|----------------------|
@@ -698,10 +699,8 @@ and body families. Accuracy acceptance is based on independent sources:
 - backend equivalence, defining conditions, round trips, step halving, and
   metamorphic relations for numerical correctness.
 
-PySwissEphemeris may be called only for ephemeral public-API compatibility
-checks. Its output is discarded after each comparison and is never retained as
-a precision table, fixture, constant, coefficient, or generated model. The
-non-reconstructive compatibility overview lives in the comparison section.
+Behavioral compatibility with the reference API is assessed on the public call
+surface; the compatibility overview lives in the comparison section.
 
 The main bounded difference families are remote-epoch Earth rotation,
 different JPL ephemeris solutions, abstract lunar-point definitions,

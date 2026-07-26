@@ -2,12 +2,10 @@
 
 LibEphemeris validates astronomical accuracy against independent sources:
 NASA JPL DE440/DE441 and Horizons, ERFA/SOFA, IERS, Hipparcos/Gaia/SIMBAD,
-Astropy, and published defining equations. PySwissEphemeris may be called only
-as an external reference API for compatibility comparison. Those observations
-are ephemeral: no returned value is stored in this page, a fixture, a
-coefficient, a table, or a generated artifact.
+Astropy, and published defining equations. Compatibility with the reference
+API is checked behaviorally, by comparing public outputs.
 
-This page therefore reports model classes and non-reconstructive aggregate
+This page reports model classes and non-reconstructive aggregate
 behavior rather than per-date reference output. Exact regression tolerances
 are documented next to their tests and justified from the relevant source's
 accuracy, a propagated numerical error budget, or a declared project acceptance

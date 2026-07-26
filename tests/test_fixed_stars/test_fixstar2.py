@@ -1,12 +1,15 @@
 """
 Unit tests for fixstar2 and fixstar2_ut functions.
 
-Tests the enhanced fixed star lookup functions that support:
-- Exact star name lookup
-- Hipparcos catalog number lookup
-- Partial name search
-- Bayer/Flamsteed nomenclature lookup
+Tests the v2-family fixed star lookup functions that support:
+- Exact traditional star name lookup (case- and whitespace-insensitive)
+- Nomenclature after a comma (",alLeo"), exact and case-sensitive
+- Sequential catalog numbers ("12")
+- Trailing-'%' prefix wildcard ("Alde%")
 - Returns the full star name with the position
+
+Bare nomenclature, bare HIP numbers, Bayer word forms and implicit
+partial matching do NOT resolve (measured reference behavior).
 """
 
 import pytest
@@ -44,45 +47,46 @@ class TestFixstar2TT:
         assert name_upper == name_lower == name_mixed == "Regulus,alLeo"
         assert pos_upper[0] == pos_lower[0] == pos_mixed[0]
 
-    def test_fixstar2_hip_number(self, standard_jd):
-        """Test lookup by Hipparcos catalog number."""
-        # Regulus is HIP 49669
-        pos, name, retflag = ephem.fixstar2("49669", standard_jd, 0)
+    def test_fixstar2_no_bare_hip_number(self, standard_jd):
+        """A bare number is a sequential index, never a HIP lookup."""
+        # HIP 49669 (Regulus) is far beyond the catalog size, so the
+        # sequential interpretation fails loudly instead of resolving.
+        with pytest.raises(Error, match="sequential fixed star number"):
+            ephem.fixstar2("49669", standard_jd, 0)
 
-        assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
-        assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f} out of range"
-
-    def test_fixstar2_hip_number_with_comma(self, standard_jd):
-        """Test lookup by HIP number with leading comma (reference ephemeris format)."""
-        # Spica is HIP 65474
-        pos, name, retflag = ephem.fixstar2(",65474", standard_jd, 0)
-
-        assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"
-        assert 203 < pos[0] < 205, f"Spica lon: {pos[0]:.2f} out of range"
+    def test_fixstar2_no_hip_number_with_comma(self, standard_jd):
+        """A comma form keys on the nomenclature, never on a HIP number."""
+        with pytest.raises(Error, match="could not find star name ,65474"):
+            ephem.fixstar2(",65474", standard_jd, 0)
 
     def test_fixstar2_nomenclature(self, standard_jd):
-        """Test lookup by Bayer/Flamsteed nomenclature."""
-        pos, name, retflag = ephem.fixstar2("alLeo", standard_jd, 0)
-
+        """Nomenclature resolves only AFTER a comma; bare nomen errors."""
+        pos, name, retflag = ephem.fixstar2(",alLeo", standard_jd, 0)
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
 
-    def test_fixstar2_nomenclature_case_insensitive(self, standard_jd):
-        """Test nomenclature lookup is case insensitive."""
-        _, name1, _ = ephem.fixstar2("alVir", standard_jd, 0)
-        _, name2, _ = ephem.fixstar2("ALVIR", standard_jd, 0)
-        _, name3, _ = ephem.fixstar2("AlViR", standard_jd, 0)
+        with pytest.raises(Error, match="could not find star name alleo"):
+            ephem.fixstar2("alLeo", standard_jd, 0)
 
-        assert name1 == name2 == name3 == "Spica,alVir"
+    def test_fixstar2_nomenclature_case_sensitive(self, standard_jd):
+        """The nomenclature key is matched case-sensitively."""
+        _, name1, _ = ephem.fixstar2(",alVir", standard_jd, 0)
+        assert name1 == "Spica,alVir"
 
-    def test_fixstar2_partial_name(self, standard_jd):
-        """Test partial name lookup (prefix search)."""
-        pos, name, retflag = ephem.fixstar2("Reg", standard_jd, 0)
+        for wrong_case in (",ALVIR", ",AlViR"):
+            with pytest.raises(Error, match="could not find star name"):
+                ephem.fixstar2(wrong_case, standard_jd, 0)
 
+    def test_fixstar2_no_implicit_partial_name(self, standard_jd):
+        """A partial name errors; the explicit '%' wildcard resolves."""
+        with pytest.raises(Error, match="could not find star name reg"):
+            ephem.fixstar2("Reg", standard_jd, 0)
+
+        pos, name, retflag = ephem.fixstar2("Regu%", standard_jd, 0)
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
 
-    def test_fixstar2_partial_name_spica(self, standard_jd):
-        """Test partial name lookup for Spica."""
-        pos, name, retflag = ephem.fixstar2("Spi", standard_jd, 0)
+    def test_fixstar2_wildcard_spica(self, standard_jd):
+        """Trailing-'%' prefix lookup for Spica."""
+        pos, name, retflag = ephem.fixstar2("Spi%", standard_jd, 0)
 
         assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"
 
@@ -165,16 +169,16 @@ class TestFixstar2UT:
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f} out of range"
 
-    def test_fixstar2_ut_hip_number(self, standard_jd):
-        """Test fixstar2_ut with HIP number lookup."""
-        pos, name, retflag = ephem.fixstar2_ut("65474", standard_jd, 0)
+    def test_fixstar2_ut_nomenclature(self, standard_jd):
+        """Test fixstar2_ut with comma-nomenclature lookup."""
+        pos, name, retflag = ephem.fixstar2_ut(",alVir", standard_jd, 0)
 
         assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"
         assert 203 < pos[0] < 205, f"Spica lon: {pos[0]:.2f} out of range"
 
-    def test_fixstar2_ut_partial_name(self, standard_jd):
-        """Test fixstar2_ut with partial name lookup."""
-        pos, name, retflag = ephem.fixstar2_ut("Spi", standard_jd, 0)
+    def test_fixstar2_ut_wildcard_name(self, standard_jd):
+        """Test fixstar2_ut with the explicit '%' prefix wildcard."""
+        pos, name, retflag = ephem.fixstar2_ut("Spi%", standard_jd, 0)
 
         assert name == "Spica,alVir"
 

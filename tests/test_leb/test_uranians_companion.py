@@ -329,8 +329,8 @@ def test_out_of_range_dates_fall_back_to_model(trusted_composite) -> None:
 
 
 def test_unverified_fictitious_ids_still_fail_closed(trusted_composite) -> None:
-    """IDs 48-58 keep raising even with trusted uranians channels active."""
-    for bid in (48, 49, 54, 55, 57, 58):
+    """Nibiru and Waldemath keep raising even with trusted uranians channels."""
+    for bid in (49, 58):
         with pytest.raises(UnknownBodyError):
             ephem.calc_ut(SAMPLE_JDS[0], bid, FLG_SWIEPH | FLG_SPEED)
 

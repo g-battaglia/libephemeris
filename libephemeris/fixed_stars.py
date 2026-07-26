@@ -1728,10 +1728,11 @@ STAR_ALIASES: dict[str, int] = {
     "ANTARIES": ANTARES,
     "ANTARAS": ANTARES,
     "ANTARRES": ANTARES,
-    # Rigel variants (Arabic: rijl = foot)
+    # Rigel variants (Arabic: rijl = foot). NOTE: "Rigil" is NOT listed
+    # here — it is the customary short form of Rigil Kentaurus (alpha Cen),
+    # which the traditional-name prefix search resolves on its own.
     "RIEGEL": RIGEL,
     "RIJEL": RIGEL,
-    "RIGIL": RIGEL,
     # Vega variants (Arabic: an-nasr al-waqi)
     "VEGHA": VEGA,
     # Polaris variants
@@ -2695,14 +2696,76 @@ def _ref_sorted_catalog():
     return _REF_SORTED_CATALOG
 
 
+_NOMEN_SORTED_CATALOG: "list | None" = None
+
+
+def _nomen_sorted_catalog():
+    """Catalog entries sorted by their (space-stripped) nomenclature key.
+
+    Sequential star numbers of the v2 family index this deterministic order,
+    which is specific to the independently sourced catalog shipped with this
+    library (the v1 family indexes _ref_sorted_catalog instead).
+    """
+    global _NOMEN_SORTED_CATALOG
+    if _NOMEN_SORTED_CATALOG is None:
+        _NOMEN_SORTED_CATALOG = sorted(
+            STAR_CATALOG, key=lambda e: "".join(e.nomenclature.split())
+        )
+    return _NOMEN_SORTED_CATALOG
+
+
+def _nomen_exact_entry(key: str):
+    """Exact (case-sensitive, space-stripped) nomenclature lookup.
+
+    A Bayer designation without an explicit component letter denotes the
+    system's PRIMARY component, so when several catalog entries share one
+    designation (alpha Centauri A "Rigil Kentaurus" and B "Toliman" both
+    carry "alCen") the brightest entry wins, independently of catalog row
+    order.
+
+    Args:
+        key: Space-stripped nomenclature key (case preserved).
+
+    Returns:
+        The matching StarCatalogEntry, or None.
+    """
+    best = None
+    for entry in STAR_CATALOG:
+        if "".join(entry.nomenclature.split()) == key:
+            if best is None or entry.magnitude < best.magnitude:
+                best = entry
+    return best
+
+
+_NOMEN_UPPER_KEYS: "frozenset[str] | None" = None
+
+
+def _nomen_upper_keys() -> "frozenset[str]":
+    """Uppercased nomenclature keys, used to filter nomen-shaped aliases.
+
+    The compatibility star search resolves a bare string by traditional
+    name only: a bare nomenclature such as "alCen" must NOT resolve (only
+    ",alCen" does). Alias-table keys that merely mirror a catalog
+    nomenclature would defeat that rule, so both resolvers skip them.
+    """
+    global _NOMEN_UPPER_KEYS
+    if _NOMEN_UPPER_KEYS is None:
+        _NOMEN_UPPER_KEYS = frozenset(
+            "".join(e.nomenclature.split()).upper() for e in STAR_CATALOG
+        )
+    return _NOMEN_UPPER_KEYS
+
+
 def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     """Resolve a star with the reference's exact search semantics.
 
     Mirrors the reference resolution rules:
     - leading comma: the rest is a Bayer/Flamsteed nomenclature key,
-      matched exactly (case preserved): ",alTau" -> Aldebaran;
-    - "name,nomenclature": the traditional-name part is ignored and the
-      nomenclature key decides;
+      matched exactly (case preserved): ",alTau" -> Aldebaran; when several
+      entries share the designation the primary (brightest) component wins
+      (",alCen" -> Rigil Kentaurus, not Toliman);
+    - "name,nomenclature": the NAME part decides and the nomenclature part
+      is ignored;
     - leading digit: 1-based sequential number in the sorted catalog;
     - otherwise: traditional-name match (whitespace removed,
       case-insensitive) — exact first, then implicit PREFIX match in
@@ -2724,6 +2787,11 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     if not sstar:
         return -1, "star name empty", None
 
+    # Every v1-family lookup failure uses this one message shape, echoing
+    # the ORIGINAL search string (case and spacing preserved) — including
+    # comma forms and out-of-range sequential numbers.
+    not_found = f"star {star_name} not found"
+
     def _found(entry) -> tuple[int, None, str]:
         return entry.id, None, f"{entry.name},{entry.nomenclature}"
 
@@ -2741,11 +2809,11 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
             sstar = name_part  # fall through to exact traditional-name match
         else:
             if not key:
-                return -1, f"could not find star name {sstar}", None
-            for entry in STAR_CATALOG:
-                if "".join(entry.nomenclature.split()) == key:
-                    return _found(entry)
-            return -1, f"could not find star name ,{key}", None
+                return -1, not_found, None
+            entry = _nomen_exact_entry(key)
+            if entry is not None:
+                return _found(entry)
+            return -1, not_found, None
 
     # Sequential star number.
     if sstar[0].isdigit():
@@ -2758,25 +2826,24 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
         star_nr = int(digits)
         ordered = _ref_sorted_catalog()
         if star_nr < 1 or star_nr > len(ordered):
-            return (
-                -1,
-                f"sequential fixed star number {star_nr} is not available",
-                None,
-            )
+            return -1, not_found, None
         return _found(ordered[star_nr - 1])
 
     # No wildcard handling: the reference's v1 family treats '%' strings
     # as plain (unmatched) names — they fall through to the exact-match
-    # loop below and fail with "could not find star name". The prefix
+    # loop below and fail with the standard not-found error. The prefix
     # wildcard is a v2-only feature.
 
     # Exact traditional-name match. The alias table plays the role of
     # the reference catalog's additional name lines per star, so exact
-    # alias keys resolve too (still no fuzzy or prefix matching).
+    # alias keys resolve too (still no fuzzy matching). Aliases that are
+    # nomen-shaped are skipped: a bare nomenclature must not resolve.
     for entry in STAR_CATALOG:
         if _ref_star_key(entry.name) == sstar:
             return _found(entry)
     for alias, star_id in STAR_ALIASES.items():
+        if "".join(alias.split()).upper() in _nomen_upper_keys():
+            continue
         if _ref_star_key(alias) == sstar:
             for entry in STAR_CATALOG:
                 if entry.id == star_id:
@@ -2791,22 +2858,21 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
         if _ref_star_key(entry.name).startswith(sstar):
             return _found(entry)
 
-    return -1, f"could not find star name {sstar}", None
+    return -1, not_found, None
 
 
 def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
     """
     Resolve a star name to its ID with reference API-compatible name resolution.
 
-    Supports:
-    - Exact star names: "Regulus", "Spica"
-    - Bayer designations: "Alpha Leo", "Alpha Leonis"
-    - Flamsteed numbers: "87 Leo"
-    - Traditional/Arabic names: "Cor Leonis", "Dog Star"
-    - Comma-prefix partial match: ",alg" finds Algol
+    Supports the v1-family search forms (see _resolve_star_ref):
+    - Exact traditional names and aliases: "Regulus", "Dog Star"
+    - Implicit prefix on traditional names: "aldeb" finds Aldebaran
+    - Comma-nomenclature form: ",alTau" (exact nomenclature key)
+    - Sequential star numbers: "12"
 
     Args:
-        star_name: Name of star (e.g. "Regulus", "Alpha Leo", ",alg")
+        star_name: Name of star (e.g. "Regulus", "aldeb", ",alTau")
 
     Returns:
         Tuple of (star_id, error_message, canonical_name).
@@ -3652,196 +3718,142 @@ def _format_star_name(entry: StarCatalogEntry) -> str:
 
 def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]:
     """
-    Resolve a star identifier with flexible lookup for fixstar2 functions.
+    Resolve a star identifier with the v2-family search semantics.
 
-    Supports multiple lookup methods:
-    1. Exact star name (case-insensitive): "Regulus", "SPICA"
-    2. Hipparcos catalog number (as string): "49669", ",49669"
-    3. Hipparcos catalog number with HIP prefix: "HIP 49669", "HIP65474"
-    4. Bayer designation with Greek letter names: "Alpha Leonis", "Beta Persei"
-    5. Flamsteed designation with number + constellation: "32 Leonis", "87 Virginis"
-    6. Partial name search (case-insensitive): "Reg", "pic"
-    7. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
-    8. Format with comma: "Regulus,alLeo" (takes first part)
-    9. Phonetic fuzzy matching for alternate spellings: "Betelgeux", "Formalhaut"
+    Mirrors the reference resolution rules for the v2 family
+    (fixstar2/fixstar2_ut/fixstar2_mag):
+
+    1. Trailing-'%' wildcard: prefix search on the traditional name
+       (case- and whitespace-insensitive) over the sorted catalog.
+    2. Any comma form keys on the Bayer/Flamsteed nomenclature AFTER the
+       comma; the name part is ignored ("Regulus,alVir" -> Spica). The
+       nomenclature is matched exactly, case-sensitively, whitespace
+       stripped; a shared designation resolves to the primary (brightest)
+       component (",alCen" -> Rigil Kentaurus).
+    3. Leading digit: 1-based sequential number in the nomenclature-sorted
+       catalog (trailing non-digits ignored: "2x" -> star #2).
+    4. Otherwise: traditional-name match only — case-insensitive with all
+       whitespace removed ("RigilKentaurus" == "rigil kentaurus"), exact
+       (no implicit prefix or partial matching, no fuzzy matching, and no
+       bare-nomenclature lookup: "alCen" does NOT resolve, ",alCen" does).
+       The alias table and the curated-name table stand in for the
+       alternate traditional-name entries of a star catalog.
 
     Args:
-        star_name: Star identifier - can be name, catalog number, or search string
+        star_name: Star search string (name, ",nomenclature", sequential
+            number, or "prefix%" wildcard)
 
     Returns:
         Tuple of (StarCatalogEntry, error_message). If error, entry is None.
 
     Examples:
         >>> entry, err = _resolve_star2("Regulus")         # Exact name
-        >>> entry, err = _resolve_star2("49669")           # HIP number
-        >>> entry, err = _resolve_star2(",49669")          # HIP with leading comma
-        >>> entry, err = _resolve_star2("HIP 49669")       # HIP with prefix
-        >>> entry, err = _resolve_star2("HIP65474")        # HIP with prefix (no space)
-        >>> entry, err = _resolve_star2("Alpha Leonis")    # Bayer designation
-        >>> entry, err = _resolve_star2("Beta Persei")     # Bayer designation
-        >>> entry, err = _resolve_star2("32 Leonis")       # Flamsteed designation
-        >>> entry, err = _resolve_star2("Reg")             # Partial match
-        >>> entry, err = _resolve_star2("alLeo")           # Nomenclature
+        >>> entry, err = _resolve_star2(",alLeo")          # Nomenclature
+        >>> entry, err = _resolve_star2("Spica,alVir")     # Nomenclature
+        >>> entry, err = _resolve_star2("12")              # Sequential number
+        >>> entry, err = _resolve_star2("Alde%")           # Prefix wildcard
         >>> entry, err = _resolve_star2("Betelgeux")       # Alternate spelling
     """
-    search = star_name.strip()
+    skey = _ref_star_key(star_name)
 
-    if not search:
-        return None, "Empty star name"
+    if not skey:
+        return None, "star name empty"
 
     # Trailing-'%' prefix wildcard on the traditional name — a v2-family
     # feature of the reference API (its v1 family rejects wildcards; see
     # _resolve_star_ref). A '%' anywhere else is an invalid search string.
-    # Ambiguous prefixes resolve to the first match in the library's
-    # sorted catalog, which can differ from the reference's star-file
-    # order for very short prefixes (documented in known-differences).
-    if "%" in search:
-        skey = _ref_star_key(search)
+    # A bare "%" (empty prefix) matches the first sorted entry. Ambiguous
+    # prefixes resolve to the first match in the library's sorted catalog,
+    # which can differ from the reference's star-file order for very short
+    # prefixes (documented in known-differences).
+    if "%" in skey:
         if not skey.endswith("%") or skey.count("%") != 1:
-            return None, f"invalid search string {search}"
+            return None, f"invalid search string {skey}"
         prefix = skey[:-1]
-        if prefix:
-            for entry in _ref_sorted_catalog():
-                if _ref_star_key(entry.name).startswith(prefix):
-                    return entry, None
-        return None, f"could not find star name {search}"
-
-    # Check if it's a catalog number (numeric string, possibly with leading comma)
-    number_search = search.lstrip(",").strip()
-    if number_search.isdigit():
-        hip_number = int(number_search)
-        for entry in STAR_CATALOG:
-            if entry.hip_number == hip_number:
+        for entry in _ref_sorted_catalog():
+            if _ref_star_key(entry.name).startswith(prefix):
                 return entry, None
-        return None, f"could not find star name {hip_number}"
+        return None, f"star search string {skey} did not match"
 
-    # Check for "HIP NNNNN" format (case-insensitive)
-    search_upper_temp = search.upper()
-    if search_upper_temp.startswith("HIP ") or search_upper_temp.startswith("HIP"):
-        # Extract the numeric part after "HIP" (with or without space)
-        hip_part = search[3:].strip()
-        if hip_part.isdigit():
-            hip_number = int(hip_part)
-            for entry in STAR_CATALOG:
-                if entry.hip_number == hip_number:
-                    return entry, None
-            return None, f"could not find star name HIP {hip_number}"
+    # Any comma form keys on the nomenclature after the comma; the name
+    # part is ignored entirely. (The v1 family is the mirror image: it
+    # keys on the name — see _resolve_star_ref.)
+    if "," in skey:
+        _head, _sep, key = skey.partition(",")
+        entry = _nomen_exact_entry(key)
+        if entry is not None:
+            return entry, None
+        return None, f"could not find star name ,{key}"
 
-    # Handle comma-separated format (e.g., "Regulus,alLeo").
-    # The v2 family keys EVERY comma form on the Bayer/Flamsteed
-    # nomenclature after the comma; the name part is ignored entirely.
-    # Matched exactly and
-    # case-sensitively (",alTau" -> Aldebaran; ",ALTAU" -> not found).
-    # (The v1 family is the mirror image: it keys on the name — see
-    # _resolve_star_ref.)
-    if "," in search:
-        _head, _sep, tail = search.partition(",")
-        key = "".join(tail.split())
-        if not key:
-            return None, f"could not find star name {star_name}"
-        for entry in STAR_CATALOG:
-            if "".join(entry.nomenclature.split()) == key:
-                return entry, None
-        return None, f"could not find star name {star_name}"
+    # Sequential star number (leading digits; the rest is ignored).
+    if skey[0].isdigit():
+        digits = ""
+        for ch in skey:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        star_nr = int(digits)
+        ordered = _nomen_sorted_catalog()
+        # "0" is not a sequential number at all (plain not-found), while an
+        # index past the catalog end gets the dedicated message.
+        if star_nr < 1:
+            return None, f"could not find star name {skey}"
+        if star_nr > len(ordered):
+            return None, f"sequential fixed star number {star_nr} is not available"
+        return ordered[star_nr - 1], None
 
-    search_upper = search.upper()
-
-    # 1. Try exact name match (case-insensitive)
+    # 1. Exact traditional-name match (case- and whitespace-insensitive).
     for entry in STAR_CATALOG:
-        if entry.name.upper() == search_upper:
+        if _ref_star_key(entry.name) == skey:
             return entry, None
 
-    # 2. Try exact nomenclature match (case-insensitive)
-    for entry in STAR_CATALOG:
-        if entry.nomenclature.upper() == search_upper:
-            return entry, None
-
-    # 2b. Try exact alias match. Alternate spellings and traditional names
-    # (e.g. "Betelgeux", "Beetlejuice", "Formalhaut") are explicit aliases,
-    # so they resolve exactly here rather than by a lossy fuzzy guess below.
-    alias_id = _STAR_ALIASES_UPPER.get(search_upper)
-    if alias_id is not None:
-        for entry in STAR_CATALOG:
-            if entry.id == alias_id:
-                return entry, None
-
-    # 2c. Curated traditional-name corrections (HIP-keyed, stable across
-    # regen). Resolves names that are not catalog entry names or aliases to the
-    # correct star (e.g. "Alaraph" -> beta Vir / Zavijava, "Atri" -> delta UMa
-    # / Megrez), overriding the looser prefix tiers below.
-    fix_hip = _NAME_HIP_FIX.get(search_upper)
-    if fix_hip is not None:
-        fix_entry = _HIP_TO_ENTRY.get(fix_hip)
-        if fix_entry is not None:
-            return fix_entry, None
-
-    # 3. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
-    parsed_nomenclature = _parse_bayer_designation(search)
-    if parsed_nomenclature:
-        for entry in STAR_CATALOG:
-            if entry.nomenclature.upper() == parsed_nomenclature.upper():
-                return entry, None
-
-    # 3b. Try Flamsteed designation (e.g., "32 Leonis", "87 Virginis")
-    parsed_flamsteed = _parse_flamsteed_designation(search)
-    if parsed_flamsteed:
-        # Look up in STAR_ALIASES using the normalized format (e.g., "32 LEO")
-        if parsed_flamsteed in STAR_ALIASES:
-            star_id = STAR_ALIASES[parsed_flamsteed]
+    # 2. Exact alias match. Alternate spellings and traditional names
+    # (e.g. "Betelgeux", "Formalhaut") are explicit aliases standing in
+    # for a catalog's additional name entries. Nomen-shaped alias keys
+    # are skipped: a bare nomenclature must not resolve.
+    for alias, alias_id in STAR_ALIASES.items():
+        if "".join(alias.split()).upper() in _nomen_upper_keys():
+            continue
+        if _ref_star_key(alias) == skey:
             for entry in STAR_CATALOG:
-                if entry.id == star_id:
+                if entry.id == alias_id:
                     return entry, None
 
-    # 4. Try partial name match (prefix search, case-insensitive)
-    matches: List[StarCatalogEntry] = []
-    for entry in STAR_CATALOG:
-        if entry.name.upper().startswith(search_upper):
-            matches.append(entry)
+    # 3. Curated traditional-name corrections (HIP-keyed, stable across
+    # regen). Resolves names that are not catalog entry names or aliases to
+    # the correct star (e.g. "Alaraph" -> beta Vir / Zavijava, "Atri" ->
+    # delta UMa / Megrez).
+    for fix_name, fix_hip in _NAME_HIP_FIX.items():
+        if "".join(fix_name.split()).lower() == skey:
+            fix_entry = _HIP_TO_ENTRY.get(fix_hip)
+            if fix_entry is not None:
+                return fix_entry, None
+            break
 
-    if len(matches) == 1:
-        return matches[0], None
-    elif len(matches) > 1:
-        names = ", ".join(m.name for m in matches)
-        return None, f"Ambiguous star name '{star_name}' matches: {names}"
-
-    # 5. Try partial nomenclature match
-    for entry in STAR_CATALOG:
-        if entry.nomenclature.upper().startswith(search_upper):
-            matches.append(entry)
-
-    if len(matches) == 1:
-        return matches[0], None
-    elif len(matches) > 1:
-        names = ", ".join(m.name for m in matches)
-        return None, f"Ambiguous star name '{star_name}' matches: {names}"
-
-    # No substring-anywhere or phonetic fuzzy fallback here: those tiers
-    # silently returned an unrelated but similarly-spelled star (e.g.
-    # "Chort"->kaRet, "Pushya"->psHya, "Messier 42"->muSer, "Alrai"->Cebalrai)
-    # for any valid name absent from this catalog, diverging from the reference
-    # ephemeris (which errors on unknown names). Legitimate alternate
-    # spellings are handled by the exact-alias tier above; an unresolved name
-    # now returns an honest error instead of a wrong star.
-    return None, f"could not find star name {star_name.lower()}"
+    # No prefix, partial, nomenclature, catalog-number, Bayer-word or
+    # phonetic-fuzzy tiers here: the reference v2 search errors on all of
+    # those bare forms, and a lossy guess would return a wrong star.
+    return None, f"could not find star name {skey}"
 
 
 def fixstar2_ut(
     star: str, tjdut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
-    Calculate position of a fixed star for Universal Time with flexible lookup.
+    Calculate position of a fixed star for Universal Time (v2 search).
 
-    Enhanced version of fixstar_ut() that supports flexible star lookup:
-    - Star name (full or partial): "Regulus", "Reg"
-    - Hipparcos catalog number: "49669", ",49669"
-    - Hipparcos with HIP prefix: "HIP 49669", "HIP65474"
-    - Bayer/Flamsteed designation: "alLeo", "alVir"
+    Uses the v2-family search semantics (see _resolve_star2):
+    - Traditional star name, exact: "Regulus", "rigil kentaurus"
+    - Nomenclature after a comma: ",alLeo", "Spica,alVir"
+    - Sequential catalog number: "12"
+    - Trailing-'%' prefix wildcard: "Alde%"
 
     Returns the position and full star name, allowing identification
-    of which star was matched when using partial searches.
+    of which star was matched when using wildcard searches.
 
     Args:
-        star: Star identifier (name, catalog number, or partial search)
+        star: Star search string (name, ",nomenclature", number, "prefix%")
         tjdut: Julian Day in Universal Time (UT1)
         flags: Calculation flags
 
@@ -3860,12 +3872,12 @@ def fixstar2_ut(
         using Delta T before calculating the star position.
 
     Example:
-        >>> pos, name, retflag = fixstar2_ut("Reg", 2451545.0, 0)
+        >>> pos, name, retflag = fixstar2_ut("Regulus", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo"
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
 
-        >>> pos, name, retflag = fixstar2_ut("49669", 2451545.0, 0)
-        >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
+        >>> pos, name, retflag = fixstar2_ut(",alVir", 2451545.0, 0)
+        >>> print(name)  # "Spica,alVir" (looked up by nomenclature)
     """
     _fe = _fixed_epoch_star_call(fixstar2_ut, star, tjdut, flags, flexible_lookup=True)
     if _fe is not None:
@@ -3919,18 +3931,19 @@ def fixstar2(
     star: str, tjdet: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
-    Calculate position of a fixed star for Terrestrial Time with flexible lookup.
+    Calculate position of a fixed star for Terrestrial Time (v2 search).
 
-    Enhanced version of fixstar() that supports flexible star lookup:
-    - Star name (full or partial): "Regulus", "Reg"
-    - Hipparcos catalog number: "49669", ",49669"
-    - Bayer/Flamsteed designation: "alLeo", "alVir"
+    Uses the v2-family search semantics (see _resolve_star2):
+    - Traditional star name, exact: "Regulus", "rigil kentaurus"
+    - Nomenclature after a comma: ",alLeo", "Spica,alVir"
+    - Sequential catalog number: "12"
+    - Trailing-'%' prefix wildcard: "Alde%"
 
     Returns the position and full star name, allowing identification
-    of which star was matched when using partial searches.
+    of which star was matched when using wildcard searches.
 
     Args:
-        star: Star identifier (name, catalog number, or partial search)
+        star: Star search string (name, ",nomenclature", number, "prefix%")
         tjdet: Julian Day in Terrestrial Time (TT/ET)
         flags: Calculation flags
 
@@ -3953,8 +3966,8 @@ def fixstar2(
         >>> print(name)  # "Spica,alVir"
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
 
-        >>> pos, name, retflag = fixstar2("65474", 2451545.0, 0)
-        >>> print(name)  # "Spica,alVir" (looked up by HIP number)
+        >>> pos, name, retflag = fixstar2(",alVir", 2451545.0, 0)
+        >>> print(name)  # "Spica,alVir" (looked up by nomenclature)
     """
     _fe = _fixed_epoch_star_call(
         fixstar2,
@@ -5183,12 +5196,13 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
 
 def fixstar2_mag(star: str) -> Tuple[float, str]:
     """
-    Get the visual magnitude of a fixed star with flexible lookup.
+    Get the visual magnitude of a fixed star with the v2 search.
 
-    Enhanced version that supports flexible star lookup like fixstar2:
-    - Star name (full or partial): "Regulus", "Reg"
-    - Hipparcos catalog number: "49669", ",49669"
-    - Bayer/Flamsteed designation: "alLeo", "alVir"
+    Uses the v2-family search semantics like fixstar2 (see _resolve_star2):
+    - Traditional star name, exact: "Regulus"
+    - Nomenclature after a comma: ",alLeo"
+    - Sequential catalog number: "12"
+    - Trailing-'%' prefix wildcard: "Regu%"
 
     Returns the magnitude and the full star name, useful for
     visibility calculations where position is not needed.
@@ -5197,7 +5211,7 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
     raises Error if the star is not found.
 
     Args:
-        star: Star identifier (name, catalog number, or partial search)
+        star: Star search string (name, ",nomenclature", number, "prefix%")
 
     Returns:
         Tuple containing:
@@ -5209,10 +5223,10 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
         Error: If the star cannot be found.
 
     Example:
-        >>> mag, name = fixstar2_mag("Reg")
+        >>> mag, name = fixstar2_mag("Regulus")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
 
-        >>> mag, name = fixstar2_mag("49669")
+        >>> mag, name = fixstar2_mag(",alLeo")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
     """
     entry, error = _resolve_star2(star)

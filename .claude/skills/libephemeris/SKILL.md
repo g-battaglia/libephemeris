@@ -210,5 +210,5 @@ centre offset on top.
 - `references/tiers-and-coverage.md` — tiers, best-by-date routing, `data-v3`
   artifact set, `get_body_coverage` / `BodyCoverage`, `get_leb_inventory`,
   provisioning, and the full error contract.
-- `references/pyswisseph-compat.md` — drop-in migration, naming, argument-order
+- `references/reference-api-compat.md` — drop-in migration, naming, argument-order
   gotchas, return shapes, flags, and the documented intentional divergences.

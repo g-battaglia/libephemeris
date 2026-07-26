@@ -3994,19 +3994,28 @@ def _resolve_tier(args) -> Tuple[float, float, str]:
         exact_tier_start = DE441_START_JD
         exact_tier_end = DE441_END_JD
 
+    # Tier-default year bounds carry a one-day margin on each side so the
+    # advertised calendar range stays fully usable at its boundary instants:
+    # a UT request at the end boundary converts to TT past it, and
+    # light-time retardation samples the source slightly before the start.
+    # Explicit --start/--end/--start-jd/--end-jd keep their exact calendar
+    # semantics. Requests that exceed the actual DE kernel coverage are
+    # narrowed by the source-backed grid resolver, never extrapolated.
+    start_margin = 1.0 if args.start is None else 0.0
+    end_margin = 1.0 if args.end is None else 0.0
     jd_start = (
         float(args.start_jd)
         if args.start_jd is not None
         else exact_tier_start
         if exact_tier_start is not None
-        else _year_to_jd(start_year)
+        else _year_to_jd(start_year) - start_margin
     )
     jd_end = (
         float(args.end_jd)
         if args.end_jd is not None
         else exact_tier_end
         if exact_tier_end is not None
-        else _year_to_jd(end_year)
+        else _year_to_jd(end_year) + end_margin
     )
     if jd_start >= jd_end:
         raise SystemExit("generation start must be before generation end")

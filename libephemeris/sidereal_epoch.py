@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Fixed-epoch sidereal modes (SIDM_J2000 / J1900 / B1950).
+"""Fixed-epoch sidereal modes (SIDM_J2000 / J1900 / B1950 / GALALIGN_MARDYKS).
 
 These modes express positions on the mean ecliptic and equinox of a reference
 epoch rather than applying only a scalar longitude offset:
@@ -11,6 +11,11 @@ epoch rather than applying only a scalar longitude offset:
   additionally precessed (Vondrák 2011 chain) to the mean frame of t0 and,
   for ecliptic output, rotated onto the mean ecliptic of t0 (IAU 2006 mean
   obliquity at t0).
+- ``SIDM_GALALIGN_MARDYKS``: the same t0-frame construction anchored at the
+  mode's defining epoch (September equinox 1998), with the defining 30
+  degree ayanamsha subtracted from the ecliptic channels (spherical
+  longitude and ecliptic XYZ alike). The equatorial channels are the plain
+  mean equator/equinox of t0 without the longitude offset.
 The returned flags echo the caller's flags with ``FLG_NONUT`` added (the
 reference does the same; the internal ``FLG_J2000`` bit is not echoed).
 
@@ -35,6 +40,7 @@ from typing import Tuple
 import erfa
 import numpy as np
 
+from .ayanamsha_definitions import MARDYKS_DEFINING
 from .constants import (
     FLG_EQUATORIAL,
     FLG_J2000,
@@ -43,6 +49,7 @@ from .constants import (
     FLG_SIDEREAL,
     FLG_XYZ,
     SIDM_B1950,
+    SIDM_GALALIGN_MARDYKS,
     SIDM_J1900,
     SIDM_J2000,
 )
@@ -68,6 +75,14 @@ FIXED_EPOCH_T0 = {
     SIDM_J2000: _J2000,
     SIDM_J1900: _julian_epoch_jd(1900.0),
     SIDM_B1950: _besselian_epoch_jd(1950.0),
+    SIDM_GALALIGN_MARDYKS: MARDYKS_DEFINING[1],
+}
+
+# Constant ecliptic-longitude offset of the t0 frame in degrees (the mode's
+# defining ayanamsha at t0). Subtracted from the ecliptic channels only; the
+# equatorial output stays the plain mean equator/equinox of t0.
+FIXED_EPOCH_LON_OFFSET = {
+    SIDM_GALALIGN_MARDYKS: MARDYKS_DEFINING[0],
 }
 
 
@@ -101,7 +116,8 @@ def _epoch_matrices(sid_mode: int) -> Tuple[np.ndarray, np.ndarray]:
     Both are identity for SIDM_J2000.
     """
     t0 = FIXED_EPOCH_T0[sid_mode]
-    if t0 == _J2000:
+    lon_offset = FIXED_EPOCH_LON_OFFSET.get(sid_mode, 0.0)
+    if t0 == _J2000 and lon_offset == 0.0:
         eye = np.eye(3)
         return eye, eye
     v_t0 = np.array(vondrak_precession_matrix(t0))
@@ -110,6 +126,8 @@ def _epoch_matrices(sid_mode: int) -> Tuple[np.ndarray, np.ndarray]:
     eps_j2k = erfa.obl06(_J2000, 0.0)
     eps_t0 = erfa.obl06(t0, 0.0)
     m_ecl = _rot_x(eps_t0) @ m_eq @ _rot_x(-eps_j2k)
+    if lon_offset:
+        m_ecl = _rot_z(math.radians(lon_offset)) @ m_ecl
     return m_eq, m_ecl
 
 
@@ -117,6 +135,12 @@ def _rot_x(angle_rad: float) -> np.ndarray:
     """Return the passive x-axis rotation matrix used for ecliptic frames."""
     c, s = math.cos(angle_rad), math.sin(angle_rad)
     return np.array([[1.0, 0.0, 0.0], [0.0, c, s], [0.0, -s, c]])
+
+
+def _rot_z(angle_rad: float) -> np.ndarray:
+    """Return the passive z-axis rotation (subtracts the angle from longitudes)."""
+    c, s = math.cos(angle_rad), math.sin(angle_rad)
+    return np.array([[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]])
 
 
 def _rotate_spherical(

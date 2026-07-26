@@ -97,13 +97,29 @@ J2000 = 2451545.0
 
 _SUPPORTED_IDS = {
     *range(CUPIDO, POSEIDON + 1),
+    ISIS,
     HARRINGTON,
     NEPTUNE_LEVERRIER,
     NEPTUNE_ADAMS,
     PLUTO_LOWELL,
+    PLUTO_PICKERING,
+    VULCAN,
     WHITE_MOON,
+    PROSERPINA,
 }
 _UNSUPPORTED_IDS = set(range(CUPIDO, WALDEMATH + 1)) - _SUPPORTED_IDS
+
+# Reviewed literal transcriptions of one identified primary publication.
+_PRIMARY_TRANSCRIPTION_IDS = {
+    *range(CUPIDO, POSEIDON + 1),
+    HARRINGTON,
+    NEPTUNE_LEVERRIER,
+    NEPTUNE_ADAMS,
+    PLUTO_LOWELL,
+    PLUTO_PICKERING,
+}
+# Published conventions realized from documented public sources.
+_PUBLISHED_MODEL_IDS = {ISIS, VULCAN, WHITE_MOON, PROSERPINA}
 
 _RC7_LEGACY_PUBLIC_NAMES = {
     "ADMETOS_KEPLERIAN_ELEMENTS",
@@ -127,26 +143,32 @@ _RC7_LEGACY_PUBLIC_NAMES = {
 }
 
 
-def test_builtin_tables_contain_only_primary_transcriptions() -> None:
+def test_builtin_tables_contain_only_sourced_models() -> None:
     assert set(URANIAN_ELEMENTS) == set(range(CUPIDO, POSEIDON + 1))
     assert set(URANIAN_KEPLERIAN_ELEMENTS) == set(range(CUPIDO, POSEIDON + 1))
-    assert HYPOTHETICAL_ELEMENTS == {}
+    assert set(HYPOTHETICAL_ELEMENTS) == {ISIS, PROSERPINA}
     assert type(TRANSPLUTO_KEPLERIAN_ELEMENTS) is TransplutoKeplerianElements
     assert TRANSPLUTO_KEPLERIAN_ELEMENTS.name == "Transpluto"
+    assert HYPOTHETICAL_ELEMENTS[ISIS] is TRANSPLUTO_KEPLERIAN_ELEMENTS
     assert set(FICTITIOUS_ORBITAL_ELEMENTS) == {
         HARRINGTON,
         NEPTUNE_LEVERRIER,
         NEPTUNE_ADAMS,
         PLUTO_LOWELL,
+        PLUTO_PICKERING,
     }
     assert VULCAN_ELEMENTS.name == "Vulcan"
     assert WALDEMATH_ELEMENTS.name == "Waldemath"
     assert set(HYPOTHETICAL_PROVENANCE) == set(range(CUPIDO, WALDEMATH + 1))
+    assert _PRIMARY_TRANSCRIPTION_IDS | _PUBLISHED_MODEL_IDS == _SUPPORTED_IDS
     assert all(
         HYPOTHETICAL_PROVENANCE[body_id][0] == "primary-transcription"
-        for body_id in _SUPPORTED_IDS - {WHITE_MOON}
+        for body_id in _PRIMARY_TRANSCRIPTION_IDS
     )
-    assert HYPOTHETICAL_PROVENANCE[WHITE_MOON][0] == "published-model"
+    assert all(
+        HYPOTHETICAL_PROVENANCE[body_id][0] == "published-model"
+        for body_id in _PUBLISHED_MODEL_IDS
+    )
     assert all(
         HYPOTHETICAL_PROVENANCE[body_id][0] == "unsupported"
         for body_id in _UNSUPPORTED_IDS
@@ -187,7 +209,7 @@ def test_removed_element_constants_are_exported_at_package_import() -> None:
     assert ephem.PICKERING_PLANET_X_ELEMENTS is PICKERING_PLANET_X_ELEMENTS
     assert ephem.TransplutoKeplerianElements is TransplutoKeplerianElements
     assert set(URANIAN_KEPLERIAN_ELEMENTS) == set(range(CUPIDO, POSEIDON + 1))
-    assert HYPOTHETICAL_ELEMENTS == {}
+    assert set(HYPOTHETICAL_ELEMENTS) == {ISIS, PROSERPINA}
 
 
 def test_legacy_public_element_objects_reflect_reviewed_or_unavailable_state() -> None:
@@ -211,21 +233,23 @@ def test_legacy_public_element_objects_reflect_reviewed_or_unavailable_state() -
         assert values
         assert all(math.isfinite(value) for value in values.values())
 
-    assert all(
-        math.isfinite(value)
-        for name, value in vars(LOWELL_PLANET_X_ELEMENTS).items()
-        if name != "name"
-    )
-    for elements in (
+    for finite_elements in (
+        LOWELL_PLANET_X_ELEMENTS,
         TRANSPLUTO_KEPLERIAN_ELEMENTS,
         PICKERING_PLANET_X_ELEMENTS,
         VULCAN_ELEMENTS,
-        WALDEMATH_ELEMENTS,
     ):
-        values = vars(elements).copy()
-        assert isinstance(values.pop("name"), str)
-        assert values
-        assert all(math.isnan(value) for value in values.values())
+        assert all(
+            math.isfinite(value)
+            for name, value in vars(finite_elements).items()
+            if name != "name"
+        )
+    # Waldemath remains the single explicit NaN sentinel: no public element
+    # set has been recovered for it.
+    values = vars(WALDEMATH_ELEMENTS).copy()
+    assert isinstance(values.pop("name"), str)
+    assert values
+    assert all(math.isnan(value) for value in values.values())
 
 
 def test_rc7_legacy_public_names_are_real_module_level_definitions() -> None:
@@ -262,7 +286,9 @@ def test_reviewed_position_is_finite_and_continuous(body_id: int) -> None:
     assert -90.0 <= position[1] <= 90.0
     assert position[2] > 0.0
     delta = ((later[0] - position[0] + 180.0) % 360.0) - 180.0
-    assert abs(delta) < 1.0
+    # Weston's Vulcan is the single fast body (~19.4 deg/day sidereal); all
+    # other supported hypotheticals move well under a degree per day.
+    assert abs(delta) < (25.0 if body_id == VULCAN else 1.0)
 
 
 @pytest.mark.parametrize(
@@ -279,13 +305,8 @@ def test_recognised_but_unverified_ids_raise_unknown_body(body_id: int) -> None:
 @pytest.mark.parametrize(
     ("function", "body_id"),
     [
-        (calc_transpluto, ISIS),
-        (calc_transpluto_position, ISIS),
-        (calc_vulcan, VULCAN),
-        (calc_proserpina, PROSERPINA),
         (calc_waldemath, WALDEMATH),
         (calc_waldemath_position, WALDEMATH),
-        (calc_planet_x_pickering, PLUTO_PICKERING),
     ],
 )
 def test_unverified_named_entry_points_raise(function: object, body_id: int) -> None:
@@ -306,8 +327,13 @@ def test_unverified_named_entry_points_raise(function: object, body_id: int) -> 
         (calc_admetos, ADMETOS),
         (calc_vulkanus, VULKANUS),
         (calc_poseidon, POSEIDON),
+        (calc_transpluto, ISIS),
+        (calc_transpluto_position, ISIS),
         (calc_planet_x_lowell, PLUTO_LOWELL),
+        (calc_planet_x_pickering, PLUTO_PICKERING),
+        (calc_vulcan, VULCAN),
         (calc_white_moon_position, WHITE_MOON),
+        (calc_proserpina, PROSERPINA),
     ],
 )
 def test_reviewed_named_entry_points_return_finite_state(
