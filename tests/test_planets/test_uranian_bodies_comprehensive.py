@@ -19,10 +19,9 @@ from libephemeris.exceptions import UnknownBodyError
 
 UNVERIFIED_FICTITIOUS_BODIES = [
     (49, "Nibiru"),
-    (58, "Waldemath"),
 ]
 
-REVIEWED_FICTITIOUS_BODIES = [*range(40, 49), *range(50, 58)]
+REVIEWED_FICTITIOUS_BODIES = [*range(40, 49), *range(50, 59)]
 
 
 @pytest.mark.unit

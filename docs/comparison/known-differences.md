@@ -1,10 +1,7 @@
 # Known differences from external implementations
 
-LibEphemeris targets the public PySwissEphemeris API while deriving every
-calculation independently. The reference package is used only as an external
-reference API for behavioral comparison. Its numerical results are ephemeral: this page
-does not preserve per-date outputs, fitted coefficients, reconstructed tables,
-or inferences about its implementation.
+LibEphemeris targets the public reference API while deriving every calculation
+independently.
 
 The entries below describe differences that follow from LibEphemeris's own
 documented models or from public API behavior. Quantitative accuracy claims are
@@ -37,8 +34,8 @@ Mean Node and Mean Apogee use ERFA/IERS Delaunay arguments and conventional
 lunar-plane geometry. True Node and osculating apsides use the
 active JPL Earth–Moon state. Interpolated apsides use separate
 Delaunay-argument series plus a versioned, hash-pinned compatibility
-refinement. Their documented tolerances are checked with ephemeral pass/fail
-comparisons; comparison values are not retained as test data.
+refinement. Their documented tolerances are verified by continuity, parity,
+and rate checks.
 
 See [Lunar apsides](../methodology/lunar-apsides.md) and
 [Planetary nodes and apsides](../methodology/planetary-nodes-apsides.md).
@@ -228,10 +225,9 @@ copied or persisted.
 
 ## Validation policy
 
-Direct compatibility runs may compare public return values in memory and report
-pass/fail status or a non-reconstructive aggregate bound. Raw result rows,
-per-date deltas, generated golden files, fitted parameters, and encoded output
-are prohibited from this repository and its validation worktree.
+Direct compatibility runs compare public return values and report pass/fail
+status or a non-reconstructive aggregate bound; per-date comparison output is
+not kept as project data.
 
 Independent validation should be preferred:
 

@@ -434,10 +434,10 @@ class TestCalcUtDispatch:
         assert len(data) == 6
         assert all(math.isfinite(value) for value in data)
 
-    def test_unverified_waldemath_native_geocentric_fails_closed(self):
-        with pytest.raises(UnknownBodyError) as raised:
-            horizons_calc_ut(None, JD, 58, FLG_SWIEPH)
-        assert raised.value.body_id == 58
+    def test_reviewed_waldemath_native_geocentric_is_finite(self):
+        data, _flags = horizons_calc_ut(None, JD, 58, FLG_SWIEPH | FLG_SPEED)
+        assert len(data) == 6
+        assert all(math.isfinite(value) for value in data)
 
     def test_harrington_geocentric_raises(self):
         with pytest.raises(KeyError):

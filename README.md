@@ -53,10 +53,10 @@ This is an enforced engineering contract, not a general aspiration:
   a vendored component lacks its upstream/license, or a citation is replaced
   by a vague placeholder.
 
-Public API compatibility is kept separate from scientific provenance. Public
-behavior may be measured ephemerally for regression testing, but those outputs
-are never stored as model data or fitted into coefficients. The detailed policy
-is in [Independence and Methodology](docs/methodology/independence.md).
+Public API compatibility is kept separate from scientific provenance: every
+calculation is derived from published standards and JPL data, independently of
+the compatibility surface. The methodology is described in
+[Independence and Methodology](docs/methodology/independence.md).
 
 “Public source” means independently identifiable and citable. Some standards,
 books, and papers retain their publishers' copyright; LibEphemeris uses the
@@ -184,8 +184,8 @@ Choose your trade-off between speed, locality, and setup. The same `calc_ut()` i
 | Mode | Backend | Speed | Use case |
 |------|---------|-------|----------|
 | `"auto"` | LEB -> Horizons -> Skyfield | adaptive | **Default.** Best onboarding; resolves local or remote data transparently |
-| `"skyfield"` | JPL DE440/DE441 via Skyfield | ~120 us | High-precision local JPL workflow |
-| `"leb"` | Sealed LEB plus declared local models | ~5 us | Offline, source-pure repeated calculations; never opens JPL/BSP |
+| `"skyfield"` | JPL DE440/DE441 via Skyfield | order of 1 ms/call | High-precision local JPL workflow |
+| `"leb"` | Sealed LEB plus declared local models | order of 100 µs/call | Offline, source-pure repeated calculations; never opens JPL/BSP |
 | `"horizons"` | NASA JPL Horizons REST API | ~300 ms | No local ephemeris files required |
 
 ```python
@@ -238,7 +238,7 @@ libephemeris download extended     # DE441 core span; minor-body ranges vary
 - [Computation Tracing](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/tracing.md) - discover which backend computed each body
 - [Complete API Reference](https://github.com/g-battaglia/libephemeris/blob/main/docs/api_reference.rst) - every public function, class, and constant with signatures and examples
 - [Precision Report](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/precision.md) - models chosen and measured accuracy for every calculation
-- [Compatibility Comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md) - API semantics, known differences, intentional divergences, and clean-room validation policy
+- [Compatibility Comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md) - API semantics, known differences, intentional divergences, and independent validation methodology
 - [Long-term sidereal time, precession & cusp speeds](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/sidereal-time-longterm.md) - why houses and cusp speeds stay correct over ±13,000 years
 - [Delta T (ΔT)](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/delta-t.md) - the multi-era ΔT model (IERS + Stephenson-Morrison-Hohenkerk 2016 / Morrison 2021), why it is piecewise, and the model selector
 - [Flag Reference](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/flags.md) - all supported flags with examples

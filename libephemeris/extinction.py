@@ -22,10 +22,22 @@ The extinction coefficient k is composed of:
 - Ozone absorption: small contribution, ~0.016 mag/airmass
 
 References:
-    - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-    - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction"
+    - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes", PASP 102,
+      212-229, DOI 10.1086/132629
+    - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction",
+      International Comet Quarterly 14, 55-59
+    - Hayes, D.S. & Latham, D.W. (1975) "A rediscussion of the atmospheric
+      extinction and the absolute spectral-energy distribution of Vega",
+      ApJ 197, 593-601 (V-band Rayleigh coefficient)
+    - Angstrom, A. (1929) "On the atmospheric transmission of sun radiation
+      and on dust in the air", Geografiska Annaler 11, 156-166 (aerosol
+      wavelength power law)
+    - Koschmieder, H. (1924) "Theorie der horizontalen Sichtweite", Beitr.
+      Phys. freien Atmos. 12, 33-53 (visibility-range relation)
     - Young, A.T. (1974) "Observational Technique and Data Reduction"
-    - Kasten, F. & Young, A.T. (1989) "Revised optical air mass tables"
+    - Kasten, F. & Young, A.T. (1989) "Revised optical air mass tables and
+      approximation formula", Applied Optics 28, 4735-4738,
+      DOI 10.1364/AO.28.004735
 
 Provenance:
     Rayleigh, aerosol, ozone, water-vapour, and airmass relations are empirical
@@ -179,10 +191,14 @@ def calc_rayleigh_coefficient(
         0.359...  # Higher extinction for blue light
 
     References:
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+        - Hayes, D.S. & Latham, D.W. (1975), ApJ 197, 593-601 (V-band
+          sea-level Rayleigh coefficient 0.1451 mag/airmass)
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes", PASP 102,
+          212-229
         - Young, A.T. (1974) "Observational Technique and Data Reduction"
     """
-    # Reference values
+    # Reference values. The V-band sea-level Rayleigh coefficient 0.1451
+    # mag/airmass comes from Hayes & Latham (1975), ApJ 197, 593.
     k_ref = 0.1451  # Rayleigh coefficient at sea level, V-band
     wavelength_ref = 550.0  # V-band reference wavelength
 
@@ -224,31 +240,39 @@ def calc_aerosol_coefficient(
         and wavelength provide the estimate.
 
     References:
-        Schaefer (1990), *Telescopic Limiting Magnitudes*; Green (1992),
-        *Magnitude Corrections for Atmospheric Extinction*.
+        Koschmieder, H. (1924), Beitr. Phys. freien Atmos. 12, 33-53, and
+        Green, D.W.E. (1992), International Comet Quarterly 14, 55-59, for the
+        visibility-range aerosol relation; Angstrom, A. (1929), Geografiska
+        Annaler 11, 156-166, for the aerosol wavelength power law. The
+        humidity/altitude fallback below is a project-calibrated estimate.
     """
     if visibility_km is not None and visibility_km > 0:
-        # Direct calculation from meteorological visibility
-        # Using Koschmieder formula: V = 3.912 / beta
-        # where beta is extinction coefficient per km
-        # Convert to mag/airmass
+        # Direct calculation from meteorological visibility using the
+        # Koschmieder (1924) relation V = 3.912 / beta (beta = extinction per
+        # unit path); the standard ICQ extinction procedure of Green (1992)
+        # uses the same 3.912 constant. The molecular part (~0.1066
+        # mag/airmass at V) is removed to leave the aerosol coefficient.
         k_aerosol = 3.912 / visibility_km - 0.1066
         return max(0.0, k_aerosol)
 
-    # Aerosol scale height (aerosols concentrated in lower atmosphere)
+    # Aerosol scale height: aerosols are concentrated in the lower troposphere
+    # (order 1-2 km; e.g. Allen, "Astrophysical Quantities").
     aerosol_scale_height = 1500.0  # meters
 
-    # Base aerosol coefficient (clean atmosphere)
+    # Base aerosol coefficient for a clean atmosphere at V. Aerosol extinction
+    # follows the Angstrom (1929) turbidity power law; 0.08 mag/airmass is a
+    # project-chosen clear-air baseline.
     k_base = 0.08
 
-    # Humidity factor (hygroscopic growth of aerosols)
+    # Humidity factor (project-calibrated hygroscopic-growth term).
     humidity_fraction = humidity_percent / 100.0
     humidity_factor = 1.0 + 2.0 * humidity_fraction**2
 
     # Altitude factor (aerosols decrease exponentially with altitude)
     altitude_factor = math.exp(-altitude_m / aerosol_scale_height)
 
-    # Wavelength dependence (weaker than Rayleigh: ~lambda^-1.3)
+    # Wavelength dependence: Angstrom (1929) power law, exponent ~1.3 (weaker
+    # than Rayleigh's lambda^-4).
     wavelength_factor = (WAVELENGTH_V / wavelength_nm) ** 1.3
 
     return k_base * humidity_factor * altitude_factor * wavelength_factor
@@ -269,8 +293,12 @@ def calc_ozone_coefficient(wavelength_nm: float = WAVELENGTH_V) -> float:
         Typically 0.01-0.04 for visual wavelengths.
 
     Algorithm:
-        Ozone absorption has a complex wavelength dependence.
-        For visual wavelengths, we use an empirical approximation.
+        Ozone absorption has a complex wavelength dependence (strong Hartley/
+        Huggins bands in the UV, weaker Chappuis bands near 600 nm). The
+        piecewise values returned here are a project-calibrated step
+        approximation; the ~0.016 mag/airmass V-band figure matches the small,
+        roughly constant visual-band value used by Schaefer (1990), PASP 102,
+        212.
 
     Example:
         >>> calc_ozone_coefficient(550.0)  # V-band
@@ -311,6 +339,11 @@ def calc_water_vapor_coefficient(
     Returns:
         Water vapor absorption coefficient in magnitudes per airmass.
         Typically very small (<0.01) for visual wavelengths.
+
+    Note:
+        The piecewise per-band coefficients (linearly scaled by humidity) are
+        a project-calibrated approximation. Water-vapour absorption is
+        negligible in the blue-green and grows into the red/near-IR bands.
 
     Example:
         >>> calc_water_vapor_coefficient(50.0, 15.0, 550.0)
@@ -569,9 +602,11 @@ def get_extinction_for_heliacal(
 #   - Astronomical twilight: Sun altitude -12° to -18°
 #
 # The model is based on the work of:
-#   - Patat, F. (2003) "UBVRI twilight sky brightness at ESO-Paranal"
-#   - Krisciunas, K. & Schaefer, B.E. (1991) "A model of the brightness of moonlight"
-#   - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
+#   - Patat, F. (2003) "UBVRI twilight sky brightness at ESO-Paranal",
+#     A&A 400, 1183-1198
+#   - Krisciunas, K. & Schaefer, B.E. (1991) "A model of the brightness of
+#     moonlight", PASP 103, 1033-1039, DOI 10.1086/132921
+#   - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes", PASP 102, 212-229
 #   - Rozenberg, G.V. (1966) "Twilight: A Study in Atmospheric Optics"
 # =============================================================================
 
@@ -586,8 +621,11 @@ TWILIGHT_ASTRONOMICAL_END = -18.0  # End of astronomical twilight (full darkness
 DARK_SKY_BRIGHTNESS_V = 21.7  # Typical dark sky, V-band
 ZENITH_DARK_SKY = 21.9  # Zenith dark sky brightness
 
-# Twilight sky brightness at key Sun altitudes (approximate, V-band)
-# These are representative values for zenith in mag/arcsec^2
+# Twilight zenith sky brightness anchors at key Sun altitudes (V-band,
+# mag/arcsec^2). These are project-calibrated representative values,
+# consistent in trend with the measured twilight profiles of Patat, F. (2003),
+# A&A 400, 1183-1198, and Rozenberg (1966); linearly interpolated between
+# anchors by calc_twilight_sky_brightness. Not transcribed measured constants.
 SKY_BRIGHTNESS_SUN_0 = 3.0  # Sun at horizon (very bright)
 SKY_BRIGHTNESS_SUN_MINUS6 = 8.0  # End of civil twilight
 SKY_BRIGHTNESS_SUN_MINUS12 = 17.0  # End of nautical twilight
@@ -841,7 +879,9 @@ def calc_twilight_sky_brightness(
 
     # Calculate base sky brightness from Sun altitude
     if sun_altitude_deg >= 0:
-        # Daytime - very bright sky
+        # Daytime - very bright sky. Project-calibrated linear darkening of the
+        # zenith surface brightness with increasing Sun altitude (not a
+        # published relation).
         base_brightness = 3.0 - sun_altitude_deg * 0.05  # Brighter as Sun goes up
         base_brightness = max(0.0, base_brightness)
     elif sun_altitude_deg >= TWILIGHT_CIVIL_END:
@@ -918,10 +958,15 @@ def calc_twilight_sky_brightness(
     # Clamp to reasonable range
     surface_brightness = max(0.0, min(surface_brightness, 22.5))
 
-    # Calculate limiting magnitude from sky brightness
-    # Empirical relation: limiting mag depends on sky brightness and observer
-    # Based on Schaefer (1990): m_lim = 7.93 - 5*log10(1 + 10^(4.316 - B/5))
-    # Simplified approximation:
+    # Calculate limiting magnitude from sky brightness.
+    #
+    # This is a project-calibrated PIECEWISE-LINEAR fit of naked-eye limiting
+    # magnitude as a function of the zenith surface brightness (mag/arcsec^2),
+    # NOT an evaluation of Schaefer's closed-form limiting-magnitude relation
+    # (Schaefer (1990), PASP 102, 212, whose sky-brightness argument is a
+    # luminance, not a mag/arcsec^2 value). The three segments are chosen to
+    # reproduce the standard limits: ~ -2 mag in a bright twilight sky rising
+    # to ~6-6.5 mag under a dark sky.
     if surface_brightness < 10:
         limiting_mag = -2.0 + surface_brightness * 0.5  # Very bright sky
     elif surface_brightness < 18:
@@ -931,10 +976,11 @@ def calc_twilight_sky_brightness(
 
     limiting_mag = max(-2.0, min(limiting_mag, 7.0))
 
-    # Convert mag/arcsec^2 to nanoLamberts
-    # Standard photometric relation: nL = 10^((26.33 - B)/2.5)
-    # (B = 26.33 mag/arcsec^2 corresponds to 1 nL; the previous
-    # 10^(35.96 - 0.4*B) form was off by ~25 orders of magnitude)
+    # Convert mag/arcsec^2 to nanoLamberts: nL = 10^((26.33 - B)/2.5), the
+    # inverse of the surface-brightness relation in the form used by Garstang,
+    # R.H. (1989), PASP 101, 306-329. The 26.33 term is the photometric zero
+    # point (B = 26.33 mag/arcsec^2 corresponds to 1 nL; the previous
+    # 10^(35.96 - 0.4*B) form was off by ~25 orders of magnitude).
     nanolamberts = 10 ** ((26.33 - surface_brightness) / 2.5)
 
     return TwilightSkyBrightness(
@@ -974,7 +1020,8 @@ def calc_twilight_brightness_simple(
         21.7
 
     References:
-        - Patat, F. (2003) "UBVRI twilight sky brightness at ESO-Paranal"
+        - Patat, F. (2003) "UBVRI twilight sky brightness at ESO-Paranal",
+          A&A 400, 1183-1198
     """
     result = calc_twilight_sky_brightness(
         sun_altitude_deg=sun_altitude_deg,
@@ -996,7 +1043,8 @@ OBSERVER_SKILL_AVERAGE = 2
 OBSERVER_SKILL_EXPERIENCED = 3
 OBSERVER_SKILL_EXPERT = 4
 
-# Experience factor applied to threshold - lower = can detect fainter objects
+# Experience factor applied to threshold - lower = can detect fainter objects.
+# Project convention (not a published calibration).
 EXPERIENCE_FACTORS = {
     OBSERVER_SKILL_INEXPERIENCED: 1.3,  # 30% worse than average
     OBSERVER_SKILL_AVERAGE: 1.0,  # Baseline
@@ -1053,8 +1101,10 @@ def calc_limiting_magnitude_twilight(
         6.0...
 
     References:
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-        - Crumey, A. (2014) "Human contrast threshold and astronomical visibility"
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes", PASP 102,
+          212-229
+        - Crumey, A. (2014) "Human contrast threshold and astronomical
+          visibility", MNRAS 442, 2600-2619, DOI 10.1093/mnras/stu992
     """
     result = calc_twilight_sky_brightness(
         sun_altitude_deg=sun_altitude_deg,
@@ -1283,8 +1333,9 @@ def calc_contrast_threshold(
         else:
             limiting_mag = -4.5 + (sky_brightness) * 0.5
 
-    # Apply observer experience adjustment
-    # Better observers can see about 0.5-1.0 magnitude fainter
+    # Apply observer experience adjustment. The EXPERIENCE_FACTORS and the
+    # factor-to-magnitude scaling (3.0) are a project convention, not a
+    # published calibration: better observers can see ~0.5-1.0 mag fainter.
     experience_factor = EXPERIENCE_FACTORS.get(observer_skill, 1.0)
     # Factor 1.0 = average, <1.0 = better
     # Each 0.1 decrease in factor = ~0.3 mag improvement

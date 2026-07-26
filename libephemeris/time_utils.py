@@ -388,7 +388,8 @@ def deltat(tjdut: float) -> float:
 
         Outside the SMH-2016 spline interval, Skyfield's implementation uses
         the long-term parabola ``Delta T = -320 + 32.5 * u**2`` seconds, where
-        ``u = (year - 1825) / 100``.
+        ``u = (year - 1825) / 100`` (Morrison & Stephenson 2004, Journal for
+        the History of Astronomy 35, 327-336).
 
         The selected Delta-T value drives calculations that convert UT to TT
         through this function, including LEB, Horizons, event searches, and
@@ -699,6 +700,21 @@ def utc_to_jd(
         jd_et = jd_ut1 + deltat(jd_ut1)
         return float(jd_et), float(jd_ut1)
 
+    # From 2035 on, leap-second UTC ends: CGPM Resolution 4 (27th CGPM, 2022)
+    # decides that the UT1-UTC tolerance will be increased by or before 2035,
+    # so the leap-second table cannot describe later civil labels. Like the
+    # pre-1972 branch (and the measured reference behavior, which converges
+    # to it once Delta T exceeds the frozen TAI-UTC offset), a far-future
+    # civil label is treated as UT1: jd_ut1 is the literal calendar JD and
+    # jd_et = jd_ut1 + Delta T. Keeping Skyfield's frozen-offset UTC chain
+    # here instead would diverge without bound (measured -208,000 s in TT by
+    # year 9999).
+    if greg_year >= 2035:
+        decimal_hour = hour + minute / 60.0 + second / 3600.0
+        jd_ut1 = julday(year, month, day, decimal_hour, calendar)
+        jd_et = jd_ut1 + deltat(jd_ut1)
+        return float(jd_et), float(jd_ut1)
+
     ts = get_timescale()
 
     if calendar == JUL_CAL:
@@ -780,6 +796,11 @@ def jdet_to_utc(
     # across the boundary (UTC 1972-01-01 00:00:00.0 has UT1 in year 1971).
     near_utc_epoch = abs(jd_ut1_est - _UTC_EPOCH_JD) < _UTC_EPOCH_BAND
     if revjul(jd_ut1_est, GREG_CAL)[0] < 1972 and not near_utc_epoch:
+        return _jd_to_calendar_tuple(jd_ut1_est, calendar)
+
+    # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
+    # mirror utc_to_jd and return the UT1 calendar label directly.
+    if revjul(jd_ut1_est, GREG_CAL)[0] >= 2035:
         return _jd_to_calendar_tuple(jd_ut1_est, calendar)
 
     ts = get_timescale()
@@ -867,6 +888,11 @@ def jdut1_to_utc(
     # across the boundary (UTC 1972-01-01 00:00:00.0 has UT1 in year 1971).
     near_utc_epoch = abs(jd_ut1 - _UTC_EPOCH_JD) < _UTC_EPOCH_BAND
     if revjul(jd_ut1, GREG_CAL)[0] < 1972 and not near_utc_epoch:
+        return _jd_to_calendar_tuple(jd_ut1, calendar)
+
+    # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
+    # mirror utc_to_jd and return the UT1 calendar label directly.
+    if revjul(jd_ut1, GREG_CAL)[0] >= 2035:
         return _jd_to_calendar_tuple(jd_ut1, calendar)
 
     # Create a Skyfield Time object from UT1 Julian Day

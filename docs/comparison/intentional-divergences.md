@@ -5,9 +5,8 @@ only when reproducing the observed behavior would require an unsupported
 numerical definition, would violate the meaning of a documented output
 channel, or would conflict with an independently sourced scientific model.
 
-External reference-API comparisons are ephemeral. This page records semantics
-and independent rationale, never per-date output, fitted thresholds, or
-inferred internals.
+This page records the semantic choices and the independent rationale behind
+each retained divergence.
 
 ## `SIDEREAL | J2000` is honored uniformly for lunar points
 
@@ -54,18 +53,17 @@ channel, and that side effect is not reproduced. Only introspection through
 `get_tid_acc()` after a `deltat_ex` call can observe the difference; every
 returned Delta-T value matches.
 
-## Total-eclipse obscuration is a bounded fraction
+## Total-eclipse obscuration slot carries the disc-area ratio
 
-Obscuration — `attr[2]` of `sol_eclipse_how`, `sol_eclipse_when_loc`,
-`sol_eclipse_where`, and `lun_occult_where` — is the fraction of the Sun's
-disc area covered by the Moon, which is bounded to [0, 1] by its published
-definition (NASA/USNO eclipse glossaries). During a total eclipse
-LibEphemeris reports exactly `1.0`. The > 1 Moon/Sun disc *area ratio* that
-some implementations place in this slot remains derivable as
-`attr[1] ** 2`. Annular and partial eclipses are identical in both
-conventions. The LibEphemeris-only helpers
-(`sol_eclipse_obscuration_at_loc()`, `sol_eclipse_how_details()`) report the
-same bounded fraction.
+Obscuration — `attr[2]` of `sol_eclipse_how`, `sol_eclipse_when_loc`, and
+`sol_eclipse_where` — reports the Moon/Sun disc *area ratio*
+(`attr[1] ** 2`), which exceeds 1 during a total eclipse (measured
+compatibility convention). Annular and partial eclipses are identical in
+both conventions, and occultation slots stay at 1.0. Consumers who want the
+physically bounded covered-area fraction in [0, 1] (the NASA/USNO glossary
+definition) use the LibEphemeris-only helpers
+(`sol_eclipse_obscuration_at_loc()`, `sol_eclipse_how_details()`), which
+keep that contract.
 
 ## Sripati `house_pos` preserves the fraction in the house-12 wrap
 
@@ -206,6 +204,27 @@ The LibEphemeris-only helpers `sol_eclipse_obscuration_at_loc()` and
 covered-area fraction, matching the compatibility slots. Because these
 functions are extensions, their contract is defined by LibEphemeris
 documentation rather than by the reference API.
+
+## Topocentric Moon reduction is internally consistent
+
+The topocentric observer vector uses the full nutation-consistent frame
+chain, and topocentric velocities are the exact time derivatives of the
+reported topocentric positions. External implementations that build the
+observer vector with a simplified rotation differ by up to ~0.16″ in the
+Moon's topocentric position and by a few arcseconds/day in its topocentric
+speed — and are there internally inconsistent with their own trajectory
+(their reported speed does not differentiate their reported position).
+LibEphemeris keeps the self-consistent reduction.
+
+## Sidereal time is continuous across 2050
+
+`sidtime`/`sidtime0` follow the ERFA GST06A realization at every date. At
+least one external implementation switches its internal sidereal-time model
+exactly at 2050-01-01, producing a ~0.13 s step (about 1.9″ of ARMC) that
+propagates into its rise/set times after that date. LibEphemeris does not
+reproduce the step: its sidereal time stays continuous and matches ERFA,
+so a constant ~0.13 s offset against that implementation is expected for
+dates from 2050 on.
 
 ## Independent astronomical models
 

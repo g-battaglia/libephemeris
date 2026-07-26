@@ -1,13 +1,13 @@
 # Hypothetical bodies
 
-LibEphemeris recognises all historical compatibility IDs 40–58. Seventeen IDs
+LibEphemeris recognises all historical compatibility IDs 40–58. Eighteen IDs
 have independently reconstructed numerical models: the eight Hamburg-school
 points (40–47), Transpluto/Isis (48), Harrington (50), Le Verrier (51),
 Adams (52), Lowell (53), Pickering (54), Vulcan (55), the symbolic White
-Moon / Selena convention (56), and Proserpina (57). The remaining two IDs
-(49, 58) retain their names and constants but deliberately
-raise `UnknownBodyError`; their exact missing evidence is inventoried in
-[the missing-models inventory](missing-hypothetical-models.md).
+Moon / Selena convention (56), Proserpina (57), and the Waldemath /
+Sepharial Dark Moon (58). Only Nibiru (49) retains its name and constants
+while deliberately raising `UnknownBodyError`; its missing evidence is
+inventoried in [the missing-models inventory](missing-hypothetical-models.md).
 
 These are historical mathematical, predictive, or astrological conventions.
 Their inclusion does not assert that the proposed objects physically exist.
@@ -27,12 +27,11 @@ Their inclusion does not assert that the proposed objects physically exist.
 | 55 | Vulcan | Supported; Weston (AFA reprint of the 1908/1920 tables), 1920 element table. |
 | 56 | White Moon / Selena | Supported; Velichko and Larin (2007), pp. 17, 18, 20, 29, and 45, plus explicit LibEphemeris time/radius conventions derived from IAU standards. |
 | 57 | Proserpina | Supported; Russian-school circular convention (Globa; Timashev 1996; Velichko and Larin 2007 ephemerides). |
-| 58 | Waldemath | Unsupported; no source-complete reconstruction of the historical second-moon convention was recovered. |
+| 58 | Waldemath | Supported; Sepharial, *The Science of Foreknowledge* (1918), ch. "The New Satellite — Lilith"; Waltemath 1898 via *Science* 8/189, p. 185 and Ashbrook, *Sky & Telescope* 28 (1964), p. 218. |
 
-`HYPOTHETICAL_PROVENANCE` exposes the same boundary in machine-readable form.
-Unsupported legacy element-container objects remain importable for API
-compatibility, but every unavailable numeric field is `NaN`; they are not
-registered with a calculation path.
+`HYPOTHETICAL_PROVENANCE` exposes the same boundary in machine-readable
+form: every supported ID carries its source annotation, and Nibiru is the
+single ID without a calculation path.
 
 ## IDs 40–47: Neely's Hamburg-school elements
 
@@ -286,6 +285,34 @@ converted with the exact `149597870700 m` astronomical unit from
 The result, about `0.05279359825 AU`, exists solely to preserve the return
 tuple's shape and finite-distance invariant.
 
+## ID 58: Waldemath / Sepharial Dark Moon
+
+The primary model source is Sepharial [Walter Gorn Old], *The Science of
+Foreknowledge* (W. Foulsham, London, 1918), chapter "The New Satellite —
+Lilith": the point advances uniformly along the geocentric tropical ecliptic
+and returns to conjunction with the Sun every 177 days, with a dated
+conjunction table for 1854–1906. The physical scale comes from Waltemath's
+1898 Hamburg announcements (*Science*, New Series, Vol. 8, No. 189, p. 185;
+summarized with the element values by J. Ashbrook, "The Many Moons of
+Dr. Waltemath," *Sky & Telescope* 28, October 1964, p. 218): mean distance
+about 1.03 million km, sidereal period 119 days, synodic 177 days, and a
+predicted transit of the Sun on 1898 February 2–4.
+
+The realization anchors the longitude to the Sun's apparent geocentric
+longitude at the predicted transit (1898 February 2, 00:00 GMT — the
+midnight-GMT convention of the Delphine Jay AFA ephemerides), and derives
+the mean motion from the printed synodic period:
+`n = 360/177 + 360/365.2422 = 3.0195456 deg/day` (mean tropical year from
+Meeus, *Astronomical Algorithms*, 2nd ed.). Sepharial's own consistency
+statements pin this reading: his "returns to the same longitude on the same
+day in 126 years" is exactly `126 × 365.2422 / 177 = 260.00` synodic
+revolutions, and the implied sidereal period `360/n = 119.2` days matches
+Waltemath's published 119 days. The point rides the ecliptic (zero
+latitude) at the fixed published distance; the eccentricity and inclination
+figures found in legacy tabulations (`e = 0.1587`, `i = 2.5`) are attested
+in no primary publication — the `2.5` most plausibly conflates Waltemath's
+~2.5 arcminute apparent *diameter* — and are deliberately not used.
+
 ## Shared independent orbital propagation
 
 Every supported orbital row is propagated by project-authored, source-neutral
@@ -353,9 +380,7 @@ uv run pytest tests/test_hypothetical.py tests/test_cov100_hypothetical.py \
 ```
 
 The dedicated gate pins the 12-row CSV, literal source fields, reviewed-scan
-hashes where a scan may be retained, the page-located Selena derivation,
-source-rate consistency, registry coverage, finite behavior for all supported
-IDs, `NaN` compatibility sentinels, and `UnknownBodyError` for all six
-unsupported IDs. Reference-API calls may be used only as ephemeral
-pass/fail checks; their outputs must never become rows, fixtures, fitted
-coefficients, or generated artifacts.
+hashes where a scan may be retained, the page-located Selena and Waldemath
+derivations, source-rate consistency, registry coverage, finite behavior for
+all supported IDs, and `UnknownBodyError` for the single unsupported ID
+(Nibiru).

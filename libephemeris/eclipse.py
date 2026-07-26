@@ -384,6 +384,24 @@ _ECL_RMOON_AU = 1738.15 / _ECL_AU_KM
 _ECL_REARTH_AU = 6378.140 / _ECL_AU_KM
 _ECL_EARTH_FLATTENING = 1.0 / 298.25642
 
+# Inner-contact ("umbral") lunar radius.  Classical eclipse practice adopts
+# two values of k (the ratio of the Moon's radius to Earth's equatorial
+# radius): the larger, k = 0.2725076 (~1738.15 km, the mean lunar limb,
+# adopted by the IAU in 1982), for the penumbral / outer silhouette, and the
+# smaller k = 0.272281 for the umbral / inner geometry, where the marginal
+# valleys of the lunar limb let a thread of photosphere through so that true
+# totality/annularity, and the disappearance/reappearance of an occulted
+# body behind the dark limb, are reckoned against a slightly smaller disc.
+# Sources: Espenak & Meeus, "Five Millennium Canon of Solar Eclipses"
+# (NASA/TP-2006-214141), sec. 1.5 (k = 0.272281 for umbral/central contacts);
+# Explanatory Supplement to the Astronomical Almanac (3rd ed., 2013), eclipse
+# phenomena; Meeus, "Elements of Solar Eclipses 1951-2200" (Willmann-Bell,
+# 1989), ch. 3.  Applied at second/third contact and at occultation
+# disappearance/reappearance while the full disc stays at first/fourth
+# (measured reference behavior, and the convention of the NASA canon whose
+# published durations these contacts reproduce to ~0.1 s).
+_ECL_RMOON_INNER_AU = 0.272281 * 6378.140 / _ECL_AU_KM
+
 # Danjon lunar-shadow convention used by NASA's Five Millennium Catalog.
 # Instead of multiplying both completed shadow diameters by an empirical
 # factor, it increases the Moon's equatorial horizontal parallax term by one
@@ -816,8 +834,13 @@ def _sol_how_core(
     allowing for refraction and the observer's horizon dip.
 
     attr: [0] magnitude as diameter fraction (negative when the limbs do
-    not yet overlap), [1] lunar/solar diameter ratio, [2] obscuration
-    (fraction of the solar disc area covered, 1.0 during totality),
+    not yet overlap), [1] lunar/solar diameter ratio, [2] obscuration.
+    For a solar eclipse the obscuration follows the measured reference
+    convention: the disc-area ratio (r_moon/r_sun)**2 while one disc lies
+    inside the other, so it exceeds 1 during totality (Moon larger) and is
+    (r_moon/r_sun)**2 < 1 during annularity; the partial phase reports the
+    two-disc lens-overlap fraction. For an occultation the obscuration is
+    the covered fraction of the body and stays bounded at 1.0.
     [3] 0 (callers fill the core-shadow width), [4] azimuth of the Sun,
     [5] true altitude, [6] apparent altitude, [7] Moon-Sun center
     separation in degrees, [8] NASA magnitude, [9]/[10] saros series and
@@ -852,6 +875,11 @@ def _sol_how_core(
     attr = [0.0] * 20
     attr[1] = rmoon / rsun if rsun > 0.0 else 0.0
     attr[0] = (rsun + rmoon - dctr) / (2.0 * rsun) if rsun > 0.0 else 1.0
+    # A solar eclipse (Sun as the "occulted" body) reports the disc-area
+    # ratio while one disc lies inside the other, so obscuration exceeds 1
+    # during totality; an occultation of a finite body caps the covered
+    # fraction at 1.0. Measured reference behavior.
+    _is_solar = (not isinstance(body, str)) and body == SUN
     if retc == 0:
         # No eclipse at this place and time: nothing of the Sun is obscured.
         # (sol_eclipse_how() zeroes attr on retflag==0, but sol_eclipse_where()
@@ -860,18 +888,19 @@ def _sol_how_core(
     elif rsun <= 0.0:
         attr[2] = 1.0
     elif retc in (ECL_TOTAL, ECL_ANNULAR):
-        # One disc lies entirely within the other. Total (larger Moon): the
-        # Sun is fully covered, so the obscured fraction is 1.0 — the
-        # published definition of obscuration (fraction of the solar disc
-        # area occulted) is bounded by construction; the > 1 disc area ratio
-        # remains available as attr[1]**2. Annular (smaller Moon): a ring of
-        # Sun remains and the covered fraction is (rmoon/rsun)**2 < 1.
-        attr[2] = min(1.0, (rmoon / rsun) ** 2)
+        # One disc lies entirely within the other. The disc-area ratio is
+        # (rmoon/rsun)**2 — > 1 during totality (larger Moon), < 1 during
+        # annularity (a ring of Sun remains). For a solar eclipse the
+        # reference returns this ratio uncapped; an occultation caps the
+        # covered fraction of the body at 1.0.
+        ratio_sq = (rmoon / rsun) ** 2
+        attr[2] = ratio_sq if _is_solar else min(1.0, ratio_sq)
     elif dctr <= 0.0:
         # Exactly concentric discs in the partial branch are reachable only at
         # the annular/total boundary (rsun == rmoon); the overlap is the whole
         # smaller disc. Guards the lens-area 1/dctr singularity below.
-        attr[2] = min(1.0, (rmoon / rsun) ** 2)
+        ratio_sq = (rmoon / rsun) ** 2
+        attr[2] = ratio_sq if _is_solar else min(1.0, ratio_sq)
     else:
         # Standard two-disc overlap (lens) area as a fraction of the
         # solar disc.
@@ -3577,11 +3606,18 @@ def _sol_eclipse_when_loc_impl(
         s_p, m_p = _topo_sun_moon(jd, _geopos3, reader)
         return angular_separation(s_p[0], s_p[1], m_p[0], m_p[1])
 
-    def _radii_sep(jd: float) -> Tuple[float, float, float]:
-        """Apparent solar and lunar radii plus center separation at jd."""
+    def _radii_sep(
+        jd: float, rmoon_au: float = _ECL_RMOON_AU
+    ) -> Tuple[float, float, float]:
+        """Apparent solar and lunar radii plus center separation at jd.
+
+        ``rmoon_au`` selects the lunar radius: the default full disc for the
+        outer (penumbral) contacts and magnitude, or the smaller inner-contact
+        radius for second/third contact (see ``_ECL_RMOON_INNER_AU``).
+        """
         s_p, m_p = _topo_sun_moon(jd, _geopos3, reader)
         rs = math.degrees(math.asin(_ECL_RSUN_AU / s_p[2]))
-        rm = math.degrees(math.asin(_ECL_RMOON_AU / m_p[2]))
+        rm = math.degrees(math.asin(rmoon_au / m_p[2]))
         return rs, rm, angular_separation(s_p[0], s_p[1], m_p[0], m_p[1])
 
     def _sun_altaz(jd: float) -> Tuple[float, float, float]:
@@ -3707,15 +3743,17 @@ def _sol_eclipse_when_loc_impl(
             phase = ECL_PARTIAL
 
         # Contact times. Outer contacts: center separation equals the
-        # sum of the apparent radii evaluated at the contact itself.
-        # Inner contacts use the exact tangency of the two apparent discs:
-        # center separation equals the absolute semidiameter difference.
+        # sum of the apparent radii evaluated at the contact itself, with the
+        # full mean lunar disc. Inner contacts use the exact tangency of the
+        # two apparent discs (center separation equals the absolute
+        # semidiameter difference) against the smaller inner-contact lunar
+        # radius, so totality/annularity is reckoned against the umbral disc.
         def _f_outer(jd_c: float) -> float:
             rs_c, rm_c, sep_c = _radii_sep(jd_c)
             return sep_c - (rs_c + rm_c)
 
         def _f_inner(jd_c: float) -> float:
-            rs_c, rm_c, sep_c = _radii_sep(jd_c)
+            rs_c, rm_c, sep_c = _radii_sep(jd_c, _ECL_RMOON_INNER_AU)
             return abs(rs_c - rm_c) - sep_c
 
         two_hours = 2.0 / 24.0
@@ -6288,11 +6326,13 @@ def _lun_occult_when_loc_pythonic(
         pos, _ = calc_ut(jd, cast(int, body), eph_flags)
         return float(pos[0]), float(pos[1])
 
-    def _radii_sep(jd: float) -> Tuple[float, float, float]:
+    def _radii_sep(
+        jd: float, rmoon_au: float = _ECL_RMOON_AU
+    ) -> Tuple[float, float, float]:
         b_p = _occ_body_topo(jd, body, geopos3, flags, reader)
         _s_p, m_p = _topo_sun_moon(jd, geopos3, reader)
         rb = math.degrees(math.asin(body_radius_au / b_p[2])) if body_radius_au else 0.0
-        rm = math.degrees(math.asin(_ECL_RMOON_AU / m_p[2]))
+        rm = math.degrees(math.asin(rmoon_au / m_p[2]))
         return rb, rm, angular_separation(b_p[0], b_p[1], m_p[0], m_p[1])
 
     def _sep_minus_radii(jd: float) -> float:
@@ -6352,14 +6392,16 @@ def _lun_occult_when_loc_pythonic(
         else:
             phase = ECL_PARTIAL
 
-        # Inner contacts use exact apparent-disc tangency; for point-source
-        # stars the outer contacts coincide with them.
+        # Inner contacts use exact apparent-disc tangency against the smaller
+        # inner-contact lunar radius (disappearance/reappearance behind the
+        # dark limb); for point-source stars the outer contacts coincide with
+        # them. Outer contacts use the full mean lunar disc.
         def _f_outer(jd_c: float) -> float:
             rb_c, rm_c, sep_c = _radii_sep(jd_c)
             return sep_c - (rb_c + rm_c)
 
         def _f_inner(jd_c: float) -> float:
-            rb_c, rm_c, sep_c = _radii_sep(jd_c)
+            rb_c, rm_c, sep_c = _radii_sep(jd_c, _ECL_RMOON_INNER_AU)
             return abs(rb_c - rm_c) - sep_c
 
         jd_second = 0.0

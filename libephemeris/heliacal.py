@@ -22,11 +22,20 @@ Historical Note:
 
 References:
     - Schaefer, B.E. (1990), "Telescopic Limiting Magnitudes", PASP 102,
-      212-229, DOI 10.1086/132629; and Schaefer (1993), "Astronomy and the
-      Limits of Vision", Vistas in Astronomy 36, 311-361
-    - Yallop (1997), NAO Technical Note 69, lunar-crescent q criterion
-    - Kasten & Young (1989), "Revised optical air mass tables and
-      approximation formula", DOI 10.1364/AO.28.004735
+      212-229, DOI 10.1086/132629
+    - Schaefer, B.E. (1993), "Astronomy and the Limits of Vision", Vistas in
+      Astronomy 36, 311-361; and Schaefer, B.E. (1998), "To the Visual
+      Limits", Sky & Telescope 95(5), 57-60. Together these define the
+      VISLIMIT V-band limiting-magnitude algorithm and its per-component
+      relative-airmass relations used by this module's active path (the
+      low-altitude airmass form follows Rozenberg, G.V. (1966), "Twilight: A
+      Study in Atmospheric Optics"; Kasten & Young (1989) is NOT used here).
+    - Krisciunas, K. & Schaefer, B.E. (1991), "A model of the brightness of
+      moonlight", PASP 103, 1033-1039, DOI 10.1086/132921 (scattered
+      moonlight and the daylight sky-scattering terms)
+    - Yallop, B.D. (1997), NAO Technical Note No. 69 (lunar-crescent q
+      criterion); Bruin, F. (1977), "The first visibility of the lunar
+      crescent", Vistas in Astronomy 21, 331-358 (crescent width)
 
 Provenance:
     Body positions and photometry come from the registered ephemeris pipeline;
@@ -130,48 +139,72 @@ _HELIACAL_VIS_MARGIN = 0.0
 
 class SchaeferConstants:
     """
-    Constants for the Schaefer atmospheric model.
+    Legacy descriptive constants for a Schaefer-style atmospheric model.
 
-    Based on Schaefer (1990).
+    NOTE: these values are documentation/compatibility defaults only. The
+    active VISLIMIT limiting-magnitude path (``SchaeferModel`` and the
+    ``_vl_*`` helpers above) does not read this class; it uses its own
+    coefficients. Citations below are given for the published origin of each
+    representative value, not because this class drives any result.
     """
 
-    # Rayleigh scattering coefficient at sea level (per airmass)
-    # At 550nm (V-band), k_r = 0.1451 at sea level
+    # Rayleigh (molecular) scattering coefficient at sea level, V band
+    # (~550 nm), per unit airmass. The 0.1451 mag/airmass V-band value derives
+    # from the atmospheric-extinction model of Hayes, D.S. & Latham, D.W.
+    # (1975), "A rediscussion of the atmospheric extinction and the absolute
+    # spectral-energy distribution of Vega", ApJ 197, 593-601.
     K_RAYLEIGH_SEA_LEVEL = 0.1451
 
-    # Ozone absorption coefficient (per airmass)
-    # Small contribution at visual wavelengths
+    # Ozone absorption coefficient (per airmass). Small, roughly constant
+    # contribution at visual wavelengths (Chappuis bands); representative
+    # V-band value used by Schaefer (1990), PASP 102, 212.
     K_OZONE = 0.016
 
-    # Aerosol scattering base coefficient
-    # Typical value 0.05-0.15 depending on conditions
+    # Aerosol (Mie) scattering base coefficient at V, clear-air baseline.
+    # Aerosol extinction follows the wavelength power law of Angstrom, A.
+    # (1929), "On the atmospheric transmission of sun radiation and on dust in
+    # the air", Geografiska Annaler 11, 156-166.
     K_AEROSOL_BASE = 0.08
 
-    # Scale height for pressure (km)
+    # Scale height for pressure (km) - standard atmospheric density scale.
     SCALE_HEIGHT_PRESSURE = 8.5
 
-    # Scale height for aerosols (km)
+    # Scale height for aerosols (km) - aerosols are concentrated in the lower
+    # troposphere (order 1-2 km; e.g. Allen, "Astrophysical Quantities").
     SCALE_HEIGHT_AEROSOL = 1.5
 
-    # Airglow brightness (nanoLamberts) - natural sky glow
+    # Airglow brightness (nanoLamberts) - natural minimum sky glow. Standard
+    # dark-night airglow level (Allen, "Astrophysical Quantities"; Roach, F.E.
+    # & Gordon, J.L. (1973), "The Light of the Night Sky").
     AIRGLOW = 145.0
 
-    # Zodiacal light brightness (nanoLamberts) - typical value
+    # Zodiacal light brightness (nanoLamberts) - representative near-ecliptic
+    # value (Allen, "Astrophysical Quantities"; Roach & Gordon 1973).
     ZODIACAL_LIGHT = 100.0
 
-    # Dark sky brightness at zenith (mag/arcsec^2)
+    # Dark sky brightness at zenith (mag/arcsec^2) - representative excellent
+    # dark-site V-band value.
     DARK_SKY_MAG = 21.6
 
-    # Full Moon brightness relative to Sun (magnitude difference)
+    # Full Moon brightness relative to Sun (magnitude difference). The Sun-Moon
+    # magnitude offset near full phase is ~14 mag (Allen, "Astrophysical
+    # Quantities").
     FULL_MOON_MAG_DIFF = 14.0
 
-    # Visual limiting magnitude for perfect dark sky conditions
+    # Visual limiting magnitude for perfect dark-sky conditions - classic
+    # naked-eye limit for a young dark-adapted observer (Schaefer (1990),
+    # PASP 102, 212).
     PERFECT_SKY_LIM_MAG = 6.5
 
     # Legacy descriptive defaults retained for callers inspecting this class.
     # The active arcus-visionis calculation below root-solves the Schaefer
     # limiting-magnitude model and does not read this mapping. These exact
-    # object values are project defaults, not a transcription from Ptolemy.
+    # object values are project defaults; they lie in the same range as the
+    # classical Schoch/Ptolemaic arcus-visionis thresholds discussed in the
+    # heliacal-visibility literature (e.g. Schaefer, B.E. (1987), "Heliacal
+    # Rise Phenomena", Journal for the History of Astronomy 18,
+    # Archaeoastronomy Suppl. 11, S19-S33) but are not a verbatim
+    # transcription of any historical table.
     ARCUS_VISIONIS = {
         "venus": 5.0,
         "mercury": 10.0,
@@ -183,13 +216,18 @@ class SchaeferConstants:
         "star_faint": 13.0,  # Stars fainter than mag 3
     }
 
-    # Threshold contrast for naked-eye visibility (log units)
-    THRESHOLD_CONTRAST = 0.0094  # Schaefer's value
+    # Representative threshold-contrast constant for naked-eye point-source
+    # detection from the Schaefer visibility framework (Schaefer (1990),
+    # PASP 102, 212; Schaefer (1993), Vistas in Astronomy 36, 311). Legacy
+    # descriptive value; not read by the active VISLIMIT path.
+    THRESHOLD_CONTRAST = 0.0094
 
-    # Eye pupil diameter in dark-adapted conditions (mm)
+    # Eye pupil diameter in dark-adapted conditions (mm) - classical maximum
+    # dark-adapted pupil; the active path instead uses the age-dependent
+    # relation _vl_eye_pupil (Schaefer 1990/1998).
     DARK_PUPIL_DIAMETER = 7.0
 
-    # Eye pupil diameter in bright conditions (mm)
+    # Eye pupil diameter in bright (photopic) conditions (mm).
     BRIGHT_PUPIL_DIAMETER = 2.0
 
 
@@ -244,6 +282,13 @@ _VL_DARK_SKY_MAG_ARCSEC2 = 22.0
 _VL_DARK_SKY_NL = (
     108000.0 * 10.0 ** (-0.4 * _VL_DARK_SKY_MAG_ARCSEC2) * math.pi / 1.0e-5
 )
+# Unit-scale factor converting nanoLamberts to the VISLIMIT model's internal
+# radiance scale, on which the additive daylight/twilight/moonlight scattering
+# terms below are expressed (their absolute coefficients such as 43.27 and the
+# 6.2e7/10**6.15/10**5.36 scattering constants come from Schaefer's VISLIMIT
+# algorithm, Sky & Telescope 95(5), 57). It cancels for the dark-sky term
+# (which is multiplied and then divided by it) and fixes the relative weight of
+# the scattered-light terms; the sum is divided back out to return nanoLamberts.
 _VL_MODEL_RADIANCE_PER_NL = 1.11e-15
 # Reijs refined scale heights (m)
 _VL_SH_RAY = 8515.0
@@ -305,7 +350,14 @@ def _vl_extinction_components(
 
 
 def _vl_airmass(alt_deg: float) -> float:
-    """Schaefer sky airmass (gas) as a function of altitude."""
+    """Sky airmass vs altitude, Rozenberg (1966) low-altitude form.
+
+    ``X = 1 / (cos z + 0.025 * exp(-11 cos z))``, valid to the horizon, from
+    Rozenberg, G.V. (1966), "Twilight: A Study in Atmospheric Optics". This is
+    the general sky airmass used by Schaefer's VISLIMIT model (NOT the Kasten &
+    Young relation, which appears in the standalone extinction/schaefer helper
+    modules).
+    """
     if alt_deg <= 0.0:
         return 40.0
     c = math.cos((90.0 - alt_deg) * _RD)
@@ -313,19 +365,19 @@ def _vl_airmass(alt_deg: float) -> float:
 
 
 def _vl_airmass_gas(alt_deg: float) -> float:
-    """Return Schaefer VISLIMIT's gas/Rayleigh relative airmass."""
+    """Gas/Rayleigh relative airmass, Schaefer VISLIMIT (S&T 95(5), 57)."""
     c = math.cos((90.0 - alt_deg) * _RD)
     return 1.0 / (c + 0.0286 * math.exp(-10.5 * c))
 
 
 def _vl_airmass_aer(alt_deg: float) -> float:
-    """Return Schaefer VISLIMIT's aerosol relative airmass."""
+    """Aerosol relative airmass, Schaefer VISLIMIT (S&T 95(5), 57)."""
     c = math.cos((90.0 - alt_deg) * _RD)
     return 1.0 / (c + 0.0123 * math.exp(-24.5 * c))
 
 
 def _vl_airmass_ozone(alt_deg: float) -> float:
-    """Return the spherical-shell ozone airmass used by VISLIMIT."""
+    """Spherical-shell ozone airmass, Schaefer VISLIMIT (S&T 95(5), 57)."""
     s = math.sin((90.0 - alt_deg) * _RD)
     val = 1.0 - (s / (1.0 + 20.0 / 6378.0)) ** 2
     return 1.0 / math.sqrt(val) if val > 0 else 40.0
@@ -335,7 +387,9 @@ def _vl_hecht_threshold(bl: float) -> float:
     """Hecht/Knoll-Schaefer contrast threshold (foot-candles) for sky ``bl``.
 
     Two photoreceptor regimes (photopic above / scotopic below 1500 nL), exactly
-    as in Schaefer's VISLIMIT: ``TH = C1 * (1 + sqrt(C2 * BL))**2``.
+    as in Schaefer's VISLIMIT algorithm (Schaefer (1998), Sky & Telescope
+    95(5), 57): ``TH = C1 * (1 + sqrt(C2 * BL))**2``, with the C1/C2 pairs the
+    published photopic and scotopic Hecht-model constants.
     """
     if bl > 1500.0:
         c1 = 10.0**-8.350001
@@ -492,7 +546,10 @@ class SchaeferModel:
             k_total = max(mr, floor)
             ka = max(0.0, k_total - floor)
         elif mr >= 1.0:
-            # Meteorological visual range (km): Koschmieder aerosol.
+            # Meteorological visual range V (km) -> aerosol coefficient via
+            # the Koschmieder (1924) relation, k = 3.912 / V, with the
+            # molecular part kr removed. Koschmieder, H. (1924), "Theorie der
+            # horizontalen Sichtweite", Beitr. Phys. freien Atmos. 12, 33-53.
             ka = max(0.0, 3.912 / mr - kr)
         self.k_rayleigh = kr
         self.k_aerosol = ka
@@ -567,7 +624,12 @@ class SchaeferModel:
         ZZ = Z * _RD
         year = 2000.0 + (self.jd - 2451545.0) / 365.25
 
-        # Dark night sky
+        # Dark night sky (Schaefer VISLIMIT dark-sky term, Schaefer (1998),
+        # Sky & Telescope 95(5), 57): a 0.3-amplitude 11-year solar-cycle
+        # modulation of airglow, a van Rhijn zenith-distance brightening
+        # (0.4 + 0.6/sqrt(1 - 0.96 sin^2 Z)), and extinction 10**(-0.4 K X)
+        # to the object altitude. The absolute level is set by the published
+        # natural dark-sky luminance in _VL_DARK_SKY_NL.
         bn = _VL_DARK_SKY_NL * _VL_MODEL_RADIANCE_PER_NL
         bn *= 1.0 + 0.3 * math.cos(6.283 * (year - 1992.0) / 11.0)
         bn *= 0.4 + 0.6 / math.sqrt(1.0 - 0.96 * (math.sin(ZZ)) ** 2)
@@ -580,6 +642,12 @@ class SchaeferModel:
             # Daylight scattering (Sun above the horizon). The twilight term
             # BT is only valid for a Sun below the horizon (its -HS factor
             # diverges for HS > 0), so daylight uses BD alone.
+            # fs is the angular scattering function f(rho) of Krisciunas, K. &
+            # Schaefer, B.E. (1991), PASP 103, 1033 (their scattered-light
+            # relations, eqs. 15-21): an aureole/forward term (6.2e7*rho^-2),
+            # an intermediate-angle term (10**(6.15 - rho/40)), and a
+            # Rayleigh+Mie term (10**5.36*(1.06 + cos^2 rho)), with rho the
+            # Sun-object sky angle in degrees.
             xs = _vl_airmass(sun_alt)
             c4 = 10.0 ** (-0.4 * K * xs)
             fs = (
@@ -593,19 +661,29 @@ class SchaeferModel:
                 * (fs * c4 + 440000.0 * (1.0 - c4))
             )
         else:
-            # Twilight brightness (Sun below the horizon).
+            # Twilight brightness (Sun below the horizon), from Schaefer's
+            # VISLIMIT twilight term (Schaefer (1998), Sky & Telescope 95(5),
+            # 57): the 32.5 offset and the -HS / -(Z/(360 K)) dependence on
+            # Sun depression and object zenith distance are the published
+            # BT relation.
             bt = 10.0 ** (
                 -0.4 * (_VL_MS - _VL_MOI + 32.5 - sun_alt - (Z / (360.0 * K)))
             )
             b += bt * (100.0 / rs) * one_minus
 
-        # Moonlight
+        # Moonlight, following Krisciunas, K. & Schaefer, B.E. (1991),
+        # "A model of the brightness of moonlight", PASP 103, 1033-1039,
+        # DOI 10.1086/132921.
         if moon_alt > 0.0:
             rm = max(moon_obj_angle, 1.0)
             am = math.degrees(math.acos(min(1.0, max(-1.0, 2.0 * moon_phase - 1.0))))
+            # Moon V magnitude as a function of phase angle am (deg): their
+            # eq. 9, m = -12.73 + 0.026*|am| + 4e-9*am**4.
             mm = -12.73 + 0.026 * abs(am) + 4e-9 * (am**4)
             xm = _vl_airmass(moon_alt)
             c3 = 10.0 ** (-0.4 * K * xm)
+            # fm is the same K&S (1991) scattering function f(rho) as fs above
+            # (eqs. 15-21), evaluated at the Moon-object sky angle rm.
             fm = (
                 6.2e7 * (rm**-2)
                 + 10.0 ** (6.15 - rm / 40.0)
@@ -670,6 +748,10 @@ class SchaeferModel:
         th = _vl_hecht_threshold(bl)  # foot-candles
 
         # Extinction to the object (magnitudes) is included in the limit.
+        # The -16.57 magnitude zero point converts the Hecht/Knoll-Schaefer
+        # threshold illuminance (foot-candles) into a V-band limiting
+        # magnitude, per Schaefer's VISLIMIT algorithm (Schaefer (1998),
+        # Sky & Telescope 95(5), 57).
         dm = self.extinction(obj_alt)
         m_lim = -16.57 - 2.5 * math.log10(th) - dm
 
@@ -975,7 +1057,7 @@ def _get_star_magnitude(star_id: int) -> float:
     Get the visual magnitude of a fixed star from the catalog.
 
     Args:
-        star_id: Star ID (SE_* constant, e.g., SIRIUS)
+        star_id: Star ID (body constant, e.g., SIRIUS)
 
     Returns:
         Visual magnitude of the star. Brighter stars have lower/negative values.
@@ -1042,7 +1124,7 @@ def _leb_body_altaz(
     Args:
         reader: LEBReader instance.
         jd_ut: Julian Day UT1.
-        body_id: SE_* body constant.
+        body_id: Body constant.
         geopos_lonlat: (lon_deg, lat_deg, alt_m) for the observer.
         atpress: Atmospheric pressure in mbar.
         attemp: Atmospheric temperature in Celsius.
@@ -1950,7 +2032,9 @@ def _heliacal_pheno_ut_leb(
             moon_diameter = (
                 moon_pheno[3] if len(moon_pheno) > 3 and moon_pheno[3] > 0 else 0.5
             )
-            # Crescent width (Yallop/Bruin): W = SD * (1 - cos ARCL), where
+            # Crescent width W = SD * (1 - cos ARCL) from Bruin, F. (1977),
+            # "The first visibility of the lunar crescent", Vistas in Astronomy
+            # 21, 331-358 (adopted by Yallop's q-test below), where
             # ARCL is the arc of light (Sun-Moon elongation, moon_pheno[2]) and
             # SD is the Moon's apparent semidiameter in arcmin (moon_pheno[3]
             # is the apparent diameter in degrees). Near new moon ARCL -> 0 so
@@ -1964,6 +2048,9 @@ def _heliacal_pheno_ut_leb(
             pass
 
     if body == MOON:
+        # Yallop q-test (Yallop, B.D. (1997), NAO Technical Note No. 69):
+        # the cubic criterion in the crescent width w (arcmin) and the
+        # q = (ARCV - criterion) / 10 statistic.
         w = w_moon * 60.0
         q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
         q_yallop = (arcv_act - q_criterion) / 10.0
@@ -2375,9 +2462,11 @@ def _heliacal_ut_pythonic(
     References:
         - Schaefer (1990), PASP 102, 212-229, DOI 10.1086/132629,
           limiting-magnitude/observer model.
-        - Schaefer (1993), Vistas in Astronomy 36, 311-361, visibility
-          context and observer effects.
-        - Kasten & Young (1989), DOI 10.1364/AO.28.004735, optical airmass.
+        - Schaefer (1993), Vistas in Astronomy 36, 311-361; Schaefer (1998),
+          Sky & Telescope 95(5), 57-60 (the VISLIMIT V-band model and its
+          per-component relative airmasses actually used here).
+        - Rozenberg (1966), "Twilight: A Study in Atmospheric Optics"
+          (low-altitude sky airmass form used by the VISLIMIT path).
 
         The historical note above is context only; it does not provide the
         numerical event algorithm or its thresholds.
@@ -3515,7 +3604,7 @@ def _parse_object_name(
             ``heliacal_ut`` and ``vis_limit_mag`` keep the default rejection.
 
     Returns:
-        Body ID (SE_* constant) for planets
+        Body ID (body constant) for planets
 
     Raises:
         Error: If object name is not recognized or not valid for heliacal
@@ -3843,10 +3932,13 @@ def _heliacal_pheno_ut_pythonic(
 
     References:
         - Schaefer (1990), PASP 102, 212-229, DOI 10.1086/132629,
-          limiting-magnitude/observer model.
+          limiting-magnitude/observer model; Schaefer (1998), Sky & Telescope
+          95(5), 57-60 (VISLIMIT V-band model and its relative airmasses).
+        - Krisciunas & Schaefer (1991), PASP 103, 1033-1039,
+          DOI 10.1086/132921 (scattered-moonlight sky brightness).
         - Yallop (1997), NAO Technical Note 69, only for the lunar-crescent
-          q statistic and class boundaries placed in result slots 17-18.
-        - Kasten & Young (1989), DOI 10.1364/AO.28.004735, optical airmass.
+          q statistic and class boundaries placed in result slots 17-18;
+          Bruin (1977), Vistas in Astronomy 21, 331-358 (crescent width).
     """
     # --- LEB fast path ---
     from .state import get_leb_reader as _get_leb_reader
@@ -4170,7 +4262,9 @@ def _heliacal_pheno_ut_pythonic(
             moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
             illumination = moon_pheno[1] * 100.0  # [1] = illuminated fraction 0-1
 
-            # Crescent width (Yallop/Bruin): W = SD * (1 - cos ARCL), where
+            # Crescent width W = SD * (1 - cos ARCL) from Bruin, F. (1977),
+            # "The first visibility of the lunar crescent", Vistas in Astronomy
+            # 21, 331-358 (adopted by Yallop's q-test below), where
             # ARCL is the arc of light (Sun-Moon elongation, moon_pheno[2]) and
             # SD is the Moon's apparent semidiameter in arcmin (moon_pheno[3]
             # is the apparent diameter in degrees). Near new moon ARCL -> 0 so
@@ -4190,9 +4284,9 @@ def _heliacal_pheno_ut_pythonic(
         except (ValueError, TypeError, ArithmeticError):
             pass
 
-    # Yallop q-test (for lunar crescent visibility)
+    # Yallop q-test for lunar crescent visibility, Yallop, B.D. (1997), NAO
+    # Technical Note No. 69:
     # q = (ARCV - (11.8371 - 6.3226*W + 0.7319*W^2 - 0.1018*W^3)) / 10
-    # Simplified version
     if body == MOON:
         w = w_moon * 60.0  # Convert to arcminutes for formula
         q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3

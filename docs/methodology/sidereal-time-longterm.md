@@ -170,7 +170,3 @@ Validation is source-based and reproducible in this repository:
   derivative consistency, finite behavior at high latitudes, and tier edges.
 - Independent DE441 state vectors and ERFA frame routines provide a second
   implementation path without sharing LibEphemeris reduction code.
-
-Public reference-API calls may be used ephemerally to check API behavior, but
-their numerical outputs are not stored as baselines, tables, or fitted
-parameters.

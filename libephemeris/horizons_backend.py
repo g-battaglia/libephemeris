@@ -50,7 +50,7 @@ logger = logging.getLogger("libephemeris")
 
 API_URL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
-# Map SE_* body IDs to Horizons COMMAND strings
+# Map libephemeris body IDs to Horizons COMMAND strings
 _HORIZONS_COMMAND: Dict[int, str] = {
     0: "10",  # Sun
     1: "301",  # Moon
@@ -433,7 +433,7 @@ def horizons_calc_ut(
     Args:
         client: HorizonsClient instance.
         jd_ut: Julian Day UT.
-        body_id: SE_* body constant.
+        body_id: libephemeris body constant.
         iflag: Public calculation flags.
         sid_mode: Sidereal mode override; reads the global state when None.
             An explicit value lets EphemerisContext dispatch through

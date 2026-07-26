@@ -116,8 +116,8 @@ ayanamshas.
 - Every predefined base `SIDM_*` mode 0--46 computes without fallback.
 - The source-audit status of each historical anchor is documented separately.
 - Use `SIDM_USER` for a lawful, citable tradition-specific definition.
-- External implementation output is used only for ephemeral comparison, never
-  as an anchor source.
+- Ayanamsha anchors are defined from published or catalogue/IAU sources, not
+  taken from another implementation's output.
 
 See [Sidereal modes](../../reference/ayanamsha.md) for the authoritative mode
 list and provenance notes.

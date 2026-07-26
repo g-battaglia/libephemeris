@@ -419,8 +419,11 @@ def _nearest_past_helio_crossing(
 # Retrograde-loop arc (deg) each planet sweeps: a target within this arc of the
 # planet is reachable via an imminent retrograde dip rather than a full orbit
 # ahead. Also reused as the "fine scan band" of the forward first-crossing guard.
+# Approximate per-planet values (order of the synodic geometry, cf. Meeus
+# ch. 31); scan-band seeds only, non-final.
 _RETRO_ARC = {2: 16.0, 3: 18.0, 4: 22.0, 5: 12.0, 6: 9.0, 7: 6.0, 8: 5.0, 9: 4.0}
-# Synodic period (days) — the spacing between successive retrograde loops.
+# Synodic period (days) — the spacing between successive retrograde loops,
+# approximate mean values (Meeus ch. 31); bracketing seeds only, non-final.
 _SYNODIC = {
     2: 116.0,
     3: 584.0,
@@ -658,7 +661,9 @@ def solcross_ut(
 
     # Initial time estimate (linear approximation)
     if speed == 0:
-        speed = 0.9856  # Average Sun motion ~1°/day
+        # Sun mean motion ~0.9856 deg/day (Meeus ch. 25/31);
+        # root-finder seed only, non-final.
+        speed = 0.9856
 
     # Calculate angular distance to target — direction-aware
     diff = (x2cross - lon_start) % 360.0  # in [0, 360)
@@ -790,7 +795,9 @@ def solcross(
 
     # Initial time estimate (linear approximation)
     if speed == 0:
-        speed = 0.9856  # Average Sun motion ~1°/day
+        # Sun mean motion ~0.9856 deg/day (Meeus ch. 25/31);
+        # root-finder seed only, non-final.
+        speed = 0.9856
 
     # Calculate angular distance to target — direction-aware
     diff = (x2cross - lon_start) % 360.0
@@ -900,7 +907,9 @@ def mooncross_ut(
 
     # Initial time estimate
     if speed == 0:
-        speed = 13.176  # Average Moon motion ~13.18°/day
+        # Moon mean motion ~13.176 deg/day (Meeus ch. 47);
+        # root-finder seed only, non-final.
+        speed = 13.176
 
     # Calculate initial guess — direction-aware
     diff = (x2cross - lon_start) % 360.0
@@ -1023,7 +1032,9 @@ def mooncross(
 
     # Initial time estimate
     if speed == 0:
-        speed = 13.176  # Average Moon motion ~13.18°/day
+        # Moon mean motion ~13.176 deg/day (Meeus ch. 47);
+        # root-finder seed only, non-final.
+        speed = 13.176
 
     # Calculate initial guess — direction-aware
     diff = (x2cross - lon_start) % 360.0
@@ -1198,7 +1209,8 @@ def mooncross_node(
     """
     backwards = _coerce_backwards(backwards)
 
-    # Half nodal month - time between successive node crossings
+    # Half nodal (draconic) month ~13.6 days between successive node crossings
+    # (Meeus ch. 47); root-finder seed only, non-final.
     HALF_NODAL_MONTH = 13.6
     direction = -1.0 if backwards else 1.0
 
@@ -1353,7 +1365,8 @@ def cross_ut(
     # Estimate typical speed if near zero
     # Geocentric average speeds (°/day) - slower planets need more iterations
     # Note: geocentric speeds are affected by retrograde motion, values are
-    # approximate averages during direct motion
+    # approximate averages during direct motion (order of the mean motions,
+    # cf. Meeus ch. 31); root-finder seeds only, non-final.
     typical_speeds = {
         2: 1.4,  # Mercury
         3: 1.2,  # Venus

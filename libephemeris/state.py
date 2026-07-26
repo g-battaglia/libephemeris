@@ -25,6 +25,7 @@ Provenance:
 from __future__ import annotations
 
 import os
+import re
 import threading
 import warnings
 import weakref
@@ -304,16 +305,36 @@ def get_calc_mode() -> str:
     # moment earlier.
     if _CALC_MODE is not None:
         return _CALC_MODE
-    env_value = os.environ.get(_CALC_MODE_ENV_VAR, "").lower().strip()
-    if env_value in _VALID_CALC_MODES:
-        return env_value
+    env_raw = os.environ.get(_CALC_MODE_ENV_VAR, "")
+    if env_raw.strip():
+        return _validated_calc_mode(env_raw, _CALC_MODE_ENV_VAR)
     # TOML config fallback
     from ._config_toml import get_str as _toml_str
 
     toml_value = _toml_str("mode")
-    if toml_value and toml_value.lower().strip() in _VALID_CALC_MODES:
-        return toml_value.lower().strip()
+    if toml_value and toml_value.strip():
+        return _validated_calc_mode(toml_value, "TOML key 'mode'")
     return "auto"
+
+
+def _validated_calc_mode(value: str, source: str) -> str:
+    """Normalize a configured calc mode, rejecting unknown spellings.
+
+    A typo in the mode selector (e.g. ``LIBEPHEMERIS_MODE=lebb``) must not
+    silently widen a sealed ``"leb"`` deployment back to ``"auto"`` — where
+    a source fallback is allowed and the network is unsealed. It fails loudly
+    instead, mirroring :func:`libephemeris.net.set_network_policy` /
+    ``_validated_policy`` for ``LIBEPHEMERIS_NETWORK_POLICY`` and the
+    programmatic :func:`set_calc_mode` guard. Absence of the variable is not
+    a typo and still resolves to the ``"auto"`` default upstream.
+    """
+    normalized = value.lower().strip()
+    if normalized not in _VALID_CALC_MODES:
+        raise ValueError(
+            f"Invalid calculation mode from {source}: {value!r}. Must be one "
+            f"of: {list(_VALID_CALC_MODES)}"
+        )
+    return normalized
 
 
 @contextmanager
@@ -621,9 +642,7 @@ def _discover_reviewed_leb_tier_cores() -> dict[str, str]:
         if _is_reviewed_tier_core(bundled, tier):
             discovered[tier] = bundled
         elif os.path.isfile(bundled):
-            get_logger().error(
-                "Bundled LEB core was rejected as unusable: %s", bundled
-            )
+            get_logger().error("Bundled LEB core was rejected as unusable: %s", bundled)
 
     return discovered
 
@@ -1311,12 +1330,28 @@ def list_tiers() -> List[PrecisionTier]:
     return list(TIERS.values())
 
 
+# Priority order of the cumulative precision tiers. A higher tier must cover
+# at least every lower tier's minor-body SPK window.
+_TIER_PRIORITY: Tuple[str, ...] = ("base", "medium", "extended")
+
+
 def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, str]:
     """
     Get the SPK date range for a tier.
 
     This determines the date range used when auto-downloading SPK files
     from JPL Horizons for minor bodies.
+
+    The tiers are **cumulative** (``base`` ⊂ ``medium`` ⊂ ``extended``), so the
+    returned window is the union of the requested tier's own window with every
+    lower-priority tier's window. This guarantees the download window is
+    monotonic in the tier order: without it the ``medium`` literal (1900-2100)
+    is *narrower* than ``base`` (1850-2150), so a fresh ``medium`` install would
+    fetch asteroid SPKs covering less than ``base`` and silently drop to the
+    catastrophic Keplerian fallback at e.g. 1870 — a date inside the tier's own
+    DE range and inside ``base``'s SPK window. The routing (``_find_covering_spk``)
+    already prefers any cached SPK that covers the date regardless of tier; this
+    makes the download window agree with that best-by-date intent.
 
     Args:
         tier_name: Tier name, or None to use the current tier.
@@ -1326,8 +1361,8 @@ def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, s
 
     Example:
         >>> from libephemeris.state import get_spk_date_range_for_tier
-        >>> get_spk_date_range_for_tier()
-        ('1900-01-01', '2100-01-01')
+        >>> get_spk_date_range_for_tier()          # medium, cumulative with base
+        ('1850-01-01', '2150-01-01')
         >>> get_spk_date_range_for_tier("extended")
         ('1600-01-01', '2500-01-01')
     """
@@ -1336,8 +1371,19 @@ def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, s
             raise ValueError(
                 f"Invalid tier: {tier_name!r}. Must be one of: {list(TIERS.keys())}"
             )
-        return TIERS[tier_name].spk_date_range
-    return _get_current_tier().spk_date_range
+        active = tier_name
+    else:
+        active = _get_current_tier().name
+
+    if active not in _TIER_PRIORITY:
+        # Unknown/custom tier: no cumulative ordering to apply.
+        return TIERS[active].spk_date_range
+
+    eligible = _TIER_PRIORITY[: _TIER_PRIORITY.index(active) + 1]
+    starts = [TIERS[t].spk_date_range[0] for t in eligible]
+    ends = [TIERS[t].spk_date_range[1] for t in eligible]
+    # ISO "YYYY-MM-DD" strings order lexicographically, so min/max are correct.
+    return (min(starts), max(ends))
 
 
 def _get_effective_ephemeris_file() -> str:
@@ -1374,6 +1420,54 @@ def _get_effective_ephemeris_file() -> str:
     return tier.ephemeris_file
 
 
+# JPL distributes its planetary ephemerides as ``deNNN.bsp`` / ``deNNNs.bsp``
+# (e.g. de440.bsp, de440s.bsp, de441.bsp, de421.bsp). Only such names are
+# eligible for an on-demand network download; an arbitrary configured filename
+# (e.g. a bogus set_jpl_file() argument) is not.
+_DE_KERNEL_RE = re.compile(r"^de\d+s?\.bsp$", re.IGNORECASE)
+
+
+def _is_recognized_de_kernel(filename: str) -> bool:
+    """Return whether *filename* names a JPL DE planetary ephemeris kernel."""
+    return bool(_DE_KERNEL_RE.match(os.path.basename(filename)))
+
+
+def _ephemeris_file_present(filename: str) -> bool:
+    """Return whether *filename* exists in any ephemeris search location."""
+    if _EPHEMERIS_PATH and os.path.exists(os.path.join(_EPHEMERIS_PATH, filename)):
+        return True
+    return os.path.exists(os.path.join(_resolve_data_dir(), filename))
+
+
+def _resolve_missing_ephemeris_fallback(filename: str, logger) -> str:
+    """Fall back to the tier default for an unrecognized, absent JPL file.
+
+    The reference API, asked for a JPL file it cannot find (e.g. after
+    ``set_jpl_file("bogus.bsp")`` under ``FLG_JPLEPH``), falls back to a valid
+    default ephemeris and returns a position rather than erroring or fetching
+    the missing name. libephemeris must likewise never turn an arbitrary
+    configured filename into a network download of that exact name from
+    ssd.jpl.nasa.gov. Recognized JPL DE kernels (``deNNN[s].bsp``) are still
+    downloaded on demand; any other name that is absent from every local search
+    location is replaced by the active tier's DE kernel.
+
+    (The public retflag still echoes the requested ephemeris bit, resolved in
+    ``planets._normalize_calc_flags``; the source substitution here only changes
+    which kernel is opened, not the echoed flags.)
+    """
+    if _is_recognized_de_kernel(filename) or _ephemeris_file_present(filename):
+        return filename
+    fallback = _get_current_tier().ephemeris_file
+    logger.warning(
+        "Configured ephemeris file %r is not a recognized JPL DE kernel and is "
+        "not present locally; using the default kernel %s instead of "
+        "downloading the requested name.",
+        filename,
+        fallback,
+    )
+    return fallback
+
+
 def get_planets() -> SpiceKernel:
     """
     Get or load the planetary ephemeris (DE440 by default).
@@ -1407,6 +1501,9 @@ def get_planets() -> SpiceKernel:
             if _PLANETS is None:
                 load = get_loader()
                 effective_file = _get_effective_ephemeris_file()
+                effective_file = _resolve_missing_ephemeris_fallback(
+                    effective_file, logger
+                )
                 _EPHEMERIS_FILE = effective_file
 
                 # Try custom ephemeris path first if set
@@ -1842,12 +1939,16 @@ def reset_session() -> None:
     clear_observer_cache()
 
 
-def set_ephe_path(path: Optional[str]) -> None:
+def set_ephe_path(path: Optional[str] = None) -> None:
     """
     Set the path for ephemeris files.
 
     Args:
-        path: Path to directory containing ephemeris files.
+        path: Path to directory containing ephemeris files. Omit the argument
+            (or pass ``None``) to reset to the default search location, matching
+            the reference API, whose ``set_ephe_path()`` with no argument resets
+            to its default. A required-positional signature previously raised
+            ``TypeError`` on the no-argument reset call.
 
     Note:
         This sets the directory where get_planets() will look for the ephemeris
@@ -2228,8 +2329,12 @@ def close() -> None:
           set via set_calc_mode(), the .leb file path set via
           set_leb_file() and the strict-precision setting survive close()
           (they are re-resolved from env/TOML only if never set
-          explicitly). Per-session state (topo, sidereal mode, user
-          Delta-T, open files, caches) is cleared.
+          explicitly). Per-session state (topo, sidereal mode, open files,
+          caches) is cleared.
+        - Measured reference behavior: a user-defined Delta-T set via
+          set_delta_t_userdef() is preserved across close() (it is treated
+          as configuration, not per-session state). Clear it explicitly with
+          set_delta_t_userdef(None).
         - This is useful for:
           - Freeing memory and file handles in long-running applications
           - Switching to a different ephemeris file
@@ -2260,7 +2365,7 @@ def _close_inner() -> None:
     global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
     global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
-    global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
+    global _ANGLES_CACHE, _TIDAL_ACCELERATION, _LAPSE_RATE
     global _SPK_KERNELS, _SPK_BODY_MAP, _SPK_TYPE21_KERNELS, _AUTO_SPK_DOWNLOAD
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
     global _PRECISION_TIER
@@ -2348,7 +2453,9 @@ def _close_inner() -> None:
     _SIDEREAL_T0 = 0.0
     _ANGLES_CACHE = {}
     _TIDAL_ACCELERATION = None
-    _DELTA_T_USERDEF = None
+    # _DELTA_T_USERDEF is deliberately NOT reset here: measured reference
+    # behavior preserves a user-defined Delta-T across close(). Callers clear
+    # it explicitly via set_delta_t_userdef(None).
     _LAPSE_RATE = None
     _AUTO_SPK_DOWNLOAD = None
     _SPK_CACHE_DIR = None
@@ -2818,7 +2925,7 @@ def get_iers_delta_t_enabled() -> bool:
 #     dependency; see THIRD_PARTY_NOTICES.md).
 #   - ``espenak_meeus``: a native reimplementation of the classic Espenak &
 #     Meeus (2006) NASA polynomial set (published coefficients).
-# Neither derives from the reference (copyleft) Swiss Ephemeris; the project
+# Neither derives from the reference (copyleft) ephemeris; the project
 # depends only on permissively-licensed ephemeris tooling (Skyfield/pyerfa).
 # Exact parity with the reference ephemeris (for validation only) is injected
 # externally via set_delta_t_userdef() in the validation harness.

@@ -102,15 +102,23 @@ class TestCotransSpSplitForm:
         assert dist_sp == 0.0
 
     @pytest.mark.unit
-    def test_denominator_degenerate_branch(self):
-        """Choose inputs so x^2 + y^2 ~ 0, hitting the denom guard (line 170)."""
-        eps = 23.0
-        # cos(lon)=0 at lon=90; pick lat so the rotated y-component vanishes too.
-        lat = math.degrees(math.atan(1.0 / math.tan(math.radians(-eps))))
-        (_, _, _), (lon_sp, lat_sp, dist_sp) = cotrans_sp(
-            [90.0, lat, 1.0], [1.0, 1.0, 0.0], eps
+    def test_near_pole_longitude_speed_is_analytic(self):
+        """Near the pole the longitude rate is the finite analytic value.
+
+        denom = x^2 + y^2 = cos^2(new_lat) shrinks toward the pole but the
+        analytic rate (x*dy - y*dx)/denom stays finite and grows like
+        1/cos(new_lat). The reference returns this large finite value rather
+        than zero, so libephemeris must not clamp it to 0 inside a guard band.
+        """
+        eps = 23.4392911
+        # lon=90, lat just below 90-eps maps Dec very close to +90 (near pole).
+        (_, out_lat, _), (lon_sp, _, _) = cotrans_sp(
+            [90.0, 66.5606, 1.0], [1.0, 0.5, 0.0], -eps
         )
-        assert lon_sp == 0.0
+        assert out_lat > 89.999  # confirm we are within ~0.001 deg of the pole
+        assert math.isfinite(lon_sp)
+        # Analytic value is large (|rate| ~ 2e5 deg/day here), never clamped to 0.
+        assert abs(lon_sp) > 1e4
 
 
 class TestAzaltAndAzaltRevDegenerate:
@@ -401,10 +409,12 @@ class TestSplitDegNakshatra:
         assert result[:2] == (0, 35)
 
     @pytest.mark.unit
-    def test_nakshatra_decimal_boundary_normalizes(self):
-        """A longitude beyond one turn is normalized before segmentation."""
+    def test_nakshatra_index_beyond_one_turn_is_not_reduced(self):
+        """Matching the reference, the nakshatra index counts from the raw
+        longitude and is not reduced modulo 360 (only a raw index of exactly
+        27 — one full turn — wraps to 0)."""
         result = split_deg(373.3333333333333, SPLIT_DEG_NAKSHATRA)
-        assert result[4] == 0
+        assert result[4] == 28
 
     @pytest.mark.unit
     def test_negative_nakshatra_flag_uses_ordinary_signed_split(self):
@@ -412,13 +422,16 @@ class TestSplitDegNakshatra:
         assert split_deg(-30.5, SPLIT_DEG_NAKSHATRA) == (30, 30, 0, 0.0, -1)
 
     @pytest.mark.unit
-    def test_zodiac_indices_normalize_and_combined_negative_flag_precedence(self):
-        """Zodiac indices normalize and negative combined flags stay defined."""
-        assert split_deg(370.0, SPLIT_DEG_ZODIACAL)[4] == 0
-        assert split_deg(390.0, SPLIT_DEG_ZODIACAL)[4] == 1
-        assert split_deg(480.0, SPLIT_DEG_ZODIACAL)[4] == 4
-        assert split_deg(-370.0, SPLIT_DEG_ZODIACAL)[4] == 0
-        assert split_deg(-720.0, SPLIT_DEG_ZODIACAL)[4] == 0
+    def test_zodiac_indices_match_reference_wrap_and_negative_flag_precedence(self):
+        """Zodiac indices follow the reference: int(deg/30) is reported
+        unreduced except a raw index of exactly 12 (one full turn) which wraps
+        to 0; negative inputs use the absolute value; combined flags stay
+        defined."""
+        assert split_deg(370.0, SPLIT_DEG_ZODIACAL)[4] == 0  # raw index 12 -> 0
+        assert split_deg(390.0, SPLIT_DEG_ZODIACAL)[4] == 13  # unreduced
+        assert split_deg(480.0, SPLIT_DEG_ZODIACAL)[4] == 16  # unreduced
+        assert split_deg(-370.0, SPLIT_DEG_ZODIACAL)[4] == 0  # |370| -> 12 -> 0
+        assert split_deg(-720.0, SPLIT_DEG_ZODIACAL)[4] == 24  # |720| -> 24
         assert split_deg(-30.5, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ZODIACAL)[4] == 1
 
     @pytest.mark.unit

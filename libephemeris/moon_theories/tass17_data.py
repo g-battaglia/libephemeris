@@ -17,7 +17,9 @@ Original theory: Vienne & Duriez (1995), IMCCE.
 This file contains ~1500 periodic terms for Saturn's 8 major satellites.
 
 Reference:
-- Vienne, A. & Duriez, L. (1995) "TASS1.6", A&A 297, 588-605
+- Vienne, A. & Duriez, L. (1995) "TASS1.6", A&A 297, 588-605. NOTE: the paper
+  documents the TASS 1.6 solution; TASS 1.7 is the later IMCCE revision (the
+  Fortran distribution below), not a separate publication.
 - Original Fortran: ftp://ftp.imcce.fr/pub/ephem/satel/tass17/
 - Stellarium implementation: Johannes Gajdosik (MIT license)
 

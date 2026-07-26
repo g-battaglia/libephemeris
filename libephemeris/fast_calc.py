@@ -105,9 +105,7 @@ if TYPE_CHECKING:
     from .leb_composite import CompositeLEBReader, TieredLEBReader
     from .leb_reader import LEBReader
 
-    LEBReaderLike = Union[
-        LEBReader, LEB2Reader, CompositeLEBReader, TieredLEBReader
-    ]
+    LEBReaderLike = Union[LEBReader, LEB2Reader, CompositeLEBReader, TieredLEBReader]
 
     class _DeflectorSource(Protocol):
         """Structural type for anything that can supply deflector states.
@@ -125,6 +123,9 @@ if TYPE_CHECKING:
 # CONSTANTS
 # =============================================================================
 
+# Speed of light in AU/day (NOVAS/Skyfield ``C_AUDAY``; adopted for
+# cross-backend bit-identity). c = 299792458 m/s exactly (BIPM/CODATA SI) with
+# the IAU 1976 System au (1.49597870691e11 m) reproduces 173.1446326846693.
 C_LIGHT_AU_DAY = 173.1446326846693  # Speed of light in AU/day
 J2000 = 2451545.0  # J2000.0 epoch in JD
 
@@ -419,8 +420,11 @@ def _apply_aberration(
 ) -> Tuple[float, float, float]:
     """Apply relativistic aberration to a geometric position vector.
 
-    Uses the full special-relativistic formula implemented by Skyfield's
-    ``add_aberration()``, including the Lorentz factor gamma.
+    Special-relativistic stellar aberration (Explanatory Supplement to the
+    Astronomical Almanac, 3rd ed. 2013, section 7.2.3; Kaplan 2005, USNO
+    Circular 179, section 6). Uses the full special-relativistic formula
+    implemented by Skyfield's ``add_aberration()``, including the Lorentz
+    factor gamma.
 
     When *light_time* is zero or negative, falls back to a first-order
     approximation (classical Bradley aberration) for backward
@@ -483,12 +487,20 @@ def _apply_aberration(
     return (ax / a_dist * dist, ay / a_dist * dist, az / a_dist * dist)
 
 
-# Gravitational deflection constants (matching Skyfield's relativity module)
+# Gravitational deflection constants (matching Skyfield's relativity module so
+# the deflection is bit-identical to the Skyfield backend).
+# Heliocentric gravitational constant GM_sun (m^3/s^2). This is the value
+# carried by the NOVAS/Skyfield relativity model (equal to Skyfield's ``GS``);
+# it is NOT the DE440 GM_sun of Park, Folkner, Williams & Boggs (2021), AJ 161,
+# 105 (1.327124400413e20). It is retained here only to reproduce Skyfield's
+# deflection bit-for-bit.
 _GS = 1.32712440017987e20  # heliocentric gravitational constant (m^3/s^2)
-_C_MS = 299792458.0  # speed of light (m/s)
-_AU_M = 149597870700  # 1 AU in metres
+_C_MS = 299792458.0  # speed of light (m/s), exact SI (BIPM/CODATA)
+_AU_M = 149597870700  # 1 AU in metres (IAU 2012 Resolution B2)
 
-# Deflector reciprocal masses (solar mass / deflector mass)
+# Deflector reciprocal masses (solar mass / deflector mass). Sun-to-planet mass
+# ratios of the order used in the Astronomical Almanac (Selected Astronomical
+# Constants), matching the deflector set of the Skyfield relativity model.
 _DEFLECTORS: Tuple[Tuple[int, float], ...] = (
     (SUN, 1.0),  # Sun
     (5, 1047.3486),  # Jupiter barycenter
@@ -582,8 +594,11 @@ def _apply_gravitational_deflection(
 ) -> Tuple[float, float, float]:
     """Apply PPN gravitational light deflection by Sun, Jupiter, Saturn.
 
-    Matches Skyfield's ``apparent(deflectors=(10, 599, 699))`` formula.
-    Uses LEB data for deflector positions (barycentric ICRS).
+    Post-Newtonian (PPN, gamma = 1) light deflection in the field of each
+    deflector (Explanatory Supplement to the Astronomical Almanac, 3rd ed.
+    2013, section 7.2.4; Kaplan 2005, USNO Circular 179, section 6). Matches
+    Skyfield's ``apparent(deflectors=(10, 599, 699))`` formula. Uses LEB data
+    for deflector positions (barycentric ICRS).
 
     For the Sun, deflection is the dominant correction (~max 1.75" at
     the limb, typically 0.01–4" for planets).  Jupiter and Saturn add
@@ -2181,6 +2196,73 @@ def _pipeline_helio(
 # =============================================================================
 
 
+def _escalate_sealed_range_miss(
+    reader: "LEBReaderLike", ipl: int, jd_tt: float, err: Exception
+) -> Optional[Exception]:
+    """Name the REQUESTED body when neither it nor its LEB support covers jd.
+
+    In sealed ``leb`` mode a curated minor body requested outside its own LEB
+    window falls through to the declared Keplerian model, which reads Sun/Earth
+    states from the same LEB. When the support states are ALSO out of range the
+    Keplerian reduction fails on the internal Sun lookup and would surface an
+    ``EphemerisRangeError`` naming ``Body 0`` (the support Sun) instead of the
+    body the caller actually asked for. Detect that both the requested body and
+    the Sun are out of range and return a typed error naming the requested body
+    with its own stored window.
+
+    Returns ``None`` -- letting the original ``ValueError``/``KeyError``
+    propagate so calc_ut()/calc() take the normal out-of-range → Keplerian
+    fall-through -- when the support states still cover the date (the Keplerian
+    model can run), when the request was not a body-range miss (e.g. an
+    unsupported-flag ``KeyError`` on an in-range body), or when the reader does
+    not expose per-body coverage.
+    """
+    from .state import get_calc_mode
+
+    if get_calc_mode() != "leb":
+        return None
+    # Core bodies (Sun..mean Apogee, Earth) are handled downstream by
+    # planets._raise_leb_range_miss, which emits the canonical sealed-mode
+    # "does not silently substitute" contract. Only the curated minor bodies
+    # that fall through to the Keplerian model (and there read the internal Sun)
+    # can be mislabelled as "Body 0", so restrict escalation to non-core ids.
+    from .planets import _LEB_CORE_BODY_IDS
+
+    if ipl in _LEB_CORE_BODY_IDS:
+        return None
+    coverage_fn = getattr(reader, "body_coverage", None)
+    if coverage_fn is None:
+        return None
+    body_cov = coverage_fn(ipl)
+    if body_cov is None:
+        # Body absent from the reader entirely: not a date-range miss for this
+        # body. Leave the original error for the caller's missing-body policy.
+        return None
+    b_start, b_end = float(body_cov[0]), float(body_cov[1])
+    if b_start <= jd_tt <= b_end:
+        # The requested body IS covered here; the failure was something else
+        # (unsupported flag, corrupt section). Do not relabel it.
+        return None
+    sun_cov = coverage_fn(SUN)
+    if sun_cov is not None and float(sun_cov[0]) <= jd_tt <= float(sun_cov[1]):
+        # Keplerian support (Sun/Earth) is available: allow the documented
+        # out-of-range → declared-local-model fall-through to proceed.
+        return None
+    from .exceptions import EphemerisRangeError
+
+    return EphemerisRangeError(
+        message=(
+            f"Body {ipl} at JD {jd_tt:.6f} is outside active LEB coverage range "
+            f"[{b_start:.6f}, {b_end:.6f}], and no in-range LEB support state is "
+            "available for the declared local model."
+        ),
+        requested_jd=jd_tt,
+        start_jd=b_start,
+        end_jd=b_end,
+        body_id=ipl,
+    )
+
+
 def fast_calc_ut(
     reader: "LEBReaderLike",
     tjd_ut: float,
@@ -2266,18 +2348,24 @@ def fast_calc_ut(
             ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
                 return _topocentric_offset(_tgp, jd_sample, jd_sample - _dt, reader)
 
-    return _fast_calc_core(
-        reader,
-        jd_tt,
-        tjd_ut,
-        ipl,
-        iflag,
-        sid_mode=sid_mode,
-        sid_t0=sid_t0,
-        sid_ayan_t0=sid_ayan_t0,
-        topo_offset=topo_offset,
-        topo_offset_fn=topo_offset_fn,
-    )
+    try:
+        return _fast_calc_core(
+            reader,
+            jd_tt,
+            tjd_ut,
+            ipl,
+            iflag,
+            sid_mode=sid_mode,
+            sid_t0=sid_t0,
+            sid_ayan_t0=sid_ayan_t0,
+            topo_offset=topo_offset,
+            topo_offset_fn=topo_offset_fn,
+        )
+    except (KeyError, ValueError) as err:
+        escalated = _escalate_sealed_range_miss(reader, ipl, jd_tt, err)
+        if escalated is not None:
+            raise escalated from err
+        raise
 
 
 def fast_calc_tt(
@@ -2370,18 +2458,24 @@ def fast_calc_tt(
             ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
                 return _topocentric_offset(_tgp, jd_sample, jd_sample - _dt, reader)
 
-    return _fast_calc_core(
-        reader,
-        tjd_tt,
-        tjd_ut,
-        ipl,
-        iflag,
-        sid_mode=sid_mode,
-        sid_t0=sid_t0,
-        sid_ayan_t0=sid_ayan_t0,
-        topo_offset=topo_offset,
-        topo_offset_fn=topo_offset_fn,
-    )
+    try:
+        return _fast_calc_core(
+            reader,
+            tjd_tt,
+            tjd_ut,
+            ipl,
+            iflag,
+            sid_mode=sid_mode,
+            sid_t0=sid_t0,
+            sid_ayan_t0=sid_ayan_t0,
+            topo_offset=topo_offset,
+            topo_offset_fn=topo_offset_fn,
+        )
+    except (KeyError, ValueError) as err:
+        escalated = _escalate_sealed_range_miss(reader, ipl, tjd_tt, err)
+        if escalated is not None:
+            raise escalated from err
+        raise
 
 
 def _fast_calc_core(

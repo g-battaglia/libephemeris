@@ -381,9 +381,7 @@ All four were **restored**, and `_calc_nutation_obliquity()` was updated to use
 **Date:** March 2026
 
 The `pheno_ut()` implementation was audited against Mallama & Hilton (2018),
-published almanac formulae, vector identities, and IAU 2015 standards. External
-compatibility calls were used only as ephemeral behavioral checks; no numeric
-output from them was retained or used to derive a model.
+published almanac formulae, vector identities, and IAU 2015 standards.
 
 #### Phase Angle — 3D Vector Dot Product (Critical)
 
@@ -554,9 +552,9 @@ calls currently used for finite-difference, yielding ~3× performance improvemen
 
 ### Lunar geometry improvements
 
-Future changes to True Node or lunar apsides must start from JPL states, IAU/ERFA
-arguments, or citable primary literature. New output-offset calibration and
-new externally fitted perturbation terms are prohibited. A scientifically motivated
+Future changes to True Node or lunar apsides start from JPL states, IAU/ERFA
+arguments, or citable primary literature, rather than from output-offset
+calibration or externally fitted perturbation terms. A scientifically motivated
 improvement can refine a published analytical definition or use a documented
 multi-body dynamical construction validated against JPL identities while
 preserving the public compatibility tolerances.

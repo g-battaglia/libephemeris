@@ -13,8 +13,8 @@ Uranus has 5 major moons that dominate its satellite system mass:
 The barycenter offset is computed from the weighted sum of moon positions.
 
 References:
-- Laskar, J. (1987) "GUST86 - an analytical ephemeris of the Uranian satellites"
-  A&A 188, 212-218
+- Laskar, J. & Jacobson, R.A. (1987) "GUST86 - an analytical ephemeris of the
+  Uranian satellites" A&A 188, 212-224
 - JPL SSD: Planetary Satellite Mean Elements
   https://ssd.jpl.nasa.gov/sats/elem
 - Jacobson, R.A. (2014) "The orbits of the Uranian satellites and rings"
@@ -44,10 +44,16 @@ from typing import Tuple
 # PHYSICAL CONSTANTS
 # =============================================================================
 
-# GM values (km³/s²) from URA111 / JPL
+# Planet GM in km³/s² from URA111 (Jacobson 2014, AJ 148, 76).
 GM_URANUS: float = 5793951.3  # URA111
 
-# Major moon GM values (approximate, from literature)
+# Major-moon barycenter weights. WARNING: despite the GM_ prefix these are NOT
+# GM in km^3/s^2 -- they are approximate mass-scale figures (order 1e20 kg,
+# roughly GM/6.7 vs the URA111 GMs ~86.4/81.5/228.2/192.4/4.4 km^3/s^2). Below
+# they enter uranus_cob_offset() only as RELATIVE weights among the moons, so
+# the barycenter direction is about right; but sharing a denominator with the
+# true-GM GM_URANUS scales the offset magnitude down by ~6.7x. Correcting the
+# numbers would change results, so it is documented rather than changed here.
 GM_ARIEL: float = 14.0
 GM_UMBRIEL: float = 13.0
 GM_TITANIA: float = 41.0
@@ -98,7 +104,11 @@ TITANIA_E: float = 0.0014
 OBERON_E: float = 0.0016
 MIRANDA_E: float = 0.0013
 
-# Mean anomaly at J2000 (radians, approximate)
+# Mean anomaly at the J2000 epoch (radians). These whole-degree phase angles,
+# together with the node and pericenter longitudes below, are project-derived
+# by rounding a GUST86-consistent sampling of the satellite phases at J2000;
+# they are not transcribed epoch elements. The resulting few-thousand-km moon
+# position error is the dominant term quantified in the module docstring.
 ARIEL_M0: float = math.radians(123.0)
 UMBRIEL_M0: float = math.radians(285.0)
 TITANIA_M0: float = math.radians(107.0)

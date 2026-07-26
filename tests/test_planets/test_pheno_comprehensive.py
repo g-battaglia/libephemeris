@@ -30,6 +30,53 @@ def _reset_state():
     swe.close()
 
 
+from libephemeris.constants import FLG_HELCTR, FLG_TOPOCTR  # noqa: E402
+
+
+class TestPhenoTopocentric:
+    """FLG_TOPOCTR is honored in pheno (measured reference behavior)."""
+
+    @pytest.mark.unit
+    def test_moon_topocentric_differs_from_geocentric(self):
+        """The Moon's topocentric phenomena differ from the geocentric ones:
+        the observer parallax enlarges/shrinks the disc and shifts the phase
+        angle by a few tenths of a degree. The base (pre-fix) behavior ignored
+        the flag and returned identical values."""
+        swe.set_topo(12.5, 41.9, 100.0)
+        geo = swe.pheno_ut(2451545.0, MOON, 0)
+        topo = swe.pheno_ut(2451545.0, MOON, FLG_TOPOCTR)
+        assert abs(topo[3] - geo[3]) * 3600.0 > 1.0  # diameter shift > 1 arcsec
+        assert abs(topo[0] - geo[0]) > 0.05  # phase-angle shift > 0.05 deg
+
+    @pytest.mark.unit
+    def test_far_planet_topocentric_effect_tiny(self):
+        """A far planet's parallax is small: the topocentric diameter barely
+        moves, but the value is still finite and positive."""
+        swe.set_topo(12.5, 41.9, 100.0)
+        geo = swe.pheno_ut(2451545.0, JUPITER, 0)
+        topo = swe.pheno_ut(2451545.0, JUPITER, FLG_TOPOCTR)
+        assert topo[3] > 0.0
+        assert abs(topo[3] - geo[3]) * 3600.0 < 0.1
+
+    @pytest.mark.unit
+    def test_topocentric_without_set_topo_raises(self):
+        """FLG_TOPOCTR without a prior set_topo() is an error (as in calc)."""
+        from libephemeris.exceptions import ConfigurationError
+
+        swe.close()  # clears any previously set observer location
+        with pytest.raises(ConfigurationError):
+            swe.pheno_ut(2451545.0, MOON, FLG_TOPOCTR)
+
+    @pytest.mark.unit
+    def test_helctr_still_ignored_with_topoctr(self):
+        """FLG_HELCTR remains ignored; FLG_TOPOCTR|FLG_HELCTR == FLG_TOPOCTR."""
+        swe.set_topo(12.5, 41.9, 100.0)
+        topo = swe.pheno_ut(2451545.0, MOON, FLG_TOPOCTR)
+        topo_helctr = swe.pheno_ut(2451545.0, MOON, FLG_TOPOCTR | FLG_HELCTR)
+        for a, b in zip(topo, topo_helctr):
+            assert a == pytest.approx(b, abs=1e-9)
+
+
 JD_J2000 = 2451545.0
 JD_2020 = 2458849.5
 JD_2023 = 2460000.0

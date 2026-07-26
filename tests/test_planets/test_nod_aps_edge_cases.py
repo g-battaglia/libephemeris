@@ -14,6 +14,7 @@ import pytest
 import libephemeris as swe
 from libephemeris.constants import (
     SUN,
+    MOON,
     EARTH,
     MARS,
     JUPITER,
@@ -21,10 +22,16 @@ from libephemeris.constants import (
     URANUS,
     NEPTUNE,
     MEAN_NODE,
+    INTP_APOG,
+    INTP_PERG,
     NODBIT_MEAN,
     NODBIT_OSCU,
     NODBIT_OSCU_BAR,
     NODBIT_FOPOINT,
+    FLG_SWIEPH,
+    FLG_EQUATORIAL,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
 )
 
 
@@ -111,15 +118,23 @@ class TestNodApsZeroBodies:
 
     @pytest.mark.unit
     def test_earth_nod_aps(self):
-        """Earth nod_aps returns some result."""
+        """Earth nod_aps returns its apsides with zeroed nodes."""
         result = swe.nod_aps_ut(JD_J2000, EARTH, NODBIT_MEAN)
         assert len(result) == 4
+        # Nodes are zero (Earth's orbit defines the ecliptic); apsides are not.
+        assert result[0][0] == 0.0 and result[1][0] == 0.0
+        assert result[2][2] != 0.0 and result[3][2] != 0.0
 
     @pytest.mark.unit
-    def test_mean_node_body_nod_aps(self):
-        """Mean Node body in nod_aps returns some result."""
-        result = swe.nod_aps_ut(JD_J2000, MEAN_NODE, NODBIT_MEAN)
-        assert len(result) == 4
+    def test_mean_node_body_nod_aps_raises(self):
+        """Mean Node body in nod_aps raises (nodes-of-a-node undefined).
+
+        Measured reference behavior: the mean/true node and apogee ids have
+        no nodes/apsides decomposition and raise rather than returning a
+        silent zero.
+        """
+        with pytest.raises(swe.Error, match="not implemented"):
+            swe.nod_aps_ut(JD_J2000, MEAN_NODE, NODBIT_MEAN)
 
 
 class TestNodApsMinorBodiesRaise:
@@ -208,3 +223,75 @@ class TestNodApsAllMethods:
                 assert math.isfinite(val), (
                     f"Non-finite at [{i}][{j}] for method {method}"
                 )
+
+
+class TestNodApsInterpolatedApsidesNaN:
+    """INTP_APOG / INTP_PERG have no node/apse decomposition.
+
+    Measured reference behavior: nod_aps returns a not-a-number in every slot
+    for the interpolated lunar apsides rather than raising or zero-filling.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [INTP_APOG, INTP_PERG])
+    def test_interpolated_apsides_return_nan(self, body):
+        result = swe.nod_aps_ut(JD_J2000, body, NODBIT_MEAN)
+        assert len(result) == 4
+        for tup in result:
+            assert len(tup) == 6
+            for val in tup:
+                assert math.isnan(val)
+
+
+class TestNodApsEquatorialSingleRotation:
+    """FLG_EQUATORIAL must rotate ecliptic->equator exactly once.
+
+    A regression once double-rotated the Moon points (the lunar branch let
+    calc_ut() convert to the equator and then the formatter rotated again),
+    inflating the declination by roughly the obliquity. This guards the
+    single-rotation invariant against the ecliptic coordinates the same call
+    reports, with no reference values baked in.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [MOON, MARS])
+    def test_node_declination_matches_single_rotation(self, body):
+        from libephemeris.cache import get_true_obliquity
+
+        ecl = swe.nod_aps(JD_J2000, body, NODBIT_MEAN, FLG_SWIEPH)
+        equ = swe.nod_aps(JD_J2000, body, NODBIT_MEAN, FLG_SWIEPH | FLG_EQUATORIAL)
+        eps = math.radians(get_true_obliquity(JD_J2000))
+        for ecl_pt, equ_pt in zip(ecl, equ):
+            lon = math.radians(ecl_pt[0])
+            lat = math.radians(ecl_pt[1])
+            # Single ecliptic->equatorial rotation of the reported ecliptic point.
+            x = math.cos(lat) * math.cos(lon)
+            y = math.cos(lat) * math.sin(lon) * math.cos(eps) - math.sin(
+                lat
+            ) * math.sin(eps)
+            z = math.cos(lat) * math.sin(lon) * math.sin(eps) + math.sin(
+                lat
+            ) * math.cos(eps)
+            dec_expected = math.degrees(math.asin(max(-1.0, min(1.0, z))))
+            assert abs(equ_pt[1] - dec_expected) < 1e-6
+
+
+class TestNodApsSiderealMeanAyanamsha:
+    """Sidereal nod_aps longitudes subtract the MEAN ayanamsha.
+
+    Measured reference behavior: even though the of-date coordinate carries
+    nutation, the sidereal reduction uses the mean ayanamsha (no
+    nutation-in-longitude term). The tropical->sidereal shift must therefore
+    equal the mean ayanamsha, not the true one (they differ by ~14" at J2000).
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [MOON, MARS])
+    def test_sidereal_shift_is_mean_ayanamsha(self, body):
+        swe.set_sid_mode(SIDM_LAHIRI, 0.0, 0.0)
+        trop = swe.nod_aps(JD_J2000, body, NODBIT_MEAN, FLG_SWIEPH)
+        sid = swe.nod_aps(JD_J2000, body, NODBIT_MEAN, FLG_SWIEPH | FLG_SIDEREAL)
+        mean_aya = swe.get_ayanamsa_ut(2451545.0 - swe.deltat(2451545.0))
+        # Compare against a non-zero slot (perihelion of an inclined orbit).
+        peri_shift = (trop[2][0] - sid[2][0]) % 360.0
+        assert abs(peri_shift - mean_aya) < 1e-3

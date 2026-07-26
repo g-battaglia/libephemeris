@@ -166,8 +166,14 @@ def cotrans_sp(
         - cos_lat * sin_eps * lat_speed_rad
     )
 
+    # denom = x^2 + y^2 = cos^2(new_lat); it is >= 0 and vanishes only at the
+    # exact pole. The analytic longitude rate (x*dy - y*dx)/denom is stable for
+    # every denom > 0, so no artificial guard band is used: an earlier
+    # ``denom > 1e-10`` guard zeroed the rate within ~0.0006 deg of the pole,
+    # whereas the reference returns the (large, finite) analytic value there.
+    # Only the genuine singularity (denom exactly 0.0) falls back to 0.0.
     denom = x * x + y * y
-    if abs(denom) > 1e-10:
+    if denom > 0.0:
         new_lon_speed_rad = (x * dy_dt - y * dx_dt) / denom
     else:
         new_lon_speed_rad = 0.0
@@ -1477,38 +1483,92 @@ def _decompose_to_dms(ddeg: float, has_rounding: bool) -> Tuple[int, int, int, f
     return ideg, imin, isec, secfr
 
 
+def _decompose_arcsec_to_dms(
+    pos_arcsec: float, has_rounding: bool
+) -> Tuple[int, int, int, float]:
+    """Break a non-negative arc-second position into deg, min, sec, secfr.
+
+    The nakshatra split reduces in the arc-second domain (where the 13°20'
+    segment is exactly 48000") so that positions on an exact degree, minute
+    or segment boundary decompose without the sub-arcsecond truncation the
+    degree-domain path would show. ``has_rounding`` mirrors
+    :func:`_decompose_to_dms`.
+    """
+    total = max(pos_arcsec, 0.0)
+    ideg = int(total / 3600.0)
+    total = max(total - ideg * 3600.0, 0.0)
+    imin = int(total / 60.0)
+    total = max(total - imin * 60.0, 0.0)
+    isec = int(total)
+    if has_rounding:
+        secfr = float(isec)
+    else:
+        secfr = max(total - isec, 0.0)
+    return ideg, imin, isec, secfr
+
+
+_NAK_SPAN_ARCSEC: float = 48000.0  # 360° * 3600 / 27, exact in the arcsec domain
+
+
 def _split_deg_nakshatra(
     ddeg: float, roundflag: int
 ) -> Tuple[int, int, int, float, int]:
     """Nakshatra-mode split for non-negative degree values.
 
-    The ecliptic is divided into 27 equal segments (nakshatras) of
-    13°20' each.  Returns the position within the current nakshatra.
+    The ecliptic is divided into 27 equal segments (nakshatras) of 13°20'
+    each. The value is reduced into its segment in the arc-second domain, then
+    the rounding offset is applied with ``KEEP_DEG``/``KEEP_SIGN`` tested on the
+    position *within* the nakshatra (the displayed degree) — for a 13°20'
+    segment the whole-degree part of the position and of the raw longitude
+    differ, so the check must use the position, unlike the 30° zodiac path.
+
+    The index is not reduced modulo 360°: it counts nakshatras from 0 for the
+    raw longitude, so inputs beyond one turn report indices >= 27. Measured
+    reference behavior: a raw index of exactly 27 (one full turn, longitude in
+    [360°, 360° + 13°20')) reports as nakshatra 0; larger indices are reported
+    unreduced.
+
+    Because the segment is exact in arc-seconds but not in degrees, the
+    arc-second reduction here makes exact degree/minute/segment boundaries
+    display cleanly, unlike the reference's degree-domain arithmetic which can
+    render such boundaries one arc-second low. Away from boundaries the two may
+    still differ by up to one arc-second in the sub-arcsecond field (float
+    representation only); the segment index and rounded fields agree.
     """
-    nakshatra_span = 360.0 / 27.0
-    normalized = ddeg % 360.0
-    pos_in_nak = normalized % nakshatra_span
-
-    # Determine and conditionally suppress rounding offset
-    offset = _rounding_offset(roundflag)
-    if offset > 0.0:
-        if roundflag & SPLIT_DEG_KEEP_DEG:
-            # Suppress when offset would bump the integer-degree part
-            if int(pos_in_nak + offset) - int(pos_in_nak) > 0:
-                offset = 0.0
-        elif roundflag & SPLIT_DEG_KEEP_SIGN:
-            # Suppress when offset would cross into next nakshatra
-            if pos_in_nak + offset >= nakshatra_span:
-                offset = 0.0
-
-    rounded = (normalized + offset) % 360.0
-    nak_idx = min(int(rounded / nakshatra_span), 26)
-    position = rounded - nak_idx * nakshatra_span
-
     has_rounding = bool(
         roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
     )
-    ideg, imin, isec, secfr = _decompose_to_dms(position, has_rounding)
+
+    # Reduce into the current nakshatra in the exact arc-second domain. The
+    # index is chosen from a copy snapped onto the integer-arcsec grid so a
+    # value a hair below a segment boundary still lands in the right segment;
+    # the position itself is left unsnapped to preserve its true sub-arcsecond
+    # fraction (matching the reference, which keeps the full fraction).
+    total_arcsec = ddeg * 3600.0
+    near = round(total_arcsec)
+    idx_source = near if abs(total_arcsec - near) < 1e-6 else total_arcsec
+    nak_idx = int(idx_source / _NAK_SPAN_ARCSEC)
+    pos_arcsec = total_arcsec - nak_idx * _NAK_SPAN_ARCSEC
+
+    # Rounding offset in arc-seconds, suppressed by KEEP_DEG (would advance the
+    # displayed whole-degree part of the position) or KEEP_SIGN (would cross
+    # into the next nakshatra).
+    off_arcsec = _rounding_offset(roundflag) * 3600.0
+    if off_arcsec > 0.0:
+        if roundflag & SPLIT_DEG_KEEP_DEG:
+            if int((pos_arcsec + off_arcsec) / 3600.0) > int(pos_arcsec / 3600.0):
+                off_arcsec = 0.0
+        elif roundflag & SPLIT_DEG_KEEP_SIGN:
+            if pos_arcsec + off_arcsec >= _NAK_SPAN_ARCSEC:
+                off_arcsec = 0.0
+    pos_arcsec += off_arcsec
+    if pos_arcsec >= _NAK_SPAN_ARCSEC:
+        pos_arcsec -= _NAK_SPAN_ARCSEC
+        nak_idx += 1
+    if nak_idx == 27:
+        nak_idx = 0
+
+    ideg, imin, isec, secfr = _decompose_arcsec_to_dms(pos_arcsec, has_rounding)
     return (ideg, imin, isec, secfr, nak_idx)
 
 
@@ -1605,10 +1665,16 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
     ddeg += offset
 
     # --- Zodiacal sign extraction (after rounding) ---
+    # The index is not reduced modulo 360°: int(ddeg / 30) counts 30° signs
+    # from 0 for the raw longitude, so inputs beyond one turn report indices
+    # >= 12. Measured reference behavior: a raw index of exactly 12 (one full
+    # turn, ddeg in [360°, 390°)) reports as sign 0; larger indices are
+    # reported unreduced.
     if roundflag & SPLIT_DEG_ZODIACAL:
-        ddeg %= 360.0
         sign_out = int(ddeg / 30.0)
-        ddeg %= 30.0
+        ddeg = math.fmod(ddeg, 30.0)
+        if sign_out == 12:
+            sign_out = 0
 
     # --- Decompose into deg / min / sec / secfr ---
     ideg, imin, isec, secfr = _decompose_to_dms(ddeg, has_rounding)

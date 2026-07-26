@@ -3,21 +3,30 @@
 """
 Physical constants for planetary moon theories.
 
-All GM values are from JPL satellite ephemerides (2024).
-Units: km³/s² for GM, km for distances.
+Most GM values are from JPL satellite ephemerides in km³/s²; distances in km.
 
 References:
 - JUP365: Jacobson (2021) - Jupiter system
 - SAT441: Jacobson (2022) - Saturn system
+- URA111: Jacobson (2014), AJ 148, 76 - Uranus system
 - NEP097: Brozović (2020) - Neptune system
 - PLU060: Brozović & Jacobson (2024) - Pluto system
 
 Provenance:
-    Every gravitational parameter is labelled by the public JPL satellite
-    solution from which it was transcribed and remains in km^3/s^2. Derived
+    Most gravitational parameters are labelled by the public JPL satellite
+    solution from which they were transcribed and remain in km^3/s^2. Derived
     totals and barycenter weights are exact arithmetic on those values. The IAU
     astronomical-unit conversion is labelled at its use; no value is inferred
     from positions returned by another application.
+
+    EXCEPTION -- the five Uranian moon "GM" constants below (GM_ARIEL..
+    GM_MIRANDA) are NOT GM in km^3/s^2: they are approximate mass-scale figures
+    (order 1e20 kg, roughly GM/6.7 relative to the Jacobson 2014 URA111 GMs of
+    ~86.4/81.5/228.2/192.4/4.4 km^3/s^2). They enter uranus_cob_offset() (see
+    uranian.py) only as RELATIVE weights, so the barycenter direction is about
+    right, but because they share a denominator with the true-GM GM_URANUS the
+    resulting offset magnitude is scaled down by ~6.7x. See the note at their
+    definition and uranian.py.
 """
 
 from __future__ import annotations
@@ -32,7 +41,7 @@ from typing import Tuple
 # Planet GM values
 GM_JUPITER: float = 126686531.9  # JPL JUP365 satellite ephemeris
 GM_SATURN: float = 37931206.23  # JPL SAT441 satellite ephemeris
-GM_URANUS: float = 5793951.3  # URA111
+GM_URANUS: float = 5793951.3  # URA111 (Jacobson 2014, AJ 148, 76)
 GM_NEPTUNE: float = 6835099.97  # NEP097
 GM_PLUTO: float = 869.3  # PLU060
 
@@ -70,7 +79,10 @@ GM_SATURN_MOONS_TOTAL: float = (
 # Neptune's moons (NEP097)
 GM_TRITON: float = 1428.49546
 
-# Uranus' major moons (URA111 / GUST86)
+# Uranus' major moons. WARNING: despite the GM_ prefix these are NOT GM in
+# km^3/s^2 -- they are approximate mass-scale figures (order 1e20 kg, i.e.
+# roughly GM/6.7 vs the Jacobson 2014 URA111 GMs ~86.4/81.5/228.2/192.4/4.4).
+# Used only as relative barycenter weights (see uranian.uranus_cob_offset).
 GM_ARIEL: float = 14.0
 GM_UMBRIEL: float = 13.0
 GM_TITANIA: float = 41.0
@@ -89,7 +101,8 @@ GM_CHARON: float = 106.1
 # ORBITAL CONSTANTS
 # =============================================================================
 
-# Jupiter equatorial radius (km) - for Galilean moon theory output
+# Jupiter equatorial radius (km) - for Galilean moon theory output.
+# IAU/IAG WGCCRE value (Archinal et al. 2018, Cel. Mech. Dyn. Astron. 130, 22).
 JUPITER_RADIUS_KM: float = 71492.0
 
 # Astronomical Unit in km
@@ -130,7 +143,8 @@ TRITON_PERIOD_DAYS: float = 5.876854
 TRITON_ECCENTRICITY: float = 0.000016  # Nearly circular
 TRITON_INCLINATION_DEG: float = 156.865  # Retrograde orbit!
 
-# Neptune's J2 causes nodal precession with ~688 year period
+# Neptune's J2 causes nodal precession with a ~688 year period
+# (Jacobson 2009, AJ 137, 4322, Neptune-system solution NEP081/NEP097).
 TRITON_NODE_RATE_DEG_PER_DAY: float = -360.0 / (688.0 * 365.25)
 
 # =============================================================================

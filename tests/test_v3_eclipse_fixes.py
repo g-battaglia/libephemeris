@@ -364,26 +364,27 @@ class TestFix5PlanetOccultContactSpeed:
 
 
 # ---------------------------------------------------------------------------
-# Total-eclipse obscuration is the bounded covered fraction
+# Total-eclipse obscuration is the disc-area ratio (measured reference behavior)
 # ---------------------------------------------------------------------------
 class TestTotalObscurationBounded:
-    """``attr[2]`` in totality is 1.0: the published obscuration definition
-    (fraction of the solar disc area occulted) is bounded by construction.
-    The > 1 disc area ratio stays derivable as ``attr[1] ** 2``."""
+    """``attr[2]`` in totality is the disc-area ratio ``(r_moon/r_sun)**2``,
+    which exceeds 1 for a total eclipse (the Moon overfills the Sun). This is
+    the measured reference behavior: the reference returns the area ratio
+    while one disc lies inside the other, equal to ``attr[1] ** 2``."""
 
     DALLAS = (-96.797, 32.777, 0.0)
 
-    def test_total_obscuration_is_bounded_fraction(self):
+    def test_total_obscuration_is_area_ratio(self):
         jd_start = julday(2024, 4, 1, 0.0)
         _require_ephemeris(jd_start)
         _retflag, tret, _search_attr = E.sol_eclipse_when_loc(jd_start, self.DALLAS)
 
         rc, attr = E.sol_eclipse_how(tret[0], self.DALLAS)
         assert rc & ECL_TOTAL, f"expected local totality, got {rc:#x}"
-        # The Sun is fully covered: obscuration is exactly 1.0, never more.
-        assert attr[2] == pytest.approx(1.0, abs=1e-12)
-        # The diameter ratio still records the > 1 excess.
-        assert attr[1] ** 2 > 1.0
+        # The reference reports the disc-area ratio, which exceeds 1 in
+        # totality and equals the squared diameter ratio.
+        assert attr[2] == pytest.approx(attr[1] ** 2, rel=1e-9)
+        assert attr[2] > 1.0
 
 
 # ---------------------------------------------------------------------------

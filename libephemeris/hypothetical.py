@@ -52,8 +52,6 @@ from .constants import FICT_OFFSET
 
 # Public element-container objects for *unsupported* bodies use NaN fields.
 # This preserves their import names and type identity without silently
-# distributing, approximating, or calculating from an unverified data table.
-_UNAVAILABLE_FLOAT = float("nan")
 
 
 # =============================================================================
@@ -580,16 +578,16 @@ class VulcanElements:
 
 @dataclass
 class WaldemathElements:
-    """Legacy public container for the unsupported Waldemath ID 58.
+    """Legacy public container for the Waldemath Dark Moon (ID 58).
 
-    Its exported instance contains only ``NaN`` sentinels.  Waltemath's 1898
-    announcements publish only a distance (~1.03 million km), a ~119-day
-    sidereal / 177-day synodic period, a diameter and transit dates; the
-    complete Keplerian digitization used by legacy software (eccentricity,
-    inclination, epoch angles) has no recoverable public source.  The
-    sentinels preserve import and attribute compatibility while making
-    accidental numerical use fail visibly instead of resurrecting an
-    unverifiable table.
+    The exported instance describes the published uniform model (Sepharial
+    1918: 3 deg/day geocentric tropical longitude anchored at a printed
+    Lilith-Sun conjunction; Waltemath 1898: mean distance ~1.03 million km)
+    — see the WALDEMATH model block for the full citations. ``a`` carries
+    the published mean distance in AU, ``L0``/``M0`` the anchor longitude,
+    ``n`` the 3 deg/day rate; eccentricity, inclination and the orientation
+    angles are structural zeros of the circular longitude-only model (the
+    e/i values in legacy tabulations have no traceable primary source).
     """
 
     name: str
@@ -826,7 +824,11 @@ TRANSPLUTO_KEPLERIAN_ELEMENTS = TransplutoKeplerianElements(
 # * Transpluto (48): the Sevin/Landscheidt/Hawkins trans-Plutonian orbit
 #   used by the astrological Transpluto ephemerides (a = 77.755 AU, e = 0.3,
 #   planar); see ``TRANSPLUTO_KEPLERIAN_ELEMENTS`` above for the sources.
-# * Proserpina (57): the Russian-school circular orbit attributed to Abramov
+# * Proserpina (57): the Russian-school circular orbit as published by Velichko
+#   and Larin (2007; the Selena source cited above). This orbit is traditionally
+#   attributed to Abramov, but that attribution is a tradition claim and cannot
+#   be independently verified, so the numbers are sourced from the published
+#   Velichko/Larin elements, not from any Abramov primary text.
 #   (a = 79.22563 AU, e = i = 0), whose mean longitude at the J1900 epoch is
 #   170.73 degrees and whose rate is the standard Gaussian mean motion
 #   n = 0.9856076686 / a^1.5 (~51.05 deg/Julian century, period ~705 years).
@@ -924,21 +926,79 @@ VULCAN_ELEMENTS = VulcanElements(
     -1670.056,
 )
 
+# =============================================================================
+# WALDEMATH / SEPHARIAL DARK MOON (ID 58) — PUBLISHED UNIFORM MODEL
+# =============================================================================
+# The astrological "Waldemath Dark Moon" is, in the primary literature, a
+# mean-longitude-only construct, not a Keplerian orbit:
+#
+# * Sepharial [Walter Gorn Old], "The Science of Foreknowledge", W. Foulsham,
+#   London, 1918, chapter "The New Satellite — Lilith" (pp. 39-45 of the
+#   public-domain scan), prints the operative rule: "Multiply the number of
+#   days from the day of last conjunction to the day of birth by three, and
+#   add that number of degrees to the longitude of the last conjunction" —
+#   i.e. uniform 3 deg/day geocentric tropical motion — together with the
+#   177-day synodic period ("synodical revolution at 177 days") and a dated
+#   table of Lilith-Sun conjunctions 1854-1906.
+# * Georg Waltemath's 1898 Hamburg announcements (reported in Science, New
+#   Series, Vol. 8, No. 189, 1898-08-12, p. 185, and summarized by Joseph
+#   Ashbrook, "The Many Moons of Dr. Waltemath", Sky & Telescope, Vol. 28,
+#   p. 218, October 1964) give the physical scale: mean distance about
+#   1.03 million km, sidereal period 119 days, synodic 177 days, and the
+#   predicted transit of the Sun on 1898 February 2-4.
+#
+# Realization: the anchor is Waltemath's predicted 1898 February 2 transit
+# (a Lilith-Sun conjunction in Sepharial's table), taken at 00:00 GMT — the
+# midnight-GMT convention of the Delphine Jay AFA ephemerides (Jay, "Lilith
+# Ephemeris 1900-2000 A.D.", AFA, 1983). At a conjunction the Lilith
+# longitude equals the Sun's apparent geocentric longitude; at that instant
+# (JD 2414322.5 UT) DE440 gives 313.2150483608214 deg (reproducible with
+# this library's own Sun).
+#
+# The mean motion comes from Sepharial's printed synodic period: the point
+# returns to conjunction with the Sun every 177 days, so
+#   n = 360/177 + 360/365.2422 deg/day = 3.0195456... deg/day,
+# where 365.2422 days is the mean tropical year (Meeus, Astronomical
+# Algorithms, 2nd ed., 1998). Sepharial's own consistency statements pin
+# this reading of the primary sources: his "the satellite Lilith returns
+# to the same longitude on the same day in 126 years" is exactly
+# 126 x 365.2422 / 177 = 260.00 synodic revolutions, and the implied
+# sidereal period 360/n = 119.2 days matches Waltemath's published
+# 119-day sidereal period. (Sepharial's hand-computation rule rounds the
+# rate to "3 deg per day"; used globally that rounding cannot reproduce
+# his own 1854-1906 conjunction table, so the printed synodic period is
+# the defining quantity and the 3 deg/day wording is its practical
+# approximation.)
+#
+# The model is longitude-only: uniform motion on the ecliptic (zero
+# latitude), circular by construction, with the published mean distance as
+# the fixed radial coordinate. Eccentricity, inclination and node values
+# that circulate in legacy tabulations (e = 0.1587, i = 2.5) have no
+# traceable primary source — the 2.5 figure is most plausibly a conflation
+# with Waltemath's ~2.5 arcminute apparent DIAMETER — and are deliberately
+# not used.
+_WALDEMATH_ANCHOR_JD_UT: float = 2414322.5
+_WALDEMATH_ANCHOR_APPARENT_LON_DEG: float = 313.2150483608214
+_WALDEMATH_SYNODIC_DAYS: float = 177.0
+_WALDEMATH_TROPICAL_YEAR_DAYS: float = 365.2422
+_WALDEMATH_RATE_DEG_PER_DAY: float = (
+    360.0 / _WALDEMATH_SYNODIC_DAYS + 360.0 / _WALDEMATH_TROPICAL_YEAR_DAYS
+)
+# Waltemath's published mean distance, converted with the exact astronomical
+# unit adopted by IAU 2012 Resolution B2 (149 597 870 700 m).
+_WALDEMATH_DISTANCE_AU: float = 1.03e6 / 149_597_870.7
+
 WALDEMATH_ELEMENTS = WaldemathElements(
     "Waldemath",
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
+    _WALDEMATH_ANCHOR_JD_UT,
+    _WALDEMATH_DISTANCE_AU,
+    0.0,  # circular by construction (uniform longitude model)
+    0.0,  # longitude-only model: the point rides the ecliptic
+    0.0,  # degenerate for a circular planar orbit (stated-convention zero)
+    0.0,  # degenerate for a circular planar orbit (stated-convention zero)
+    _WALDEMATH_ANCHOR_APPARENT_LON_DEG,
+    _WALDEMATH_RATE_DEG_PER_DAY,
+    _WALDEMATH_ANCHOR_APPARENT_LON_DEG,
 )
 
 HYPOTHETICAL_PROVENANCE: Dict[int, Tuple[str, str]] = {
@@ -989,13 +1049,16 @@ HYPOTHETICAL_PROVENANCE: Dict[int, Tuple[str, str]] = {
     ),
     PROSERPINA: (
         "published-model",
-        "Russian-school circular orbit attributed to Abramov: a=79.22563 AU, "
-        "mean longitude 170.73 deg at J1900, Gaussian mean motion",
+        "Russian-school circular orbit (Velichko and Larin 2007; the Abramov "
+        "attribution is a tradition claim, not independently verified): "
+        "a=79.22563 AU, mean longitude 170.73 deg at J1900, Gaussian mean motion",
     ),
     WALDEMATH: (
-        "unsupported",
-        "Waltemath 1898 published only distance, period, size and transit "
-        "dates; no complete public element set (e, i, epoch angles) recovered",
+        "published-model",
+        "Sepharial 1918 (Science of Foreknowledge, ch. 'The New Satellite — "
+        "Lilith'): uniform 3 deg/day tropical longitude anchored at the "
+        "printed 1898 Feb 2 Lilith-Sun conjunction; distance 1.03e6 km from "
+        "Waltemath 1898 (Science 8/189 p. 185; Ashbrook, S&T 28, p. 218)",
     ),
 }
 
@@ -2426,9 +2489,37 @@ def _calc_vulcan_raw(jd_tt: float) -> Tuple[float, float, float]:
 
 
 def calc_waldemath(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
-    """Raise until Waldemath has an independently reviewed element set."""
-    del jd_tt
-    _raise_unsupported_builtin_fictitious(WALDEMATH)
+    """Return the published uniform Waldemath/Sepharial Dark Moon model.
+
+    Sepharial (The Science of Foreknowledge, 1918, ch. "The New Satellite —
+    Lilith") defines the point by uniform 3 deg/day geocentric tropical
+    motion from the Sun's longitude at a printed Lilith-Sun conjunction;
+    the anchor here is Waltemath's predicted 1898 February 2 transit at
+    00:00 GMT (see the WALDEMATH model block above for the full sources).
+    The stored anchor is the Sun's APPARENT longitude at that instant, so
+    the nutation at the anchor epoch is removed to yield the mean-of-date
+    longitude this layer must return (the apparent-place layer in calc_ut
+    adds the nutation of the request date, exactly as for Selena).
+    """
+    import math as _math
+
+    from .cache import get_cached_nutation
+    from .time_utils import deltat
+
+    anchor_tt = _WALDEMATH_ANCHOR_JD_UT + deltat(_WALDEMATH_ANCHOR_JD_UT)
+    dpsi_rad, _ = get_cached_nutation(anchor_tt)
+    anchor_mean = _WALDEMATH_ANCHOR_APPARENT_LON_DEG - _math.degrees(dpsi_rad)
+    longitude = (
+        anchor_mean + _WALDEMATH_RATE_DEG_PER_DAY * (jd_tt - anchor_tt)
+    ) % 360.0
+    return (
+        float(longitude),
+        0.0,
+        float(_WALDEMATH_DISTANCE_AU),
+        float(_WALDEMATH_RATE_DEG_PER_DAY),
+        0.0,
+        0.0,
+    )
 
 
 def calc_transpluto_position(
@@ -2639,7 +2730,8 @@ def calc_waldemath_position(
 def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
     """Calculate the trans-Plutonian Proserpina (heliocentric, of-date).
 
-    The Russian-school convention attributed to Abramov is a uniform circular
+    The Russian-school convention (published by Velichko and Larin 2007;
+    traditionally but unverifiably attributed to Abramov) is a uniform circular
     ecliptic orbit: a = 79.22563 AU, mean longitude 170.73 degrees at the
     J1900 epoch, Gaussian mean motion (~51.05 deg/Julian century, period
     ~705 years), referred to the ecliptic and mean equinox of date.  Being

@@ -263,7 +263,11 @@ def _get_polar_circle_info(lat: float, eps: float, house_system: str) -> dict:
     }
 
 
-# Default threshold for extreme latitude (80°)
+# Default threshold for extreme latitude (80°). Project convention, not from any
+# published standard: the |latitude| beyond which several quadrant house systems
+# (Campanus, Regiomontanus, Topocentric) become numerically fragile. Chosen for
+# this library and used only to flag reduced-accuracy regions, never to alter a
+# computation.
 EXTREME_LATITUDE_THRESHOLD = 80.0
 
 
@@ -2165,6 +2169,9 @@ def _houses_placidus(
     Most popular house system in modern Western astrology. Divides the time a point
     takes to travel from horizon to meridian (and meridian to horizon) into thirds.
 
+    Historical basis: Placidus de Titis, "Primum Mobile" (1657); modern
+    description in Holden, "The Elements of House Division" (1977).
+
     Algorithm:
         1. Trisect semi-diurnal arc (rising to culmination) for houses 11, 12
         2. Trisect semi-nocturnal arc (setting to anti-culmination) for houses 2, 3
@@ -2428,8 +2435,11 @@ def _houses_koch(
     developed by Walter Koch. It divides houses based on the ascensional
     difference of the MC's declination.
 
-    Algorithm derived from:
-    Holden, 'The Elements of House Division' (1977), Koch section.
+    Primary basis: Walter Koch & Elisabeth Knappich, "Geburtsort-
+    Häusertabellen" (Birthplace House Tables, 1960s); modern derivation in
+    Holden, 'The Elements of House Division' (1977), Koch section. The Koch arc
+    (one-third of the MC's ascensional difference) comes from that
+    construction, not from Meeus.
 
     Derivation from semi-arc concept:
         1. Compute sin(dec_MC) = sin(MC) * sin(eps) (MC declination)
@@ -2439,8 +2449,9 @@ def _houses_koch(
         4. Cusps are the ecliptic rising points at ARMC offsets of
            30, 60, 120, 150 degrees, adjusted by multiples of the Koch arc.
 
-    Reference: Meeus, 'Astronomical Algorithms' 2nd ed., Ch. 13
-    (spherical trigonometry for rising-point formula).
+    Reference for the rising-point coordinate transform only: Meeus,
+    'Astronomical Algorithms' 2nd ed., Ch. 13 (spherical trigonometry). The
+    Koch quadrant division itself is not from Meeus.
 
     Note: Polar latitude handling
         Koch is undefined at latitudes > ~66 deg where some ecliptic points never
@@ -2471,8 +2482,10 @@ def _houses_koch(
     tan_lat = math.tan(math.radians(lat))
     cos_lat = math.cos(math.radians(lat))
 
-    # Declination of the MC: sin(dec_MC) = sin(MC) * sin(ε) / cos(φ)
-    # Ref: Meeus, "Astronomical Algorithms" 2nd ed., Ch. 13
+    # Koch auxiliary: sin(dec_MC) = sin(MC) * sin(ε) / cos(φ). This belongs to
+    # the Koch/Knappich house construction (see Holden 1977), NOT to Meeus;
+    # Meeus Ch. 13 only supplies the rising-point transform used by
+    # _calc_ascendant below.
     mc_dec_sin = max(
         -1.0, min(1.0, math.sin(math.radians(mc)) * sin_obliquity / cos_lat)
     )
@@ -2509,6 +2522,10 @@ def _houses_regiomontanus(
 
     Divides the celestial equator into 12 equal 30° arcs, then projects these
     divisions onto the ecliptic using great circles through the celestial poles.
+
+    Historical basis: Regiomontanus (Johannes Müller von Königsberg), "Tabulae
+    directionum profectionumque" (compiled 1467; printed 1490); modern
+    description in Holden, "The Elements of House Division" (1977).
 
     Algorithm:
         1. Divide equator into 30° segments from MC
@@ -2580,6 +2597,9 @@ def _houses_campanus(
     Divides the prime vertical (great circle through Zenith, East, Nadir, West)
     into 12 equal 30° arcs, then projects onto the ecliptic via great circles
     through the North and South points of the horizon.
+
+    Historical basis: Campanus of Novara (13th century); modern description in
+    Holden, "The Elements of House Division" (1977).
 
     Derivation from spherical trigonometry
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2688,6 +2708,9 @@ def _houses_whole_sign(asc: float) -> List[float]:
     Each house occupies one complete zodiac sign. House 1 starts at 0° of the
     sign containing the Ascendant. Used extensively in ancient astrology.
 
+    Historical basis: Hellenistic and early Indian traditions; modern
+    description in Holden, "The Elements of House Division" (1977).
+
     Algorithm:
         1. Find zodiac sign of Ascendant (floor(asc / 30) * 30)
         2. Each house = one complete sign (30° intervals from sign 0°)
@@ -2795,6 +2818,10 @@ def _houses_sripati(asc: float, mc: float) -> List[float]:
     Creates house cusps at the midpoints of Porphyry house cusps. Each Sripati
     cusp is the midpoint between the previous and current Porphyry cusp.
 
+    Historical basis: Jyotiṣa (Indian) bhāva-cakra tradition, associated with
+    Śrīpati; modern description in Holden, "The Elements of House Division"
+    (1977).
+
     Algorithm:
         1. Calculate Porphyry house cusps
         2. For each house i, the Sripati cusp is:
@@ -2840,6 +2867,9 @@ def _houses_pullen_sd(asc: float, mc: float) -> List[float]:
     Invented by Walter Pullen in 1994. Like Porphyry, based on ecliptic quadrant
     divisions, but fits house widths to a sine wave pattern rather than equal
     trisection.
+
+    Reference: Walter D. Pullen, Astrolog (open-source software) documentation,
+    "House Systems" (astrolog.org); SD introduced 1994.
 
     Algorithm:
         - Ideal house size = 30°
@@ -2923,6 +2953,9 @@ def _houses_pullen_sr(asc: float, mc: float) -> List[float]:
     Proposed by Walter Pullen in 2016 as an improvement over Pullen SD. Uses
     ratio multipliers instead of additive offsets, avoiding negative house
     sizes for small quadrants.
+
+    Reference: Walter D. Pullen, Astrolog (open-source software) documentation,
+    "House Systems" (astrolog.org); SR introduced 2016.
 
     Algorithm:
         For quadrant size q:
@@ -3033,6 +3066,9 @@ def _houses_alcabitius(
     Medieval Arabic system that divides the diurnal and nocturnal arcs differently
     than Placidus, using a simpler geometric approach.
 
+    Historical basis: al-Qabīṣī (Alcabitius, 10th century). Text: al-Qabīṣī,
+    "The Introduction to Astrology", ed. Burnett, Yamamoto & Yano (2004).
+
     Algorithm:
         1. Calculate RA of Ascendant and MC
         2. Divide RA intervals between angles
@@ -3118,6 +3154,8 @@ def _houses_polich_page(
     Developed in 1960s to account for observer's actual position on Earth's surface
     rather than at Earth's center. Uses modified pole calculations.
 
+    Reference: Polich & Page, "The Topocentric System of Houses", Spica, 1964.
+
     Algorithm:
         Similar to Regiomontanus but with modified pole factors that account
         for the topocentric (observer-centered) perspective.
@@ -3189,6 +3227,9 @@ def _houses_morinus(
 
     Divides the celestial equator into 12 equal 30° sections starting from 0° Aries,
     then projects to ecliptic. Independent of observer location.
+
+    Historical basis: Jean-Baptiste Morin (Morinus), "Astrologia Gallica"
+    (1661), Book XVII.
 
     Algorithm:
         1. Divide equator into 30° RA sections from 0h RA
@@ -3263,6 +3304,9 @@ def _houses_meridian(
     Based on meridian passages, divides RA from MC in equal 30° intervals.
     Related to Morinus but starts from MC instead of 0° Aries.
 
+    Historical basis: proposed by "Zariel" (David Cope), c. 1910; modern
+    description in Holden, "The Elements of House Division" (1977).
+
     Algorithm:
         Projects equator points (ARMC + n×30°) to ecliptic via celestial poles.
 
@@ -3327,6 +3371,9 @@ def _houses_vehlow(asc: float) -> List[float]:
     Variant of Equal houses where the Ascendant falls at 15° into House 1
     rather than at the cusp. Each house is still 30°.
 
+    Historical basis: Johannes Vehlow (German astrologer), "Erlebte
+    Sternenwelt"; the Ascendant is centered in House 1.
+
     Mathematical Formula:
         start = (λ_Asc - 15°) mod 360°
         λᵢ = (start + (i-1) × 30°) mod 360°
@@ -3358,6 +3405,9 @@ def _houses_carter(
 
     Equal 30° divisions on the celestial equator starting from RA of Ascendant,
     projected to ecliptic via hour circles.
+
+    Historical basis: Charles E. O. Carter, "Essays on the Foundations of
+    Astrology" (Theosophical Publishing House, London).
 
     Algorithm:
         1. Calculate RA of Ascendant

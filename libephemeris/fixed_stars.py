@@ -6,7 +6,7 @@ Fixed star position calculations for libephemeris.
 Computes ecliptic positions for bright fixed stars with:
 - Proper motion correction (rigorous space motion approach)
 - Long-term precession (Vondrák 2011) from J2000 to date
-- IAU 2000A nutation model (1365 terms) for sub-milliarcsecond precision
+- IAU 2006/2000A nutation (ERFA nut06a) for sub-milliarcsecond precision
 - Equatorial to ecliptic coordinate transformation
 
 Supported stars:
@@ -30,22 +30,33 @@ Notes on precision:
     proper motion stars (e.g., Barnard's Star) over century-scale intervals.
 
     Limitations:
-    - Ignores radial velocity (parallax causes small position shift)
+    - Radial velocity and trigonometric parallax ARE applied: they set the
+      star's finite J2000 distance and the Doppler light-time factor (see
+      _calc_star_position_leb). Stars without a measured parallax fall back to
+      a one-gigaparsec direction-at-infinity.
+    - Annual parallax enters through the barycentric observer geometry, so
+      nearby stars show the corresponding of-date shift.
     - Assumes constant proper motion (real stars accelerate slightly)
-    - No annual parallax correction (distance effect negligible for distant stars)
     Typical error: <0.01 arcsec over ±100 years, <1 arcsec over ±500 years
     For research astronomy, use SIMBAD/Gaia catalogs.
 
 Data Sources:
-- Positions (RA/Dec at J2000.0): ESA Hipparcos Catalog (ESA SP-1200, 1997)
-- Proper motions: van Leeuwen 2007 new Hipparcos reduction (A&A 474, 653-664)
-  Independently verified via CDS/VizieR catalog I/311/hip2
+- Astrometry (RA/Dec, parallax, proper motion; epoch J1991.25): van Leeuwen
+  2007 Hipparcos New Reduction, CDS/VizieR catalog I/311/hip2. This is the
+  authoritative source for the catalog positions used at runtime (see
+  scripts/build_star_catalog_v2.py).
+- Cross-identifications (HD, Bayer, Flamsteed) and radial velocities: original
+  Hipparcos (ESA 1997, I/239/hip_main), IV/27A, and XHIP (V/137D).
 - Star names: IAU Working Group on Star Names (WGSN, 2022)
 - Visual magnitudes: Hipparcos photometry
 
 References:
-- Hipparcos Catalog Vol. 1, Section 1.5.5 (ESA SP-1200, 1997)
-- van Leeuwen F., 2007, A&A 474, 653-664 (new Hipparcos reduction)
+- van Leeuwen F., 2007, A&A 474, 653-664 (Hipparcos New Reduction, I/311/hip2)
+- Hipparcos Catalog Vol. 1, Section 1.5.5 (ESA SP-1200, 1997) — space-motion method
+- Long-term precession: Vondrák, Capitaine & Wallace 2011, A&A 534, A22
+  (corrigendum A&A 541, C1)
+- IAU 2006/2000A nutation (ERFA nut06a): Wallace & Capitaine 2006, A&A 459, 981
+  (erratum A&A 464, 793)
 - IAU 2006 Precession: Capitaine et al. A&A 412, 567-586 (2003)
 - IAU WGSN: https://www.iau.org/public/themes/naming_stars/
 
@@ -260,7 +271,18 @@ class StarCatalogEntry:
         nomenclature: Bayer/Flamsteed designation (e.g. "alLeo", "alVir")
         hip_number: Hipparcos catalog number (e.g. 49669)
         data: Astrometric data for position calculation
-        magnitude: Visual magnitude (apparent brightness)
+        magnitude: Visual magnitude (apparent brightness). Source is the
+            Hipparcos Catalogue (ESA 1997, VizieR I/239/hip_main) Johnson
+            ``Vmag`` for the star's HIP number; for the rare star that carries
+            no catalogued ``Vmag``, the Hipparcos New Reduction (VizieR
+            I/311/hip2) broadband ``Hp`` magnitude is used as a fallback. Both
+            are single published photometric values tied to one passband and,
+            for variables, one measurement epoch, so a variable (e.g. Mira,
+            Antares) or a resolved multiple (e.g. alpha Centauri A/B, theta
+            Eridani) can differ by tenths of a magnitude from a catalogue that
+            lists a different epoch or a system-combined magnitude. Such
+            differences reflect the chosen source, not an error, and values are
+            never fitted to another implementation's output.
     """
 
     id: int
@@ -867,7 +889,7 @@ def _parse_flamsteed_designation(designation: str) -> str | None:
     return f"{number_str} {const_abbrev.upper()}"
 
 
-# STAR_ALIASES: Maps alternative star names to canonical SE_* constant IDs
+# STAR_ALIASES: Maps alternative star names to canonical star-ID constants
 # Includes: common names, Bayer designations (full and abbreviated),
 # Flamsteed numbers, Arabic names, Latin names, Greek transliterations
 STAR_ALIASES: dict[str, int] = {
@@ -2000,7 +2022,7 @@ def _fuzzy_match_star(name: str) -> int | None:
 
 def resolve_star_name(name: str) -> int | None:
     """
-    Resolve a star name to its SE_* constant ID using reference API-compatible resolution.
+    Resolve a star name to its star-ID constant using reference API-compatible resolution.
 
     Implements the following resolution algorithm:
     1. Normalize input (uppercase, strip whitespace)
@@ -2016,7 +2038,7 @@ def resolve_star_name(name: str) -> int | None:
         name: Star name, alias, designation, or comma-prefixed partial name
 
     Returns:
-        Star ID (SE_* constant) if found, None otherwise
+        Star ID (star-ID constant) if found, None otherwise
 
     Examples:
         >>> resolve_star_name("Regulus")
@@ -2125,7 +2147,7 @@ def get_canonical_star_name(star_id: int) -> str | None:
     Get the canonical star name for a star ID.
 
     Args:
-        star_id: Star ID (SE_* constant)
+        star_id: Star ID (star-ID constant)
 
     Returns:
         Canonical star name (e.g., "Regulus") or None if not found
@@ -2311,8 +2333,8 @@ def _calc_star_position_leb(
     #    epochs; the 3D form tracks the Skyfield reference to the LEB pipeline
     #    floor (<0.005" across the full catalogue).
     _ASEC2RAD = math.pi / 180.0 / 3600.0
-    _C_M_PER_S = 299792458.0
-    _AU_KM = 149597870.7
+    _C_M_PER_S = 299792458.0  # speed of light, exact SI (BIPM/CODATA)
+    _AU_KM = 149597870.7  # 1 AU in km (IAU 2012 Resolution B2)
     # A non-positive measured parallax has no physical inverse distance.
     # Skyfield (MIT licensed) represents this case at one gigaparsec, which by
     # the parsec definition is 1 microarcsecond = 1e-6 mas.  Mirror that public
@@ -2421,7 +2443,7 @@ def _calc_star_position_skyfield(
     - Gravitational light deflection (unless nogdefl=True)
 
     Args:
-        star_id: Star identifier (SE_* constant)
+        star_id: Star identifier (star-ID constant)
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
         nogdefl: If True, skip gravitational deflection but keep aberration
@@ -4035,7 +4057,7 @@ _STAR_MAGNITUDES = {entry.id: entry.magnitude for entry in STAR_CATALOG}
 # IAU-CSN (IAU Catalog of Star Names) last updated 2022-04-04
 #
 # This mapping provides direct lookup from star names to HIP numbers,
-# independent of the internal SE_* star ID constants.
+# independent of the internal star-ID constants.
 # =============================================================================
 
 STAR_NAME_TO_HIP: dict[str, int] = {

@@ -48,12 +48,21 @@ from .constants import (
     FLG_RADIANS,
     FLG_SIDEREAL,
     FLG_XYZ,
+    SIDBIT_ECL_T0,
+    SIDBIT_SSY_PLANE,
     SIDM_B1950,
     SIDM_GALALIGN_MARDYKS,
     SIDM_J1900,
     SIDM_J2000,
 )
 from .precession_vondrak import vondrak_precession_matrix
+
+# Solar-system invariable plane relative to the J2000 mean ecliptic and equinox:
+# inclination and ascending-node longitude from Souami & Souchay (2012),
+# "New determination of the invariable plane of the Solar System", A&A 543,
+# A133 (i = 1.578690 deg, node = 107.582222 deg). Used by SIDBIT_SSY_PLANE.
+INVARIABLE_PLANE_INCL_DEG = 1.578690
+INVARIABLE_PLANE_NODE_DEG = 107.582222
 
 
 def _julian_epoch_jd(epoch: float) -> float:
@@ -191,6 +200,105 @@ def _rotate_spherical(
         math.degrees(dlat2),
         float(dr2),
     )
+
+
+def _invariable_plane_matrix() -> np.ndarray:
+    """J2000 mean ecliptic -> solar-system invariable-plane frame.
+
+    Passive rotation: ascending node onto the x-axis, then tilt by the
+    inclination so the invariable plane becomes the new x-y plane.
+    """
+    return _rot_x(math.radians(INVARIABLE_PLANE_INCL_DEG)) @ _rot_z(
+        math.radians(INVARIABLE_PLANE_NODE_DEG)
+    )
+
+
+def _ecliptic_of_t0_matrix(t0_jd: float) -> np.ndarray:
+    """J2000 mean ecliptic -> mean ecliptic and equinox of t0 (IAU 2006)."""
+    m_eq = np.array(erfa.pmat06(_J2000, t0_jd - _J2000))
+    eps0 = erfa.obl06(_J2000, 0.0)
+    epst = erfa.obl06(t0_jd, 0.0)
+    return _rot_x(epst) @ m_eq @ _rot_x(-eps0)
+
+
+def sidbit_ecliptic_matrix(
+    sid_bits: int, t0_jd: float, zero_point_deg: float
+) -> np.ndarray | None:
+    """Ecliptic-frame rotation for a SIDBIT projection, or None.
+
+    The returned matrix maps a J2000 mean-ecliptic Cartesian state to the
+    projection frame with the sidereal zero point rotated onto the x-axis, so
+    that applying it and reading spherical longitude yields the sidereal
+    longitude directly. ``zero_point_deg`` is the longitude of the sidereal
+    zero point *in the projection frame* (for SIDBIT_ECL_T0 it is the mode's
+    ayanamsha at t0; for SIDBIT_SSY_PLANE it is the projection of the J2000
+    ayanamsha direction onto the invariable plane, computed by the caller).
+
+    Args:
+        sid_bits: The active SIDBIT projection flags.
+        t0_jd: Reference epoch (JD TT) for SIDBIT_ECL_T0.
+        zero_point_deg: Sidereal zero-point longitude in the projection frame.
+
+    Returns:
+        A 3x3 numpy rotation matrix, or None when no projection bit is set.
+    """
+    if sid_bits & SIDBIT_SSY_PLANE:
+        base = _invariable_plane_matrix()
+    elif sid_bits & SIDBIT_ECL_T0:
+        base = _ecliptic_of_t0_matrix(t0_jd)
+    else:
+        return None
+    return _rot_z(math.radians(zero_point_deg)) @ base
+
+
+def ssy_plane_zero_point_deg(ayan_j2000_deg: float) -> float:
+    """Invariable-plane longitude of the J2000 ayanamsha zero-point direction.
+
+    The sidereal zero point sits at J2000 mean-ecliptic longitude
+    ``ayan_j2000_deg`` (latitude 0); projecting that unit direction onto the
+    invariable plane gives the longitude from which SIDBIT_SSY_PLANE sidereal
+    longitudes are measured.
+    """
+    m = _invariable_plane_matrix()
+    a = math.radians(ayan_j2000_deg)
+    p = m @ np.array([math.cos(a), math.sin(a), 0.0])
+    return math.degrees(math.atan2(p[1], p[0])) % 360.0
+
+
+def transform_sidbit_result(
+    xx: Tuple[float, ...], iflag: int, m_ecl: np.ndarray
+) -> Tuple[float, ...]:
+    """Project a J2000|NONUT *ecliptic* result onto a SIDBIT frame.
+
+    Only ecliptic output is handled (spherical or FLG_XYZ); equatorial requests
+    are not routed here. ``m_ecl`` already folds in the sidereal zero-point
+    rotation, so the rotated longitude is the sidereal longitude. FLG_RADIANS
+    is re-applied at the end for spherical output.
+
+    Args:
+        xx: The 6-tuple from the rewritten J2000|NONUT request (degrees/AU;
+            FLG_RADIANS was stripped from the rewrite).
+        iflag: The original caller flags (for FLG_XYZ / FLG_RADIANS).
+        m_ecl: Ecliptic-frame rotation from :func:`sidbit_ecliptic_matrix`.
+
+    Returns:
+        The projected 6-tuple.
+    """
+    if iflag & FLG_XYZ:
+        pos = m_ecl @ np.array(xx[:3])
+        vel = m_ecl @ np.array(xx[3:6])
+        return tuple(float(c) for c in pos) + tuple(float(c) for c in vel)
+    out = _rotate_spherical(tuple(xx), m_ecl)  # type: ignore[arg-type]
+    if iflag & FLG_RADIANS:
+        out = (
+            math.radians(out[0]),
+            math.radians(out[1]),
+            out[2],
+            math.radians(out[3]),
+            math.radians(out[4]),
+            out[5],
+        )
+    return out
 
 
 def transform_fixed_epoch_result(

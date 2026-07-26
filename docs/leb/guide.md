@@ -62,8 +62,8 @@ astrological chart calculations.
 | Path | Data Source | Activation | Speed |
 |------|------------|------------|-------|
 | **Horizons path** | NASA JPL Horizons API | `auto` without a local DE kernel, or forced `horizons` mode | Network-bound |
-| **Skyfield path** | JPL DE440/DE441 via Skyfield | Final fallback | ~120 µs/eval |
-| **LEB path** | Locally generated `.leb` or reviewed `.leb2` file | `set_leb_file()` or auto-discovery | ~5-8 µs/eval |
+| **Skyfield path** | JPL DE440/DE441 via Skyfield | Final fallback | order of 1 ms per `calc_ut()` |
+| **LEB path** | Locally generated `.leb` or reviewed `.leb2` file | `set_leb_file()` or auto-discovery | order of 100 µs per `calc_ut()` |
 
 The default `auto` mode uses a configured or manifest-reviewed LEB first. With
 `precision=extended`, reviewed auto-discovery opens all eligible tiers and
@@ -441,8 +441,8 @@ regardless of file size.
 `warm(jd_start, jd_end)` method that calls `madvise(MADV_WILLNEED)` on
 the page-aligned byte ranges of segments/chunks overlapping the given
 Julian Day range.  This allows pre-faulting only the date ranges that
-will be needed (e.g. 1800-2200 CE ≈ 11 MB for extended tier) without
-loading the entire file (about 7.64 GB for the current full-registry extended
+will be needed (e.g. 1800-2200 CE ≈ 330 MB across the extended-tier bodies)
+without loading the entire file (about 18 GB for the current merged extended
 artifact). `CompositeLEBReader.warm()` delegates to all constituent readers.
 
 Automatic preloading can be enabled via TOML configuration:
@@ -1715,8 +1715,17 @@ tier range.
 | `delta_t()` | ~0.3 us |
 | Pipeline A full (ICRS -> ecliptic of date, with speed) | ~8 us |
 | Pipeline B full (ecliptic direct, with speed) | ~2 us |
-| Skyfield calc_ut() for comparison | ~120 us |
-| **Speedup (Pipeline A)** | **~14x** |
+
+The rows above are the internal Chebyshev-core and reduction-pipeline costs,
+exclusive of the Python-level `calc_ut()` dispatch, flag handling, and ERFA
+reductions that wrap them. Measured end-to-end, on a warm local run
+(`timeit` over `calc_ut`, 1000 iterations, median):
+
+| End-to-end `calc_ut()` | Time |
+|------------------------|------|
+| LEB mode (all reductions) | order of 100 µs |
+| Skyfield mode (for comparison) | order of 1 ms |
+| **Speedup (LEB vs Skyfield `calc_ut`)** | **order of 10x** |
 
 ### 11.2 Generation Performance
 

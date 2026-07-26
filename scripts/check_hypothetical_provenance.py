@@ -80,6 +80,7 @@ _PUBLISHED_MODELS = {
     hyp.VULCAN,
     hyp.WHITE_MOON,
     hyp.PROSERPINA,
+    hyp.WALDEMATH,
 }
 _SUPPORTED = _PRIMARY_TRANSCRIPTIONS | _PUBLISHED_MODELS
 _ALL_IDS = set(range(hyp.CUPIDO, hyp.WALDEMATH + 1))
@@ -582,14 +583,58 @@ def _check_fail_closed_behavior(problems: list[str]) -> None:
         else:
             problems.append(f"unsupported body {body_id} unexpectedly calculated")
 
-    # Waldemath is the single remaining explicit sentinel: Waltemath's 1898
-    # announcements publish no complete element set, so its container must
-    # stay NaN.  The other legacy containers are now populated from the
-    # documented publications and must be fully finite.
+    # Waldemath realizes the published uniform model (Sepharial 1918,
+    # "The Science of Foreknowledge", ch. "The New Satellite — Lilith":
+    # uniform 3 deg/day tropical longitude anchored at a printed Lilith-Sun
+    # conjunction; Waltemath 1898 via Science 8/189 p. 185 and Ashbrook,
+    # Sky & Telescope 28, p. 218: mean distance 1.03e6 km). The gate
+    # re-derives the distance from the published kilometre figure and the
+    # IAU 2012 B2 astronomical unit and verifies the runtime returns the
+    # declared uniform realization.
     _check(
         problems,
-        _all_numeric_fields_are_nan(hyp.WALDEMATH_ELEMENTS),
-        "unsupported public container WaldemathElements contains data",
+        _close(
+            hyp._WALDEMATH_RATE_DEG_PER_DAY,
+            360.0 / 177.0 + 360.0 / 365.2422,
+        ),
+        "Waldemath rate is not the printed 177-day synodic derivation",
+    )
+    # Sepharial's own consistency statement: 126 years = 260 synodic turns.
+    _check(
+        problems,
+        abs(126.0 * 365.2422 / 177.0 - 260.0) < 0.01,
+        "Waldemath synodic model fails Sepharial's 126-year return check",
+    )
+    _check(
+        problems,
+        hyp._WALDEMATH_ANCHOR_JD_UT == 2414322.5,
+        "Waldemath anchor is not 1898-02-02 00:00 GMT (Waltemath's transit)",
+    )
+    _check(
+        problems,
+        _close(hyp._WALDEMATH_DISTANCE_AU, 1.03e6 / 149_597_870.7),
+        "Waldemath distance is not the published 1.03e6 km in IAU 2012 au",
+    )
+    _check(
+        problems,
+        0.0 <= hyp._WALDEMATH_ANCHOR_APPARENT_LON_DEG < 360.0,
+        "Waldemath anchor longitude is out of range",
+    )
+    w_state = hyp.calc_waldemath(2451545.0)
+    w_next = hyp.calc_waldemath(2451546.0)
+    _check(
+        problems,
+        _close(
+            (w_next[0] - w_state[0]) % 360.0,
+            hyp._WALDEMATH_RATE_DEG_PER_DAY,
+            atol=1e-9,
+        )
+        and w_state[1] == 0.0
+        and _close(w_state[2], hyp._WALDEMATH_DISTANCE_AU)
+        and _close(w_state[3], hyp._WALDEMATH_RATE_DEG_PER_DAY)
+        and w_state[4] == 0.0
+        and w_state[5] == 0.0,
+        "Waldemath runtime does not return the declared uniform realization",
     )
     for value in (
         hyp.TRANSPLUTO_KEPLERIAN_ELEMENTS,

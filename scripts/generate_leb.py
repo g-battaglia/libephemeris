@@ -762,9 +762,17 @@ def _eval_ecliptic_bodies_batch(
         # |r| for eccentricity vector
         r_mag = np.sqrt(r[0] ** 2 + r[1] ** 2 + r[2] ** 2)
 
-        # Gravitational parameter μ for Earth-Moon system in AU³/day²
-        gm_earth = 398600.435436  # km³/s²
-        earth_moon_mass_ratio = 81.3005691
+        # Gravitational parameter μ for Earth-Moon system in AU³/day².
+        # NOTE: these are the JPL DE430 constants (Folkner et al. 2014, IPN PR
+        # 42-196): GM_Earth = 398600.435436 km³/s², EMRAT = 81.3005691 (DE430
+        # EMRAT 81.30056907...). They are NOT the DE440 values used elsewhere in
+        # the project (DE440: GM_Earth = 398600.435507, EMRAT = 81.3005682...),
+        # a ~2e-10 relative difference. The effect on the derived Moon
+        # eccentricity vector is negligible, but a future .leb regeneration
+        # should decide whether to align these with DE440. Not changed here (a
+        # value change would alter generated artifacts).
+        gm_earth = 398600.435436  # km³/s² (DE430)
+        earth_moon_mass_ratio = 81.3005691  # DE430 EMRAT
         gm_moon = gm_earth / earth_moon_mass_ratio
         gm_earth_moon = gm_earth + gm_moon
         mu = gm_earth_moon / (149597870.7**3) * (86400**2)
@@ -1601,7 +1609,7 @@ def generate_body_icrs_asteroid(
             )
 
         # Compute asteroid heliocentric positions via spktype21 (scalar loop)
-        AU_KM = 149597870.7
+        AU_KM = 149597870.7  # exact IAU 2012 (Resolution B2) astronomical unit
         all_values = np.empty((len(all_jds), 3))
         spk_bar = ProgressBar(
             len(all_jds),
@@ -3181,7 +3189,9 @@ def assemble_leb(
                     yr_e = 2000.0 + (br_end - 2451545.0) / 365.25
                     range_note = f" [~{yr_s:.0f}-{yr_e:.0f}]"
             if coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
-                # Convert AU error to arcseconds using min geocentric distance
+                # Convert AU error to arcseconds using min geocentric distance.
+                # 206265.0 is the rounded arcseconds-per-radian factor
+                # (180*3600/pi = 206264.806...).
                 geo_dist = _MIN_GEO_DIST.get(bid, 1.0)
                 if geo_dist > 0.01:
                     arcsec = (error / geo_dist) * 206265.0

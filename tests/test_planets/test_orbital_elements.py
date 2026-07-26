@@ -61,14 +61,79 @@ class TestOrbitalElementsBasic:
             assert isinstance(val, (int, float)), f"Element {i} should be numeric"
 
     @pytest.mark.unit
-    def test_sun_returns_zeros(self):
-        """Sun should return zero elements (no heliocentric orbit)."""
-        jd = 2451545.0
-        elements = ephem.get_orbital_elements(jd, SUN, 0)
+    def test_sun_raises_not_valid(self):
+        """Sun has no heliocentric orbit: get_orbital_elements raises, matching
+        the measured reference (``object 0 not valid``) rather than returning a
+        silent all-zeros tuple."""
+        from libephemeris.exceptions import Error
 
-        # All elements should be zero for Sun
-        assert elements[0] == 0.0  # Semi-major axis
-        assert elements[1] == 0.0  # Eccentricity
+        jd = 2451545.0
+        with pytest.raises(Error) as exc:
+            ephem.get_orbital_elements(jd, SUN, 0)
+        assert (
+            str(exc.value) == "get_orbital_elements: error in get_orbital_elements(): "
+            "object 0 not valid"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [10, 11, 12, 13, 21, 22, -1, -2])
+    def test_points_without_orbit_raise_not_valid(self, ipl):
+        """Lunar nodes/apogees (10-13), interpolated apsides (21, 22) and
+        negatives raise ``object N not valid`` for both time scales."""
+        from libephemeris.exceptions import Error
+
+        jd = 2451545.0
+        expected = (
+            f"get_orbital_elements: error in get_orbital_elements(): "
+            f"object {ipl} not valid"
+        )
+        with pytest.raises(Error) as exc:
+            ephem.get_orbital_elements(jd, ipl, 0)
+        assert str(exc.value) == expected
+        expected_ut = expected.replace(
+            "get_orbital_elements:", "get_orbital_elements_ut:", 1
+        )
+        with pytest.raises(Error) as exc_ut:
+            ephem.get_orbital_elements_ut(jd, ipl, 0)
+        assert str(exc_ut.value) == expected_ut
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [23, 30, 39])
+    def test_undefined_block_raises_illegal_planet(self, ipl):
+        """Ids 23-39 are an undefined block: ``illegal planet number N``."""
+        from libephemeris.exceptions import Error
+
+        jd = 2451545.0
+        with pytest.raises(Error) as exc:
+            ephem.get_orbital_elements(jd, ipl, 0)
+        assert str(exc.value) == f"get_orbital_elements: illegal planet number {ipl}."
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "ipl,a_expected,e_expected",
+        [
+            (40, 40.99837, 0.00460),  # Cupido
+            (44, 70.29949, 0.0),  # Apollon
+            (47, 83.66907, 0.0),  # Poseidon
+        ],
+    )
+    def test_uranian_elements_match_reference(self, ipl, a_expected, e_expected):
+        """The Uranians (40-47) share the Neely runtime with the reference, so
+        their osculating elements agree to well under the arbitration level."""
+        jd = 2451545.0
+        el = ephem.get_orbital_elements(jd, ipl, 0)
+        assert el[0] == pytest.approx(a_expected, abs=1e-3)
+        assert el[1] == pytest.approx(e_expected, abs=1e-3)
+
+    @pytest.mark.unit
+    def test_white_moon_is_geocentric_model(self):
+        """White Moon (56) is a geocentric circular construction here: its
+        osculating semi-major axis is Earth-relative (~0.053 AU), an intentional
+        divergence from the reference's ~0.909 AU heliocentric element set."""
+        jd = 2451545.0
+        el = ephem.get_orbital_elements(jd, 56, 0)
+        assert 0.04 < el[0] < 0.07  # geocentric radius, not the reference's 0.909
+        assert el[1] < 0.01  # near-circular
 
 
 class TestOrbitalElementsValues:

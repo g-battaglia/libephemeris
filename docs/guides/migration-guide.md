@@ -93,12 +93,14 @@ Both libraries return the same shape: a 12-element cusp tuple, 0-indexed
 needed when migrating:
 
 ```python
-# pyswisseph: 12 elements, 0-indexed
-cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, b'P')
-cusp1_swe = cusps_swe[0]
+import libephemeris as swe
 
-# libephemeris: identical
-cusps, ascmc = ephem.houses(jd, lat, lon, b'P')
+jd = swe.julday(2000, 1, 1, 12.0)
+lat, lon = 41.9, 12.5  # Rome
+
+# 12-element cusp tuple, 0-indexed (cusp 1 at index 0), plus an 8-element
+# ascmc tuple -- identical shape to pyswisseph, no index shifting needed.
+cusps, ascmc = swe.houses(jd, lat, lon, b'P')
 cusp1 = cusps[0]  # First house cusp
 ```
 
@@ -108,8 +110,7 @@ cusp1 = cusps[0]  # First house cusp
 
 LibEphemeris uses NASA JPL DE ephemerides, IAU/ERFA reductions, and independently
 published models. Results are therefore not guaranteed to be bit-identical to
-another ephemeris. Compatibility checks are performed ephemerally; per-date
-per-date comparison values and delta tables are not stored in this project.
+another ephemeris.
 
 Planetary coordinates are validated against JPL states, house geometry against
 the published spherical definitions, and frame transforms against ERFA. Speeds
@@ -158,8 +159,13 @@ Solar/lunar eclipse and occultation entry points are implemented. Remaining
 numeric or convention differences are maintained in the evidence-backed
 [Known Differences](../comparison/known-differences.md) catalog rather than a
 blanket "partial" classification.
-- `lun_eclipse_when()` / `lun_eclipse_when()`
-- `lun_occult_when_glob()` / `lun_occult_when_glob()`
+The entry points carry the same names as pyswisseph:
+
+- Solar: `sol_eclipse_when_glob()`, `sol_eclipse_when_loc()`,
+  `sol_eclipse_where()`, `sol_eclipse_how()`
+- Lunar: `lun_eclipse_when()`, `lun_eclipse_when_loc()`, `lun_eclipse_how()`
+- Occultations: `lun_occult_when_glob()`, `lun_occult_when_loc()`,
+  `lun_occult_where()`
 
 ### Fixed Star Velocities
 
@@ -167,7 +173,11 @@ Fixed star velocities are computed from proper motion, precession, and frame
 rates. Note the 3-tuple return shape:
 
 ```python
-xx, star_name, retflag = ephem.fixstar_ut("Aldebaran", jd, FLG_SPEED)
+import libephemeris as swe
+from libephemeris.constants import FLG_SPEED
+
+jd = swe.julday(2000, 1, 1, 12.0)
+xx, star_name, retflag = swe.fixstar_ut("Aldebaran", jd, FLG_SPEED)
 # xx[3], xx[4], xx[5] carry the longitude/latitude/distance rates
 ```
 
@@ -260,12 +270,12 @@ For multi-threaded applications, use `EphemerisContext`:
 
 ```python
 from libephemeris import EphemerisContext
-from libephemeris.constants import SUN, MOON, FLG_SIDEREAL
+from libephemeris.constants import SUN, MOON, FLG_SIDEREAL, SIDM_TRUE_CITRA
 
 # Each thread creates its own context with isolated state
 ctx = EphemerisContext()
 ctx.set_topo(12.5, 41.9, 0)    # Rome - isolated to this context
-ctx.set_sid_mode(swe.SIDM_TRUE_CITRA)  # isolated to this context
+ctx.set_sid_mode(SIDM_TRUE_CITRA)  # isolated to this context
 
 # Thread-safe calculations
 sun, _ = ctx.calc_ut(2451545.0, SUN, FLG_SIDEREAL)
@@ -277,7 +287,7 @@ cusps, ascmc = ctx.houses(2451545.0, 41.9, 12.5, ord('P'))
 
 ```python
 from libephemeris import EphemerisContext
-from libephemeris.constants import SUN, MOON, FLG_SIDEREAL
+from libephemeris.constants import SUN, MOON, FLG_SIDEREAL, SIDM_TRUE_CITRA
 from concurrent.futures import ThreadPoolExecutor
 
 def calculate_chart(location: dict, jd: float) -> dict:
@@ -285,7 +295,7 @@ def calculate_chart(location: dict, jd: float) -> dict:
     # Each thread creates its own context
     ctx = EphemerisContext()
     ctx.set_topo(location['lon'], location['lat'], 0)
-    ctx.set_sid_mode(swe.SIDM_TRUE_CITRA)
+    ctx.set_sid_mode(SIDM_TRUE_CITRA)
 
     sun, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
     moon, _ = ctx.calc_ut(jd, MOON, FLG_SIDEREAL)
@@ -343,15 +353,18 @@ for r in results:
 - **Thread-Safe Loading**: Uses double-checked locking pattern for lazy initialization
 
 ```python
+from libephemeris import EphemerisContext
+from libephemeris.constants import SIDM_TRUE_CITRA, SIDM_J2000
+
 # Multiple contexts share the same ephemeris file (memory efficient)
 ctx1 = EphemerisContext()
 ctx2 = EphemerisContext()
 ctx3 = EphemerisContext()
 
 # Each context has isolated state
-ctx1.set_sid_mode(swe.SIDM_TRUE_CITRA)
-ctx2.set_sid_mode(swe.SIDM_J2000)
-ctx3.set_sid_mode(27) # True Citra
+ctx1.set_sid_mode(SIDM_TRUE_CITRA)
+ctx2.set_sid_mode(SIDM_J2000)
+ctx3.set_sid_mode(27)  # True Citra (same as SIDM_TRUE_CITRA)
 
 # But they all share the same ephemeris data in memory
 ```
@@ -367,6 +380,9 @@ Code that used `FLG_MOSEPH` continues to run, but the flag does not replace the
 active source with Moshier.
 
 ```python
+import libephemeris as swe
+
+jd = swe.julday(2000, 1, 1, 12.0)
 # This still works, but FLG_MOSEPH does not select another backend:
 pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_MOSEPH | swe.FLG_SPEED)
 # Equivalent to:
@@ -438,5 +454,5 @@ Include:
 3. The LibEphemeris error or behavior category
 4. Python version and LibEphemeris version
 
-Do not attach reference-distribution files or persist numerical comparison
-output in the issue. Maintainers reproduce public-API comparisons ephemerally.
+Please do not attach files from other ephemeris distributions; a minimal
+public-API reproduction is enough.

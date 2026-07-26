@@ -45,11 +45,10 @@ one direction, and it does not recover the historical model.
 | ID | Public name | Source-complete row | Runtime behavior | Blocking evidence |
 |---:|---|---|---|---|
 | 49 | Nibiru | Missing | `UnknownBodyError` | No credible primary publication defining a complete numerical orbit has been identified. |
-| 58 | Waldemath | Missing | `UnknownBodyError` | Waltemath's 1898 announcements publish distance, period, diameter, and transit dates only; no printed source supplies the phase, orientation, and equinox of the orbital convention associated with this ID. |
 
-IDs 48 (Transpluto/Isis), 54 (Pickering), 55 (Vulcan), and 57 (Proserpina)
-were recovered from their primary publications and moved to
-[Hypothetical bodies](hypothetical-bodies.md).
+IDs 48 (Transpluto/Isis), 54 (Pickering), 55 (Vulcan), 57 (Proserpina) and
+58 (Waldemath / Sepharial Dark Moon) were recovered from their primary
+publications and moved to [Hypothetical bodies](hypothetical-bodies.md).
 
 ## ID 49 — Nibiru
 
@@ -63,35 +62,6 @@ semimajor axis or period law, eccentricity, perihelion orientation, node,
 inclination, center, and secular terms. This ID cannot be admitted merely by
 finding numbers that reproduce another implementation; the defining primary
 publication and its stated methodology are required.
-
-## ID 58 — Waldemath
-
-Georg Waltemath's 1898 announcements (summarized in *Science* 8, No. 189,
-1898, p. 185, and retold by Sepharial in *The Science of Foreknowledge*)
-publish only a mean distance of about 1.03 million km, a sidereal period of
-119 days (177-day synodic), an apparent diameter, and predicted transit
-dates. The Delphine Jay ephemeris (AFA, 1983) associated with this point
-realizes a different, uniform-plus-sinusoid longitude model whose published
-fit (about 1.55 deg amplitude over a 354-day term) is incompatible with an
-eccentric Keplerian orbit.
-
-| Required field | Status |
-|---|---|
-| epoch and time scale | An epoch (JD 2414290.95827875) circulates in secondary tabulations without a printed source |
-| reference equinox / geocentric plane | Missing |
-| phase and its exact rate law | Missing |
-| orbital radius / semimajor axis | Derivable from the printed 1.03 million km distance |
-| eccentricity | A value (0.1587) circulates in secondary tabulations without a printed source |
-| periapsis orientation | Missing |
-| node and inclination | An inclination (2.5 deg) circulates in secondary tabulations without a printed source |
-| center | Earth-centered per the historical claim |
-| additional periodic terms | Missing |
-
-Admission requires a page-level primary source for the complete model —
-candidate leads are Waltemath's own Hamburg pamphlets (1898) and the
-Delphine Jay volume (AFA, 1983). Modern retellings or a numerical
-reconstruction tuned to reproduce legacy positions are explicitly
-insufficient.
 
 ## Procedure when a missing source is found
 

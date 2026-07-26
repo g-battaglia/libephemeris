@@ -25,7 +25,8 @@ reproducibly, as the smooth track through the Moon's actual apsis passages:
 
 Everything derives from the JPL DE440 kernel (Park et al. 2021, AJ 161:105),
 the IAU SOFA/IERS 2003 fundamental arguments exposed by BSD-licensed ERFA,
-the mean Earth-orbit eccentricity published by Simon et al. (1994), and this
+the mean Earth-orbit eccentricity polynomial of Meeus, Astronomical Algorithms
+(2nd ed.), eq. 25.4 (after Simon et al. 1994, A&A 282, 663--683), and this
 script. No value is fitted to any external ephemeris implementation.
 
 Outputs ``libephemeris/lunar_apse_model.py`` (tables + fitted coefficients).

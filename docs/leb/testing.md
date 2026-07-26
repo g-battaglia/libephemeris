@@ -458,7 +458,7 @@ assert 4.5e-05 < 3e-05
 
 ### What to do if a test fails
 
-1. **Check the date** — large errors at extreme dates (start/end of tier) suggest SPK contamination or edge Chebyshev segments
+1. **Check the date** — large errors at extreme dates (start/end of tier) suggest SPK coverage-edge artifacts or edge Chebyshev segments
 2. **Check the body** — Saturn, Uranus, asteroids have known architectural limits
 3. **Widen the tolerance?** — only if the error is close to the limit and the safety margin (2x) is confirmed across many dates
 4. **Regenerate the LEB?** — if you changed parameters in `leb_format.py` or `fast_calc.py`

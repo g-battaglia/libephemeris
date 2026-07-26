@@ -1,11 +1,11 @@
 """
-Tests for the SIDBIT projection-flag guard (this version).
+Tests for the SIDBIT projection-flag handling.
 
-The SIDBIT_* flags (>= 256: ECL_T0, SSY_PLANE, USER_UT, ECL_DATE,
-NO_PREC_OFFSET, PREC_ORIG) select alternative ecliptic/equinox projections
-that are not implemented in this version. set_sid_mode() must strip them,
-    warn, and keep the base ayanamsha mode. Planned for a future release
-    (NEXT.md).
+The implemented projection flags SIDBIT_ECL_T0, SIDBIT_SSY_PLANE and
+SIDBIT_USER_UT are applied by the module-level setter (they are retained and
+consumed by the sidereal path). The remaining projection flags (ECL_DATE,
+NO_PREC_OFFSET, PREC_ORIG) still strip-and-warn to the base ayanamsha mode.
+EphemerisContext strips every projection flag (it does not carry them).
 """
 
 from __future__ import annotations
@@ -29,13 +29,31 @@ JD = 2451545.0
 
 
 @pytest.mark.unit
-def test_sidbit_stripped_and_warned():
-    """A composite mode warns and stores only the base mode."""
+def test_unimplemented_sidbit_stripped_and_warned():
+    """A still-unsupported projection flag warns and stores only the base mode."""
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        ephem.set_sid_mode(ephem.SIDM_FAGAN_BRADLEY | ephem.SIDBIT_ECL_T0)
+        ephem.set_sid_mode(ephem.SIDM_FAGAN_BRADLEY | ephem.SIDBIT_ECL_DATE)
     assert state.get_sid_mode() == ephem.SIDM_FAGAN_BRADLEY
     assert any(issubclass(w.category, UserWarning) for w in caught)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "bit",
+    [ephem.SIDBIT_ECL_T0, ephem.SIDBIT_SSY_PLANE, ephem.SIDBIT_USER_UT],
+)
+def test_implemented_sidbit_no_warn_and_retained(bit):
+    """Implemented projection flags do not warn; the base mode is stored and
+    the flag is retained for the sidereal path to apply."""
+    from libephemeris.planets import _get_sidereal_bits
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        ephem.set_sid_mode(ephem.SIDM_FAGAN_BRADLEY | bit)
+    assert state.get_sid_mode() == ephem.SIDM_FAGAN_BRADLEY
+    assert not caught
+    assert _get_sidereal_bits() & bit
 
 
 @pytest.mark.unit

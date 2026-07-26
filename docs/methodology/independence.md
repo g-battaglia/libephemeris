@@ -68,9 +68,9 @@ surface:
 
 API compatibility extends beyond signatures to numeric behavior: flag
 semantics, frame conventions, retflag echoes, edge-case handling. That
-behavior is established **by measurement, not by reading source**: the
-reference API is called only for ephemeral pass/fail comparison; its output is
-never added to fixtures, coefficients, tables, or generated artifacts.
+behavior is established by measuring public outputs; the reference API is
+compared behaviorally, and its output is not used as a data source for
+fixtures, coefficients, tables, or generated artifacts.
 Where the two engines legitimately disagree
 (different underlying ephemeris, different ΔT, physical-model choices), the
 difference is measured and documented in

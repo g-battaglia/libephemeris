@@ -51,9 +51,8 @@ policy. A finite sampled test is not presented as proof of a continuous maximum.
 | Interpolated Apogee/Perigee | DE440 apsis passages + Delaunay series + hash-pinned residual tables | Exactness at the DE440 passages, endpoint, continuity, and derivative checks |
 
 Interpolated points are anchored to the actual DE440 apsis passages
-(exact there by construction); ephemeral comparison with external
-implementations between passages stays within ~0.05° in longitude and
-`0.25°` in latitude, without retaining any sampled output.
+(exact there by construction); between passages they stay within ~0.05° in
+longitude and `0.25°` in latitude of an external implementation.
 
 ## Independent triangulation
 

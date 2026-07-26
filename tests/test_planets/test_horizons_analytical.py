@@ -149,11 +149,12 @@ class TestHorizonsFictitiousAnalytical:
         assert len(data) == 6
         assert all(math.isfinite(value) for value in data)
 
-    def test_unverified_waldemath_native_geocentric_fails_closed(self):
-        """Waldemath has no reviewed built-in model."""
-        with pytest.raises(UnknownBodyError) as raised:
-            horizons_calc_ut(None, JD_J2000, 58, FLG_SWIEPH)
-        assert raised.value.body_id == 58
+    def test_waldemath_native_geocentric_computes(self):
+        """Waldemath (58) computes via the published Sepharial uniform model."""
+        data, retflag = horizons_calc_ut(None, JD_J2000, 58, FLG_SWIEPH)
+        assert len(data) == 6
+        assert all(math.isfinite(value) for value in data)
+        assert data[1] == 0.0  # longitude-only model rides the ecliptic
 
 
 @pytest.mark.unit

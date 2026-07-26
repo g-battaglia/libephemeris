@@ -236,3 +236,55 @@ def test_get_library_path_after_close():
         # Should return default path (~/.libephemeris), not the custom one
         expected_base = os.path.join(os.path.expanduser("~"), ".libephemeris")
         assert os.path.normpath(path) == os.path.normpath(expected_base)
+
+
+def test_set_ephe_path_no_argument_resets():
+    """set_ephe_path() with no argument resets to default (reference parity).
+
+    The reference API accepts set_ephe_path() with no argument as a reset to
+    its default search location; a required-positional signature previously
+    raised TypeError on that call.
+    """
+    from libephemeris import state
+
+    set_ephe_path("/tmp")
+    assert state._EPHEMERIS_PATH == "/tmp"
+    # No-argument call must not raise TypeError and resets to default (None).
+    set_ephe_path()
+    assert state._EPHEMERIS_PATH is None
+    set_ephe_path(None)
+
+
+def test_missing_arbitrary_jpl_file_falls_back_without_download():
+    """A missing, unrecognized JPL filename falls back to the tier default.
+
+    The reference API, asked for a JPL file it cannot find (e.g. after
+    set_jpl_file('bogus.bsp')), falls back to a valid default ephemeris rather
+    than fetching the exact missing name. libephemeris must never turn an
+    arbitrary configured filename into a network download of that name.
+    """
+    from libephemeris.state import (
+        _is_recognized_de_kernel,
+        _resolve_missing_ephemeris_fallback,
+        _get_current_tier,
+    )
+    from libephemeris.logging_config import get_logger
+
+    logger = get_logger()
+
+    # Recognized JPL DE kernels are still eligible for on-demand download.
+    assert _is_recognized_de_kernel("de440.bsp")
+    assert _is_recognized_de_kernel("de440s.bsp")
+    assert _is_recognized_de_kernel("de441.bsp")
+    assert not _is_recognized_de_kernel("de_nonexistent_xyz.bsp")
+    assert not _is_recognized_de_kernel("random.bsp")
+
+    tier_default = _get_current_tier().ephemeris_file
+    # An unrecognized, absent filename resolves to the tier default kernel.
+    assert (
+        _resolve_missing_ephemeris_fallback("de_nonexistent_xyz.bsp", logger)
+        == tier_default
+    )
+    # A recognized DE kernel name is preserved (may be downloaded on demand),
+    # even when absent locally.
+    assert _resolve_missing_ephemeris_fallback("de441.bsp", logger) == "de441.bsp"
