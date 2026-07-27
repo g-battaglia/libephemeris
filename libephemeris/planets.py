@@ -10077,7 +10077,11 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     helio_lat = 0.0
     tjd = t.tt
 
-    if ipl == SATURN:
+    if ipl in (SATURN, URANUS):
+        # Saturn needs the ecliptic coordinates for the ring-tilt term and
+        # Uranus for the sub-Earth photometric latitude of Mallama & Hilton
+        # (2018) Eq. 15 — without them the Uranus term degenerates to a
+        # constant and the two backends split by tens of millimagnitudes.
         # Get geocentric ecliptic coordinates
         try:
             geo_ecl_lat, geo_ecl_lon, _ = target_pos_geo.frame_latlon(ecliptic_frame)

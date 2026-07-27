@@ -268,6 +268,17 @@ conventional-date realization (~2 days apart at remote epochs) and the
 measured external choices are not internally consistent across modes.
 LibEphemeris keeps the literal published anchors and conventions.
 
+The galactic-anchored modes use the canonical published coordinates — the
+VLBI Sgr A* position with its apparent (solar-reflex) proper motion (Reid &
+Brunthaler 2004) for the galactic-center modes, and the standard J2000
+galactic north pole (192.85948°, +27.12825°) for the equator modes.
+Measured against one external implementation, its galactic realizations
+differ by a stable 0.08–0.36 arcseconds (center modes ~0.08", IAU-1958
+equator modes ~0.19", the mid-Mula equator mode ~0.36"), unaffected by the
+projection flags; the modes anchored to a fixed published value at a fixed
+date (Fiorenza, Mardyks) agree exactly. LibEphemeris keeps the canonical
+coordinates.
+
 Of the `SIDBIT_*` projection flags, the frame projections (`ECL_T0`,
 `SSY_PLANE`) and the ecliptic-of-date reference (`ECL_DATE`, realized from
 the Vondrák 2011 ecliptic-pole geometry) are implemented for defining-pair
