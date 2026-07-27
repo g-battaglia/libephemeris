@@ -345,6 +345,7 @@ def _vl_extinction_components(
     altitude_m: float,
     latitude: float,
     jd: float,
+    pressure_mbar: float = 0.0,
 ) -> Tuple[float, float, float, float]:
     """Return the four V-band extinction coefficients (KR, KA, KO, KW).
 
@@ -352,12 +353,21 @@ def _vl_extinction_components(
     ozone term. Coefficients are per unit airmass.  Aerosol extinction varies
     with humidity and altitude; no empirically recovered seasonal multiplier
     is applied.
+
+    Rayleigh scattering is proportional to the molecular column mass, i.e.
+    to the site pressure (Schaefer 1993): an explicit barometric pressure
+    (``pressure_mbar > 0``) therefore scales the molecular coefficient as
+    P/1013.25; with the sentinel 0 the standard-atmosphere altitude form
+    ``exp(-h/H)`` is used, which is the same quantity for a standard site.
     """
     Mc = _vl_month_cont(jd)
     RA = (Mc - 3.0) * 30.0 * _RD
     LT = latitude * _RD
     RH = min(max(humidity_pct, 1.0), 99.5)
-    kr = 0.1066 * math.exp(-altitude_m / _VL_SH_RAY)
+    if pressure_mbar > 0.0:
+        kr = 0.1066 * (pressure_mbar / 1013.25)
+    else:
+        kr = 0.1066 * math.exp(-altitude_m / _VL_SH_RAY)
     ka = (
         0.1
         * math.exp(-altitude_m / _VL_SH_AER)
@@ -560,6 +570,7 @@ class SchaeferModel:
             self.atmo.altitude,
             self.latitude,
             self.jd,
+            pressure_mbar=self.atmo.pressure,
         )
         mr = self.atmo.met_range
         if 0.0 < mr < 1.0:

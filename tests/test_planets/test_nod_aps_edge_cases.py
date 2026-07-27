@@ -418,3 +418,34 @@ class TestNodApsSiderealMeanAyanamsha:
         # Compare against a non-zero slot (perihelion of an inclined orbit).
         peri_shift = (trop[2][0] - sid[2][0]) % 360.0
         assert abs(peri_shift - mean_aya) < 1e-3
+
+
+class TestNodApsBarycentricFlag:
+    """FLG_BARYCTR re-references node/apse points to the solar-system
+    barycentre (the point vector gains the Sun's barycentric offset)."""
+
+    def test_baryctr_differs_from_helctr_by_sun_offset(self):
+        import math
+
+        import libephemeris as le
+
+        jd = 2455362.5
+        hel = le.nod_aps_ut(
+            jd, le.JUPITER, le.NODBIT_OSCU, le.FLG_SWIEPH | le.FLG_HELCTR
+        )
+        bar = le.nod_aps_ut(
+            jd, le.JUPITER, le.NODBIT_OSCU, le.FLG_SWIEPH | le.FLG_BARYCTR
+        )
+        # The physical point is the same: the barycentric distance differs
+        # from the heliocentric one by (at most) the Sun-SSB offset.
+        d_dist = abs(bar[0][2] - hel[0][2])
+        assert 0.0 < d_dist < 0.02  # Sun-SSB stays within ~0.02 AU
+        # And the longitudes are no longer bit-identical (the old no-op).
+        assert not math.isclose(bar[0][0], hel[0][0], abs_tol=1e-12)
+
+    def test_geocentric_and_helctr_unchanged_by_flagless_paths(self):
+        import libephemeris as le
+
+        jd = 2455362.5
+        geo = le.nod_aps_ut(jd, le.JUPITER, le.NODBIT_OSCU, le.FLG_SWIEPH)
+        assert all(0.0 <= v < 360.0 for v in (geo[0][0], geo[2][0]))

@@ -7660,12 +7660,23 @@ def _calc_nod_aps(
     # (or the barycentric Sun under FLG_HELCTR) for frame consistency;
     # otherwise the heliocentric Earth (None = no subtraction, points are
     # already observer-relative).
-    if bar_mode and is_centered:
+    if bar_mode and is_bary:
+        # OSCU_BAR points are already SSB-relative; a barycentric request
+        # needs no observer subtraction.
+        r_obs_ecl = None
+    elif bar_mode and is_centered:
         _s_bary = sun_pos.position.au
         r_obs_ecl = _icrs_to_ecliptic((_s_bary[0], _s_bary[1], _s_bary[2]))
     elif bar_mode:
         _e_bary = earth_pos.position.au
         r_obs_ecl = _icrs_to_ecliptic((_e_bary[0], _e_bary[1], _e_bary[2]))
+    elif is_bary:
+        # FLG_BARYCTR on heliocentric orbit points: measured reference
+        # behavior re-references each node/apse point to the solar-system
+        # barycentre (the point vector gains the Sun's barycentric offset),
+        # so the observer sits at -r_sun in the Sun-centered working frame.
+        _s_bary = sun_pos.position.au
+        r_obs_ecl = _icrs_to_ecliptic((-_s_bary[0], -_s_bary[1], -_s_bary[2]))
     elif is_centered:
         r_obs_ecl = None
     else:
