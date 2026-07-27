@@ -152,6 +152,13 @@ _STATE_LOCK = _CONTEXT_SWAP_LOCK
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
 _EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
 _EPHEMERIS_FILE_EXPLICIT: bool = False  # True if set_ephemeris_file() was called
+# Sticky record of whether the most recent ephemeris load silently replaced an
+# unavailable configured JPL file with the tier default (see
+# _resolve_missing_ephemeris_fallback / jpl_fallback_active). get_planets()
+# overwrites _EPHEMERIS_FILE with the resolved fallback name, which would hide
+# the fallback from a filename-only check after the first load, so the resolver
+# records it here.
+_JPL_FALLBACK_ACTIVE: bool = False
 _EPHEMERIS_ENV_VAR = "LIBEPHEMERIS_EPHEMERIS"  # Env var for ephemeris file selection
 _PRECISION_TIER: Optional[str] = None  # Programmatic tier override
 _LOADER: Optional[Loader] = None  # Skyfield data loader
@@ -1278,7 +1285,7 @@ def set_precision_tier(tier: str) -> None:
         'extended'
     """
     global _PRECISION_TIER, _PLANETS, _LEB_READER, _EPHEMERIS_FILE_EXPLICIT
-    global _PLANET_CENTER_CACHE_TIER
+    global _PLANET_CENTER_CACHE_TIER, _JPL_FALLBACK_ACTIVE
     if tier not in TIERS:
         raise ValueError(
             f"Invalid tier: {tier!r}. Must be one of: {list(TIERS.keys())}"
@@ -1286,6 +1293,7 @@ def set_precision_tier(tier: str) -> None:
     with _STATE_LOCK:
         _PRECISION_TIER = tier
         _EPHEMERIS_FILE_EXPLICIT = False
+        _JPL_FALLBACK_ACTIVE = False
         _PLANET_CENTER_MISSING.clear()
         _PLANET_CENTER_REJECTED_FILES.clear()
         _PLANET_CENTER_CACHE_TIER = None
@@ -1451,12 +1459,16 @@ def _resolve_missing_ephemeris_fallback(filename: str, logger) -> str:
     downloaded on demand; any other name that is absent from every local search
     location is replaced by the active tier's DE kernel.
 
-    (The public retflag still echoes the requested ephemeris bit, resolved in
-    ``planets._normalize_calc_flags``; the source substitution here only changes
-    which kernel is opened, not the echoed flags.)
+    (The public retflag echoes SWIEPH instead of the requested JPLEPH once this
+    fallback fires, resolved in ``planets._normalize_calc_flags`` via the
+    ``_JPL_FALLBACK_ACTIVE`` record set here; the source substitution itself only
+    changes which kernel is opened.)
     """
+    global _JPL_FALLBACK_ACTIVE
     if _is_recognized_de_kernel(filename) or _ephemeris_file_present(filename):
+        _JPL_FALLBACK_ACTIVE = False
         return filename
+    _JPL_FALLBACK_ACTIVE = True
     fallback = _get_current_tier().ephemeris_file
     logger.warning(
         "Configured ephemeris file %r is not a recognized JPL DE kernel and is "
@@ -1466,6 +1478,38 @@ def _resolve_missing_ephemeris_fallback(filename: str, logger) -> str:
         fallback,
     )
     return fallback
+
+
+def jpl_fallback_active() -> bool:
+    """Return whether the configured JPL file is being silently replaced.
+
+    True exactly when the effective ephemeris file (set_jpl_file() /
+    LIBEPHEMERIS_EPHEMERIS / TOML / tier default) is neither a recognized JPL DE
+    kernel nor present in any local search location, so ``get_planets()``
+    substitutes the active tier's default kernel via
+    ``_resolve_missing_ephemeris_fallback``.
+
+    The public retflag consults this so a requested ``FLG_JPLEPH`` is echoed as
+    ``FLG_SWIEPH`` once the fallback is in effect, matching the reference API:
+    asked for a JPL file it cannot open, it computes from its default ephemeris
+    and echoes SWIEPH rather than JPLEPH. Evaluated eagerly (a filename +
+    filesystem check, no kernel load and no network) so the echo is correct on
+    the first calc, before the kernel is lazily opened. Sealed ``leb`` mode never
+    opens a JPL kernel, so it never reports a fallback.
+    """
+    if get_calc_mode() == "leb":
+        return False
+    # After the kernel is opened once, get_planets() has already overwritten
+    # _EPHEMERIS_FILE with the resolved fallback name, so the sticky record set
+    # by the resolver is authoritative; before the first load the eager filename
+    # check catches the fallback so the very first retflag is correct too.
+    if _JPL_FALLBACK_ACTIVE:
+        return True
+    effective_file = _get_effective_ephemeris_file()
+    return not (
+        _is_recognized_de_kernel(effective_file)
+        or _ephemeris_file_present(effective_file)
+    )
 
 
 def get_planets() -> SpiceKernel:
@@ -2011,9 +2055,12 @@ def set_ephemeris_file(filename: str) -> None:
         This takes priority over the precision tier setting. To revert to
         tier-based ephemeris selection, call close() to reset state.
     """
-    global _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT, _PLANETS
+    global _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT, _PLANETS, _JPL_FALLBACK_ACTIVE
     _EPHEMERIS_FILE = filename
     _EPHEMERIS_FILE_EXPLICIT = True
+    # A new configured file is unresolved until the next load; drop any stale
+    # fallback record so jpl_fallback_active() re-checks the new name.
+    _JPL_FALLBACK_ACTIVE = False
     # Close old kernel and clear caches before reloading
     if _PLANETS is not None:
         try:
@@ -2363,6 +2410,7 @@ def close() -> None:
 def _close_inner() -> None:
     """Inner close implementation (must be called with _STATE_LOCK held)."""
     global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
+    global _JPL_FALLBACK_ACTIVE
     global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _LAPSE_RATE
@@ -2440,6 +2488,7 @@ def _close_inner() -> None:
     _EPHEMERIS_PATH = None
     _EPHEMERIS_FILE = "de440.bsp"
     _EPHEMERIS_FILE_EXPLICIT = False
+    _JPL_FALLBACK_ACTIVE = False
     _LOADER = None
     _PLANETS = None
     _PLANET_CENTERS = None

@@ -583,7 +583,15 @@ def main() -> None:
         f"MULA_WILHELM_TARGET_LON = {MULA_WILHELM_TARGET!r}\n\n"
     )
     lines.append(
-        "# Aldebaran at 15\N{DEGREE SIGN} Taurus: published target longitude.\n"
+        "# Aldebaran at 15\N{DEGREE SIGN} Taurus (45\N{DEGREE SIGN} absolute): the "
+        "star-fixed anchor of the\n"
+        '# "Aldebaran = 15 Tau" sidereal convention, the Babylonian '
+        "exaltation-degree\n"
+        '# tradition revived by Cyril Fagan, "Zodiacs Old and New" (Llewellyn, '
+        "1950).\n"
+        "# It defines sidereal mode SIDM_ALDEBARAN_15TAU (14) and is distinct "
+        "from the\n"
+        "# Fagan-Bradley SVP ayanamsha, from which it differs by ~1'.\n"
         "ALDEBARAN_TARGET_LON = 45.0\n\n"
     )
     lines.append(

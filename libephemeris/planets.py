@@ -845,6 +845,29 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
     return result
 
 
+def _degrade_jpl_echo_on_fallback(flags: int) -> int:
+    """Echo FLG_SWIEPH for a JPLEPH request once the JPL file has fallen back.
+
+    The reference, asked for FLG_JPLEPH with a JPL file it cannot open, computes
+    from its default ephemeris and echoes FLG_SWIEPH. libephemeris mirrors that:
+    when ``state.jpl_fallback_active()`` reports the configured JPL kernel is
+    being silently replaced by the tier default, a requested JPLEPH bit is
+    echoed (and normalized) as SWIEPH. The computation is unaffected -- it always
+    uses the JPL DE kernel; this only keeps retflag 1:1 with the reference. The
+    state check is skipped unless JPLEPH was actually requested, so the common
+    path pays no filesystem cost.
+    """
+    from .constants import FLG_JPLEPH
+
+    if not (flags & FLG_JPLEPH):
+        return flags
+    from . import state
+
+    if state.jpl_fallback_active():
+        flags = (flags & ~FLG_JPLEPH) | FLG_SWIEPH
+    return flags
+
+
 def _normalize_calc_flags(flags: int) -> int:
     """Normalize calculation flags according to the public API contract.
 
@@ -854,7 +877,10 @@ def _normalize_calc_flags(flags: int) -> int:
     - FLG_MOSEPH is accepted for compatibility but stripped (all
       calculations use the JPL DE440/DE441 path).
     - Exactly one ephemeris bit is echoed. Selection bits are mutually
-      exclusive, with priority JPLEPH > SWIEPH; FLG_SWIEPH is the default.
+      exclusive, with priority JPLEPH > SWIEPH; FLG_SWIEPH is the default. A
+      requested JPLEPH degrades to SWIEPH when the configured JPL file has
+      silently fallen back to the tier default (see
+      _degrade_jpl_echo_on_fallback), matching the reference.
     - FLG_SPEED3 implies FLG_SPEED for the computation, while retaining the
       SPEED3 marker internally so eligible bodies can use the public centered
       three-position derivative. SPEED wins when callers pass both bits.
@@ -862,6 +888,7 @@ def _normalize_calc_flags(flags: int) -> int:
     from .constants import FLG_JPLEPH, FLG_MOSEPH
 
     flags = flags & ~FLG_MOSEPH
+    flags = _degrade_jpl_echo_on_fallback(flags)
     if flags & FLG_JPLEPH:
         # JPLEPH takes priority; ensure the ephemeris bits stay mutually
         # exclusive so retflag never echoes both (the reference never does).
@@ -982,6 +1009,7 @@ def _exclusive_ephemeris_bit(flags: int) -> int:
     """
     from .constants import FLG_JPLEPH, FLG_MOSEPH
 
+    flags = _degrade_jpl_echo_on_fallback(flags)
     ephmask = FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH
     if flags & FLG_JPLEPH:
         epheflag = FLG_JPLEPH
@@ -6474,6 +6502,16 @@ _SUN_EARTH_MASS_RATIO = 332946.0487
 # Waldemath dark moon (58). Their osculating elements are reduced with GM_earth.
 _FICT_GEOCENTRIC_IDS = frozenset({WHITE_MOON, WALDEMATH})
 
+# Heliocentric fictitious body whose runtime model is exactly *circular* and is
+# referred to the mean equinox of date: Proserpina (57). Its osculating elements
+# are reduced in that native of-date frame rather than J2000, because the tiny
+# Gaussian mean motion (~0.0014 deg/day) would otherwise be contaminated by the
+# ~50.29"/yr equinox precession rate that a J2000 request injects into the
+# tangential velocity (see _calc_orbital_elements_fictitious). The genuinely
+# eccentric of-date model Vulcan (55) is not listed: its ~19 deg/day motion
+# makes the precession-rate term negligible, so its J2000 reduction is unaffected.
+_FICT_ECL_OF_DATE_CIRCULAR_IDS = frozenset({PROSERPINA})
+
 # Astronomical points that carry no heliocentric orbit and for which the
 # reference raises "object N not valid" from get_orbital_elements: the lunar
 # nodes (10, 11), the lunar apogees (12, 13), and the interpolated lunar
@@ -7429,6 +7467,18 @@ def _calc_orbital_elements_fictitious(t, ipl: int) -> Tuple[float, ...]:
         GM_earth = _GM_SUN / _SUN_EARTH_MASS_RATIO
         flags = FLG_J2000 | FLG_TRUEPOS | FLG_SPEED  # geocentric geometric place
         return _osculating_from_calc_state(t, ipl, flags, GM_earth)
+    if ipl in _FICT_ECL_OF_DATE_CIRCULAR_IDS:
+        # Reduce this exactly-circular of-date model in its native mean ecliptic
+        # of date. A J2000 request rotates the position onto the of-date-circular
+        # path but injects the equinox precession rate into the tangential
+        # velocity, a ~2.7% deficit against the Gaussian circular speed
+        # (n = k/a^1.5) that the reducer would read as a spurious e ~ 0.054
+        # aphelion. In the mean-of-date frame (FLG_NONUT, no FLG_J2000) position
+        # and velocity are self-consistent, so the circular orbit yields e ~ 0
+        # with a = q = Q. The angular elements are degenerate for e = i = 0, so
+        # the of-date reference changes no reported quantity.
+        flags = FLG_HELCTR | FLG_NONUT | FLG_TRUEPOS | FLG_SPEED
+        return _osculating_from_calc_state(t, ipl, flags, _GM_SUN)
     flags = FLG_HELCTR | FLG_J2000 | FLG_TRUEPOS | FLG_SPEED
     return _osculating_from_calc_state(t, ipl, flags, _GM_SUN)
 

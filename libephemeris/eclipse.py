@@ -48,7 +48,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Sequence, Tuple, Union, cast
+from typing import Callable, Sequence, Tuple, Union, cast
 
 from .constants import (
     SUN,
@@ -1941,6 +1941,105 @@ def _find_contact_time_besselian(
     return (jd_start + jd_end) / 2
 
 
+def _besselian_contact_residuals(
+    jd: float, flags: int = FLG_SWIEPH
+) -> Tuple[float, float, float]:
+    """Signed Besselian contact residuals on the Earth ellipsoid, in km.
+
+    The global-eclipse contacts (P1/P4, U1/U4, centre line) are the
+    instants at which the Moon's shadow cone is tangent to the Earth's
+    flattened surface. Working in the auxiliary frame in which the polar
+    axis is stretched by 1/(1-f) so the ellipsoid becomes a sphere of
+    equatorial radius (the standard reduction; see the Explanatory
+    Supplement to the Astronomical Almanac, 3rd ed. 2013, ch. 11, and
+    Meeus, "Elements of Solar Eclipses 1951-2200", 1989, ch. 4), the
+    external-tangency condition of a shadow cone of half angle f and
+    fundamental-plane radius L with a sphere of radius R_e whose centre
+    lies at perpendicular distance r0 from the axis is
+
+        (r0 - L) * cos f = R_e      i.e.   r0 = R_e * cos f + L,
+
+    to O(f^2). The cone-depth term z*tan(f) that a plain circle-on-the-
+    fundamental-plane test omits is carried implicitly here: L is the
+    radius on the fundamental plane and the geometry supplies the height
+    of the tangent point through cos f. The Earth's oblateness enters via
+    the same z-stretch that ``_eclipse_where_core`` applies.
+
+    Returns ``(pen, umb, cen)`` where each residual is negative while the
+    corresponding shadow feature is in contact with (or inside) the
+    ellipsoid and positive once it has cleared it:
+
+    * ``pen`` -> penumbral outer edge (first/last contact, P1/P4)
+    * ``umb`` -> umbral/antumbral outer edge (U1/U4)
+    * ``cen`` -> shadow axis vs. the limb (centre line begins/ends)
+
+    The three residuals are built from exactly the quantities
+    ``_eclipse_where_core`` uses for its CENTRAL / NONCENTRAL / PARTIAL
+    classification, so the contact times stay consistent with
+    ``sol_eclipse_where`` at every instant.
+    """
+    _rc, _lon, _lat, dc = _eclipse_where_core(jd, flags)
+    r0_km = dc[2]
+    core_diam_fp_km = dc[3]
+    pen_diam_fp_km = dc[4]
+    cos_f_core = dc[5]
+    cos_f_pen = dc[6]
+    re_km = _ECL_REARTH_AU * _ECL_AU_KM
+    pen = r0_km - (re_km * cos_f_pen + pen_diam_fp_km / 2.0)
+    umb = r0_km - (re_km * cos_f_core + abs(core_diam_fp_km) / 2.0)
+    cen = r0_km - re_km * cos_f_core
+    return pen, umb, cen
+
+
+def _solve_besselian_contact(
+    residual: "Callable[[float], float]",
+    jd_max: float,
+    search_before: bool,
+    max_win: float = 0.35,
+) -> float:
+    """Time of a Besselian contact by bracketing a residual's sign change.
+
+    ``residual(t)`` is one of the signed distances from
+    :func:`_besselian_contact_residuals` (negative while in contact,
+    positive once cleared). The residual is negative at ``jd_max`` for a
+    contact that occurs; this expands a bracket outward from ``jd_max``
+    until the residual turns positive, then bisects. Returns 0.0 when the
+    feature does not touch the Earth at maximum (no such contact) or when
+    no clearing is found within ``max_win`` days.
+    """
+    try:
+        f_max = residual(jd_max)
+    except (KeyError, ValueError, ArithmeticError) as exc:
+        _reraise_if_leb_range_error(exc)
+        return 0.0
+    if f_max is None or f_max >= 0.0:
+        return 0.0
+
+    sign = -1.0 if search_before else 1.0
+    far = 0.0
+    step = 0.02
+    while step <= max_win:
+        t = jd_max + sign * step
+        try:
+            ft = residual(t)
+        except (KeyError, ValueError, ArithmeticError) as exc:
+            _reraise_if_leb_range_error(exc)
+            ft = None
+        if ft is not None and ft > 0.0:
+            far = t
+            break
+        step *= 1.6
+    if far == 0.0:
+        return 0.0
+
+    lo, hi = (far, jd_max) if search_before else (jd_max, far)
+    try:
+        return _root_bisect(residual, lo, hi)
+    except (KeyError, ValueError, ArithmeticError) as exc:
+        _reraise_if_leb_range_error(exc)
+        return 0.0
+
+
 def _calculate_eclipse_phases_besselian(
     jd_max: float, eclipse_type: int
 ) -> Tuple[float, float, float, float, float, float, float, float, float, float]:
@@ -1979,45 +2078,45 @@ def _calculate_eclipse_phases_besselian(
     is_hybrid = bool(eclipse_type & ECL_ANNULAR_TOTAL)
     has_umbral_contact = is_total or is_annular or is_hybrid
 
-    # Get l1 (penumbral limit) and l2 (umbral limit) at maximum
-    l1 = _calc_penumbra_limit(jd_max)
-    l2 = _calc_umbra_limit(jd_max)
-    gamma_max = _calc_gamma(jd_max)
+    # Contact times are the instants at which the Moon's shadow cone is
+    # tangent to the Earth *ellipsoid*. Each contact is the zero crossing
+    # of the corresponding signed residual from
+    # _besselian_contact_residuals(), which carries both the cone-depth
+    # term (z*tan f, previously omitted by the plain circle-on-the-
+    # fundamental-plane test) and the Earth's oblateness (via the polar-
+    # axis stretch shared with _eclipse_where_core). See that helper for
+    # the geometry and the published references.
+    def _pen_residual(jd: float) -> float:
+        return _besselian_contact_residuals(jd)[0]
 
-    # For global eclipse, first/fourth contacts occur when gamma = 1 + l1
-    # (penumbral shadow touches Earth's limb from outside)
-    penumbral_limit = 1.0 + l1  # Earth radius + penumbra radius
+    def _umb_residual(jd: float) -> float:
+        return _besselian_contact_residuals(jd)[1]
 
-    # Calculate first contact (penumbra first touches Earth)
-    t_first_contact = _find_contact_time_besselian(
-        jd_max, penumbral_limit, search_before=True, search_range=0.15
+    def _cen_residual(jd: float) -> float:
+        return _besselian_contact_residuals(jd)[2]
+
+    # P1/P4: first/last external tangency of the penumbral cone (eclipse
+    # begins/ends anywhere on Earth).
+    t_first_contact = _solve_besselian_contact(
+        _pen_residual, jd_max, search_before=True
+    )
+    t_fourth_contact = _solve_besselian_contact(
+        _pen_residual, jd_max, search_before=False
     )
 
-    # Calculate fourth contact (penumbra last leaves Earth)
-    t_fourth_contact = _find_contact_time_besselian(
-        jd_max, penumbral_limit, search_before=False, search_range=0.15
-    )
-
-    # For total/annular eclipses, calculate U1/U4 (totality begin/end
-    # anywhere on Earth)
+    # U1/U4: first/last external tangency of the umbral/antumbral cone
+    # (totality/annularity begins/ends anywhere on Earth). The solver
+    # returns 0.0 when the core shadow never reaches the surface, so no
+    # separate gamma gate is needed.
     t_second_contact = 0.0
     t_third_contact = 0.0
-
-    if has_umbral_contact and abs(l2) > 0:
-        # The umbra/antumbra first and last touches Earth at EXTERIOR
-        # tangency: shadow-axis distance = 1 + |l2|. (The previous
-        # interior criterion 1 - |l2| — umbra entirely inside the disc —
-        # was ~2-4 minutes late/early systematically and returned zeros
-        # for grazing-central eclipses.)
-        umbral_limit = 1.0 + abs(l2)
-
-        if gamma_max < umbral_limit:
-            t_second_contact = _find_contact_time_besselian(
-                jd_max, umbral_limit, search_before=True, search_range=0.10
-            )
-            t_third_contact = _find_contact_time_besselian(
-                jd_max, umbral_limit, search_before=False, search_range=0.10
-            )
+    if has_umbral_contact:
+        t_second_contact = _solve_besselian_contact(
+            _umb_residual, jd_max, search_before=True
+        )
+        t_third_contact = _solve_besselian_contact(
+            _umb_residual, jd_max, search_before=False
+        )
 
     # tret[1]: time when the eclipse takes place at local apparent noon —
     # the shadow axis crosses the x = 0 plane (Besselian x sign change)
@@ -2052,12 +2151,10 @@ def _calculate_eclipse_phases_besselian(
     t_cl_begin = 0.0
     t_cl_end = 0.0
     if has_umbral_contact and (eclipse_type & ECL_CENTRAL):
-        t_cl_begin = _find_contact_time_besselian(
-            jd_max, 1.0, search_before=True, search_range=0.10
-        )
-        t_cl_end = _find_contact_time_besselian(
-            jd_max, 1.0, search_before=False, search_range=0.10
-        )
+        # Centre line begins/ends when the shadow axis itself grazes the
+        # ellipsoid limb (the cen residual crosses zero).
+        t_cl_begin = _solve_besselian_contact(_cen_residual, jd_max, search_before=True)
+        t_cl_end = _solve_besselian_contact(_cen_residual, jd_max, search_before=False)
 
     # Reference degenerate layout for an ultra-shallow partial: when the
     # penumbra only grazes Earth at the instant of maximum, the P1/P4
@@ -9377,20 +9474,15 @@ def calc_eclipse_first_contact_c1(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Get l1 (penumbral radius) at maximum eclipse
-    l1 = _calc_penumbra_limit(jd_max)
-
-    # For global eclipse, first contact occurs when gamma = 1 + l1
-    # (penumbral shadow touches Earth's limb from outside)
-    penumbral_limit = 1.0 + l1  # Earth radius + penumbra radius
-
-    # Calculate first contact (penumbra first touches Earth)
-    # Search backward from maximum with a range of ~3.6 hours
-    t_first_contact = _find_contact_time_besselian(
-        jd_max, penumbral_limit, search_before=True, search_range=0.15
+    # First contact (P1): the first external tangency of the penumbral cone
+    # with the Earth *ellipsoid*, before maximum. Uses the same ellipsoidal
+    # contact solver as sol_eclipse_when_glob (tret[2]), so the standalone
+    # helper and the global-eclipse array stay consistent.
+    return _solve_besselian_contact(
+        lambda jd: _besselian_contact_residuals(jd, flags)[0],
+        jd_max,
+        search_before=True,
     )
-
-    return t_first_contact
 
 
 def calc_eclipse_second_contact_c2(
@@ -9471,30 +9563,17 @@ def calc_eclipse_second_contact_c2(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Get l2 (umbral/antumbral radius) at maximum eclipse
-    l2 = _calc_umbra_limit(jd_max)
-
-    # Get gamma at maximum to check if central phase is possible
-    gamma_max = _calc_gamma(jd_max)
-
-    # The umbra/antumbra first touches Earth at EXTERIOR tangency:
-    # shadow-axis distance = 1 + |l2| (consistent with tret[4] of
-    # sol_eclipse_when_glob and with NASA's U1 convention).
-    umbral_limit = 1.0 + abs(l2)
-
-    # Check if a total/annular phase is possible anywhere on Earth
-    if gamma_max >= umbral_limit:
-        # No umbral contact - eclipse is partial only
-        return 0.0
-
-    # Calculate second contact (umbra/antumbra first touches Earth)
-    # Search backward from maximum with a range of ~2.4 hours
-    # (umbral contact typically occurs 0.5-1.5 hours before maximum)
-    t_second_contact = _find_contact_time_besselian(
-        jd_max, umbral_limit, search_before=True, search_range=0.10
+    # Second contact (U1): the first external tangency of the umbral /
+    # antumbral cone with the Earth ellipsoid, before maximum. The solver
+    # returns 0.0 when the core shadow never reaches the surface (a
+    # penumbra-only partial eclipse), so no separate central-phase gate is
+    # needed. Shares the ellipsoidal contact solver with tret[4] of
+    # sol_eclipse_when_glob.
+    return _solve_besselian_contact(
+        lambda jd: _besselian_contact_residuals(jd, flags)[1],
+        jd_max,
+        search_before=True,
     )
-
-    return t_second_contact
 
 
 def calc_eclipse_third_contact_c3(
@@ -9576,30 +9655,15 @@ def calc_eclipse_third_contact_c3(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Get l2 (umbral/antumbral radius) at maximum eclipse
-    l2 = _calc_umbra_limit(jd_max)
-
-    # Get gamma at maximum to check if central phase is possible
-    gamma_max = _calc_gamma(jd_max)
-
-    # For central eclipse, third contact occurs when gamma = 1 - |l2|
-    # (umbral/antumbral shadow leaves Earth's limb from inside)
-    # Exterior tangency, consistent with tret[5]/U4 (see C2 helper)
-    umbral_limit = 1.0 + abs(l2)
-
-    # Check if central phase is possible (gamma at max must be less than umbral limit)
-    if gamma_max >= umbral_limit:
-        # No central phase - eclipse is partial only
-        return 0.0
-
-    # Calculate third contact (umbra/antumbra last leaves Earth)
-    # Search forward from maximum with a range of ~2.4 hours
-    # (umbral contact typically occurs 0.5-1.5 hours after maximum)
-    t_third_contact = _find_contact_time_besselian(
-        jd_max, umbral_limit, search_before=False, search_range=0.10
+    # Third contact (U4): the last external tangency of the umbral /
+    # antumbral cone with the Earth ellipsoid, after maximum. Returns 0.0
+    # for a penumbra-only partial eclipse. Shares the ellipsoidal contact
+    # solver with tret[5]/U4 of sol_eclipse_when_glob.
+    return _solve_besselian_contact(
+        lambda jd: _besselian_contact_residuals(jd, flags)[1],
+        jd_max,
+        search_before=False,
     )
-
-    return t_third_contact
 
 
 def calc_eclipse_fourth_contact_c4(
@@ -9676,21 +9740,14 @@ def calc_eclipse_fourth_contact_c4(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Get l1 (penumbral radius) at maximum eclipse
-    l1 = _calc_penumbra_limit(jd_max)
-
-    # For global eclipse, fourth contact occurs when gamma = 1 + l1
-    # (penumbral shadow leaves Earth's limb from inside)
-    penumbral_limit = 1.0 + l1  # Earth radius + penumbra radius
-
-    # Calculate fourth contact (penumbra completely leaves Earth)
-    # Search forward from maximum with a range of ~3.6 hours
-    # (penumbral contact typically occurs 1.5-3 hours after maximum)
-    t_fourth_contact = _find_contact_time_besselian(
-        jd_max, penumbral_limit, search_before=False, search_range=0.15
+    # Fourth contact (P4): the last external tangency of the penumbral cone
+    # with the Earth ellipsoid, after maximum. Shares the ellipsoidal
+    # contact solver with tret[3] of sol_eclipse_when_glob.
+    return _solve_besselian_contact(
+        lambda jd: _besselian_contact_residuals(jd, flags)[0],
+        jd_max,
+        search_before=False,
     )
-
-    return t_fourth_contact
 
 
 def _calc_lunar_eclipse_penumbral_separation(jd: float) -> float:

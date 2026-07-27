@@ -163,6 +163,34 @@ independent barycentric state, may return a documented fallback or unsupported
 result. The implementation does not manufacture missing values from external
 output.
 
+All methods (mean and osculating) reduce the body's own JPL osculating state;
+there is no separate mean-element planetary theory, so the two methods return
+the same planetary nodes and apsides. Measured longitude residuals against an
+external osculating implementation (both reducing their own JPL state;
+geocentric ecliptic of date, 1900–2024 sample) stay well inside the node
+tolerance but are non-zero because osculating node and apse *longitudes* are
+geometrically ill-conditioned:
+
+- **Apse longitudes** lose definition as eccentricity falls: the
+  perihelion/aphelion direction is poorly constrained for a near-circular
+  orbit. Perihelion-longitude differences scale inversely with `e` — Mars
+  (`e≈0.09`) agrees to ≲0.4″, Jupiter and Saturn (`e≈0.05`) to ≈0.5–1.3″, and
+  Neptune (`e≈0.009`) to ≈15–20″. Pluto's apse longitudes differ ≈0.6″.
+- **Node longitudes** are amplified by `1/sin i` for low-inclination orbits;
+  because each node is reported as the *geocentric* projection of a distinct
+  orbit point, the ascending and descending nodes are not exactly 180° apart
+  and carry slightly different residuals. Jupiter's nodes differ ≈0.7″
+  (ascending) and ≈3.0″ (descending), while the well-inclined Pluto (`i≈17°`)
+  agrees to ≈0.03″.
+
+These residuals do not grow monotonically toward remote epochs — Jupiter's
+descending-node difference is ≈0.001″ near 1900 and ≈3″ near 2000 — which rules
+out a precession, nutation, or epoch error. They are the inherent sensitivity
+of the osculating decomposition to sub-milliarcsecond differences between two
+independent ephemeris realizations, not a correctable offset; the underlying
+orbital-plane orientation agrees closely (node and apse *latitudes* match to
+≈1e-5°).
+
 ### `pheno*`
 
 Phase angle, illuminated fraction, elongation, apparent diameter, and magnitude

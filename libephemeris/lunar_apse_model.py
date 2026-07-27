@@ -18,7 +18,8 @@ docs/methodology/interpolated-perigee.md):
 
 Sources: JPL DE440; IERS Conventions (2010), Eq. 5.43; ERFA's BSD-licensed
 implementation of the IAU SOFA fundamental-argument routines; and the mean
-Earth-orbit eccentricity from Simon et al. (1994), A&A 282, 663--683.
+Earth-orbit eccentricity polynomial of Meeus, Astronomical Algorithms
+(2nd ed., 1998), eq. 25.4 (after Simon et al. 1994, A&A 282, 663--683).
 No value derives from any external ephemeris implementation.
 
 Fit quality (vs the DE440 passage track):
