@@ -154,7 +154,7 @@ class TestSidbitSpeedsAndRadians:
         _, _, cusps_speed, ascmc_speed = swe.houses_ex2(
             JD_2028, LAT, LON, ord("P"), FLG_SIDEREAL
         )
-        dt = 1.0 / 86400.0
+        dt = 1.0 / 4096.0  # the implementation's exact-binary half-step
         cm, am = swe.houses_ex(JD_2028 - dt, LAT, LON, ord("P"), FLG_SIDEREAL)
         cp, ap = swe.houses_ex(JD_2028 + dt, LAT, LON, ord("P"), FLG_SIDEREAL)
         for i in range(12):

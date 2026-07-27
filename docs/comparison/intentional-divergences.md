@@ -250,17 +250,29 @@ report the following day's; LibEphemeris returns the real next event. When
 comparing rise/set series externally, either start the search a few minutes
 before the expected event or tolerate a one-day offset in this edge case.
 
-## Lunar lower transit is solved to the geometric condition
+## Meridian transits are solved to the geometric condition
 
-`CALC_ITRANSIT` (lower culmination) is refined until the body's apparent
-hour angle is 180° to well under an arcsecond, for the fast-moving Moon
-like for every other body. At the instant reported by at least one external
-implementation, the Moon's own hour angle — evaluated with that
-implementation's functions — still misses 180° by 10–15 arcseconds
-(~0.6–1.0 s of time), a convergence residual specific to the fast lunar
-motion; its upper transits and the slow bodies' lower transits are
-converged on both sides. LibEphemeris reports the geometrically exact
-instant rather than reproducing the residual.
+`CALC_MTRANSIT`/`CALC_ITRANSIT` are refined until the body's apparent hour
+angle is exactly 0°/180° to well under an arcsecond. At the instant
+reported by at least one external implementation, the body's own hour
+angle — evaluated with that implementation's functions — can still miss
+the meridian: by 10–15 arcseconds (~0.6–1.0 s) for the fast-moving Moon's
+lower transit, and by up to ~26 arcseconds (~1.8 s) for the upper transit
+of a near-polar star (Polaris, growing as its declination approaches the
+pole), where the flat culmination gives the residual nothing to push
+against. LibEphemeris reports the geometrically exact instant rather than
+reproducing the convergence residual.
+
+## Lunar limb rise targets use the geocentric semidiameter
+
+With `BIT_DISC_BOTTOM` (or the default upper limb) the Moon's limb
+altitude target uses the semidiameter from the published IAU k = 0.2725076
+and the geocentric distance; the event instant satisfies that target
+exactly. An external implementation's limb target sits ~0.2–0.4" lower —
+a composition of semidiameter and parallax-at-altitude that does not match
+any canonical variant (geocentric, topocentric, or eclipse-k
+semidiameter). The timing effect is below 0.15 s at ordinary latitudes and
+reaches ~0.6 s only for grazing polar rises of the perigee Moon.
 
 ## Fixed-star speeds under `FLG_SPEED3`
 

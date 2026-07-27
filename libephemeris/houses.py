@@ -2340,14 +2340,23 @@ def houses_ex2(
     #
     # evaluated on houses_ex() itself, so every time-dependent term (ARMC rate,
     # dε/dt, nutation) — and the FLG_SIDEREAL ayanamsa, which houses() does not
-    # apply — is captured automatically. A one-second step balances
-    # centered-difference truncation and binary64 roundoff.
+    # apply — is captured automatically.
+    #
+    # The half-step is an exact binary fraction of a day (1/4096 ≈ 21 s), so
+    # tjdut ± dt is exactly representable and the stencil stays symmetric. A
+    # one-second step is NOT usable here: at JD ~2.45e6 the ULP is ~46 µs, so
+    # a 1-second half-step loses ~5 significant digits to roundoff and biased
+    # every ascmc rate low by ~7 arcsec/day; the centered-difference
+    # truncation error at ~21 s is far below that for every angle including
+    # the fast, latitude-amplified Ascendant/Vertex rates (the ARMC rate
+    # converges to the same value from 60 s through 300 s; the faster angles
+    # need the shorter step).
     #
     # This is the genuine derivative of the reported cusps for every system,
     # including the iteratively-solved ones (Placidus, Koch): integrating it
     # reproduces the cusp motion, which an analytic speed approximation of those
     # systems does not.
-    _DT_DAYS = 1.0 / 86400.0
+    _DT_DAYS = 1.0 / 4096.0
     cusps_minus, ascmc_minus = houses_ex(tjdut - _DT_DAYS, lat, lon, hsys, _flags_deg)
     cusps_plus, ascmc_plus = houses_ex(tjdut + _DT_DAYS, lat, lon, hsys, _flags_deg)
 
