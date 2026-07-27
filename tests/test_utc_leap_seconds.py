@@ -605,3 +605,37 @@ class TestPre1972LeapSecondMessage:
 
         with pytest.raises(Error, match=r"no leap second"):
             ephem.utc_to_jd(2000, 1, 1, 23, 59, 60.0, 1)
+
+
+class TestRoundInstantReconstruction:
+    """Inverse conversions recover round instants exactly.
+
+    A modern float JD carries a ~40 microsecond ulp, so the raw calendar
+    reconstruction has a ~+-20 microsecond floor that used to straddle
+    midnight backward (2013-01-01 -> 2012-12-31 23:59:59.99998). Readings
+    within 200 microseconds of a whole second snap, with a leap-aware
+    calendar carry; genuinely offset instants are untouched.
+    """
+
+    def test_midnight_round_trip_is_exact(self):
+        import libephemeris as le
+
+        for y, m, d in ((2013, 1, 1), (1985, 3, 20), (2030, 12, 31)):
+            jd = le.utc_to_jd(y, m, d, 0, 0, 0.0, 1)
+            assert le.jdet_to_utc(jd[0], 1) == (y, m, d, 0, 0, 0.0)
+            assert le.jdut1_to_utc(jd[1], 1) == (y, m, d, 0, 0, 0.0)
+
+    def test_leap_second_kept_and_post_leap_midnight(self):
+        import libephemeris as le
+
+        jd = le.utc_to_jd(2012, 6, 30, 23, 59, 60.0, 1)
+        assert le.jdet_to_utc(jd[0], 1) == (2012, 6, 30, 23, 59, 60.0)
+        jd2 = le.utc_to_jd(2012, 7, 1, 0, 0, 0.0, 1)
+        assert le.jdet_to_utc(jd2[0], 1) == (2012, 7, 1, 0, 0, 0.0)
+
+    def test_genuine_offset_not_snapped(self):
+        import libephemeris as le
+
+        jd = le.utc_to_jd(2013, 1, 1, 0, 0, 0.0025, 1)
+        sec = le.jdet_to_utc(jd[0], 1)[5]
+        assert abs(sec - 0.0025) < 2e-4 and sec != 0.0

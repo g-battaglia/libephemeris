@@ -733,6 +733,46 @@ def utc_to_jd(
     return float(t.tt), float(t.ut1)
 
 
+def _snap_reconstructed_second(
+    year: int, month: int, day: int, hour: int, minute: int, second: float
+) -> tuple[int, int, int, int, int, float]:
+    """Snap a reconstructed Gregorian clock reading to its round instant.
+
+    A modern Julian Day has a ~40 microsecond ulp, so any calendar
+    reconstruction from a float JD carries a ~+-20 microsecond floor;
+    measured reference behavior recovers round instants exactly. A reading
+    within 200 microseconds of a whole second is therefore snapped, with
+    the carry cascading through the calendar. A genuine leap-second minute
+    keeps its second-60 reading (probed through utc_to_jd); the end of a
+    leap second (60.99998 -> 61) rolls into the next day like an ordinary
+    midnight carry.
+    """
+    sec_round = round(second)
+    if second == sec_round or abs(second - sec_round) >= 2e-4:
+        return year, month, day, hour, minute, second
+    if sec_round < 60:
+        return year, month, day, hour, minute, float(sec_round)
+    if sec_round == 60:
+        try:
+            utc_to_jd(year, month, day, hour, minute, 60.0, GREG_CAL)
+            return year, month, day, hour, minute, 60.0
+        except Exception:
+            pass
+    total = hour * 3600 + minute * 60 + int(sec_round)
+    if total < 86400:
+        return (
+            year,
+            month,
+            day,
+            total // 3600,
+            (total % 3600) // 60,
+            float(total % 60),
+        )
+    jd_next = julday(year, month, day, 12.0, GREG_CAL) + 1.0
+    ny, nm, nd, _ = revjul(jd_next, GREG_CAL)
+    return ny, nm, nd, 0, 0, 0.0
+
+
 def _jd_to_calendar_tuple(
     jd: float, calendar: int
 ) -> tuple[int, int, int, int, int, float]:
@@ -742,6 +782,16 @@ def _jd_to_calendar_tuple(
     minute_frac = (decimal_hour - hh) * 60.0
     mm = int(minute_frac)
     ss = (minute_frac - mm) * 60.0
+    # Snap the float-JD reconstruction floor (see _snap_reconstructed_second);
+    # no leap seconds exist on these paths, so the plain carry applies.
+    sec_round = round(ss)
+    if ss != sec_round and abs(ss - sec_round) < 2e-4:
+        total = hh * 3600 + mm * 60 + int(sec_round)
+        if total < 86400:
+            return y, m, d, total // 3600, (total % 3600) // 60, float(total % 60)
+        jd_next = julday(y, m, d, 12.0, calendar) + 1.0
+        ny, nm, nd, _ = revjul(jd_next, calendar)
+        return ny, nm, nd, 0, 0, 0.0
     return y, m, d, hh, mm, ss
 
 
@@ -825,6 +875,9 @@ def jdet_to_utc(
     g_hour = int(utc_data[3])
     g_minute = int(utc_data[4])
     g_second = float(utc_data[5])
+    g_year, g_month, g_day, g_hour, g_minute, g_second = _snap_reconstructed_second(
+        g_year, g_month, g_day, g_hour, g_minute, g_second
+    )
 
     if calendar == JUL_CAL:
         # Only the calendar DATE differs between Gregorian and Julian (a
@@ -912,6 +965,9 @@ def jdut1_to_utc(
     g_hour = int(utc_data[3])
     g_minute = int(utc_data[4])
     g_second = float(utc_data[5])
+    g_year, g_month, g_day, g_hour, g_minute, g_second = _snap_reconstructed_second(
+        g_year, g_month, g_day, g_hour, g_minute, g_second
+    )
 
     if calendar == JUL_CAL:
         # Only the calendar DATE differs between Gregorian and Julian (a

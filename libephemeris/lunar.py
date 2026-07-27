@@ -2668,9 +2668,17 @@ def _finite_difference_polar_state(
     position_function,
     jd_tt: float,
     *,
-    step_days: float = 0.5,
+    step_days: float = 0.002,
 ) -> Tuple[float, float, float, float, float, float]:
-    """Return a native-float polar state and centered derivative."""
+    """Return a native-float polar state and centered derivative.
+
+    The half-step matches the osculating-apogee stencil (~3 minutes): the
+    interpolated-apsis longitude carries short-period Delaunay/residual
+    structure that a half-day chord misrepresents by up to ~10"/day at
+    fast-swing phases (the derivative is step-stable from 0.05 down to
+    1e-4 days, so 0.002 sits safely inside the plateau while float64
+    roundoff stays negligible).
+    """
     jd = float(jd_tt)
     longitude, latitude, distance = position_function(jd)
     before = position_function(jd - step_days)

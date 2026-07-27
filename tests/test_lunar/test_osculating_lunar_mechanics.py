@@ -188,3 +188,21 @@ def test_true_node_follows_the_orbital_plane_intersection(jd_tt: float) -> None:
     assert latitude == 0.0
     assert distance == pytest.approx(expected_distance, abs=2e-14)
     assert all(type(value) is float for value in (longitude, latitude, distance))
+
+
+def test_interpolated_apsides_speed_is_self_consistent():
+    """INTP_APOG/INTP_PERG FLG_SPEED equals the derivative of the reported
+    positions: the half-day stencil misrepresented the short-period
+    Delaunay/residual structure by up to ~10"/day at fast-swing phases."""
+    import libephemeris as le
+
+    cases = [(2079, 9, 17, 2.4, 22), (1940, 6, 15, 12.0, 22), (2001, 1, 21, 2.4, 21)]
+    f = le.FLG_SWIEPH | le.FLG_SPEED
+    for y, m, d, h, body in cases:
+        jd = le.julday(y, m, d, h)
+        rep = le.calc_ut(jd, body, f)[0]
+        hh = 0.02
+        p_m = le.calc_ut(jd - hh, body, f)[0]
+        p_p = le.calc_ut(jd + hh, body, f)[0]
+        dl = (p_p[0] - p_m[0] + 180.0) % 360.0 - 180.0
+        assert abs(rep[3] - dl / (2 * hh)) * 3600.0 < 0.3
