@@ -112,6 +112,31 @@ def _yallop_visibility_code(q: float) -> float:
     return 6.0
 
 
+def _arc_of_light(arcv_deg: float, daz_deg: float) -> float:
+    """Arc of light (ARCL) from the arcus visionis and azimuth separation.
+
+    ARCV (vertical), DAZ (horizontal), and ARCL (the hypotenuse arc between the
+    body and the Sun) form a right-angled spherical triangle, so
+    ``cos ARCL = cos ARCV * cos DAZ`` (see, e.g., Yallop, B.D. (1997), NAO
+    Technical Note No. 69, and Bruin, F. (1977), Vistas in Astronomy 21, 331).
+    The result is a non-negative arc in [0, 180] degrees.
+
+    This is the exact spherical relation, not the ``sqrt(ARCV^2 + DAZ^2)``
+    small-angle (planar) approximation, which underestimates the arc as the
+    body moves away from the Sun. ``cos`` is even and 360-periodic, so the
+    result is invariant to how ``daz_deg`` is normalised.
+
+    Args:
+        arcv_deg: Geocentric arcus visionis (object-minus-Sun altitude), deg.
+        daz_deg: Object-minus-Sun azimuth separation, deg.
+
+    Returns:
+        Arc of light between the body and the Sun, in degrees.
+    """
+    c = math.cos(math.radians(arcv_deg)) * math.cos(math.radians(daz_deg))
+    return math.degrees(math.acos(max(-1.0, min(1.0, c))))
+
+
 # Detection margin (magnitudes) for the twilight visibility test used by the
 # heliacal-event search. With the published VISLIMIT limiting-magnitude model
 # (dret[0] is a catalog-magnitude limit, extinction folded in) an object is at
@@ -2041,7 +2066,9 @@ def _heliacal_pheno_ut_leb(
             magnitude = 0.0
             phase_angle = 0.0
 
-    arcl_act = math.sqrt(arcv_act**2 + daz_act**2)
+    # ARCLact: arc of light between the body and the Sun via the exact
+    # right-spherical-triangle relation cos ARCL = cos ARCV * cos DAZ.
+    arcl_act = _arc_of_light(arcv_act, daz_act)
 
     (
         _obs_age,
@@ -4032,7 +4059,8 @@ def _heliacal_pheno_ut_pythonic(
         - 6 ``TAVact``: topocentric vertical separation from the Sun (deg).
         - 7 ``ARCVact``: geocentric vertical separation from the Sun (deg).
         - 8 ``DAZact``: signed object-minus-Sun azimuth separation (deg).
-        - 9 ``ARCLact``: signed object-minus-Sun longitude separation (deg).
+        - 9 ``ARCLact``: arc of light between the object and the Sun (deg),
+          from the right-spherical-triangle relation cos ARCL = cos ARCV * cos DAZ.
         - 10 ``kact``: atmospheric extinction coefficient.
         - 11 ``minTAV``: limiting topocentric vertical separation (deg).
         - 12-14 ``TfirstVR``, ``TbVR``, ``TlastVR``: beginning, optimum, and
@@ -4335,9 +4363,10 @@ def _heliacal_pheno_ut_pythonic(
             magnitude = 0.0
             phase_angle = 0.0
 
-    # ARCLact: actual arc length between body and Sun in horizontal coords
-    # Computed as great-circle distance: sqrt(ARCV² + DAZ²)
-    arcl_act = math.sqrt(arcv_act**2 + daz_act**2)
+    # ARCLact: arc of light between the body and the Sun via the exact
+    # right-spherical-triangle relation cos ARCL = cos ARCV * cos DAZ (ARCV
+    # vertical, DAZ horizontal), not the sqrt(ARCV^2 + DAZ^2) planar form.
+    arcl_act = _arc_of_light(arcv_act, daz_act)
 
     # Use Schaefer model for extinction and arcus visionis (observer tuple
     # already parsed above, before the name was rebound).

@@ -3863,11 +3863,23 @@ def _calc_body(
     if CUPIDO <= ipl <= POSEIDON:
         from . import hypothetical
         from skyfield.framelib import ecliptic_J2000_frame
+        from .astrometry import apply_aberration_to_position
 
         jd_tt = t.tt
-        is_helio = bool(iflag & FLG_HELCTR)
+        # Center priority TOPOCTR > BARYCTR > HELCTR (see _resolve_center_flags):
+        # a barycentric request suppresses the heliocentric branch, and a
+        # topocentric one suppresses both so the geocentric+parallax path runs.
+        is_topo = bool(iflag & FLG_TOPOCTR)
+        is_bary = bool(iflag & FLG_BARYCTR) and not is_topo
+        is_helio = bool(iflag & FLG_HELCTR) and not is_bary and not is_topo
         is_j2000 = bool(iflag & FLG_J2000)
         is_sidereal = bool(iflag & FLG_SIDEREAL)
+        # The geocentric apparent place carries stellar aberration unless the
+        # caller asked for the astrometric (FLG_NOABERR) or true (FLG_TRUEPOS)
+        # place. Barycentric and heliocentric places are astrometric by
+        # convention (their retflag echoes NOABERR|NOGDEFL), so aberration is
+        # applied only on the geocentric branch below.
+        apply_aberration = not (iflag & FLG_TRUEPOS) and not (iflag & FLG_NOABERR)
 
         # Position sourcing. With an active LEB reader the vector-resolver
         # Earth evaluation — and, when the serving file byte-matches its
@@ -3936,13 +3948,42 @@ def _calc_body(
             exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
             return float(exyz[0]), float(exyz[1]), float(exyz[2])
 
+        # The exact ICRS -> J2000-ecliptic matrix of the Skyfield frame used by
+        # the fallback path. It is constant for this inertial frame, so it is
+        # evaluated once (at the request time t) and reused for every sample
+        # date; every Sun/Earth sub-helper below rotates through this identical
+        # matrix so the LEB and Skyfield sources agree to the last bit.
+        _ecl_m = ecliptic_J2000_frame.rotation_at(t)
+
+        def _rot_ecl_j2000(
+            vx: float, vy: float, vz: float
+        ) -> Tuple[float, float, float]:
+            return (
+                float(_ecl_m[0, 0] * vx + _ecl_m[0, 1] * vy + _ecl_m[0, 2] * vz),
+                float(_ecl_m[1, 0] * vx + _ecl_m[1, 1] * vy + _ecl_m[1, 2] * vz),
+                float(_ecl_m[2, 0] * vx + _ecl_m[2, 1] * vy + _ecl_m[2, 2] * vz),
+            )
+
+        def _sun_bary_ecl_j2000_vector(jd: float) -> Tuple[float, float, float]:
+            # The Sun's position relative to the solar-system barycentre, in
+            # ecliptic J2000 (the helio -> bary shift, ~0.008 AU).
+            ts_i = get_timescale()
+            t_i = ts_i.tt_jd(jd)
+            sxyz = planets["sun"].at(t_i).frame_xyz(ecliptic_J2000_frame).au
+            return float(sxyz[0]), float(sxyz[1]), float(sxyz[2])
+
+        def _earth_bary_vel_ecl_j2000_vector(
+            jd: float,
+        ) -> Tuple[float, float, float]:
+            # Earth's barycentric (SSB) velocity in ecliptic J2000 (AU/day),
+            # the observer velocity for stellar aberration.
+            ts_i = get_timescale()
+            t_i = ts_i.tt_jd(jd)
+            v = planets["earth"].at(t_i).velocity.au_per_d
+            return _rot_ecl_j2000(float(v[0]), float(v[1]), float(v[2]))
+
         if _reader is not None and _reader.has_body(SUN) and _reader.has_body(EARTH):
             from .fast_calc import C_LIGHT_AU_DAY
-
-            # The exact ICRS -> J2000-ecliptic matrix of the Skyfield frame
-            # used by the fallback path (constant for an inertial frame), so
-            # both Earth sources share the rotation to the last bit.
-            _ecl_m = ecliptic_J2000_frame.rotation_at(t)
 
             def _earth_helio_ecl_j2000(jd: float) -> Tuple[float, float, float]:
                 try:
@@ -3974,18 +4015,81 @@ def _calc_body(
                     lt = lt_next
                     if converged:
                         break
-                return (
-                    float(_ecl_m[0, 0] * rx + _ecl_m[0, 1] * ry + _ecl_m[0, 2] * rz),
-                    float(_ecl_m[1, 0] * rx + _ecl_m[1, 1] * ry + _ecl_m[1, 2] * rz),
-                    float(_ecl_m[2, 0] * rx + _ecl_m[2, 1] * ry + _ecl_m[2, 2] * rz),
-                )
+                return _rot_ecl_j2000(rx, ry, rz)
+
+            def _sun_bary_ecl_j2000(jd: float) -> Tuple[float, float, float]:
+                # SSB-relative Sun position from the LEB (barycentric ICRS),
+                # rotated to ecliptic J2000 — the helio -> bary shift.
+                try:
+                    (sx, sy, sz), _ = _reader.eval_body(SUN, jd)
+                except LEBCorruptionError:
+                    raise
+                except (KeyError, ValueError):
+                    return _sun_bary_ecl_j2000_vector(jd)
+                return _rot_ecl_j2000(sx, sy, sz)
+
+            def _earth_bary_vel_ecl_j2000(
+                jd: float,
+            ) -> Tuple[float, float, float]:
+                # Earth's barycentric velocity from the LEB (analytical
+                # Chebyshev derivative, AU/day), rotated to ecliptic J2000.
+                try:
+                    _, (evx, evy, evz) = _reader.eval_body(EARTH, jd)
+                except LEBCorruptionError:
+                    raise
+                except (KeyError, ValueError):
+                    return _earth_bary_vel_ecl_j2000_vector(jd)
+                return _rot_ecl_j2000(evx, evy, evz)
 
         else:
             _earth_helio_ecl_j2000 = _earth_helio_ecl_j2000_vector
+            _sun_bary_ecl_j2000 = _sun_bary_ecl_j2000_vector
+            _earth_bary_vel_ecl_j2000 = _earth_bary_vel_ecl_j2000_vector
 
-        if is_helio:
-            # Heliocentric J2000 ecliptic state (position + centered velocity)
-            pos = _uranian_helio_state(jd_tt)
+        def _uranian_bary_pos(jd: float) -> Tuple[float, float, float]:
+            # Barycentric ecliptic-J2000 place: the body's heliocentric
+            # position in ecliptic-J2000 Cartesian, shifted by the Sun's own
+            # barycentric offset. bary = helio + Sun_bary. (The prior code left
+            # BARYCTR to fall through to the geocentric branch, which returns
+            # helio - Earth_from_Sun — a ~1 AU error for these distant bodies.)
+            u_lon, u_lat, u_dist = _uranian_pos(jd)
+            lon_r = math.radians(u_lon)
+            lat_r = math.radians(u_lat)
+            cl = math.cos(lat_r)
+            xh = u_dist * cl * math.cos(lon_r)
+            yh = u_dist * cl * math.sin(lon_r)
+            zh = u_dist * math.sin(lat_r)
+            sx, sy, sz = _sun_bary_ecl_j2000(jd)
+            xb, yb, zb = xh + sx, yh + sy, zh + sz
+            rb = math.sqrt(xb * xb + yb * yb + zb * zb)
+            lon_b = math.degrees(math.atan2(yb, xb)) % 360.0
+            sin_lat = max(-1.0, min(1.0, zb / rb)) if rb > 0 else 0.0
+            lat_b = math.degrees(math.asin(sin_lat))
+            return lon_b, lat_b, rb
+
+        def _uranian_bary_state(
+            jd: float,
+        ) -> Tuple[float, float, float, float, float, float]:
+            # Same centered 1-day stencil / 0-360 unwrap as the heliocentric
+            # state; the Sun's slow barycentric drift enters the speed through
+            # the finite difference.
+            lon0, lat0, dist0 = _uranian_bary_pos(jd)
+            dt_step = 1.0
+            prev = _uranian_bary_pos(jd - dt_step)
+            nxt = _uranian_bary_pos(jd + dt_step)
+            dlon = (nxt[0] - prev[0]) / (2.0 * dt_step)
+            if dlon > 180.0 / (2.0 * dt_step):
+                dlon -= 360.0 / (2.0 * dt_step)
+            elif dlon < -180.0 / (2.0 * dt_step):
+                dlon += 360.0 / (2.0 * dt_step)
+            dlat = (nxt[1] - prev[1]) / (2.0 * dt_step)
+            ddist = (nxt[2] - prev[2]) / (2.0 * dt_step)
+            return (lon0, lat0, dist0, dlon, dlat, ddist)
+
+        if is_helio or is_bary:
+            # Heliocentric, or (with the Sun's barycentric offset added)
+            # barycentric, J2000 ecliptic state (position + centered velocity).
+            pos = _uranian_bary_state(jd_tt) if is_bary else _uranian_helio_state(jd_tt)
             lon, lat, dist = pos[0], pos[1], pos[2]
             dlon, dlat, ddist = pos[3], pos[4], pos[5]
             # Zero the speed slots when FLG_SPEED is absent so callers never
@@ -4036,6 +4140,17 @@ def _calc_body(
             xg = xh - ex
             yg = yh - ey
             zg = zh - ez
+            # Stellar (annual) aberration for the geocentric apparent place,
+            # using Earth's barycentric velocity in ecliptic J2000 — the same
+            # IAU convention and helper as the real-planet and SPK pipelines.
+            # Folding it into this sample (rather than only the central place)
+            # keeps the FLG_SPEED stencil consistent — the speed picks up the
+            # aberration rate. Skipped for the astrometric (FLG_NOABERR) or true
+            # (FLG_TRUEPOS) place. Applied in the J2000 ecliptic frame before the
+            # of-date precession, exactly like the SPK type-21 apparent path.
+            if apply_aberration:
+                evx, evy, evz = _earth_bary_vel_ecl_j2000(jd)
+                xg, yg, zg = apply_aberration_to_position((xg, yg, zg), (evx, evy, evz))
             rg = math.sqrt(xg * xg + yg * yg + zg * zg)
             lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
             sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
@@ -6002,12 +6117,30 @@ _AYANAMSA_EX_NONUT_DROP_MODES = frozenset(
 def _ayanamsa_ex_retflag(flags: int, sid_mode: int) -> int:
     """Echoed return flag for get_ayanamsa_ex[_ut].
 
-    Add the default FLG_SWIEPH bit, then strip FLG_NONUT for star/galactic
-    "calculated" modes according to the public retflag convention.
+    Measured against the reference, the echo carries only the resolved
+    ephemeris-selection bit plus (conditionally) FLG_NONUT — every other input
+    bit (FLG_SPEED, FLG_SIDEREAL, spurious bits) is dropped:
+
+    - The ephemeris bit is a single-winner resolution with priority
+      JPLEPH > SWIEPH > MOSEPH; with no ephemeris bit set it defaults to
+      SWIEPH. So 0 -> 2, 1 -> 1, 4 -> 4, 258(SWIEPH|SPEED) -> 2, 6(SWIEPH|
+      MOSEPH) -> 2, 3(JPLEPH|SWIEPH) -> 1.
+    - FLG_NONUT is echoed only when set AND the mode is not one of the
+      star/galactic "calculated" modes that drop it (so 64 -> 66, 65 -> 65 in
+      the normal modes; 64 -> 2, 65 -> 1 in a drop mode).
     """
-    retflag = flags | FLG_SWIEPH
-    if sid_mode in _AYANAMSA_EX_NONUT_DROP_MODES:
-        retflag &= ~FLG_NONUT
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
+    if flags & FLG_JPLEPH:
+        retflag = FLG_JPLEPH
+    elif flags & FLG_SWIEPH:
+        retflag = FLG_SWIEPH
+    elif flags & FLG_MOSEPH:
+        retflag = FLG_MOSEPH
+    else:
+        retflag = FLG_SWIEPH
+    if (flags & FLG_NONUT) and sid_mode not in _AYANAMSA_EX_NONUT_DROP_MODES:
+        retflag |= FLG_NONUT
     return retflag
 
 

@@ -824,6 +824,7 @@ def _sol_how_core(
     flags: int,
     reader,
     body: "Union[int, str]" = SUN,
+    where_convention: bool = False,
 ) -> Tuple[int, list]:
     """Local circumstances of a solar eclipse (reference ``attr`` layout).
 
@@ -840,7 +841,10 @@ def _sol_how_core(
     inside the other, so it exceeds 1 during totality (Moon larger) and is
     (r_moon/r_sun)**2 < 1 during annularity; the partial phase reports the
     two-disc lens-overlap fraction. For an occultation the obscuration is
-    the covered fraction of the body and stays bounded at 1.0.
+    the covered fraction of the body, bounded at 1.0 on the how/when_loc
+    path — but the WHERE path reports the uncapped disc-area ratio for
+    planet targets (measured reference behavior; ``where_convention``),
+    while star targets stay at 1.0 on every path.
     [3] 0 (callers fill the core-shadow width), [4] azimuth of the Sun,
     [5] true altitude, [6] apparent altitude, [7] Moon-Sun center
     separation in degrees, [8] NASA magnitude, [9]/[10] saros series and
@@ -894,13 +898,15 @@ def _sol_how_core(
         # reference returns this ratio uncapped; an occultation caps the
         # covered fraction of the body at 1.0.
         ratio_sq = (rmoon / rsun) ** 2
-        attr[2] = ratio_sq if _is_solar else min(1.0, ratio_sq)
+        _uncap = _is_solar or (where_convention and rsun > 0.0)
+        attr[2] = ratio_sq if _uncap else min(1.0, ratio_sq)
     elif dctr <= 0.0:
         # Exactly concentric discs in the partial branch are reachable only at
         # the annular/total boundary (rsun == rmoon); the overlap is the whole
         # smaller disc. Guards the lens-area 1/dctr singularity below.
         ratio_sq = (rmoon / rsun) ** 2
-        attr[2] = ratio_sq if _is_solar else min(1.0, ratio_sq)
+        _uncap = _is_solar or (where_convention and rsun > 0.0)
+        attr[2] = ratio_sq if _uncap else min(1.0, ratio_sq)
     else:
         # Standard two-disc overlap (lens) area as a fraction of the
         # solar disc.
@@ -6731,7 +6737,12 @@ def _lun_occult_where_pythonic(
     """
     retflag, center_lon, center_lat, dcore = _eclipse_where_core(tjdut, flags, body)
     _rc_how, attr_list = _sol_how_core(
-        tjdut, (center_lon, center_lat, 0.0), flags, reader, body
+        tjdut,
+        (center_lon, center_lat, 0.0),
+        flags,
+        reader,
+        body,
+        where_convention=True,
     )
     attr_list[3] = dcore[0]
     geopos = (center_lon, center_lat, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)

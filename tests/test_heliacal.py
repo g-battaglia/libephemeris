@@ -826,6 +826,72 @@ class TestHeliacalPhenoValues:
         assert 0 <= parallax < 1.0
 
 
+class TestHeliacalArcOfLight:
+    """ARCLact (slot 9) is the arc of light via the exact spherical relation.
+
+    ARCV (vertical), DAZ (horizontal), and ARCL form a right-angled spherical
+    triangle: cos ARCL = cos ARCV * cos DAZ. The earlier small-angle form
+    sqrt(ARCV^2 + DAZ^2) overestimates the arc as the body moves away from the
+    Sun; these tests pin the spherical convention on both a near-Sun and a
+    far-from-Sun geometry.
+    """
+
+    def _arcl_expected(self, arcv, daz):
+        import math
+
+        c = math.cos(math.radians(arcv)) * math.cos(math.radians(daz))
+        return math.degrees(math.acos(max(-1.0, min(1.0, c))))
+
+    def test_arcl_matches_spherical_relation(self):
+        """dret[9] equals acos(cos(ARCV) * cos(DAZ)) from dret[7], dret[8]."""
+        jd = julday(2024, 6, 15, 12.0)
+        geopos = (31.2357, 30.0444, 75.0)  # Cairo
+        for body, ev in [
+            (VENUS, HELIACAL_RISING),
+            (MERCURY, HELIACAL_RISING),
+            (JUPITER, HELIACAL_RISING),
+            (SATURN, HELIACAL_SETTING),
+        ]:
+            dret = heliacal_pheno_ut(
+                jd,
+                geopos,
+                (1013.25, 15.0, 40.0, 0.0),
+                (36.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+                {
+                    VENUS: "Venus",
+                    MERCURY: "Mercury",
+                    JUPITER: "Jupiter",
+                    SATURN: "Saturn",
+                }[body],
+                ev,
+            )
+            arcv, daz, arcl = dret[7], dret[8], dret[9]
+            expected = self._arcl_expected(arcv, daz)
+            assert abs(arcl - expected) < 1e-9, (body, arcl, expected)
+            # ARCL is a non-negative arc.
+            assert 0.0 <= arcl <= 180.0
+
+    def test_arcl_differs_from_small_angle_when_far_from_sun(self):
+        """For a wide geometry, the arc exceeds the small-angle approximation."""
+        import math
+
+        jd = julday(2024, 6, 15, 12.0)
+        geopos = (31.2357, 30.0444, 75.0)
+        dret = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 15.0, 40.0, 0.0),
+            (36.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+            "Saturn",
+            HELIACAL_SETTING,
+        )
+        arcv, daz, arcl = dret[7], dret[8], dret[9]
+        small_angle = math.sqrt(arcv**2 + daz**2)
+        # Only meaningful when the body is genuinely away from the Sun.
+        if abs(arcv) + abs(daz) > 10.0:
+            assert abs(arcl - small_angle) > 1e-3
+
+
 class TestHeliacalPhenoEventTypes:
     """Test different event types for heliacal_pheno_ut."""
 
