@@ -113,6 +113,16 @@ _RANGE_ERRORS = (OutOfRangeError, SkyfieldRangeError)
 # one second. These are numerical-analysis choices, not ephemeris fit values.
 _MOON_SPEED_HALF_STEP_DAYS = 6.0 / 86400.0
 _BODY_SPEED_HALF_STEP_DAYS = 1.0 / 86400.0
+# Geometric (FLG_TRUEPOS) place of an SPK type-21 minor body. The type-21
+# difference-table evaluation carries ~4e-7" of per-sample jitter, which a
+# one-second central difference amplifies into a spurious +0.007..+0.02"/day
+# longitude-speed bias (the derivative stops matching the body's own geometric
+# positions). The apparent place is unaffected — Skyfield's observe/apparent
+# reduction smooths it — so this larger step is used ONLY for the geometric
+# type-21 speed. A five-minute half-step drops the jitter contribution below
+# 1e-8"/day while these slow bodies' angular acceleration keeps the O(h^2)
+# truncation negligible, restoring reference-grade agreement.
+_ASTEROID_TRUEPOS_SPEED_HALF_STEP_DAYS = 300.0 / 86400.0
 
 from .constants import (
     SUN,
@@ -5172,8 +5182,14 @@ def _calc_body(
     # providing ~100x better precision for the same timestep.
     #
     # The Moon uses a six-second half-step to resolve its faster apparent
-    # motion; other bodies use one second.
-    dt = _MOON_SPEED_HALF_STEP_DAYS if ipl == MOON else _BODY_SPEED_HALF_STEP_DAYS
+    # motion; other bodies use one second. The geometric (FLG_TRUEPOS) place of
+    # an SPK type-21 minor body uses a five-minute half-step so the type-21
+    # sample jitter does not leak into the reported speed (see the constant's
+    # note); the apparent place is smooth and keeps the one-second step.
+    if _spk_type21_target is not None and (iflag & FLG_TRUEPOS) and ipl != MOON:
+        dt = _ASTEROID_TRUEPOS_SPEED_HALF_STEP_DAYS
+    else:
+        dt = _MOON_SPEED_HALF_STEP_DAYS if ipl == MOON else _BODY_SPEED_HALF_STEP_DAYS
     dp1, dp2, dp3 = 0.0, 0.0, 0.0
 
     if iflag & FLG_SPEED:
@@ -7060,17 +7076,19 @@ def _calc_nod_aps(
 
     # Interpolated lunar apsides (INTP_APOG / INTP_PERG): the interpolated
     # point is not an orbital-element body, so it has no node/apse
-    # decomposition. Measured reference behavior returns a not-a-number in
-    # every slot rather than an error; mirror that so callers can detect the
-    # undefined result the same way.
+    # decomposition. Measured reference behavior returns a not-a-number in the
+    # three position slots (longitude, latitude, distance) but leaves the three
+    # speed slots at 0.0 — never NaN — for every method, with or without
+    # FLG_SPEED. Mirror that exactly so callers can detect the undefined place
+    # while the speed channels stay well-formed floats.
     if ipl in (INTP_APOG, INTP_PERG):
         nan_pos: PosTuple = (
             math.nan,
             math.nan,
             math.nan,
-            math.nan,
-            math.nan,
-            math.nan,
+            0.0,
+            0.0,
+            0.0,
         )
         return (nan_pos, nan_pos, nan_pos, nan_pos)
 
@@ -8932,6 +8950,53 @@ _ASTEROID_DIAMETER_KM = {
     VESTA: 522.77,
 }
 
+# Numbered minor bodies the library can position (the SPK registry in
+# exotic_bodies.py) that also carry published photometry. Each row is
+# (H, G, diameter_km): H the absolute magnitude, G the IAU H-G phase slope,
+# and the effective diameter. Values are transcribed from NASA/JPL's
+# Small-Body Database (https://ssd-api.jpl.nasa.gov/doc/sbdb.html), retrieved
+# 2026-07-27. Where SBDB lists no fitted G, the conventional H-G default
+# G = 0.15 is used (same convention as the curated Chiron/Pholus rows above).
+# Keyed by the runtime ``AST_OFFSET + minor-planet-number`` id — the same id
+# the SPK/registry path serves the position under.
+#
+# Positionable bodies deliberately absent here — e.g. 7066 Nessus and the
+# distant TNOs (Eris, Sedna, Haumea, Makemake, Ixion, Orcus, Quaoar,
+# Gonggong), for which SBDB publishes no effective diameter — keep the
+# existing point-body behavior: pheno's diameter/magnitude slots ([3]/[4])
+# report 0.0. Only bodies with BOTH a magnitude and a diameter are listed, so
+# _ASTEROID_HG and _ASTEROID_DIAMETER_KM stay in lockstep.
+_NUMBERED_ASTEROID_PHOTOMETRY: dict[int, tuple[float, float, float]] = {
+    # --- main-belt ---
+    AST_OFFSET + 10: (5.65, 0.15, 407.12),  # 10 Hygiea (SBDB: no G)
+    AST_OFFSET + 16: (6.20, 0.20, 222.0),  # 16 Psyche
+    AST_OFFSET + 52: (6.65, 0.18, 303.918),  # 52 Europa
+    AST_OFFSET + 55: (7.82, 0.15, 84.794),  # 55 Pandora (SBDB: no G)
+    AST_OFFSET + 80: (8.06, 0.15, 68.563),  # 80 Sappho (SBDB: no G)
+    AST_OFFSET + 87: (6.93, 0.15, 253.051),  # 87 Sylvia (SBDB: no G)
+    AST_OFFSET + 511: (6.42, 0.16, 270.327),  # 511 Davida
+    AST_OFFSET + 704: (6.34, -0.02, 306.313),  # 704 Interamnia
+    AST_OFFSET + 1181: (11.36, 0.15, 20.492),  # 1181 Lilith (SBDB: no G)
+    # --- centaurs ---
+    AST_OFFSET + 944: (10.55, 0.15, 38.0),  # 944 Hidalgo (SBDB: no G)
+    AST_OFFSET + 8405: (9.20, 0.15, 66.0),  # 8405 Asbolus (SBDB: no G)
+    AST_OFFSET + 10199: (6.55, 0.15, 302.0),  # 10199 Chariklo (SBDB: no G)
+    # --- near-Earth asteroids ---
+    AST_OFFSET + 433: (10.40, 0.46, 16.84),  # 433 Eros
+    AST_OFFSET + 1221: (17.37, 0.15, 1.0),  # 1221 Amor (SBDB: no G)
+    AST_OFFSET + 1566: (16.53, 0.15, 1.0),  # 1566 Icarus (SBDB: no G)
+    AST_OFFSET + 1685: (14.26, 0.15, 3.4),  # 1685 Toro (SBDB: no G)
+    AST_OFFSET + 4179: (15.29, 0.10, 5.4),  # 4179 Toutatis
+    AST_OFFSET + 25143: (19.26, 0.15, 0.33),  # 25143 Itokawa (SBDB: no G)
+    AST_OFFSET + 99942: (19.09, 0.24, 0.34),  # 99942 Apophis
+    AST_OFFSET + 162173: (19.55, 0.15, 0.896),  # 162173 Ryugu (SBDB: no G)
+    # --- trans-Neptunian (only those with a published diameter) ---
+    AST_OFFSET + 20000: (3.79, 0.15, 900.0),  # 20000 Varuna (SBDB: no G)
+}
+for _bid, (_h_abs, _g_slope, _diam_km) in _NUMBERED_ASTEROID_PHOTOMETRY.items():
+    _ASTEROID_HG[_bid] = (_h_abs, _g_slope)
+    _ASTEROID_DIAMETER_KM[_bid] = _diam_km
+
 
 def _asteroid_hg_magnitude(
     ipl: int, phase_angle_deg: float, helio_dist: float, geo_dist: float
@@ -9145,6 +9210,12 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     from . import fast_calc
     from .state import get_leb_reader
     from .utils import angular_separation
+
+    # Built-in asteroids requested via the AST_OFFSET + number alias resolve to
+    # their dedicated id (AST_OFFSET + 4 -> Vesta, AST_OFFSET + 5145 -> Pholus),
+    # exactly as calc_ut serves the position, so their pheno matches the
+    # built-in id. Registry-served numbered asteroids keep their own id.
+    ipl = _remap_ast_offset(ipl)
 
     reader = get_leb_reader()
     if reader is None:
@@ -9568,6 +9639,12 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     from .cache import get_cached_observer_at
 
     planets = _get_computation_ephemeris()
+
+    # Built-in asteroids requested via the AST_OFFSET + number alias resolve to
+    # their dedicated id (AST_OFFSET + 4 -> Vesta, AST_OFFSET + 5145 -> Pholus),
+    # matching calc_ut's position aliasing and the built-in id's pheno.
+    # Registry-served numbered asteroids keep their own id.
+    ipl = _remap_ast_offset(ipl)
 
     # The reference ignores FLG_HELCTR in pheno: every quantity is
     # Earth-based regardless of the observer flag (measured behavior).

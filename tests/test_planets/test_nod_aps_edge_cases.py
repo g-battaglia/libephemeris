@@ -339,19 +339,31 @@ class TestNodApsAllMethods:
 class TestNodApsInterpolatedApsidesNaN:
     """INTP_APOG / INTP_PERG have no node/apse decomposition.
 
-    Measured reference behavior: nod_aps returns a not-a-number in every slot
-    for the interpolated lunar apsides rather than raising or zero-filling.
+    Measured reference behavior: nod_aps marks the three *position* slots
+    (longitude, latitude, distance) not-a-number for the interpolated lunar
+    apsides, but leaves the three *speed* slots at 0.0 -- never NaN -- for every
+    method, with and without FLG_SPEED. The point is undefined as an orbital
+    node/apse, yet the speed channels stay well-formed floats. Mirror that
+    exactly (it neither raises nor zero-fills the position slots).
     """
 
     @pytest.mark.unit
     @pytest.mark.parametrize("body", [INTP_APOG, INTP_PERG])
-    def test_interpolated_apsides_return_nan(self, body):
-        result = swe.nod_aps_ut(JD_J2000, body, NODBIT_MEAN)
+    @pytest.mark.parametrize("method", [0, NODBIT_MEAN, NODBIT_OSCU])
+    @pytest.mark.parametrize("flags", [FLG_SWIEPH, FLG_SWIEPH | FLG_SPEED])
+    def test_interpolated_apsides_nan_positions_zero_speeds(self, body, method, flags):
+        result = swe.nod_aps_ut(JD_J2000, body, method, flags)
         assert len(result) == 4
         for tup in result:
             assert len(tup) == 6
-            for val in tup:
+            # Position slots: not-a-number.
+            for val in tup[:3]:
                 assert math.isnan(val)
+            # Speed slots: exactly 0.0 (well-formed floats, never NaN).
+            for val in tup[3:]:
+                assert val == 0.0
+                assert not math.isnan(val)
+                assert isinstance(val, float)
 
 
 class TestNodApsEquatorialSingleRotation:

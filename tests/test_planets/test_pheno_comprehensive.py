@@ -285,3 +285,82 @@ class TestPhenoETVariant:
         assert len(result) == 20
         assert 0.0 <= result[0] <= 180.0  # phase angle
         assert 0.0 <= result[1] <= 1.0  # illumination
+
+
+from libephemeris.constants import (  # noqa: E402
+    AST_OFFSET,
+    VESTA,
+    PHOLUS,
+    CERES,
+    FLG_SWIEPH,
+)
+
+
+class TestPhenoNumberedAsteroids:
+    """Physical magnitude/diameter for numbered asteroids the library serves.
+
+    Before this fix pheno reported 0.0 magnitude and 0.0 diameter for every
+    numbered minor body (AST_OFFSET + number) except the six curated ones,
+    because the H-G/diameter tables covered only the curated bodies. The tables
+    now carry JPL SBDB photometry for the positionable numbered asteroids, and
+    the AST_OFFSET + number alias of a built-in asteroid resolves to the
+    built-in's row (matching how calc_ut serves its position).
+    """
+
+    EROS = AST_OFFSET + 433
+    PSYCHE = AST_OFFSET + 16
+
+    @pytest.mark.unit
+    def test_eros_magnitude_is_finite_nonzero_native_float(self):
+        """433 Eros reports a real, finite, nonzero visual magnitude."""
+        swe.set_calc_mode("skyfield")
+        swe.set_auto_spk_download(True)
+        result = swe.pheno_ut(swe.julday(1990, 6, 1, 0.0), self.EROS, FLG_SWIEPH)
+        magnitude = result[4]
+        diameter = result[3]
+        assert isinstance(magnitude, float)
+        assert isinstance(diameter, float)
+        assert math.isfinite(magnitude)
+        assert magnitude != 0.0
+        # Eros is a faint main-belt/NEA object, never as bright as the planets.
+        assert 8.0 < magnitude < 20.0, magnitude
+        assert diameter > 0.0
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "alias,builtin",
+        [
+            (AST_OFFSET + 4, VESTA),
+            (AST_OFFSET + 5145, PHOLUS),
+            (AST_OFFSET + 1, CERES),
+        ],
+    )
+    def test_alias_matches_builtin_photometry(self, alias, builtin):
+        """AST_OFFSET + number alias yields the built-in body's full pheno."""
+        jd = swe.julday(1985, 3, 15, 0.0)
+        alias_result = swe.pheno_ut(jd, alias, FLG_SWIEPH)
+        builtin_result = swe.pheno_ut(jd, builtin, FLG_SWIEPH)
+        assert alias_result == builtin_result
+        # The built-in asteroids carry a real magnitude and disc.
+        assert builtin_result[4] != 0.0
+        assert builtin_result[3] > 0.0
+
+    @pytest.mark.unit
+    def test_positionable_body_without_photometry_row_reports_zero(self):
+        """A positionable numbered body absent from the tables keeps 0.0/0.0.
+
+        136199 Eris is served from the registry SPK but has no published
+        effective diameter in SBDB, so it carries no photometry row; the
+        documented behavior is diameter and magnitude 0.0 (its elongation is
+        still a real geometric quantity).
+        """
+        swe.set_calc_mode("skyfield")
+        swe.set_auto_spk_download(True)
+        eris = AST_OFFSET + 136199
+        try:
+            result = swe.pheno_ut(swe.julday(1990, 6, 1, 0.0), eris, FLG_SWIEPH)
+        except Exception:
+            pytest.skip("136199 Eris not positionable in this environment")
+        assert result[3] == 0.0  # diameter
+        assert result[4] == 0.0  # magnitude
+        assert math.isfinite(result[2])  # elongation is a real quantity

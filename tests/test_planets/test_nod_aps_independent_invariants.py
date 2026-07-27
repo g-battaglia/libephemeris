@@ -29,6 +29,10 @@ J2000 = 2451545.0
 @pytest.fixture(autouse=True)
 def _isolate_observer_and_sidereal_state() -> Iterator[None]:
     eph.reset_session()
+    # These invariants dissect the Skyfield reduction internals (get_planets,
+    # aberration helpers), so they must not inherit a sealed-LEB mode from the
+    # environment (e.g. a local .env exporting LIBEPHEMERIS_MODE=leb).
+    eph.set_calc_mode("skyfield")
     yield
     eph.reset_session()
 

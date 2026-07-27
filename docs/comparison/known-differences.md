@@ -28,13 +28,15 @@ Apparent coordinates also depend on Earth orientation, precession, nutation,
 light deflection, aberration, and time-scale conversion. Their published model
 validity can be narrower than the underlying kernel coverage.
 
-For Saturn and Pluto the body-center convention itself is visible: DE kernels
-supply the system barycenter, and the local `skyfield` mode refines it to the
-physical planet center with the `planet_centers` SPK data (a ~0.05" effect
-for Saturn/Titan and ~0.08" for Pluto/Charon in geocentric longitude).
-Implementations that stop at the system barycenter — including the sealed LEB
-tier, whose channels store the barycentric state — differ from the refined
-position by exactly that offset.
+For the outer planets the body-center convention itself is visible: DE
+kernels supply the system barycenter, and the local `skyfield` mode refines
+it to the physical planet center with the `planet_centers` SPK data. The
+geocentric-longitude effect is largest where the moon system is heaviest
+relative to the planet: ~0.08" for Pluto/Charon, ~0.05" for Saturn/Titan,
+~0.05" for Jupiter/Galileans, and a few milliarcseconds for Uranus and
+Neptune. Implementations that stop at the system barycenter — including the
+sealed LEB tier, whose channels store the barycentric state — differ from
+the refined position by exactly that offset.
 
 ### Lunar points
 
