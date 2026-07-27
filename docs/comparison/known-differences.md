@@ -283,7 +283,13 @@ Of the `SIDBIT_*` projection flags, the frame projections (`ECL_T0`,
 `SSY_PLANE`) and the ecliptic-of-date reference (`ECL_DATE`, realized from
 the Vondrák 2011 ecliptic-pole geometry) are implemented for defining-pair
 modes and suppressed for live star/galactic modes, whose value is already an
-of-date longitude. Two flags are accepted silently but reduce to the base
+of-date longitude. For `SIDM_USER`, the `ECL_T0` projection plane is the
+mean ecliptic of the `t0` passed to `set_sid_mode` taken literally (with
+`SIDBIT_USER_UT` the stored `t0` is read as UT and converted to TT); the
+plane realization uses the Vondrák 2011 long-term model, so agreement with
+implementations built on the IAU 2006 developments degrades from the ~0.02"
+near-J2000 convergence floor to arcminute level only for epochs several
+millennia from J2000 (for example a literal `t0 = 0`, i.e. JD 0). Two flags are accepted silently but reduce to the base
 value: `SIDBIT_PREC_ORIG` (measured external effect below the ~0.1"
 realization floor in the standard configuration) and `SIDBIT_NO_PREC_OFFSET`
 (a time-constant per-mode reconciliation offset, non-zero for six modes and

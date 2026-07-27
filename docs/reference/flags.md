@@ -74,7 +74,7 @@ These exist for pyswisseph API compatibility; most users never need them.
 
 | Flag | Effect |
 |------|--------|
-| `FLG_CENTER_BODY` | Request the planet body center instead of the system barycenter. libephemeris already returns body centers by default (see [Planet Centers](../methodology/planet-centers-spk.md)). |
+| `FLG_CENTER_BODY` | Request the planet body center instead of the system barycenter. libephemeris already returns body centers by default (see [Planet Centers](../methodology/planet-centers-spk.md)). For Sun through Mars (body IDs 0–4) the flag is consumed and not echoed in the return flags — those bodies have no satellite-system barycenter to resolve; for all other bodies the bit is echoed back unchanged. |
 | `FLG_ORBEL_AA` | Use the Astronomical Almanac convention for osculating orbital elements (`get_orbital_elements`). |
 | `FLG_JPLHOR` | JPL Horizons-consistent precession/nutation handling (legacy compatibility). |
 | `FLG_JPLHOR_APPROX` | Approximate JPL Horizons mode (legacy compatibility). |

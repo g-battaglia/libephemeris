@@ -234,3 +234,35 @@ class TestCalcTTNormalBodyEphemerisBits:
             le.set_calc_mode(mode)
             assert le.calc(JD, 2, 0)[1] == 0, mode
         le.set_calc_mode("auto")
+
+
+class TestCenterBodyRetflagEcho:
+    """FLG_CENTER_BODY is consumed for Sun..Mars, echoed for other bodies.
+
+    Measured reference behavior: for ipl 0-4 there is no satellite-system
+    barycenter to resolve, and the retflag does NOT carry the bit back
+    (calc and calc_ut alike); nodes, apogees and asteroids echo it
+    unchanged. Backend-independent (LEB and Skyfield agree).
+    """
+
+    CB = 1048576  # FLG_CENTER_BODY
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [0, 1, 2, 3, 4])
+    def test_stripped_for_sun_through_mars(self, body: int) -> None:
+        assert le.calc_ut(JD, body, 2 | self.CB)[1] == 2
+        assert le.calc(JD, body, 2 | self.CB)[1] == 2
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [10, 11, 12, 15, 17])
+    def test_echoed_for_nodes_apogees_asteroids(self, body: int) -> None:
+        assert le.calc_ut(JD, body, 2 | self.CB)[1] == 2 | self.CB
+        assert le.calc(JD, body, 2 | self.CB)[1] == 2 | self.CB
+
+    @pytest.mark.unit
+    def test_backend_independent(self) -> None:
+        for mode in ("skyfield", "leb"):
+            le.set_calc_mode(mode)
+            assert le.calc_ut(JD, 0, 2 | self.CB)[1] == 2, mode
+            assert le.calc_ut(JD, 15, 2 | self.CB)[1] == 2 | self.CB, mode
+        le.set_calc_mode("auto")

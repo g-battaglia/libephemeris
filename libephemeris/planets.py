@@ -173,6 +173,7 @@ from .constants import (
     FLG_SWIEPH,
     FLG_HELCTR,
     FLG_TOPOCTR,
+    FLG_CENTER_BODY,
     FLG_ORBEL_AA,
     FLG_SIDEREAL,
     ANGLE_OFFSET,
@@ -1883,6 +1884,16 @@ def calc_ut(
         _record(requested_planet, "ERFA")
         return result
 
+    # FLG_CENTER_BODY consumed for Sun..Mars: for ipl 0-4 there is no
+    # satellite-system barycenter to resolve (positions are body centers
+    # already), and the measured reference retflag does NOT echo the bit for
+    # these five bodies, while nodes, apogees and asteroids echo it back
+    # unchanged. Strip it from the request so every downstream echo path
+    # stays clean; the bit carries no positional meaning in this library
+    # (see docs/reference/flags.md).
+    if (flags & FLG_CENTER_BODY) and 0 <= planet <= MARS:
+        flags &= ~FLG_CENTER_BODY
+
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
 
@@ -2176,6 +2187,12 @@ def calc(
         get_logger().debug("body=%d jd=%.1f source=ERFA", requested_planet, tjdet)
         _record(requested_planet, "ERFA")
         return result
+
+    # FLG_CENTER_BODY consumed for Sun..Mars (see calc_ut: the measured
+    # reference retflag does not echo the bit for ipl 0-4 on either time
+    # argument; other bodies echo it unchanged).
+    if (flags & FLG_CENTER_BODY) and 0 <= planet <= MARS:
+        flags &= ~FLG_CENTER_BODY
 
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
@@ -5983,7 +6000,25 @@ def _ecl_t0_epoch_jd(sid_mode: int) -> float:
     special case the lookup silently fell back to J2000 and the ECL_T0
     projection became a near no-op (up to ~4' of error at high ecliptic
     latitudes) instead of using the mode's ancient defining ecliptic.
+
+    SIDM_USER takes the epoch from the user's ``set_sid_mode(SIDM_USER, t0,
+    ayan_t0)`` call, NOT from the defining table (whose lookup would fall
+    back to J2000 and freeze the projection plane). Measured reference
+    behavior: the plane is the mean ecliptic of the stored t0 taken
+    literally (t0 = 0.0 really means JD 0), the latitude shift vanishes
+    when t0 equals the computation date and grows by ~0.36 arcsec per year
+    of |date - t0|, and it is independent of ayan_t0 (rotating the zero
+    point within the plane moves longitudes, never latitudes). With
+    SIDBIT_USER_UT the stored t0 is a UT date and is converted to TT here,
+    mirroring the _calc_ayanamsa anchoring convention.
     """
+    if sid_mode == SIDM_USER:
+        _, t0, _ = get_sid_mode(full=True)
+        if _get_sidereal_bits() & SIDBIT_USER_UT:
+            from .time_utils import deltat
+
+            t0 = t0 + deltat(t0)
+        return t0
     if sid_mode == SIDM_VALENS_MOON:
         from .time_utils import deltat
 

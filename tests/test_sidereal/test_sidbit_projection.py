@@ -291,3 +291,58 @@ class TestValensEclT0Epoch:
         le.set_sid_mode(0)
         shift = abs((proj - plain + 180.0) % 360.0 - 180.0) * 3600.0
         assert shift > 30.0  # was ~0.03" with the J2000 fallback
+
+
+class TestUserEclT0Epoch:
+    """SIDM_USER's ECL_T0 projection uses the user-supplied t0, not J2000.
+
+    Measured reference behavior: the projection plane is the mean ecliptic
+    of the t0 passed to set_sid_mode(SIDM_USER, t0, ayan_t0), taken
+    literally. The ECL_T0 latitude shift therefore vanishes when t0 equals
+    the computation date and grows by ~0.36 arcsec per year of |date - t0|
+    (the secular inclination motion of the ecliptic; Vondrak et al. 2011,
+    A&A 534, A22). Before the fix the epoch resolver silently fell back to
+    J2000, freezing the plane regardless of t0.
+    """
+
+    JD_1990 = 2448076.5 + 0.5  # 1990-07-04 12:00 UT
+
+    def _lat_shift(self, t0: float, body: int = ephem.PLUTO) -> float:
+        ephem.set_sid_mode(SIDM_USER, t0, 24.0)
+        plain = ephem.calc_ut(self.JD_1990, body, FLG_SIDEREAL)[0][1]
+        ephem.set_sid_mode(SIDM_USER | SIDBIT_ECL_T0, t0, 24.0)
+        proj = ephem.calc_ut(self.JD_1990, body, FLG_SIDEREAL)[0][1]
+        return (proj - plain) * 3600.0
+
+    @pytest.mark.unit
+    def test_epoch_resolver_returns_user_t0(self):
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        t0 = 2430000.25
+        ephem.set_sid_mode(SIDM_USER, t0, 0.0)
+        assert _ecl_t0_epoch_jd(SIDM_USER) == pytest.approx(t0, abs=1e-9)
+
+    @pytest.mark.unit
+    def test_epoch_resolver_converts_user_ut_t0(self):
+        from libephemeris.planets import _ecl_t0_epoch_jd
+        from libephemeris.time_utils import deltat
+
+        t0 = 2430000.25
+        ephem.set_sid_mode(SIDM_USER | SIDBIT_USER_UT, t0, 0.0)
+        assert _ecl_t0_epoch_jd(SIDM_USER) == pytest.approx(t0 + deltat(t0), abs=1e-9)
+
+    @pytest.mark.unit
+    def test_shift_vanishes_at_t0_equal_date(self):
+        # Plane of t0 == plane of date: the projection is a longitude-only
+        # rezeroing, so the latitude shift collapses to the numerical floor.
+        assert abs(self._lat_shift(self.JD_1990)) < 0.1
+
+    @pytest.mark.unit
+    def test_shift_scales_with_epoch_separation(self):
+        # ~90 years of secular inclination motion: tens of arcseconds,
+        # strictly larger than the ~36-year J2000 baseline. A frozen-J2000
+        # plane would make both values identical.
+        shift_1900 = self._lat_shift(2415021.0)  # 1900-01-01 12:00
+        shift_j2000 = self._lat_shift(JD)
+        assert abs(shift_1900) > 20.0
+        assert abs(shift_1900) > 2.0 * abs(shift_j2000)
