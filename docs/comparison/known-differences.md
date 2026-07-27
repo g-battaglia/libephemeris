@@ -247,6 +247,18 @@ model choices, not defects; the modes with an unambiguous published anchor
 (Fagan/Bradley, Lahiri, Raman, Krishnamurti, ICRC, the frame epochs, the
 galactic and star-anchored modes) agree to well under an arcsecond.
 
+Of the `SIDBIT_*` projection flags, the frame projections (`ECL_T0`,
+`SSY_PLANE`) and the ecliptic-of-date reference (`ECL_DATE`, realized from
+the Vondrák 2011 ecliptic-pole geometry) are implemented for defining-pair
+modes and suppressed for live star/galactic modes, whose value is already an
+of-date longitude. Two flags are accepted silently but reduce to the base
+value: `SIDBIT_PREC_ORIG` (measured external effect below the ~0.1"
+realization floor in the standard configuration) and `SIDBIT_NO_PREC_OFFSET`
+(a time-constant per-mode reconciliation offset, non-zero for six modes and
+bounded at ~0.83", whose defining values are internal metadata of the
+external implementation's per-mode precession-model assignment and are not
+reconstructible from published models without fitting output).
+
 ### Crossing functions
 
 Crossing searches scan and bracket the independently computed longitude or
@@ -264,14 +276,16 @@ physical parameters rather than output-fitted seasonal or geographic terms.
 
 ### Hypothetical bodies
 
-IDs 40–47 and 50–53 calculate from independently transcribed primary-source
-models: Neely, Harrington, Le Verrier, Adams, and Lowell. ID 56 (Selena/White
+IDs 40–48 and 50–55, 57–58 calculate from independently transcribed
+primary-source models: Neely, Harrington, Le Verrier, Adams, Lowell,
+Pickering, and the historical Vulcan, Isis, Proserpina, and Waldemath
+literature. ID 56 (Selena/White
 Moon) uses Velichko and Larin's published seven-year uniform zodiac cycle,
 unwrapped over their published January 1800–January 2000 endpoints and checked
 against three unused rows through 2007; its compatibility-only radius is
-derived from published IAU nominal constants. IDs 48, 49, 54, 55, 57, and 58
-remain named and recognised but raise `UnknownBodyError`; their
-complete historical definitions were not recovered. Source-exact epochs,
+derived from published IAU nominal constants. ID 49 (Nibiru)
+remains named and recognised but raises `UnknownBodyError`; its
+complete historical definition was not recovered. Source-exact epochs,
 frames, and sexagesimal conversions can intentionally differ from an
 undocumented legacy convention where reproducing that convention would require
 unverified data.

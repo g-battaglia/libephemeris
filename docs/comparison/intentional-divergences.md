@@ -119,6 +119,11 @@ reproduced from external implementations:
   0.0 for all eight intermediate cusp speeds while the true derivative
   reaches hundreds of degrees per day near high latitudes. LibEphemeris
   reports the genuine, self-consistent derivative here as well.
+- Gauquelin (`G`, 36 sectors) belongs to the same class: sector-cusp
+  positions agree to sub-arcsecond level, but the external analytic sector
+  speeds deviate from the derivative of those same positions — by up to
+  ~29°/day at latitude 60° (growing with latitude from a ~0.002°/day
+  equatorial floor). LibEphemeris reports the genuine derivative.
 
 Porphyry (`O`), Whole Sign (`W`) and Aries (`N`) are the exception: the
 reference API reports an *analytic* cusp speed for these that is not the

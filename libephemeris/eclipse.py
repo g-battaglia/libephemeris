@@ -7274,10 +7274,12 @@ def _rise_trans_true_hor_impl(
         For transits, circumpolar objects still have valid transit times.
 
         Twilight flags (BIT_CIVIL_TWILIGHT, BIT_NAUTIC_TWILIGHT,
-        BIT_ASTRO_TWILIGHT) are honored for the Sun: they switch the
-        event to a geometric Sun-center crossing of -6/-12/-18 degrees
-        and override horhgt, matching the reference behavior. The
-        special value horhgt=-100 requests the dip of the sea horizon.
+        BIT_ASTRO_TWILIGHT) are honored for the Sun and for fixed
+        stars: they switch the event to a geometric center crossing of
+        -6/-12/-18 degrees and override horhgt, matching the reference
+        behavior (planets and the Moon keep their ordinary horizon
+        crossing). The special value horhgt=-100 requests the dip of
+        the sea horizon.
 
     Algorithm:
         1. For transits: Find when body crosses the local meridian
@@ -7428,13 +7430,16 @@ def _rise_trans_true_hor_impl(
             max(altitude, 0.0), atpress=pressure, attemp=temperature
         )
 
-    # Twilight events: geometric Sun-center crossings of -6/-12/-18
-    # degrees (the horizon height is ignored for twilight).
+    # Twilight events: geometric center crossings of -6/-12/-18 degrees
+    # (the horizon height is ignored for twilight). Measured reference
+    # behavior honors the twilight bits for the Sun AND for fixed stars
+    # (heliacal-style star visibility at a chosen solar-depression class),
+    # while planets and the Moon keep their ordinary horizon crossing.
     rsmi_eff = rsmi
     is_twilight = bool(
         rsmi & (BIT_CIVIL_TWILIGHT | BIT_NAUTIC_TWILIGHT | BIT_ASTRO_TWILIGHT)
     )
-    if is_twilight and planet == SUN:
+    if is_twilight and (planet == SUN or is_fixed_star):
         rsmi_eff = rsmi | BIT_NO_REFRACTION | BIT_DISC_CENTER
         if rsmi & BIT_CIVIL_TWILIGHT:
             horizon_alt = -6.0

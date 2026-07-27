@@ -44,6 +44,7 @@ from .constants import (
     OSCU_APOG,
     PLUTO,
     SATURN,
+    SIDBIT_ECL_DATE,
     SUN,
     TRUE_NODE,
     URANUS,
@@ -1171,7 +1172,12 @@ def _calc_ayanamsa_from_leb(
 
     mode = sid_mode if sid_mode is not None else 0
 
-    if mode in _DELEGATED_AYANAMSHA_MODES:
+    from .planets import _get_sidereal_bits
+
+    if mode in _DELEGATED_AYANAMSHA_MODES or (_get_sidereal_bits() & SIDBIT_ECL_DATE):
+        # SIDBIT_ECL_DATE refers the zero point to the mean ecliptic of date;
+        # the geometric delta lives in planets._calc_ayanamsa, so delegate the
+        # whole evaluation there to keep both backends numerically identical.
         # Late imports avoid a cycle. _calc_ayanamsa accepts UT, so invert
         # TT approximately with the same Delta T model used in the forward
         # conversion.

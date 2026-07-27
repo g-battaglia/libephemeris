@@ -471,3 +471,54 @@ class TestRiseTransSequential:
 
         # Transit should be between rise and set
         assert jd_rise < jd_transit < jd_set
+
+
+class TestRiseTransStarTwilight:
+    """Twilight bits apply to fixed stars (Sun-style depression crossing).
+
+    Measured reference behavior honors CIVIL/NAUTIC/ASTRO for the Sun and
+    for fixed stars — the event becomes a geometric center crossing of
+    -6/-12/-18 degrees — while planets and the Moon keep the ordinary
+    horizon crossing.
+    """
+
+    def test_star_twilight_equals_true_horizon_depression(self):
+        from libephemeris import rise_trans_true_hor
+
+        jd_start = julday(2019, 12, 21, 0)
+        geopos = [36.8219, -1.2921, 1795.0]  # Nairobi
+        for bits, depth in (
+            (BIT_CIVIL_TWILIGHT, -6.0),
+            (BIT_NAUTIC_TWILIGHT, -12.0),
+            (BIT_ASTRO_TWILIGHT, -18.0),
+        ):
+            rf_tw, tret_tw = rise_trans(jd_start, "Aldebaran", CALC_RISE | bits, geopos)
+            rf_hor, tret_hor = rise_trans_true_hor(
+                jd_start,
+                "Aldebaran",
+                CALC_RISE | BIT_NO_REFRACTION | BIT_DISC_CENTER,
+                geopos,
+                horhgt=depth,
+            )
+            assert rf_tw == rf_hor == 0
+            assert tret_tw[0] == pytest.approx(tret_hor[0], abs=1e-6)
+
+    def test_star_twilight_ordering(self):
+        jd_start = julday(2019, 12, 21, 0)
+        geopos = [36.8219, -1.2921, 1795.0]
+        times = []
+        for bits in (BIT_ASTRO_TWILIGHT, BIT_NAUTIC_TWILIGHT, BIT_CIVIL_TWILIGHT):
+            _, tret = rise_trans(jd_start, "Aldebaran", CALC_RISE | bits, geopos)
+            times.append(tret[0])
+        _, tret = rise_trans(
+            jd_start, "Aldebaran", CALC_RISE | BIT_NO_REFRACTION, geopos
+        )
+        # Deeper depression classes rise earlier; the plain horizon last.
+        assert times[0] < times[1] < times[2] < tret[0]
+
+    def test_planet_twilight_bits_are_ignored(self):
+        jd_start = julday(2019, 12, 21, 0)
+        geopos = [36.8219, -1.2921, 1795.0]
+        _, tret_tw = rise_trans(jd_start, MARS, CALC_RISE | BIT_CIVIL_TWILIGHT, geopos)
+        _, tret_plain = rise_trans(jd_start, MARS, CALC_RISE, geopos)
+        assert tret_tw[0] == pytest.approx(tret_plain[0], abs=1e-9)

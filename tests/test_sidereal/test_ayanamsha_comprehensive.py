@@ -103,3 +103,41 @@ def test_modes_without_a_predefined_name_return_empty_string(sidmode: int) -> No
     unassigned block above mode 46 and the user-defined mode SIDM_USER (255) --
     returns the empty string, not a placeholder such as 'Unknown'."""
     assert ephem.get_ayanamsa_name(sidmode) == ""
+
+
+@pytest.mark.parametrize(
+    "sidmode,expected",
+    [
+        (ephem.SIDBIT_ECL_T0 | ephem.SIDM_LAHIRI, "Lahiri"),
+        (ephem.SIDBIT_ECL_T0 | ephem.SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+        (ephem.SIDBIT_ECL_T0 | ephem.SIDM_KRISHNAMURTI, "Krishnamurti"),
+        (ephem.SIDBIT_SSY_PLANE | ephem.SIDM_RAMAN, "Raman"),
+        (ephem.SIDBIT_ECL_DATE | ephem.SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+        (ephem.SIDBIT_NO_PREC_OFFSET | ephem.SIDM_LAHIRI_ICRC, "Lahiri ICRC"),
+        (ephem.SIDBIT_PREC_ORIG | ephem.SIDM_TRUE_CITRA, "True Citra"),
+        # Multiple projection flags OR-ed together still mask to the base name.
+        (
+            ephem.SIDBIT_ECL_T0 | ephem.SIDBIT_SSY_PLANE | ephem.SIDM_KRISHNAMURTI,
+            "Krishnamurti",
+        ),
+    ],
+)
+def test_sidbit_projection_flags_are_masked_for_the_name(
+    sidmode: int, expected: str
+) -> None:
+    """The SIDBIT_* projection flags occupy bits >= 8, so the name lookup is
+    driven by the low byte only (measured reference behavior)."""
+    assert ephem.get_ayanamsa_name(sidmode) == expected
+
+
+@pytest.mark.parametrize(
+    "sidmode",
+    [
+        ephem.SIDBIT_ECL_T0 | ephem.SIDM_USER,  # 511 -> low byte 255, unnamed
+        ephem.SIDBIT_ECL_T0 | 47,  # 303 -> low byte 47, unnamed
+        ephem.SIDBIT_SSY_PLANE | 47,  # 559 -> low byte 47, unnamed
+    ],
+)
+def test_sidbit_flags_over_unnamed_modes_stay_empty(sidmode: int) -> None:
+    """A projection flag over an unnamed base mode still returns ''."""
+    assert ephem.get_ayanamsa_name(sidmode) == ""

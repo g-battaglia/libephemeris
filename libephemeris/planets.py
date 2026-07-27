@@ -181,6 +181,12 @@ from .constants import (
     PARS_SPIRITUS,
     PARS_AMORIS,
     PARS_FIDEI,
+    SIDBIT_ECL_DATE,
+    SIDBIT_ECL_T0,
+    SIDBIT_NO_PREC_OFFSET,
+    SIDBIT_PREC_ORIG,
+    SIDBIT_SSY_PLANE,
+    SIDBIT_USER_UT,
     SIDM_FAGAN_BRADLEY,
     SIDM_LAHIRI,
     SIDM_DELUCE,
@@ -454,18 +460,32 @@ _PLANET_NAMES = {
     ISIS: "Isis-Transpluto",
     NIBIRU: "Nibiru",
     HARRINGTON: "Harrington",
-    NEPTUNE_LEVERRIER: "Leverrier",
-    NEPTUNE_ADAMS: "Adams",
-    PLUTO_LOWELL: "Lowell",
-    PLUTO_PICKERING: "Pickering",
+    # Historical trans-Uranian/trans-Neptunian predictions carry a
+    # parenthetical annotation naming the planet each prediction targeted,
+    # matching the compatibility metadata contract (Le Verrier 1846 and Adams
+    # 1845-46 for Neptune; Lowell 1915 and Pickering 1919 for Pluto).
+    NEPTUNE_LEVERRIER: "Leverrier (Neptune)",
+    NEPTUNE_ADAMS: "Adams (Neptune)",
+    PLUTO_LOWELL: "Lowell (Pluto)",
+    PLUTO_PICKERING: "Pickering (Pluto)",
     CUPIDO: "Cupido",
     HADES: "Hades",
     ZEUS: "Zeus",
     KRONOS: "Kronos",
     APOLLON: "Apollon",
     ADMETOS: "Admetos",
-    VULKANUS: "Vulkanus",
+    # "Vulcanus" is the canonical Witte-Sieggrün (Hamburg School) spelling of
+    # the seventh Uranian planet; the constant keeps its VULKANUS spelling for
+    # API compatibility while the display name matches the metadata contract.
+    VULKANUS: "Vulcanus",
     POSEIDON: "Poseidon",
+    # Geocentric/heliocentric symbolic points the runtime models analytically
+    # (ids 55-58). They resolve to their published astrological names because
+    # calc_ut returns positions for them, so the metadata must agree.
+    VULCAN: "Vulcan",
+    WHITE_MOON: "Selena/White Moon",
+    PROSERPINA: "Proserpina",
+    WALDEMATH: "Waldemath",
     CHIRON: "Chiron",
     PHOLUS: "Pholus",
     CERES: "Ceres",
@@ -1759,10 +1779,15 @@ def _sidbit_projection_calc(
     sub_xx, sub_rf = calc_fn(tjd, planet, fixed_epoch_request_flags(flags))
     xx = transform_sidbit_result(sub_xx, flags, m_ecl)
     # Echo the caller's representation and SIDEREAL bit; drop the internal
-    # J2000/NONUT rewrite bits.
+    # J2000 rewrite bit but RETAIN FLG_NONUT. The SIDBIT projection is defined
+    # on a MEAN ecliptic and equinox (of the mode's t0 for SIDBIT_ECL_T0, or the
+    # invariable plane for SIDBIT_SSY_PLANE), so the projected longitude is
+    # declared without nutation -- the same mean-frame convention the base
+    # sidereal path echoes via _implied_retflag_bits / fixed_epoch_retflag.
+    # sub_rf always carries FLG_NONUT because fixed_epoch_request_flags forces
+    # it into the rewritten sub-request.
     retflag = _echo_request_bits(
-        (sub_rf & ~(FLG_J2000 | FLG_NONUT))
-        | (flags & (FLG_SIDEREAL | FLG_RADIANS | FLG_XYZ)),
+        (sub_rf & ~FLG_J2000) | (flags & (FLG_SIDEREAL | FLG_RADIANS | FLG_XYZ)),
         raw_flags,
     )
     return (_to_native_floats(xx), retflag)
@@ -5407,6 +5432,14 @@ def get_ayanamsa_name(sidmode: int) -> str:
     predefined name -- the unassigned block above the last predefined mode and
     the user-defined mode SIDM_USER (255) -- returns the empty string rather
     than a placeholder.
+
+    The SIDBIT_* projection flags (SIDBIT_ECL_T0=256, SIDBIT_SSY_PLANE=512,
+    SIDBIT_USER_UT=1024, SIDBIT_ECL_DATE=2048, SIDBIT_NO_PREC_OFFSET=4096,
+    SIDBIT_PREC_ORIG=8192) may be OR-ed onto the base mode id. They occupy
+    bits >= 8, so the name lookup is driven by the low byte only: e.g.
+    get_ayanamsa_name(SIDBIT_ECL_T0 | SIDM_LAHIRI) == "Lahiri". Masking with
+    0xFF matches the measured reference behavior across every combination of
+    projection flags.
     """
     names = {
         SIDM_FAGAN_BRADLEY: "Fagan/Bradley",
@@ -5457,7 +5490,9 @@ def get_ayanamsa_name(sidmode: int) -> str:
         SIDM_KRISHNAMURTI_VP291: "Krishnamurti-Senthilathiban",
         SIDM_LAHIRI_ICRC: "Lahiri ICRC",
     }
-    return names.get(sidmode, "")
+    # Strip the SIDBIT_* projection flags (all >= 256) so a mode combined with
+    # ECL_T0/SSY_PLANE/ECL_DATE/... still resolves to its base name.
+    return names.get(sidmode & 0xFF, "")
 
 
 @dataclass
@@ -5857,6 +5892,66 @@ def _star_position_ecliptic_uncached(
     return math.degrees(math.atan2(ye, xe)) % 360.0
 
 
+def _ecl_date_ayanamsha_delta(
+    defining_value_deg: float, t0_tt: float, tjd_tt: float
+) -> float:
+    """Longitude shift (deg) for referring a mode to the ecliptic of date.
+
+    This is the geometric realization of SIDBIT_ECL_DATE, applied by
+    ``_calc_ayanamsa`` to every defining pair (epoch modes, Valens and
+    SIDM_USER); the LEB fast path delegates here when the bit is set so both
+    backends stay numerically identical. Live star/galactic modes are
+    naturally inert: their value is already an of-date longitude.
+
+    SIDBIT_ECL_DATE refers the sidereal longitude to the mean ecliptic and
+    equinox **of date** instead of the mode's defining mean ecliptic of ``t0``
+    (the default Method-B frame; see
+    :func:`precession_vondrak.method_b_accumulated_precession`). Geometrically
+    the fixed sidereal zero point ``Z`` is defined on the mean ecliptic of
+    ``t0`` at ecliptic longitude ``defining_value_deg`` (latitude 0). This
+    returns the difference between the tropical longitude of ``Z`` measured on
+    the mean ecliptic of date and on the mean ecliptic of ``t0`` (the Method-B
+    baseline), i.e. the amount to add to the Method-B ayanamsha.
+
+    Both ecliptic frames are built from the Vondrák 2011 long-term
+    ecliptic/equator poles (``erfa.ltpecl``/``ltpequ`` via
+    :func:`precession_vondrak._ltp_ecliptic_frame`), so the construction is
+    valid over the full Vondrák span and introduces no fitted term. The shift
+    is zero at ``tjd_tt == t0_tt`` and grows with the ecliptic tilt between the
+    two epochs (a few milli-arcseconds for modern epochs, up to ~0.5-0.7" for
+    modes whose defining epoch is a millennium or more from the request).
+
+    Args:
+        defining_value_deg: The mode's ayanamsha at ``t0`` (its sidereal-zero
+            longitude on the mean ecliptic of ``t0``), in degrees.
+        t0_tt: The mode's defining epoch, Julian Date in TT.
+        tjd_tt: The epoch of interest, Julian Date in TT.
+
+    Returns:
+        Signed longitude shift in degrees, unwrapped to ``(-180, 180]``.
+    """
+    from .precession_vondrak import _ltp_ecliptic_frame
+
+    # Sidereal zero point Z on the mean ecliptic of t0 (longitude defining
+    # value, latitude 0), expressed in the GCRS basis: (ecliptic-of-t0
+    # basis rows)^T @ [cos, sin, 0].
+    e0 = _ltp_ecliptic_frame(t0_tt)
+    lon0 = math.radians(defining_value_deg)
+    cx, sx = math.cos(lon0), math.sin(lon0)
+    zx = e0[0][0] * cx + e0[1][0] * sx
+    zy = e0[0][1] * cx + e0[1][1] * sx
+    zz = e0[0][2] * cx + e0[1][2] * sx
+
+    # Tropical longitude of Z on the mean ecliptic and equinox of date.
+    ed = _ltp_ecliptic_frame(tjd_tt)
+    wx = ed[0][0] * zx + ed[0][1] * zy + ed[0][2] * zz
+    wy = ed[1][0] * zx + ed[1][1] * zy + ed[1][2] * zz
+    lon_date = math.degrees(math.atan2(wy, wx))
+
+    method_b = defining_value_deg + method_b_accumulated_precession(tjd_tt, t0_tt)
+    return (lon_date - method_b + 180.0) % 360.0 - 180.0
+
+
 def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     """Calculate the selected predefined mean ayanamsha.
 
@@ -5892,6 +5987,10 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
             t0 = t0 + deltat(t0)
         value = ayan_t0 + method_b_accumulated_precession(tjd_tt, t0)
+        if _get_sidereal_bits() & SIDBIT_ECL_DATE:
+            # Refer the fixed zero point to the mean ecliptic of date instead
+            # of the mean ecliptic of t0 (see _ecl_date_ayanamsha_delta).
+            value += _ecl_date_ayanamsha_delta(ayan_t0, t0, tjd_tt)
         return float(value % 360.0)
 
     if sid_mode in DYNAMIC_AYANAMSHA_MODES:
@@ -5979,6 +6078,13 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             value = VALENS_MOON_AYAN_T0_DEG + method_b_accumulated_precession(
                 tjd_tt, defining_epoch_tt
             )
+            if _get_sidereal_bits() & SIDBIT_ECL_DATE:
+                # Valens is an epoch-pair mode (it lives on this branch only
+                # for its UT-anchored epoch), so the ecliptic-of-date
+                # projection applies to it like to every defining pair.
+                value += _ecl_date_ayanamsha_delta(
+                    VALENS_MOON_AYAN_T0_DEG, defining_epoch_tt, tjd_tt
+                )
         else:
             raise AssertionError(f"Unhandled dynamic sidereal mode {sid_mode}")
         return float(value % 360.0)
@@ -6002,6 +6108,13 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     # from secondary attributions and explicit project conventions.
     defining_value, defining_epoch = AYANAMSHA_DEFINING[sid_mode]
     value = defining_value + method_b_accumulated_precession(tjd_tt, defining_epoch)
+    if _get_sidereal_bits() & SIDBIT_ECL_DATE:
+        # SIDBIT_ECL_DATE: refer the mode's fixed zero point to the mean
+        # ecliptic of date instead of its defining mean ecliptic (Vondrák
+        # 2011 pole geometry; see _ecl_date_ayanamsha_delta). Live star and
+        # galactic modes are naturally inert: their value is already an
+        # of-date longitude, so no delta applies on the dynamic branch.
+        value += _ecl_date_ayanamsha_delta(defining_value, defining_epoch, tjd_tt)
     return float(value % 360.0)
 
 
@@ -6070,10 +6183,36 @@ def _get_ayanamsa_for_flags(
     return _get_true_ayanamsa(tjd_ut, sid_mode)
 
 
-# SIDBIT projection flags this version applies (rather than warning-and-reducing
-# to the base ayanamsha mode). state.set_sid_mode() strips every bit >= 256, so
-# the implemented ones are retained here for the sidereal path to consume.
-_IMPLEMENTED_SIDBITS = SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE | SIDBIT_USER_UT
+# SIDBIT projection flags with a distinct realization on the sidereal path:
+#   * SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE -> frame projection (see calc_ut).
+#   * SIDBIT_USER_UT -> interpret the SIDM_USER t0 as a UT date.
+#   * SIDBIT_ECL_DATE -> refer the mode's fixed zero point to the mean
+#     ecliptic of date instead of its defining ecliptic of t0 (see
+#     _ecl_date_ayanamsha_delta): applied in _calc_ayanamsa for every
+#     defining pair (epoch modes, Valens, SIDM_USER) and naturally inert
+#     for the live star/galactic modes, whose value is already an of-date
+#     longitude. The LEB fast path delegates to _calc_ayanamsa when this
+#     bit is set so both backends stay numerically identical.
+_APPLIED_SIDBITS = SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE | SIDBIT_USER_UT | SIDBIT_ECL_DATE
+
+# SIDBIT flags accepted for compatibility but WITHOUT a distinct realization in
+# this version, so they currently reduce to the base ayanamsha value:
+#   * SIDBIT_PREC_ORIG (use the mode's original precession model): the measured
+#     effect is below the ~0.1" ayanamsha floor in the standard configuration,
+#     so reducing to the default precession reproduces it within floor.
+#   * SIDBIT_NO_PREC_OFFSET (drop the mode's precession-offset reconciliation):
+#     this is a time-constant per-mode correction (non-zero for only six modes,
+#     up to ~0.83") whose value derives from each mode's reference-internal
+#     precession-model assignment; it is not reconstructible from published
+#     models without fitting the reference output, so it is left as a documented
+#     no-op pending an independent, citable derivation.
+# They are retained (not warned) here so the public API accepts them silently,
+# matching the reference, which emits no warning for any SIDBIT flag.
+_ACCEPTED_SIDBITS = SIDBIT_NO_PREC_OFFSET | SIDBIT_PREC_ORIG
+
+# Union retained by set_sid_mode(): bits NOT in this union are still forwarded to
+# state.set_sid_mode(), which strips-and-warns genuinely unknown high bits.
+_IMPLEMENTED_SIDBITS = _APPLIED_SIDBITS | _ACCEPTED_SIDBITS
 
 # The SIDBIT projection flags carried by the last public set_sid_mode() call.
 # Module-global (matching the module-global sidereal mode in state.py); the
@@ -6102,9 +6241,12 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
     Notes:
         All predefined base IDs 0--46 are accepted and computed. The SIDBIT
         projection flags SIDBIT_ECL_T0, SIDBIT_SSY_PLANE and SIDBIT_USER_UT are
-        applied (see calc_ut / _calc_ayanamsa) rather than reduced to the base
-        mode; the remaining projection flags (ECL_DATE, NO_PREC_OFFSET,
-        PREC_ORIG) still warn and reduce.
+        applied (see calc_ut / _calc_ayanamsa). The remaining three,
+        SIDBIT_ECL_DATE, SIDBIT_NO_PREC_OFFSET and SIDBIT_PREC_ORIG, are
+        accepted silently for compatibility but currently reduce to the base
+        ayanamsha value (see _ACCEPTED_SIDBITS for the per-flag rationale); no
+        warning is emitted, matching the reference. Genuinely unknown high bits
+        still warn.
 
     Example:
         >>> set_sid_mode(SIDM_J2000)

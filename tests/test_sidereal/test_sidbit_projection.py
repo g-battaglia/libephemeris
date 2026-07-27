@@ -21,6 +21,7 @@ import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
     FLG_EQUATORIAL,
+    FLG_NONUT,
     FLG_SIDEREAL,
     FLG_SPEED,
     FLG_XYZ,
@@ -189,6 +190,51 @@ class TestSidbitSuppressedForStarGalacticModes:
             proj[1] - base[1]
         )
         assert moved > 1e-3
+
+
+class TestAppliedProjectionEchoesNonut:
+    """An applied SIDBIT_ECL_T0/SSY_PLANE projection echoes FLG_NONUT.
+
+    The projection is defined on a MEAN ecliptic and equinox (of the mode's t0
+    or the invariable plane), so the projected longitude is declared without
+    nutation -- the same mean-frame convention the base sidereal path echoes.
+    Both calc and calc_ut are covered.
+    """
+
+    # Off-epoch date so ECL_T0 is a genuine projection (base tier 1850-2150).
+    JD_OFF = 2415020.0  # 1900-01-01
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("bit", [SIDBIT_ECL_T0, SIDBIT_SSY_PLANE])
+    @pytest.mark.parametrize("mode", [SIDM_LAHIRI, SIDM_ALDEBARAN_15TAU])
+    def test_applied_projection_retflag_has_nonut(self, mode, bit):
+        ephem.set_sid_mode(mode | bit)
+        _, rf_ut = ephem.calc_ut(self.JD_OFF, SUN, FLG_SIDEREAL | FLG_SPEED)
+        _, rf_tt = ephem.calc(self.JD_OFF, SUN, FLG_SIDEREAL | FLG_SPEED)
+        assert rf_ut & FLG_NONUT
+        assert rf_tt & FLG_NONUT
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("bit", [SIDBIT_ECL_T0, SIDBIT_SSY_PLANE])
+    def test_suppressed_mode_also_echoes_nonut(self, bit):
+        """A suppressed star/galactic mode reaches the base path, which already
+        echoes FLG_NONUT; the applied path now agrees."""
+        ephem.set_sid_mode(SIDM_TRUE_CITRA | bit)
+        _, rf = ephem.calc_ut(self.JD_OFF, SUN, FLG_SIDEREAL | FLG_SPEED)
+        assert rf & FLG_NONUT
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("bit", [SIDBIT_ECL_T0, SIDBIT_SSY_PLANE])
+    def test_explicit_nonut_does_not_change_position(self, bit):
+        """Passing FLG_NONUT explicitly leaves the projected position unchanged
+        (NONUT is an echo-only implication, not a computation switch)."""
+        ephem.set_sid_mode(SIDM_LAHIRI | bit)
+        without, _ = ephem.calc_ut(self.JD_OFF, MARS, FLG_SIDEREAL | FLG_SPEED)
+        with_nonut, _ = ephem.calc_ut(
+            self.JD_OFF, MARS, FLG_SIDEREAL | FLG_SPEED | FLG_NONUT
+        )
+        assert with_nonut[0] == pytest.approx(without[0], abs=1e-12)
+        assert with_nonut[1] == pytest.approx(without[1], abs=1e-12)
 
 
 class TestUserUtApplied:
