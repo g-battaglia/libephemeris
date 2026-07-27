@@ -1109,6 +1109,48 @@ def _star_name_from_id(star_id: int) -> str:
     raise Error(f"Star ID {star_id} not found in catalog")
 
 
+def _altaz_from_radec(
+    ra_hours: float,
+    dec_deg: float,
+    lon_deg: float,
+    lat_deg: float,
+    gast_hours: float,
+) -> tuple[float, float]:
+    """Altitude/azimuth from of-date equatorial coordinates via the hour angle.
+
+    Standard spherical-astronomy reduction (Explanatory Supplement to the
+    Astronomical Almanac; Meeus, Astronomical Algorithms, ch. 13). The azimuth
+    is returned in the north-zero, eastward-positive convention to match
+    Skyfield's ``altaz()`` and the public heliacal azimuth slots.
+
+    Args:
+        ra_hours: Right ascension of date, in hours.
+        dec_deg: Declination of date, in degrees.
+        lon_deg: Observer geographic longitude (east positive), degrees.
+        lat_deg: Observer geographic latitude, degrees.
+        gast_hours: Greenwich apparent sidereal time, in hours.
+
+    Returns:
+        ``(altitude_deg, azimuth_deg)``; altitude is geometric (unrefracted).
+    """
+    lst_hours = gast_hours + lon_deg / 15.0
+    ha_rad = math.radians((lst_hours - ra_hours) * 15.0)
+    dec_rad = math.radians(dec_deg)
+    lat_rad = math.radians(lat_deg)
+    sin_alt = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
+        dec_rad
+    ) * math.cos(ha_rad)
+    alt_deg = math.degrees(math.asin(max(-1.0, min(1.0, sin_alt))))
+    # Azimuth from South (classic hour-angle form), rotated by 180 deg to the
+    # north-zero convention.
+    y = math.sin(ha_rad) * math.cos(dec_rad)
+    x = math.cos(ha_rad) * math.sin(lat_rad) * math.cos(dec_rad) - math.sin(
+        dec_rad
+    ) * math.cos(lat_rad)
+    az_deg = (math.degrees(math.atan2(y, x)) + 180.0) % 360.0
+    return alt_deg, az_deg
+
+
 def _leb_body_altaz(
     reader,
     jd_ut: float,
@@ -1848,18 +1890,43 @@ def _heliacal_pheno_ut_leb(
     geopos = (lon, lat, altitude)
 
     # --- positions via LEB ---
-    # Sun
-    sun_az, sun_alt_deg, _ = _leb_body_altaz(
-        reader,
-        jd,
-        SUN,
-        geopos,
-        pressure,
-        temperature,
-    )
+    # Geometric (TRUEPOS-like) topocentric places drive the geometric output
+    # slots (AltO, GeoAltO, AziO, AltS, AziS and the derived arcs): the
+    # reference reports them from the astrometric direction (no aberration /
+    # light-time), matching the Skyfield pheno path. The refracted AppAltO slot
+    # keeps the apparent altitude and the arbitrated refraction model, and the
+    # visibility detector (which calls the shared _leb_body_altaz) is untouched.
+    from .utils import azalt as _azalt_hp, ECL2HOR as _ECL2HOR_hp
+    from .constants import FLG_TRUEPOS as _FLG_TRUEPOS_hp
+    from .fast_calc import _topo_ecliptic as _topo_ecliptic_hp
+    from .time_utils import deltat as _deltat_hp
 
-    # Body
-    body_az_deg, body_alt_deg, _body_app_alt = _leb_body_altaz(
+    _jd_tt_hp = jd + _deltat_hp(jd)
+
+    def _geom_topo_altaz(bid: int, star: bool) -> tuple[float, float]:
+        """Geometric topocentric (north-zero azimuth, unrefracted altitude)."""
+        if star:
+            from .fixed_stars import fixstar_ut as _fsu_hp
+
+            assert star_name is not None
+            _p, _, _ = _fsu_hp(star_name, jd, _FLG_TRUEPOS_hp)
+            _elon, _elat, _edist = _p[0], _p[1], _p[2]
+        else:
+            _tp = _topo_ecliptic_hp(
+                reader, _jd_tt_hp, jd, bid, geopos, iflag=_FLG_TRUEPOS_hp
+            )
+            _elon, _elat, _edist = _tp[0], _tp[1], _tp[2]
+        _az, _alt_true, _ = _azalt_hp(
+            jd, _ECL2HOR_hp, geopos, 0.0, 0.0, (_elon, _elat, _edist)
+        )
+        return (_az + 180.0) % 360.0, _alt_true
+
+    # Sun: geometric topocentric altitude/azimuth (AltS, AziS).
+    sun_az, sun_alt_deg = _geom_topo_altaz(SUN, False)
+
+    # Object apparent topocentric altitude, retained ONLY as the refracted
+    # AppAltO base (the refraction model is unchanged).
+    _body_az_app, _body_alt_app, _ = _leb_body_altaz(
         reader,
         jd,
         body,
@@ -1870,19 +1937,23 @@ def _heliacal_pheno_ut_leb(
         star_name=star_name,
     )
 
-    # Atmospheric refraction from true altitude, in arcminutes:
+    # Object: geometric topocentric altitude/azimuth (AltO, AziO).
+    body_az_deg, body_alt_deg = _geom_topo_altaz(body, is_star)
+
+    # Atmospheric refraction from the APPARENT true altitude, in arcminutes:
     # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
     # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
     # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
-    # Below h = -1° the 0.5° fallback approximates horizon refraction.
-    if body_alt_deg > -1:
+    # Below h = -1° the 0.5° fallback approximates horizon refraction. The
+    # refracted AppAltO slot stays on the apparent base and the arbitrated model.
+    if _body_alt_app > -1:
         refraction = 1.02 / math.tan(
-            math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
+            math.radians(_body_alt_app + 10.3 / (_body_alt_app + 5.11))
         )
         refraction /= 60.0
     else:
         refraction = 0.5
-    app_alt_deg = body_alt_deg + refraction
+    app_alt_deg = _body_alt_app + refraction
 
     # Get ecliptic positions for parallax and elongation calculations
     body_ecl = _leb_ecliptic_pos(
@@ -1899,19 +1970,22 @@ def _heliacal_pheno_ut_leb(
     # GAST is referenced to the true equinox of date, so the RA/Dec must be of
     # date (FLG_EQUATORIAL alone, NOT FLG_J2000) to keep the hour-angle frame
     # consistent. Mixing J2000 RA with of-date GAST injected the full
-    # J2000→date precession+nutation into the hour angle.
+    # J2000→date precession+nutation into the hour angle. FLG_TRUEPOS uses the
+    # astrometric (aberration/light-time-free) direction, matching the reference.
     from .constants import FLG_EQUATORIAL
 
     if is_star:
         from .fixed_stars import fixstar_ut
 
         assert star_name is not None
-        _eq_pos, _, _ = fixstar_ut(star_name, jd, FLG_EQUATORIAL | FLG_SPEED)
+        _eq_pos, _, _ = fixstar_ut(
+            star_name, jd, FLG_EQUATORIAL | _FLG_TRUEPOS_hp | FLG_SPEED
+        )
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
     else:
         from .planets import calc_ut as _scu_hp
 
-        _eq_pos, _ = _scu_hp(jd, body, FLG_EQUATORIAL | FLG_SPEED)
+        _eq_pos, _ = _scu_hp(jd, body, FLG_EQUATORIAL | _FLG_TRUEPOS_hp | FLG_SPEED)
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
 
     # Use GAST to match the Skyfield path's of-date RA + t.gast
@@ -4139,65 +4213,91 @@ def _heliacal_pheno_ut_pythonic(
     t = ts.ut1_jd(jd)
     observer_at = earth + observer
 
-    # Calculate Sun position
-    sun_app = observer_at.at(t).observe(sun).apparent()
-    sun_alt_topo, sun_az, _ = sun_app.altaz()
-    sun_alt_deg = sun_alt_topo.degrees
-    sun_az_deg = sun_az.degrees
+    # --- Geometric (TRUEPOS-like) places for the geometric output slots -------
+    # The reference reports AltO, GeoAltO, AziO, AltS, AziS and the derived arcs
+    # from the astrometric (aberration- and light-time-free) direction, whereas
+    # the apparent place carries the ~20" annual aberration (plus, for the fast
+    # planets, the light-time bending of the direction). Using the geometric
+    # place was verified against the reference to cut the residual from ~20-42"
+    # to the frame-model floor. Only the geometric output slots change: the
+    # refracted AppAltO slot keeps the apparent altitude and the arbitrated
+    # refraction model, and the visibility detector is untouched.
+    gast = t.gast
 
-    # Calculate body position (handle both planets and stars)
+    # Sun: geometric topocentric altitude/azimuth (AltS, AziS).
+    _sun_geom = (sun - observer_at).at(t)
+    _sun_alt, _sun_az, _ = _sun_geom.altaz()
+    sun_alt_deg = _sun_alt.degrees
+    sun_az_deg = _sun_az.degrees
+
+    # Object apparent topocentric altitude, retained ONLY as the base of the
+    # refracted AppAltO slot (see below); the refraction model is unchanged.
     if is_star and star_object is not None:
         body_app = observer_at.at(t).observe(star_object).apparent()
     else:
         body_app = observer_at.at(t).observe(target).apparent()
-    body_alt_topo, body_az, body_dist = body_app.altaz()
-    body_alt_deg = body_alt_topo.degrees
-    body_az_deg = body_az.degrees
+    body_app_alt_deg = body_app.altaz()[0].degrees
 
-    # Get geocentric altitude (without refraction or topocentric correction)
+    # Object geometric topocentric altitude/azimuth (AltO, AziO) and the of-date
+    # geocentric RA/Dec for GeoAltO. A Star cannot form a geometric difference
+    # vector and altaz() rejects an astrometric position, so its of-date
+    # astrometric place is reduced by hand; a fixed star's diurnal parallax is
+    # nil, so its topocentric and geocentric altitudes coincide.
     if is_star and star_object is not None:
-        body_geo = earth.at(t).observe(star_object).apparent()
+        _ra_t, _dec_t, _ = observer_at.at(t).observe(star_object).radec(epoch=t)
+        body_alt_deg, body_az_deg = _altaz_from_radec(
+            _ra_t.hours, _dec_t.degrees, lon, lat, gast
+        )
+        _ra_g, _dec_g, _ = earth.at(t).observe(star_object).radec(epoch=t)
+        geo_ra_hours = _ra_g.hours
+        geo_dec_deg = _dec_g.degrees
     else:
-        body_geo = earth.at(t).observe(target).apparent()
-    body_geo_ra, body_geo_dec, body_geo_dist = body_geo.radec(epoch=t)
+        _body_geom = (target - observer_at).at(t)
+        _b_alt, _b_az, _ = _body_geom.altaz()
+        body_alt_deg = _b_alt.degrees
+        body_az_deg = _b_az.degrees
+        _ra_g, _dec_g, _ = (target - earth).at(t).radec(epoch=t)
+        geo_ra_hours = _ra_g.hours
+        geo_dec_deg = _dec_g.degrees
 
-    # Calculate geocentric altitude using hour angle
-    # First get the local sidereal time. GAST is referenced to the true equinox
-    # of date, so the RA must be of date too: radec(epoch=t) reduces to the
-    # equator of date (apparent). Using the default J2000 radec() here mixed a
-    # J2000 RA with an of-date LST, injecting the full J2000→date
-    # precession+nutation in RA into the hour angle (GeoAltO/ARCVact/ARCLact off
-    # by ~0.2-0.3 deg in 2024, growing with distance from J2000).
-    gast = t.gast
+    # Geocentric altitude via hour angle. GAST is referenced to the true equinox
+    # of date, so the RA/Dec must be of date too (radec(epoch=t)); mixing a
+    # J2000 RA with an of-date LST would inject the J2000->date precession+
+    # nutation into the hour angle.
     lst = gast + lon / 15.0  # Local sidereal time in hours
-    ra_hours = body_geo_ra.hours
-    ha = (lst - ra_hours) * 15.0  # Hour angle in degrees
-
-    # Geocentric altitude calculation
-    dec_rad = math.radians(body_geo_dec.degrees)
+    ha = (lst - geo_ra_hours) * 15.0  # Hour angle in degrees
+    dec_rad = math.radians(geo_dec_deg)
     lat_rad = math.radians(lat)
     ha_rad = math.radians(ha)
-
     sin_alt = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
         dec_rad
     ) * math.cos(ha_rad)
     sin_alt = max(-1.0, min(1.0, sin_alt))
     geo_alt_deg = math.degrees(math.asin(sin_alt))
 
-    # Atmospheric refraction from true altitude, in arcminutes:
+    # Apparent geocentric place kept for the fixed-star / fallback elongation
+    # separation below (angular separation is aberration-insensitive).
+    if is_star and star_object is not None:
+        body_geo = earth.at(t).observe(star_object).apparent()
+    else:
+        body_geo = earth.at(t).observe(target).apparent()
+
+    # Atmospheric refraction from the APPARENT true altitude, in arcminutes:
     # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
     # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
-    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
-    if body_alt_deg > -1:
+    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4. The
+    # refracted AppAltO slot deliberately stays on the apparent base and the
+    # arbitrated refraction model (unchanged behaviour).
+    if body_app_alt_deg > -1:
         refraction = 1.02 / math.tan(
-            math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
+            math.radians(body_app_alt_deg + 10.3 / (body_app_alt_deg + 5.11))
         )
         refraction /= 60.0  # Convert arcminutes to degrees
     else:
         refraction = 0.5  # Near-horizon fallback (below the formula's range)
 
     # Apparent altitude (with refraction)
-    app_alt_deg = body_alt_deg + refraction
+    app_alt_deg = body_app_alt_deg + refraction
 
     # Calculate arcus visionis (altitude difference between body and Sun)
     # Topocentric arcus visionis

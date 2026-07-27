@@ -8497,6 +8497,14 @@ def _asteroid_hg_magnitude(
 # 1 AU in kilometers (IAU 2012 definition)
 _AU_KM = 149597870.7
 
+# Earth equatorial radius (km), IAU/IERS 2003 (a = 6378136.6 m; Astronomical
+# Almanac 2006). Used for the Moon's equatorial horizontal parallax reported in
+# pheno slot [5]: sin(pi) = R_eq / d, with d the geometric geocentric distance
+# (Explanatory Supplement to the Astronomical Almanac; Meeus, Astronomical
+# Algorithms, ch. 40 "Parallax"). This is the same constant already used by the
+# lunar distance modulus in _calc_moon_magnitude (6378136.6 m).
+_EARTH_EQ_RADIUS_KM = 6378.1366
+
 # Conversion factor: radians to arcseconds
 _RAD_TO_ARCSEC = 206264.80624709636  # (180/pi) * 3600
 
@@ -8529,23 +8537,25 @@ def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
     return 2.0 * radius_km / distance_km * _RAD_TO_ARCSEC / 3600.0
 
 
-# Visual magnitude parameters for outer planets
-# Using simplified formula: V = V(1,0) + 5*log10(r*d) + phase_correction
-# For Mercury, Venus, Mars, Jupiter, Saturn we use Mallama 2018 formulas
-# (implemented directly in _calc_planet_magnitude)
-_PLANET_MAG_PARAMS = {
-    # Mercury, Venus, Mars, Jupiter, Saturn, Pluto use Mallama 2018 formulas
-    # (implemented directly in _calc_planet_magnitude)
-    # Uranus: simplified V(1,0) + linear phase photometry. This omits the
-    # sub-observer-latitude brightness term that the full Mallama & Hilton
-    # (2018) model carries for Uranus's extreme obliquity; the resulting
-    # ~10 mmag model difference is documented in
-    # docs/comparison/intentional-divergences.md ("Outer-planet visual
-    # magnitude photometry").
-    URANUS: (-7.15, 0.002, 0.0, 0.0),
-    # Neptune uses dedicated secular variation formula in _calc_planet_magnitude
-    # Pluto uses dedicated Mallama 2018 formula below
-}
+# Visual magnitude parameters for outer planets (generic fallback:
+# V = V(1,0) + 5*log10(r*d) + B1*a + B2*a^2 + B3*a^3).
+# Every classical planet now has a dedicated Mallama & Hilton (2018) branch in
+# _calc_planet_magnitude (Mercury, Venus, Mars, Jupiter, Saturn, Uranus,
+# Neptune, Pluto), so this table is empty and only kept as an extension hook.
+_PLANET_MAG_PARAMS: dict[int, tuple[float, float, float, float]] = {}
+
+# --- Uranus photometry: Mallama & Hilton (2018) rotational-pole geometry ------
+# Uranus reflects light more strongly when a pole faces the observer (its polar
+# regions are depleted in light-absorbing methane), so its apparent magnitude
+# depends on the planetographic sub-Earth and sub-solar latitudes. The IAU
+# WGCCRE (2009/2015) north-pole direction of Uranus is constant in time:
+#   right ascension alpha0 = 257.311 deg, declination delta0 = -15.175 deg
+# (equatorial J2000). Flattening f = 0.0022927 (Mallama & Hilton 2018 Eq. 13,
+# after Schmude et al. 2015).
+_URANUS_POLE_RA = math.radians(257.311)
+_URANUS_POLE_DEC = math.radians(-15.175)
+_URANUS_FLATTENING = 0.0022927
+_URANUS_ONE_MINUS_F_SQ = (1.0 - _URANUS_FLATTENING) ** 2
 
 # J2000 epoch for Saturn ring calculations
 _J2000 = 2451545.0
@@ -8623,6 +8633,33 @@ def _calc_moon_magnitude(
             # At exactly α=180° (geometrically impossible in practice)
             base = 50.0
     return base + dist_correction
+
+
+def _moon_horizontal_parallax_deg(geo_dist_geometric_au: float) -> float:
+    """Equatorial horizontal parallax of the Moon for pheno slot [5].
+
+    The reference reports the Moon's geocentric equatorial horizontal parallax
+    in pheno attribute [5] (0.0 for every other body). The convention, verified
+    to 0.000000" against the reference over perigee-to-apogee dates, is
+
+        sin(pi) = R_eq / d
+
+    with R_eq the Earth equatorial radius (6378.1366 km, IAU/IERS 2003) and d
+    the *geometric* geocentric distance (light-time removed), independent of the
+    request's FLG_TRUEPOS bit. See the Explanatory Supplement to the
+    Astronomical Almanac and Meeus, Astronomical Algorithms, ch. 40.
+
+    Args:
+        geo_dist_geometric_au: Geometric geocentric Moon distance in AU.
+
+    Returns:
+        Equatorial horizontal parallax in degrees (0.0 if the distance is
+        non-positive).
+    """
+    d_km = geo_dist_geometric_au * _AU_KM
+    if d_km <= 0.0:
+        return 0.0
+    return math.degrees(math.asin(_EARTH_EQ_RADIUS_KM / d_km))
 
 
 def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
@@ -8825,7 +8862,33 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
             tjd,
         )
 
-    return (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
+    # Slot [5]: the Moon's horizontal parallax (0.0 for every other body). The
+    # reference reports the geocentric equatorial horizontal parallax when no
+    # observer is set, and the actual geocentric->topocentric parallactic
+    # displacement under FLG_TOPOCTR (both verified to 0.000000" against the
+    # reference); neither depends on the request's FLG_TRUEPOS bit.
+    slot5 = 0.0
+    if ipl == MOON:
+        if iflag & FLG_TOPOCTR:
+            geo_app, _ = _leb_calc(
+                tjd_ut, MOON, base_flags & ~(FLG_TOPOCTR | FLG_TRUEPOS)
+            )
+            topo_app, _ = _leb_calc(
+                tjd_ut, MOON, (base_flags | FLG_TOPOCTR) & ~FLG_TRUEPOS
+            )
+            slot5 = angular_separation(
+                float(geo_app[0]),
+                float(geo_app[1]),
+                float(topo_app[0]),
+                float(topo_app[1]),
+            )
+        else:
+            geom_pos, _ = _leb_calc(
+                tjd_ut, MOON, (base_flags & ~FLG_TOPOCTR) | FLG_TRUEPOS
+            )
+            slot5 = _moon_horizontal_parallax_deg(float(geom_pos[2]))
+
+    return (phase_angle, phase, elongation, diameter, magnitude, slot5) + (0.0,) * 14
 
 
 def _calc_pheno_asteroid(t, ipl: int, iflag: int) -> Tuple[float, ...]:
@@ -9216,7 +9279,42 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         # mag_ms is the Sun-Moon distance (heliocentric distance of Moon) in AU
         magnitude = _calc_moon_magnitude(phase_angle, r_moon, mag_ms)
 
-        attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
+        # Slot [5]: the Moon's horizontal parallax. Without an observer the
+        # reference reports the geocentric equatorial horizontal parallax from
+        # the geometric geocentric distance; under FLG_TOPOCTR it reports the
+        # actual geocentric->topocentric parallactic displacement (the on-sky
+        # angle between the geocentric-apparent and topocentric-apparent Moon
+        # directions). Both were verified to 0.000000" against the reference and
+        # are independent of the request's FLG_TRUEPOS bit.
+        if iflag & FLG_TOPOCTR:
+            # Both legs are the APPARENT place (even under FLG_TRUEPOS, where
+            # target_pos_geo would be geometric): the reference's topocentric
+            # parallax is the apparent geo->topo displacement.
+            geo_app = get_cached_observer_at(earth, t).observe(target).apparent()
+            topo_app = obs_at_t.observe(target).apparent()
+            v_geo = geo_app.position.au
+            v_topo = topo_app.position.au
+            dot_p = sum(a * b for a, b in zip(v_geo, v_topo))
+            n_geo = math.sqrt(sum(a * a for a in v_geo))
+            n_topo = math.sqrt(sum(a * a for a in v_topo))
+            if n_geo > 0 and n_topo > 0:
+                cos_par = max(-1.0, min(1.0, dot_p / (n_geo * n_topo)))
+                horizontal_parallax = math.degrees(math.acos(cos_par))
+            else:
+                horizontal_parallax = 0.0
+        else:
+            moon_geom = (target - earth).at(t)
+            dist_geom_au = math.sqrt(sum(x**2 for x in moon_geom.position.au))
+            horizontal_parallax = _moon_horizontal_parallax_deg(dist_geom_au)
+
+        attr = (
+            phase_angle,
+            phase,
+            elongation,
+            diameter,
+            magnitude,
+            horizontal_parallax,
+        ) + (0.0,) * 14
         return attr
 
     # For planets: calculate elongation, phase angle, etc.
@@ -9319,6 +9417,66 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # Return tuple with at least 20 elements (reference-API compatibility)
     attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
     return attr
+
+
+def _uranus_photometric_latitude(
+    geo_lon: float, geo_lat: float, helio_lon: float, helio_lat: float
+) -> float:
+    """Photometric latitude phi' of Uranus for Mallama & Hilton (2018).
+
+    phi' is the average of the absolute planetographic sub-Earth and sub-solar
+    latitudes (Mallama & Hilton 2018, "Computing Apparent Planetary Magnitudes
+    for The Astronomical Almanac"). Each planetocentric latitude is the angle
+    between Uranus' IAU rotational pole and the Uranus->Earth / Uranus->Sun
+    direction, then converted to planetographic latitude via Eq. 13
+    (tan phi' = tan phi / (1 - f)^2).
+
+    The IAU J2000 pole vector is dotted against apparent ecliptic-of-date
+    directions; the resulting frame mixing shifts phi' by <=0.7 deg near the
+    span extremes, i.e. <=0.6 mmag through the -8.4e-4 mag/deg coefficient,
+    which is far below the model's structural agreement with any reference.
+
+    Args:
+        geo_lon: Geocentric apparent ecliptic longitude of Uranus (degrees).
+        geo_lat: Geocentric apparent ecliptic latitude of Uranus (degrees).
+        helio_lon: Heliocentric ecliptic longitude of Uranus (degrees).
+        helio_lat: Heliocentric ecliptic latitude of Uranus (degrees).
+
+    Returns:
+        Photometric latitude phi' in degrees (>= 0).
+    """
+    # Uranus north-pole unit vector: equatorial J2000 -> J2000 ecliptic.
+    eps = math.radians(23.43929111)  # J2000 mean obliquity (IAU 2006)
+    cos_d = math.cos(_URANUS_POLE_DEC)
+    pe = (
+        cos_d * math.cos(_URANUS_POLE_RA),
+        cos_d * math.sin(_URANUS_POLE_RA),
+        math.sin(_URANUS_POLE_DEC),
+    )
+    pole = (
+        pe[0],
+        pe[1] * math.cos(eps) + pe[2] * math.sin(eps),
+        -pe[1] * math.sin(eps) + pe[2] * math.cos(eps),
+    )
+
+    def _sub_latitude(lon_deg: float, lat_deg: float) -> float:
+        # Direction Uranus->observer is the antipode of observer->Uranus.
+        lon = math.radians(lon_deg)
+        lat = math.radians(lat_deg)
+        d = (
+            -math.cos(lat) * math.cos(lon),
+            -math.cos(lat) * math.sin(lon),
+            -math.sin(lat),
+        )
+        sin_phi = max(-1.0, min(1.0, d[0] * pole[0] + d[1] * pole[1] + d[2] * pole[2]))
+        phi_centric = math.asin(sin_phi)
+        # Eq. 13: planetocentric -> planetographic latitude.
+        phi_graphic = math.atan2(math.tan(phi_centric), _URANUS_ONE_MINUS_F_SQ)
+        return abs(math.degrees(phi_graphic))
+
+    phi_earth = _sub_latitude(geo_lon, geo_lat)
+    phi_sun = _sub_latitude(helio_lon, helio_lat)
+    return (phi_earth + phi_sun) / 2.0
 
 
 def _calc_planet_magnitude(
@@ -9462,6 +9620,31 @@ def _calc_planet_magnitude(
         beta = 0.0362  # Phase coefficient in mag/degree
         phase_correction = beta * a  # Linear phase correction
         magnitude = V0 + dist_factor + phase_correction
+        return magnitude
+
+    # Uranus - Mallama & Hilton (2018) complete photometric law (Eq. 15)
+    # From "Computing Apparent Planetary Magnitudes for The Astronomical Almanac"
+    # (Astronomy and Computing 25, 2018, 10-24; arXiv:1808.01973), which folds
+    # the sub-observer-latitude brightness variation and the phase-angle
+    # dependence into:
+    #     V = 5*log10(r*d) - 7.110 - 8.4e-4*phi' + 6.587e-3*a + 1.045e-4*a^2
+    # where phi' is the photometric latitude (average of the absolute
+    # planetographic sub-Earth and sub-solar latitudes; Eq. 14 gives the
+    # phase-free geocentric form). Uranus brightens as a pole turns toward the
+    # observer because its polar regions are depleted in light-absorbing
+    # methane (Schmude et al. 2015). Valid to a = 154 deg; geocentric a <= 3.1
+    # deg. The residual model divergence versus the reference API is documented
+    # in docs/comparison/intentional-divergences.md ("Outer-planet visual
+    # magnitude photometry").
+    if ipl == URANUS:
+        phi_prime = _uranus_photometric_latitude(geo_lon, geo_lat, helio_lon, helio_lat)
+        magnitude = (
+            dist_factor
+            - 7.110
+            - 8.4e-04 * phi_prime
+            + 6.587e-03 * a
+            + 1.045e-04 * a * a
+        )
         return magnitude
 
     # Neptune - secular brightness variation

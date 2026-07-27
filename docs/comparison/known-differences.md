@@ -48,6 +48,15 @@ and rate checks.
 See [Lunar apsides](../methodology/lunar-apsides.md) and
 [Planetary nodes and apsides](../methodology/planetary-nodes-apsides.md).
 
+### True Node under `FLG_ICRS`
+
+For the osculating (true) lunar node, at least one external implementation
+applies a longitude shift of about −0.26″ under `FLG_ICRS` that is neither
+the frame bias applied to physical bodies (~−0.0065″) nor stable across
+epochs (it changes sign around 1963). LibEphemeris applies no ICRS shift to
+the node (the mean points behave identically in both implementations). The
+divergence is bounded at ~0.35″ and affects only this niche combination.
+
 ### Delta T
 
 LibEphemeris uses observed IERS values where available and the independently

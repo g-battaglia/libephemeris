@@ -111,9 +111,14 @@ reproduced from external implementations:
 
 - For intermediate cusps of iteratively solved systems (Placidus, Koch),
   an external analytic speed approximation can deviate from the derivative
-  of that implementation's own reported cusps by ~0.1–0.7°/day even when
-  the cusps themselves agree to sub-arcsecond level. LibEphemeris reports
-  the genuine derivative: integrating it reproduces the cusp motion.
+  of that implementation's own reported cusps — by tens of degrees per day
+  for Koch intermediate cusps (median ~27°/day measured) — even when the
+  cusps themselves agree to sub-arcsecond level. LibEphemeris reports the
+  genuine derivative: integrating it reproduces the cusp motion.
+- Krusinski (`U`) is the extreme case: the external implementation reports
+  0.0 for all eight intermediate cusp speeds while the true derivative
+  reaches hundreds of degrees per day near high latitudes. LibEphemeris
+  reports the genuine, self-consistent derivative here as well.
 
 Porphyry (`O`), Whole Sign (`W`) and Aries (`N`) are the exception: the
 reference API reports an *analytic* cusp speed for these that is not the
@@ -187,20 +192,48 @@ purely a choice of photometric model, not an ephemeris difference.
   disagree by up to ~47 mmag (worst near 1989); LibEphemeris keeps the modern
   phase-dependent model.
 
-- **Uranus** uses a simplified photometry — a single V(1,0) with a linear phase
-  term. Because Uranus has an extreme (~98°) obliquity, its disk-integrated
-  brightness also depends on the sub-observer latitude (the poles are brighter
-  than the equator), a term the external model carries and this simplified
-  model omits. The resulting difference is bounded at ~10 mmag and oscillates
-  over Uranus's ~42-year sub-latitude half-cycle. The residual does not reduce
-  to a single sub-latitude coefficient, so it is treated as a photometry-model
-  difference rather than reproduced.
+- **Uranus** uses the complete Mallama & Hilton (2018) photometric law — their
+  Eq. 15 (*Astronomy and Computing* 25, 10; arXiv:1808.01973), the same work
+  cited for Pluto and Saturn:
+
+  V = 5·log₁₀(r·Δ) − 7.110 − 8.4×10⁻⁴·φ′ + 6.587×10⁻³·α + 1.045×10⁻⁴·α²
+
+  Here φ′ is the photometric latitude — the average of the absolute
+  planetographic sub-Earth and sub-solar latitudes. Those latitudes are the
+  angles between Uranus's IAU (2009/2015) rotational pole (α₀ = 257.311°,
+  δ₀ = −15.175°, J2000) and the Uranus→Earth / Uranus→Sun directions, each
+  reduced to planetographic latitude with the flattening f = 0.0022927
+  (Eq. 13). Because Uranus's poles are depleted in light-absorbing methane, the
+  disk brightens as a pole turns toward the observer, which the φ′ term now
+  models directly instead of the earlier single V(1,0). The sub-latitude term
+  reproduces the ~42-year brightness half-cycle of the external model, but two
+  structural differences remain against it: (a) the external model follows the
+  *Astronomical Almanac* geocentric convention (Eq. 14) and drops the
+  phase-angle polynomial, which for geocentric Uranus (α ≤ 3.1°) adds up to
+  ~21 mmag and a ~+14 mmag mean bias; (b) the external sub-latitude realization
+  is not reproducible without fitting. Over a full 1970–2059 orbit the residual
+  is therefore bounded at ~46 mmag (rms ~25 mmag), larger than but of the same
+  sub-latitude character as before. φ′ is evaluated by dotting the J2000 pole
+  against the apparent ecliptic-of-date directions; the resulting frame mixing
+  is ≤0.6 mmag, negligible beside the structural terms above.
 
 - **Saturn** uses the full Mallama & Hilton (2018) formula with a Meeus ring-
   tilt reduction (the ring contribution dominates the disk near ring-plane
   crossings). The residual against the external model stays within ~2 mmag,
   concentrated near the low ring-opening epochs (e.g. ~2005), and reflects a
   ring-geometry convention rather than an ephemeris difference.
+
+## Asteroid photometric data follow the current JPL SBDB
+
+The H (absolute magnitude) and diameter values behind the asteroid
+`pheno` photometry are transcribed from the JPL Small-Body Database
+(retrieved 2026-07-13): for example Chiron H=5.54 and D=166 km. External
+implementations that carry the older MPC-era values (Chiron H≈6.50)
+differ by a constant magnitude offset per body — up to ~0.96 mag for
+Chiron, ~0.14 mag Juno, ~0.05 mag Vesta — and a proportional apparent
+diameter. The formula itself (IAU H-G system) is identical; only the
+measured physical data vintage differs, and the current SBDB values are
+kept.
 
 ## Rise/set events immediately after the search start
 
