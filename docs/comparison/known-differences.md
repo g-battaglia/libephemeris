@@ -227,7 +227,25 @@ modes share one defining table across backends and live catalogue modes can
 differ slightly through catalogue and apparent-place choices. `SIDM_USER`
 remains available for callers with their own independently sourced epoch and
 zero point. See [Sidereal modes](../reference/ayanamsha.md) for the per-mode
-source-audit status.
+source-audit status and its realization notes.
+
+For a subset of the esoteric and historical modes, the primary statement
+leaves a realization freedom (which instant "the year X" means, arcminute
+precision of the published value, epoch-fixed versus star-tracking
+convention, internal inconsistencies of the source) that different
+implementations resolve differently. LibEphemeris realizes the cited
+statement literally and does not tune the residual freedom toward external
+output. Measured against one external implementation, the resulting stable
+zero-point offsets are of order 10--30 arcseconds (De Luce, Djwhal Khul,
+Huber, Lahiri-1940, Britton), a few arcseconds for the Siddhantic mean-Sun
+and Revati modes, and larger for two modes whose published basis is
+qualitatively different: Yukteshwar (~5.5 arcminutes, an unrecoverable
+zero-point realization of the 1894 statement) and Aldebaran-15-Tau (offset
+of order 2 arcminutes plus ~0.05"/yr, the star-tracking versus epoch-fixed
+convention difference documented in the audit notes). These are documented
+model choices, not defects; the modes with an unambiguous published anchor
+(Fagan/Bradley, Lahiri, Raman, Krishnamurti, ICRC, the frame epochs, the
+galactic and star-anchored modes) agree to well under an arcsecond.
 
 ### Crossing functions
 

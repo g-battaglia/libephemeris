@@ -182,10 +182,15 @@ class TestFictitiousSpeedGate:
 
 
 class TestEclNutRetflagEphemerisBits:
-    """TT and UT use the same exclusive ephemeris-bit resolver."""
+    """ECL_NUT retflags: calc echoes the input flags, calc_ut adds a source.
 
-    def test_calc_tt_uses_default_source(self):
-        for f, want in [(0, 2), (256, 258), (128, 130), (64, 66), (32, 98)]:
+    Measured reference behavior: the TT entry point returns the request
+    unchanged (apart from the SPEED3->SPEED implication), while the UT entry
+    point resolves a default ephemeris bit when none is requested.
+    """
+
+    def test_calc_tt_echoes_flags(self):
+        for f, want in [(0, 0), (256, 256), (128, 128), (64, 64), (32, 96)]:
             assert le.calc(JD, -1, f)[1] == want, f
 
     def test_calc_tt_explicit_bits_kept(self):

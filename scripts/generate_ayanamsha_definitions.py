@@ -116,6 +116,16 @@ def sun_mean_longitude_deg(jd_tt: float) -> float:
     return (280.46646 + 36000.76983 * t + 0.0003032 * t * t) % 360.0
 
 
+def nutation_longitude_deg(jd_tt: float) -> float:
+    """IAU 2000A nutation in longitude at ``jd_tt``, in degrees.
+
+    Used to convert a published TRUE (nutation-bearing) ayanamsha anchor to
+    the MEAN value stored in the defining table: mean = true - dpsi(t0).
+    """
+    dpsi, _ = erfa.nut06a(J2000, jd_tt - J2000)
+    return math.degrees(float(dpsi))
+
+
 def mean_september_equinox_jd(year: float) -> float:
     """Mean September-equinox instant (TT JD), Meeus ch. 27 (27.B)."""
     y = (year - 2000.0) / 1000.0
@@ -441,13 +451,13 @@ DEFINITIONS: list[tuple[int, str, float, float, str]] = [
         julday_jd(230, 3, 21, 12.0, julian=True),
         "Britton, AHES 64 (2010) uniform zodiac; zero epoch 230 CE (primary transcription pending)",
     ),
-    (
-        39,
-        "TRUE_SHEORAN",
-        -60.0,
-        mean_december_solstice_jd(-4173.0),
-        "Sunil Sheoran, The Science of Time: ayanamsha -60\N{DEGREE SIGN} at the winter solstice 4174 BCE",
-    ),
+    # Mode 39 (TRUE_SHEORAN) is NOT an epoch mode: Sheoran's rigorous
+    # definition anchors the sidereal zero to the live star Asellus Australis
+    # (delta Cancri) at a fixed sidereal longitude, making "the actual rate of
+    # precession irrelevant" (The Science of Time, 2017). It is emitted below
+    # as a dynamic star mode with SHEORAN_TARGET_LON; the book's -60 deg at
+    # the 4174 BCE winter solstice and the 1 deg / 71.75 yr rule are the
+    # author's own derived checkpoints/approximation of that anchor.
     (
         41,
         "GALEQU_FIORENZA",
@@ -479,9 +489,17 @@ DEFINITIONS: list[tuple[int, str, float, float, str]] = [
     (
         46,
         "LAHIRI_ICRC",
-        dms(23, 15, 0),
+        # The committee's 23 deg 15'0" is a Citra-referenced value of the same
+        # family as the Indian Astronomical Ephemeris series, which publishes
+        # TRUE (nutation-bearing) ayanamshas (Senthilathiban, "A Study of KP
+        # Ayanamsa with Modern Precession Theories", p. 112). The defining
+        # pair stores MEAN values, so the anchor is converted at its own
+        # epoch with the IAU 2000A nutation in longitude (public model, no
+        # output fitting): mean = 23 deg 15' - dpsi(t0).
+        dms(23, 15, 0) - nutation_longitude_deg(julday_jd(1956, 3, 21, 0.0, False)),
         julday_jd(1956, 3, 21, 0.0, julian=False),
-        "Calendar Reform Committee (1955): 23\N{DEGREE SIGN}15' at 1956-03-21 00:00 ET",
+        "Calendar Reform Committee (1955): true ayanamsha 23\N{DEGREE SIGN}15' "
+        "at 1956-03-21 00:00 ET, stored as mean (- dpsi at the epoch)",
     ),
 ]
 
@@ -564,7 +582,7 @@ def main() -> None:
     lines.append(
         "# Modes evaluated from live catalog/frame geometry in planets.py.\n"
         "DYNAMIC_AYANAMSHA_MODES = frozenset(\n"
-        "    {14, 17, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 40, 42}\n"
+        "    {14, 17, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 42}\n"
         ")\n\n"
     )
 
@@ -593,6 +611,19 @@ def main() -> None:
         "from the\n"
         "# Fagan-Bradley SVP ayanamsha, from which it differs by ~1'.\n"
         "ALDEBARAN_TARGET_LON = 45.0\n\n"
+    )
+    lines.append(
+        "# Sheoran, The Science of Time (2017): the sidereal zero is anchored\n"
+        "# to the live star Asellus Australis (delta Cancri) held at the fixed\n"
+        "# sidereal longitude 103\N{DEGREE SIGN}29'32.9375\", chosen so that "
+        "the Sun stands at\n"
+        "# sidereal 330\N{DEGREE SIGN} (Pisces 0) at the 4174 BCE winter "
+        "solstice; the star\n"
+        '# anchor makes "the actual rate of precession irrelevant" (the\n'
+        "# 1\N{DEGREE SIGN}/71.75 yr rule is the author's stated "
+        "approximation only). It\n"
+        "# defines sidereal mode SIDM_TRUE_SHEORAN (39).\n"
+        f"SHEORAN_TARGET_LON = {dms(103, 29, 32.9375)!r}\n\n"
     )
     lines.append(
         "# Mardyks, Sacred Astronomy (1991): ayanamsha exactly 30\N{DEGREE SIGN} at\n"

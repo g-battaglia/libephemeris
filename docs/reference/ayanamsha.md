@@ -51,16 +51,16 @@ ephemeris implementation's output.
 | 3 | `SIDM_RAMAN` | (year − 397) × 50⅓", anchored at 1900.0 (Raman, App. A) | Published |
 | 4 | `SIDM_USHASHASHI` | zero epoch 559 CE (Usha & Shashi 1978) | Secondary |
 | 5 | `SIDM_KRISHNAMURTI` | 22°21'50" at 1900 January 0.5 (Krishnamurti Paddhati) | Published |
-| 6 | `SIDM_DJWHAL_KHUL` | 30° at 2117.0 — Aquarian-age assumption (Bailey/Ageless Wisdom) | Published |
+| 6 | `SIDM_DJWHAL_KHUL` | 30° at 2117.0 — Aquarian-age reading of the 1940 Djwhal Khul letter (see bibliography) | Secondary |
 | 7 | `SIDM_YUKTESHWAR` | 20°54'36" at the spring 1894 equinox (*The Holy Science*) | Published |
 | 8 | `SIDM_JN_BHASIN` | zero epoch 364 CE (Bhasin) | Secondary |
 | 9 | `SIDM_BABYL_KUGLER1` | zero epoch 309 CE (Kugler, *Sternkunde* solution 1) | Secondary |
 | 10 | `SIDM_BABYL_KUGLER2` | zero epoch 208 CE (Kugler, solution 2) | Secondary |
 | 11 | `SIDM_BABYL_KUGLER3` | zero epoch 146 CE (Kugler, solution 3) | Secondary |
 | 12 | `SIDM_BABYL_HUBER` | vernal point at Babylonian Aries 4°28' in −100 (Huber 1958) | Published |
-| 13 | `SIDM_BABYL_ETPSC` | eta Piscium norm, zero epoch 237 CE (Mercier) | Secondary |
+| 13 | `SIDM_BABYL_ETPSC` | eta Piscium norm, zero epoch 237 CE | Secondary |
 | 14 | `SIDM_ALDEBARAN_15TAU` | live Aldebaran (HIP 21421) held at 15° Taurus | Geometry |
-| 15 | `SIDM_HIPPARCHOS` | Hipparchan norm, zero epoch 545 CE (Mercier) | Published |
+| 15 | `SIDM_HIPPARCHOS` | Hipparchan norm, zero epoch 545 CE | Secondary |
 | 16 | `SIDM_SASSANIAN` | Sassanian zij norm, zero 18 March 564 CE (Mercier) | Published |
 | 17 | `SIDM_GALCENT_0SAG` | live Sgr A* (Reid & Brunthaler 2004) at 0° Sagittarius | Geometry |
 | 18 | `SIDM_J2000` | mean ecliptic/equinox of J2000 (frame epoch) | Published |
@@ -84,20 +84,80 @@ ephemeris implementation's output.
 | 36 | `SIDM_GALCENT_MULA_WILHELM` | Sgr A* hour-circle (dhruva) projection at mid-Mula 246°40' (Wilhelm) | Published/Geometry |
 | 37 | `SIDM_ARYABHATA_522` | zero at the 522 CE spring equinox (Aryabhata-522 tradition) | Secondary |
 | 38 | `SIDM_BABYL_BRITTON` | uniform-zodiac norm, zero epoch 230 CE (Britton 2010) | Secondary |
-| 39 | `SIDM_TRUE_SHEORAN` | −60° at the winter solstice 4174 BCE (Sheoran, *The Science of Time*) | Published |
+| 39 | `SIDM_TRUE_SHEORAN` | live δ Cancri (Asellus Australis) held at 103°29'32.9375" (Sheoran, *The Science of Time*) | Published/Geometry |
 | 40 | `SIDM_GALCENT_COCHRANE` | live Sgr A* at 0° Capricorn (Cochrane) | Geometry |
 | 41 | `SIDM_GALEQU_FIORENZA` | 25° at 2000-01-01 (Fiorenza) | Published |
 | 42 | `SIDM_VALENS_MOON` | −2.9422° at JD 1775845.5 UT (~150 CE); consistent with the ~−3° Hellenistic norm | Convention |
 | 43 | `SIDM_LAHIRI_1940` | zero epoch 286 CE (Lahiri 1940 tradition) | Secondary |
 | 44 | `SIDM_LAHIRI_VP285` | zero at the 285 CE spring equinox | Published |
 | 45 | `SIDM_KRISHNAMURTI_VP291` | zero at the 291 CE spring equinox | Published |
-| 46 | `SIDM_LAHIRI_ICRC` | 23°15' at 1956-03-21 00:00 ET (Calendar Reform Committee 1955) | Published |
+| 46 | `SIDM_LAHIRI_ICRC` | true ayanamsha 23°15' at 1956-03-21 00:00 ET (Calendar Reform Committee 1955), stored as mean via IAU 2000A Δψ at the epoch | Published |
 
 Zero-epoch entries use 21 March of the stated year (Julian calendar, 12:00,
 treated as TT) unless the primary statement fixes the instant; equinox and
 solstice instants use the mean-equinox polynomials of Meeus, *Astronomical
 Algorithms*, chapter 27. Both conventions bound the anchor uncertainty below
 0.1 arcsecond.
+
+### Realization notes from the source audit
+
+Several published anchors carry an intrinsic realization uncertainty far above
+the arcsecond level, because the primary statement fixes a value only to the
+arcminute or only to a calendar year. LibEphemeris realizes each statement
+literally with the documented conventions above and does not tune the residual
+freedom toward any other implementation's output:
+
+- **De Luce (2)** — p. 5 anchors the system twice: conceptually at 1 A.D.
+  ("beginning calculation date") and numerically at 26°24'47" for 1900 with
+  "50¼″ annually". The two statements are mutually inconsistent at the
+  arcminute level (his own 1940 example implies ~50.07"/yr), so the tabulated
+  1900 value is the anchor and B1900.0 realizes "the year 1900".
+- **Djwhal Khul (6)** — the year 2117 is not in Alice Bailey's published
+  books; it derives from a February 1940 letter attributed to Djwhal Khul
+  ("another 177 years must go by"), published by Phillip Lindsay in 2020. The
+  30° offset is the technical construct that starts the sidereal Aquarian age
+  in that year; the sub-year instant is undefined in the source.
+- **Yukteshwar (7)** — *The Holy Science* states 20°54'36" for 1894 and that
+  "1394 years have passed", which implies (but never states) a uniform
+  54.00"/yr motion from a ~500 CE zero on a 24,000-year cycle. The library
+  anchors the stated 1894 value and propagates it with real precession; the
+  book's internal uniform rate would diverge from the sky by ~4"/yr.
+- **Huber (12)** — the published value is "4°28′ for 100 BC" (Kollerstrom's
+  report of Huber p. 205, with Aldebaran at 10°34′ Taurus), quoted to the
+  arcminute with Huber's own stated uncertainty of order ±20′. Whether the
+  epoch label means historical 100 BC (astronomical −99) or astronomical −100
+  is not decidable without the original German text; the one-year difference
+  (~50") is far below the source's precision. The current anchor uses the
+  spring equinox of astronomical −100.
+- **eta Piscium (13) / Hipparchos (15)** — the academically attested Piscium
+  norm is the **ζ Piscium (Revati)** point ~10′ east of the star (Mercier
+  1976/77, 2004; Pingree 1989), with the Sassanian epoch near 564 CE. A
+  distinct η-Piscium/237-CE norm and a Hipparchan zero-year of 545 CE are not
+  locatable in that literature; both rows therefore keep Secondary status
+  with their conventional epochs.
+- **Aldebaran 15 Tau (14)** — the library holds the *live* star (proper
+  motion included) at exactly 15° Taurus, the literal reading of the
+  convention. The historical realizations (Fagan 1950; the American Sidereal
+  Ephemeris, which prints Aldebaran at 15°03′ Taurus) anchor an epoch-fixed
+  frame moved by precession only, so the star itself drifts off 15°00′ by its
+  accumulated proper motion (~0.05"/yr in ecliptic longitude). The two
+  conventions differ by a slowly growing offset of order arcminutes over
+  millennia.
+- **Kugler 1/2/3 (9–11)** — Kugler's attested results are the Babylonian
+  System A/B norms (vernal point at 10° and 8°15′→8° of Babylonian Aries;
+  van der Waerden 1953, Neugebauer 1955/1975). The three discrete zero-year
+  parametrizations used by software traditions are not printed in
+  *Sternkunde und Sterndienst in Babel*; the rows remain Secondary.
+- **Britton (38)** — the published result is Δλ\* = C − 1.3828°·Y with
+  C = 3.20° ± 0.1° and an introduction of the uniform zodiac between −408
+  and −397. The implied modern zero-year, ~231 CE with ±7 years from the
+  stated uncertainty alone, is consistent with the conventional 230 CE epoch
+  used here; Britton himself publishes no calendar zero-year.
+- **Lahiri 1940 (43)** — the canonical zero of Lahiri's own ephemeris is
+  285 A.D. (207 Śaka, adopted from the 1948 issue; Astro Research Bureau),
+  which is exactly the anchor of `SIDM_LAHIRI_VP285` (44). A separately
+  published anchor for the distinct "1940" tradition is not independently
+  recoverable; the row keeps its conventional 286 CE epoch as Secondary.
 
 ## User-defined mode
 
@@ -125,11 +185,16 @@ Skyfield, and LEB calculations all use the same dispatcher.
   p. 13: the Synetic Vernal Point is 335 degrees 57 minutes 28.64 seconds at
   B1950.0, reproducing Bradley's May 1957 publication.
 - Government of India, Calendar Reform Committee. *Report of the Calendar
-  Reform Committee* (1955), Part A, and the Positional Astronomy Centre's
+  Reform Committee* (1955), Part A ("The value of this ayanamsa would amount
+  to 23° 15' 0" on 21st March, 1956"), and the Positional Astronomy Centre's
   annual *Indian Astronomical Ephemeris* for the Lahiri/ICRC definition.
   `SIDM_LAHIRI` anchors to the IAE's own modern constant — ayanamsa
   23°51'25".53 on 2000 January 1.5 TT — the official continuation of the
   Lahiri system; `SIDM_LAHIRI_ICRC` keeps the original 1955 committee value.
+  Both published values are of the true (nutation-bearing) kind, so the ICRC
+  anchor is converted to the stored mean form with the IAU 2000A nutation in
+  longitude at its own epoch; consistently, its J2000 mean equivalent then
+  agrees with the IAE anchor to under an arcsecond.
 - De Luce, Robert. *Constellational Astrology* (1963), p. 5: 26 degrees
   24 minutes 47 seconds in 1900 with 50.25 arcseconds added per year.
 - Raman, B. V. *Hindu Predictive Astrology*, Appendix A and Table IV: subtract
@@ -138,9 +203,31 @@ Skyfield, and LEB calculations all use the same dispatcher.
   22 degrees 21 minutes 50 seconds at 1900.
 - Sri Yukteswar Giri. *The Holy Science* (1894), introduction: the spring 1894
   equinox is 20 degrees 54 minutes 36 seconds from the fixed origin.
-- Bailey, Alice A. (Ageless Wisdom / Djwhal Khul teachings): the Aquarian age
-  begins in 2117, i.e. an ayanamsha of exactly 30 degrees in that year.
-- Kugler, F. X. *Sternkunde und Sterndienst in Babel* (1907--1924).
+- Lindsay, Phillip. "Aquarius 2,117 AD: Beginning of the Age of Aquarius"
+  (Esoteric Astrologer, 2020), publishing the February 1940 letter attributed
+  to Djwhal Khul ("another 177 years must go by"); the year 2117 = 1940 + 177.
+  The 30-degree offset realizing it as an ayanamsha is a technical convention
+  of the mode, not a statement in Alice Bailey's published books.
+- Kugler, F. X. *Sternkunde und Sterndienst in Babel* (1907--1924); van der
+  Waerden, B. L. "History of the Zodiac," *Archiv fur Orientforschung* 16
+  (1953), 216--230, and Neugebauer, Otto, *ACT* (1955) / *HAMA* (1975) for
+  the System A/B vernal-point norms (10 and 8 1/4 degrees of Babylonian
+  Aries).
+- Kollerstrom, Nick. "The Star Zodiac of Antiquity," *Culture and Cosmos*
+  1(2) (1997), 5--22: reports Huber's 4 degrees 28 minutes at 100 BC
+  (Huber p. 205), Aldebaran at 10 degrees 34 minutes Taurus at that epoch,
+  and Fagan's mid-Taurus Aldebaran norm.
+- Michelson, Neil. *The American Sidereal Ephemeris 1976--2000* (Astro
+  Computing Services, 1980): prints Aldebaran at 15 degrees 03 minutes
+  Taurus, evidence that the historical Aldebaran norm is epoch-fixed rather
+  than star-tracking.
+- Astro Research Bureau (Kolkata): the nirayana zero of Lahiri's *Indian
+  Ephemeris of Planets' Positions* is 285 A.D. (207 Saka), adopted from the
+  1948 issue.
+- Senthilathiban, D. *A Study of KP Ayanamsa with Modern Precession Theories*:
+  the Krishnamurti zero year 291 AD with the Newcomb rate 50.2388475"/yr,
+  the 21 March 291 equinox instant, and the attestation that the official
+  Lahiri/IAE values are true (nutation-bearing) ayanamshas.
 - Huber, Peter. "Uber den Nullpunkt der babylonischen Ekliptik," *Centaurus*
   5 (1958), 192--208, doi:10.1111/j.1600-0498.1958.tb00498.x: vernal point at
   Babylonian Aries 4 degrees 28 minutes in -100.
@@ -157,8 +244,14 @@ Skyfield, and LEB calculations all use the same dispatcher.
   Citra/Revati. The mean-Sun modes place the sidereal zero at the mean Sun
   of the Kali + 3600-year instant (Meeus 25.2 mean solar longitude, day
   counts converted to TT with the project's Delta-T model).
-- Sheoran, Sunil. *The Science of Time* : ayanamsha -60 degrees at the winter
-  solstice of 4174 BCE (start of the last Manvantara).
+- Sheoran, Sunil. *The Science of Time and Timeline of World History* (2017):
+  the sidereal zero is anchored to the fixed star Asellus Australis
+  (delta Cancri) at sidereal longitude 103 degrees 29 minutes 32.9375
+  seconds, chosen so that the Sun stands at sidereal Pisces 0 at the winter
+  solstice of 4174 BCE; "choosing a fixed star itself as the zodiac anchor
+  makes the actual rate of precession irrelevant". The 1 degree per
+  71.75 years rule is the author's stated quick approximation, not the
+  definition.
 - Mardyks, Raymond. *Sacred Astronomy* (1991): ayanamsha exactly 30 degrees at
   the autumn equinox 1998 (galactic alignment).
 - Gil Brand, Rafael. *Himmlische Matrix. Die Bedeutung der Ayanamsha in der

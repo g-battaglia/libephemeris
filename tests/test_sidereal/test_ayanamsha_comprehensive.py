@@ -89,3 +89,17 @@ def test_sidereal_longitude_uses_the_selected_mean_ayanamsha(mode: int) -> None:
     ayanamsha = ephem.get_ayanamsa_ut(jd_ut)
     difference = _signed_angle((tropical[0] - sidereal[0]) - ayanamsha)
     assert difference == pytest.approx(0.0, abs=5e-10)
+
+
+@pytest.mark.parametrize("mode", range(47))
+def test_predefined_modes_have_a_nonempty_name(mode: int) -> None:
+    """Every predefined mode 0-46 carries a non-empty descriptive name."""
+    assert ephem.get_ayanamsa_name(mode) != ""
+
+
+@pytest.mark.parametrize("sidmode", [47, 48, 100, 254, ephem.SIDM_USER])
+def test_modes_without_a_predefined_name_return_empty_string(sidmode: int) -> None:
+    """Measured reference behavior: an id without a predefined name -- the
+    unassigned block above mode 46 and the user-defined mode SIDM_USER (255) --
+    returns the empty string, not a placeholder such as 'Unknown'."""
+    assert ephem.get_ayanamsa_name(sidmode) == ""

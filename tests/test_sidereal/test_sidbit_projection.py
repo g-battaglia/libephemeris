@@ -29,8 +29,16 @@ from libephemeris.constants import (
     SIDBIT_ECL_T0,
     SIDBIT_SSY_PLANE,
     SIDBIT_USER_UT,
+    SIDM_ALDEBARAN_15TAU,
+    SIDM_GALCENT_0SAG,
+    SIDM_GALEQU_TRUE,
     SIDM_LAHIRI,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_MULA,
+    SIDM_TRUE_PUSHYA,
+    SIDM_TRUE_REVATI,
     SIDM_USER,
+    SIDM_VALENS_MOON,
     SUN,
 )
 
@@ -128,6 +136,59 @@ class TestEclT0Applied:
         ecl, _ = ephem.calc_ut(JD, MARS, FLG_SIDEREAL | FLG_EQUATORIAL)
         assert 0.0 <= ecl[0] < 360.0
         assert -90.0 <= ecl[1] <= 90.0
+
+
+class TestSidbitSuppressedForStarGalacticModes:
+    """The star/galactic "true" modes leave SIDBIT_ECL_T0 / SSY_PLANE inert.
+
+    Their zero point is defined by a live catalog/frame direction on the
+    ecliptic of date, so re-projecting onto another reference plane is not
+    defined by the model; measured reference behavior suppresses the projection
+    (the sidereal longitude and latitude equal the un-projected baseline). The
+    epoch-anchored mean modes and the two live modes whose zero is not a bare
+    ecliptic-of-date star/frame direction (Aldebaran = 15 Tau, Vettius Valens)
+    keep the projection.
+    """
+
+    SUPPRESSED = [
+        SIDM_TRUE_CITRA,
+        SIDM_TRUE_REVATI,
+        SIDM_TRUE_PUSHYA,
+        SIDM_TRUE_MULA,
+        SIDM_GALEQU_TRUE,
+        SIDM_GALCENT_0SAG,
+    ]
+    APPLIED = [SIDM_LAHIRI, SIDM_ALDEBARAN_15TAU, SIDM_VALENS_MOON]
+    # A date well away from the modes' J2000 reference epoch, so ECL_T0 is a
+    # genuine (non-identity) projection, kept inside the base tier (1850-2150).
+    JD_OFF = 2415020.0  # 1900-01-01
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("mode", SUPPRESSED)
+    @pytest.mark.parametrize("bit", [SIDBIT_ECL_T0, SIDBIT_SSY_PLANE])
+    def test_projection_is_inert(self, mode, bit):
+        """Longitude and latitude match the un-projected baseline exactly (a
+        non-suppressed mode would move by up to ~0.1° here)."""
+        ephem.set_sid_mode(mode)
+        base, _ = ephem.calc_ut(self.JD_OFF, MARS, FLG_SIDEREAL)
+        ephem.set_sid_mode(mode | bit)
+        proj, _ = ephem.calc_ut(self.JD_OFF, MARS, FLG_SIDEREAL)
+        assert proj[0] == pytest.approx(base[0], abs=1e-9)
+        assert proj[1] == pytest.approx(base[1], abs=1e-9)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("mode", APPLIED)
+    @pytest.mark.parametrize("bit", [SIDBIT_ECL_T0, SIDBIT_SSY_PLANE])
+    def test_projection_still_applies_for_other_modes(self, mode, bit):
+        """A mean mode or a non-suppressed live mode still shifts the result."""
+        ephem.set_sid_mode(mode)
+        base, _ = ephem.calc_ut(self.JD_OFF, MARS, FLG_SIDEREAL)
+        ephem.set_sid_mode(mode | bit)
+        proj, _ = ephem.calc_ut(self.JD_OFF, MARS, FLG_SIDEREAL)
+        moved = abs((proj[0] - base[0] + 180.0) % 360.0 - 180.0) + abs(
+            proj[1] - base[1]
+        )
+        assert moved > 1e-3
 
 
 class TestUserUtApplied:

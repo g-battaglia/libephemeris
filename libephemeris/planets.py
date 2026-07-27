@@ -95,6 +95,7 @@ from .ayanamsha_definitions import (
     GALCENT_TARGET_LON,
     MARDYKS_DEFINING,
     MULA_WILHELM_TARGET_LON,
+    SHEORAN_TARGET_LON,
     VALENS_MOON_AYAN_T0_DEG,
     VALENS_MOON_T0_UT,
 )
@@ -1679,6 +1680,42 @@ def _calc_body_race_safe(t, planet: int, calc_iflag: int):
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+# Sidereal modes for which SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE are inert.
+#
+# These are the star- and galactic-frame "true"/live-catalog modes whose zero
+# point is *defined* by the actual direction of a star or a galactic-frame axis
+# projected onto the ecliptic (or equator) of date. That direction already
+# fixes the frame in which the sidereal longitude is measured, so re-projecting
+# it onto a different reference plane -- the mean ecliptic/equinox of the mode's
+# t0 (SIDBIT_ECL_T0) or the solar-system invariable plane (SIDBIT_SSY_PLANE) --
+# is not defined by the underlying model. Measured reference behavior confirms
+# the projection is a no-op for exactly these modes (the sidereal longitude is
+# identical to the un-projected baseline), while the epoch-anchored mean modes
+# (Fagan/Bradley, Lahiri, ...) and the two live modes whose zero is not a bare
+# ecliptic-of-date star/frame direction -- Aldebaran = 15 Tau (14, an absolute
+# ecliptic longitude anchor) and Vettius Valens (42, a Method-B epoch mode) --
+# do accept the projection. This is the same "calculated" star/galactic class
+# that drops FLG_NONUT from get_ayanamsa_ex (see _AYANAMSA_EX_NONUT_DROP_MODES);
+# Skydram/Mardyks (34) suppresses it too but reaches the same result through the
+# fixed-epoch frame path, so it need not be listed here.
+_SIDBIT_PROJECTION_SUPPRESS_MODES = frozenset(
+    {
+        SIDM_GALCENT_0SAG,
+        SIDM_TRUE_CITRA,
+        SIDM_TRUE_REVATI,
+        SIDM_TRUE_PUSHYA,
+        SIDM_GALCENT_RGILBRAND,
+        SIDM_GALEQU_IAU1958,
+        SIDM_GALEQU_TRUE,
+        SIDM_GALEQU_MULA,
+        SIDM_TRUE_MULA,
+        SIDM_GALCENT_MULA_WILHELM,
+        SIDM_TRUE_SHEORAN,
+        SIDM_GALCENT_COCHRANE,
+    }
+)
+
+
 def _sidbit_projection_calc(
     tjd: float,
     planet: int,
@@ -1853,9 +1890,15 @@ def calc_ut(
             return result
 
         # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections (ecliptic output).
+        # The star/galactic "true" modes define their zero on the ecliptic of
+        # date, so the reference leaves the projection inert for them (see
+        # _SIDBIT_PROJECTION_SUPPRESS_MODES): fall through to the base sidereal
+        # path, which reproduces the un-projected baseline longitude.
         _bits = _get_sidereal_bits()
-        if (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE)) and not (
-            flags & FLG_EQUATORIAL
+        if (
+            (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE))
+            and not (flags & FLG_EQUATORIAL)
+            and _sidm not in _SIDBIT_PROJECTION_SUPPRESS_MODES
         ):
             return _sidbit_projection_calc(
                 tjdut, planet, flags, raw_flags, _sidm, _bits, calc_ut
@@ -2140,9 +2183,15 @@ def calc(
             return result
 
         # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections (ecliptic output).
+        # The star/galactic "true" modes define their zero on the ecliptic of
+        # date, so the reference leaves the projection inert for them (see
+        # _SIDBIT_PROJECTION_SUPPRESS_MODES): fall through to the base sidereal
+        # path, which reproduces the un-projected baseline longitude.
         _bits = _get_sidereal_bits()
-        if (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE)) and not (
-            flags & FLG_EQUATORIAL
+        if (
+            (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE))
+            and not (flags & FLG_EQUATORIAL)
+            and _sidm not in _SIDBIT_PROJECTION_SUPPRESS_MODES
         ):
             return _sidbit_projection_calc(
                 tjdet, planet, flags, raw_flags, _sidm, _bits, calc
@@ -5352,7 +5401,12 @@ def get_ayanamsa_ut(tjdut: float) -> float:
 def get_ayanamsa_name(sidmode: int) -> str:
     """
     Get the name of a sidereal mode.
-    Compatible with the reference get_ayanamsa_name().
+
+    Compatible with the reference get_ayanamsa_name(). Measured reference
+    behavior: only the predefined modes 0--46 carry a name; every id without a
+    predefined name -- the unassigned block above the last predefined mode and
+    the user-defined mode SIDM_USER (255) -- returns the empty string rather
+    than a placeholder.
     """
     names = {
         SIDM_FAGAN_BRADLEY: "Fagan/Bradley",
@@ -5402,9 +5456,8 @@ def get_ayanamsa_name(sidmode: int) -> str:
         SIDM_LAHIRI_VP285: "Lahiri VP285",
         SIDM_KRISHNAMURTI_VP291: "Krishnamurti-Senthilathiban",
         SIDM_LAHIRI_ICRC: "Lahiri ICRC",
-        SIDM_USER: "User Defined",
     }
-    return names.get(sidmode, "Unknown")
+    return names.get(sidmode, "")
 
 
 @dataclass
@@ -5866,6 +5919,17 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             value = (
                 _get_star_position_ecliptic(STARS["MULA"], tjd_tt, 0.0, nonut=True)
                 - 240.0
+            )
+        elif sid_mode == SIDM_TRUE_SHEORAN:
+            # Sheoran's rigorous definition (The Science of Time, 2017)
+            # anchors the sidereal zero to the live star Asellus Australis
+            # (delta Cancri) at the fixed sidereal longitude 103°29'32.9375",
+            # explicitly so that "the actual rate of precession [is]
+            # irrelevant"; his -60° at the 4174 BCE winter solstice and the
+            # 1°/71.75 yr rule are derived checkpoints, not the anchor.
+            value = (
+                _get_star_position_ecliptic(STARS["PUSHYA"], tjd_tt, 0.0, nonut=True)
+                - SHEORAN_TARGET_LON
             )
         elif sid_mode == SIDM_ALDEBARAN_15TAU:
             # Aldebaran held at 15 degrees Taurus (45 degrees absolute),
@@ -6834,15 +6898,12 @@ def _calc_nod_aps(
     """
     zero_pos: PosTuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
-    # Minor-body nodes/apsides are not implemented. Raise a clear error rather
-    # than returning zeros, which would read as a node at 0° Aries.
-    if ipl in _MINOR_BODY_NODAPS or (AST_OFFSET < ipl < FIXSTAR_OFFSET):
-        from .exceptions import Error
-
-        raise Error(
-            f"nod_aps is not supported for minor bodies (asteroids/centaurs) "
-            f"in this version (body id {ipl}); planned for a future release."
-        )
+    # Minor bodies (curated asteroids/centaurs 15-20 and any numbered asteroid
+    # AST_OFFSET+n) carry a real heliocentric orbit, so their nodes/apsides are
+    # computed from the osculating state served by the same position pipeline as
+    # calc/get_orbital_elements (see the osculating branch below). Same
+    # membership test as _calc_orbital_elements so the two stay in lockstep.
+    is_minor = ipl in _MINOR_BODY_NODAPS or (AST_OFFSET < ipl < FIXSTAR_OFFSET)
 
     # Interpolated lunar apsides (INTP_APOG / INTP_PERG): the interpolated
     # point is not an orbital-element body, so it has no node/apse
@@ -6865,7 +6926,8 @@ def _calc_nod_aps(
     # reference behavior raises an error rather than returning a silent zero
     # that would read as a node at 0° Aries. Earth stays in _PLANET_MAP and is
     # handled below with its nodes zeroed (its orbit defines the ecliptic).
-    if ipl not in _PLANET_MAP:
+    # Minor bodies are not in _PLANET_MAP but carry a real orbit (handled below).
+    if ipl not in _PLANET_MAP and not is_minor:
         from .exceptions import Error
 
         raise Error(f"nod_aps: nodes/apsides for body id {ipl} are not implemented.")
@@ -6953,16 +7015,20 @@ def _calc_nod_aps(
     r_earth_ecl = _icrs_to_ecliptic(r_earth_icrs)
 
     # --- Get target's state vector ---
-    target_name = _PLANET_MAP[ipl]
-    try:
-        target = planets[target_name]
-    except KeyError:
-        if target_name in _PLANET_FALLBACK:
-            target = planets[_PLANET_FALLBACK[target_name]]
-        else:
-            return (zero_pos, zero_pos, zero_pos, zero_pos)
+    # Minor bodies are not Skyfield ephemeris segments; their heliocentric state
+    # comes from the position pipeline in the osculating branch below, so skip
+    # the _PLANET_MAP lookup here (target_pos is unused for them).
+    if not is_minor:
+        target_name = _PLANET_MAP[ipl]
+        try:
+            target = planets[target_name]
+        except KeyError:
+            if target_name in _PLANET_FALLBACK:
+                target = planets[_PLANET_FALLBACK[target_name]]
+            else:
+                return (zero_pos, zero_pos, zero_pos, zero_pos)
 
-    target_pos = target.at(t)
+        target_pos = target.at(t)
 
     # For Moon, use lunar theory bodies rather than computing osculating
     # elements from geocentric state vectors.
@@ -7093,11 +7159,11 @@ def _calc_nod_aps(
 
         # NODBIT_MEAN (the default) uses the published mean-element
         # polynomials (Meeus Table 31.A / Simon et al. 1994); bodies
-        # without mean elements (e.g. Pluto) fall back to osculating
-        # state vectors, matching the reference.
+        # without mean elements (e.g. Pluto and the minor bodies) fall back to
+        # osculating state vectors for every method, matching the reference.
         mean_el = None
         bar_mode = False
-        if not (method & (NODBIT_OSCU | NODBIT_OSCU_BAR)):
+        if not (method & (NODBIT_OSCU | NODBIT_OSCU_BAR)) and not is_minor:
             from .planetary_mean_elements import mean_orbital_elements
 
             mean_el = mean_orbital_elements(elem_ipl, jd_tt)
@@ -7133,6 +7199,44 @@ def _calc_nod_aps(
             emb_pos = planets["earth barycenter"].at(t)
             r_icrs = emb_pos.position.au - sun_pos.position.au
             v_icrs = emb_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
+        elif is_minor:
+            # Heliocentric geometric ICRS state from the body's own position
+            # pipeline (SPK/LEB/Keplerian) — the same source calc() and
+            # get_orbital_elements report for this body — reduced with GM_sun.
+            r_helio, v_helio = _minor_body_helio_icrs_state(jd_tt, ipl)
+            # A trans-jovian centaur/TNO re-references to the solar-system
+            # barycentre under NODBIT_OSCU_BAR, exactly as the planets beyond
+            # Jupiter do (measured, e.g. Chiron shifts ~0.07° while the belt
+            # asteroids at a ~ 2.4-2.8 AU are unaffected). The barycentric state
+            # is the heliocentric one plus the Sun's barycentric offset.
+            if bool(method & NODBIT_OSCU_BAR) and (
+                _osculating_semi_major_axis(
+                    r_helio[0],
+                    r_helio[1],
+                    r_helio[2],
+                    v_helio[0],
+                    v_helio[1],
+                    v_helio[2],
+                    _GM_SUN,
+                )
+                > _TRANS_JOVIAN_A_AU
+            ):
+                bar_mode = True
+                sp = sun_pos.position.au
+                sv = sun_pos.velocity.au_per_d
+                r_icrs = (
+                    r_helio[0] + float(sp[0]),
+                    r_helio[1] + float(sp[1]),
+                    r_helio[2] + float(sp[2]),
+                )
+                v_icrs = (
+                    v_helio[0] + float(sv[0]),
+                    v_helio[1] + float(sv[1]),
+                    v_helio[2] + float(sv[2]),
+                )
+            else:
+                r_icrs = r_helio
+                v_icrs = v_helio
         elif bar_mode:
             # SSB-relative vectors for the planets beyond Jupiter.
             r_icrs = target_pos.position.au
@@ -7570,6 +7674,87 @@ def _sun_barycentric_ecliptic_state(
     return (sx, sy, sz, svx, svy, svz)
 
 
+def _ecliptic_spherical_to_cartesian_state(
+    pos: Tuple[float, float, float, float, float, float],
+) -> Tuple[float, float, float, float, float, float]:
+    """Ecliptic spherical state -> Cartesian state, both in the same frame.
+
+    Converts ``(lon, lat, r, dlon, dlat, ddist)`` in degrees / degrees-per-day
+    / AU (the calc() spherical convention) to a Cartesian ``(x, y, z, vx, vy,
+    vz)`` state in AU and AU/day. The velocity is the analytic time-derivative
+    of the position, so the pair is self-consistent for a two-body reduction.
+    """
+    lon, lat, r, dlon, dlat, ddist = pos
+    lam = math.radians(lon)
+    bet = math.radians(lat)
+    dlam = math.radians(dlon)
+    dbet = math.radians(dlat)
+    cos_lam = math.cos(lam)
+    sin_lam = math.sin(lam)
+    cos_bet = math.cos(bet)
+    sin_bet = math.sin(bet)
+
+    x = r * cos_bet * cos_lam
+    y = r * cos_bet * sin_lam
+    z = r * sin_bet
+    vx = (
+        ddist * cos_bet * cos_lam
+        - r * sin_bet * cos_lam * dbet
+        - r * cos_bet * sin_lam * dlam
+    )
+    vy = (
+        ddist * cos_bet * sin_lam
+        - r * sin_bet * sin_lam * dbet
+        + r * cos_bet * cos_lam * dlam
+    )
+    vz = ddist * sin_bet + r * cos_bet * dbet
+    return (x, y, z, vx, vy, vz)
+
+
+def _minor_body_helio_icrs_state(
+    jd_tt: float, ipl: int
+) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+    """Heliocentric geometric ICRS state (AU, AU/day) for a minor body.
+
+    Sources the state from the same position pipeline as calc() and
+    get_orbital_elements: a geometric heliocentric place in the mean J2000
+    ecliptic (FLG_HELCTR | FLG_J2000 | FLG_TRUEPOS: no light-time, aberration,
+    or deflection). The state is rotated from the mean J2000 ecliptic back to
+    ICRS so it enters the shared node/apse reduction on exactly the same footing
+    as the Skyfield planet states (which the reduction rotates ICRS -> ecliptic
+    of date). FLG_SPEED is always requested because the osculating ellipse needs
+    the velocity even when the caller did not ask for node/apse speeds.
+
+    Raises:
+        Error: If the pipeline returns a degenerate (zero/non-finite) distance.
+            Range/coverage/unknown-body failures surface as the pipeline's own
+            typed Error subclass (never a silent zero state).
+    """
+    from .exceptions import Error
+    from .fast_calc import _ICRS_TO_ECL_J2000_REF
+
+    pos, _ = calc(jd_tt, ipl, FLG_HELCTR | FLG_J2000 | FLG_TRUEPOS | FLG_SPEED)
+    if not (pos[2] > 0.0) or not math.isfinite(pos[2]):
+        raise Error(
+            f"nod_aps: the position pipeline returned a degenerate state "
+            f"(distance {pos[2]} AU) for body {ipl} at JD {jd_tt}."
+        )
+    x, y, z, vx, vy, vz = _ecliptic_spherical_to_cartesian_state(pos)
+
+    # Mean J2000 ecliptic -> ICRS is the transpose of the ICRS -> ecliptic
+    # frame matrix used to define the FLG_J2000 ecliptic output above.
+    m = _ICRS_TO_ECL_J2000_REF
+
+    def _to_icrs(ax: float, ay: float, az: float) -> Tuple[float, float, float]:
+        return (
+            m[0][0] * ax + m[1][0] * ay + m[2][0] * az,
+            m[0][1] * ax + m[1][1] * ay + m[2][1] * az,
+            m[0][2] * ax + m[1][2] * ay + m[2][2] * az,
+        )
+
+    return _to_icrs(x, y, z), _to_icrs(vx, vy, vz)
+
+
 def _calc_orbital_elements_minor(t, ipl: int, iflag: int = 0) -> Tuple[float, ...]:
     """Osculating orbital elements for a minor body (asteroid/centaur/TNO).
 
@@ -7625,7 +7810,7 @@ def _osculating_from_calc_state(
 
     tt_jd = float(t.tt)
     pos, _ = calc(tt_jd, ipl, flags)
-    lon, lat, r, dlon, dlat, ddist = pos
+    r = pos[2]
 
     if not (r > 0.0) or not math.isfinite(r):
         raise Error(
@@ -7635,29 +7820,7 @@ def _osculating_from_calc_state(
         )
 
     # Ecliptic spherical (degrees, degrees/day) -> Cartesian state (AU, AU/day).
-    lam = math.radians(lon)
-    bet = math.radians(lat)
-    dlam = math.radians(dlon)
-    dbet = math.radians(dlat)
-    cos_lam = math.cos(lam)
-    sin_lam = math.sin(lam)
-    cos_bet = math.cos(bet)
-    sin_bet = math.sin(bet)
-
-    x = r * cos_bet * cos_lam
-    y = r * cos_bet * sin_lam
-    z = r * sin_bet
-    vx = (
-        ddist * cos_bet * cos_lam
-        - r * sin_bet * cos_lam * dbet
-        - r * cos_bet * sin_lam * dlam
-    )
-    vy = (
-        ddist * cos_bet * sin_lam
-        - r * sin_bet * sin_lam * dbet
-        + r * cos_bet * cos_lam * dlam
-    )
-    vz = ddist * sin_bet + r * cos_bet * dbet
+    x, y, z, vx, vy, vz = _ecliptic_spherical_to_cartesian_state(pos)
 
     # Barycentric re-reference for trans-jovian orbits: shift the heliocentric
     # state (target - Sun) to the barycentric state (target - SSB) by adding the

@@ -84,8 +84,6 @@ AYANAMSHA_DEFINING: dict[int, tuple[float, float]] = {
     37: (0.0, 1911798.0),
     # BABYL_BRITTON: Britton, AHES 64 (2010) uniform zodiac; zero epoch 230 CE (primary transcription pending)
     38: (0.0, 1805145.0),
-    # TRUE_SHEORAN: Sunil Sheoran, The Science of Time: ayanamsha -60° at the winter solstice 4174 BCE
-    39: (-60.0, 197256.37679305955),
     # GALEQU_FIORENZA: Fiorenza: galactic-equator ayanamsha 25° at 2000-01-01
     41: (25.0, 2451544.5),
     # LAHIRI_1940: Lahiri (1940) tradition; zero epoch 286 CE (primary transcription pending)
@@ -94,13 +92,13 @@ AYANAMSHA_DEFINING: dict[int, tuple[float, float]] = {
     44: (0.0, 1825233.3060523525),
     # KRISHNAMURTI_VP291: Vernal-point convention: zero at the 291 CE spring equinox
     45: (0.0, 1827424.7590899938),
-    # LAHIRI_ICRC: Calendar Reform Committee (1955): 23°15' at 1956-03-21 00:00 ET
-    46: (23.25, 2435553.5),
+    # LAHIRI_ICRC: Calendar Reform Committee (1955): true ayanamsha 23°15' at 1956-03-21 00:00 ET, stored as mean (- dpsi at the epoch)
+    46: (23.245339462821466, 2435553.5),
 }
 
 # Modes evaluated from live catalog/frame geometry in planets.py.
 DYNAMIC_AYANAMSHA_MODES = frozenset(
-    {14, 17, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 40, 42}
+    {14, 17, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 42}
 )
 
 # Galactic-center modes: published sidereal target longitude of Sgr A*.
@@ -123,6 +121,15 @@ MULA_WILHELM_TARGET_LON = 246.66666666666666
 # It defines sidereal mode SIDM_ALDEBARAN_15TAU (14) and is distinct from the
 # Fagan-Bradley SVP ayanamsha, from which it differs by ~1'.
 ALDEBARAN_TARGET_LON = 45.0
+
+# Sheoran, The Science of Time (2017): the sidereal zero is anchored
+# to the live star Asellus Australis (delta Cancri) held at the fixed
+# sidereal longitude 103°29'32.9375", chosen so that the Sun stands at
+# sidereal 330° (Pisces 0) at the 4174 BCE winter solstice; the star
+# anchor makes "the actual rate of precession irrelevant" (the
+# 1°/71.75 yr rule is the author's stated approximation only). It
+# defines sidereal mode SIDM_TRUE_SHEORAN (39).
+SHEORAN_TARGET_LON = 103.49248263888889
 
 # Mardyks, Sacred Astronomy (1991): ayanamsha exactly 30° at
 # the September equinox 1998 (Meeus mean-equinox instant); fixed-epoch
