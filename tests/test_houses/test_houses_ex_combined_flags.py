@@ -190,10 +190,27 @@ class TestHousesInvalidHsys:
             )
 
     @pytest.mark.unit
-    def test_house_name_unknown_for_invalid(self):
-        """house_name returns 'Unknown' for invalid system."""
-        name = swe.house_name(ord("Z"))
-        assert name == "Unknown"
+    def test_house_name_empty_for_invalid(self):
+        """house_name returns '' for an unknown selector (measured contract)."""
+        assert swe.house_name(ord("Z")) == ""
+        assert swe.house_name(ord("5")) == ""
+
+    def test_house_system_selector_is_case_insensitive(self):
+        """Lowercase selectors fold to their uppercase system ('k' == 'K')...
+
+        ...except 'i', which is the distinct Sunshine-alternative system.
+        """
+        jd = swe.julday(2005, 6, 15, 12.0)
+        for ch in "korcaewbxhtgmvudnylfjspq":
+            lo = swe.houses(jd, 48.2, 16.4, ch.encode())[0]
+            up = swe.houses(jd, 48.2, 16.4, ch.upper().encode())[0]
+            assert lo == up, ch
+        assert swe.house_name(ord("k")) == "Koch"
+        assert swe.house_name(ord("i")) == "Sunshine/alt."
+        # 'i' stays distinct from 'I' where the two constructions differ.
+        ci = swe.houses(jd, 62.0, 12.5, b"i")[0]
+        cI = swe.houses(jd, 62.0, 12.5, b"I")[0]
+        assert max(abs(a - b) for a, b in zip(ci, cI)) > 1.0
 
     @pytest.mark.unit
     def test_houses_ex_invalid_hsys_falls_back(self):

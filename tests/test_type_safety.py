@@ -111,10 +111,10 @@ class TestHousesReturnTypes:
         assert name == "Placidus"
 
     def test_swe_house_name_with_unknown(self):
-        """house_name should return 'Unknown' for unknown systems."""
+        """house_name returns '' for an unknown selector (measured contract)."""
         name = house_name(ord("Z"))  # Unknown system
         assert isinstance(name, str)
-        assert name == "Unknown"
+        assert name == ""
 
 
 class TestEphemerisContextHouses:

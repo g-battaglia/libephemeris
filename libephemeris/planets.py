@@ -3508,30 +3508,21 @@ def _apply_sidereal_correction(
     return lon, dlon
 
 
-def _degenerate_origin_result(
-    t, iflag: int
-) -> Tuple[float, float, float, float, float, float]:
+def _degenerate_origin_result() -> Tuple[float, float, float, float, float, float]:
     """Position tuple for a body that sits at its own observation origin.
 
     Earth observed geocentrically and the Sun observed heliocentrically are
-    both trivially the zero vector, so latitude, distance and every speed are
-    zero and the longitude direction is physically meaningless. For a sidereal
-    ecliptic request the LEB backend (and the reference ephemeris) nevertheless
-    subtract the ayanamsha from the zero longitude, yielding ``(-ayanamsha) %
-    360`` rather than 0. Mirror that here so the Skyfield path agrees with LEB
-    at the origin instead of short-circuiting to a bare zero longitude.
-    Non-sidereal and equatorial requests keep the plain zero vector.
-
-    Args:
-        t: Skyfield Time object (used for ``t.ut1`` when applying the ayanamsha).
-        iflag: Calculation flags (FLG_SIDEREAL / FLG_EQUATORIAL / FLG_SPEED*).
+    both trivially the zero vector: latitude, distance and every speed are zero
+    and the longitude direction is physically meaningless. Measured reference
+    behavior: the reference ephemeris returns the exact zero vector here for
+    every frame -- including a sidereal ecliptic request, where the ayanamsha
+    is NOT subtracted from the (undefined) zero-length longitude. Mirror that;
+    the LEB fast path skips the same subtraction on a zero-length state (see
+    ``fast_calc._fast_calc_core``).
 
     Returns:
-        The 6-tuple ``(lon, lat, dist, dlon, dlat, ddist)``.
+        The 6-tuple ``(0, 0, 0, 0, 0, 0)``.
     """
-    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
-        lon, dlon = _apply_sidereal_correction(0.0, 0.0, t.ut1, iflag)
-        return (lon, 0.0, 0.0, dlon, 0.0, 0.0)
     return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
@@ -3593,11 +3584,12 @@ def _calc_body(
     planets = _get_computation_ephemeris()
 
     # Sun heliocentric = Sun from Sun = trivially (0,0,0). A sidereal ecliptic
-    # request still subtracts the ayanamsha (see _degenerate_origin_result) so
-    # this fallback path agrees with the LEB backend at the origin.
+    # request keeps the zero vector: measured reference behavior does not
+    # subtract the ayanamsha from the undefined zero-length longitude
+    # (see _degenerate_origin_result).
     if ipl == SUN and (iflag & FLG_HELCTR):
         _mark_dispatch_source("Analytical")
-        return _to_native_floats(_degenerate_origin_result(t, iflag)), iflag
+        return _to_native_floats(_degenerate_origin_result()), iflag
 
     # Remap AST_OFFSET + N to dedicated body IDs for built-in asteroids
     # (idempotent safety net; calc/calc_ut already remap pre-dispatch).
@@ -4874,11 +4866,12 @@ def _calc_body(
     # Earth geocentric is trivially (0,0,0,0,0,0) regardless of frame flags.
     # Return early to avoid division-by-zero in J2000/ICRS coordinate transforms
     # where dist=0 would cause NaN from asin(ze/dist). A sidereal ecliptic
-    # request still subtracts the ayanamsha (see _degenerate_origin_result) so
-    # this fallback path agrees with the LEB backend at the origin.
+    # request keeps the zero vector: measured reference behavior does not
+    # subtract the ayanamsha from the undefined zero-length longitude
+    # (see _degenerate_origin_result).
     if ipl == EARTH and not (iflag & FLG_HELCTR) and not is_barycentric:
         _mark_dispatch_source("Analytical")
-        return _to_native_floats(_degenerate_origin_result(t, iflag)), iflag
+        return _to_native_floats(_degenerate_origin_result()), iflag
 
     if iflag & FLG_HELCTR:
         # Heliocentric
@@ -6725,10 +6718,16 @@ def _format_nodaps_output(
     for point in points:
         point = _apply_nodaps_topocentric(point, jd_tt, flags)
         if flags & FLG_EQUATORIAL:
+            # Drop FLG_SIDEREAL for the equatorial rotation: the sidereal
+            # ayanamsha is already suppressed for EQUATORIAL requests in
+            # _calc_nod_aps (SID+EQU == EQU alone), and _maybe_equatorial_convert
+            # would otherwise switch to the MEAN obliquity for a sidereal
+            # request, leaving a nutation-in-obliquity residual against the pure
+            # equatorial reference. FLG_NONUT/FLG_J2000 still select their frames.
             point = _maybe_equatorial_convert(
                 point,
                 jd_tt,
-                flags,
+                flags & ~FLG_SIDEREAL,
                 already_j2000=bool(flags & FLG_J2000),
             )
         transformed.append(_to_native_floats(_apply_output_flags(point, flags)))
@@ -7047,6 +7046,18 @@ def _calc_nod_aps(
     # membership test as _calc_orbital_elements so the two stay in lockstep.
     is_minor = ipl in _MINOR_BODY_NODAPS or (AST_OFFSET < ipl < FIXSTAR_OFFSET)
 
+    # Method-bit precedence (measured reference behavior): NODBIT_MEAN wins
+    # whenever it is set, even alongside NODBIT_OSCU / NODBIT_OSCU_BAR, so
+    # methods 3/5/7 track method 1 (mean), not 2/4/6 (osculating); method 0
+    # (no bits) also defaults to mean. An osculating bit only takes effect when
+    # the mean bit is absent. The barycentric center (NODBIT_OSCU_BAR) is an
+    # independent choice that applies only on the osculating path (see bar_mode
+    # below); a body without mean elements (Pluto, minor bodies) therefore still
+    # honors OSCU_BAR under method 5/7 because it falls through to osculating.
+    prefer_mean = bool(method & NODBIT_MEAN) or not (
+        method & (NODBIT_OSCU | NODBIT_OSCU_BAR)
+    )
+
     # Interpolated lunar apsides (INTP_APOG / INTP_PERG): the interpolated
     # point is not an orbital-element body, so it has no node/apse
     # decomposition. Measured reference behavior returns a not-a-number in
@@ -7207,13 +7218,14 @@ def _calc_nod_aps(
         # Select node and apogee bodies based on method.
         # NODBIT_OSCU_BAR is treated as OSCU for the Moon, matching the
         # reference (a barycentric variant is meaningless for the
-        # geocentric lunar orbit).
-        if method & (NODBIT_OSCU | NODBIT_OSCU_BAR):
-            node_body = TRUE_NODE
-            apog_body = OSCU_APOG
-        else:
+        # geocentric lunar orbit). NODBIT_MEAN takes precedence when set
+        # (see prefer_mean above).
+        if prefer_mean:
             node_body = MEAN_NODE
             apog_body = MEAN_APOG
+        else:
+            node_body = TRUE_NODE
+            apog_body = OSCU_APOG
 
         # Node longitude from lunar theory
         node_pos, _ = calc_ut(jd_ut, node_body, calc_flags)
@@ -7230,7 +7242,7 @@ def _calc_nod_aps(
         # latitude mirrored, with its physically distinct apsis distance.
         peri_lon = (apog_lon + 180.0) % 360.0
         peri_lat = -apog_lat
-        if method & (NODBIT_OSCU | NODBIT_OSCU_BAR):
+        if not prefer_mean:
             # Distance of the osculating perigee from the instantaneous
             # ellipse (lon/lat above already follow the apogee transform).
             from .lunar import calc_osculating_perigee
@@ -7267,11 +7279,14 @@ def _calc_nod_aps(
                 lat_d = math.degrees(math.asin(max(-1.0, min(1.0, gz / dist))))
             if iflag & FLG_J2000:
                 lon_d, lat_d = _nodaps_to_j2000(lon_d, lat_d, jd_tt)
-            if iflag & FLG_SIDEREAL:
+            if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
                 # Measured reference behavior: nod_aps sidereal subtracts the
                 # MEAN ayanamsha (no nutation-in-longitude term), identical to
                 # the planet branch below. Requesting NONUT semantics from
-                # _get_ayanamsa_for_flags selects that mean value.
+                # _get_ayanamsa_for_flags selects that mean value. FLG_EQUATORIAL
+                # suppresses the ayanamsha entirely (SID+EQU == EQU alone): the
+                # equatorial rotation runs afterward in _format_nodaps_output, so
+                # subtracting here would double-shift the coordinate.
                 aya = _get_ayanamsa_for_flags(jd_ut, (iflag & ~FLG_J2000) | FLG_NONUT)
                 lon_d = float((lon_d - aya) % 360.0)
             return (lon_d, lat_d, dist, 0.0, 0.0, 0.0)
@@ -7305,7 +7320,7 @@ def _calc_nod_aps(
         # osculating state vectors for every method, matching the reference.
         mean_el = None
         bar_mode = False
-        if not (method & (NODBIT_OSCU | NODBIT_OSCU_BAR)) and not is_minor:
+        if prefer_mean and not is_minor:
             from .planetary_mean_elements import mean_orbital_elements
 
             mean_el = mean_orbital_elements(elem_ipl, jd_tt)
@@ -7651,7 +7666,14 @@ def _calc_nod_aps(
     # instead left a residual of the nutation-in-longitude term (~13.9" at
     # J2000). Requesting NONUT semantics selects the mean value; FLG_J2000 is
     # stripped so the ayanamsha epoch matches the of-date longitude.
-    if iflag & FLG_SIDEREAL:
+    #
+    # FLG_EQUATORIAL suppresses the sidereal correction entirely: measured
+    # reference behavior returns pure equatorial coordinates for SID+EQU
+    # (identical to EQU alone). _format_nodaps_output rotates the of-date
+    # longitude to the equator afterward, so subtracting the ayanamsha here
+    # would double-shift the coordinate (mirrors calc_ut, where EQUATORIAL
+    # skips the sidereal reduction).
+    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
         aya = _get_ayanamsa_for_flags(t.ut1, (iflag & ~FLG_J2000) | FLG_NONUT)
 
         def _to_sidereal(g):

@@ -850,28 +850,33 @@ class TestEdgeCaseBodies:
 
     def test_earth_geocentric_sidereal_backends_agree(self):
         # ADV-3: a body at its own observation origin (Earth geocentric) is the
-        # zero vector, but a sidereal ecliptic request still subtracts the
-        # ayanamsha (-ayanamsha % 360, matching the reference). LEB did this;
-        # Skyfield short-circuited to 0. Both backends must now agree.
+        # zero vector. Measured reference behavior: a sidereal ecliptic request
+        # keeps the exact zero vector -- the ayanamsha is NOT subtracted from
+        # the undefined zero-length longitude. Both backends must return the
+        # bare zero vector and agree.
         from libephemeris.constants import EARTH
 
         flags = FLG_SIDEREAL | FLG_SPEED
         pos_leb, _ = _run_leb(calc_ut, JD_TEST, EARTH, flags)
         pos_sf, _ = _run_skyfield(calc_ut, JD_TEST, EARTH, flags)
-        assert pos_sf[0] != 0.0  # ayanamsha applied, not short-circuited
-        assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.001
-        assert abs(pos_leb[3] - pos_sf[3]) < 1e-9  # longitude speed (= -da)
+        assert pos_leb[0] == 0.0  # no ayanamsha on the degenerate zero vector
+        assert pos_sf[0] == 0.0
+        assert tuple(pos_leb) == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        assert tuple(pos_sf) == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     def test_sun_heliocentric_sidereal_backends_agree(self):
-        # ADV-3, Sun-from-Sun origin: same requirement as the Earth case.
+        # ADV-3, Sun-from-Sun origin: same requirement as the Earth case. The
+        # sidereal ecliptic longitude stays the exact zero (no ayanamsha on the
+        # undefined zero-length longitude), matching the reference.
         from libephemeris.constants import SUN, FLG_HELCTR
 
         flags = FLG_SIDEREAL | FLG_HELCTR | FLG_SPEED
         pos_leb, _ = _run_leb(calc_ut, JD_TEST, SUN, flags)
         pos_sf, _ = _run_skyfield(calc_ut, JD_TEST, SUN, flags)
-        assert pos_sf[0] != 0.0
-        assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.001
-        assert abs(pos_leb[3] - pos_sf[3]) < 1e-9
+        assert pos_leb[0] == 0.0
+        assert pos_sf[0] == 0.0
+        assert tuple(pos_leb) == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        assert tuple(pos_sf) == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     def test_earth_geocentric_nonsidereal_stays_zero(self):
         # Guard: the degenerate short-circuit must remain a bare zero vector

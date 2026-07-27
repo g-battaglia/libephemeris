@@ -532,8 +532,8 @@ def test_house_name_int_bytes_str():
 
 
 def test_house_name_unknown():
-    """An unknown code returns 'Unknown'."""
-    assert H.house_name(ord("z")) == "Unknown"
+    """An unknown code returns '' (measured contract)."""
+    assert H.house_name(ord("z")) == ""
 
 
 # ---------------------------------------------------------------------------

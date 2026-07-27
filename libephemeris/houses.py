@@ -110,6 +110,20 @@ from . import sidereal_longterm as _sidlt
 from .time_utils import deltat as _deltat
 
 
+def _fold_hsys_case(hsys_char: str) -> str:
+    """Fold a house-system selector to its canonical case.
+
+    Measured reference behavior accepts house-system letters
+    case-insensitively (``'k'`` selects Koch exactly like ``'K'``), with one
+    deliberate exception: lowercase ``'i'`` is a distinct system of its own
+    (Sunshine/Makransky alternative), not an alias of ``'I'`` (Sunshine),
+    so it must never be folded.
+    """
+    if hsys_char == "i":
+        return hsys_char
+    return hsys_char.upper()
+
+
 def _hsys_code(hsys: int | bytes | str) -> int:
     """Normalize a house-system identifier to its integer character code.
 
@@ -126,10 +140,12 @@ def _hsys_code(hsys: int | bytes | str) -> int:
         The integer character code of the (first character of the) identifier.
     """
     if isinstance(hsys, int):
-        return hsys
-    if isinstance(hsys, bytes):
-        return hsys[0]  # first byte == ord of the first character
-    return ord(hsys[0])
+        code = hsys
+    elif isinstance(hsys, bytes):
+        code = hsys[0]  # first byte == ord of the first character
+    else:
+        code = ord(hsys[0])
+    return ord(_fold_hsys_case(chr(code)))
 
 
 def _house_armc_obliquity(tjdut: float) -> tuple[float, float]:
@@ -727,6 +743,7 @@ def houses(
         hsys_char = hsys.decode("utf-8")
     else:
         hsys_char = str(hsys)
+    hsys_char = _fold_hsys_case(hsys_char)
 
     # Determine if we need to flip MC (and thus ARMC) for specific systems
     # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
@@ -1098,7 +1115,7 @@ def houses_with_fallback(
         "N": "Natural Gradient",
     }
 
-    hsys_char = chr(hsys) if isinstance(hsys, int) else hsys
+    hsys_char = _fold_hsys_case(chr(hsys) if isinstance(hsys, int) else hsys)
     fallback_char = (
         chr(fallback_hsys) if isinstance(fallback_hsys, int) else fallback_hsys
     )
@@ -1209,7 +1226,7 @@ def houses_armc_with_fallback(
         "N": "Natural Gradient",
     }
 
-    hsys_char = chr(hsys) if isinstance(hsys, int) else hsys
+    hsys_char = _fold_hsys_case(chr(hsys) if isinstance(hsys, int) else hsys)
     fallback_char = (
         chr(fallback_hsys) if isinstance(fallback_hsys, int) else fallback_hsys
     )
@@ -1360,6 +1377,7 @@ def houses_armc(
         hsys_char = hsys.decode("utf-8")
     else:
         hsys_char = str(hsys)
+    hsys_char = _fold_hsys_case(hsys_char)
 
     # Determine if we need to flip MC (and thus ARMC) for specific systems
     # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
@@ -1618,10 +1636,10 @@ def houses_armc(
 def _hsys_to_char(hsys: int | bytes | str) -> str:
     """Normalize a house-system selector (int code, bytes, or str) to a char."""
     if isinstance(hsys, int):
-        return chr(hsys)
+        return _fold_hsys_case(chr(hsys))
     if isinstance(hsys, bytes):
-        return hsys.decode("utf-8")
-    return str(hsys)
+        return _fold_hsys_case(hsys.decode("utf-8"))
+    return _fold_hsys_case(str(hsys))
 
 
 # House systems whose reference cusp SPEEDS follow a closed-form analytic rule
@@ -1950,6 +1968,7 @@ def houses_ex(
         hsys_char = hsys.decode("utf-8")
     else:
         hsys_char = str(hsys)
+    hsys_char = _fold_hsys_case(hsys_char)
 
     # In an ayanamsha (non-fixed-epoch) sidereal zodiac the reference computes
     # Sunshine 'i' (Makransky) identically to 'I' (Treindl): the Makransky
@@ -1984,6 +2003,7 @@ def houses_ex(
                 _hch = hsys.decode("utf-8")
             else:
                 _hch = str(hsys)
+            _hch = _fold_hsys_case(_hch)
             cusps, ascmc = _houses_fixed_epoch_sidereal(
                 tjdut, lat, _hch, cusps, ascmc, flags, _sidm_hx
             )
@@ -2220,6 +2240,7 @@ def house_name(hsys: int) -> str:
         hsys_char = hsys.decode("utf-8")
     else:
         hsys_char = str(hsys)
+    hsys_char = _fold_hsys_case(hsys_char)
 
     names = {
         "P": "Placidus",
@@ -2249,7 +2270,8 @@ def house_name(hsys: int) -> str:
         "i": "Sunshine/alt.",
         "J": "Savard-A",
     }
-    return names.get(hsys_char, "Unknown")
+    # Measured reference behavior: an unknown selector yields an empty string.
+    return names.get(hsys_char, "")
 
 
 def _houses_placidus(
@@ -5021,6 +5043,11 @@ def _house_pos_pythonic(
                 lat_body = float(lon_or_hsys[1])
         else:
             lon = float(lon_or_hsys) if lon_or_hsys is not None else 0.0
+
+    # Case-fold the selector like every other entry point ('k' == 'K',
+    # lowercase 'i' stays the distinct Sunshine-alternative system).
+    hsys_char = _fold_hsys_case(hsys_char)
+    hsys_int = ord(hsys_char[0]) if hsys_char else hsys_int
 
     # Normalize angular inputs
     armc %= 360.0

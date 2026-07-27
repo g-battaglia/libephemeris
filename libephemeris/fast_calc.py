@@ -2745,7 +2745,13 @@ def _fast_calc_core(
     # so we use mean ayanamsha; for ecliptic of date we use true ayanamsha.
     _skip_sidereal = bool(iflag & FLG_EQUATORIAL)
 
-    if (iflag & FLG_SIDEREAL) and not _skip_sidereal:
+    # Degenerate self-observation (Earth geocentric, Sun heliocentric) yields a
+    # zero-length state whose longitude is physically undefined. Measured
+    # reference behavior: the reference returns the exact zero vector here and
+    # does NOT subtract the ayanamsha from the undefined zero longitude, so skip
+    # the sidereal reduction on a zero-distance state (matches the Skyfield
+    # path's _degenerate_origin_result).
+    if (iflag & FLG_SIDEREAL) and not _skip_sidereal and dist != 0.0:
         try:
             mean_aya = _calc_ayanamsa_from_leb(
                 reader,
