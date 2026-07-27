@@ -1781,7 +1781,7 @@ def _sidbit_projection_calc(
     # Measured reference behavior: with BOTH projection bits set,
     # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE.
     if sid_bits & SIDBIT_ECL_T0:
-        t0_jd = AYANAMSHA_DEFINING.get(sid_mode, (0.0, _J2000_JD))[1]
+        t0_jd = _ecl_t0_epoch_jd(sid_mode)
         zero_point = _calc_ayanamsa(t0_jd, sid_mode)
     else:  # SIDBIT_SSY_PLANE
         t0_jd = _J2000_JD
@@ -5973,6 +5973,22 @@ def _ecl_date_ayanamsha_delta(
 
     method_b = defining_value_deg + method_b_accumulated_precession(tjd_tt, t0_tt)
     return (lon_date - method_b + 180.0) % 360.0 - 180.0
+
+
+def _ecl_t0_epoch_jd(sid_mode: int) -> float:
+    """Defining epoch (JD TT) of a sidereal mode for the ECL_T0 projection.
+
+    Valens (SIDM_VALENS_MOON) keeps its defining pair outside
+    AYANAMSHA_DEFINING because its epoch is UT-anchored; without this
+    special case the lookup silently fell back to J2000 and the ECL_T0
+    projection became a near no-op (up to ~4' of error at high ecliptic
+    latitudes) instead of using the mode's ancient defining ecliptic.
+    """
+    if sid_mode == SIDM_VALENS_MOON:
+        from .time_utils import deltat
+
+        return VALENS_MOON_T0_UT + deltat(VALENS_MOON_T0_UT)
+    return AYANAMSHA_DEFINING.get(sid_mode, (0.0, _J2000_JD))[1]
 
 
 def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:

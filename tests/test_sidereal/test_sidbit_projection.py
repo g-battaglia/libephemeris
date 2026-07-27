@@ -263,3 +263,31 @@ class TestUserUtApplied:
         ephem.set_sid_mode(SIDM_USER | SIDBIT_USER_UT, t0, 24.0)
         a_ut = ephem.get_ayanamsa_ut(JD)
         assert abs(a_ut - a_tt) < 1.0 / 3600.0
+
+
+class TestValensEclT0Epoch:
+    """SIDM_VALENS_MOON's ECL_T0 projection uses the Valens defining epoch.
+
+    The mode keeps its UT-anchored defining pair outside the shared table,
+    so the projection-epoch lookup needs the dedicated resolver: with the
+    silent J2000 fallback the projection degenerated to a near no-op (up to
+    ~4' at high ecliptic latitudes).
+    """
+
+    def test_valens_ecl_t0_projects_on_ancient_ecliptic(self):
+        import libephemeris as le
+        from libephemeris.ayanamsha_definitions import VALENS_MOON_T0_UT
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        t0 = _ecl_t0_epoch_jd(le.SIDM_VALENS_MOON)
+        # The resolved epoch is Valens' (~150 CE), not the J2000 fallback.
+        assert abs(t0 - VALENS_MOON_T0_UT) < 1.0
+        # And the projection genuinely moves a high-ecliptic-latitude body.
+        jd = 2451545.0
+        le.set_sid_mode(le.SIDM_VALENS_MOON)
+        plain = le.calc_ut(jd, le.PLUTO, le.FLG_SWIEPH | le.FLG_SIDEREAL)[0][0]
+        le.set_sid_mode(le.SIDM_VALENS_MOON | le.SIDBIT_ECL_T0)
+        proj = le.calc_ut(jd, le.PLUTO, le.FLG_SWIEPH | le.FLG_SIDEREAL)[0][0]
+        le.set_sid_mode(0)
+        shift = abs((proj - plain + 180.0) % 360.0 - 180.0) * 3600.0
+        assert shift > 30.0  # was ~0.03" with the J2000 fallback

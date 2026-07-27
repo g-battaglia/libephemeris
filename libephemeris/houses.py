@@ -2030,7 +2030,7 @@ def _houses_sidbit_projection(
         _rot_x,
         ssy_plane_zero_point_deg,
     )
-    from .planets import AYANAMSHA_DEFINING, _calc_ayanamsa
+    from .planets import _calc_ayanamsa
 
     _J2000 = 2451545.0
     jd_tt = tjdut + _deltat(tjdut)
@@ -2049,7 +2049,9 @@ def _houses_sidbit_projection(
     # Measured reference behavior: with BOTH projection bits set,
     # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE.
     if sid_bits & SIDBIT_ECL_T0:
-        t0_jd = AYANAMSHA_DEFINING.get(sid_mode, (0.0, _J2000))[1]
+        from .planets import _ecl_t0_epoch_jd
+
+        t0_jd = _ecl_t0_epoch_jd(sid_mode)
         base = _ecliptic_of_t0_matrix(t0_jd)
         zero_point = _calc_ayanamsa(t0_jd, sid_mode)
     else:  # SIDBIT_SSY_PLANE
