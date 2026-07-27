@@ -114,12 +114,14 @@ def _fold_hsys_case(hsys_char: str) -> str:
     """Fold a house-system selector to its canonical case.
 
     Measured reference behavior accepts house-system letters
-    case-insensitively (``'k'`` selects Koch exactly like ``'K'``), with one
-    deliberate exception: lowercase ``'i'`` is a distinct system of its own
+    case-insensitively (``'k'`` selects Koch exactly like ``'K'``), with two
+    deliberate exceptions: lowercase ``'i'`` is a distinct system of its own
     (Sunshine/Makransky alternative), not an alias of ``'I'`` (Sunshine),
-    so it must never be folded.
+    and lowercase ``'g'`` is NOT an alias of Gauquelin ``'G'`` — it stays an
+    unrecognized selector served by the default 12-cusp fallback (folding it
+    would change the return shape from 12 to 36 cusps).
     """
-    if hsys_char == "i":
+    if hsys_char in ("i", "g"):
         return hsys_char
     return hsys_char.upper()
 
@@ -995,7 +997,12 @@ def houses(
         cusps = _houses_krusinski(armc_active, lat, eps, asc, mc)
     elif hsys_char == "N":  # Natural Gradient
         cusps = _houses_natural_gradient(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "G":  # Gauquelin
+    elif hsys_char in ("G", "g"):  # Gauquelin
+        # Lowercase 'g' computes the same 36 Gauquelin sectors: measured
+        # reference behavior folds it for the computation (house_pos and
+        # house_name treat 'g' as Gauquelin) but keys the RETURN SHAPE on
+        # the uppercase byte only, so 'g' yields the first 12 sectors in
+        # the ordinary 12-cusp tuple (see the shape check below).
         cusps = _houses_gauquelin(armc_active, lat, eps, asc, mc)
     elif hsys_char == "S":  # Sripati
         cusps = _houses_sripati(asc, mc)
@@ -1599,7 +1606,12 @@ def houses_armc(
         cusps = _houses_krusinski(armc_active, lat, eps, asc, mc)
     elif hsys_char == "N":  # Natural Gradient
         cusps = _houses_natural_gradient(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "G":  # Gauquelin
+    elif hsys_char in ("G", "g"):  # Gauquelin
+        # Lowercase 'g' computes the same 36 Gauquelin sectors: measured
+        # reference behavior folds it for the computation (house_pos and
+        # house_name treat 'g' as Gauquelin) but keys the RETURN SHAPE on
+        # the uppercase byte only, so 'g' yields the first 12 sectors in
+        # the ordinary 12-cusp tuple (see the shape check below).
         cusps = _houses_gauquelin(armc_active, lat, eps, asc, mc)
     elif hsys_char == "S":  # Sripati
         cusps = _houses_sripati(asc, mc)
@@ -2270,7 +2282,11 @@ def house_name(hsys: int) -> str:
         "i": "Sunshine/alt.",
         "J": "Savard-A",
     }
-    # Measured reference behavior: an unknown selector yields an empty string.
+    # Measured reference behavior: an unknown selector yields an empty
+    # string, and the name lookup folds 'g' to Gauquelin (unlike the
+    # houses() tuple shape, which stays 12 for the lowercase byte).
+    if hsys_char == "g":
+        hsys_char = "G"
     return names.get(hsys_char, "")
 
 
@@ -5046,7 +5062,12 @@ def _house_pos_pythonic(
 
     # Case-fold the selector like every other entry point ('k' == 'K',
     # lowercase 'i' stays the distinct Sunshine-alternative system).
+    # house_pos folds 'g' fully: measured reference behavior returns
+    # Gauquelin SECTOR positions (1-36) for the lowercase selector too —
+    # only the houses() tuple shape is keyed on the uppercase byte.
     hsys_char = _fold_hsys_case(hsys_char)
+    if hsys_char == "g":
+        hsys_char = "G"
     hsys_int = ord(hsys_char[0]) if hsys_char else hsys_int
 
     # Normalize angular inputs

@@ -250,6 +250,18 @@ report the following day's; LibEphemeris returns the real next event. When
 comparing rise/set series externally, either start the search a few minutes
 before the expected event or tolerate a one-day offset in this edge case.
 
+## Lunar lower transit is solved to the geometric condition
+
+`CALC_ITRANSIT` (lower culmination) is refined until the body's apparent
+hour angle is 180° to well under an arcsecond, for the fast-moving Moon
+like for every other body. At the instant reported by at least one external
+implementation, the Moon's own hour angle — evaluated with that
+implementation's functions — still misses 180° by 10–15 arcseconds
+(~0.6–1.0 s of time), a convergence residual specific to the fast lunar
+motion; its upper transits and the slow bodies' lower transits are
+converged on both sides. LibEphemeris reports the geometrically exact
+instant rather than reproducing the residual.
+
 ## Fixed-star radial channels
 
 For fixed stars, `dist` is the geocentric distance of the same propagated

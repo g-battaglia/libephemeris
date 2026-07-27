@@ -245,7 +245,16 @@ of order 2 arcminutes plus ~0.05"/yr, the star-tracking versus epoch-fixed
 convention difference documented in the audit notes). These are documented
 model choices, not defects; the modes with an unambiguous published anchor
 (Fagan/Bradley, Lahiri, Raman, Krishnamurti, ICRC, the frame epochs, the
-galactic and star-anchored modes) agree to well under an arcsecond.
+galactic and star-anchored modes) agree to under an arcsecond. Within that
+envelope, several carry a measured *constant* residual with an exactly
+matching precession rate: ~0.41" (Fagan/Bradley) and ~0.83" (Krishnamurti)
+equal to the external implementation's own removable per-mode
+precession-reconciliation offset (see the `SIDBIT_NO_PREC_OFFSET` note
+below), and ~0.15–0.27" for the equinox-anchored historical rows, where
+"the equinox of year X" admits both a computed-instant and a
+conventional-date realization (~2 days apart at remote epochs) and the
+measured external choices are not internally consistent across modes.
+LibEphemeris keeps the literal published anchors and conventions.
 
 Of the `SIDBIT_*` projection flags, the frame projections (`ECL_T0`,
 `SSY_PLANE`) and the ecliptic-of-date reference (`ECL_DATE`, realized from

@@ -96,8 +96,14 @@ ephemeris implementation's output.
 Zero-epoch entries use 21 March of the stated year (Julian calendar, 12:00,
 treated as TT) unless the primary statement fixes the instant; equinox and
 solstice instants use the mean-equinox polynomials of Meeus, *Astronomical
-Algorithms*, chapter 27. Both conventions bound the anchor uncertainty below
-0.1 arcsecond.
+Algorithms*, chapter 27. The two conventions differ by up to ~2 days at
+remote epochs (~0.3 arcseconds of ayanamsha), and an external implementation
+is free to realize "the equinox of year X" with either one — measured
+external realizations are not even internally consistent across modes (some
+match the computed equinox, some the conventional date). LibEphemeris keeps
+the convention that follows each primary statement literally and documents
+the residual as realization freedom rather than tuning per-mode instants
+toward external output.
 
 ### Realization notes from the source audit
 
@@ -158,6 +164,17 @@ freedom toward any other implementation's output:
   which is exactly the anchor of `SIDM_LAHIRI_VP285` (44). A separately
   published anchor for the distinct "1940" tradition is not independently
   recoverable; the row keeps its conventional 286 CE epoch as Secondary.
+- **Sub-arcsecond reconciliation offsets (0, 5, and the equinox-anchored
+  rows)** — measured against one external implementation, several modes
+  carry a *constant* zero-point offset with an exactly matching precession
+  rate: Fagan/Bradley ~0.41" and Krishnamurti ~0.83" (equal to that
+  implementation's own removable per-mode "precession offset", the internal
+  reconciliation between each author's historical precession model and the
+  modern one — the same metadata documented under `SIDBIT_NO_PREC_OFFSET`
+  in the comparison notes), and ~0.15–0.27" for Raman and the
+  equinox-anchored rows (21, 23, 26, 44), the epoch-instant realization
+  freedom described above. None of these constants is published; the
+  library keeps the literal anchors.
 
 ## User-defined mode
 
