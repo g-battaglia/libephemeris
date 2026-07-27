@@ -356,15 +356,20 @@ class TestRiseTransTrueHorErrors:
                 jd_start, 9999, CALC_RISE, [12.5, 41.9, 0.0], horhgt=5.0
             )
 
-    def test_invalid_rsmi_raises_error(self):
-        """Test that invalid rsmi raises ValueError."""
+    def test_bare_rsmi_defaults_to_rise(self):
+        """rsmi without an event bit defaults to a rise search.
+
+        Measured reference behavior (2.10.3.2): rsmi=0 and rsmi=16 (a bare
+        modifier bit) both return the same event and instant as rsmi=1.
+        """
         jd_start = julday(2024, 6, 21, 0)
-
-        with pytest.raises(ValueError, match="Invalid event type"):
-            rise_trans_true_hor(jd_start, SUN, 0, [12.5, 41.9, 0.0], horhgt=5.0)
-
-        with pytest.raises(ValueError, match="Invalid event type"):
-            rise_trans_true_hor(jd_start, SUN, 16, [12.5, 41.9, 0.0], horhgt=5.0)
+        base = rise_trans_true_hor(jd_start, SUN, 1, [12.5, 41.9, 0.0], horhgt=5.0)
+        for rsmi in (0, 16):
+            got = rise_trans_true_hor(
+                jd_start, SUN, rsmi, [12.5, 41.9, 0.0], horhgt=5.0
+            )
+            assert got[0] == base[0]
+            assert abs(got[1][0] - base[1][0]) < 1e-9
 
 
 class TestRiseTransTrueHorVariousAngles:

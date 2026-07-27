@@ -1200,7 +1200,24 @@ def _calc_ayanamsa_from_leb(
             jd_tt, defining_epoch
         )
     else:
-        raise KeyError(mode)
+        # Measured reference behavior: an unrecognized sidereal mode falls back
+        # to the default Fagan/Bradley ayanamsha (mode 0). Match the module
+        # reducer (planets._calc_ayanamsa) so a sidereal position request on the
+        # LEB path never raises on an invalid mode.
+        import warnings
+
+        from .constants import SIDM_FAGAN_BRADLEY
+
+        warnings.warn(
+            f"Unknown sidereal mode {mode} is not recognized; "
+            f"falling back to Fagan/Bradley (mode {SIDM_FAGAN_BRADLEY}).",
+            UserWarning,
+            stacklevel=2,
+        )
+        defining_value, defining_epoch = AYANAMSHA_DEFINING[SIDM_FAGAN_BRADLEY]
+        mean_aya = defining_value + method_b_accumulated_precession(
+            jd_tt, defining_epoch
+        )
 
     # Mean ayanamsa (without nutation) - get_ayanamsa_ut() returns mean value
     return mean_aya % 360.0

@@ -74,13 +74,18 @@ def test_context_calc_tt_leb_retflag_uses_tt_echo_contract(monkeypatch, flags, w
     "method,flags,want",
     [
         ("calc_ut", 0, le.FLG_SWIEPH),
-        ("calc", 0, le.FLG_SWIEPH),
+        ("calc", 0, 0),
         ("calc_ut", le.FLG_J2000, le.FLG_SWIEPH | le.FLG_J2000 | le.FLG_NONUT),
-        ("calc", le.FLG_J2000, le.FLG_SWIEPH | le.FLG_J2000 | le.FLG_NONUT),
+        ("calc", le.FLG_J2000, le.FLG_J2000 | le.FLG_NONUT),
         (
             "calc_ut",
             le.FLG_HELCTR,
             le.FLG_SWIEPH | le.FLG_HELCTR | le.FLG_NOGDEFL | le.FLG_NOABERR,
+        ),
+        (
+            "calc",
+            le.FLG_HELCTR,
+            le.FLG_HELCTR | le.FLG_NOGDEFL | le.FLG_NOABERR,
         ),
         (
             "calc_ut",
@@ -90,23 +95,30 @@ def test_context_calc_tt_leb_retflag_uses_tt_echo_contract(monkeypatch, flags, w
         (
             "calc",
             le.FLG_TOPOCTR | le.FLG_BARYCTR,
-            le.FLG_SWIEPH | le.FLG_TOPOCTR,
+            le.FLG_TOPOCTR,
         ),
         (
             "calc_ut",
             le.FLG_SPEED | le.FLG_SPEED3,
             le.FLG_SWIEPH | le.FLG_SPEED,
         ),
+        (
+            "calc",
+            le.FLG_SPEED | le.FLG_SPEED3,
+            le.FLG_SPEED,
+        ),
     ],
 )
 def test_context_ecl_nut_retflag_matches_entrypoint_contract(method, flags, want):
-    """ECL_NUT uses one flag contract for TT and UT entry points.
+    """ECL_NUT follows the ordinary calc()-vs-calc_ut() ephemeris-bit echo.
 
-    Clean-room note: the pseudo-body is evaluated from IAU/ERFA models and has
-    no ephemeris-file dependency. Both entry points therefore use the ordinary
-    default ephemeris-selection bit. This intentionally removes the historical
-    TT-only zero-flag exception while preserving every explicitly requested
-    flag.
+    Measured against the reference: the TT entry point (``calc``) echoes only
+    the ephemeris-selection bits the caller actually passed (a zero-flag
+    request returns retflag 0, J2000 returns J2000|NONUT, ...), while the UT
+    entry point (``calc_ut``) injects the default SWIEPH bit (0 -> SWIEPH,
+    J2000 -> SWIEPH|J2000|NONUT, ...). This is the same contract regular
+    bodies use; the pseudo-body is not a special case. Every explicitly
+    requested flag is preserved either way.
     """
     _, retflag = getattr(le.EphemerisContext(), method)(JD, le.ECL_NUT, flags)
 

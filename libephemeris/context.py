@@ -643,6 +643,7 @@ class EphemerisContext:
             from .planets import (
                 _calc_nutation_obliquity,
                 _calc_nutation_obliquity_tt,
+                _calc_tt_epheflag_echo,
                 _exclusive_ephemeris_bit,
                 _implied_retflag_bits,
                 _resolve_center_flags,
@@ -655,9 +656,16 @@ class EphemerisContext:
             nut_flags = _exclusive_ephemeris_bit(res_flags)
             if ut:
                 pos, retflag = _calc_nutation_obliquity(tjd, nut_flags)
+                echoed = retflag | _implied_retflag_bits(res_flags)
             else:
                 pos, retflag = _calc_nutation_obliquity_tt(tjd, nut_flags)
-            result = (pos, retflag | _implied_retflag_bits(res_flags))
+                # calc() (TT) echoes only the ephemeris-selection bits the
+                # caller passed (a zero-flag request returns retflag 0), while
+                # calc_ut() injects the SWIEPH default. Mirror the module path.
+                echoed = _calc_tt_epheflag_echo(
+                    retflag | _implied_retflag_bits(res_flags), iflag
+                )
+            result = (pos, echoed)
             from .logging_config import get_logger
 
             get_logger().debug(

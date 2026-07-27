@@ -859,10 +859,15 @@ def houses(
     # Co-Ascendant (Munkasey) formula:
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
-    # At the equator coasc2_lat is +90 degrees; _calc_ascendant applies its
-    # explicit polar limiting convention.
+    # At the exact equator the northern (+90-lat) and southern (-90-lat) pole
+    # heights give antipodal one-sided limits for coasc2 (180 vs 0). Measured
+    # reference behavior resolves this degeneracy per house system: the horizon
+    # system 'H' takes the southern branch (coasc2 -> 0), while every other
+    # system takes the northern branch (coasc2 -> 180). Away from lat == 0 the
+    # sign of the latitude selects the branch unambiguously and the two
+    # implementations already agree.
     coasc2_armc = (armc_deg + 90.0) % 360.0
-    if lat >= 0:
+    if lat > 0.0 or (lat == 0.0 and hsys_char != "H"):
         coasc2_lat = 90.0 - lat
     else:
         coasc2_lat = -90.0 - lat
@@ -1477,10 +1482,15 @@ def houses_armc(
     # Co-Ascendant M. Munkasey (coasc2)
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
-    # At the equator coasc2_lat is +90 degrees; _calc_ascendant applies its
-    # explicit polar limiting convention.
+    # At the exact equator the northern (+90-lat) and southern (-90-lat) pole
+    # heights give antipodal one-sided limits for coasc2 (180 vs 0). Measured
+    # reference behavior resolves this degeneracy per house system: the horizon
+    # system 'H' takes the southern branch (coasc2 -> 0), while every other
+    # system takes the northern branch (coasc2 -> 180). Away from lat == 0 the
+    # sign of the latitude selects the branch unambiguously and the two
+    # implementations already agree.
     coasc2_armc = (armc_deg + 90.0) % 360.0
-    if lat >= 0:
+    if lat > 0.0 or (lat == 0.0 and hsys_char != "H"):
         coasc2_lat = 90.0 - lat
     else:
         coasc2_lat = -90.0 - lat
@@ -1932,8 +1942,32 @@ def houses_ex(
         >>> set_sid_mode(SIDM_LAHIRI)
         >>> cusps, ascmc = houses_ex(2451545.0, 51.5, -0.12, ord('P'), FLG_SIDEREAL)
     """
+    # House-system character, needed up front to seed the tropical computation
+    # for the ayanamsha-mode sidereal Sunshine 'i'.
+    if isinstance(hsys, int):
+        hsys_char = chr(hsys)
+    elif isinstance(hsys, bytes):
+        hsys_char = hsys.decode("utf-8")
+    else:
+        hsys_char = str(hsys)
+
+    # In an ayanamsha (non-fixed-epoch) sidereal zodiac the reference computes
+    # Sunshine 'i' (Makransky) identically to 'I' (Treindl): the Makransky
+    # upper/lower-meridian construction — and its circumpolar guard — is not
+    # applied on that path. Seed the tropical computation from 'I' so a
+    # circumpolar Sun returns cusps (matching the reference) instead of raising.
+    # The fixed-epoch modes keep 'i' on the Makransky path, where they match the
+    # reference by raising, so they are deliberately excluded here.
+    _tropical_hsys = hsys
+    if (flags & FLG_SIDEREAL) and hsys_char == "i":
+        from .state import get_sid_mode as _get_sid_mode_seed
+        from .sidereal_epoch import FIXED_EPOCH_T0 as _FIXED_EPOCH_T0_seed
+
+        if _get_sid_mode_seed() not in _FIXED_EPOCH_T0_seed:
+            _tropical_hsys = ord("I")
+
     # Propagate flags to houses() so ephemeris flags (FLG_MOSEPH etc.) are used
-    cusps, ascmc = houses(tjdut, lat, lon, hsys, flags)
+    cusps, ascmc = houses(tjdut, lat, lon, _tropical_hsys, flags)
 
     if flags & FLG_SIDEREAL:
         # Fixed-epoch modes (SIDM_J2000/J1900/B1950) are frame requests:
@@ -1982,14 +2016,6 @@ def houses_ex(
         ascmc_list[7] = (ascmc_list[7] - ayanamsa) % 360.0  # PolarAsc
         ascmc = tuple(ascmc_list)
 
-        # Normalize hsys to a character for comparison
-        if isinstance(hsys, int):
-            hsys_char = chr(hsys)
-        elif isinstance(hsys, bytes):
-            hsys_char = hsys.decode("utf-8")
-        else:
-            hsys_char = str(hsys)
-
         # For Ascendant-based house systems, recalculate using sidereal Ascendant
         # Whole Sign (W), Equal (A/E), Vehlow (V)
         if hsys_char == "W":
@@ -2004,35 +2030,6 @@ def houses_ex(
             # Vehlow Equal: sidereal Asc at middle of 1st house
             start = (sid_asc - 15.0) % 360.0
             cusps = tuple([(start + i * 30.0) % 360.0 for i in range(12)])
-        elif hsys_char in ("I", "i"):
-            # Sunshine: Recalculate using sidereal Asc/MC
-            try:
-                eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
-                sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
-                sun_dec = sun_pos[1]
-            except EphemerisRangeError:
-                sun_dec = _sun_declination_analytic(tjdut)
-            except (IndexError, TypeError, ValueError, CalculationError):
-                sun_dec = 0.0
-            _, eps = _house_armc_obliquity(tjdut)
-            armc = ascmc[2]
-            # In sidereal mode the reference API computes 'i' (Makransky)
-            # identically to 'I' (Treindl): sid 'i' == sid 'I' byte-for-byte
-            # at every latitude/date/ayanamsha probed, even where the
-            # tropical variants differ by tens of degrees (|lat| >~ 58).
-            # Both letters therefore route to the Treindl algorithm here;
-            # they differ only on the tropical path.
-            sunshine_cusps = _houses_sunshine(armc, lat, eps, sid_asc, sid_mc, sun_dec)
-            # Angular cusps (1, 4, 7, 10) are already correct with sid_asc/sid_mc
-            # Intermediate cusps (2, 3, 5, 6, 8, 9, 11, 12) are calculated
-            # geometrically and need to be converted to sidereal
-            intermediate_houses = {2, 3, 5, 6, 8, 9, 11, 12}  # 1-indexed
-            cusps = tuple(
-                (sunshine_cusps[i] - ayanamsa) % 360.0
-                if i in intermediate_houses
-                else sunshine_cusps[i]
-                for i in range(1, 13)
-            )
         elif hsys_char == "N":
             # Aries houses: the wheel is anchored at 0 deg of the
             # zodiac in use — in the sidereal zodiac the cusps stay at
@@ -2040,7 +2037,12 @@ def houses_ex(
             # ayanamsha).
             cusps = tuple(float(i * 30) for i in range(12))
         else:
-            # For other systems, just subtract ayanamsa from tropical cusps
+            # For every other system — including Sunshine 'I'/'i', whose
+            # tropical Treindl cusps already carry the single MC-below-horizon
+            # reflection — subtract the ayanamsha uniformly from all twelve
+            # cusps. This mirrors the reference (compute tropical, shift by the
+            # ayanamsha) and avoids re-running the Sunshine construction on an
+            # already-reflected sidereal MC, which would flip it a second time.
             cusps = tuple([(c - ayanamsa) % 360.0 for c in cusps])
 
     # degnorm snaps the bare-%360 artifact (exactly 360.0 from a

@@ -2080,7 +2080,16 @@ def calc(
             res_flags &= ~FLG_SPEED3
         nut_flags = _exclusive_ephemeris_bit(res_flags)
         pos_nut, rf_nut = _calc_nutation_obliquity_tt(tjdet, nut_flags)
-        result = (pos_nut, rf_nut | _implied_retflag_bits(res_flags))
+        # calc() (TT) echoes only the ephemeris-selection bits the caller
+        # actually passed: a request with no source bit returns retflag 0,
+        # not the SWIEPH default that calc_ut() injects. Measured against the
+        # reference: calc ECL_NUT 0->0, 64->64, 256->256, 320->320, while
+        # calc_ut ECL_NUT 0->2, 64->66, ... (SWIEPH default). Requests that
+        # carry an explicit source bit (2, 4, 6, 66, 258, ...) are unaffected.
+        retflag = _calc_tt_epheflag_echo(
+            rf_nut | _implied_retflag_bits(res_flags), flags
+        )
+        result = (pos_nut, retflag)
         from .logging_config import get_logger
 
         get_logger().debug("body=%d jd=%.1f source=ERFA", requested_planet, tjdet)
@@ -5696,7 +5705,12 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     Returns:
         Mean ayanamsha in degrees, normalized to [0, 360).
     """
-    sid_mode &= 0xFF
+    # Strip positive SIDBIT projection flags (>= 256) to recover the base mode,
+    # but never mask a negative mode: -1 & 0xFF == 255 (SIDM_USER) would turn
+    # an invalid ID into a valid one. Negatives fall through to the invalid-mode
+    # fallback below.
+    if sid_mode >= 0:
+        sid_mode &= 0xFF
     tjd_tt = float(get_timescale().ut1_jd(tjd_ut).tt)
 
     if sid_mode == SIDM_USER:
@@ -5791,13 +5805,16 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         return float(value % 360.0)
 
     if sid_mode not in AYANAMSHA_DEFINING:
+        # Measured reference behavior: an unrecognized sidereal mode (including
+        # negatives and unregistered positive IDs) falls back to the default
+        # Fagan/Bradley ayanamsha (mode 0), not to Lahiri.
         warnings.warn(
             f"Unknown sidereal mode {sid_mode} is not recognized; "
-            f"falling back to Lahiri (mode {SIDM_LAHIRI}).",
+            f"falling back to Fagan/Bradley (mode {SIDM_FAGAN_BRADLEY}).",
             UserWarning,
             stacklevel=2,
         )
-        sid_mode = SIDM_LAHIRI
+        sid_mode = SIDM_FAGAN_BRADLEY
 
     # Registered defining pair: ayanamsha value at the defining epoch,
     # propagated with Method-B on that epoch's mean ecliptic — the same
@@ -5921,10 +5938,20 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
     from .state import set_sid_mode
 
     global _SIDEREAL_BITS
-    _SIDEREAL_BITS = mode & _IMPLEMENTED_SIDBITS
-    # Forward the base mode plus any still-unsupported projection bits to the
-    # state setter, which strips-and-warns for those remaining bits only.
-    set_sid_mode(mode & ~_IMPLEMENTED_SIDBITS, t0, ayan_t0)
+    if mode >= 0:
+        _SIDEREAL_BITS = mode & _IMPLEMENTED_SIDBITS
+        # Forward the base mode plus any still-unsupported projection bits to
+        # the state setter, which strips-and-warns for those remaining bits.
+        base_mode = mode & ~_IMPLEMENTED_SIDBITS
+    else:
+        # A negative mode is an invalid ID, not a SIDBIT composite. Extracting
+        # projection bits from it (mode & _IMPLEMENTED_SIDBITS on the all-ones
+        # two's-complement pattern) would spuriously enable ECL_T0/SSY_PLANE/
+        # USER_UT and the `& ~bits` would map it onto a positive base. Pass it
+        # through verbatim so the reducer applies the invalid-mode fallback.
+        _SIDEREAL_BITS = 0
+        base_mode = mode
+    set_sid_mode(base_mode, t0, ayan_t0)
 
 
 def get_ayanamsa(tjdet: float) -> float:
@@ -7316,6 +7343,10 @@ def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, 
 
     Note:
         - For heliocentric calculations (default), elements are relative to the Sun
+        - With FLG_BARYCTR the elements of the trans-jovian bodies (Saturn,
+          Uranus, Neptune, Pluto, and centaurs/TNOs beyond Jupiter) are
+          re-referenced to the solar-system barycentre; Jupiter and every
+          interior body are unchanged (matching the reference)
         - Moon's elements are geocentric (relative to Earth)
         - Elements change constantly due to perturbations from other planets
 
@@ -7361,7 +7392,52 @@ def get_orbital_elements_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float,
     return _calc_orbital_elements(t, ipl, iflag)
 
 
-def _calc_orbital_elements_minor(t, ipl: int) -> Tuple[float, ...]:
+# Semi-major-axis threshold for FLG_BARYCTR orbital elements. Measured
+# reference behavior: under FLG_BARYCTR the two-body osculating fit is
+# re-referenced from the Sun to the solar-system barycentre only for orbits
+# beyond Jupiter; Jupiter (a ~ 5.20 AU) and every interior body (the terrestrial
+# planets and the main-belt asteroids Ceres/Pallas/Juno/Vesta at ~2.4-2.8 AU)
+# are unchanged. The 6.0 AU boundary cleanly separates Jupiter's stable
+# semi-major axis from Saturn (~9.58 AU) and the trans-jovian centaurs/TNOs.
+_TRANS_JOVIAN_A_AU = 6.0
+
+
+def _osculating_semi_major_axis(
+    rx: float, ry: float, rz: float, vx: float, vy: float, vz: float, GM: float
+) -> float:
+    """Two-body semi-major axis (AU) from a state vector and central GM."""
+    r = math.sqrt(rx * rx + ry * ry + rz * rz)
+    if not (r > 0.0):
+        return 0.0
+    v2 = vx * vx + vy * vy + vz * vz
+    denom = 2.0 / r - v2 / GM
+    return (1.0 / denom) if denom != 0.0 else 0.0
+
+
+def _sun_barycentric_ecliptic_state(
+    t,
+) -> Tuple[float, float, float, float, float, float]:
+    """Sun position/velocity relative to the SSB, in the mean J2000 ecliptic.
+
+    Adding this to a heliocentric state (target - Sun) yields the barycentric
+    state (target - SSB): (target - Sun) + (Sun - SSB) = target - SSB.
+    """
+    from .fast_calc import _rotate_icrs_to_ecliptic_j2000
+
+    planets = _get_computation_ephemeris()
+    sun = planets["sun"].at(t)
+    sp = sun.position.au
+    sv = sun.velocity.au_per_d
+    sx, sy, sz = _rotate_icrs_to_ecliptic_j2000(
+        float(sp[0]), float(sp[1]), float(sp[2])
+    )
+    svx, svy, svz = _rotate_icrs_to_ecliptic_j2000(
+        float(sv[0]), float(sv[1]), float(sv[2])
+    )
+    return (sx, sy, sz, svx, svy, svz)
+
+
+def _calc_orbital_elements_minor(t, ipl: int, iflag: int = 0) -> Tuple[float, ...]:
     """Osculating orbital elements for a minor body (asteroid/centaur/TNO).
 
     The heliocentric state is taken from the same position pipeline that
@@ -7379,13 +7455,16 @@ def _calc_orbital_elements_minor(t, ipl: int) -> Tuple[float, ...]:
     """
     GM = 0.01720209895**2  # Gaussian gravitational constant k^2 (IAU)
     # Geometric heliocentric J2000-ecliptic state (light-time/aberration/
-    # deflection removed) reduced with GM_sun.
+    # deflection removed) reduced with GM_sun. Under FLG_BARYCTR a trans-jovian
+    # minor body (e.g. a centaur/TNO beyond Jupiter) is re-referenced to the SSB.
     flags = FLG_HELCTR | FLG_J2000 | FLG_TRUEPOS | FLG_SPEED
-    return _osculating_from_calc_state(t, ipl, flags, GM)
+    return _osculating_from_calc_state(
+        t, ipl, flags, GM, want_barycentric=bool(iflag & FLG_BARYCTR)
+    )
 
 
 def _osculating_from_calc_state(
-    t, ipl: int, flags: int, GM: float
+    t, ipl: int, flags: int, GM: float, want_barycentric: bool = False
 ) -> Tuple[float, ...]:
     """Osculating elements from the geometric state the pipeline serves.
 
@@ -7446,6 +7525,18 @@ def _osculating_from_calc_state(
         + r * cos_bet * cos_lam * dlam
     )
     vz = ddist * sin_bet + r * cos_bet * dbet
+
+    # Barycentric re-reference for trans-jovian orbits: shift the heliocentric
+    # state (target - Sun) to the barycentric state (target - SSB) by adding the
+    # Sun's barycentric position/velocity. Only orbits beyond Jupiter respond
+    # (measured), so the belt asteroids and any interior body stay heliocentric.
+    if (
+        want_barycentric
+        and _osculating_semi_major_axis(x, y, z, vx, vy, vz, GM) > _TRANS_JOVIAN_A_AU
+    ):
+        sx, sy, sz, svx, svy, svz = _sun_barycentric_ecliptic_state(t)
+        x, y, z = x + sx, y + sy, z + sz
+        vx, vy, vz = vx + svx, vy + svy, vz + svz
 
     return _orbital_elements_from_ecliptic_state(x, y, z, vx, vy, vz, GM, ipl, tt_jd)
 
@@ -7511,7 +7602,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # test as _calc_nod_aps so the two paths stay in lockstep, and never a
     # silent zero-element tuple, which would read as a real orbit at 0 AU.
     if ipl in _MINOR_BODY_NODAPS or (AST_OFFSET < ipl < FIXSTAR_OFFSET):
-        return _calc_orbital_elements_minor(t, ipl)
+        return _calc_orbital_elements_minor(t, ipl, iflag)
 
     # Fictitious/hypothetical bodies (40-58): osculating elements from the
     # library's own runtime models (heliocentric for most, geocentric for the
@@ -7554,13 +7645,64 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         mass_ratio = _SUN_MASS_RATIOS.get(ipl)
         GM = _GM_SUN * (1.0 + 1.0 / mass_ratio) if mass_ratio else _GM_SUN
 
-    # Get heliocentric (or geocentric for Moon) position and velocity
-    center_pos = center.at(t)
-    target_pos = target.at(t)
+    # Get heliocentric (or geocentric for Moon) position and velocity. In
+    # sealed leb mode an out-of-range request evaluates the heliocentric center
+    # (the Sun, body 0) first, so the raw EphemerisRangeError would name
+    # "Body 0" rather than the planet the caller asked for. Re-raise naming the
+    # requested body (mirrors the minor-body escalation, which already does so).
+    from .exceptions import EphemerisRangeError
 
-    # Position and velocity vectors in ICRS (equatorial) frame
-    r_icrs = target_pos.position.au - center_pos.position.au
-    v_icrs = target_pos.velocity.au_per_d - center_pos.velocity.au_per_d
+    try:
+        center_pos = center.at(t)
+        target_pos = target.at(t)
+    except EphemerisRangeError as exc:
+        if getattr(exc, "body_id", None) == ipl:
+            raise
+        _start = getattr(exc, "start_jd", None)
+        _end = getattr(exc, "end_jd", None)
+        _jd = getattr(exc, "requested_jd", float(t.tt))
+        if _start is None or _end is None:
+            raise
+        raise EphemerisRangeError(
+            message=(
+                f"Body {ipl} at JD {_jd:.6f} is outside active LEB coverage "
+                f"range [{_start:.6f}, {_end:.6f}]."
+            ),
+            requested_jd=_jd,
+            start_jd=_start,
+            end_jd=_end,
+            body_id=ipl,
+        ) from exc
+
+    # Heliocentric state (target - Sun); Moon uses the geocentric state above.
+    r_helio = target_pos.position.au - center_pos.position.au
+    v_helio = target_pos.velocity.au_per_d - center_pos.velocity.au_per_d
+
+    # Barycentric orbital elements (FLG_BARYCTR): the reference re-references the
+    # two-body fit from the Sun to the SSB for the trans-jovian planets only
+    # (Saturn dM0 ~ -2.89 deg, Uranus -1.54, Neptune -0.40, Pluto -0.31; Mercury
+    # through Jupiter show no shift). The Moon is unaffected. Same GM as helio.
+    _bary = (
+        bool(iflag & FLG_BARYCTR)
+        and ipl != MOON
+        and _osculating_semi_major_axis(
+            float(r_helio[0]),
+            float(r_helio[1]),
+            float(r_helio[2]),
+            float(v_helio[0]),
+            float(v_helio[1]),
+            float(v_helio[2]),
+            GM,
+        )
+        > _TRANS_JOVIAN_A_AU
+    )
+    if _bary:
+        # Target relative to the SSB (Skyfield positions are BCRS/SSB-relative).
+        r_icrs = target_pos.position.au
+        v_icrs = target_pos.velocity.au_per_d
+    else:
+        r_icrs = r_helio
+        v_icrs = v_helio
 
     # Convert from ICRS to the mean J2000 ecliptic using the IAU 2006 frame
     # bias and mean obliquity.
@@ -8062,6 +8204,19 @@ def _calc_orbit_max_min_true_distance(
     if ipl in (SUN, MOON):
         iflag &= ~FLG_HELCTR
 
+    # FLG_BARYCTR re-references the orbit to the SSB only for bodies beyond
+    # Jupiter; for every interior body the reference returns the heliocentric
+    # result for all three channels (max, min and true distance). Normalize the
+    # interior case to FLG_HELCTR so the true-distance calc() below and the
+    # element branch both stay heliocentric and agree with the reference.
+    if (iflag & FLG_BARYCTR) and ipl not in (SUN, MOON):
+        try:
+            _a_helio = _calc_orbital_elements(t, ipl, FLG_HELCTR)[0]
+        except Exception:
+            _a_helio = 0.0
+        if not (_a_helio > _TRANS_JOVIAN_A_AU):
+            iflag = (iflag & ~FLG_BARYCTR) | FLG_HELCTR
+
     # Current true distance at the requested ephemeris time (ET/TT input).
     true_dist = 0.0
     if tjd_et > 0:
@@ -8082,8 +8237,10 @@ def _calc_orbit_max_min_true_distance(
             math.radians(el[4]),
         )
 
-    # Heliocentric: extremes are simply the body's own perihelion/aphelion.
-    if iflag & FLG_HELCTR:
+    # Heliocentric / barycentric: extremes are simply the body's own
+    # perihelion/aphelion. The reference honors FLG_BARYCTR here too, so a
+    # trans-jovian body reports its barycentric aphelion/perihelion (measured).
+    if iflag & (FLG_HELCTR | FLG_BARYCTR):
         el = _calc_orbital_elements(t, ipl, iflag)
         if el[0] <= 0.0:
             return (0.0, 0.0, true_dist)
@@ -8379,7 +8536,13 @@ def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
 _PLANET_MAG_PARAMS = {
     # Mercury, Venus, Mars, Jupiter, Saturn, Pluto use Mallama 2018 formulas
     # (implemented directly in _calc_planet_magnitude)
-    URANUS: (-7.15, 0.002, 0.0, 0.0),  # Uranus (Mallama & Hilton 2018)
+    # Uranus: simplified V(1,0) + linear phase photometry. This omits the
+    # sub-observer-latitude brightness term that the full Mallama & Hilton
+    # (2018) model carries for Uranus's extreme obliquity; the resulting
+    # ~10 mmag model difference is documented in
+    # docs/comparison/intentional-divergences.md ("Outer-planet visual
+    # magnitude photometry").
+    URANUS: (-7.15, 0.002, 0.0, 0.0),
     # Neptune uses dedicated secular variation formula in _calc_planet_magnitude
     # Pluto uses dedicated Mallama 2018 formula below
 }

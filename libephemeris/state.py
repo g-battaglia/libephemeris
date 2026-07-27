@@ -1868,7 +1868,13 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
     # only the base ayanamsha mode avoids the silent wrong fallback the
     # composite value would otherwise trigger downstream. Warn so the caller
     # knows the projection was dropped rather than applied.
-    sidbits = mode & ~0xFF
+    # SIDBIT projection flags are positive high bits (>= 256) OR-ed onto a
+    # base mode in 0..255. Only strip them for a non-negative composite: a
+    # negative mode is simply an invalid mode ID, and masking it with 0xFF
+    # would wrap it onto a valid high base mode (e.g. -1 -> 255 = SIDM_USER).
+    # Leave negatives untouched so the ayanamsha reducer applies the reference
+    # invalid-mode fallback (Fagan/Bradley).
+    sidbits = (mode & ~0xFF) if mode >= 0 else 0
     if sidbits:
         warnings.warn(
             f"SIDBIT projection flags 0x{sidbits:04X} are not supported in "

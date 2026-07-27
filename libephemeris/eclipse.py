@@ -7114,13 +7114,49 @@ def _calculate_rise_set(
         return -2, _make_tret()
     assert jd_cross_end is not None
 
-    # Bisection: 0.0001 degrees corresponds to well under a second of
-    # time at typical horizon crossing speeds.
-    for _ in range(50):
+    # Bisection with a rate-aware altitude tolerance for near-tangential
+    # grazing crossings.
+    #
+    # A fixed altitude residual maps to a time error of |h| / |dh/dt|. On a
+    # steep crossing (the Sun rises/sets at ~15"/s at mid latitudes) 0.0001 deg
+    # is well under 0.03 s, so that tolerance is kept and the crossing exits
+    # exactly as before. Only when the apparent altitude sweeps the horizon
+    # very slowly — the Sun skimming the horizon at a solstice essentially at
+    # the polar circle, where |dh/dt| <~ 2"/s — does 0.0001 deg span an
+    # appreciable time (up to ~0.4 s). There the loop keeps bisecting until the
+    # *time* (not the altitude) is pinned to ~0.03 s, using the local slope
+    # |dh/dt| measured at the candidate by a tight symmetric probe.
+    #
+    # The slope gate deliberately excludes the steeper high-summer sub-polar
+    # geometry, where the rise/set sits on the refraction "dip" discontinuity
+    # (the apparent altitude jumps by ~the horizon refraction across the
+    # crossing): there the reference stops on the refracted branch above the
+    # jump, so converging onto |h| = 0 would diverge from it. Those crossings
+    # keep the historic exit unchanged. Measured behavioral comparison places
+    # the near-tangential grazing that needs refining below ~2"/s and the
+    # dip-branch geometry above it, so the gate sits at 2"/s.
+    _TIME_TOL_S = 0.03
+    _SLOPE_PROBE_S = 0.05
+    _GRAZE_SLOPE_DEG_S = 2.0 / 3600.0  # ~2"/s: near-tangential grazing only
+    for _ in range(60):
         jd_mid = (jd_cross_start + jd_cross_end) / 2
         h_mid = _event_height(jd_mid)
-        if abs(h_mid) < 0.0001:
-            return 0, _make_tret(jd_mid)
+        if abs(h_mid) < 1e-4:
+            span = jd_cross_end - jd_cross_start
+            dt = _SLOPE_PROBE_S / 86400.0
+            if dt > 0.25 * span:
+                dt = 0.25 * span
+            slope = 0.0
+            if dt > 0.0:
+                slope = abs(_event_height(jd_mid + dt) - _event_height(jd_mid - dt)) / (
+                    2.0 * dt * 86400.0
+                )
+            if (
+                slope <= 0.0
+                or slope >= _GRAZE_SLOPE_DEG_S
+                or abs(h_mid) < slope * _TIME_TOL_S
+            ):
+                return 0, _make_tret(jd_mid)
         if event_type == CALC_RISE:
             if h_mid < 0.0:
                 jd_cross_start = jd_mid

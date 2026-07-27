@@ -182,10 +182,15 @@ def test_houses_unknown_code_defaults_placidus():
 
 
 def test_houses_equator_co_asc_branch():
-    """All systems share the positive geometric equator convention."""
-    cusps_h, ascmc_h = ephem.houses(JD, 0.0, ROME_LON, ord("H"))
-    cusps_e, ascmc_e = ephem.houses(JD, 0.0, ROME_LON, ord("E"))
-    assert ascmc_h[6] == ascmc_e[6]
+    """The Munkasey co-ascendant at the exact equator is system-dependent.
+
+    Measured reference behavior: the horizon system 'H' resolves the equator
+    degeneracy on the southern branch — the antipode of the northern branch
+    that every other system (here Equal 'E') uses.
+    """
+    _, ascmc_h = ephem.houses(JD, 0.0, ROME_LON, ord("H"))
+    _, ascmc_e = ephem.houses(JD, 0.0, ROME_LON, ord("E"))
+    assert ascmc_h[6] == (ascmc_e[6] + 180.0) % 360.0
 
 
 def test_houses_apc_polar_flip():

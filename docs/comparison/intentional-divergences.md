@@ -151,15 +151,56 @@ The Sun itself reports 0.0 in all three phase channels (phase angle,
 illuminated fraction, elongation): phase quantities are inapplicable to the
 self-luminous disc.
 
-## Pluto visual magnitude photometry
+## Heliocentric apparent-place light time
 
-The Pluto magnitude channel of `pheno` uses the modern Mallama & Hilton (2018),
-*Icarus* 306, 33 photometry — V(1,0) = −1.024 mag with a linear phase
-coefficient β = 0.0362 mag/degree, i.e. V = V(1,0) + 5·log₁₀(r·Δ) + β·α. At
-least one external implementation uses the older flat photometry
-(V(1,0) = −1.00 mag, no phase term). The two disagree by ≤22 mmag over the
-range of geocentric phase angles Pluto reaches; LibEphemeris keeps the modern
-phase-dependent model.
+The apparent heliocentric place (`FLG_HELCTR` without `FLG_TRUEPOS`) retards the
+target by the rigorous observer-to-target (Sun-to-target) light time: the
+target state is re-evaluated at `t − lt` from the JPL ephemeris, the standard
+IAU / NOVAS apparent-place reduction. The geometric heliocentric place
+(`FLG_TRUEPOS`) and the reported heliocentric distance agree with an external
+implementation to below 0.001″.
+
+The apparent heliocentric *longitude* differs from that external
+implementation by up to ~0.5″ for the fast inner planets (Mercury near
+perihelion), ~0.06–0.3″ for Venus and Mars, and negligibly for the slow outer
+planets. Its apparent displacement is a linear extrapolation along the
+heliocentric velocity by an effective light time that departs from `r/c` by a
+date-dependent amount — present even for a near-circular orbit, so it is not a
+radial-velocity, Sun-retardation, or observer-aberration effect — which does
+not reduce to a published closed form. The rigorous re-evaluated retardation is
+the documented convention chosen here; no fitted per-date correction is carried.
+Both the Skyfield and LEB back ends are identical.
+
+## Outer-planet visual magnitude photometry
+
+The `pheno` visual-magnitude channel differs from at least one external
+implementation for three outer bodies. In every case the disk geometry
+(diameter, phase, distance) is identical to the sub-arcsecond level and the
+Skyfield and LEB back ends agree with each other exactly, so the difference is
+purely a choice of photometric model, not an ephemeris difference.
+
+- **Pluto** uses the modern Mallama & Hilton (2018), *Icarus* 306, 33
+  photometry — V(1,0) = −1.024 mag with a linear phase coefficient
+  β = 0.0362 mag/degree, i.e. V = V(1,0) + 5·log₁₀(r·Δ) + β·α. An external
+  implementation uses the older flat photometry (V(1,0) = −1.00 mag, no phase
+  term). Over the range of geocentric phase angles Pluto reaches the two
+  disagree by up to ~47 mmag (worst near 1989); LibEphemeris keeps the modern
+  phase-dependent model.
+
+- **Uranus** uses a simplified photometry — a single V(1,0) with a linear phase
+  term. Because Uranus has an extreme (~98°) obliquity, its disk-integrated
+  brightness also depends on the sub-observer latitude (the poles are brighter
+  than the equator), a term the external model carries and this simplified
+  model omits. The resulting difference is bounded at ~10 mmag and oscillates
+  over Uranus's ~42-year sub-latitude half-cycle. The residual does not reduce
+  to a single sub-latitude coefficient, so it is treated as a photometry-model
+  difference rather than reproduced.
+
+- **Saturn** uses the full Mallama & Hilton (2018) formula with a Meeus ring-
+  tilt reduction (the ring contribution dominates the disk near ring-plane
+  crossings). The residual against the external model stays within ~2 mmag,
+  concentrated near the low ring-opening epochs (e.g. ~2005), and reflects a
+  ring-geometry convention rather than an ephemeris difference.
 
 ## Rise/set events immediately after the search start
 
@@ -204,8 +245,11 @@ another public implementation exposes a different edge-case result:
 - `fixstar*` and `fixstar2*` both differentiate the state in the frame
   actually returned to the caller, so position and speed cannot refer to
   different frames.
-- `calc()` and `calc_ut()` apply the same default return-flag convention to
-  the `ECL_NUT` pseudo-body.
+- The `ECL_NUT` pseudo-body follows the ordinary `calc()`-versus-`calc_ut()`
+  ephemeris-bit echo: the TT entry point echoes only the source bits the
+  caller passed (a zero-flag request returns retflag 0), while the UT entry
+  point injects the default `FLG_SWIEPH`. It is not treated as a special
+  case.
 
 These choices follow coordinate and derivative definitions, not retained or
 fitted external observations.
