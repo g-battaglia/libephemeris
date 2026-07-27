@@ -89,6 +89,8 @@ from .constants import (
     FLG_JPLEPH,
     FLG_SWIEPH,
     FLG_TOPOCTR,
+    SIDBIT_ECL_T0,
+    SIDBIT_SSY_PLANE,
 )
 from .planets import calc_ut
 from .cache import get_cached_nutation
@@ -1941,6 +1943,167 @@ def _houses_fixed_epoch_sidereal(
     return cusps, tuple(ascmc_list)
 
 
+def _houses_sidbit_projection(
+    tjdut: float,
+    lat: float,
+    hsys_char: str,
+    trop_ascmc: tuple,
+    flags: int,
+    sid_mode: int,
+    sid_bits: int,
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Sidereal houses for the SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE projections.
+
+    These two SIDBIT flags request the sidereal zodiac measured on a reference
+    plane other than the ecliptic of date:
+
+      * ``SIDBIT_ECL_T0``  -> the mean ecliptic and equinox of the mode's
+        reference epoch ``t0`` (``AYANAMSHA_DEFINING``); the zero point is the
+        mode's ayanamsha at ``t0``.
+      * ``SIDBIT_SSY_PLANE`` -> the solar-system invariable plane (Souami &
+        Souchay 2012); the zero point is the J2000 ayanamsha direction projected
+        onto that plane.
+
+    Measured reference behavior builds the whole house construction ON that
+    plane rather than shifting the ecliptic-of-date cusps by a scalar ayanamsha:
+    the ARMC is re-based to the ascending node of the true equator of date on
+    the plane (so the reported ARMC itself moves -- up to ~3.9 deg for the tilted
+    invariable plane), the obliquity becomes the inclination between the two
+    planes, and the cusp arcs are then measured from the mode's sidereal zero
+    point along the plane. Hypothesis (a), projecting each ecliptic-of-date cusp
+    point-by-point, was tested and rejected -- it leaves the equatorial ARMC
+    unchanged and misplaces the invariable-plane cusps by up to several degrees.
+
+    The projection-plane definitions and the sidereal zero point are taken from
+    the SAME frame model the position path uses
+    (:mod:`libephemeris.sidereal_epoch`, ``_sidbit_projection_calc``), so cusps
+    and bodies stay in one self-consistent frame.
+
+    Measured residual envelope against the reference:
+
+      * ``SIDBIT_SSY_PLANE`` inherits the invariable-plane zero point of the
+        calc path, whose Souami & Souchay (2012) orientation differs from the
+        reference's by a near-constant ~30 arcsec. Houses reproduce the
+        reference to that same shared envelope, not more tightly, by design --
+        matching the calc positions is required for a body and its house to
+        agree. The construction itself (ARMC, obliquity, cusp arcs on the
+        plane) agrees to <0.2 arcsec once that shared offset is removed.
+      * ``SIDBIT_ECL_T0`` carries no such calc offset (the position path is at
+        parity), and at ordinary modern epochs it reproduces the reference
+        closely -- e.g. the Ascendant to a few arcsec at |lat| ~ 40 deg. Two
+        few-arcsec-class differences remain and are NOT fitted here: (1) the
+        reference measures this near-ecliptic-of-date plane in a mean-equinox
+        frame whose nutation treatment near the mode's reference epoch t0 the
+        node-rebased ``houses_armc`` reduction does not fully reproduce (at the
+        exact t0, where the plane coincides with the ecliptic of date, the
+        residual is dominated by the of-date nutation, ~20-30 arcsec on the
+        Ascendant); (2) the reported ARMC differs from the geometric
+        node-rebased value by a mode-specific ~4-6 arcsec. Through the quadrant
+        house systems these differences are amplified at high geographic
+        latitude, reaching tens of arcsec near |lat| ~ 55-60 deg. That is the
+        documented ECL_T0 envelope; the strongly tilted SSY_PLANE construction
+        is unaffected because its large reconstruction dominates the of-date
+        nutation.
+
+    Args:
+        tjdut: Julian Day in UT1.
+        lat: Geographic latitude in degrees.
+        hsys_char: Canonical house-system character.
+        trop_ascmc: The tropical ASCMC tuple; only ``trop_ascmc[2]`` (the plain
+            apparent ARMC) is consumed -- the cusps are rebuilt on the plane.
+        flags: Calculation flags (ephemeris bits forwarded to the Sunshine Sun
+            fetch; FLG_RADIANS applied by the caller).
+        sid_mode: The base sidereal mode.
+        sid_bits: The active SIDBIT projection flags.
+
+    Returns:
+        (cusps, ascmc) in degrees; the caller applies degnorm / FLG_RADIANS.
+    """
+    import numpy as np
+
+    import erfa
+
+    from .precession_vondrak import vondrak_pn_matrix, vondrak_precession_matrix
+    from .sidereal_epoch import (
+        _ecliptic_of_t0_matrix,
+        _invariable_plane_matrix,
+        _rot_x,
+        ssy_plane_zero_point_deg,
+    )
+    from .planets import AYANAMSHA_DEFINING, _calc_ayanamsa
+
+    _J2000 = 2451545.0
+    jd_tt = tjdut + _deltat(tjdut)
+    dpsi_rad, deps_rad = get_cached_nutation(jd_tt)
+
+    # True equator of date <- ICRS, using the SAME Vondrak precession + IAU
+    # nutation chain as the tropical house frame (_house_armc_obliquity), so the
+    # rebased ARMC stays consistent with trop_ascmc[2].
+    pn_tuples, _eps_true = vondrak_pn_matrix(jd_tt, dpsi_rad, deps_rad)
+    pn = np.array(pn_tuples)
+    v_j2k = np.array(vondrak_precession_matrix(_J2000))
+    eps_j2000 = erfa.obl06(_J2000, 0.0)
+
+    # Projection plane, expressed as J2000-mean-ecliptic -> plane frame, and the
+    # sidereal zero point in that frame -- identical to the calc SIDBIT path.
+    if sid_bits & SIDBIT_SSY_PLANE:
+        base = _invariable_plane_matrix()
+        zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000, sid_mode))
+    else:  # SIDBIT_ECL_T0
+        t0_jd = AYANAMSHA_DEFINING.get(sid_mode, (0.0, _J2000))[1]
+        base = _ecliptic_of_t0_matrix(t0_jd)
+        zero_point = _calc_ayanamsa(t0_jd, sid_mode)
+
+    # m maps projection-plane coordinates onto the true equator of date.
+    m = pn @ v_j2k.T @ _rot_x(-eps_j2000) @ base.T
+
+    # Inclination between the plane and the equator of date (the construction
+    # obliquity), and the ascending node of the equator of date on the plane.
+    z = m.T @ np.array([0.0, 0.0, 1.0])
+    eps_p = math.degrees(math.acos(max(-1.0, min(1.0, float(z[2])))))
+    n_p = np.cross(z, [0.0, 0.0, 1.0])
+    n_p /= np.linalg.norm(n_p)
+    lon_node = math.degrees(math.atan2(float(n_p[1]), float(n_p[0]))) % 360.0
+    n_eq = m @ n_p
+    ang_n = math.degrees(math.atan2(float(n_eq[1]), float(n_eq[0]))) % 360.0
+    armc_p = (trop_ascmc[2] - ang_n) % 360.0
+
+    # Sunshine ('I'/'i') Sun declination on the equator of date. In an ayanamsha
+    # (non-fixed-epoch) sidereal zodiac the reference computes 'i' like 'I'
+    # (see houses_ex), so collapse the engine selector here as well.
+    engine_hsys = "I" if hsys_char == "i" else hsys_char
+    ascmc9 = 0.0
+    if engine_hsys == "I":
+        try:
+            eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
+            sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
+            ascmc9 = sun_pos[1]
+        except EphemerisRangeError:
+            ascmc9 = _sun_declination_analytic(tjdut)
+        except (IndexError, TypeError, ValueError, CalculationError):
+            ascmc9 = 0.0
+
+    eng_cusps, eng_ascmc = houses_armc(
+        armc_p, lat, eps_p, ord(engine_hsys), ascmc9=ascmc9
+    )
+
+    # Cusp arcs (measured from the node by houses_armc) -> plane longitude
+    # (add the node's plane longitude) -> sidereal longitude (subtract the zero
+    # point). Aries ('N') stays anchored at 0 deg of the sidereal zodiac.
+    off = lon_node - zero_point
+    if hsys_char == "N":
+        cusps = tuple(float(i * 30) for i in range(12))
+    else:
+        cusps = tuple((off + c) % 360.0 for c in eng_cusps)
+
+    ascmc_list = list(trop_ascmc)
+    for i in (0, 1, 3, 4, 5, 6, 7):
+        ascmc_list[i] = (off + eng_ascmc[i]) % 360.0
+    # ascmc[2] (ARMC) reports the node-rebased armc_p the construction runs on.
+    ascmc_list[2] = armc_p
+    return cusps, tuple(ascmc_list)
+
+
 def houses_ex(
     tjdut: float, lat: float, lon: float, hsys: int = ord("P"), flags: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
@@ -2018,6 +2181,35 @@ def houses_ex(
             _hch = _fold_hsys_case(_hch)
             cusps, ascmc = _houses_fixed_epoch_sidereal(
                 tjdut, lat, _hch, cusps, ascmc, flags, _sidm_hx
+            )
+            cusps = tuple(degnorm(c) for c in cusps)
+            ascmc = tuple(degnorm(a) for a in ascmc)
+            if flags & FLG_RADIANS:
+                cusps = tuple(math.radians(c) for c in cusps)
+                ascmc = tuple(math.radians(a) for a in ascmc)
+            return cusps, ascmc
+
+        # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections. The sidereal zodiac
+        # is measured on the mean ecliptic of the mode's reference epoch t0, or on
+        # the solar-system invariable plane, instead of the ecliptic of date. The
+        # reference rebuilds the whole house construction on that plane (measured
+        # reference behavior: the reported ARMC itself shifts to the plane's node),
+        # so route to the projected-plane reconstruction. The star/galactic "true"
+        # modes define their zero point on the ecliptic of date, where the
+        # projection is inert (the same suppression the calc path applies): those
+        # fall through to the ayanamsha path below, which reproduces the base
+        # longitude.
+        from .planets import (
+            _SIDBIT_PROJECTION_SUPPRESS_MODES as _sidbit_suppress,
+            _get_sidereal_bits,
+        )
+
+        _bits_hx = _get_sidereal_bits()
+        if (_bits_hx & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE)) and (
+            _sidm_hx not in _sidbit_suppress
+        ):
+            cusps, ascmc = _houses_sidbit_projection(
+                tjdut, lat, hsys_char, ascmc, flags, _sidm_hx, _bits_hx
             )
             cusps = tuple(degnorm(c) for c in cusps)
             ascmc = tuple(degnorm(a) for a in ascmc)

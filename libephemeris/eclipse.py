@@ -6220,6 +6220,14 @@ def lun_occult_when_glob(
         examined; a miss returns retflag zero and a continuation date in the
         first time slot.
     """
+    if isinstance(body, int) and body == MOON:
+        # Degenerate self-request: the Moon cannot occult itself. Raise the
+        # typed contract error instead of letting the shadow geometry divide
+        # by the zero Moon-to-body distance (measured reference behavior
+        # never returns here either: it fails to terminate).
+        from .exceptions import Error as _Error
+
+        raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
     from .exceptions import Error
     from .constants import ECL_ONE_TRY
 
@@ -6708,6 +6716,14 @@ def lun_occult_when_loc(
         Local attributes include covered diameter/disc fractions, target
         azimuth and altitude, elongation, and the event contact times.
     """
+    if isinstance(body, int) and body == MOON:
+        # Degenerate self-request: the Moon cannot occult itself. Raise the
+        # typed contract error instead of letting the shadow geometry divide
+        # by the zero Moon-to-body distance (measured reference behavior
+        # never returns here either: it fails to terminate).
+        from .exceptions import Error as _Error
+
+        raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
 
     # Validate geopos
     if len(geopos) < 3:
@@ -6832,6 +6848,14 @@ def lun_occult_where(
     Returns:
         Tuple of (retflag, geopos, attr) matching the reference ephemeris.
     """
+    if isinstance(body, int) and body == MOON:
+        # Degenerate self-request: the Moon cannot occult itself. Raise the
+        # typed contract error instead of letting the shadow geometry divide
+        # by the zero Moon-to-body distance (measured reference behavior
+        # never returns here either: it fails to terminate).
+        from .exceptions import Error as _Error
+
+        raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
     if isinstance(body, int):
         from .fixed_stars import FIXED_STARS as _FS
         from .fixed_stars import get_canonical_star_name as _star_name_by_id

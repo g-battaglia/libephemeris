@@ -262,6 +262,34 @@ motion; its upper transits and the slow bodies' lower transits are
 converged on both sides. LibEphemeris reports the geometrically exact
 instant rather than reproducing the residual.
 
+## Fixed-star speeds under `FLG_SPEED3`
+
+For fixed stars, at least one external implementation returns zero speed
+slots when only `FLG_SPEED3` is requested, while returning the real apparent
+rates under `FLG_SPEED`. LibEphemeris reports the true derivative of its own
+positions under both speed flags (verified against the numerical derivative
+of both implementations' positions, which agree). The same
+true-derivative-over-empty-slot choice documented for the lunar-apside
+`SPEED3` case applies here.
+
+## Robustness on degenerate inputs
+
+Where the external implementation fails structurally on a legitimate or
+degenerate input, LibEphemeris returns a defined result or a typed error
+instead of reproducing the failure:
+
+- `refrac_extended` with a below-sea-level observer (e.g. the Dead Sea)
+  returns a zero horizon dip (the sea-horizon dip is not defined for a
+  depressed observer) and applies the normal refraction; the external
+  implementation emits NaN for the dip and silently skips the
+  apparent-to-true correction.
+- `rise_trans` with the latitude-zeroing bit (128) alone on a fixed star
+  returns the stable zero-latitude projection event; the external result is
+  non-deterministic (search-seed dependent, with round-hour sentinel
+  values).
+- A lunar occultation of the Moon itself raises the typed `Error`; the
+  external implementation does not terminate.
+
 ## Fixed-star radial channels
 
 For fixed stars, `dist` is the geocentric distance of the same propagated
