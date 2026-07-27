@@ -3140,6 +3140,11 @@ def _maybe_equatorial_convert(
         Otherwise: original result unchanged
     """
     lon, lat, dist, dlon, dlat, ddist = result
+    if not (math.isfinite(lon) and math.isfinite(lat)):
+        # Degenerate/undefined point (e.g. the interpolated lunar apsides in
+        # nod_aps): no frame conversion is defined, so pass it through and
+        # keep NaN as NaN instead of clamping to a pole declination.
+        return result
 
     # Apply precession from date to J2000 if requested. The velocity is
     # precessed alongside the position (not left in the of-date frame) so the
@@ -7166,13 +7171,17 @@ def _calc_nod_aps(
     # FLG_SPEED. Mirror that exactly so callers can detect the undefined place
     # while the speed channels stay well-formed floats.
     if ipl in (INTP_APOG, INTP_PERG):
+        # Measured reference behavior: the undefined point keeps ZERO speed
+        # slots on a plain request, but an explicit FLG_SPEED request
+        # propagates NaN through the speed channel too.
+        _spd = math.nan if iflag & FLG_SPEED else 0.0
         nan_pos: PosTuple = (
             math.nan,
             math.nan,
             math.nan,
-            0.0,
-            0.0,
-            0.0,
+            _spd,
+            _spd,
+            _spd,
         )
         return (nan_pos, nan_pos, nan_pos, nan_pos)
 
@@ -7369,9 +7378,16 @@ def _calc_nod_aps(
         def _moon_point(lon_d: float, lat_d: float, dist: float) -> PosTuple:
             """Assemble a lunar point, honoring HELCTR and J2000 output."""
             if iflag & (FLG_HELCTR | FLG_BARYCTR):
-                # Public nod_aps treats BARYCTR identically to HELCTR: add
-                # Earth's heliocentric vector to the geocentric lunar point.
-                earth_center = r_earth_ecl
+                # Measured reference behavior: FLG_HELCTR adds Earth's
+                # heliocentric vector to the geocentric lunar point, and
+                # FLG_BARYCTR its BARYCENTRIC vector (the point becomes
+                # SSB-relative). With both bits set the heliocentric view
+                # wins, mirroring the reference's nod_aps precedence.
+                if iflag & FLG_HELCTR:
+                    earth_center = r_earth_ecl
+                else:
+                    _e_b = earth_pos.position.au
+                    earth_center = _icrs_to_ecliptic((_e_b[0], _e_b[1], _e_b[2]))
                 cl = math.cos(math.radians(lat_d))
                 gx = dist * cl * math.cos(math.radians(lon_d)) + earth_center[0]
                 gy = dist * cl * math.sin(math.radians(lon_d)) + earth_center[1]
@@ -7409,7 +7425,11 @@ def _calc_nod_aps(
 
     else:
         is_helio = bool(iflag & FLG_HELCTR)
-        is_bary = bool(iflag & FLG_BARYCTR)
+        # Measured reference behavior for nod_aps: with BOTH center flags
+        # set, the heliocentric view wins (unlike calc, where the
+        # barycentric flag prevails — the reference itself differs between
+        # the two surfaces and nod_aps mirrors its nod_aps contract).
+        is_bary = bool(iflag & FLG_BARYCTR) and not is_helio
         is_centered = is_helio or is_bary
         # For the Sun the reference returns the apsides of the apparent
         # solar orbit: Earth's orbit mirrored through the origin.

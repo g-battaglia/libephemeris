@@ -354,16 +354,20 @@ class TestNodApsInterpolatedApsidesNaN:
     def test_interpolated_apsides_nan_positions_zero_speeds(self, body, method, flags):
         result = swe.nod_aps_ut(JD_J2000, body, method, flags)
         assert len(result) == 4
+        want_nan_speeds = bool(flags & FLG_SPEED)
         for tup in result:
             assert len(tup) == 6
             # Position slots: not-a-number.
             for val in tup[:3]:
                 assert math.isnan(val)
-            # Speed slots: exactly 0.0 (well-formed floats, never NaN).
+            # Speed slots (measured contract): exactly 0.0 on a plain
+            # request; NaN propagates when FLG_SPEED is explicitly asked.
             for val in tup[3:]:
-                assert val == 0.0
-                assert not math.isnan(val)
                 assert isinstance(val, float)
+                if want_nan_speeds:
+                    assert math.isnan(val)
+                else:
+                    assert val == 0.0
 
 
 class TestNodApsEquatorialSingleRotation:
@@ -449,3 +453,44 @@ class TestNodApsBarycentricFlag:
         jd = 2455362.5
         geo = le.nod_aps_ut(jd, le.JUPITER, le.NODBIT_OSCU, le.FLG_SWIEPH)
         assert all(0.0 <= v < 360.0 for v in (geo[0][0], geo[2][0]))
+
+
+class TestNodApsRoundUContracts:
+    """Round-U measured contracts: Moon barycentre, flag precedence, INTP."""
+
+    def test_moon_baryctr_offsets_by_barycentric_earth(self):
+        import libephemeris as le
+
+        jd = 2436005.0
+        geo = le.nod_aps_ut(jd, le.MOON, le.NODBIT_OSCU, le.FLG_SWIEPH)
+        bar = le.nod_aps_ut(jd, le.MOON, le.NODBIT_OSCU, le.FLG_SWIEPH | le.FLG_BARYCTR)
+        # The barycentric point sits ~1 AU from the SSB (geocentric point
+        # plus the barycentric Earth), not at the geocentric distance.
+        assert 0.9 < bar[1][2] < 1.1
+        assert geo[1][2] < 0.01
+
+    def test_helctr_wins_over_baryctr_when_both_set(self):
+        import libephemeris as le
+
+        jd = 2436005.0
+        hel = le.nod_aps_ut(jd, le.MARS, le.NODBIT_OSCU, le.FLG_SWIEPH | le.FLG_HELCTR)
+        both = le.nod_aps_ut(
+            jd,
+            le.MARS,
+            le.NODBIT_OSCU,
+            le.FLG_SWIEPH | le.FLG_HELCTR | le.FLG_BARYCTR,
+        )
+        assert both[2][0] == hel[2][0]
+
+    def test_intp_flag_contracts(self):
+        import math
+
+        import libephemeris as le
+
+        t = le.julday(2020, 6, 15, 0.0)
+        # EQUATORIAL: NaN stays NaN (no clamped pole declination).
+        equ = le.nod_aps_ut(t, 21, le.NODBIT_MEAN, le.FLG_SWIEPH | le.FLG_EQUATORIAL)
+        assert math.isnan(equ[0][1]) and equ[0][3] == 0.0
+        # SPEED: NaN propagates through the speed slots.
+        spd = le.nod_aps_ut(t, 21, le.NODBIT_MEAN, le.FLG_SWIEPH | le.FLG_SPEED)
+        assert all(math.isnan(v) for v in spd[0])
