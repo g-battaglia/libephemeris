@@ -1958,10 +1958,14 @@ def _pipeline_ecliptic(
     # Chebyshev derivative). At an ephemeris edge the ±dt samples may fall out
     # of range; return zero speed there, matching the Skyfield boundary path.
     if (iflag & FLG_SPEED) and not _clean_model_body:
+        # OSCU_APOG mirrors the Skyfield backend's 0.002-day half-step: the
+        # true-apogee longitude has fast structure that a 0.05-day chord
+        # misrepresents by up to ~1.4"/day (the two backends must report the
+        # same derivative of the same position channel).
         _dt = (
             0.0001
             if iflag & (FLG_SPEED3 | FLG_TOPOCTR)
-            else (0.05 if ipl in (OSCU_APOG, TRUE_NODE) else 0.5)
+            else (0.002 if ipl == OSCU_APOG else (0.05 if ipl == TRUE_NODE else 0.5))
         )
         try:
             lo_m, la_m, di_m, _, _, _ = _ofdate_state(jd_tt - _dt)

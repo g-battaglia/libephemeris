@@ -1778,12 +1778,14 @@ def _sidbit_projection_calc(
         transform_sidbit_result,
     )
 
-    if sid_bits & SIDBIT_SSY_PLANE:
-        t0_jd = _J2000_JD
-        zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000_JD, sid_mode))
-    else:  # SIDBIT_ECL_T0
+    # Measured reference behavior: with BOTH projection bits set,
+    # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE.
+    if sid_bits & SIDBIT_ECL_T0:
         t0_jd = AYANAMSHA_DEFINING.get(sid_mode, (0.0, _J2000_JD))[1]
         zero_point = _calc_ayanamsa(t0_jd, sid_mode)
+    else:  # SIDBIT_SSY_PLANE
+        t0_jd = _J2000_JD
+        zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000_JD, sid_mode))
 
     m_ecl = sidbit_ecliptic_matrix(sid_bits, t0_jd, zero_point)
     assert m_ecl is not None  # a projection bit is set by the caller's guard

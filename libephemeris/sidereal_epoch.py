@@ -242,10 +242,13 @@ def sidbit_ecliptic_matrix(
     Returns:
         A 3x3 numpy rotation matrix, or None when no projection bit is set.
     """
-    if sid_bits & SIDBIT_SSY_PLANE:
-        base = _invariable_plane_matrix()
-    elif sid_bits & SIDBIT_ECL_T0:
+    # Measured reference behavior: with BOTH projection bits set,
+    # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE (must mirror the
+    # callers' precedence, which choose t0_jd/zero_point the same way).
+    if sid_bits & SIDBIT_ECL_T0:
         base = _ecliptic_of_t0_matrix(t0_jd)
+    elif sid_bits & SIDBIT_SSY_PLANE:
+        base = _invariable_plane_matrix()
     else:
         return None
     return _rot_z(math.radians(zero_point_deg)) @ base

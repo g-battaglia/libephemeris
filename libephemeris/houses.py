@@ -2046,13 +2046,15 @@ def _houses_sidbit_projection(
 
     # Projection plane, expressed as J2000-mean-ecliptic -> plane frame, and the
     # sidereal zero point in that frame -- identical to the calc SIDBIT path.
-    if sid_bits & SIDBIT_SSY_PLANE:
-        base = _invariable_plane_matrix()
-        zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000, sid_mode))
-    else:  # SIDBIT_ECL_T0
+    # Measured reference behavior: with BOTH projection bits set,
+    # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE.
+    if sid_bits & SIDBIT_ECL_T0:
         t0_jd = AYANAMSHA_DEFINING.get(sid_mode, (0.0, _J2000))[1]
         base = _ecliptic_of_t0_matrix(t0_jd)
         zero_point = _calc_ayanamsa(t0_jd, sid_mode)
+    else:  # SIDBIT_SSY_PLANE
+        base = _invariable_plane_matrix()
+        zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000, sid_mode))
 
     # m maps projection-plane coordinates onto the true equator of date.
     m = pn @ v_j2k.T @ _rot_x(-eps_j2000) @ base.T
