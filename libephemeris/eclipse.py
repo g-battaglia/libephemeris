@@ -7089,14 +7089,20 @@ def _make_tret(jd_event: float = 0.0) -> Tuple[float, ...]:
     return (float(jd_event), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
-def _calculate_transit_leb(
+def _calculate_transit(
     jd_start: float,
     lon: float,
     event_type: int,
     get_ra_dec,
     CALC_ITRANSIT: int,
 ) -> Tuple[int, Tuple[float, ...]]:
-    """LEB version of _calculate_transit using a callable for RA/Dec."""
+    """Meridian transit time from a backend-agnostic RA/Dec callable.
+
+    ``get_ra_dec(jd)`` returns the body's apparent (RA hours, Dec deg). It is
+    sourced from calc_ut(FLG_EQUATORIAL) / fixstar_ut, so the LEB and Skyfield
+    backends share one transit engine (the meridian crossing is geocentric, so
+    no observer/parallax is needed).
+    """
 
     def _get_body_hour_angle(jd: float) -> float:
         ra_hours, _ = get_ra_dec(jd)
@@ -7136,90 +7142,6 @@ def _calculate_transit_leb(
             return 0, _make_tret(jd_guess)
         jd_guess -= ha / (360.0 / sidereal_day)
 
-    return 0, _make_tret(jd_guess)
-
-
-def _calculate_transit(
-    jd_start: float,
-    lat: float,
-    lon: float,
-    event_type: int,
-    ts,
-    earth,
-    target,
-    observer,
-    CALC_ITRANSIT: int,
-) -> Tuple[int, Tuple[float, ...]]:
-    """Calculate meridian transit time."""
-    # Transit occurs when body's RA = Local Sidereal Time
-    # LST = GMST + longitude (in hours)
-    # So transit occurs when GMST = RA - longitude/15
-
-    def _get_body_hour_angle(jd: float) -> float:
-        """Calculate body's hour angle (in degrees). 0 = on meridian."""
-        t = ts.ut1_jd(jd)
-
-        # Get body's RA (epoch of date)
-        body_app = earth.at(t).observe(target).apparent()
-        ra, _, _ = body_app.radec(epoch="date")
-        ra_deg = ra.hours * 15.0  # Convert to degrees
-
-        # Get Local APPARENT Sidereal Time (apparent RA pairs with GAST;
-        # GMST left a ~1.1 s equation-of-equinoxes error in transits)
-        gast = t.gast  # in hours
-        lst = gast + lon / 15.0  # in hours
-        lst_deg = lst * 15.0  # Convert to degrees
-
-        # Hour angle = LST - RA (normalized to -180 to +180)
-        ha = (lst_deg - ra_deg) % 360.0
-        if ha > 180:
-            ha -= 360
-        return ha
-
-    # Get initial hour angle
-    ha = _get_body_hour_angle(jd_start)
-
-    # Adjust for lower transit (HA = 180 instead of 0)
-    if event_type == CALC_ITRANSIT:
-        ha = (ha - 180) % 360
-        if ha > 180:
-            ha -= 360
-
-    # Estimate time to next transit
-    # Earth rotates 360° in ~23h56m (sidereal day)
-    # So hour angle changes ~15°/hour = 360°/day (approximately)
-    sidereal_day = 0.99726957  # days
-
-    if ha > 0:
-        # Body is west of meridian, wait for it to come around
-        dt = (360.0 - ha) / 360.0 * sidereal_day
-    else:
-        # Body is east of meridian, it will cross soon
-        dt = (-ha) / 360.0 * sidereal_day
-
-    jd_guess = jd_start + dt
-
-    # Newton-Raphson refinement
-    for _ in range(30):
-        ha = _get_body_hour_angle(jd_guess)
-
-        # Adjust for lower transit
-        if event_type == CALC_ITRANSIT:
-            ha = (ha - 180) % 360
-            if ha > 180:
-                ha -= 360
-
-        # Check convergence (< 1 arcsecond in HA = < 0.07 seconds in time)
-        if abs(ha) < 1.0 / 3600.0:
-            return 0, _make_tret(jd_guess)
-
-        # Rate of change of HA: approximately 360°/sidereal day
-        ha_rate = 360.0 / sidereal_day  # degrees/day
-
-        # Newton-Raphson step
-        jd_guess -= ha / ha_rate
-
-    # If we get here, convergence failed but return best estimate
     return 0, _make_tret(jd_guess)
 
 
@@ -7321,6 +7243,10 @@ def _calculate_rise_set(
     _TIME_TOL_S = 0.03
     _SLOPE_PROBE_S = 0.05
     _GRAZE_SLOPE_DEG_S = 2.0 / 3600.0  # ~2"/s: near-tangential grazing only
+    # ~100"/s: far above any real apparent-altitude rate (a body on the
+    # celestial equator sweeps at most ~16"/s), so a measured slope this steep
+    # is the sub-polar refraction "dip" discontinuity, not a genuine crossing.
+    _DIP_SLOPE_DEG_S = 100.0 / 3600.0
     for _ in range(60):
         jd_mid = (jd_cross_start + jd_cross_end) / 2
         h_mid = _event_height(jd_mid)
@@ -7330,16 +7256,36 @@ def _calculate_rise_set(
             if dt > 0.25 * span:
                 dt = 0.25 * span
             slope = 0.0
+            slope_signed = 0.0
             if dt > 0.0:
-                slope = abs(_event_height(jd_mid + dt) - _event_height(jd_mid - dt)) / (
-                    2.0 * dt * 86400.0
-                )
+                slope_signed = (
+                    _event_height(jd_mid + dt) - _event_height(jd_mid - dt)
+                ) / (2.0 * dt * 86400.0)
+                slope = abs(slope_signed)
             if (
                 slope <= 0.0
                 or slope >= _GRAZE_SLOPE_DEG_S
                 or abs(h_mid) < slope * _TIME_TOL_S
             ):
-                return 0, _make_tret(jd_mid)
+                # Refine an ordinary, well-conditioned crossing onto its true
+                # root (h == 0) with one Newton step, so the event time is fixed
+                # by the geometry rather than by which loose |h| < 1e-4 midpoint
+                # the bisection happened to reach first. That first-inside-band
+                # exit left a ~0.024 s ambiguity that stopped the LEB and
+                # Skyfield backends - whose apparent places differ only by the
+                # ~0.0003" LEB approximation - up to ~0.055 s apart. Only the
+                # ordinary rise/set slope band is refined: near-tangential
+                # grazing keeps the time-based exit above, and the near-vertical
+                # apparent-altitude jump of the sub-polar refraction "dip" (a
+                # slope orders of magnitude above any real motion) keeps the
+                # historic midpoint so it still stops on the refracted branch
+                # above the jump.
+                jd_out = jd_mid
+                if _GRAZE_SLOPE_DEG_S <= slope < _DIP_SLOPE_DEG_S:
+                    jd_step = jd_mid - h_mid / (slope_signed * 86400.0)
+                    if jd_cross_start <= jd_step <= jd_cross_end:
+                        jd_out = jd_step
+                return 0, _make_tret(jd_out)
         if event_type == CALC_RISE:
             if h_mid < 0.0:
                 jd_cross_start = jd_mid
@@ -7490,8 +7436,6 @@ def _rise_trans_true_hor_impl(
         - Reference API: rise_trans_true_hor()
         - Meeus "Astronomical Algorithms" Ch. 15 (Rise, Set, Transit)
     """
-    from skyfield.api import wgs84
-
     from .constants import (
         CALC_RISE,
         CALC_SET,
@@ -7505,8 +7449,7 @@ def _rise_trans_true_hor_impl(
         BIT_ASTRO_TWILIGHT,
         BIT_FIXED_DISC_SIZE,
     )
-    from .planets import _PLANET_MAP, get_planet_target
-    from .state import get_planets, get_timescale
+    from .planets import _PLANET_MAP
 
     # Unpack geopos: [longitude, latitude, altitude]
     lon = float(geopos[0])
@@ -7591,54 +7534,30 @@ def _rise_trans_true_hor_impl(
             _reraise_if_leb_range_error(_probe_exc)
             _use_leb_rt = False
 
-    if _use_leb_rt:
-        from .constants import FLG_EQUATORIAL
-
-        geopos_leb = (lon, lat, altitude)
-        if is_fixed_star:
-            planet = -1
-        else:
-            planet = cast(int, body)
-            if planet not in _PLANET_MAP and not use_calc_body:
-                raise ValueError("illegal planet number %d." % planet)
-        ts = get_timescale()
-        earth = None
-        target = None
-        observer = None
+    # Both backends evaluate the horizon geometry through ONE pipeline: the
+    # topocentric apparent place from calc_ut(FLG_TOPOCTR) (fixstar_ut for
+    # stars) rotated to the observer's horizon by azalt, plus the equatorial
+    # place from calc_ut(FLG_EQUATORIAL) for the meridian transit. calc_ut and
+    # fixstar_ut dispatch to the active backend (the LEB reader when sealed,
+    # JPL/Skyfield otherwise) and azalt is the shared transform, so the LEB and
+    # Skyfield results differ only by the tiny (~0.0003") LEB-vs-Skyfield
+    # position difference instead of by the coordinate frame. The earlier split
+    # - a Skyfield-native topocentric altaz frame on one path and azalt on the
+    # other - drove rise/set times apart by up to ~0.11 s even when the two
+    # backends agreed on the position to 0.0003"; sharing the chain removes that
+    # backend-specific divergence.
+    if is_fixed_star:
+        planet = -1
     else:
-        eph = get_planets()
-        ts = get_timescale()
-        earth = eph["earth"]
-        if is_fixed_star:
-            from skyfield.api import Star as SkyfieldStar
-            from .fixed_stars import FIXED_STARS, _resolve_star_id
+        planet = cast(int, body)
+        if planet not in _PLANET_MAP and not use_calc_body:
+            # Defensive only: an out-of-map body is validated up front (it sets
+            # use_calc_body, and an unplaceable id already raised the unified
+            # illegal-body error there), so this branch is unreachable in
+            # practice; keep the reference's illegal-body message regardless.
+            from .exceptions import UnknownBodyError
 
-            star_id, err, _ = _resolve_star_id(cast(str, body))
-            if err is not None:
-                raise ValueError(err)
-            star_entry = FIXED_STARS[star_id]
-            t_years = (jd_start - 2451545.0) / 365.25
-            ra_deg = star_entry.ra_j2000 + (star_entry.pm_ra * t_years) / 3600.0
-            dec_deg = star_entry.dec_j2000 + (star_entry.pm_dec * t_years) / 3600.0
-            target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-            planet = -1
-        elif use_calc_body:
-            # Out-of-map body: positioned via calc_ut below (validated by the
-            # up-front probe); no Skyfield target name exists for it.
-            planet = cast(int, body)
-            target = None
-        else:
-            planet = cast(int, body)
-            if planet not in _PLANET_MAP:
-                # Typed error like the LEB path (UnknownBodyError is an
-                # Error subclass, the class the reference raises here), so
-                # the exception contract does not depend on the backend.
-                from .exceptions import UnknownBodyError
-
-                raise UnknownBodyError("illegal planet number %d." % planet)
-            target_name = _PLANET_MAP[planet]
-            target = get_planet_target(eph, target_name)
-        observer = wgs84.latlon(lat, lon, altitude)
+            raise UnknownBodyError("illegal planet number %d." % planet)
 
     # atpress == 0: estimate pressure from the observer altitude with the
     # reference's barometric expression; attemp is used verbatim (0 means
@@ -7701,52 +7620,45 @@ def _rise_trans_true_hor_impl(
             _r_km = _PLANET_RADIUS_KM.get(planet)
             _body_radius_au = (_r_km / _ECL_AU_KM) if _r_km else 0.0
 
-    if _use_leb_rt:
-        from .fast_calc import _topo_ecliptic
-        from .time_utils import deltat
-        from .utils import azalt, ECL2HOR
+    from .constants import FLG_EQUATORIAL, FLG_TOPOCTR as _FLG_TOPO_RT
+    from .utils import azalt, ECL2HOR
 
-        def _get_body_altaz(jd: float) -> Tuple[float, float, float]:
-            jd_tt = jd + deltat(jd)
-            if is_fixed_star:
-                from .fixed_stars import fixstar_ut
+    geopos_rt = (lon, lat, altitude)
 
-                star_pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
-                az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, star_pos[:3])
-                dist = star_pos[2]
-            else:
-                pos = _topo_ecliptic(
-                    _reader_rt, jd_tt, jd, planet, geopos_leb, FLG_SPEED
-                )
-                az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, pos[:3])
-                dist = pos[2]
-            return alt_true, az, dist
+    def _get_body_altaz(jd: float) -> Tuple[float, float, float]:
+        """(true altitude, azimuth, distance) of the ordinary topocentric
+        apparent place, evaluated identically on every backend.
 
-        def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
-            if is_fixed_star:
-                from .fixed_stars import fixstar_ut
+        Planets and points use calc_ut(FLG_TOPOCTR) (the observer is set once
+        around the search, see the dispatch tail); fixed stars use their
+        geocentric apparent place (diurnal parallax is negligible for
+        rise/set). azalt then rotates the ecliptic-of-date place to the
+        observer's horizon. calc_ut/fixstar_ut dispatch to the active backend
+        and azalt is the shared transform, so the LEB and Skyfield altitudes
+        agree to the position precision (~0.0003") and rise/set/transit are
+        backend-independent.
+        """
+        if is_fixed_star:
+            from .fixed_stars import fixstar_ut
 
-                pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_EQUATORIAL | FLG_SPEED)
-                return pos[0] / 15.0, pos[1]
-            else:
-                eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
-                return eq[0] / 15.0, eq[1]
-    else:
+            star_pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
+            az, alt_true, _ = azalt(jd, ECL2HOR, geopos_rt, 0, 0, star_pos[:3])
+            return alt_true, az, star_pos[2]
+        pos, _ = calc_ut(jd, planet, _FLG_TOPO_RT | FLG_SPEED)
+        az, alt_true, _ = azalt(jd, ECL2HOR, geopos_rt, 0, 0, pos[:3])
+        return alt_true, az, pos[2]
 
-        def _get_body_altaz(jd: float) -> Tuple[float, float, float]:
-            t = ts.ut1_jd(jd)
-            assert earth is not None and observer is not None and target is not None
-            observer_at = earth + observer
-            body_app = observer_at.at(t).observe(target).apparent()
-            alt, az, _ = body_app.altaz()
-            return alt.degrees, (az.degrees + 180.0) % 360.0, body_app.distance().au
+    def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
+        """Apparent RA (hours) and Dec (deg), evaluated identically on every
+        backend: calc_ut(FLG_EQUATORIAL) for planets/points, fixstar_ut for
+        fixed stars."""
+        if is_fixed_star:
+            from .fixed_stars import fixstar_ut
 
-        def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
-            t = ts.ut1_jd(jd)
-            assert earth is not None and target is not None
-            body_app = earth.at(t).observe(target).apparent()
-            ra, dec, _ = body_app.radec(epoch="date")
-            return ra.hours, dec.degrees
+            pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_EQUATORIAL | FLG_SPEED)
+            return pos[0] / 15.0, pos[1]
+        eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
+        return eq[0] / 15.0, eq[1]
 
     # Hindu-rising convention (BIT_GEOCTR_NO_ECL_LAT): the event uses the
     # body's GEOCENTRIC apparent place projected onto the ecliptic (ecliptic
@@ -7785,68 +7697,29 @@ def _rise_trans_true_hor_impl(
         )
         return alt_true, az, dist_b
 
-    def _get_body_altaz_geoctr(jd: float) -> Tuple[float, float, float]:
-        """(true altitude, azimuth, distance) from the body's TOPOCENTRIC
-        apparent ecliptic place via calc_ut(FLG_TOPOCTR) + azalt.
-
-        Used for bodies outside the classical _PLANET_MAP (nodes, apsides,
-        Chiron, asteroids, numbered minor planets). The topocentric parallax
-        reaches ~3" for the nearer main-belt asteroids and shifts their
-        rise/set by ~0.2 s, so it is applied here exactly as the in-map bodies
-        get it (calc_ut(FLG_TOPOCTR) reproduces fast_calc._topo_ecliptic to
-        0.000"). The observer location is set once around the rise/set search
-        (see the dispatch tail); calc_ut sources from the active backend.
-        """
-        from .utils import azalt, ECL2HOR
-
-        pos_p, _ = calc_ut(jd, planet, _FLG_TOPO_RT | FLG_SPEED)
-        lon_b, lat_b, dist_b = float(pos_p[0]), float(pos_p[1]), float(pos_p[2])
-        az, alt_true, _ = azalt(
-            jd, ECL2HOR, (lon, lat, altitude), 0.0, 0.0, (lon_b, lat_b, dist_b)
-        )
-        return alt_true, az, dist_b
-
-    def _get_body_ra_dec_calc(jd: float) -> Tuple[float, float]:
-        """Apparent RA (hours) and Dec (deg) of an out-of-map body via calc_ut."""
-        from .constants import FLG_EQUATORIAL
-
-        eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
-        return eq[0] / 15.0, eq[1]
-
-    from .constants import FLG_TOPOCTR as _FLG_TOPO_RT
-
+    # The ordinary (non-Hindu) altitude and the transit RA/Dec both flow
+    # through the shared, backend-agnostic _get_body_altaz / _get_body_ra_dec
+    # above (calc_ut/fixstar_ut + azalt), so in-map bodies, out-of-map bodies
+    # (nodes, apsides, Chiron, asteroids, numbered minor planets) and fixed
+    # stars all use one pipeline on both backends.
     _altaz_for_event = (
-        _get_body_altaz_geoctr_nolat
-        if use_geoctr_nolat
-        else (_get_body_altaz_geoctr if use_calc_body else _get_body_altaz)
+        _get_body_altaz_geoctr_nolat if use_geoctr_nolat else _get_body_altaz
     )
-    _ra_dec_for_event = _get_body_ra_dec_calc if use_calc_body else _get_body_ra_dec
+    _ra_dec_for_event = _get_body_ra_dec
 
-    # The out-of-map ordinary rise/set path samples the TOPOCENTRIC apparent
-    # altitude (calc_ut(FLG_TOPOCTR)); set the observer once for the whole
-    # search and restore it afterwards, so the parallax matches the in-map
-    # bodies without churning global state per sample. The Hindu path and the
-    # transit RA/Dec are geocentric and ignore the observer.
-    _topo_scope = use_calc_body and not use_geoctr_nolat
+    # The ordinary rise/set path samples the TOPOCENTRIC apparent altitude
+    # (calc_ut(FLG_TOPOCTR)) for every planet/point; set the observer once for
+    # the whole search and restore it afterwards so the diurnal parallax is
+    # applied without churning global state per sample. Fixed stars (geocentric)
+    # and the Hindu geocentric path ignore the observer.
+    _topo_scope = (not is_fixed_star) and not use_geoctr_nolat
 
     if event_type in (CALC_MTRANSIT, CALC_ITRANSIT):
-        if _use_leb_rt or use_calc_body:
-            return _calculate_transit_leb(
-                jd_start,
-                lon,
-                event_type,
-                _ra_dec_for_event,
-                CALC_ITRANSIT,
-            )
         return _calculate_transit(
             jd_start,
-            lat,
             lon,
             event_type,
-            ts,
-            earth,
-            target,
-            observer,
+            _ra_dec_for_event,
             CALC_ITRANSIT,
         )
 

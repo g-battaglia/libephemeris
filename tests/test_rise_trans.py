@@ -735,3 +735,95 @@ class TestRiseTransExtendedBodies:
             rise_trans(jd_start, 9999, CALC_RISE, self.ROME)
         with pytest.raises(ValueError, match="illegal planet number"):
             rise_trans(jd_start, 9999, CALC_RISE, self.ROME)
+
+
+class TestRiseTransBackendEquivalence:
+    """rise_trans must be backend-independent: the sealed LEB backend and the
+    Skyfield backend evaluate the horizon geometry through the same
+    calc_ut(FLG_TOPOCTR)/fixstar_ut + azalt chain and the same meridian-transit
+    RA/Dec, so their event times must agree to the position precision. This is
+    a pure equivalence property - no reference values are used.
+
+    Regression guard for the earlier split, where the LEB path used
+    fast_calc._topo_ecliptic + azalt while the Skyfield path used a native
+    Skyfield topocentric altaz frame. Those chains diverged by ~0.3-0.5" at the
+    horizon threshold even when the two backends agreed on the position to
+    ~0.0003", which - amplified by the loose bisection exit - drove rise/set
+    times apart by up to ~0.11 s (e.g. Moon 2081, Venus 2071).
+    """
+
+    # A grid of bodies spanning the classical planets (SUN..SATURN, with
+    # SATURN exercising the planet-centre-vs-barycentre offset the Skyfield
+    # backend applies) plus the mean lunar node, an out-of-_PLANET_MAP point
+    # routed through the same calc_ut path. All are analytical or DE440-core
+    # bodies whose data is identical on both backends; SPK-fitted minor bodies
+    # (Chiron/Ceres/...) are deliberately excluded because the test suite runs
+    # with strict precision and SPK auto-download disabled (see conftest), so
+    # the Skyfield path would use the Keplerian fallback while the LEB path
+    # uses its fitted Chebyshev coefficients - a data-layer difference, not a
+    # rise/set backend-equivalence one.
+    _BODIES = [SUN, MOON, 2, 3, MARS, JUPITER, 6, 10]  # 2=Mer 3=Ven 6=Sat 10=node
+    _EVENTS = [CALC_RISE, CALC_SET, CALC_MTRANSIT, CALC_ITRANSIT]
+    _GEOS = [
+        [12.4964, 41.9028, 0.0],  # Rome
+        [-58.38, -34.60, 25.0],  # Buenos Aires (southern)
+        [103.82, 1.35, 15.0],  # Singapore (equatorial)
+    ]
+    _DATES = [
+        julday(1950, 3, 20, 0.0),
+        julday(2001, 6, 15, 0.0),
+        julday(2071, 10, 3, 0.0),
+    ]
+
+    def _run_all_modes(self, jd, body, event, geo):
+        """rise_trans in leb then skyfield, restoring the mode. Returns
+        {mode: (retflag, jd_event)} or None if the leb backend is unavailable."""
+        from libephemeris import set_calc_mode, get_calc_mode
+        from libephemeris.state import get_leb_reader
+
+        saved = get_calc_mode()
+        out = {}
+        try:
+            for mode in ("leb", "skyfield"):
+                set_calc_mode(mode)
+                if mode == "leb" and get_leb_reader() is None:
+                    return None  # no LEB data provisioned in this environment
+                rf, tret = rise_trans(jd, body, event, geo)
+                out[mode] = (rf, tret[0])
+        finally:
+            set_calc_mode(saved)
+        return out
+
+    def test_leb_equals_skyfield_on_grid(self):
+        """leb and skyfield agree on the return flag everywhere and, when an
+        event is found, on the time to well under the ~0.11 s pre-fix split."""
+        # Tolerance: 0.02 s comfortably passes the residual floor (the
+        # Saturn/Pluto planet-centre offset is ~0.0045 s of geocentric
+        # longitude, everything else <0.001 s) while still catching the
+        # 0.055-0.11 s regression this test guards against.
+        tol_days = 0.02 / 86400.0
+        checked = 0
+        worst = 0.0
+        for jd in self._DATES:
+            for body in self._BODIES:
+                for event in self._EVENTS:
+                    for geo in self._GEOS:
+                        res = self._run_all_modes(jd, body, event, geo)
+                        if res is None:
+                            pytest.skip("LEB backend not provisioned")
+                        (rf_leb, t_leb) = res["leb"]
+                        (rf_sky, t_sky) = res["skyfield"]
+                        assert rf_leb == rf_sky, (
+                            f"return-flag split body={body} event={event} "
+                            f"geo={geo} jd={jd}: leb={rf_leb} sky={rf_sky}"
+                        )
+                        if rf_leb == 0:
+                            checked += 1
+                            d = abs(t_leb - t_sky)
+                            worst = max(worst, d)
+                            assert d < tol_days, (
+                                f"backend split body={body} event={event} "
+                                f"geo={geo} jd={jd}: "
+                                f"{(t_leb - t_sky) * 86400:+.5f} s"
+                            )
+        assert checked > 0, "no events found on the grid"
