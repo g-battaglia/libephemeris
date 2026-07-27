@@ -2419,6 +2419,13 @@ def _vis_limit_mag_leb(
     if exclude_moon:
         moon_alt = -90.0
 
+    if body_id == MOON:
+        # Measured reference behavior: when the observed object IS the Moon,
+        # its own light is not sky glow hindering the observation, so the
+        # moonlight term is removed exactly as with VISLIM_NOMOON (the sky
+        # stays dark and the limiting magnitude reflects the object alone).
+        moon_alt = -90.0
+
     schaefer = create_schaefer_model(
         pressure=pressure,
         temperature=temperature,
@@ -4837,6 +4844,13 @@ def vis_limit_mag(
 
     if exclude_moon:
         moon_alt = -90.0  # Assume Moon at nadir
+
+    if body_id == MOON:
+        # Measured reference behavior: when the observed object IS the Moon,
+        # its own light is not sky glow hindering the observation, so the
+        # moonlight term is removed exactly as with VISLIM_NOMOON (the sky
+        # stays dark and the limiting magnitude reflects the object alone).
+        moon_alt = -90.0
 
     # Create Schaefer model for visibility calculations
     schaefer = create_schaefer_model(

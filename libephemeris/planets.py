@@ -173,6 +173,7 @@ from .constants import (
     FLG_SWIEPH,
     FLG_HELCTR,
     FLG_TOPOCTR,
+    FLG_ORBEL_AA,
     FLG_SIDEREAL,
     ANGLE_OFFSET,
     ARABIC_OFFSET,
@@ -3828,13 +3829,19 @@ def _calc_body(
 
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
                 lon = (lon - math.degrees(dpsi_rad)) % 360.0
-            # Calculate velocity via central difference numerical differentiation
-            # The ordinary 0.05-day central-difference half-step resolves the
-            # smooth osculating curve; SPEED3/topocentric requests use their
-            # finer public sampling convention.
+            # Calculate velocity via central difference numerical differentiation.
+            # The osculating (true) apogee carries fast short-period structure,
+            # so a coarse 0.05-day half-step chords across the curvature and
+            # biases the reported longitude speed by up to ~1"/day, leaving it
+            # self-inconsistent with the reported position (and ~0.2-0.8"/day off
+            # the reference). A 0.002-day half-step brings the central difference
+            # self-consistent to <0.01"/day over 1896-2073 while staying well
+            # clear of double-precision differencing noise (which only reappears
+            # below ~5e-4 day). SPEED3/topocentric requests keep their still-finer
+            # public sampling. Same two evaluations as before -- only dt changes.
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if calc_iflag & FLG_SPEED:
-                dt = 0.0001 if calc_iflag & (FLG_SPEED3 | FLG_TOPOCTR) else 0.05
+                dt = 0.0001 if calc_iflag & (FLG_SPEED3 | FLG_TOPOCTR) else 0.002
                 try:
                     lon_prev, lat_prev, dist_prev = lunar.calc_true_lilith(jd_tt - dt)
                     lon_next, lat_next, dist_next = lunar.calc_true_lilith(jd_tt + dt)
@@ -6878,6 +6885,81 @@ _SUN_MASS_RATIOS = {
 # osculating ellipse is taken about the Earth rather than the Sun.
 _SUN_EARTH_MASS_RATIO = 332946.0487
 
+# --- Astronomical Almanac osculating-element central mass (FLG_ORBEL_AA) ---
+#
+# Measured reference behavior: with FLG_ORBEL_AA the two-body osculating fit
+# adds, to the Sun, every major planetary system whose orbit lies at or
+# interior to the body's own orbit -- the "Sun + interior planets" central mass
+# used for Keplerian elements referred to the perihelion (Explanatory Supplement
+# to the Astronomical Almanac, 3rd ed.). Characterization across Mercury..Pluto
+# and the belt asteroids at three epochs reproduced, to <=6e-10 relative, the
+# effective GM
+#     GM_eff = GM_sun * (1 + sum_{Q: a_Q <= a_body} 1/ratio_Q)
+# where Q runs over the nine major planetary systems, Earth is counted as the
+# Earth+Moon barycentre (using it Earth-alone would mismatch by ~4e-8), the
+# main-belt asteroids are NOT perturbers (including them would mismatch Jupiter
+# by ~7e-10), and a major planet counts itself. Only the osculating GEOMETRY
+# (a, e, q, Q and the perihelion-referred angles om/varpi/M/nu/E) responds:
+# a shrinks, the angles shift solidly about the perihelion, and the mean
+# longitude L stays invariant. The derived period family keeps the pure solar
+# GM, so its slots move only through the changed a (verified: n_aa ==
+# sqrt(GM_sun / a_aa^3) to ~1e-13). The Moon's geocentric orbit is unaffected.
+#
+# Reciprocal system-mass ratios come from _SUN_MASS_RATIOS (DE440; Park et al.
+# 2021, cf. Astronomical Almanac Table K7). Nominal semi-major axes only order
+# the nine systems and decide which planets are interior to a minor body's
+# orbit; the ordering itself is fixed.
+_ORBEL_AA_ORDER: tuple[int, ...] = (
+    MERCURY,
+    VENUS,
+    EARTH,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+)
+_ORBEL_AA_NOMINAL_A_AU: dict[int, float] = {
+    MERCURY: 0.387,
+    VENUS: 0.723,
+    EARTH: 1.000,
+    MARS: 1.524,
+    JUPITER: 5.204,
+    SATURN: 9.582,
+    URANUS: 19.19,
+    NEPTUNE: 30.07,
+    PLUTO: 39.48,
+}
+
+
+def _orbel_aa_cumulative_through_self() -> dict[int, float]:
+    """Map each major planet id to the summed reciprocal system-mass ratios of
+    the Sun's companions up to and including it (Sun + interior planets + self),
+    the FLG_ORBEL_AA central-mass excess for that planet."""
+    out: dict[int, float] = {}
+    total = 0.0
+    for pid in _ORBEL_AA_ORDER:
+        total += 1.0 / _SUN_MASS_RATIOS[pid]
+        out[pid] = total
+    return out
+
+
+_ORBEL_AA_CUM_THROUGH_SELF: dict[int, float] = _orbel_aa_cumulative_through_self()
+
+
+def _orbel_aa_interior_mass_sum(a_au: float) -> float:
+    """Summed reciprocal system-mass ratios of the major planets strictly
+    interior to semi-major axis ``a_au`` -- the FLG_ORBEL_AA central-mass excess
+    for a minor body (Sun + every major planet inside its orbit; the body's own
+    negligible mass is not added, matching the measured reference)."""
+    total = 0.0
+    for pid in _ORBEL_AA_ORDER:
+        if _ORBEL_AA_NOMINAL_A_AU[pid] < a_au:
+            total += 1.0 / _SUN_MASS_RATIOS[pid]
+    return total
+
+
 # Fictitious/hypothetical bodies whose published construction is *geocentric*
 # (they orbit the Earth, not the Sun): the White Moon Selena (56) and the
 # Waldemath dark moon (58). Their osculating elements are reduced with GM_earth.
@@ -7768,6 +7850,13 @@ def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, 
           interior body are unchanged (matching the reference)
         - Moon's elements are geocentric (relative to Earth)
         - Elements change constantly due to perturbations from other planets
+        - With FLG_ORBEL_AA the osculating fit uses the Astronomical Almanac
+          central mass (Sun plus every major planet at or interior to the
+          body's orbit, Earth as the Earth+Moon barycentre): the semi-major
+          axis shrinks and the perihelion-referred angles shift solidly while
+          the mean longitude is left invariant. In this context bit 32768 is
+          always read as FLG_ORBEL_AA (it shares its value with FLG_TOPOCTR,
+          which has no meaning for orbital elements)
 
     Divergences (documented, intentional): the Sun, the lunar nodes/apogees
     (10-13) and the interpolated apsides (21, 22) raise ``object N not valid``;
@@ -7959,12 +8048,22 @@ def _calc_orbital_elements_minor(t, ipl: int, iflag: int = 0) -> Tuple[float, ..
     # minor body (e.g. a centaur/TNO beyond Jupiter) is re-referenced to the SSB.
     flags = FLG_HELCTR | FLG_J2000 | FLG_TRUEPOS | FLG_SPEED
     return _osculating_from_calc_state(
-        t, ipl, flags, GM, want_barycentric=bool(iflag & FLG_BARYCTR)
+        t,
+        ipl,
+        flags,
+        GM,
+        want_barycentric=bool(iflag & FLG_BARYCTR),
+        orbel_aa=bool(iflag & FLG_ORBEL_AA),
     )
 
 
 def _osculating_from_calc_state(
-    t, ipl: int, flags: int, GM: float, want_barycentric: bool = False
+    t,
+    ipl: int,
+    flags: int,
+    GM: float,
+    want_barycentric: bool = False,
+    orbel_aa: bool = False,
 ) -> Tuple[float, ...]:
     """Osculating elements from the geometric state the pipeline serves.
 
@@ -8016,7 +8115,22 @@ def _osculating_from_calc_state(
         x, y, z = x + sx, y + sy, z + sz
         vx, vy, vz = vx + svx, vy + svy, vz + svz
 
-    return _orbital_elements_from_ecliptic_state(x, y, z, vx, vy, vz, GM, ipl, tt_jd)
+    GM_slots: float | None = None
+    if orbel_aa:
+        # Astronomical Almanac convention (FLG_ORBEL_AA): reduce the osculating
+        # geometry with the Sun plus every major planet interior to this body's
+        # orbit as the central mass. The interior set is chosen from the default
+        # (solar-GM) osculating a, which is ample to place the body between
+        # planet orbits. The derived period family keeps the pure solar GM
+        # (GM_slots), so it follows only through the changed a. In the orbital-
+        # elements context bit 32768 always means ORBEL_AA, never TOPOCTR.
+        a_default = _osculating_semi_major_axis(x, y, z, vx, vy, vz, GM)
+        GM_slots = GM
+        GM = _GM_SUN * (1.0 + _orbel_aa_interior_mass_sum(a_default))
+
+    return _orbital_elements_from_ecliptic_state(
+        x, y, z, vx, vy, vz, GM, ipl, tt_jd, GM_slots=GM_slots
+    )
 
 
 def _calc_orbital_elements_fictitious(t, ipl: int) -> Tuple[float, ...]:
@@ -8117,11 +8231,21 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         GM = 0.01720209895**2 / 328900.5596
     else:
         center = planets["sun"]
-        # Two-body mu = G(M_sun + M_planet_system). The planet mass cannot be
-        # neglected: it shifts a/Q by up to ~1e-5 AU for the giants (mirrors
-        # _calc_nod_aps, which uses the same _SUN_MASS_RATIOS table).
-        mass_ratio = _SUN_MASS_RATIOS.get(ipl)
-        GM = _GM_SUN * (1.0 + 1.0 / mass_ratio) if mass_ratio else _GM_SUN
+        if (iflag & FLG_ORBEL_AA) and ipl in _ORBEL_AA_CUM_THROUGH_SELF:
+            # Astronomical Almanac convention (FLG_ORBEL_AA): the central mass is
+            # the Sun plus every planetary system at or interior to this planet's
+            # orbit (Earth as the Earth+Moon barycentre). This shrinks the
+            # osculating a and shifts the perihelion-referred angles solidly
+            # while leaving the mean longitude invariant; the period family below
+            # keeps GM_slots = GM_sun, so it follows only through the changed a.
+            # In this context bit 32768 always means ORBEL_AA, never TOPOCTR.
+            GM = _GM_SUN * (1.0 + _ORBEL_AA_CUM_THROUGH_SELF[ipl])
+        else:
+            # Default two-body mu = G(M_sun + M_planet_system). The planet mass
+            # cannot be neglected: it shifts a/Q by up to ~1e-5 AU for the giants
+            # (mirrors _calc_nod_aps, same _SUN_MASS_RATIOS table).
+            mass_ratio = _SUN_MASS_RATIOS.get(ipl)
+            GM = _GM_SUN * (1.0 + 1.0 / mass_ratio) if mass_ratio else _GM_SUN
 
     # Get heliocentric (or geocentric for Moon) position and velocity. In
     # sealed leb mode an out-of-range request evaluates the heliocentric center

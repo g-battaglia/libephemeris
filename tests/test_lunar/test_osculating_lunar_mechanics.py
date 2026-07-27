@@ -115,6 +115,54 @@ def test_osculating_apogee_and_perigee_are_opposite(jd_tt: float) -> None:
     assert calc_true_lilith_orbital_elements(jd_tt) == apogee
 
 
+@pytest.mark.parametrize(
+    "jd_tt",
+    [
+        2413687.5,  # 1896
+        2426405.5,  # 1931
+        2435130.5,  # 1955
+        2447515.5,  # 1988
+        2459034.5,  # 2020
+        2478361.5,  # 2073
+    ],
+)
+def test_osculating_apogee_speed_is_self_consistent(jd_tt: float) -> None:
+    """The FLG_SPEED longitude speed reported for the osculating (true) apogee
+    (OscuApog, id 13) must be the genuine time-derivative of the reported
+    longitude curve. A coarse central-difference half-step chords across the
+    apogee's fast short-period structure and biased this speed by ~0.2-1.2"/day;
+    the finer half-step keeps it self-consistent to well under 0.03"/day.
+    """
+    import libephemeris as ephem
+    from libephemeris.constants import OSCU_APOG, FLG_SPEED
+
+    def _longitude(jd: float) -> float:
+        return calc_true_lilith(jd)[0]
+
+    def _unwrap(delta: float) -> float:
+        if delta > 180.0:
+            return delta - 360.0
+        if delta < -180.0:
+            return delta + 360.0
+        return delta
+
+    # Independent 4th-order central derivative of the reported longitude curve.
+    h = 0.002
+    d1 = _unwrap(_longitude(jd_tt + h) - _longitude(jd_tt - h))
+    d2 = _unwrap(_longitude(jd_tt + 2.0 * h) - _longitude(jd_tt - 2.0 * h))
+    true_speed = (8.0 * d1 - d2) / (12.0 * h)
+
+    position, _ = ephem.calc(jd_tt, OSCU_APOG, FLG_SPEED)
+    reported_speed = position[3]
+
+    auto_inconsistency_arcsec = abs(reported_speed - true_speed) * 3600.0
+    assert auto_inconsistency_arcsec < 0.03, (
+        f"OscuApog longitude speed {reported_speed:.6f} deg/day is "
+        f"self-inconsistent with its own longitude derivative "
+        f'{true_speed:.6f} deg/day by {auto_inconsistency_arcsec:.4f} "/day'
+    )
+
+
 @pytest.mark.parametrize("jd_tt", [2451545.0, 2458849.5, 2460676.5])
 def test_true_node_follows_the_orbital_plane_intersection(jd_tt: float) -> None:
     position, velocity = _moon_state(jd_tt)

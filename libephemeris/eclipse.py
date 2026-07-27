@@ -3049,6 +3049,23 @@ def _sol_eclipse_when_glob_pythonic(
     )
 
 
+def _strip_one_try_bit(flags: int) -> int:
+    """Drop bit 0x8000 from eclipse-search calculation flags.
+
+    The bit value is shared between ``ECL_ONE_TRY`` and ``FLG_TOPOCTR``.
+    In the eclipse functions' ``flags`` argument it can only mean the
+    one-try optimization hint (the topocentric place is defined by the
+    explicit ``geopos``, never by this flag), and measured reference
+    behavior returns identical results with or without it. Passing it
+    through to the position pipeline would instead trip the topocentric
+    configuration guard. The functional one-try request rides on the
+    ``backwards`` parameter, as in the occultation searches.
+    """
+    from .constants import ECL_ONE_TRY
+
+    return flags & ~ECL_ONE_TRY
+
+
 def sol_eclipse_when_glob(
     tjdut: float,
     flags: int = FLG_SWIEPH,
@@ -3069,6 +3086,7 @@ def sol_eclipse_when_glob(
     Returns:
         Tuple of (retflag, tret) matching the reference ephemeris.
     """
+    flags = _strip_one_try_bit(flags)
     direction = "backward" if _coerce_backwards(backwards) else "forward"
     return _sol_eclipse_when_glob_pythonic(
         tjdut, flags=flags, eclipse_type=ecltype, search_direction=direction
@@ -3673,6 +3691,7 @@ def sol_eclipse_when_loc(
     fallback for partial/custom LEB files. See the impl docstring for the
     full API contract.
     """
+    flags = _strip_one_try_bit(flags)
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_when_loc_impl,
         tjdut,
@@ -4116,6 +4135,7 @@ def sol_eclipse_where(
     Wrapper around :func:`_sol_eclipse_where_impl` that applies mode-aware LEB
     range handling. See the implementation docstring for the full API contract.
     """
+    flags = _strip_one_try_bit(flags)
     return _call_with_leb_skyfield_fallback(_sol_eclipse_where_impl, tjdut, flags)
 
 
@@ -4221,6 +4241,7 @@ def sol_eclipse_how(
     fallback for partial/custom LEB files. See the impl docstring for the
     full API contract.
     """
+    flags = _strip_one_try_bit(flags)
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_how_impl,
         tjdut,
@@ -5666,6 +5687,7 @@ def lun_eclipse_when(
     Returns:
         Tuple of (retflag, tret) matching the reference ephemeris.
     """
+    flags = _strip_one_try_bit(flags)
     return _lun_eclipse_when_pythonic(
         tjdut,
         flags=flags,
@@ -5890,6 +5912,7 @@ def lun_eclipse_when_loc(
     Returns:
         Tuple of (retflag, tret, attr) matching the reference ephemeris.
     """
+    flags = _strip_one_try_bit(flags)
     if len(geopos) < 3:
         raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
 
@@ -6149,6 +6172,7 @@ def lun_eclipse_how(
     fallback for partial/custom LEB files. See the impl docstring for the
     full API contract.
     """
+    flags = _strip_one_try_bit(flags)
     return _call_with_leb_skyfield_fallback(
         _lun_eclipse_how_impl,
         tjdut,

@@ -451,3 +451,104 @@ class TestOrbitalElementsAliases:
         result = ephem.get_orbital_elements_ut(2451545.0, MARS, 0)
         assert len(result) == 50
         assert isinstance(result[0], float)
+
+
+class TestOrbitalElementsAstronomicalAlmanac:
+    """FLG_ORBEL_AA (Astronomical Almanac central mass) osculating elements.
+
+    With FLG_ORBEL_AA the two-body fit is reduced about the Sun plus every major
+    planet at or interior to the body's orbit (Earth = Earth+Moon barycentre).
+    The semi-major axis shrinks, the perihelion-referred angles shift solidly,
+    and the mean longitude and the orbit-plane elements (i, node) stay put.
+    These properties are backend-independent and need no external reference.
+    """
+
+    JD = 2451545.0  # J2000
+
+    @pytest.mark.unit
+    def test_flag_is_exported(self):
+        assert ephem.FLG_ORBEL_AA == 32768
+
+    @pytest.mark.unit
+    def test_mercury_aa_equals_default(self):
+        """Mercury has no interior planet, so its Almanac central mass equals
+        the default Sun+Mercury mass: every element is unchanged."""
+        default = ephem.get_orbital_elements(self.JD, MERCURY, 0)
+        almanac = ephem.get_orbital_elements(self.JD, MERCURY, ephem.FLG_ORBEL_AA)
+        for i in range(17):
+            assert almanac[i] == pytest.approx(default[i], abs=1e-12, rel=1e-12)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "planet_id", [MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO]
+    )
+    def test_outer_planet_semimajor_axis_shrinks(self, planet_id):
+        """Adding interior planetary mass to the central body raises the
+        effective GM, so the osculating semi-major axis shrinks."""
+        a_default = ephem.get_orbital_elements(self.JD, planet_id, 0)[0]
+        a_almanac = ephem.get_orbital_elements(self.JD, planet_id, ephem.FLG_ORBEL_AA)[
+            0
+        ]
+        assert a_almanac < a_default
+
+    @pytest.mark.unit
+    def test_saturn_jump_dominated_by_jupiter_mass(self):
+        """The Almanac shrink jumps sharply from Jupiter to Saturn because
+        Jupiter's own (large) mass enters the interior sum at Saturn: Saturn's
+        fractional shrink is far larger than the terrestrial-only shrink at
+        Mars or the still-interior-only shrink at Jupiter."""
+
+        def frac_shrink(pid):
+            a_d = ephem.get_orbital_elements(self.JD, pid, 0)[0]
+            a_a = ephem.get_orbital_elements(self.JD, pid, ephem.FLG_ORBEL_AA)[0]
+            return (a_d - a_a) / a_d
+
+        mars = frac_shrink(MARS)
+        jupiter = frac_shrink(JUPITER)
+        saturn = frac_shrink(SATURN)
+        # Jupiter's mass ratio (~1/1047) dwarfs the terrestrial interior sum
+        # (~6e-6), so the Saturn jump is orders of magnitude larger.
+        assert saturn > 20.0 * mars
+        assert saturn > 20.0 * jupiter
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("planet_id", [MARS, JUPITER, SATURN, NEPTUNE, PLUTO])
+    def test_mean_longitude_invariant(self, planet_id):
+        """The perihelion-referred angles shift solidly (omega up, M down), so
+        the mean longitude L = node + omega + M is left essentially invariant."""
+        default = ephem.get_orbital_elements(self.JD, planet_id, 0)
+        almanac = ephem.get_orbital_elements(self.JD, planet_id, ephem.FLG_ORBEL_AA)
+        d_L = abs(((almanac[9] - default[9]) + 180.0) % 360.0 - 180.0)
+        assert d_L < 0.01
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("planet_id", [MARS, JUPITER, SATURN, NEPTUNE, PLUTO])
+    def test_orbit_plane_elements_unchanged(self, planet_id):
+        """Inclination and node depend only on the angular-momentum direction,
+        not on the central GM, so they are untouched by FLG_ORBEL_AA."""
+        default = ephem.get_orbital_elements(self.JD, planet_id, 0)
+        almanac = ephem.get_orbital_elements(self.JD, planet_id, ephem.FLG_ORBEL_AA)
+        assert almanac[2] == pytest.approx(default[2], abs=1e-9)  # inclination
+        d_node = abs(((almanac[3] - default[3]) + 180.0) % 360.0 - 180.0)
+        assert d_node < 1e-6
+
+    @pytest.mark.unit
+    def test_perihelion_angle_shifts_solidly(self):
+        """omega (argument of perihelion) and M (mean anomaly) shift by equal
+        and opposite amounts under the Almanac central mass."""
+        default = ephem.get_orbital_elements(self.JD, NEPTUNE, 0)
+        almanac = ephem.get_orbital_elements(self.JD, NEPTUNE, ephem.FLG_ORBEL_AA)
+        d_omega = ((almanac[4] - default[4]) + 180.0) % 360.0 - 180.0
+        d_M = ((almanac[6] - default[6]) + 180.0) % 360.0 - 180.0
+        assert abs(d_omega) > 1.0  # a real, several-degree shift
+        assert d_omega == pytest.approx(-d_M, rel=0.02)
+
+    @pytest.mark.unit
+    def test_asteroid_semimajor_axis_shrinks(self):
+        """A main-belt asteroid (interior planets: Mercury..Mars) also shrinks
+        under the Almanac central mass, via the minor-body element path."""
+        from libephemeris.constants import CERES
+
+        a_default = ephem.get_orbital_elements(self.JD, CERES, 0)[0]
+        a_almanac = ephem.get_orbital_elements(self.JD, CERES, ephem.FLG_ORBEL_AA)[0]
+        assert a_almanac < a_default

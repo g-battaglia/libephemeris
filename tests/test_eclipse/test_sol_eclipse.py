@@ -1369,3 +1369,36 @@ class TestSolEclipseWhenAdvanceMargin:
         _, nxt = sol_eclipse_when_glob(jm - 0.5e-4, FLG_SWIEPH, 0, False)
         assert abs(cur[0] - jm) < 0.5  # still the current eclipse
         assert nxt[0] - jm > 1.0  # advanced to the next
+
+
+class TestOneTryBitInFlags:
+    """Bit 0x8000 in the flags argument is the one-try hint, not TOPOCTR.
+
+    Measured reference behavior returns identical results with or without
+    the bit in every eclipse function's flags; the topocentric place is
+    defined by the explicit geopos, never by this flag.
+    """
+
+    def test_one_try_bit_is_inert_in_flags(self):
+        import libephemeris as le
+
+        jd = le.julday(2000, 3, 15, 0.0)
+        geopos = (12.5, 41.9, 50.0)
+        plain = le.FLG_SWIEPH
+        with_bit = le.FLG_SWIEPH | le.ECL_ONE_TRY
+
+        r0 = le.sol_eclipse_when_glob(jd, plain, 0, False)
+        r1 = le.sol_eclipse_when_glob(jd, with_bit, 0, False)
+        assert r0[0] == r1[0] and r0[1][0] == r1[1][0]
+
+        r0 = le.lun_eclipse_when(jd, plain, 0, False)
+        r1 = le.lun_eclipse_when(jd, with_bit, 0, False)
+        assert r0[0] == r1[0] and r0[1][0] == r1[1][0]
+
+        r0 = le.lun_eclipse_when_loc(jd, geopos, plain, False)
+        r1 = le.lun_eclipse_when_loc(jd, geopos, with_bit, False)
+        assert r0[0] == r1[0] and r0[1][0] == r1[1][0]
+
+        r0 = le.sol_eclipse_when_loc(jd, geopos, plain, False)
+        r1 = le.sol_eclipse_when_loc(jd, geopos, with_bit, False)
+        assert r0[0] == r1[0] and r0[1][0] == r1[1][0]
