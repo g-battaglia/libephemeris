@@ -1157,9 +1157,18 @@ def test_get_current_file_data_not_applicable(monkeypatch):
 
 
 def test_get_current_file_data_no_planets(monkeypatch):
-    """_PLANETS None -> empty tuple."""
+    """_PLANETS None: report the active LEB artifact, or empty without one."""
     monkeypatch.setattr(state, "_PLANETS", None)
-    assert state.get_current_file_data(0) == ("", 0.0, 0.0, 0)
+    result = state.get_current_file_data(0)
+    try:
+        reader = state.get_leb_reader()
+    except RuntimeError:
+        reader = None
+    if reader is not None:
+        path, start, end, denum = result
+        assert path and start < end and denum in (440, 441)
+    else:
+        assert result == ("", 0.0, 0.0, 0)
 
 
 def test_get_current_file_data_filename_attr_no_spk(monkeypatch):
@@ -1458,3 +1467,26 @@ def test_get_spk_target_keyerror(monkeypatch):
     monkeypatch.setattr(state, "_SPK_BODY_MAP", {15: ("/k.bsp", 2060)})
     monkeypatch.setattr(state, "_SPK_KERNELS", {"/k.bsp": _Kernel()})
     assert state._get_spk_target(15) is None
+
+
+def test_current_file_data_reports_active_leb():
+    """In sealed LEB mode the metadata reports the active LEB artifact.
+
+    The path names the serving core file, the range is the stored union
+    coverage of the requested channel, and the DE number is the generating
+    kernel's (440 for base/medium tiers, 441 for extended). ifno 2-4 stay
+    empty like the JPL path.
+    """
+    import libephemeris as le
+
+    prev = le.get_calc_mode()
+    try:
+        le.set_calc_mode("leb")
+        le.calc_ut(2451545.0, le.SUN, 0)
+        path, start, end, denum = le.get_current_file_data(0)
+        assert path.endswith(".leb2") or path.endswith(".leb")
+        assert start < 2451545.0 < end
+        assert denum in (440, 441)
+        assert le.get_current_file_data(2) == ("", 0.0, 0.0, 0)
+    finally:
+        le.set_calc_mode(prev)

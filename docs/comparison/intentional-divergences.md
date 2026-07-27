@@ -301,6 +301,11 @@ instead of reproducing the failure:
   values).
 - A lunar occultation of the Moon itself raises the typed `Error`; the
   external implementation does not terminate.
+- Event searches are stateless: a prior sequence of rise/transit calls at
+  other locations (including polar cases that error) never changes a later
+  result. In the external implementation such a sequence can corrupt a
+  subsequent lunar meridian transit by ~31 s until the topocentric
+  observer is explicitly reset.
 
 ## Fixed-star radial channels
 

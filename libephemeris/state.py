@@ -2609,6 +2609,34 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
     if ifno not in (0, 1):
         return ("", 0.0, 0.0, 0)
 
+    # LEB service (sealed mode, or auto mode before any JPL kernel is
+    # opened): report the active LEB artifact serving the planet/Moon
+    # channels instead of an empty tuple, with the stored union coverage and
+    # the generating JPL Development Ephemeris number (DE440 for the
+    # base/medium tiers, DE441 for extended). ifno 0 and 1 both map to the
+    # merged core file, like a JPL kernel.
+    if get_calc_mode() == "leb" or _PLANETS is None:
+        try:
+            _reader = get_leb_reader()
+        except RuntimeError:
+            _reader = None
+        if _reader is not None:
+            _body = 0 if ifno == 0 else 1  # SUN / MOON channel
+            _bounds = getattr(_reader, "body_coverage", lambda _b: None)(_body)
+            if _bounds is not None:
+                _files = [
+                    getattr(item, "path", "")
+                    for item in getattr(_reader, "_readers", (_reader,))
+                    if getattr(item, "has_body", lambda _b: False)(_body)
+                ]
+                _path = str(_files[0]) if _files else str(getattr(_reader, "path", ""))
+                _denum = (
+                    441 if any("extended" in str(f).lower() for f in _files) else 440
+                )
+                return (_path, float(_bounds[0]), float(_bounds[1]), _denum)
+        if _PLANETS is None:
+            return ("", 0.0, 0.0, 0)
+
     # If no ephemeris loaded, return empty data
     if _PLANETS is None:
         return ("", 0.0, 0.0, 0)
