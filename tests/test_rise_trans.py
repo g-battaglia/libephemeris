@@ -621,3 +621,117 @@ class TestRiseTransGeoctrNoEclLat:
                     t, ECL2HOR, tuple(self.ROME), 0.0, 0.0, (pos[0], 0.0, pos[2])
                 )
                 assert alt_true == pytest.approx(0.0, abs=0.01)
+
+
+class TestRiseTransExtendedBodies:
+    """rise_trans/rise_trans_true_hor for bodies outside the classical
+    _PLANET_MAP (lunar nodes and apsides, Chiron, the main-belt asteroids,
+    numbered minor planets). These are placeable by calc_ut on either backend,
+    so the reference computes their rise, set and transit; the engine routes
+    them through the shared calc_ut pipeline. The properties below are backend
+    agnostic (the suite runs under both Skyfield and sealed LEB) and reference
+    free.
+    """
+
+    ROME = [12.5, 41.9028, 0.0]
+    # Mean/True Node, Mean/Oscu Apogee, Chiron, Ceres, Vesta, Eros (10433).
+    BODIES = [10, 11, 12, 13, 15, 17, 20, 10000 + 433]
+
+    def test_all_events_resolve_without_raising(self):
+        """Rise, set and both transits resolve (found or circumpolar) for every
+        out-of-map body, on whichever backend the suite selected."""
+        jd_start = julday(2015, 3, 20, 0)
+        for body in self.BODIES:
+            for event in (CALC_RISE, CALC_SET, CALC_MTRANSIT, CALC_ITRANSIT):
+                res, tret = rise_trans(jd_start, body, event, self.ROME)
+                assert res in (0, -2)
+                if res == 0:
+                    # Event within the next couple of days of the start.
+                    assert 0.0 < tret[0] - jd_start < 2.5
+
+    def test_rise_altitude_is_topocentric_horizon(self):
+        """At the rise instant the body's TOPOCENTRIC true altitude sits on the
+        horizon (no refraction => 0). This fails if the engine used the
+        geocentric place: the ~3" parallax of a near asteroid would leave a
+        residual altitude and shift the time by ~0.2 s.
+        """
+        from libephemeris import azalt, calc_ut, set_topo, FLG_TOPOCTR
+        from libephemeris.state import get_topo
+        from libephemeris.utils import ECL2HOR
+
+        jd_start = julday(2015, 3, 20, 0)
+        lon, lat, alt = self.ROME
+        saved = get_topo()
+        try:
+            for body in self.BODIES:
+                res, tret = rise_trans(
+                    jd_start, body, CALC_RISE | BIT_NO_REFRACTION, self.ROME
+                )
+                if res != 0:
+                    continue
+                set_topo(lon, lat, alt)
+                pos, _ = calc_ut(tret[0], body, FLG_TOPOCTR)
+                _az, alt_true, _app = azalt(
+                    tret[0],
+                    ECL2HOR,
+                    (lon, lat, alt),
+                    0.0,
+                    0.0,
+                    (pos[0], pos[1], pos[2]),
+                )
+                assert alt_true == pytest.approx(0.0, abs=0.01)
+        finally:
+            # Restore the previous observer so global state does not leak.
+            if saved is None:
+                import libephemeris.state as _st
+
+                _st._TOPO = None
+            else:
+                set_topo(
+                    saved.longitude.degrees,
+                    saved.latitude.degrees,
+                    saved.elevation.m,
+                )
+
+    def test_transit_places_body_on_the_meridian(self):
+        """At MTRANSIT the body's hour angle is ~0; at ITRANSIT it is ~180."""
+        from libephemeris import calc_ut, sidtime, FLG_EQUATORIAL
+
+        jd_start = julday(2015, 3, 20, 0)
+        lon = self.ROME[0]
+        for body in self.BODIES:
+            for event, target_ha in ((CALC_MTRANSIT, 0.0), (CALC_ITRANSIT, 180.0)):
+                res, tret = rise_trans(jd_start, body, event, self.ROME)
+                assert res == 0
+                eq, _ = calc_ut(tret[0], body, FLG_EQUATORIAL)
+                lst_deg = (sidtime(tret[0]) * 15.0 + lon) % 360.0
+                ha = ((lst_deg - eq[0]) - target_ha + 180.0) % 360.0 - 180.0
+                assert abs(ha) < 0.02
+
+    def test_true_hor_matches_zero_horizon_rise_trans(self):
+        """rise_trans is the zero-horizon specialization of
+        rise_trans_true_hor for these bodies too."""
+        from libephemeris import rise_trans_true_hor
+
+        jd_start = julday(2015, 3, 20, 0)
+        for body in (15, 17, 10):
+            r1, t1 = rise_trans(jd_start, body, CALC_RISE, self.ROME)
+            r2, t2 = rise_trans_true_hor(
+                jd_start, body, CALC_RISE, self.ROME, 0.0, 0.0, 0.0
+            )
+            assert r1 == r2
+            if r1 == 0:
+                assert t1[0] == pytest.approx(t2[0], abs=1e-6)
+
+    def test_unplaceable_body_raises_typed_error(self):
+        """A body no backend can place (a planetary moon with no registered
+        SPK) raises the unified illegal-body error: both an Error and a
+        ValueError carrying 'illegal planet number', identically on every
+        backend."""
+        from libephemeris.exceptions import Error
+
+        jd_start = julday(2015, 3, 20, 0)
+        with pytest.raises(Error, match="illegal planet number"):
+            rise_trans(jd_start, 9999, CALC_RISE, self.ROME)
+        with pytest.raises(ValueError, match="illegal planet number"):
+            rise_trans(jd_start, 9999, CALC_RISE, self.ROME)

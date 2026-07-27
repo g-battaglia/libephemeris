@@ -46,9 +46,10 @@ Provenance:
 
 from __future__ import annotations
 
+import contextlib
 import math
 import re
-from typing import Callable, Sequence, Tuple, Union, cast
+from typing import Callable, Iterator, Sequence, Tuple, Union, cast
 
 from .constants import (
     SUN,
@@ -86,9 +87,21 @@ from .constants import (
     ECL_3RD_VISIBLE,
     ECL_4TH_VISIBLE,
 )
-from .exceptions import Error, LEBCorruptionError
+from .exceptions import Error, LEBCorruptionError, UnknownBodyError
 from .planets import calc_ut
 from .state import get_calc_mode, get_timescale
+
+
+class _IllegalRiseBodyError(UnknownBodyError, ValueError):
+    """A rise/set/transit target that no active backend can place.
+
+    Raised for an unknown or unsupported body id passed to ``rise_trans`` /
+    ``rise_trans_true_hor`` (e.g. a planetary moon with no registered SPK).
+    It multiply inherits the typed ``UnknownBodyError`` (an ``Error``
+    subclass, the class the reference raises for an illegal body) AND the
+    built-in ``ValueError`` so the single "illegal planet number" contract is
+    identical on every backend and satisfies callers catching either type.
+    """
 
 
 _ACTIVE_LEB_READER = object()
@@ -647,6 +660,31 @@ def _occ_body_geo_xyz(
     return (float(pos[0]), float(pos[1]), float(pos[2]))
 
 
+@contextlib.contextmanager
+def _observer_scope(lon: float, lat: float, alt: float) -> "Iterator[None]":
+    """Temporarily set the topocentric observer for ``calc_ut(FLG_TOPOCTR)``.
+
+    Saves and restores the process-wide observer (``state._TOPO``) so a
+    rise/set or occultation search can request the topocentric apparent place
+    of a body outside ``_PLANET_MAP`` through ``calc_ut`` — the one position
+    source that handles the AST_OFFSET id aliases and both backends — without
+    leaking the observer to the caller. ``set_topo`` clears the observer-at
+    cache on entry; the cache is cleared again on exit so a following calc keys
+    off the caller's own location.
+    """
+    from . import state as _state
+    from .cache import clear_observer_cache
+    from .state import get_topo, set_topo
+
+    saved = get_topo()
+    set_topo(lon, lat, alt)
+    try:
+        yield
+    finally:
+        _state._TOPO = saved
+        clear_observer_cache()
+
+
 def _occ_body_topo(
     tjd_ut: float,
     body: "Union[int, str]",
@@ -685,10 +723,28 @@ def _occ_body_topo(
         pos = _topo_ecliptic(reader, jd_tt, tjd_ut, body, gp)
         return (float(pos[0]), float(pos[1]), float(pos[2]))
 
+    from .planets import _PLANET_MAP, get_planet_target
+
+    if body not in _PLANET_MAP:
+        # Bodies the classical _PLANET_MAP does not enumerate (Chiron, the
+        # main-belt asteroids, numbered minor planets, ...) have no Skyfield
+        # target name here; without this the id fell through to
+        # ``_PLANET_MAP[body]`` and leaked a raw KeyError on the Skyfield path
+        # (the LEB path already served them via _topo_ecliptic). Position them
+        # topocentrically through calc_ut(FLG_TOPOCTR): the identical
+        # topocentric ecliptic-of-date place as the LEB path (verified to
+        # 0.000"), so both backends share one occulted-body position source. A
+        # genuinely unplaceable id raises the typed error from calc_ut.
+        from .constants import FLG_TOPOCTR
+
+        gp = (float(geopos[0]), float(geopos[1]), float(geopos[2]))
+        with _observer_scope(*gp):
+            pos, _ = calc_ut(tjd_ut, body, _ecl_eph_flags(flags) | FLG_TOPOCTR)
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
+
     from skyfield.api import wgs84
     from skyfield.framelib import ecliptic_frame
 
-    from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets
 
     eph = get_planets()
@@ -7458,7 +7514,43 @@ def _rise_trans_true_hor_impl(
     _reader_rt = reader
     _use_leb_rt = _reader_rt is not None
 
-    if _use_leb_rt:
+    # Bodies the classical _PLANET_MAP does not enumerate (the lunar nodes and
+    # apsides, Chiron, the main-belt asteroids, numbered minor planets, ...)
+    # are still placeable by calc_ut, so the reference computes their rise, set
+    # and transit. Route them through one backend-agnostic pipeline: the
+    # geocentric apparent place -> azalt for the altitude and calc_ut
+    # EQUATORIAL for the transit RA/Dec. calc_ut dispatches to the active
+    # backend (the LEB reader when sealed, JPL/Skyfield otherwise) and already
+    # enforces the typed error contract, so a genuinely unknown id or an
+    # out-of-range date raises there. These are point sources: zero disc radius
+    # and negligible (geocentric) parallax, matching the measured reference
+    # rise/set geometry.
+    use_calc_body = (not is_fixed_star) and (cast(int, body) not in _PLANET_MAP)
+    if use_calc_body:
+        # Validate positionability up front so an unplaceable body raises the
+        # typed error at the call (the reference rejects it there too), not
+        # mid-search; the fast_calc probe below uses the wrong id space for
+        # AST_OFFSET-aliased ids, so it is skipped for these bodies.
+        try:
+            calc_ut(jd_start, cast(int, body), FLG_SPEED)
+        except (KeyError, ValueError, Error) as _probe_exc:
+            from .exceptions import EphemerisRangeError
+
+            # A known body whose date is outside coverage (or a corrupt LEB)
+            # keeps its typed range error - never masked as an illegal body.
+            _reraise_if_leb_range_error(_probe_exc)
+            if isinstance(_probe_exc, EphemerisRangeError):
+                raise
+            # A target calc_ut cannot place at all (a planetary moon with no
+            # registered SPK, an unknown id, ...) is illegal for rise/set. One
+            # typed error on every backend, carrying the reference's "illegal
+            # planet number" message (both an Error and a ValueError).
+            raise _IllegalRiseBodyError(
+                "illegal planet number %d." % cast(int, body),
+                body_id=cast(int, body),
+            ) from _probe_exc
+
+    if _use_leb_rt and not use_calc_body:
         try:
             from . import fast_calc as _fc_rt
 
@@ -7483,7 +7575,7 @@ def _rise_trans_true_hor_impl(
             planet = -1
         else:
             planet = cast(int, body)
-            if planet not in _PLANET_MAP:
+            if planet not in _PLANET_MAP and not use_calc_body:
                 raise ValueError("illegal planet number %d." % planet)
         ts = get_timescale()
         earth = None
@@ -7506,6 +7598,11 @@ def _rise_trans_true_hor_impl(
             dec_deg = star_entry.dec_j2000 + (star_entry.pm_dec * t_years) / 3600.0
             target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
             planet = -1
+        elif use_calc_body:
+            # Out-of-map body: positioned via calc_ut below (validated by the
+            # up-front probe); no Skyfield target name exists for it.
+            planet = cast(int, body)
+            target = None
         else:
             planet = cast(int, body)
             if planet not in _PLANET_MAP:
@@ -7664,17 +7761,57 @@ def _rise_trans_true_hor_impl(
         )
         return alt_true, az, dist_b
 
+    def _get_body_altaz_geoctr(jd: float) -> Tuple[float, float, float]:
+        """(true altitude, azimuth, distance) from the body's TOPOCENTRIC
+        apparent ecliptic place via calc_ut(FLG_TOPOCTR) + azalt.
+
+        Used for bodies outside the classical _PLANET_MAP (nodes, apsides,
+        Chiron, asteroids, numbered minor planets). The topocentric parallax
+        reaches ~3" for the nearer main-belt asteroids and shifts their
+        rise/set by ~0.2 s, so it is applied here exactly as the in-map bodies
+        get it (calc_ut(FLG_TOPOCTR) reproduces fast_calc._topo_ecliptic to
+        0.000"). The observer location is set once around the rise/set search
+        (see the dispatch tail); calc_ut sources from the active backend.
+        """
+        from .utils import azalt, ECL2HOR
+
+        pos_p, _ = calc_ut(jd, planet, _FLG_TOPO_RT | FLG_SPEED)
+        lon_b, lat_b, dist_b = float(pos_p[0]), float(pos_p[1]), float(pos_p[2])
+        az, alt_true, _ = azalt(
+            jd, ECL2HOR, (lon, lat, altitude), 0.0, 0.0, (lon_b, lat_b, dist_b)
+        )
+        return alt_true, az, dist_b
+
+    def _get_body_ra_dec_calc(jd: float) -> Tuple[float, float]:
+        """Apparent RA (hours) and Dec (deg) of an out-of-map body via calc_ut."""
+        from .constants import FLG_EQUATORIAL
+
+        eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
+        return eq[0] / 15.0, eq[1]
+
+    from .constants import FLG_TOPOCTR as _FLG_TOPO_RT
+
     _altaz_for_event = (
-        _get_body_altaz_geoctr_nolat if use_geoctr_nolat else _get_body_altaz
+        _get_body_altaz_geoctr_nolat
+        if use_geoctr_nolat
+        else (_get_body_altaz_geoctr if use_calc_body else _get_body_altaz)
     )
+    _ra_dec_for_event = _get_body_ra_dec_calc if use_calc_body else _get_body_ra_dec
+
+    # The out-of-map ordinary rise/set path samples the TOPOCENTRIC apparent
+    # altitude (calc_ut(FLG_TOPOCTR)); set the observer once for the whole
+    # search and restore it afterwards, so the parallax matches the in-map
+    # bodies without churning global state per sample. The Hindu path and the
+    # transit RA/Dec are geocentric and ignore the observer.
+    _topo_scope = use_calc_body and not use_geoctr_nolat
 
     if event_type in (CALC_MTRANSIT, CALC_ITRANSIT):
-        if _use_leb_rt:
+        if _use_leb_rt or use_calc_body:
             return _calculate_transit_leb(
                 jd_start,
                 lon,
                 event_type,
-                _get_body_ra_dec,
+                _ra_dec_for_event,
                 CALC_ITRANSIT,
             )
         return _calculate_transit(
@@ -7715,17 +7852,21 @@ def _rise_trans_true_hor_impl(
     if disc_sign != 0:
         lift_max += 0.30
 
-    return _calculate_rise_set(
-        jd_start,
-        lat,
-        event_type,
-        _event_height,
-        _get_body_ra_dec,
-        CALC_RISE,
-        CALC_SET,
-        horizon_alt,
-        lift_max,
+    _rt_scope = (
+        _observer_scope(lon, lat, altitude) if _topo_scope else contextlib.nullcontext()
     )
+    with _rt_scope:
+        return _calculate_rise_set(
+            jd_start,
+            lat,
+            event_type,
+            _event_height,
+            _ra_dec_for_event,
+            CALC_RISE,
+            CALC_SET,
+            horizon_alt,
+            lift_max,
+        )
 
 
 # Alias for reference API compatibility

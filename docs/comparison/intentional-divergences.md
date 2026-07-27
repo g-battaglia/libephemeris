@@ -262,6 +262,15 @@ motion; its upper transits and the slow bodies' lower transits are
 converged on both sides. LibEphemeris reports the geometrically exact
 instant rather than reproducing the residual.
 
+## Orbital elements are observer-independent
+
+`get_orbital_elements` describes the body's heliocentric (or barycentric)
+osculating orbit, a quantity that does not depend on where the observer
+stands. LibEphemeris therefore returns identical elements with and without
+`FLG_TOPOCTR`. At least one external implementation shifts the angular
+elements by a few arcseconds under the topocentric flag; that shift has no
+orbital-mechanical meaning and is not reproduced.
+
 ## Fixed-star speeds under `FLG_SPEED3`
 
 For fixed stars, at least one external implementation returns zero speed

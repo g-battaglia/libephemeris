@@ -9700,7 +9700,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         # Sun-Moon and Earth-Moon directions. Using position vectors
         # is more numerically stable than law-of-cosines for the Moon's
         # extremely elongated triangle (Sun~1AU, Moon~0.003AU from Earth).
-        r_moon = moon_dist.au  # Earth-Moon distance
+        r_moon = float(moon_dist.au)  # Earth-Moon distance (native float, not numpy)
 
         # Vectors in geocentric frame (Earth at origin)
         M = target_pos_geo.position.au  # Moon position
