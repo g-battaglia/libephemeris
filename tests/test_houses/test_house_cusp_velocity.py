@@ -189,8 +189,16 @@ class TestHousesEx2SpeedFlag:
         assert cusps_speed1 == cusps_speed2, "Whole Sign: speeds differ"
         assert ascmc_speed1 == ascmc_speed2, "Whole Sign: ascmc speeds differ"
 
-        # Whole-sign cusps are fixed boundaries between sign changes.
-        assert all(speed == 0.0 for speed in cusps_speed1)
+        # Measured reference behavior (tropical Whole Sign): the angular cusps
+        # carry the Asc/MC rates (cusps 1,7 -> dAsc; 4,10 -> dMC); every
+        # intermediate cusp is 0.
+        d_asc, d_mc = ascmc_speed1[0], ascmc_speed1[1]
+        assert cusps_speed1[0] == d_asc
+        assert cusps_speed1[6] == d_asc
+        assert cusps_speed1[3] == d_mc
+        assert cusps_speed1[9] == d_mc
+        for i in (1, 2, 4, 5, 7, 8, 10, 11):
+            assert cusps_speed1[i] == 0.0
         assert any(speed != 0.0 for speed in ascmc_speed1)
 
     """Tests for velocities in houses_armc_ex2."""
@@ -296,11 +304,13 @@ class TestHousesEx2SpeedFlag:
 
     @pytest.mark.unit
     def test_houses_armc_ex2_speed_flag_whole_sign(self):
-        """Whole Sign cusps are fixed at sign boundaries, so velocity is zero.
+        """Whole Sign cusp speeds replicate the reference API's analytic rule.
 
-        Whole Sign houses place cusps at exact sign boundaries (0, 30, 60, etc.).
-        Within a short time interval, these don't change, so cusp velocities are zero.
-        However, ASC and MC velocities should still be calculated.
+        Whole Sign houses place cusps at exact sign boundaries, so their true
+        finite-difference derivative is zero; the reference instead exposes the
+        Asc/MC rates at the four angular cusps (1,7 -> dAsc; 4,10 -> dMC) and
+        reports 0 for the intermediate cusps. LibEphemeris replicates that
+        measured behavior. ASC and MC velocities are still calculated.
         """
         armc = 150.0
         lat = 45.0
@@ -310,7 +320,13 @@ class TestHousesEx2SpeedFlag:
             armc, lat, eps, ord("W")
         )
 
-        assert all(speed == 0.0 for speed in cusps_speed)
+        d_asc, d_mc = ascmc_speed[0], ascmc_speed[1]
+        assert cusps_speed[0] == d_asc
+        assert cusps_speed[6] == d_asc
+        assert cusps_speed[3] == d_mc
+        assert cusps_speed[9] == d_mc
+        for i in (1, 2, 4, 5, 7, 8, 10, 11):
+            assert cusps_speed[i] == 0.0
         assert any(speed != 0.0 for speed in ascmc_speed)
 
 

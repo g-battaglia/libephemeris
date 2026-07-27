@@ -1317,6 +1317,34 @@ def _heliacal_ut_leb(
         )
         return angular_separation(sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1])
 
+    def _sun_body_lon_diff(jd: float) -> float:
+        """Signed ecliptic longitude of the body minus the Sun, in (-180, 180].
+
+        Negative means the body is WEST of the Sun (rises before it -- a
+        morning apparition); positive means EAST (sets after it -- an evening
+        apparition). Mirrors the Skyfield twin so the two backends reject the
+        same wrong-apparition twilight detections (see that helper).
+        """
+        sun_ecl = _leb_ecliptic_pos(reader, jd, SUN, geopos)
+        body_ecl = _leb_ecliptic_pos(
+            reader,
+            jd,
+            body,
+            geopos,
+            is_star=is_star,
+            star_name=star_name,
+        )
+        return (body_ecl[0] - sun_ecl[0] + 180.0) % 360.0 - 180.0
+
+    def _event_side_ok(jd: float, morning: bool) -> bool:
+        """Whether a visibility at ``jd`` is on the side the event requires.
+
+        Morning events require the body WEST of the Sun; evening events require
+        it EAST. Structural mirror of the Skyfield twin.
+        """
+        lon_diff = _sun_body_lon_diff(jd)
+        return (lon_diff < 0.0) if morning else (lon_diff > 0.0)
+
     def _get_body_magnitude(jd: float) -> float:
         if is_star:
             return star_magnitude
@@ -1523,7 +1551,7 @@ def _heliacal_ut_leb(
                 moon_obj_angle=180.0,
                 margin=_HELIACAL_VIS_MARGIN,
             )
-            if visible:
+            if visible and _event_side_ok(jd_check, morning):
                 return True, jd_check
         return False, 0.0
 
@@ -2662,6 +2690,38 @@ def _heliacal_ut_pythonic(
             body_app = earth.at(t).observe(target).apparent()
         return body_app.separation_from(sun_app).degrees
 
+    def _sun_body_lon_diff(jd: float) -> float:
+        """Signed geocentric ecliptic longitude of the body minus the Sun.
+
+        Normalised to (-180, 180]. Negative means the body is WEST of the Sun
+        (rises before it -- a morning apparition); positive means EAST of the
+        Sun (sets after it -- an evening apparition). Used to reject a twilight
+        detection whose Sun-relative side contradicts the requested event: at
+        high latitudes in summer the morning and evening twilights are only a
+        few hours apart, so a scan window centred near local midnight can spill
+        into the opposite twilight and latch the wrong apparition.
+        """
+        t = ts.ut1_jd(jd)
+        _, sun_lon, _ = earth.at(t).observe(sun).apparent().ecliptic_latlon()
+        if is_star and star_object is not None:
+            _, body_lon, _ = (
+                earth.at(t).observe(star_object).apparent().ecliptic_latlon()
+            )
+        else:
+            _, body_lon, _ = earth.at(t).observe(target).apparent().ecliptic_latlon()
+        return (body_lon.degrees - sun_lon.degrees + 180.0) % 360.0 - 180.0
+
+    def _event_side_ok(jd: float, morning: bool) -> bool:
+        """Whether a visibility at ``jd`` is on the side the event requires.
+
+        Morning events (heliacal rising, morning last) require the body WEST of
+        the Sun; evening events (heliacal setting, evening first) require it
+        EAST. Rejects an opposite-apparition detection that a spilled twilight
+        window would otherwise accept.
+        """
+        lon_diff = _sun_body_lon_diff(jd)
+        return (lon_diff < 0.0) if morning else (lon_diff > 0.0)
+
     def _get_body_magnitude(jd: float) -> float:
         """Get the visual magnitude of the body."""
         if is_star:
@@ -3090,7 +3150,7 @@ def _heliacal_ut_pythonic(
                 moon_obj_angle=180.0,
                 margin=_HELIACAL_VIS_MARGIN,
             )
-            if visible:
+            if visible and _event_side_ok(float(scan_jds[k]), morning):
                 results[day_i] = (True, float(scan_jds[k]))
                 found.add(day_i)
 

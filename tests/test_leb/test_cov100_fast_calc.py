@@ -707,10 +707,27 @@ def test_pipeline_helio_eq_of_date_wrap_negative(helio_reader, monkeypatch):
 
 
 @SKIP_NO_LEB
-def test_fast_calc_tt_icrs_raises(reader):
-    """fast_calc_tt with FLG_ICRS raises KeyError (line 1809)."""
+def test_fast_calc_tt_icrs_pipeline_a_computed(reader):
+    """FLG_ICRS is reduced in-place for barycentric ICRS (Pipeline-A) bodies.
+
+    The stored channel already IS ICRS, so the direct reducer returns the
+    of-date position with the frame bias omitted instead of deferring to the
+    caller's resolver.
+    """
+    res, iflag = fast_calc_tt(reader, JD, SUN, FLG_ICRS | FLG_SPEED)
+    assert len(res) == 6
+    assert all(math.isfinite(v) for v in res)
+
+
+@SKIP_NO_LEB
+def test_fast_calc_tt_icrs_ecliptic_direct_raises(reader):
+    """FLG_ICRS still raises KeyError for ecliptic-direct (Pipeline-B) bodies.
+
+    Only the barycentric ICRS pipelines have an in-place ICRS reducer; the
+    ecliptic-direct lunar points route to the caller's mode-aware resolver.
+    """
     with pytest.raises(KeyError):
-        fast_calc_tt(reader, JD, SUN, FLG_ICRS)
+        fast_calc_tt(reader, JD, MEAN_NODE, FLG_ICRS | FLG_SPEED)
 
 
 @SKIP_NO_LEB

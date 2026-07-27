@@ -4728,7 +4728,7 @@ def _calc_body(
 
             # Speed of light in AU/day: NOVAS/Skyfield C_AUDAY realization
             # (c exact from SI, IAU 1976 au), shared with astrometry/fast_calc.
-            C_AU_PER_DAY = 173.1446326847
+            C_AU_PER_DAY = 173.1446326846693
 
             # Get initial geometric position
             p, v = get_vector(t)
@@ -7524,9 +7524,20 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     )
 
     # Convert the ecliptic heliocentric (Moon: geocentric) state to the
-    # 50-slot osculating-element tuple via the shared reducer.
+    # 50-slot osculating-element tuple via the shared reducer. The derived
+    # period slots use the central mass alone (measured reference
+    # convention): the pure Gaussian solar GM for heliocentric orbits, and
+    # for the Moon the Earth-only GM from the IAU Sun/Earth mass ratio
+    # 332946.0487 (Astronomical Almanac / Explanatory Supplement, 3rd ed.).
+    # The external implementation's geocentric GM realization for the Moon
+    # is not published; the Earth-only value leaves a ~8e-4 relative offset
+    # on the Moon's period family (down from 5.3e-3 with GM(Earth+Moon)).
+    if ipl == MOON:
+        GM_slots = 0.01720209895**2 / 332946.0487
+    else:
+        GM_slots = _GM_SUN
     return _orbital_elements_from_ecliptic_state(
-        x, y, z, vx, vy, vz, GM, ipl, float(t.tt)
+        x, y, z, vx, vy, vz, GM, ipl, float(t.tt), GM_slots=GM_slots
     )
 
 
@@ -7540,6 +7551,7 @@ def _orbital_elements_from_ecliptic_state(
     GM: float,
     ipl: int,
     tt_jd: float,
+    GM_slots: float | None = None,
 ) -> Tuple[float, ...]:
     """Reduce an ecliptic state vector to the 50-slot orbital-element tuple.
 
@@ -7554,6 +7566,13 @@ def _orbital_elements_from_ecliptic_state(
         GM: Gravitational parameter of the central body (AU^3/day^2).
         ipl: Body ID (used only for the Earth special-case in the synodic slot).
         tt_jd: Epoch (JD TT) for the time-of-perihelion-passage slot.
+        GM_slots: Optional central-mass-only gravitational parameter for the
+            derived period/rate slots [10]-[14]. The osculating GEOMETRY
+            (a, e, angles, q, Q) always uses the physical two-body ``GM``;
+            the measured reference convention derives the period family from
+            the central mass alone, so callers pass the pure Gaussian solar
+            GM here (and the Earth-only GM for the Moon). ``None`` keeps
+            ``GM`` for every slot.
 
     Returns:
         Flat tuple of 50 floats with orbital elements (padded with 0.0).
@@ -7675,9 +7694,12 @@ def _orbital_elements_from_ecliptic_state(
     # Longitude of perihelion (varpi)
     varpi = (Omega + omega) % (2 * math.pi)
 
-    # Mean daily motion (n) in radians/day
+    # Mean daily motion (n) in radians/day. The period/rate slots use the
+    # central-mass-only GM when the caller supplies it (measured reference
+    # convention); the geometry above already used the physical two-body GM.
+    GM_for_slots = GM_slots if GM_slots is not None else GM
     if a > 0 and a < float("inf"):
-        n = math.sqrt(GM / (a**3))  # radians/day
+        n = math.sqrt(GM_for_slots / (a**3))  # radians/day
     else:
         n = 0.0
 
@@ -8443,7 +8465,9 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         PLUTO,
     }
     if ipl not in _PHENO_SUPPORTED and ipl not in _ASTEROID_HG:
-        return (0.0,) * 20
+        # Point and model bodies without a physical disc: measured reference
+        # behavior fills the geometric phase triplet from their positions.
+        return _pheno_positional(tjd_ut, ipl, iflag)
 
     # ------------------------------------------------------------------
     # Special case: Sun
@@ -8490,15 +8514,13 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     # ------------------------------------------------------------------
     # Phase angle
     # ------------------------------------------------------------------
-    # Apparent phase geometry: the body→Earth leg is the apparent geocentric
-    # direction, while the illuminating body→Sun leg is evaluated at the
-    # target's retarded emission epoch. Under FLG_TRUEPOS both legs are
-    # geometric at the observation epoch.
+    # Phase angle from the apparent geocentric triangle: both the body→Earth
+    # and body→Sun legs come from the apparent geocentric Sun and body vectors
+    # (geometric under FLG_TRUEPOS). This mirrors the Skyfield _calc_pheno()
+    # composition exactly, so the two backends agree to <0.01"; see the note
+    # there and docs/comparison/intentional-divergences.md for why the
+    # reference's own (unpublished) composition is not tracked.
     try:
-        from .astrometry import C_LIGHT_AU_DAY
-        from .time_utils import deltat as _deltat
-
-        jd_tt_ph = tjd_ut + _deltat(tjd_ut)
         # body→Earth: antipode of the body's apparent ecliptic direction
         _lat_r = math.radians(target_lat)
         _lon_r = math.radians(target_lon)
@@ -8507,54 +8529,25 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
             -math.cos(_lat_r) * math.sin(_lon_r),
             -math.sin(_lat_r),
         )
-        if iflag & FLG_TRUEPOS:
-            # Geometric Sun−body from the (TRUEPOS) spherical outputs
-            _slat = math.radians(sun_lat)
-            _slon = math.radians(sun_lon)
-            s_vec = (
-                sun_dist * math.cos(_slat) * math.cos(_slon),
-                sun_dist * math.cos(_slat) * math.sin(_slon),
-                sun_dist * math.sin(_slat),
-            )
-            b_vec = (
-                -geo_dist * be[0],
-                -geo_dist * be[1],
-                -geo_dist * be[2],
-            )
-            bs = (
-                s_vec[0] - b_vec[0],
-                s_vec[1] - b_vec[1],
-                s_vec[2] - b_vec[2],
-            )
-        else:
-            tau = geo_dist / C_LIGHT_AU_DAY
-            t_ret = jd_tt_ph - tau
-            xb, _ = reader.eval_body(ipl, t_ret)
-            xs, _ = reader.eval_body(SUN, t_ret)
-            bs_icrs = (
-                xs[0] - xb[0],
-                xs[1] - xb[1],
-                xs[2] - xb[2],
-            )
-            # Rotate ICRS → true ecliptic of date to match the be frame
-            pn_mat, _, _, eps_rad = fast_calc._get_leb_frame_data(reader, jd_tt_ph)
-            xq = (
-                pn_mat[0][0] * bs_icrs[0]
-                + pn_mat[0][1] * bs_icrs[1]
-                + pn_mat[0][2] * bs_icrs[2]
-            )
-            yq = (
-                pn_mat[1][0] * bs_icrs[0]
-                + pn_mat[1][1] * bs_icrs[1]
-                + pn_mat[1][2] * bs_icrs[2]
-            )
-            zq = (
-                pn_mat[2][0] * bs_icrs[0]
-                + pn_mat[2][1] * bs_icrs[1]
-                + pn_mat[2][2] * bs_icrs[2]
-            )
-            ce, se = math.cos(eps_rad), math.sin(eps_rad)
-            bs = (xq, yq * ce + zq * se, -yq * se + zq * ce)
+        # Sun−body from the spherical outputs (apparent, or geometric under
+        # FLG_TRUEPOS, since target_pos/sun_pos honour the flag above)
+        _slat = math.radians(sun_lat)
+        _slon = math.radians(sun_lon)
+        s_vec = (
+            sun_dist * math.cos(_slat) * math.cos(_slon),
+            sun_dist * math.cos(_slat) * math.sin(_slon),
+            sun_dist * math.sin(_slat),
+        )
+        b_vec = (
+            -geo_dist * be[0],
+            -geo_dist * be[1],
+            -geo_dist * be[2],
+        )
+        bs = (
+            s_vec[0] - b_vec[0],
+            s_vec[1] - b_vec[1],
+            s_vec[2] - b_vec[2],
+        )
         dot = bs[0] * be[0] + bs[1] * be[1] + bs[2] * be[2]
         mag_bs = math.sqrt(bs[0] ** 2 + bs[1] ** 2 + bs[2] ** 2)
         mag_be = math.sqrt(be[0] ** 2 + be[1] ** 2 + be[2] ** 2)
@@ -8761,22 +8754,59 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
     return _calc_pheno(t, planet, flags)
 
 
-def _pheno_body_to_sun_direction(t, target, sun, tau_days: float):
-    """Return the geometric body→Sun vector at the target emission epoch.
+_PHENO_POINT_BODIES = frozenset((10, 11, 12, 13, 21, 22))
 
-    The apparent body is observed at ``t - tau_days``. Evaluating the Sun and
-    body at that same TT instant gives a self-consistent illumination vector
-    derived directly from the active JPL ephemeris.
+
+def _pheno_positional(jd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
+    """Phase triplet for point and model bodies without a physical disc.
+
+    Measured reference behavior: the lunar node/apsis points report only
+    their elongation from the Sun (phase angle and illuminated fraction stay
+    0.0), while fictitious and registry-served bodies report the full
+    geometric phase triplet from the apparent geocentric triangle. Apparent
+    diameter and magnitude stay 0.0 for both families. Unknown ids propagate
+    the typed error from the position pipeline.
     """
-    ts = get_timescale()
-    t_ret = ts.tt_jd(t.tt - tau_days)
-    body_position = target.at(t_ret).position.au
-    sun_position = sun.at(t_ret).position.au
-    return (
-        sun_position[0] - body_position[0],
-        sun_position[1] - body_position[1],
-        sun_position[2] - body_position[2],
-    )
+    pos_flags = iflag & (FLG_TOPOCTR | FLG_TRUEPOS)
+    body = calc_ut(jd_ut, ipl, pos_flags)[0]
+    sun = calc_ut(jd_ut, SUN, pos_flags)[0]
+
+    def _cart(lon_deg: float, lat_deg: float, dist: float) -> Tuple[float, ...]:
+        lon = math.radians(lon_deg)
+        lat = math.radians(lat_deg)
+        r = dist if dist > 0.0 else 1.0
+        return (
+            r * math.cos(lat) * math.cos(lon),
+            r * math.cos(lat) * math.sin(lon),
+            r * math.sin(lat),
+        )
+
+    P = _cart(body[0], body[1], body[2])
+    S = _cart(sun[0], sun[1], sun[2])
+    mag_p = math.sqrt(sum(c * c for c in P))
+    mag_s = math.sqrt(sum(c * c for c in S))
+    cos_el = sum(a * b for a, b in zip(P, S)) / (mag_p * mag_s)
+    elongation = math.degrees(math.acos(max(-1.0, min(1.0, cos_el))))
+
+    if ipl in _PHENO_POINT_BODIES:
+        if ipl in (21, 22):
+            # Interpolated apsides: the reference marks the inapplicable
+            # phase slots NaN (same convention as its nod_aps output).
+            return (float("nan"), float("nan"), elongation) + (0.0,) * 17
+        return (0.0, 0.0, elongation) + (0.0,) * 17
+
+    # Apparent geocentric triangle, like the disc bodies.
+    ps = tuple(s - p for s, p in zip(S, P))
+    pe = tuple(-p for p in P)
+    mag_ps = math.sqrt(sum(c * c for c in ps))
+    mag_pe = math.sqrt(sum(c * c for c in pe))
+    if mag_ps > 0.0 and mag_pe > 0.0:
+        cos_pa = sum(a * b for a, b in zip(ps, pe)) / (mag_ps * mag_pe)
+        phase_angle = math.degrees(math.acos(max(-1.0, min(1.0, cos_pa))))
+    else:
+        phase_angle = 0.0
+    phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
+    return (phase_angle, phase, elongation) + (0.0,) * 17
 
 
 def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
@@ -8882,9 +8912,9 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         # photometry via the IAU H-G system (reference behavior).
         return _calc_pheno_asteroid(t, ipl, iflag)
     else:
-        # Unsupported body - return zeros
-        attr = (0.0,) * 20
-        return attr
+        # Point and model bodies without a physical disc: measured reference
+        # behavior fills the geometric phase triplet from their positions.
+        return _pheno_positional(float(t.ut1), ipl, iflag)
 
     # Get observed positions (observer is geocentric or, under FLG_TOPOCTR,
     # the topocentre; set once near the top of this function).
@@ -8946,15 +8976,11 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         mag_ms = math.sqrt(sum(x**2 for x in vec_moon_to_sun))
         mag_me = math.sqrt(sum(x**2 for x in vec_moon_to_earth))
 
-        # Phase angle: geometric illumination at the target emission epoch
-        # against the apparent geocentric direction.
-        if iflag & FLG_TRUEPOS:
-            bs = vec_moon_to_sun
-        else:
-            # Divide by C_AUDAY (NOVAS/Skyfield speed of light in AU/day,
-            # c exact from SI, IAU 1976 au) shared with astrometry/fast_calc.
-            tau = mag_me / 173.1446326846693
-            bs = _pheno_body_to_sun_direction(t, target, sun, tau)
+        # Phase angle from the apparent geocentric triangle: both legs are
+        # taken from the apparent geocentric Sun and Moon vectors (geometric
+        # under FLG_TRUEPOS). See the note in the planet branch below for why
+        # this composition is used in place of the reference's.
+        bs = vec_moon_to_sun
 
         dot_prod = sum(a * b for a, b in zip(bs, vec_moon_to_earth))
         mag_bs = math.sqrt(sum(x**2 for x in bs))
@@ -8998,21 +9024,25 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     elongation = math.degrees(math.acos(cos_elong))
 
     # Phase angle: angle at the planet vertex between the planet→Sun and
-    # planet→Earth directions. The illuminating leg is evaluated at the
-    # target emission epoch; under FLG_TRUEPOS both legs are geometric at t.
+    # planet→Earth directions, both taken from the apparent geocentric triangle
+    # (geometric under FLG_TRUEPOS): planet→Earth = −P and planet→Sun = S − P,
+    # from the apparent geocentric Sun and planet vectors already computed.
+    #
+    # The reference ephemeris composes this angle from a proprietary blend of
+    # apparent/astrometric legs that no published single- or double-light-time
+    # formula reproduces to <0.1" for every body: the per-body best fits
+    # contradict one another and the angle even responds to aberration
+    # (toggling NOABERR shifts it ~13-19"). Rather than track an unpublished
+    # composition, this uses the fully documented apparent geocentric triangle.
+    # The residual against the reference is arc-second level for the inner
+    # planets (Mercury worst) and model-dependent; FLG_TRUEPOS stays exact.
+    # See docs/comparison/intentional-divergences.md.
     P = target_pos_geo.position.au  # Planet position (geocentric)
     S = sun_pos_geo.position.au  # Sun position (geocentric)
 
     vec_planet_to_earth = -P
     mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
-
-    if iflag & FLG_TRUEPOS:
-        vec_planet_to_sun = S - P
-    else:
-        # Divide by C_AUDAY (NOVAS/Skyfield speed of light in AU/day,
-        # c exact from SI, IAU 1976 au) shared with astrometry/fast_calc.
-        tau = mag_pe / 173.1446326846693
-        vec_planet_to_sun = _pheno_body_to_sun_direction(t, target, sun, tau)
+    vec_planet_to_sun = S - P
 
     dot_prod = sum(a * b for a, b in zip(vec_planet_to_sun, vec_planet_to_earth))
     mag_ps = math.sqrt(sum(x**2 for x in vec_planet_to_sun))

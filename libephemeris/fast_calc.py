@@ -990,6 +990,36 @@ def _prec_matrix(
     return _get_precession_matrix(jd_tt)
 
 
+def _prec_matrix_nobias(
+    jd_tt: float,
+) -> Tuple[Tuple[float, float, float], ...]:
+    """ICRS->mean-equator-of-date precession WITHOUT the ICRS frame bias.
+
+    The frame-bias-free companion to ``_prec_matrix`` used by the FLG_ICRS
+    output branch of ``_frame_transform``. The reference-API ICRS convention is
+    the same of-date reduction as the default frame, expressed relative to the
+    ICRS pole/equinox (Vondrák precession with ``frame_bias=False``), matching
+    the Skyfield-path reducer in ``planets._calc_body``.
+    """
+    return vondrak_precession_matrix(jd_tt, frame_bias=False)
+
+
+def _frame_pn_nobias(
+    jd_tt: float,
+) -> Tuple[Tuple[float, float, float], ...]:
+    """ICRS->true-equator-of-date rotation WITHOUT the ICRS frame bias.
+
+    Reuses the (cached) nutation angles from ``_frame_data`` -- so the active
+    LEB reader's Chebyshev nutation still drives the reduction -- but rebuilds
+    the Vondrák precession-nutation matrix with ``frame_bias=False``. The true
+    obliquity is frame-bias-independent, so callers that also need eps read it
+    from ``_frame_data``.
+    """
+    _, dpsi, deps, _ = _frame_data(jd_tt)
+    pn_mat, _ = vondrak_pn_matrix(jd_tt, dpsi, deps, frame_bias=False)
+    return pn_mat
+
+
 def _mat3_vec3(
     mat: Tuple[Tuple[float, float, float], ...],
     vec: Tuple[float, float, float],
@@ -1406,6 +1436,11 @@ def _frame_transform(
     *want_xyz*, in which case the Cartesian components of the rotated vector
     are returned.
     """
+    # FLG_ICRS selects the of-date reduction expressed relative to the ICRS
+    # pole/equinox: the same precession-nutation WITHOUT the ICRS frame bias.
+    # FLG_J2000 (a fixed frame) takes precedence over it, matching the reference
+    # and the Skyfield-path reducer in ``planets._calc_body``.
+    _icrs = bool(iflag & FLG_ICRS) and not (iflag & FLG_J2000)
     if (iflag & FLG_EQUATORIAL) and (iflag & FLG_J2000):
         # Mean equator/equinox of J2000: ICRS rotated by IAU 2006 frame bias.
         v = _rotate_icrs_to_j2000_mean_equator(geo[0], geo[1], geo[2])
@@ -1413,9 +1448,12 @@ def _frame_transform(
         # SID+EQ: mean equator of date (P matrix, no nutation).
         v = _mat3_vec3(_prec_matrix(jd_tt), geo)
     elif iflag & FLG_EQUATORIAL:
-        # NONUT: mean equator (P matrix); else true equator (PNM).
+        # NONUT: mean equator (P matrix); else true equator (PNM). FLG_ICRS
+        # drops the ICRS frame bias from either matrix.
         if iflag & FLG_NONUT:
-            _eq_mat = _prec_matrix(jd_tt)
+            _eq_mat = _prec_matrix_nobias(jd_tt) if _icrs else _prec_matrix(jd_tt)
+        elif _icrs:
+            _eq_mat = _frame_pn_nobias(jd_tt)
         else:
             _eq_mat, _, _, _ = _frame_data(jd_tt)
         v = _mat3_vec3(_eq_mat, geo)
@@ -1423,9 +1461,13 @@ def _frame_transform(
         v = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
     else:
         # TRUE ECLIPTIC OF DATE (default). FLG_NONUT: mean ecliptic (no nutation).
+        # FLG_ICRS drops the frame bias; the true obliquity is bias-independent.
         if iflag & FLG_NONUT:
-            _rot_mat = _prec_matrix(jd_tt)
+            _rot_mat = _prec_matrix_nobias(jd_tt) if _icrs else _prec_matrix(jd_tt)
             eps_rad = math.radians(vondrak_mean_obliquity_deg(jd_tt))
+        elif _icrs:
+            _rot_mat = _frame_pn_nobias(jd_tt)
+            _, _, _, eps_rad = _frame_data(jd_tt)
         else:
             _rot_mat, _, _, eps_rad = _frame_data(jd_tt)
         geo_eq = _mat3_vec3(_rot_mat, geo)
@@ -2293,10 +2335,12 @@ def fast_calc_ut(
             the caller applies the active mode's source policy.
         ValueError: If JD is outside the .leb file's range.
     """
-    # FLG_ICRS is not handled by this direct reducer. The caller's mode-aware
-    # vector resolver performs it without crossing the LEB source boundary.
-    if iflag & FLG_ICRS:
-        raise KeyError("FLG_ICRS not supported in LEB mode")
+    # FLG_ICRS is served directly for the barycentric ICRS pipelines (planets,
+    # Earth, and the barycentric asteroids), whose stored channel already IS
+    # ICRS; the of-date reduction simply omits the frame bias. ``_fast_calc_core``
+    # raises the KeyError below only for the ecliptic-direct / heliocentric
+    # bodies that have no ICRS reducer here, routing just those to the caller's
+    # mode-aware resolver without crossing the LEB source boundary.
 
     # Strip FLG_MOSEPH (always ignored)
     iflag = iflag & ~FLG_MOSEPH
@@ -2397,8 +2441,9 @@ def fast_calc_tt(
         KeyError: If body is not in the .leb file.
         ValueError: If JD is outside the .leb file's range.
     """
-    if iflag & FLG_ICRS:
-        raise KeyError("FLG_ICRS not supported in LEB mode")
+    # FLG_ICRS is served directly for the barycentric ICRS pipelines; see the
+    # note in ``fast_calc_ut``. ``_fast_calc_core`` gates the unsupported
+    # (ecliptic-direct / heliocentric) bodies.
 
     iflag = iflag & ~FLG_MOSEPH
 
@@ -2549,6 +2594,19 @@ def _fast_calc_core(
     coord_type = (
         COORD_ECLIPTIC if _external_ecliptic_model else reader._bodies[ipl].coord_type
     )
+
+    # FLG_ICRS is reduced in-place only for the barycentric ICRS pipelines
+    # (Pipeline A: planets, Earth, and the barycentric asteroids), whose stored
+    # channel IS ICRS -- ``_frame_transform`` just omits the frame bias. The
+    # ecliptic-direct (Pipeline B) and heliocentric (Pipeline C) bodies have no
+    # ICRS reducer here; a KeyError routes only those to the caller's mode-aware
+    # resolver, exactly as before. This keeps the sealed asteroid ICRS request
+    # on the LEB channel instead of falling through to the Keplerian/SPK path.
+    if (iflag & FLG_ICRS) and coord_type not in (
+        COORD_ICRS_BARY,
+        COORD_ICRS_BARY_SYSTEM,
+    ):
+        raise KeyError("FLG_ICRS not supported in LEB mode")
 
     _pipeline_a = False
     _pipeline_c = False

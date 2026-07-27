@@ -93,39 +93,73 @@ deviate from the numerical derivative of the same implementation's position
 series by degrees per day, while every LibEphemeris speed slot integrates
 back to its position slot exactly.
 
+`FLG_SPEED3` on the osculating lunar points (True Node, osculating apogee)
+is the same case: the external coarse three-position value deviates from
+the central difference of that implementation's own positions by ~10″/day
+(True Node) up to several hundred ″/day (osculating apogee), and no two- or
+three-point scheme at any step size reproduces it. LibEphemeris returns the
+genuine derivative for `FLG_SPEED3` as well; for slow bodies (planets,
+Moon, mean points) the two conventions agree.
+
 ## House-cusp speeds are the derivative of the reported cusps
 
-The `houses_ex2` / `houses_armc_ex2` speed tuples are the total time
-derivative of the reported cusp and angle functions — a centered
+For most systems the `houses_ex2` / `houses_armc_ex2` speed tuples are the
+total time derivative of the reported cusp and angle functions — a centered
 finite difference of the full house solution (ARMC rate, obliquity rate,
-nutation, and the sidereal ayanamsha all included). Two consequences are
-not reproduced from external implementations:
+nutation, and the sidereal ayanamsha all included). One consequence is not
+reproduced from external implementations:
 
 - For intermediate cusps of iteratively solved systems (Placidus, Koch),
   an external analytic speed approximation can deviate from the derivative
   of that implementation's own reported cusps by ~0.1–0.7°/day even when
   the cusps themselves agree to sub-arcsecond level. LibEphemeris reports
   the genuine derivative: integrating it reproduces the cusp motion.
-- Whole Sign cusps are pinned to sign boundaries, so their time derivative
-  is exactly 0.0 and LibEphemeris reports 0.0. An external convention that
-  exposes the ascendant's speed in the cusp-1/7 slots (and the MC's in
-  4/10) for pinned cusps is not reproduced; those rates remain available
-  in the `ascmc_speed` tuple.
+
+Porphyry (`O`), Whole Sign (`W`) and Aries (`N`) are the exception: the
+reference API reports an *analytic* cusp speed for these that is not the
+derivative of its own cusp positions (its Porphyry second/fourth quadrants
+are re-based on the ascendant speed, and its pinned Whole Sign / Aries cusps
+expose the ascendant's speed in the 1/7 slots and the MC's in 4/10, with the
+sidereal Whole Sign case exposing the ascendant speed in every slot).
+LibEphemeris replicates that measured convention exactly for 1:1
+compatibility.
 
 ## Phase-angle geometry in `pheno`
 
-`pheno` / `pheno_ut` compute the phase angle from the light-time-consistent
-Sun–body–observer geometry, and the illuminated fraction follows from that
-angle; the elongation channel agrees with external implementations at the
-0.01″ level. The phase-angle channel differs from at least one external
-implementation by a bounded 15–40″ for the inner planets and Mars (a
-geometry-convention difference, not an ephemeris difference — no public
-combination of apparent/geometric distances reproduces the external value
-exactly). The difference in the illuminated fraction is below 1e-4.
+`pheno` / `pheno_ut` compute the phase angle from the **apparent geocentric
+triangle**: both the body→observer leg (−P) and the illuminating body→Sun leg
+(S − P) are formed from the apparent geocentric Sun and body position vectors
+P, S that the same call already produces (both legs become geometric under
+`FLG_TRUEPOS`). The illuminated fraction follows from that angle. The
+elongation channel agrees with external implementations at the 0.01″ level,
+and the Skyfield and LEB back ends agree with each other to below 0.01″.
+
+The phase-angle channel differs from at least one external implementation at
+the arcsecond level: across 1900–2100 the residual is bounded at roughly 19″
+(Mercury, and the small-phase-angle outer planets Saturn and Pluto), about 7″
+for Venus and 8″ for Mars, and below 1″ for the Moon. This is a
+geometry-convention difference, not an ephemeris difference — no published
+combination of apparent, astrometric, geometric, or single-/double-light-time
+legs reproduces the external value for every body at once (the per-body best
+fits contradict one another, and the external angle even responds to
+aberration, shifting ~13–19″ when annual aberration is toggled off). The
+apparent geocentric triangle is the documented convention chosen here; under
+`FLG_TRUEPOS` the geometric triangle matches to <0.05″. The corresponding
+difference in the illuminated fraction is below 1e-4.
 
 The Sun itself reports 0.0 in all three phase channels (phase angle,
 illuminated fraction, elongation): phase quantities are inapplicable to the
 self-luminous disc.
+
+## Pluto visual magnitude photometry
+
+The Pluto magnitude channel of `pheno` uses the modern Mallama & Hilton (2018),
+*Icarus* 306, 33 photometry — V(1,0) = −1.024 mag with a linear phase
+coefficient β = 0.0362 mag/degree, i.e. V = V(1,0) + 5·log₁₀(r·Δ) + β·α. At
+least one external implementation uses the older flat photometry
+(V(1,0) = −1.00 mag, no phase term). The two disagree by ≤22 mmag over the
+range of geocentric phase angles Pluto reaches; LibEphemeris keeps the modern
+phase-dependent model.
 
 ## Rise/set events immediately after the search start
 

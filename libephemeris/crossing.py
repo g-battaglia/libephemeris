@@ -1220,12 +1220,27 @@ def mooncross_node(
     except (EphemerisRangeError, CalculationError, ValueError) as e:
         raise Error(f"Failed to calculate Moon position: {e}") from e
 
-    # If starting essentially at a node crossing, the linear estimate is
-    # dominated by FP noise and NR would converge on the start point
-    # (failing the direction check and bouncing forever). Take a full
-    # half-nodal-month step in the requested direction instead.
+    # If starting essentially at a node crossing, first check WHERE the
+    # nearby root lies: a start a fraction of a second BEFORE the node must
+    # return that imminent crossing (measured reference behavior), while a
+    # start exactly at or just past the node takes a half-nodal-month step
+    # (the linear estimate there is FP noise and NR would converge on the
+    # start point, failing the direction check and bouncing forever).
+    accept_eps = 1e-6
     if abs(lat) < 10 * NR_TOLERANCE_MOON:
-        jd_guess = tjdet + HALF_NODAL_MONTH * direction
+        # The NR tolerance band is ~17 ms wide in time (0.001" at the
+        # ~1.38 deg/day nodal latitude rate), so a restart from a previous
+        # result sees latitude noise anywhere inside it. The imminent-root
+        # branch below must only fire ABOVE that band: 2.5e-7 day (~22 ms)
+        # clears the noise while still accepting the measured reference
+        # behavior (a start ~0.04 s before a node returns that node).
+        lat_speed0 = pos[4]
+        t_est = -lat / lat_speed0 if abs(lat_speed0) > 0.1 else 0.0
+        if t_est * direction > 2.5e-7:
+            jd_guess = tjdet + t_est
+            accept_eps = 2.5e-7
+        else:
+            jd_guess = tjdet + HALF_NODAL_MONTH * direction
     else:
         # Locate the FIRST latitude sign change in the requested direction with
         # a bracket scan whose step provably cannot skip a root: successive Moon
@@ -1296,8 +1311,8 @@ def mooncross_node(
             # seconds before/after tjdet yet wide enough to reject the
             # numerically identical "same event" case when the caller starts
             # at the exact node crossing itself.
-            if (not backwards and jd > tjdet + 1e-6) or (
-                backwards and jd < tjdet - 1e-6
+            if (not backwards and jd > tjdet + accept_eps) or (
+                backwards and jd < tjdet - accept_eps
             ):
                 return (jd, pos[0], lat)
             # Converged on the wrong side of tjdet — nudge to the next

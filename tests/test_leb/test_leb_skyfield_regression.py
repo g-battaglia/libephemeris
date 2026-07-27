@@ -61,6 +61,21 @@ def _run_skyfield(func, *args, **kwargs):
         libephemeris.set_calc_mode("auto")
 
 
+def _run_auto(func, *args, **kwargs):
+    # Non-sealed default mode. The LEB Chebyshev pipeline still serves every
+    # supported body (traced source == "LEB"), but — unlike the sealed "leb"
+    # mode — it is allowed to complete an outer planet's system-barycentre with
+    # the pinned planet_centers center-of-body offset. Used where the LEB path
+    # must be compared to Skyfield on the COB-corrected planet centre (sealed
+    # mode deliberately keeps the barycentre and cannot open planet_centers.bsp;
+    # see tests/test_leb/test_no_kernel_load.py).
+    libephemeris.set_calc_mode("auto")
+    try:
+        return func(*args, **kwargs)
+    finally:
+        libephemeris.set_calc_mode("auto")
+
+
 # =========================================================================
 # 1. Fixed Stars
 # =========================================================================
@@ -239,9 +254,13 @@ class TestPhenoRegression:
         r_sf = _run_skyfield(pheno_ut, JD_TEST, MARS, FLG_NOABERR)
         assert abs(r_leb[0] - r_sf[0]) < 0.001
 
-    def test_pheno_unsupported_body(self):
+    def test_pheno_point_body_reports_elongation(self):
+        # Measured reference behavior: node/apsis points report only their
+        # elongation from the Sun; phase, diameter and magnitude stay 0.
         result = _run_leb(pheno_ut, JD_TEST, MEAN_NODE, 0)
-        assert result == (0.0,) * 20
+        assert result[0] == 0.0 and result[1] == 0.0
+        assert 0.0 < result[2] < 180.0
+        assert result[3:] == (0.0,) * 17
 
     def test_pheno_sun(self):
         result = _run_leb(pheno_ut, JD_TEST, SUN, 0)
@@ -503,13 +522,18 @@ class TestHelioBaryCentric:
         pos_sf, _ = _run_skyfield(calc_ut, JD_TEST, MARS, FLG_BARYCTR | FLG_SPEED)
         assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.01
 
-    # Outer planets are stored as SYSTEM barycentres; the LEB adds the
-    # center-of-body (COB) offset at runtime. For an apparent HELCTR/BARYCTR
-    # place the offset must be evaluated at the RETARDED epoch (t - light_time),
-    # matching Skyfield's target.at(t - lt). Evaluating it at the observation
-    # epoch instead biased Pluto's apparent latitude by up to ~0.016" (the
-    # largest COB / most distant body). Guard lon AND lat AND distance at two
-    # epochs against the Skyfield backend, tightly (<0.001", the planet target).
+    # Outer planets are stored as SYSTEM barycentres; the LEB pipeline completes
+    # them to the planet centre at runtime by adding the pinned planet_centers
+    # center-of-body (COB) offset — but only in the non-sealed modes, since the
+    # sealed "leb" mode may not open planet_centers.bsp (see
+    # tests/test_leb/test_no_kernel_load.py) and therefore keeps the barycentre.
+    # This parity check exercises the COB-corrected LEB path (auto mode, traced
+    # source "LEB") against Skyfield. For an apparent HELCTR/BARYCTR place the
+    # offset must be evaluated at the RETARDED epoch (t - light_time), matching
+    # Skyfield's target.at(t - lt); evaluating it at the observation epoch
+    # instead biased Pluto's apparent latitude by up to ~0.016" (the largest COB
+    # / most distant body). Guard lon AND lat AND distance at two epochs against
+    # the Skyfield backend, tightly (<0.001", the planet target).
     @pytest.mark.parametrize(
         "body,name",
         [(5, "Jupiter"), (6, "Saturn"), (7, "Uranus"), (8, "Neptune"), (9, "Pluto")],
@@ -523,7 +547,7 @@ class TestHelioBaryCentric:
             (FLG_BARYCTR, "bary"),
         ):
             flags = centre_flag | FLG_SPEED
-            pos_leb, _ = _run_leb(calc_ut, jd, body, flags)
+            pos_leb, _ = _run_auto(calc_ut, jd, body, flags)
             pos_sf, _ = _run_skyfield(calc_ut, jd, body, flags)
             dlon = abs(pos_leb[0] - pos_sf[0])
             if dlon > 180.0:
@@ -864,7 +888,12 @@ class TestEdgeCaseBodies:
     def test_pluto(self):
         from libephemeris.constants import PLUTO
 
-        pos_leb, _ = _run_leb(calc_ut, JD_TEST, PLUTO, FLG_SPEED)
+        # Pluto carries the largest center-of-body offset (~0.08"), which the
+        # LEB pipeline adds from the pinned planet_centers segment only in the
+        # non-sealed modes (sealed "leb" keeps the system barycentre). Compare
+        # the COB-corrected LEB path (auto mode, traced source "LEB") against
+        # Skyfield's own COB-corrected centre.
+        pos_leb, _ = _run_auto(calc_ut, JD_TEST, PLUTO, FLG_SPEED)
         pos_sf, _ = _run_skyfield(calc_ut, JD_TEST, PLUTO, FLG_SPEED)
         assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.001
 
