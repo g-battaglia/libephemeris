@@ -488,7 +488,7 @@ def test_pipeline_ecliptic_non_lunar_body_skips_nutation(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_eq_j2000_wrap_positive(reader, monkeypatch):
     """EQ+J2000: d_eq_lon > 180 wrap (line 1483)."""
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])  # eq_now, eq_fwd
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])  # eq_now, eq_fwd
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -504,7 +504,7 @@ def test_pipeline_ecliptic_eq_j2000_wrap_positive(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_eq_j2000_wrap_negative(reader, monkeypatch):
     """EQ+J2000: d_eq_lon < -180 wrap (line 1485)."""
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -520,7 +520,7 @@ def test_pipeline_ecliptic_eq_j2000_wrap_negative(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_eq_wrap_positive(reader, monkeypatch):
     """EQ of date: d_eq_lon > 180 wrap (line 1509)."""
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -533,7 +533,7 @@ def test_pipeline_ecliptic_eq_wrap_positive(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_eq_wrap_negative(reader, monkeypatch):
     """EQ of date: d_eq_lon < -180 wrap (line 1511)."""
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -546,7 +546,7 @@ def test_pipeline_ecliptic_eq_wrap_negative(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_j2000_wrap_positive(reader, monkeypatch):
     """J2000 ecliptic: d_j_lon > 180 wrap (line 1527)."""
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
 
     def fake_precess(lo, la, a, b):
         return next(seq)
@@ -559,7 +559,7 @@ def test_pipeline_ecliptic_j2000_wrap_positive(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_j2000_wrap_negative(reader, monkeypatch):
     """J2000 ecliptic: d_j_lon < -180 wrap (line 1529)."""
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_precess(lo, la, a, b):
         return next(seq)
@@ -676,7 +676,7 @@ def test_pipeline_helio_eq_of_date_sidereal_meanobl(helio_reader):
 @SKIP_NO_LEB
 def test_pipeline_helio_eq_of_date_wrap_positive(helio_reader, monkeypatch):
     """Helio EQ of date: d_eq_lon > 180 wrap (line 1671)."""
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -691,7 +691,7 @@ def test_pipeline_helio_eq_of_date_wrap_positive(helio_reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_helio_eq_of_date_wrap_negative(helio_reader, monkeypatch):
     """Helio EQ of date: d_eq_lon < -180 wrap (line 1673)."""
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -914,7 +914,7 @@ def test_deferred_sid_j2k_wrap_positive(reader, monkeypatch):
     """Deferred SID+J2000: d_j_lon > 180 wrap (line 2064)."""
     from libephemeris.constants import SIDM_LAHIRI
 
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
 
     def fake_precess(lo, la, a, b):
         return next(seq)
@@ -935,7 +935,7 @@ def test_deferred_sid_j2k_wrap_negative(reader, monkeypatch):
     """Deferred SID+J2000: d_j_lon < -180 wrap (line 2066)."""
     from libephemeris.constants import SIDM_LAHIRI
 
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_precess(lo, la, a, b):
         return next(seq)
@@ -949,3 +949,28 @@ def test_deferred_sid_j2k_wrap_negative(reader, monkeypatch):
         sid_mode=SIDM_LAHIRI,
     )
     assert all(math.isfinite(v) for v in res)
+
+
+class TestEquatorialSpeedSelfConsistency:
+    """Equatorial/J2000 frame speeds are the derivative of the reported
+    positions: the conversion uses a CENTERED stencil (a one-sided step
+    left ~0.45\"/day of declination-rate bias on the fast-swinging
+    osculating apogee)."""
+
+    def test_oscu_apog_equatorial_speed_matches_own_derivative(self):
+        import libephemeris as le
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                jd = le.julday(2004, 2, 11, 0.0)
+                f = le.FLG_SWIEPH | le.FLG_EQUATORIAL | le.FLG_SPEED
+                rep = le.calc_ut(jd, 13, f)[0]
+                h = 300.0 / 86400.0
+                p_m = le.calc_ut(jd - h, 13, f)[0]
+                p_p = le.calc_ut(jd + h, 13, f)[0]
+                num_ddec = (p_p[1] - p_m[1]) / (2 * h)
+                assert abs(rep[4] - num_ddec) * 3600.0 < 0.06
+        finally:
+            le.set_calc_mode(prev)

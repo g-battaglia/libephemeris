@@ -2032,19 +2032,28 @@ def _pipeline_ecliptic(
             eps_mean = vondrak_mean_obliquity_deg(jd_tt)
             eps = eps_mean + math.degrees(deps)
 
-        # Velocity via finite difference on original ecliptic coords
-        dt_step = 0.001  # days
+        # Velocity: CENTERED difference of the rotated ecliptic path. A
+        # one-sided (forward) step leaves a first-order truncation term
+        # proportional to the curvature of the ecliptic->equatorial mapping
+        # along the path, which reached ~0.45"/day of declination-rate
+        # self-inconsistency on the fast-swinging osculating apogee; the
+        # centered stencil cancels it and matches the derivative of the
+        # reported equatorial position.
+        dt_step = 0.001  # days (half-step of the centered stencil)
         eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)
         eq_fwd_lon, eq_fwd_lat = _cotrans(
             lon + dlon * dt_step, lat + dlat * dt_step, -eps
         )
-        d_eq_lon = eq_fwd_lon - eq_now_lon
+        eq_bwd_lon, eq_bwd_lat = _cotrans(
+            lon - dlon * dt_step, lat - dlat * dt_step, -eps
+        )
+        d_eq_lon = eq_fwd_lon - eq_bwd_lon
         if d_eq_lon > 180.0:
             d_eq_lon -= 360.0
         elif d_eq_lon < -180.0:
             d_eq_lon += 360.0
-        dlon = d_eq_lon / dt_step
-        dlat = (eq_fwd_lat - eq_now_lat) / dt_step
+        dlon = d_eq_lon / (2.0 * dt_step)
+        dlat = (eq_fwd_lat - eq_bwd_lat) / (2.0 * dt_step)
         lon = eq_now_lon
         lat = eq_now_lat
 
@@ -2054,18 +2063,24 @@ def _pipeline_ecliptic(
         # J2000 speed is the true derivative of the reported J2000 position —
         # it differs from the of-date speed by the general-precession rate
         # (~0.14"/day), as required by the time-dependent frame rotation.
-        dt_step = 0.001  # days
+        # Centered stencil for the same reason as the equatorial branch:
+        # the one-sided step biased fast-swinging points by the mapping
+        # curvature along the path.
+        dt_step = 0.001  # days (half-step of the centered stencil)
         j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
         j_fwd_lon, j_fwd_lat = _precess_ecliptic(
             lon + dlon * dt_step, lat + dlat * dt_step, jd_tt + dt_step, J2000
         )
-        d_j_lon = j_fwd_lon - j_now_lon
+        j_bwd_lon, j_bwd_lat = _precess_ecliptic(
+            lon - dlon * dt_step, lat - dlat * dt_step, jd_tt - dt_step, J2000
+        )
+        d_j_lon = j_fwd_lon - j_bwd_lon
         if d_j_lon > 180.0:
             d_j_lon -= 360.0
         elif d_j_lon < -180.0:
             d_j_lon += 360.0
-        dlon = d_j_lon / dt_step
-        dlat = (j_fwd_lat - j_now_lat) / dt_step
+        dlon = d_j_lon / (2.0 * dt_step)
+        dlat = (j_fwd_lat - j_bwd_lat) / (2.0 * dt_step)
         lon = j_now_lon
         lat = j_now_lat
 
