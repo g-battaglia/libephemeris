@@ -2622,16 +2622,27 @@ def _fast_calc_core(
         COORD_ECLIPTIC if _external_ecliptic_model else reader._bodies[ipl].coord_type
     )
 
-    # FLG_ICRS is reduced in-place only for the barycentric ICRS pipelines
+    # FLG_ICRS is reduced in-place for the barycentric ICRS pipelines
     # (Pipeline A: planets, Earth, and the barycentric asteroids), whose stored
-    # channel IS ICRS -- ``_frame_transform`` just omits the frame bias. The
-    # ecliptic-direct (Pipeline B) and heliocentric (Pipeline C) bodies have no
-    # ICRS reducer here; a KeyError routes only those to the caller's mode-aware
-    # resolver, exactly as before. This keeps the sealed asteroid ICRS request
-    # on the LEB channel instead of falling through to the Keplerian/SPK path.
+    # channel IS ICRS -- ``_frame_transform`` just omits the frame bias.
+    #
+    # The ecliptic-direct lunar points (Pipeline B: nodes, apogees, interpolated
+    # apsides) are also served here: for their of-date ecliptic output FLG_ICRS
+    # is a no-op in the public convention, exactly as the Skyfield backend treats
+    # it (``planets._maybe_equatorial_convert`` never consults FLG_ICRS). Keeping
+    # them on ``_pipeline_ecliptic`` makes an ICRS request identical to the body's
+    # own plain / J2000 / equatorial output from the same LEB channel. Routing
+    # them out to the caller's resolver instead re-derived the osculating
+    # apogee/node from a differently-sourced (LEB vs JPL) Moon state, and the
+    # osculating longitude is hypersensitive to the lunar velocity, so OscuApog
+    # drifted from the Skyfield place by up to ~0.8" of longitude (TrueNode less).
+    #
+    # The heliocentric (Pipeline C) bodies have no ICRS reducer here; a KeyError
+    # routes only those to the caller's mode-aware resolver, exactly as before.
     if (iflag & FLG_ICRS) and coord_type not in (
         COORD_ICRS_BARY,
         COORD_ICRS_BARY_SYSTEM,
+        COORD_ECLIPTIC,
     ):
         raise KeyError("FLG_ICRS not supported in LEB mode")
 

@@ -28,6 +28,7 @@ from libephemeris.constants import (
     HARRINGTON,
     MEAN_NODE,
     MOON,
+    OSCU_APOG,
     SUN,
     TRUE_NODE,
     FLG_EQUATORIAL,
@@ -38,6 +39,7 @@ from libephemeris.constants import (
     FLG_SPEED,
     FLG_TOPOCTR,
 )
+from libephemeris.leb_format import COORD_HELIO_ECL
 from libephemeris.fast_calc import (
     _apply_aberration,
     _apply_cob_correction,
@@ -720,14 +722,54 @@ def test_fast_calc_tt_icrs_pipeline_a_computed(reader):
 
 
 @SKIP_NO_LEB
-def test_fast_calc_tt_icrs_ecliptic_direct_raises(reader):
-    """FLG_ICRS still raises KeyError for ecliptic-direct (Pipeline-B) bodies.
+def test_fast_calc_tt_icrs_ecliptic_direct_served(reader):
+    """FLG_ICRS is served in place for ecliptic-direct (Pipeline-B) bodies.
 
-    Only the barycentric ICRS pipelines have an in-place ICRS reducer; the
-    ecliptic-direct lunar points route to the caller's mode-aware resolver.
+    For the of-date ecliptic lunar points FLG_ICRS is a no-op in the public
+    convention (the Skyfield backend's ``_maybe_equatorial_convert`` never
+    consults it), so the request stays on the LEB channel and returns the same
+    of-date ecliptic place as the plain request rather than re-deriving the
+    hypersensitive osculating longitude from a different Moon-state source.
     """
+    for body in (MEAN_NODE, OSCU_APOG):
+        icrs, _ = fast_calc_tt(reader, JD, body, FLG_ICRS | FLG_SPEED)
+        plain, _ = fast_calc_tt(reader, JD, body, FLG_SPEED)
+        assert len(icrs) == 6
+        assert all(math.isfinite(v) for v in icrs)
+        # ICRS adds nothing to the of-date ecliptic output for these bodies.
+        assert icrs == pytest.approx(plain, abs=1e-12)
+
+
+@SKIP_NO_LEB
+def test_fast_calc_tt_icrs_heliocentric_raises(reader, monkeypatch):
+    """FLG_ICRS still raises KeyError for heliocentric (Pipeline-C) bodies.
+
+    Only the barycentric ICRS and ecliptic-direct pipelines are served in
+    place; a heliocentric channel has no in-place ICRS reducer and routes to
+    the caller's mode-aware resolver. No public non-fictitious body carries a
+    COORD_HELIO_ECL channel, so a synthetic id exercises the guard directly.
+    """
+    from types import SimpleNamespace
+
+    fake_id = 12345  # not fictitious (40-58), not an external ecliptic model
+    real_has_body = reader.has_body
+    real_bodies = reader._bodies
+
+    def fake_has_body(body_id):
+        return body_id == fake_id or real_has_body(body_id)
+
+    monkeypatch.setattr(reader, "has_body", fake_has_body)
+    # jd_start/jd_end cover JD so the sealed-range escalation sees the body as
+    # in range and lets the original "unsupported flag" KeyError propagate.
+    monkeypatch.setitem(
+        real_bodies,
+        fake_id,
+        SimpleNamespace(
+            coord_type=COORD_HELIO_ECL, jd_start=JD - 1000.0, jd_end=JD + 1000.0
+        ),
+    )
     with pytest.raises(KeyError):
-        fast_calc_tt(reader, JD, MEAN_NODE, FLG_ICRS | FLG_SPEED)
+        fast_calc_tt(reader, JD, fake_id, FLG_ICRS | FLG_SPEED)
 
 
 @SKIP_NO_LEB
