@@ -248,3 +248,43 @@ class TestLunEclipseEdgeCases:
         # Total eclipse should also have partial phase times
         assert times[2] > 0  # Partial begins
         assert times[3] > 0  # Partial ends
+
+
+class TestLunEclipseWhenAdvanceMargin:
+    """The `jd = tret[0]; when(jd)` idiom must advance, not stall.
+
+    Measured reference behavior: a maximum within 1e-4 day (8.64 s) of the
+    search epoch counts as already reached. A lunar eclipse's opposition (Full
+    Moon) precedes its maximum by a few minutes, so the forward search also
+    pre-probes the previous lunation to keep an in-progress eclipse whose Full
+    Moon is already past but whose maximum is still ahead.
+    """
+
+    def test_start_on_maximum_advances_forward(self):
+        _, t0 = lun_eclipse_when(julday(1968, 1, 1, 0))
+        _, t1 = lun_eclipse_when(t0[0])
+        assert t1[0] - t0[0] > 1.0
+
+    def test_start_on_maximum_advances_backward(self):
+        _, t0 = lun_eclipse_when(julday(1968, 1, 1, 0))
+        _, tb = lun_eclipse_when(t0[0], backwards=True)
+        assert t0[0] - tb[0] > 1.0
+
+    def test_iteration_does_not_stall(self):
+        jd = julday(1990, 1, 1, 0)
+        prev = None
+        for _ in range(8):
+            _, t = lun_eclipse_when(jd)
+            if prev is not None:
+                assert t[0] - prev > 1.0
+            prev = t[0]
+            jd = t[0]
+
+    def test_pre_probe_keeps_eclipse_between_opposition_and_maximum(self):
+        # The 2003-05-16 eclipse's Full Moon precedes its maximum by ~4 min.
+        # Starting a few minutes before the maximum (past the Full Moon) must
+        # still return this eclipse, not skip forward to the next lunation.
+        _, t0 = lun_eclipse_when(julday(2003, 5, 1, 0))
+        jm = t0[0]
+        _, cur = lun_eclipse_when(jm - 100.0 / 86400.0)  # 100 s before maximum
+        assert abs(cur[0] - jm) < 0.5

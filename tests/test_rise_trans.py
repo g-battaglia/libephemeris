@@ -27,6 +27,8 @@ from libephemeris import (
     BIT_CIVIL_TWILIGHT,
     BIT_NAUTIC_TWILIGHT,
     BIT_ASTRO_TWILIGHT,
+    BIT_GEOCTR_NO_ECL_LAT,
+    BIT_HINDU_RISING,
 )
 
 
@@ -399,10 +401,12 @@ class TestRiseTransErrors:
     """Tests for error handling."""
 
     def test_invalid_planet_raises_error(self):
-        """Test that invalid planet ID raises ValueError."""
+        """An unknown body id raises the typed error on every backend."""
+        from libephemeris.exceptions import Error
+
         jd_start = julday(2024, 6, 21, 0)
 
-        with pytest.raises(ValueError, match="illegal planet number"):
+        with pytest.raises(Error):
             rise_trans(jd_start, 9999, CALC_RISE, [12.5, 41.9, 0])
 
     def test_bare_rsmi_defaults_to_rise(self):
@@ -522,3 +526,98 @@ class TestRiseTransStarTwilight:
         _, tret_tw = rise_trans(jd_start, MARS, CALC_RISE | BIT_CIVIL_TWILIGHT, geopos)
         _, tret_plain = rise_trans(jd_start, MARS, CALC_RISE, geopos)
         assert tret_tw[0] == pytest.approx(tret_plain[0], abs=1e-9)
+
+
+class TestRiseTransGeoctrNoEclLat:
+    """BIT_GEOCTR_NO_ECL_LAT (128): geocentric place, ecliptic latitude zeroed.
+
+    The event uses the body's geocentric apparent place projected onto the
+    ecliptic (latitude set to zero), so a body far from the ecliptic - most
+    dramatically the Moon - rises/sets tens of minutes away from its ordinary
+    time. These are self-contained property/semantic checks (no reference
+    oracle): identity of BIT_HINDU_RISING, the minutes-scale Moon shift, the
+    transit/twilight scope, and a direct check that the returned event really
+    lands where the latitude-zeroed geocentric direction meets the horizon.
+    """
+
+    ROME = [12.4964, 41.9028, 0.0]
+
+    def test_hindu_rising_is_no_ecl_lat_disc_center_no_refraction(self):
+        """896 is exactly 128 | 256 | 512 and behaves identically."""
+        assert BIT_HINDU_RISING == BIT_GEOCTR_NO_ECL_LAT | BIT_DISC_CENTER | 512
+        jd_start = julday(2005, 3, 10, 0)
+        for body in (SUN, MOON, MARS):
+            for event in (CALC_RISE, CALC_SET):
+                r1, t1 = rise_trans(jd_start, body, event | BIT_HINDU_RISING, self.ROME)
+                r2, t2 = rise_trans(
+                    jd_start,
+                    body,
+                    event | BIT_GEOCTR_NO_ECL_LAT | BIT_DISC_CENTER | BIT_NO_REFRACTION,
+                    self.ROME,
+                )
+                assert r1 == r2 == 0
+                assert t1[0] == pytest.approx(t2[0], abs=1e-9)
+
+    def test_moon_rise_shifts_minutes_with_no_ecl_lat(self):
+        """The Moon's high ecliptic latitude makes 128 move its rise by minutes."""
+        jd_start = julday(2005, 3, 10, 0)
+        base = CALC_RISE | BIT_DISC_CENTER | BIT_NO_REFRACTION
+        _, t_plain = rise_trans(jd_start, MOON, base, self.ROME)
+        _, t_nolat = rise_trans(jd_start, MOON, base | BIT_GEOCTR_NO_ECL_LAT, self.ROME)
+        assert t_plain[0] > 0 and t_nolat[0] > 0
+        shift_minutes = abs(t_nolat[0] - t_plain[0]) * 24 * 60
+        # 2005-03-10 the Moon sits well off the ecliptic: the shift is ~25 min.
+        assert shift_minutes > 5.0
+
+    def test_sun_effect_is_small_but_nonzero(self):
+        """The Sun rides the ecliptic, so 128 barely moves it (only parallax)."""
+        jd_start = julday(2000, 6, 21, 0)
+        base = CALC_RISE | BIT_DISC_CENTER | BIT_NO_REFRACTION
+        _, t_plain = rise_trans(jd_start, SUN, base, self.ROME)
+        _, t_nolat = rise_trans(jd_start, SUN, base | BIT_GEOCTR_NO_ECL_LAT, self.ROME)
+        shift_seconds = abs(t_nolat[0] - t_plain[0]) * 86400.0
+        assert shift_seconds < 5.0
+
+    def test_no_ecl_lat_ignored_for_transits(self):
+        """Measured reference behavior: 128 does not affect meridian transits."""
+        jd_start = julday(2005, 3, 10, 0)
+        for body in (SUN, MOON, MARS):
+            for event in (CALC_MTRANSIT, CALC_ITRANSIT):
+                _, t0 = rise_trans(jd_start, body, event, self.ROME)
+                _, t1 = rise_trans(
+                    jd_start, body, event | BIT_GEOCTR_NO_ECL_LAT, self.ROME
+                )
+                assert t1[0] == pytest.approx(t0[0], abs=1e-9)
+
+    def test_no_ecl_lat_applies_to_twilight(self):
+        """Measured reference behavior: 128 DOES shift the Sun's twilight."""
+        jd_start = julday(2000, 6, 21, 0)
+        _, t0 = rise_trans(jd_start, SUN, CALC_RISE | BIT_CIVIL_TWILIGHT, self.ROME)
+        _, t1 = rise_trans(
+            jd_start,
+            SUN,
+            CALC_RISE | BIT_CIVIL_TWILIGHT | BIT_GEOCTR_NO_ECL_LAT,
+            self.ROME,
+        )
+        assert t0[0] != pytest.approx(t1[0], abs=1e-9)
+
+    def test_event_lands_on_latitude_zeroed_geocentric_direction(self):
+        """At the 896 event the latitude-zeroed geocentric direction is on the
+        horizon: altitude ~ 0 (disc center, no refraction, flat horizon)."""
+        from libephemeris import calc_ut, azalt
+        from libephemeris.utils import ECL2HOR
+
+        jd_start = julday(2005, 3, 10, 0)
+        for body in (MOON, MARS):
+            for event in (CALC_RISE, CALC_SET):
+                r, tret = rise_trans(
+                    jd_start, body, event | BIT_HINDU_RISING, self.ROME
+                )
+                assert r == 0
+                t = tret[0]
+                pos, _ = calc_ut(t, body)  # geocentric apparent ecliptic-of-date
+                # azalt geopos order is (lon, lat, alt); latitude zeroed.
+                _az, alt_true, _app = azalt(
+                    t, ECL2HOR, tuple(self.ROME), 0.0, 0.0, (pos[0], 0.0, pos[2])
+                )
+                assert alt_true == pytest.approx(0.0, abs=0.01)

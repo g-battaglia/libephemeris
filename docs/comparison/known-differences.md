@@ -40,7 +40,17 @@ position by exactly that offset.
 
 Mean Node and Mean Apogee use ERFA/IERS Delaunay arguments and conventional
 lunar-plane geometry. True Node and osculating apsides use the
-active JPL Earth–Moon state. Interpolated apsides use separate
+active JPL Earth–Moon state.
+
+Because the mean points are defined by a published mean-element theory, two
+implementations can legitimately use polynomials with slightly different
+secular coefficients. Measured against one external implementation, the
+mean node and mean apogee longitudes agree at J2000 and drift apart
+linearly by about 0.002 arcseconds per year (≈0.1" over the modern century,
+≤0.35" at the 1850/2150 tier edges), identically on every backend and
+entry point — the signature of a different published rate coefficient, not
+of a frame or Delta-T effect. LibEphemeris keeps the IERS 2003 Delaunay
+expressions and does not tune the rate toward external output. Interpolated apsides use separate
 Delaunay-argument series plus a versioned, hash-pinned compatibility
 refinement. Their documented tolerances are verified by continuity, parity,
 and rate checks.

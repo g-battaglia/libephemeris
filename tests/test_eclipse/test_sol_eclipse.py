@@ -1325,3 +1325,47 @@ class TestSolEclipseMaxTime:
         # (may be equal due to floating point precision)
         assert gamma_at_max <= gamma_before + 1e-10
         assert gamma_at_max <= gamma_after + 1e-10
+
+
+class TestSolEclipseWhenAdvanceMargin:
+    """The `jd = tret[0]; when(jd)` idiom must advance, not stall.
+
+    Measured reference behavior: a maximum within 1e-4 day (8.64 s) of the
+    search epoch counts as already reached, so starting exactly on a maximum
+    returns the NEIGHBOURING eclipse and iterating on tret[0] walks the series
+    monotonically instead of re-returning the same event forever.
+    """
+
+    def test_start_on_maximum_advances_forward(self):
+        jd_start = julday(1955, 1, 1, 0)
+        _, t0 = sol_eclipse_when_glob(jd_start, FLG_SWIEPH, 0, False)
+        _, t1 = sol_eclipse_when_glob(t0[0], FLG_SWIEPH, 0, False)
+        # Advances by roughly a lunation or more, never re-returns the same max.
+        assert t1[0] - t0[0] > 1.0
+
+    def test_start_on_maximum_advances_backward(self):
+        jd_start = julday(1955, 1, 1, 0)
+        _, t0 = sol_eclipse_when_glob(jd_start, FLG_SWIEPH, 0, False)
+        _, tb = sol_eclipse_when_glob(t0[0], FLG_SWIEPH, 0, True)
+        assert t0[0] - tb[0] > 1.0
+
+    def test_iteration_does_not_stall(self):
+        jd = julday(1990, 1, 1, 0)
+        prev = None
+        for _ in range(8):
+            _, t = sol_eclipse_when_glob(jd, FLG_SWIEPH, 0, False)
+            if prev is not None:
+                assert t[0] - prev > 1.0  # strictly forward, no stall
+            prev = t[0]
+            jd = t[0]
+
+    def test_transition_boundary_near_maximum(self):
+        # Just before max - 1e-4 day keeps the current eclipse; just after it
+        # advances (the measured reference transition sits at max - 1e-4 day).
+        jd_start = julday(1955, 1, 1, 0)
+        _, t0 = sol_eclipse_when_glob(jd_start, FLG_SWIEPH, 0, False)
+        jm = t0[0]
+        _, cur = sol_eclipse_when_glob(jm - 2e-4, FLG_SWIEPH, 0, False)
+        _, nxt = sol_eclipse_when_glob(jm - 0.5e-4, FLG_SWIEPH, 0, False)
+        assert abs(cur[0] - jm) < 0.5  # still the current eclipse
+        assert nxt[0] - jm > 1.0  # advanced to the next

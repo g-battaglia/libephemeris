@@ -311,6 +311,16 @@ _ECLIPSE_SEARCH_HORIZON_YEARS = 2000
 # stops earlier at the ephemeris boundary.
 _OCCULT_MAX_CONJUNCTIONS = int(_ECLIPSE_SEARCH_HORIZON_YEARS * 13.5)
 
+# Epoch-vs-maximum coincidence margin shared by every eclipse/occultation
+# "when" finder. A candidate maximum within this margin of the search epoch
+# counts as "already reached", so the idiom `jd = tret[0]; when(jd)` advances
+# to the neighbouring event instead of re-returning the one it started on.
+# Measured reference behavior: the current<->next (forward) and
+# current<->previous (backward) transition sits exactly at max -/+ 1e-4 day
+# (8.64 s), symmetric in both directions, uniformly across the global and
+# local solar, lunar and occultation searches.
+_ECLIPSE_WHEN_EPOCH_MARGIN = 1e-4  # days (8.64 s)
+
 SYNODIC_MONTH = 29.530588853  # Mean synodic month in days
 LUNAR_NODE_PERIOD = 6798.38  # Lunar node regression period in days
 ECLIPSE_LIMIT_SOLAR = 18.5  # Maximum elongation from node for solar eclipse (degrees)
@@ -2863,7 +2873,7 @@ def _sol_eclipse_when_glob_pythonic(
                 # Check if eclipse maximum is at or after jd_start
                 # (eclipse might have started before but maximum after)
                 jd_max = result[1][0]
-                if jd_max >= jd_start:
+                if jd_max > jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN:
                     # This eclipse's maximum is after jd_start, use it
                     return result
                 else:
@@ -2879,7 +2889,10 @@ def _sol_eclipse_when_glob_pythonic(
         jd_next_nm = _find_next_new_moon(jd_start)
         if jd_next_nm - jd_start <= BIDIRECTIONAL_WINDOW:
             result = _check_new_moon_for_eclipse(jd_next_nm)
-            if result is not None and result[1][0] < jd_start:
+            if (
+                result is not None
+                and result[1][0] < jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN
+            ):
                 return result
 
         jd = jd_start
@@ -2896,8 +2909,11 @@ def _sol_eclipse_when_glob_pythonic(
             if result is not None:
                 # Direction invariant: a backward search must return an
                 # eclipse whose maximum precedes jd_start (refinement can
-                # drag the maximum across the start time).
-                if result[1][0] < jd_start:
+                # drag the maximum across the start time). The epoch margin
+                # makes a maximum within 1e-4 day of jd_start count as
+                # "reached", so an on-maximum start advances to the previous
+                # eclipse (measured reference behavior).
+                if result[1][0] < jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN:
                     return result
             # Go further back
             jd = jd_prev_new_moon - 1
@@ -2924,7 +2940,10 @@ def _sol_eclipse_when_glob_pythonic(
                 raise
         if jd_prev_nm is not None and jd_start - jd_prev_nm <= BIDIRECTIONAL_WINDOW:
             result = _check_new_moon_for_eclipse(jd_prev_nm)
-            if result is not None and result[1][0] > jd_start:
+            if (
+                result is not None
+                and result[1][0] > jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
+            ):
                 return result
 
     jd = jd_start
@@ -2940,12 +2959,15 @@ def _sol_eclipse_when_glob_pythonic(
                 # eclipse exists within coverage (the tier boundary).
                 break
             raise
-        if result is not None and result[1][0] <= jd_start:
+        if result is not None and result[1][0] <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN:
             # Direction invariant: a forward search must return an eclipse
             # whose maximum follows jd_start. The conjunction-anchored
             # candidate can refine to a maximum a few minutes BEFORE the
             # start time; skip to the next lunation instead of returning
-            # a past eclipse (or looping forever in tret[0]+eps scans).
+            # a past eclipse (or looping forever in tret[0]+eps scans). The
+            # epoch margin makes a maximum within 1e-4 day of jd_start count
+            # as "reached", so `jd = tret[0]; when(jd)` advances to the next
+            # eclipse (measured reference behavior).
             result = None
         if result is not None:
             # For bidirectional mode, we have a forward result
@@ -3881,8 +3903,8 @@ def _sol_eclipse_when_loc_impl(
         # in-progress eclipse from being skipped to the next lunation.
         first_contact = jd_first if jd_first != 0.0 else jd_local_max
         last_contact = jd_fourth if jd_fourth != 0.0 else jd_local_max
-        if (not backwards and last_contact <= tjdut + 1e-4) or (
-            backwards and first_contact >= tjdut - 1e-4
+        if (not backwards and last_contact <= tjdut + _ECLIPSE_WHEN_EPOCH_MARGIN) or (
+            backwards and first_contact >= tjdut - _ECLIPSE_WHEN_EPOCH_MARGIN
         ):
             if backwards:
                 jd = jd_max_global - 1
@@ -5463,59 +5485,100 @@ def _lun_eclipse_when_pythonic(
     if eclipse_type == 0:
         eclipse_type = ECL_ALLTYPES_LUNAR
 
+    # Days to look back for the forward pre-probe below (mirror of the
+    # solar search's BIDIRECTIONAL_WINDOW).
+    LUNAR_PRE_PROBE_WINDOW = 15.0
+
+    def _check_full_moon_for_eclipse(
+        jd_full_moon: float,
+    ) -> Union[Tuple[int, Tuple[float, ...]], None]:
+        """Classify the matching eclipse (if any) at a Full Moon.
+
+        Encapsulates the node pre-filter, the maximum refinement, the
+        shadow-geometry classification and the type-mask test so the forward
+        pre-probe and the main lunation walk share one code path. Returns the
+        ``(retflag, tret)`` pair or ``None`` when this Full Moon carries no
+        matching eclipse.
+        """
+        moon_pos, _ = calc_ut(jd_full_moon, MOON, flags | FLG_SPEED)
+        moon_lon = moon_pos[0]
+
+        # Coarse PRE-FILTER (widened well past the physical limit); the true
+        # test is the shadow-geometry classification at the refined maximum
+        # (node distance is not a clean discriminator here).
+        node_dist = _get_moon_node_distance(jd_full_moon, moon_lon)
+        if node_dist >= _LUNAR_NODE_PREFILTER:
+            return None
+
+        # Refine the time of maximum eclipse: deepest immersion of the Moon
+        # in the Earth's shadow, then classify from the shadow geometry.
+        jd_max = _lun_eclipse_max_time(jd_full_moon, flags)
+        retc, _attr_max, _dcore_max = _lun_how_core(jd_max, flags)
+        if retc == 0:
+            return None
+
+        type_matches = (
+            (eclipse_type & ECL_TOTAL and retc & ECL_TOTAL)
+            or (eclipse_type & ECL_PARTIAL and retc & ECL_PARTIAL)
+            or (eclipse_type & ECL_PENUMBRAL and retc & ECL_PENUMBRAL)
+        )
+        if not type_matches:
+            return None
+
+        times = _lun_eclipse_phase_times(jd_max, retc, flags)
+        return retc, times
+
+    # Forward pre-probe (mirror of the solar search). A lunar eclipse's
+    # opposition (Full Moon) precedes its maximum by a few minutes, so a
+    # start epoch that falls in the [opposition, maximum) window would make
+    # _find_next_full_moon() skip to the NEXT lunation and drop the
+    # in-progress eclipse. Probe the previous Full Moon first and return its
+    # eclipse when its maximum is still more than the epoch margin ahead of
+    # jd_start (measured reference behavior: the current eclipse is returned
+    # right up to maximum - 1e-4 day).
+    if not backwards:
+        try:
+            jd_prev_fm = _find_previous_full_moon(jd_start)
+        except Exception as _exc:
+            if _is_ephemeris_boundary(_exc):
+                jd_prev_fm = None
+            else:
+                raise
+        if jd_prev_fm is not None and jd_start - jd_prev_fm <= LUNAR_PRE_PROBE_WINDOW:
+            pre = _check_full_moon_for_eclipse(jd_prev_fm)
+            if pre is not None and pre[1][0] > jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN:
+                return pre
+
     jd = jd_start
 
     for _ in range(MAX_FULL_MOONS):
-        # Find next (or previous) Full Moon
+        # Find next (or previous) Full Moon and classify any eclipse there.
         try:
             if backwards:
                 jd_full_moon = _find_previous_full_moon(jd)
             else:
                 jd_full_moon = _find_next_full_moon(jd)
-
-            # Get Moon position at Full Moon
-            moon_pos, _ = calc_ut(jd_full_moon, MOON, flags | FLG_SPEED)
+            result = _check_full_moon_for_eclipse(jd_full_moon)
         except Exception as _exc:
             if _is_ephemeris_boundary(_exc):
                 # Walked off the ephemeris: no matching eclipse within coverage.
                 break
             raise
-        moon_lon = moon_pos[0]
-        moon_pos[1]
 
-        # Check if close enough to ecliptic for eclipse. This is only a
-        # coarse PRE-FILTER (widened well past the physical limit); the
-        # true test is the shadow-geometry classification at the refined
-        # maximum below (node distance is not a clean discriminator here).
-        node_dist = _get_moon_node_distance(jd_full_moon, moon_lon)
-
-        if node_dist < _LUNAR_NODE_PREFILTER:
-            # Refine the time of maximum eclipse: deepest immersion of
-            # the Moon in the Earth's shadow.
-            jd_max = _lun_eclipse_max_time(jd_full_moon, flags)
+        if result is not None:
+            jd_max = result[1][0]
 
             # Direction invariant: a forward search must return an eclipse
             # after jd_start, a backward search one before it (refinement
-            # can drag the maximum across the start time).
-            if (not backwards and jd_max <= jd_start) or (
-                backwards and jd_max >= jd_start
-            ):
-                jd = jd_full_moon + (-25 if backwards else 25)
-                continue
-
-            # Classify from the shadow geometry at maximum.
-            retc, _attr_max, _dcore_max = _lun_how_core(jd_max, flags)
-
-            if retc != 0:
-                type_matches = (
-                    (eclipse_type & ECL_TOTAL and retc & ECL_TOTAL)
-                    or (eclipse_type & ECL_PARTIAL and retc & ECL_PARTIAL)
-                    or (eclipse_type & ECL_PENUMBRAL and retc & ECL_PENUMBRAL)
-                )
-
-                if type_matches:
-                    times = _lun_eclipse_phase_times(jd_max, retc, flags)
-                    return retc, times
+            # can drag the maximum across the start time). The epoch margin
+            # makes a maximum within 1e-4 day of jd_start count as "reached",
+            # so `jd = tret[0]; when(jd)` advances to the neighbouring
+            # eclipse (measured reference behavior).
+            skip = (
+                not backwards and jd_max <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
+            ) or (backwards and jd_max >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN)
+            if not skip:
+                return result
 
         # Advance (or retreat) to the next lunation: ~25 days keeps us
         # safely within one synodic month of the next Full Moon.
@@ -5729,9 +5792,9 @@ def _lun_eclipse_when_loc_pythonic(
         # not yet begun at moonrise), wedging the sequential search on an
         # already-finished eclipse. tret[0] is still the geocentric maximum
         # here, so the search advance matches the other skips.
-        if (not backwards and last_visible <= jd_start + 1e-4) or (
-            backwards and first_visible >= jd_start - 1e-4
-        ):
+        if (
+            not backwards and last_visible <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
+        ) or (backwards and first_visible >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN):
             search_jd = tret[0] + (-25.0 if backwards else 25.0)
             continue
 
@@ -6256,8 +6319,8 @@ def lun_occult_when_glob(
 
         tret = [0.0] * 10
         tret[0] = tjd
-        if (backward and tret[0] >= tjdut - 1e-4) or (
-            not backward and tret[0] <= tjdut + 1e-4
+        if (backward and tret[0] >= tjdut - _ECLIPSE_WHEN_EPOCH_MARGIN) or (
+            not backward and tret[0] <= tjdut + _ECLIPSE_WHEN_EPOCH_MARGIN
         ):
             t = tjd + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
@@ -6480,8 +6543,8 @@ def _lun_occult_when_loc_pythonic(
             t = jd_max + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
-        if (backward and jd_max >= jd_start - 1e-4) or (
-            not backward and jd_max <= jd_start + 1e-4
+        if (backward and jd_max >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN) or (
+            not backward and jd_max <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
         ):
             if one_try:
                 return _one_try_miss(jd_max + direction)
@@ -6844,6 +6907,11 @@ def _rise_trans_impl(
             - CALC_MTRANSIT (4): Upper meridian transit (culmination)
             - CALC_ITRANSIT (8): Lower meridian transit (anti-culmination)
             Additional flags (OR with event type):
+            - BIT_GEOCTR_NO_ECL_LAT (128): Use the geocentric apparent place
+              projected onto the ecliptic (ecliptic latitude zeroed) instead
+              of the topocentric place - the Hindu-rising convention. Affects
+              rise/set and twilight; ignored for meridian transits. Component
+              of BIT_HINDU_RISING (896).
             - BIT_DISC_CENTER (256): Use disc center instead of upper limb
             - BIT_DISC_BOTTOM (8192): Use lower limb of disc
             - BIT_NO_REFRACTION (512): Ignore atmospheric refraction
@@ -7244,6 +7312,9 @@ def _rise_trans_true_hor_impl(
             - CALC_MTRANSIT (4): Upper meridian transit (culmination)
             - CALC_ITRANSIT (8): Lower meridian transit (anti-culmination)
             Additional flags (OR with event type):
+            - BIT_GEOCTR_NO_ECL_LAT (128): Use the geocentric apparent place
+              with the ecliptic latitude zeroed (Hindu-rising convention;
+              see the note below). Component of BIT_HINDU_RISING (896).
             - BIT_DISC_CENTER (256): Use disc center instead of upper limb
             - BIT_DISC_BOTTOM (8192): Use lower limb of disc
             - BIT_NO_REFRACTION (512): Ignore atmospheric refraction
@@ -7280,6 +7351,17 @@ def _rise_trans_true_hor_impl(
         behavior (planets and the Moon keep their ordinary horizon
         crossing). The special value horhgt=-100 requests the dip of
         the sea horizon.
+
+        BIT_GEOCTR_NO_ECL_LAT (128) replaces the ordinary topocentric place
+        with the body's GEOCENTRIC apparent place projected onto the ecliptic
+        (ecliptic latitude set to zero, longitude and distance kept), then
+        rotates that direction to the observer's horizon. This drops both the
+        topocentric parallax and the ecliptic latitude, so a body far from the
+        ecliptic rises/sets at a very different time (e.g. the Moon shifts by
+        tens of minutes toward its ecliptic-longitude crossing). Measured
+        reference behavior: the bit affects rise/set and twilight but is
+        ignored for meridian transits. It is the latitude-zeroing component of
+        BIT_HINDU_RISING (896 = 128 | 256 | 512).
 
     Algorithm:
         1. For transits: Find when body crosses the local meridian
@@ -7403,7 +7485,12 @@ def _rise_trans_true_hor_impl(
         else:
             planet = cast(int, body)
             if planet not in _PLANET_MAP:
-                raise ValueError("illegal planet number %d." % planet)
+                # Typed error like the LEB path (UnknownBodyError is an
+                # Error subclass, the class the reference raises here), so
+                # the exception contract does not depend on the backend.
+                from .exceptions import UnknownBodyError
+
+                raise UnknownBodyError("illegal planet number %d." % planet)
             target_name = _PLANET_MAP[planet]
             target = get_planet_target(eph, target_name)
         observer = wgs84.latlon(lat, lon, altitude)
@@ -7516,6 +7603,47 @@ def _rise_trans_true_hor_impl(
             ra, dec, _ = body_app.radec(epoch="date")
             return ra.hours, dec.degrees
 
+    # Hindu-rising convention (BIT_GEOCTR_NO_ECL_LAT): the event uses the
+    # body's GEOCENTRIC apparent place projected onto the ecliptic (ecliptic
+    # latitude zeroed), not the ordinary topocentric place. Measured reference
+    # behavior: this shifts rise/set AND twilight (e.g. the Moon's rise moves by
+    # ~25 min toward its ecliptic-longitude crossing) but leaves meridian
+    # transits untouched - the transit path below returns before the altitude
+    # engine, so the bit is naturally ignored there. Built on calc_ut/azalt so
+    # both backends share one geocentric pipeline (automatic LEB<->Skyfield
+    # parity).
+    from .constants import BIT_GEOCTR_NO_ECL_LAT
+
+    use_geoctr_nolat = bool(rsmi_eff & BIT_GEOCTR_NO_ECL_LAT)
+
+    def _get_body_altaz_geoctr_nolat(jd: float) -> Tuple[float, float, float]:
+        """(true altitude, azimuth, distance) from the geocentric apparent
+        place with the ecliptic latitude zeroed.
+
+        Keeps the body's geocentric ecliptic longitude and distance, drops its
+        parallax (geocentric, not topocentric) and its ecliptic latitude, then
+        rotates to the observer's horizon. The horizon rotation still uses the
+        observer's geographic location and the of-date true obliquity.
+        """
+        from .utils import azalt, ECL2HOR
+
+        if is_fixed_star:
+            from .fixed_stars import fixstar_ut
+
+            pos_s, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
+            lon_b, dist_b = float(pos_s[0]), float(pos_s[2])
+        else:
+            pos_p, _ = calc_ut(jd, planet, FLG_SPEED)
+            lon_b, dist_b = float(pos_p[0]), float(pos_p[2])
+        az, alt_true, _ = azalt(
+            jd, ECL2HOR, (lon, lat, altitude), 0.0, 0.0, (lon_b, 0.0, dist_b)
+        )
+        return alt_true, az, dist_b
+
+    _altaz_for_event = (
+        _get_body_altaz_geoctr_nolat if use_geoctr_nolat else _get_body_altaz
+    )
+
     if event_type in (CALC_MTRANSIT, CALC_ITRANSIT):
         if _use_leb_rt:
             return _calculate_transit_leb(
@@ -7539,7 +7667,7 @@ def _rise_trans_true_hor_impl(
 
     def _event_height(jd: float) -> float:
         """Height of the configured disc point above the configured horizon."""
-        alt_true, _az, dist = _get_body_altaz(jd)
+        alt_true, _az, dist = _altaz_for_event(jd)
         alt_pt = alt_true
         if disc_sign != 0 and _body_radius_au > 0.0:
             cur = dist

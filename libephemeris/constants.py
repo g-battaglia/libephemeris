@@ -1208,6 +1208,11 @@ MOD_NPREC: int = 11
 
 # Heliacal/rise-set bit flags
 BIT_FORCE_SLOW_METHOD: int = 32768
+# Use the GEOCENTRIC apparent place with the ecliptic latitude zeroed (the body
+# projected onto the ecliptic) for the rise/set/twilight event, instead of the
+# ordinary topocentric place. This is the Hindu-rising convention; together with
+# BIT_DISC_CENTER (256) and BIT_NO_REFRACTION (512) it makes up BIT_HINDU_RISING.
+BIT_GEOCTR_NO_ECL_LAT: int = 128
 BIT_HINDU_RISING: int = 896
 
 # Rise/set type constants
