@@ -5754,7 +5754,10 @@ def _iau2006_general_precession_deg(jd_tt: float) -> float:
 
 
 def _galcent_ayanamsha(
-    tjd_tt: float, target_lon: float, noaberr: bool = False
+    tjd_tt: float,
+    target_lon: float,
+    noaberr: bool = False,
+    nogdefl: bool = False,
 ) -> float:
     """Galactic-Center mode: Sgr A* held at its published sidereal longitude.
 
@@ -5764,19 +5767,30 @@ def _galcent_ayanamsha(
     0° Sagittarius").
 
     Under ``noaberr`` (FLG_TRUEPOS / FLG_NOABERR) the anchor's annual
-    aberration is removed from the zero point; measured reference behavior.
+    aberration is removed from the zero point, and under ``nogdefl``
+    (FLG_TRUEPOS / FLG_NOGDEFL) its solar light deflection is removed;
+    measured reference behavior.
     """
     longitude = _get_star_position_ecliptic(
-        STARS["GAL_CENTER"], tjd_tt, 0.0, nonut=True, noaberr=noaberr
+        STARS["GAL_CENTER"],
+        tjd_tt,
+        0.0,
+        nonut=True,
+        noaberr=noaberr,
+        nogdefl=nogdefl,
     )
     return (longitude - target_lon) % 360.0
 
 
-def _galcent_ra_of_date(tjd_tt: float, noaberr: bool = False) -> float:
+def _galcent_ra_of_date(
+    tjd_tt: float, noaberr: bool = False, nogdefl: bool = False
+) -> float:
     """Return apparent Sgr A* RA on the Vondrak mean equator of date.
 
-    ``noaberr`` removes only the observer-velocity aberration (keeping light
-    deflection), matching the FLG_TRUEPOS / FLG_NOABERR anchor convention.
+    ``noaberr`` removes only the observer-velocity aberration and ``nogdefl``
+    removes only the Sun's gravitational light deflection, so the four flag
+    combinations match the FLG_TRUEPOS / FLG_NOABERR / FLG_NOGDEFL anchor
+    convention (FLG_TRUEPOS maps to both, i.e. the geometric direction).
     """
     import numpy as np
 
@@ -5790,11 +5804,22 @@ def _galcent_ra_of_date(tjd_tt: float, noaberr: bool = False) -> float:
     time = get_timescale().tt_jd(tjd_tt)
     try:
         astrometric = _get_computation_ephemeris()["earth"].at(time).observe(star)
-        if noaberr:
+        astro_au = np.array(astrometric.position.au, dtype=float)
+        if noaberr and nogdefl:
+            # Geometric direction (FLG_TRUEPOS): no deflection, no aberration.
+            vector = astro_au
+        elif nogdefl:
+            # Aberration only: displace the astrometric direction by aberration.
+            vector = astro_au.copy()
+            add_aberration(
+                vector,
+                astrometric.center_barycentric.velocity.au_per_d,
+                astrometric.light_time,
+            )
+        elif noaberr:
             # Deflection but no aberration: subtract apparent()'s final
             # aberration step (see _star_position_ecliptic_uncached).
             apparent_au = np.array(astrometric.apparent().position.au, dtype=float)
-            astro_au = np.array(astrometric.position.au, dtype=float)
             aberrated_au = astro_au.copy()
             add_aberration(
                 aberrated_au,
@@ -5810,9 +5835,11 @@ def _galcent_ra_of_date(tjd_tt: float, noaberr: bool = False) -> float:
     return math.atan2(float(y_coord), float(x_coord))
 
 
-def _mula_wilhelm_longitude(tjd_tt: float, noaberr: bool = False) -> float:
+def _mula_wilhelm_longitude(
+    tjd_tt: float, noaberr: bool = False, nogdefl: bool = False
+) -> float:
     """Project Sgr A*'s hour circle onto the mean ecliptic of date."""
-    alpha = _galcent_ra_of_date(tjd_tt, noaberr=noaberr)
+    alpha = _galcent_ra_of_date(tjd_tt, noaberr=noaberr, nogdefl=nogdefl)
     epsilon = vondrak_mean_obliquity_rad(tjd_tt)
     return (
         math.degrees(math.atan2(math.sin(alpha), math.cos(alpha) * math.cos(epsilon)))
@@ -5827,23 +5854,60 @@ def _get_star_position_ecliptic(
     nonut: bool = False,
     geometric: bool = False,
     noaberr: bool = False,
+    nogdefl: bool = False,
 ) -> float:
     """Interpolating wrapper: see _star_position_ecliptic_uncached.
 
     The anchor longitude varies slowly (precession ~0.14"/day, proper
     motion <0.01"/day, annual aberration <0.36"/day), so it is evaluated
     exactly only at memoized 8-day grid nodes and interpolated with a
-    Lagrange quadratic in between. The fastest term (annual aberration,
-    ~20.5" sinusoid) leaves a cubic residual below 0.004" over a 16-day
-    node span — negligible against the pipeline's own precision — while
+    Lagrange quadratic in between. The fastest interpolated term (annual
+    aberration, ~20.5" sinusoid) leaves a cubic residual below 0.004" over a
+    16-day node span — negligible against the pipeline's own precision — while
     cutting the per-call cost of the star-based ayanamsha modes by the
     node-reuse factor (the full Skyfield pipeline runs only at nodes).
+
+    The Sun's gravitational light deflection is the exception: near the annual
+    conjunction it changes sign across the source and can reach ~1" over a
+    single day for a near-ecliptic anchor, a feature the 8-day node grid
+    cannot represent. When deflection is applied (neither ``geometric`` nor
+    ``nogdefl``) the deflected apparent place is therefore evaluated *exactly*
+    at ``tjd_tt`` rather than interpolated; the per-date LRU cache still
+    collapses the many-bodies-at-one-date chart workload to a single pipeline
+    run. Deflection-free longitudes (``geometric`` frame poles, or FLG_NOGDEFL
+    / FLG_TRUEPOS) stay on the fast interpolation path, since without the
+    deflection spike the longitude is a slow, smooth function of date.
     """
-    h = 8.0  # node spacing in days
-    base = math.floor(tjd_tt / (2.0 * h)) * (2.0 * h)
     # Under nonut the true obliquity argument is unused: normalize it so
     # the node cache key does not vary with the caller's request date.
     eps_key = 0.0 if nonut else eps_true
+
+    if not geometric and not nogdefl:
+        # Deflection is active and cannot be interpolated: evaluate exactly.
+        try:
+            return _star_position_ecliptic_cached(
+                star.ra_j2000,
+                star.dec_j2000,
+                star.pm_ra,
+                star.pm_dec,
+                star.parallax,
+                star.radial_velocity,
+                tjd_tt,
+                eps_key,
+                nonut,
+                geometric,
+                noaberr,
+                nogdefl,
+            )
+        except _RANGE_ERRORS as e:
+            # Translate the raw skyfield range error to our typed
+            # EphemerisRangeError, matching the interpolation path below so the
+            # star/galactic ayanamsha modes surface the same exception as
+            # calc_ut/fixstar for out-of-tier epochs.
+            raise _wrap_ephemeris_range_error(e, tjd_tt) from e
+
+    h = 8.0  # node spacing in days
+    base = math.floor(tjd_tt / (2.0 * h)) * (2.0 * h)
 
     def _node(jd_node: float) -> float:
         return _star_position_ecliptic_cached(
@@ -5858,6 +5922,7 @@ def _get_star_position_ecliptic(
             nonut,
             geometric,
             noaberr,
+            nogdefl,
         )
 
     try:
@@ -5891,13 +5956,15 @@ def _star_position_ecliptic_cached(
     nonut: bool,
     geometric: bool,
     noaberr: bool,
+    nogdefl: bool,
 ) -> float:
     """Cache the scalarized fixed-star longitude calculation by full input.
 
     Scalar fields make the key immutable; the uncached routine retains the
-    catalogue-motion and frame provenance documented for fixed stars. ``noaberr``
-    is part of the key so the aberration-free (FLG_TRUEPOS / FLG_NOABERR) anchor
-    never collides with the default apparent one.
+    catalogue-motion and frame provenance documented for fixed stars.
+    ``noaberr`` and ``nogdefl`` are both part of the key so the aberration-free
+    (FLG_NOABERR), deflection-free (FLG_NOGDEFL) and geometric (FLG_TRUEPOS)
+    anchors never collide with each other or with the default apparent one.
     """
     star = StarData(
         ra_j2000=ra_j2000,
@@ -5908,7 +5975,13 @@ def _star_position_ecliptic_cached(
         radial_velocity=radial_velocity,
     )
     return _star_position_ecliptic_uncached(
-        star, tjd_tt, eps_true, nonut=nonut, geometric=geometric, noaberr=noaberr
+        star,
+        tjd_tt,
+        eps_true,
+        nonut=nonut,
+        geometric=geometric,
+        noaberr=noaberr,
+        nogdefl=nogdefl,
     )
 
 
@@ -5919,6 +5992,7 @@ def _star_position_ecliptic_uncached(
     nonut: bool = False,
     geometric: bool = False,
     noaberr: bool = False,
+    nogdefl: bool = False,
 ) -> float:
     """
     Calculate ecliptic longitude of a fixed star at given date.
@@ -5953,6 +6027,13 @@ def _star_position_ecliptic_uncached(
             direction already carries no aberration. Used by the star/galactic
             ayanamsha modes under FLG_TRUEPOS / FLG_NOABERR (measured reference
             behavior removes the anchor's aberration from the zero point).
+        nogdefl: When True, remove the Sun's gravitational light deflection of
+            the anchor while keeping annual aberration (the FLG_NOGDEFL
+            convention; general relativity, Einstein 1916 — the same reduction
+            the fixed-star pipeline applies). ``noaberr`` and ``nogdefl`` are
+            independent: FLG_NOABERR alone keeps deflection, FLG_NOGDEFL alone
+            keeps aberration, and FLG_TRUEPOS (which maps to both being True)
+            yields the geometric direction. Ignored when ``geometric`` is set.
 
     Returns:
         Ecliptic longitude of date in degrees (0-360)
@@ -5989,20 +6070,31 @@ def _star_position_ecliptic_uncached(
     # then applies gravitational light deflection followed by annual aberration
     # as its final step.
     astrometric = earth.at(t).observe(star_obj)
-    if geometric:
+    astro_au = np.array(astrometric.position.au, dtype=float)
+    if geometric or (noaberr and nogdefl):
         # Geometric (astrometric) direction: no deflection, no aberration.
-        position_au = np.array(astrometric.position.au, dtype=float)
+        # FLG_TRUEPOS (and FLG_NOABERR | FLG_NOGDEFL together) request exactly
+        # this place; measured reference behavior removes both reductions.
+        position_au = astro_au
+    elif nogdefl:
+        # Aberration only (FLG_NOGDEFL keeps annual aberration but drops the
+        # Sun's gravitational light deflection): displace the astrometric
+        # direction by aberration alone (Bradley 1728; IAU aberration constant
+        # kappa ~ 20.49552"), leaving the geometric direction otherwise intact.
+        position_au = astro_au.copy()
+        add_aberration(
+            position_au,
+            astrometric.center_barycentric.velocity.au_per_d,
+            astrometric.light_time,
+        )
     elif noaberr:
-        # Apparent direction WITHOUT the anchor's annual aberration: keep proper
-        # motion, light-time and gravitational deflection, and remove only the
-        # observer-velocity aberration (Bradley 1728; IAU aberration constant
-        # kappa ~ 20.49552"). apparent() applies deflection first and aberration
-        # last, so subtract that final displacement. Evaluating the aberration
-        # displacement on the astrometric direction rather than on the deflected
-        # one differs only at second order in (deflection x beta), i.e. well
-        # below a micro-arcsecond for these anchors.
+        # Deflection only (FLG_NOABERR keeps the Sun's gravitational light
+        # deflection but drops the observer-velocity aberration). apparent()
+        # applies deflection first and aberration last, so subtract that final
+        # displacement. Evaluating the aberration displacement on the
+        # astrometric direction rather than on the deflected one differs only at
+        # second order in (deflection x beta), i.e. well below a micro-arcsecond.
         apparent_au = np.array(astrometric.apparent().position.au, dtype=float)
-        astro_au = np.array(astrometric.position.au, dtype=float)
         aberrated_au = astro_au.copy()
         add_aberration(
             aberrated_au,
@@ -6011,7 +6103,9 @@ def _star_position_ecliptic_uncached(
         )
         position_au = apparent_au - (aberrated_au - astro_au)
     else:
-        # Full apparent place: deflection + annual aberration.
+        # Full apparent place: gravitational light deflection + annual
+        # aberration (the default apparent anchor; general relativity plus
+        # Bradley aberration, matching the fixed-star pipeline).
         position_au = np.array(astrometric.apparent().position.au, dtype=float)
 
     # Rotate the apparent ICRS direction to the Vondrák ecliptic of date (same
@@ -6180,14 +6274,19 @@ _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
 
 
 # Star / galactic-center ayanamsha modes whose sidereal zero point is anchored
-# to a light source subject to annual aberration. Under FLG_TRUEPOS or
-# FLG_NOABERR the anchor's annual aberration (Bradley 1728; IAU aberration
-# constant kappa ~ 20.49552") is removed from the zero-point reduction; measured
-# reference behavior leaves every other mode unchanged. This deliberately
-# EXCLUDES the fixed-catalogue Aldebaran anchor (SIDM_ALDEBARAN_15TAU), the
-# geometric galactic-pole GALEQU modes (already aberration-free) and the
+# to a live light source, so its apparent place carries both annual aberration
+# and the Sun's gravitational light deflection. The default anchor applies both
+# reductions (Bradley 1728 aberration, IAU constant kappa ~ 20.49552"; Einstein
+# 1916 deflection, up to ~1" near the annual conjunction and sign-changing
+# across it — the same reduction the fixed-star pipeline applies). Under
+# FLG_NOABERR the aberration is removed, under FLG_NOGDEFL the deflection is
+# removed, and under FLG_TRUEPOS both are (the geometric anchor); measured
+# reference behavior. This deliberately EXCLUDES the fixed-catalogue Aldebaran
+# anchor (SIDM_ALDEBARAN_15TAU: the reference reports no aberration and no
+# deflection for it — see the Aldebaran branch), the geometric galactic-pole
+# GALEQU modes (already aberration- and deflection-free) and the
 # precession-formula modes (Mardyks, Valens) — the reference reports a zero
-# TRUEPOS/NOABERR shift for all of those.
+# TRUEPOS/NOABERR/NOGDEFL shift for all of those.
 _ABERRANT_ANCHOR_MODES = frozenset(
     {
         SIDM_TRUE_CITRA,
@@ -6203,7 +6302,12 @@ _ABERRANT_ANCHOR_MODES = frozenset(
 )
 
 
-def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float:
+def _calc_ayanamsa(
+    tjd_ut: float,
+    sid_mode: int,
+    noaberr: bool = False,
+    nogdefl: bool = False,
+) -> float:
     """Calculate the selected predefined mean ayanamsha.
 
     Epoch modes share the defining epochs in :mod:`ayanamsha_definitions` and
@@ -6218,6 +6322,11 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float
         noaberr: When True (request carried FLG_TRUEPOS or FLG_NOABERR), remove
             the anchor's annual aberration from the zero point for the modes in
             ``_ABERRANT_ANCHOR_MODES``. Inert for every other mode.
+        nogdefl: When True (request carried FLG_TRUEPOS or FLG_NOGDEFL), remove
+            the anchor's solar gravitational light deflection from the zero
+            point for the modes in ``_ABERRANT_ANCHOR_MODES``. Inert for every
+            other mode. FLG_TRUEPOS sets both toggles, yielding the geometric
+            anchor.
 
     Returns:
         Mean ayanamsha in degrees, normalized to [0, 360).
@@ -6228,10 +6337,11 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float
     # fallback below.
     if sid_mode >= 0:
         sid_mode &= 0xFF
-    # The aberration-free anchor only applies to the live star / galactic-center
-    # modes whose reference realization removes it; every other mode is
-    # unaffected regardless of the request flags.
+    # The aberration-free / deflection-free anchor only applies to the live
+    # star / galactic-center modes whose reference realization removes them;
+    # every other mode is unaffected regardless of the request flags.
     eff_noaberr = noaberr and sid_mode in _ABERRANT_ANCHOR_MODES
+    eff_nogdefl = nogdefl and sid_mode in _ABERRANT_ANCHOR_MODES
     tjd_tt = float(get_timescale().ut1_jd(tjd_ut).tt)
 
     if sid_mode == SIDM_USER:
@@ -6255,7 +6365,12 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float
         if sid_mode == SIDM_TRUE_CITRA:
             value = (
                 _get_star_position_ecliptic(
-                    STARS["SPICA"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                    STARS["SPICA"],
+                    tjd_tt,
+                    0.0,
+                    nonut=True,
+                    noaberr=eff_noaberr,
+                    nogdefl=eff_nogdefl,
                 )
                 - 180.0
             )
@@ -6264,7 +6379,12 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float
             # Pisces; the ayanamsha is therefore star longitude + 10 arcmin.
             value = (
                 _get_star_position_ecliptic(
-                    STARS["REVATI"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                    STARS["REVATI"],
+                    tjd_tt,
+                    0.0,
+                    nonut=True,
+                    noaberr=eff_noaberr,
+                    nogdefl=eff_nogdefl,
                 )
                 + 10.0 / 60.0
             )
@@ -6273,7 +6393,12 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float
             # 16 degrees Cancer (106 degrees absolute longitude).
             value = (
                 _get_star_position_ecliptic(
-                    STARS["PUSHYA"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                    STARS["PUSHYA"],
+                    tjd_tt,
+                    0.0,
+                    nonut=True,
+                    noaberr=eff_noaberr,
+                    nogdefl=eff_nogdefl,
                 )
                 - 106.0
             )
@@ -6281,7 +6406,12 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float
             # Chandra Hari's Mula origin places lambda Scorpii at 0 Sagittarius.
             value = (
                 _get_star_position_ecliptic(
-                    STARS["MULA"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                    STARS["MULA"],
+                    tjd_tt,
+                    0.0,
+                    nonut=True,
+                    noaberr=eff_noaberr,
+                    nogdefl=eff_nogdefl,
                 )
                 - 240.0
             )
@@ -6294,23 +6424,36 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float
             # 1°/71.75 yr rule are derived checkpoints, not the anchor.
             value = (
                 _get_star_position_ecliptic(
-                    STARS["PUSHYA"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                    STARS["PUSHYA"],
+                    tjd_tt,
+                    0.0,
+                    nonut=True,
+                    noaberr=eff_noaberr,
+                    nogdefl=eff_nogdefl,
                 )
                 - SHEORAN_TARGET_LON
             )
         elif sid_mode == SIDM_ALDEBARAN_15TAU:
             # Aldebaran held at 15 degrees Taurus (45 degrees absolute),
-            # evaluated from the live Hipparcos catalog position. Deliberately
-            # NOT aberration-free under FLG_TRUEPOS / FLG_NOABERR: measured
-            # reference behavior reports a zero shift for this fixed anchor, so
-            # this mode is absent from _ABERRANT_ANCHOR_MODES.
+            # evaluated from the live Hipparcos catalog position. This fixed
+            # catalogue anchor is absent from _ABERRANT_ANCHOR_MODES, so its
+            # reduction never responds to FLG_TRUEPOS / FLG_NOABERR / FLG_NOGDEFL
+            # (measured reference behavior reports a zero shift). The default
+            # apparent place keeps its existing aberration+deflection semantics
+            # (the toggles below stay at their False defaults), differing from
+            # the previous interpolated value only by removing the deflection
+            # interpolation artifact (well below a milli-arcsecond off
+            # conjunction, ~0.015" at worst near it).
             value = (
                 _get_star_position_ecliptic(STARS["ALDEBARAN"], tjd_tt, 0.0, nonut=True)
                 - ALDEBARAN_TARGET_LON
             )
         elif sid_mode in GALCENT_TARGET_LON:
             value = _galcent_ayanamsha(
-                tjd_tt, GALCENT_TARGET_LON[sid_mode], noaberr=eff_noaberr
+                tjd_tt,
+                GALCENT_TARGET_LON[sid_mode],
+                noaberr=eff_noaberr,
+                nogdefl=eff_nogdefl,
             )
         elif sid_mode in (
             SIDM_GALEQU_IAU1958,
@@ -6344,7 +6487,9 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float
             # Wilhelm: Sgr A* hour-circle (dhruva) projection held at the
             # middle of Mula (246 degrees 40 minutes).
             value = (
-                _mula_wilhelm_longitude(tjd_tt, noaberr=eff_noaberr)
+                _mula_wilhelm_longitude(
+                    tjd_tt, noaberr=eff_noaberr, nogdefl=eff_nogdefl
+                )
                 - MULA_WILHELM_TARGET_LON
             )
         elif sid_mode == SIDM_VALENS_MOON:
@@ -6395,7 +6540,10 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float
 
 
 def _get_true_ayanamsa(
-    tjd_ut: float, sid_mode: int | None = None, noaberr: bool = False
+    tjd_ut: float,
+    sid_mode: int | None = None,
+    noaberr: bool = False,
+    nogdefl: bool = False,
 ) -> float:
     """
     Get TRUE ayanamsha (mean + nutation) for sidereal planet position calculations.
@@ -6412,6 +6560,9 @@ def _get_true_ayanamsa(
         noaberr: Forwarded to :func:`_calc_ayanamsa` (FLG_TRUEPOS / FLG_NOABERR
             requests) so the anchor of the aberrant star/galactic modes is
             evaluated without annual aberration.
+        nogdefl: Forwarded to :func:`_calc_ayanamsa` (FLG_TRUEPOS / FLG_NOGDEFL
+            requests) so the anchor of the aberrant star/galactic modes is
+            evaluated without solar gravitational light deflection.
 
     Returns:
         True ayanamsha in degrees: the mean ayanamsha normalized to
@@ -6425,7 +6576,7 @@ def _get_true_ayanamsa(
     assert isinstance(sid_mode, int)
 
     # Get mean ayanamsha
-    mean_ayanamsa = _calc_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
+    mean_ayanamsa = _calc_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr, nogdefl=nogdefl)
 
     # Add nutation in longitude (IAU 2006/2000A via pyerfa, ~0.01-0.05 mas)
     ts = get_timescale()
@@ -6456,17 +6607,18 @@ def _get_ayanamsa_for_flags(
     Returns:
         Ayanamsha in degrees
     """
-    # FLG_TRUEPOS / FLG_NOABERR both evaluate the anchor of the aberrant
-    # star/galactic ayanamsha modes without annual aberration, so the ayanamsha
-    # subtracted matches the (aberration-free) planet place the same request
-    # produces (measured reference behavior).
+    # FLG_TRUEPOS / FLG_NOABERR evaluate the anchor of the aberrant star/galactic
+    # ayanamsha modes without annual aberration, and FLG_TRUEPOS / FLG_NOGDEFL
+    # without solar light deflection, so the ayanamsha subtracted matches the
+    # planet place the same request produces (measured reference behavior).
     noaberr = bool(iflag & (FLG_TRUEPOS | FLG_NOABERR))
+    nogdefl = bool(iflag & (FLG_TRUEPOS | FLG_NOGDEFL))
     if (iflag & FLG_NONUT) or (iflag & FLG_J2000):
         if sid_mode is None:
             sid_mode = get_sid_mode()
         assert isinstance(sid_mode, int)
-        return _calc_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
-    return _get_true_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
+        return _calc_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr, nogdefl=nogdefl)
+    return _get_true_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr, nogdefl=nogdefl)
 
 
 # SIDBIT projection flags with a distinct realization on the sidereal path:
@@ -6727,11 +6879,13 @@ def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int, flags: int = 0) -> flo
     t_obj = ts.tt_jd(tjd_tt)
     tjd_ut = t_obj.ut1
     # FLG_TRUEPOS / FLG_NOABERR evaluate the aberrant star/galactic anchors
-    # without annual aberration (measured reference behavior).
+    # without annual aberration, and FLG_TRUEPOS / FLG_NOGDEFL without solar
+    # light deflection (measured reference behavior).
     noaberr = bool(flags & (FLG_TRUEPOS | FLG_NOABERR))
+    nogdefl = bool(flags & (FLG_TRUEPOS | FLG_NOGDEFL))
     if flags & FLG_NONUT:
-        return _calc_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
-    return _get_true_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
+        return _calc_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr, nogdefl=nogdefl)
+    return _get_true_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr, nogdefl=nogdefl)
 
 
 class _SkyfieldDeflectorSource:

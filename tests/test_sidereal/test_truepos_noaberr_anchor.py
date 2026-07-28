@@ -1,12 +1,17 @@
-"""FLG_TRUEPOS / FLG_NOABERR remove the anchor's annual aberration.
+"""FLG_TRUEPOS / FLG_NOABERR / FLG_NOGDEFL and the anchor's apparent-place reduction.
 
 The star / galactic-center ayanamsha modes anchor the sidereal zero point to a
-live light source. Under a FLG_TRUEPOS or FLG_NOABERR request the anchor's
-annual aberration (Bradley 1728; IAU aberration constant kappa ~ 20.49552") is
-removed from the zero-point reduction, so the subtracted ayanamsha matches the
-aberration-free planet place the same request produces. Modes with a fixed
-catalogue anchor (Aldebaran), a geometric galactic-pole direction (GALEQU) or a
-precession-formula definition (Mardyks, Valens) are left unchanged.
+live light source, so its apparent place carries two independent corrections:
+annual aberration (Bradley 1728; IAU aberration constant kappa ~ 20.49552") and
+the Sun's gravitational light deflection (Einstein 1916; up to ~1" near the
+annual conjunction and sign-changing across it — the same reduction the
+fixed-star pipeline applies). FLG_NOABERR removes only the aberration,
+FLG_NOGDEFL removes only the deflection, and FLG_TRUEPOS removes both (the
+geometric anchor), so the three shifts compose linearly (TRUEPOS == NOABERR +
+NOGDEFL) and the subtracted ayanamsha matches the planet place the same request
+produces. Modes with a fixed catalogue anchor (Aldebaran), a geometric
+galactic-pole direction (GALEQU) or a precession-formula definition (Mardyks,
+Valens) are left unchanged by all three flags.
 
 These are library-internal consistency invariants; no reference output is read
 or persisted.
@@ -19,6 +24,7 @@ import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
     FLG_NOABERR,
+    FLG_NOGDEFL,
     FLG_SIDEREAL,
     FLG_SWIEPH,
     FLG_TRUEPOS,
@@ -82,21 +88,76 @@ def _shift_arcsec(jd: float, extra_flag: int) -> float:
     return _signed_arcsec(shifted - plain)
 
 
+# Near-conjunction epochs where the Sun passes the anchor and its solar light
+# deflection projects strongly onto ecliptic longitude. Revati (zeta Piscium)
+# sits close to the ecliptic, so its deflection reaches several tenths of an
+# arcsecond and changes sign across the 1988 April conjunction.
+REVATI_CONJUNCTION_JDS = (2447260.5, 2447261.5, 2447262.5)
+
+
 @pytest.mark.parametrize("sid_mode", ABERRANT_MODES)
-def test_aberrant_anchor_shifts_under_truepos_and_noaberr(sid_mode: int) -> None:
-    """The anchor moves by up to the aberration constant, and TP == NB in lib."""
+def test_aberrant_anchor_truepos_noaberr_nogdefl_compose(sid_mode: int) -> None:
+    """TRUEPOS removes aberration AND deflection; NOABERR/NOGDEFL each remove one.
+
+    The two corrections are independent, so the three shifts compose linearly
+    (TRUEPOS == NOABERR + NOGDEFL) to well below a milli-arcsecond, and the
+    aberration alone is a real annual-scale effect over the epoch spread.
+    """
     ephem.set_sid_mode(sid_mode)
-    max_shift = 0.0
+    max_aberration = 0.0
     for jd in DATES:
+        nb = _shift_arcsec(jd, FLG_NOABERR)
+        ng = _shift_arcsec(jd, FLG_NOGDEFL)
+        tp = _shift_arcsec(jd, FLG_TRUEPOS)
+        # Independent corrections compose (second-order cross term ~1e-4").
+        assert tp == pytest.approx(nb + ng, abs=5e-3)
+        # Aberration is bounded by the IAU constant; deflection is at most ~1-2".
+        assert abs(nb) <= SHIFT_CEILING_ARCSEC
+        assert abs(ng) <= 2.0
+        max_aberration = max(max_aberration, abs(nb))
+    # Over the epoch spread the aberration is a real, annual-scale effect.
+    assert max_aberration > 5.0
+
+
+def test_nogdefl_removes_a_real_anchor_deflection_near_conjunction() -> None:
+    """FLG_NOGDEFL / FLG_TRUEPOS remove a genuine, sign-changing anchor deflection.
+
+    The default (plain) anchor applies the Sun's gravitational light deflection,
+    so FLG_NOGDEFL produces a non-zero shift that peaks near the annual
+    conjunction and changes sign across it. FLG_NOABERR (which keeps deflection)
+    must NOT reproduce that shift, proving the two corrections are distinct.
+    """
+    ephem.set_sid_mode(SIDM_TRUE_REVATI)
+    deflection_shifts = [
+        _shift_arcsec(jd, FLG_NOGDEFL) for jd in REVATI_CONJUNCTION_JDS
+    ]
+    # The deflection is a real, several-tenths-of-an-arcsecond effect at the peak
+    assert max(abs(s) for s in deflection_shifts) > 0.3
+    # ...and it changes sign across the conjunction (positive then negative).
+    assert min(deflection_shifts) < 0.0 < max(deflection_shifts)
+    # FLG_NOABERR keeps deflection, so it does not carry this NOGDEFL signature:
+    # its shift is dominated by the ~20" aberration, never a few tenths.
+    for jd in REVATI_CONJUNCTION_JDS:
+        assert abs(_shift_arcsec(jd, FLG_NOABERR)) > 5.0
+        # TRUEPOS differs from NOABERR by exactly the removed deflection.
         tp = _shift_arcsec(jd, FLG_TRUEPOS)
         nb = _shift_arcsec(jd, FLG_NOABERR)
-        # The library uses a single aberration-free toggle for both flags
-        # (they differ only by sub-arcsecond light deflection in the reference).
-        assert tp == pytest.approx(nb, abs=1e-9)
-        assert abs(tp) <= SHIFT_CEILING_ARCSEC
-        max_shift = max(max_shift, abs(tp))
-    # Over the epoch spread the shift is a real, annual-aberration-scale effect.
-    assert max_shift > 5.0
+        ng = _shift_arcsec(jd, FLG_NOGDEFL)
+        assert tp - nb == pytest.approx(ng, abs=5e-3)
+
+
+def test_default_anchor_applies_deflection_the_toggle_removes() -> None:
+    """The plain anchor is NOT the geometric one: it carries the deflection.
+
+    Confirms the fix (previously the anchor path silently omitted the Sun's
+    deflection): plain minus TRUEPOS at the conjunction differs from plain minus
+    NOABERR by the deflection, i.e. the deflection is present in the plain
+    ayanamsha and only the deflection-removing flags (NOGDEFL/TRUEPOS) drop it.
+    """
+    ephem.set_sid_mode(SIDM_TRUE_REVATI)
+    jd = 2447261.5  # near the 1988 April Sun-Revati conjunction
+    ng = _shift_arcsec(jd, FLG_NOGDEFL)
+    assert abs(ng) > 0.3  # deflection is really in the plain anchor
 
 
 @pytest.mark.parametrize("sid_mode", UNAFFECTED_MODES)

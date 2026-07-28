@@ -2337,35 +2337,44 @@ def houses_ex2(
     _flags_deg = flags & ~FLG_RADIANS
     cusps, ascmc = houses_ex(tjdut, lat, lon, hsys, _flags_deg)
 
-    # Velocities (daily motion). A cusp longitude is a function of time through
-    # the sidereal time (ARMC), the obliquity of the ecliptic and (via the
-    # ecliptic frame) nutation. The true daily motion is therefore the TOTAL
-    # time derivative dλ/dt, which we obtain by a centered finite difference of
-    # the full house solution in time:
-    #
-    #     dλ/dt ≈ [ λ(jd + dt) − λ(jd − dt) ] / (2·dt)
-    #
-    # evaluated on houses_ex() itself, so every time-dependent term (ARMC rate,
-    # dε/dt, nutation) — and the FLG_SIDEREAL ayanamsa, which houses() does not
-    # apply — is captured automatically.
-    #
-    # The half-step is an exact binary fraction of a day (1/4096 ≈ 21 s), so
-    # tjdut ± dt is exactly representable and the stencil stays symmetric. A
-    # one-second step is NOT usable here: at JD ~2.45e6 the ULP is ~46 µs, so
-    # a 1-second half-step loses ~5 significant digits to roundoff and biased
-    # every ascmc rate low by ~7 arcsec/day; the centered-difference
-    # truncation error at ~21 s is far below that for every angle including
-    # the fast, latitude-amplified Ascendant/Vertex rates (the ARMC rate
-    # converges to the same value from 60 s through 300 s; the faster angles
-    # need the shorter step).
-    #
-    # This is the genuine derivative of the reported cusps for every system,
+    # Velocities (daily motion). A cusp or angle longitude is a function of time
+    # through the sidereal time (ARMC), the obliquity of the ecliptic and (via
+    # the ecliptic frame) nutation — plus, under FLG_SIDEREAL, the ayanamsa that
+    # houses() does not apply. The true daily motion is the TOTAL time
+    # derivative dλ/dt, obtained by finite-differencing the full houses_ex()
+    # solution in time so every time-dependent term is captured automatically.
+    # This is the genuine derivative of the reported positions for every system,
     # including the iteratively-solved ones (Placidus, Koch): integrating it
     # reproduces the cusp motion, which an analytic speed approximation of those
     # systems does not.
+    #
+    # Step choice is a truncation-vs-roundoff trade-off. A centered difference
+    # carries O(h²) truncation ≈ f'''·h²/6 and O(ε/h) roundoff, where ε is the
+    # position noise floor. The coarse half-step 1/4096 day (≈ 21 s) is an exact
+    # binary fraction, so tjdut ± dt is exactly representable and the stencil
+    # stays symmetric; it sits near the roundoff floor for the slowly-curving
+    # cusp longitudes and for MC/ARMC. (A one-second half-step is unusable: at
+    # JD ~2.45e6 the ULP is ~46 µs, so it loses ~5 significant digits to
+    # roundoff and biases every rate low by several arcsec/day.)
+    #
+    # The angles carry a large f''' on the latitude-amplified Ascendant, Vertex
+    # and co-ascendant slots. There the fixed-1/4096 truncation is not
+    # negligible: it reaches a few arcsec/day at mid-latitude and hundreds of
+    # arcsec/day near the polar circle, while MC/ARMC stay at the roundoff floor.
+    # Refining the step alone cannot fix this — a step short enough to tame the
+    # fast angles pushes the slow ones into roundoff. The ascmc rates therefore
+    # use two-step Richardson extrapolation, combining centered differences at
+    # h = 1/4096 and h/2 = 1/8192 day (both exact binary fractions, both above
+    # the roundoff floor) to cancel the leading f'''·h² term, O(h²) → O(h⁴).
+    # This tracks the measured reference behavior across latitude on every angle.
+    # The cusp rates keep the plain centered difference at the coarse step.
     _DT_DAYS = 1.0 / 4096.0
+    _DT_HALF = 1.0 / 8192.0
     cusps_minus, ascmc_minus = houses_ex(tjdut - _DT_DAYS, lat, lon, hsys, _flags_deg)
     cusps_plus, ascmc_plus = houses_ex(tjdut + _DT_DAYS, lat, lon, hsys, _flags_deg)
+    # Fine ± h/2 samples feed only the Richardson step for the angles.
+    _, ascmc_hminus = houses_ex(tjdut - _DT_HALF, lat, lon, hsys, _flags_deg)
+    _, ascmc_hplus = houses_ex(tjdut + _DT_HALF, lat, lon, hsys, _flags_deg)
 
     def _rate(after: float, before: float) -> float:
         d = after - before
@@ -2379,8 +2388,33 @@ def houses_ex2(
             return 0.0
         return d / (2.0 * _DT_DAYS)
 
+    def _rate_richardson(ph: float, mh: float, pq: float, mq: float) -> float:
+        # Wrapped central differences at the coarse (± h) and fine (± h/2)
+        # symmetric steps, then Richardson-extrapolated to cancel the O(h²) term.
+        d_h = ph - mh
+        if d_h > 180.0:
+            d_h -= 360.0
+        elif d_h < -180.0:
+            d_h += 360.0
+        d_q = pq - mq
+        if d_q > 180.0:
+            d_q -= 360.0
+        elif d_q < -180.0:
+            d_q += 360.0
+        # A change larger than 90 degrees across either symmetric step is a
+        # branch discontinuity, where no finite derivative exists.
+        if abs(d_h) > 90.0 or abs(d_q) > 90.0:
+            return 0.0
+        d_coarse = d_h / (2.0 * _DT_DAYS)
+        d_fine = d_q / (2.0 * _DT_HALF)
+        # Cancel the leading f'''·h²/6 term: D = [4·D(h/2) − D(h)] / 3.
+        return (4.0 * d_fine - d_coarse) / 3.0
+
     cusps_speed = tuple(_rate(cusps_plus[i], cusps_minus[i]) for i in range(len(cusps)))
-    ascmc_speed = tuple(_rate(ascmc_plus[i], ascmc_minus[i]) for i in range(len(ascmc)))
+    ascmc_speed = tuple(
+        _rate_richardson(ascmc_plus[i], ascmc_minus[i], ascmc_hplus[i], ascmc_hminus[i])
+        for i in range(len(ascmc))
+    )
 
     # Porphyry ('O'), Whole-Sign ('W') and Aries ('N') report analytic cusp
     # speeds that are NOT the finite-difference derivative of their cusp
