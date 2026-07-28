@@ -339,3 +339,25 @@ class TestCalcPctrTimeScale:
         assert 0.0 <= pos_pctr[0] < 360.0
         # Sun-Mars distance should be roughly 1.5 AU
         assert 1.0 < pos_pctr[2] < 2.0
+
+
+class TestTrueDistanceSlotIsGeometric:
+    """The 3rd slot is the GEOMETRIC (light-time-free) distance.
+
+    Measured reference behavior returns the FLG_TRUEPOS distance in the
+    true-distance slot; a missing flag used to leak the apparent,
+    light-time-corrected value (up to ~1.6e-4 AU short on Mercury, where
+    the radial rate is fastest).
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [2, 4, 9])
+    def test_slot_matches_truepos_distance(self, ipl):
+        jd = 2458849.5
+        td = ephem.orbit_max_min_true_distance(jd, ipl, ephem.FLG_SWIEPH)[2]
+        true = ephem.calc(jd, ipl, ephem.FLG_SWIEPH | ephem.FLG_TRUEPOS)[0][2]
+        apparent = ephem.calc(jd, ipl, ephem.FLG_SWIEPH)[0][2]
+        assert td == pytest.approx(true, abs=1e-12)
+        # Sanity: the two reductions genuinely differ at this instant, so
+        # the assertion above discriminates.
+        assert abs(true - apparent) > 1e-9

@@ -78,6 +78,7 @@ from jplephem.exceptions import OutOfRangeError
 from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
 from skyfield.api import Star
 from skyfield.framelib import ecliptic_frame
+from skyfield.relativity import add_aberration
 from dataclasses import dataclass
 import erfa
 
@@ -5752,22 +5753,31 @@ def _iau2006_general_precession_deg(jd_tt: float) -> float:
     return math.degrees(float(angles[12]))
 
 
-def _galcent_ayanamsha(tjd_tt: float, target_lon: float) -> float:
+def _galcent_ayanamsha(
+    tjd_tt: float, target_lon: float, noaberr: bool = False
+) -> float:
     """Galactic-Center mode: Sgr A* held at its published sidereal longitude.
 
     The ayanamsha is the apparent mean-ecliptic longitude of Sgr A*
     (Reid & Brunthaler 2004 ICRS position and proper motion) minus the
     mode's published target longitude (e.g. 240° for "Galactic Center at
     0° Sagittarius").
+
+    Under ``noaberr`` (FLG_TRUEPOS / FLG_NOABERR) the anchor's annual
+    aberration is removed from the zero point; measured reference behavior.
     """
     longitude = _get_star_position_ecliptic(
-        STARS["GAL_CENTER"], tjd_tt, 0.0, nonut=True
+        STARS["GAL_CENTER"], tjd_tt, 0.0, nonut=True, noaberr=noaberr
     )
     return (longitude - target_lon) % 360.0
 
 
-def _galcent_ra_of_date(tjd_tt: float) -> float:
-    """Return apparent Sgr A* RA on the Vondrak mean equator of date."""
+def _galcent_ra_of_date(tjd_tt: float, noaberr: bool = False) -> float:
+    """Return apparent Sgr A* RA on the Vondrak mean equator of date.
+
+    ``noaberr`` removes only the observer-velocity aberration (keeping light
+    deflection), matching the FLG_TRUEPOS / FLG_NOABERR anchor convention.
+    """
     import numpy as np
 
     center = STARS["GAL_CENTER"]
@@ -5779,22 +5789,30 @@ def _galcent_ra_of_date(tjd_tt: float) -> float:
     )
     time = get_timescale().tt_jd(tjd_tt)
     try:
-        vector = np.array(
-            _get_computation_ephemeris()["earth"]
-            .at(time)
-            .observe(star)
-            .apparent()
-            .position.au
-        )
+        astrometric = _get_computation_ephemeris()["earth"].at(time).observe(star)
+        if noaberr:
+            # Deflection but no aberration: subtract apparent()'s final
+            # aberration step (see _star_position_ecliptic_uncached).
+            apparent_au = np.array(astrometric.apparent().position.au, dtype=float)
+            astro_au = np.array(astrometric.position.au, dtype=float)
+            aberrated_au = astro_au.copy()
+            add_aberration(
+                aberrated_au,
+                astrometric.center_barycentric.velocity.au_per_d,
+                astrometric.light_time,
+            )
+            vector = apparent_au - (aberrated_au - astro_au)
+        else:
+            vector = np.array(astrometric.apparent().position.au)
     except _RANGE_ERRORS as error:
         raise _wrap_ephemeris_range_error(error, tjd_tt) from error
     x_coord, y_coord, _ = np.array(vondrak_precession_matrix(tjd_tt)) @ vector
     return math.atan2(float(y_coord), float(x_coord))
 
 
-def _mula_wilhelm_longitude(tjd_tt: float) -> float:
+def _mula_wilhelm_longitude(tjd_tt: float, noaberr: bool = False) -> float:
     """Project Sgr A*'s hour circle onto the mean ecliptic of date."""
-    alpha = _galcent_ra_of_date(tjd_tt)
+    alpha = _galcent_ra_of_date(tjd_tt, noaberr=noaberr)
     epsilon = vondrak_mean_obliquity_rad(tjd_tt)
     return (
         math.degrees(math.atan2(math.sin(alpha), math.cos(alpha) * math.cos(epsilon)))
@@ -5808,6 +5826,7 @@ def _get_star_position_ecliptic(
     eps_true: float,
     nonut: bool = False,
     geometric: bool = False,
+    noaberr: bool = False,
 ) -> float:
     """Interpolating wrapper: see _star_position_ecliptic_uncached.
 
@@ -5838,6 +5857,7 @@ def _get_star_position_ecliptic(
             eps_key,
             nonut,
             geometric,
+            noaberr,
         )
 
     try:
@@ -5870,11 +5890,14 @@ def _star_position_ecliptic_cached(
     eps_true: float,
     nonut: bool,
     geometric: bool,
+    noaberr: bool,
 ) -> float:
     """Cache the scalarized fixed-star longitude calculation by full input.
 
     Scalar fields make the key immutable; the uncached routine retains the
-    catalogue-motion and frame provenance documented for fixed stars.
+    catalogue-motion and frame provenance documented for fixed stars. ``noaberr``
+    is part of the key so the aberration-free (FLG_TRUEPOS / FLG_NOABERR) anchor
+    never collides with the default apparent one.
     """
     star = StarData(
         ra_j2000=ra_j2000,
@@ -5885,7 +5908,7 @@ def _star_position_ecliptic_cached(
         radial_velocity=radial_velocity,
     )
     return _star_position_ecliptic_uncached(
-        star, tjd_tt, eps_true, nonut=nonut, geometric=geometric
+        star, tjd_tt, eps_true, nonut=nonut, geometric=geometric, noaberr=noaberr
     )
 
 
@@ -5895,6 +5918,7 @@ def _star_position_ecliptic_uncached(
     eps_true: float,
     nonut: bool = False,
     geometric: bool = False,
+    noaberr: bool = False,
 ) -> float:
     """
     Calculate ecliptic longitude of a fixed star at given date.
@@ -5923,6 +5947,12 @@ def _star_position_ecliptic_uncached(
         geometric: When True, skip aberration and light deflection (use the
             astrometric direction). Required for frame poles, which are
             geometric directions rather than light sources.
+        noaberr: When True, remove only the annual aberration of the anchor
+            while keeping light deflection (the astrometric-place convention of
+            FLG_NOABERR). Ignored when ``geometric`` is set, since a geometric
+            direction already carries no aberration. Used by the star/galactic
+            ayanamsha modes under FLG_TRUEPOS / FLG_NOABERR (measured reference
+            behavior removes the anchor's aberration from the zero point).
 
     Returns:
         Ecliptic longitude of date in degrees (0-360)
@@ -5953,17 +5983,39 @@ def _star_position_ecliptic_uncached(
     t = ts.tt_jd(tjd_tt)
     earth = planets["earth"]
 
-    # earth.at(t).observe(star) applies proper motion + light-time;
-    # .apparent() applies aberration + deflection (skipped for geometric
-    # directions like the galactic pole).
-    pos = earth.at(t).observe(star_obj)
-    if not geometric:
-        pos = pos.apparent()
+    import numpy as np
+
+    # earth.at(t).observe(star) applies proper motion + light-time; .apparent()
+    # then applies gravitational light deflection followed by annual aberration
+    # as its final step.
+    astrometric = earth.at(t).observe(star_obj)
+    if geometric:
+        # Geometric (astrometric) direction: no deflection, no aberration.
+        position_au = np.array(astrometric.position.au, dtype=float)
+    elif noaberr:
+        # Apparent direction WITHOUT the anchor's annual aberration: keep proper
+        # motion, light-time and gravitational deflection, and remove only the
+        # observer-velocity aberration (Bradley 1728; IAU aberration constant
+        # kappa ~ 20.49552"). apparent() applies deflection first and aberration
+        # last, so subtract that final displacement. Evaluating the aberration
+        # displacement on the astrometric direction rather than on the deflected
+        # one differs only at second order in (deflection x beta), i.e. well
+        # below a micro-arcsecond for these anchors.
+        apparent_au = np.array(astrometric.apparent().position.au, dtype=float)
+        astro_au = np.array(astrometric.position.au, dtype=float)
+        aberrated_au = astro_au.copy()
+        add_aberration(
+            aberrated_au,
+            astrometric.center_barycentric.velocity.au_per_d,
+            astrometric.light_time,
+        )
+        position_au = apparent_au - (aberrated_au - astro_au)
+    else:
+        # Full apparent place: deflection + annual aberration.
+        position_au = np.array(astrometric.apparent().position.au, dtype=float)
 
     # Rotate the apparent ICRS direction to the Vondrák ecliptic of date (same
     # reduction as _calc_body), not Skyfield's IAU 2006 ecliptic_frame.
-    import numpy as np
-
     if nonut:
         # Mean ecliptic of date: precession-only rotation, mean obliquity.
         pn = vondrak_precession_matrix(tjd_tt)
@@ -5972,7 +6024,7 @@ def _star_position_ecliptic_uncached(
         dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjd_tt - 2451545.0)
         pn, _eps = vondrak_pn_matrix(tjd_tt, float(dpsi_rad), float(deps_rad))
         eps_rad = math.radians(eps_true)
-    xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
+    xq, yq, zq = np.array(pn) @ position_au
     ce, se = math.cos(eps_rad), math.sin(eps_rad)
     xe = float(xq)
     ye = float(yq) * ce + float(zq) * se
@@ -6127,7 +6179,31 @@ _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
 }
 
 
-def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
+# Star / galactic-center ayanamsha modes whose sidereal zero point is anchored
+# to a light source subject to annual aberration. Under FLG_TRUEPOS or
+# FLG_NOABERR the anchor's annual aberration (Bradley 1728; IAU aberration
+# constant kappa ~ 20.49552") is removed from the zero-point reduction; measured
+# reference behavior leaves every other mode unchanged. This deliberately
+# EXCLUDES the fixed-catalogue Aldebaran anchor (SIDM_ALDEBARAN_15TAU), the
+# geometric galactic-pole GALEQU modes (already aberration-free) and the
+# precession-formula modes (Mardyks, Valens) — the reference reports a zero
+# TRUEPOS/NOABERR shift for all of those.
+_ABERRANT_ANCHOR_MODES = frozenset(
+    {
+        SIDM_TRUE_CITRA,
+        SIDM_TRUE_REVATI,
+        SIDM_TRUE_PUSHYA,
+        SIDM_TRUE_MULA,
+        SIDM_TRUE_SHEORAN,
+        SIDM_GALCENT_0SAG,
+        SIDM_GALCENT_RGILBRAND,
+        SIDM_GALCENT_COCHRANE,
+        SIDM_GALCENT_MULA_WILHELM,
+    }
+)
+
+
+def _calc_ayanamsa(tjd_ut: float, sid_mode: int, noaberr: bool = False) -> float:
     """Calculate the selected predefined mean ayanamsha.
 
     Epoch modes share the defining epochs in :mod:`ayanamsha_definitions` and
@@ -6139,6 +6215,9 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     Args:
         tjd_ut: Julian Day in Universal Time (UT1).
         sid_mode: Sidereal mode constant, optionally combined with SIDBIT flags.
+        noaberr: When True (request carried FLG_TRUEPOS or FLG_NOABERR), remove
+            the anchor's annual aberration from the zero point for the modes in
+            ``_ABERRANT_ANCHOR_MODES``. Inert for every other mode.
 
     Returns:
         Mean ayanamsha in degrees, normalized to [0, 360).
@@ -6149,6 +6228,10 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     # fallback below.
     if sid_mode >= 0:
         sid_mode &= 0xFF
+    # The aberration-free anchor only applies to the live star / galactic-center
+    # modes whose reference realization removes it; every other mode is
+    # unaffected regardless of the request flags.
+    eff_noaberr = noaberr and sid_mode in _ABERRANT_ANCHOR_MODES
     tjd_tt = float(get_timescale().ut1_jd(tjd_ut).tt)
 
     if sid_mode == SIDM_USER:
@@ -6171,27 +6254,35 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     if sid_mode in DYNAMIC_AYANAMSHA_MODES:
         if sid_mode == SIDM_TRUE_CITRA:
             value = (
-                _get_star_position_ecliptic(STARS["SPICA"], tjd_tt, 0.0, nonut=True)
+                _get_star_position_ecliptic(
+                    STARS["SPICA"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                )
                 - 180.0
             )
         elif sid_mode == SIDM_TRUE_REVATI:
             # Usha & Shashi place Revati (zeta Piscium) at 29 deg 50 min
             # Pisces; the ayanamsha is therefore star longitude + 10 arcmin.
             value = (
-                _get_star_position_ecliptic(STARS["REVATI"], tjd_tt, 0.0, nonut=True)
+                _get_star_position_ecliptic(
+                    STARS["REVATI"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                )
                 + 10.0 / 60.0
             )
         elif sid_mode == SIDM_TRUE_PUSHYA:
             # P.V.R. Narasimha Rao's definition places delta Cancri at
             # 16 degrees Cancer (106 degrees absolute longitude).
             value = (
-                _get_star_position_ecliptic(STARS["PUSHYA"], tjd_tt, 0.0, nonut=True)
+                _get_star_position_ecliptic(
+                    STARS["PUSHYA"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                )
                 - 106.0
             )
         elif sid_mode == SIDM_TRUE_MULA:
             # Chandra Hari's Mula origin places lambda Scorpii at 0 Sagittarius.
             value = (
-                _get_star_position_ecliptic(STARS["MULA"], tjd_tt, 0.0, nonut=True)
+                _get_star_position_ecliptic(
+                    STARS["MULA"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                )
                 - 240.0
             )
         elif sid_mode == SIDM_TRUE_SHEORAN:
@@ -6202,18 +6293,25 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             # irrelevant"; his -60° at the 4174 BCE winter solstice and the
             # 1°/71.75 yr rule are derived checkpoints, not the anchor.
             value = (
-                _get_star_position_ecliptic(STARS["PUSHYA"], tjd_tt, 0.0, nonut=True)
+                _get_star_position_ecliptic(
+                    STARS["PUSHYA"], tjd_tt, 0.0, nonut=True, noaberr=eff_noaberr
+                )
                 - SHEORAN_TARGET_LON
             )
         elif sid_mode == SIDM_ALDEBARAN_15TAU:
             # Aldebaran held at 15 degrees Taurus (45 degrees absolute),
-            # evaluated from the live Hipparcos catalog position.
+            # evaluated from the live Hipparcos catalog position. Deliberately
+            # NOT aberration-free under FLG_TRUEPOS / FLG_NOABERR: measured
+            # reference behavior reports a zero shift for this fixed anchor, so
+            # this mode is absent from _ABERRANT_ANCHOR_MODES.
             value = (
                 _get_star_position_ecliptic(STARS["ALDEBARAN"], tjd_tt, 0.0, nonut=True)
                 - ALDEBARAN_TARGET_LON
             )
         elif sid_mode in GALCENT_TARGET_LON:
-            value = _galcent_ayanamsha(tjd_tt, GALCENT_TARGET_LON[sid_mode])
+            value = _galcent_ayanamsha(
+                tjd_tt, GALCENT_TARGET_LON[sid_mode], noaberr=eff_noaberr
+            )
         elif sid_mode in (
             SIDM_GALEQU_IAU1958,
             SIDM_GALEQU_TRUE,
@@ -6245,7 +6343,10 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         elif sid_mode == SIDM_GALCENT_MULA_WILHELM:
             # Wilhelm: Sgr A* hour-circle (dhruva) projection held at the
             # middle of Mula (246 degrees 40 minutes).
-            value = _mula_wilhelm_longitude(tjd_tt) - MULA_WILHELM_TARGET_LON
+            value = (
+                _mula_wilhelm_longitude(tjd_tt, noaberr=eff_noaberr)
+                - MULA_WILHELM_TARGET_LON
+            )
         elif sid_mode == SIDM_VALENS_MOON:
             from .time_utils import deltat
 
@@ -6293,7 +6394,9 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     return float(value % 360.0)
 
 
-def _get_true_ayanamsa(tjd_ut: float, sid_mode: int | None = None) -> float:
+def _get_true_ayanamsa(
+    tjd_ut: float, sid_mode: int | None = None, noaberr: bool = False
+) -> float:
     """
     Get TRUE ayanamsha (mean + nutation) for sidereal planet position calculations.
 
@@ -6306,6 +6409,9 @@ def _get_true_ayanamsa(tjd_ut: float, sid_mode: int | None = None) -> float:
         sid_mode: Sidereal mode override; reads the global state when None.
             An explicit value lets thread-safe callers (EphemerisContext,
             Horizons) avoid swapping the global sidereal mode.
+        noaberr: Forwarded to :func:`_calc_ayanamsa` (FLG_TRUEPOS / FLG_NOABERR
+            requests) so the anchor of the aberrant star/galactic modes is
+            evaluated without annual aberration.
 
     Returns:
         True ayanamsha in degrees: the mean ayanamsha normalized to
@@ -6319,7 +6425,7 @@ def _get_true_ayanamsa(tjd_ut: float, sid_mode: int | None = None) -> float:
     assert isinstance(sid_mode, int)
 
     # Get mean ayanamsha
-    mean_ayanamsa = _calc_ayanamsa(tjd_ut, sid_mode)
+    mean_ayanamsa = _calc_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
 
     # Add nutation in longitude (IAU 2006/2000A via pyerfa, ~0.01-0.05 mas)
     ts = get_timescale()
@@ -6350,12 +6456,17 @@ def _get_ayanamsa_for_flags(
     Returns:
         Ayanamsha in degrees
     """
+    # FLG_TRUEPOS / FLG_NOABERR both evaluate the anchor of the aberrant
+    # star/galactic ayanamsha modes without annual aberration, so the ayanamsha
+    # subtracted matches the (aberration-free) planet place the same request
+    # produces (measured reference behavior).
+    noaberr = bool(iflag & (FLG_TRUEPOS | FLG_NOABERR))
     if (iflag & FLG_NONUT) or (iflag & FLG_J2000):
         if sid_mode is None:
             sid_mode = get_sid_mode()
         assert isinstance(sid_mode, int)
-        return _calc_ayanamsa(tjd_ut, sid_mode)
-    return _get_true_ayanamsa(tjd_ut, sid_mode)
+        return _calc_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
+    return _get_true_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
 
 
 # SIDBIT projection flags with a distinct realization on the sidereal path:
@@ -6615,9 +6726,12 @@ def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int, flags: int = 0) -> flo
     ts = get_timescale()
     t_obj = ts.tt_jd(tjd_tt)
     tjd_ut = t_obj.ut1
+    # FLG_TRUEPOS / FLG_NOABERR evaluate the aberrant star/galactic anchors
+    # without annual aberration (measured reference behavior).
+    noaberr = bool(flags & (FLG_TRUEPOS | FLG_NOABERR))
     if flags & FLG_NONUT:
-        return _calc_ayanamsa(tjd_ut, sid_mode)
-    return _get_true_ayanamsa(tjd_ut)
+        return _calc_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
+    return _get_true_ayanamsa(tjd_ut, sid_mode, noaberr=noaberr)
 
 
 class _SkyfieldDeflectorSource:
@@ -9025,10 +9139,15 @@ def _calc_orbit_max_min_true_distance(
             iflag = (iflag & ~FLG_BARYCTR) | FLG_HELCTR
 
     # Current true distance at the requested ephemeris time (ET/TT input).
+    # "True" here is the GEOMETRIC distance (no light-time correction):
+    # measured reference behavior returns the FLG_TRUEPOS distance in this
+    # slot, and the function's own name promises the true distance. Without
+    # the flag the slot silently carried the apparent, light-time-corrected
+    # value (up to ~1.6e-4 AU short for Mercury).
     true_dist = 0.0
     if tjd_et > 0:
         try:
-            pos, _ = calc(tjd_et, ipl, iflag)
+            pos, _ = calc(tjd_et, ipl, iflag | FLG_TRUEPOS)
             true_dist = float(pos[2])
         except (IndexError, TypeError, ValueError):
             pass

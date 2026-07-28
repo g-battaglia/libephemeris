@@ -1142,6 +1142,7 @@ def _calc_ayanamsa_from_leb(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
+    noaberr: bool = False,
 ) -> float:
     """Compute ayanamsa for the LEB fast path.
 
@@ -1155,6 +1156,10 @@ def _calc_ayanamsa_from_leb(
         sid_mode: Sidereal mode ID (if None, reads from global state).
         sid_t0: Reference epoch JD for custom ayanamsha.
         sid_ayan_t0: Ayanamsha value at reference epoch (degrees).
+        noaberr: Forwarded to ``planets._calc_ayanamsa`` for the delegated
+            (dynamic) modes, so a FLG_TRUEPOS / FLG_NOABERR request evaluates the
+            aberrant star/galactic anchor without annual aberration — keeping the
+            sealed LEB path numerically identical to the Skyfield path.
 
     Returns:
         Ayanamsa in degrees.
@@ -1185,7 +1190,7 @@ def _calc_ayanamsa_from_leb(
         from .time_utils import deltat
 
         jd_ut = jd_tt - deltat(jd_tt)
-        return _calc_ayanamsa(jd_ut, mode)
+        return _calc_ayanamsa(jd_ut, mode, noaberr=noaberr)
 
     if mode == 255:
         # SIDM_USER: sidereal zero point fixed on the mean ecliptic of t0.
@@ -2798,6 +2803,7 @@ def _fast_calc_core(
                 sid_mode=sid_mode,
                 sid_t0=sid_t0,
                 sid_ayan_t0=sid_ayan_t0,
+                noaberr=bool(iflag & (FLG_TRUEPOS | FLG_NOABERR)),
             )
             # J2000 ecliptic has no nutation component → mean ayanamsha.
             # Ecliptic of date includes nutation → true ayanamsha (mean + Δψ).
@@ -2865,6 +2871,7 @@ def _fast_calc_core(
                             sid_mode=sid_mode,
                             sid_t0=sid_t0,
                             sid_ayan_t0=sid_ayan_t0,
+                            noaberr=bool(iflag & (FLG_TRUEPOS | FLG_NOABERR)),
                         )
                         if _eff_mean_aya:
                             return _m
