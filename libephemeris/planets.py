@@ -1918,6 +1918,16 @@ def calc_ut(
     if (flags & FLG_CENTER_BODY) and 0 <= planet <= MARS:
         flags &= ~FLG_CENTER_BODY
 
+    # FLG_JPLHOR / FLG_JPLHOR_APPROX consumed: this library performs no
+    # JPL-Horizons dpsi/deps Earth-orientation reduction (the flags are
+    # accepted for API compatibility only, see docs/reference/flags.md), so
+    # echoing them would advertise a correction that was never applied. The
+    # measured reference retflag does not carry them back either.
+    from .constants import FLG_JPLHOR, FLG_JPLHOR_APPROX
+
+    if flags & (FLG_JPLHOR | FLG_JPLHOR_APPROX):
+        flags &= ~(FLG_JPLHOR | FLG_JPLHOR_APPROX)
+
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
 
@@ -2220,6 +2230,13 @@ def calc(
     # argument; other bodies echo it unchanged).
     if (flags & FLG_CENTER_BODY) and 0 <= planet <= MARS:
         flags &= ~FLG_CENTER_BODY
+
+    # FLG_JPLHOR / FLG_JPLHOR_APPROX consumed (see calc_ut: no dpsi/deps
+    # reduction is performed, so the bits are never echoed back).
+    from .constants import FLG_JPLHOR, FLG_JPLHOR_APPROX
+
+    if flags & (FLG_JPLHOR | FLG_JPLHOR_APPROX):
+        flags &= ~(FLG_JPLHOR | FLG_JPLHOR_APPROX)
 
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
@@ -6058,9 +6075,18 @@ def _ecl_t0_epoch_jd(sid_mode: int) -> float:
     )
 
 
-# Classical defining epochs for the ECL_T0 projection plane, where they
-# differ from the epoch of the mode's VALUE anchor in AYANAMSHA_DEFINING.
-# Lahiri's value realization deliberately follows the Indian Astronomical
+# Classical defining epochs (TT JD) for the ECL_T0 projection plane, used
+# where a mode's classical defining epoch — the mean ecliptic and equinox its
+# authors referred the sidereal zero to — differs from the epoch of the mode's
+# VALUE anchor in AYANAMSHA_DEFINING. The SIDBIT_ECL_T0 projection plane must
+# follow the classical defining epoch, not the value anchor; resolving it from
+# the value anchor mis-orients the mean equator/ecliptic (up to ~29° in RA and
+# tens of arcsec in ecliptic latitude for these modes). Each entry cites the
+# published defining statement of the mode and resolves to a round conventional
+# epoch of that mode's tradition (the beginning of the Christian era = year
+# 0.0, the standard modern epoch 1900.0, or the Indian Calendar Reform anchor).
+#
+# LAHIRI: the value realization deliberately follows the Indian Astronomical
 # Ephemeris tabulation anchored at J2000 (see ayanamsha_definitions.py), but
 # the mode's classical defining epoch — and therefore the ecliptic the
 # ECL_T0 projection refers to — is the Calendar Reform Committee anchor:
@@ -6069,6 +6095,35 @@ def _ecl_t0_epoch_jd(sid_mode: int) -> float:
 # Astronomical Ephemeris introduction). JD 2435553.5 = 1956 March 21.0.
 _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
     SIDM_LAHIRI: 2435553.5,
+    # DELUCE: Robert De Luce, "Constellational Astrology According to the
+    # Hindu System" (De Luce Publishing Co., Los Angeles, 1963) fixes the
+    # coincidence of the constellational and sign zodiacs (ayanamsha zero) at
+    # the beginning of the Christian era; the defining plane is therefore the
+    # mean ecliptic of year 0.0. JD 1721057.5 = 0000 Jan 1.0 (Julian).
+    SIDM_DELUCE: 1721057.5,
+    # DJWHAL_KHUL: the Bailey/Djwhal Khul Aquarian-age doctrine (channelled
+    # 1940) sets the start of the Age of Aquarius at 2117 (ayanamsha 30°); its
+    # astronomical realization (Phillip Lindsay, "The Beginning of the Age of
+    # Aquarius", 2006) specifies the value via the Synetic Vernal Point at the
+    # standard epoch 1900.0, which is the defining plane epoch.
+    # JD 2415020.0 = 1900 Jan 0.5 (1900.0).
+    SIDM_DJWHAL_KHUL: 2415020.0,
+    # BABYL_BRITTON: J.P. Britton, "Studies in Babylonian lunar theory: Part
+    # III. The introduction of the uniform zodiac" (Archive for History of
+    # Exact Sciences 64, 2010) expresses the Babylonian-tropical displacement
+    # as Δλ* = C − 1.3828°·Y with C = 3.20° and Y in centuries from the
+    # beginning of the common era; the constant term is defined at Y = 0, so
+    # year 0.0 is the classical defining plane epoch (the value zero-crossing
+    # implied by the formula, ~231 CE, is the separate value anchor).
+    # JD 1721057.5 = 0000 Jan 1.0 (Julian).
+    SIDM_BABYL_BRITTON: 1721057.5,
+    # LAHIRI_1940: N.C. Lahiri, "Indian Ephemeris of Planets' Positions"
+    # (1st ed. 1939/1940) — the early Lahiri tradition, before the 1948/1955
+    # Calendar Reform Committee standardization on the 285 CE zero. Like the
+    # contemporaneous Raman and Krishnamurti Indian ayanamshas it is tabulated
+    # at the standard epoch 1900.0, which is the defining plane epoch.
+    # JD 2415020.0 = 1900 Jan 0.5 (1900.0).
+    SIDM_LAHIRI_1940: 2415020.0,
 }
 
 
@@ -7116,6 +7171,16 @@ def _validate_orbital_object(caller: str, ipl: int, *, sun_valid: bool) -> None:
         )
     if 23 <= ipl <= 39:
         raise Error(f"{caller}: illegal planet number {ipl}.")
+    if WALDEMATH < ipl < AST_OFFSET:
+        # No element source exists between the last fictitious body (58) and
+        # the numbered-asteroid offset: the measured reference raises for the
+        # whole block (its fictitious-element lookup fails), and the position
+        # pipeline rejects these ids too. Without this guard the element
+        # calculator leaked a zero-initialized 50-tuple that read as a real
+        # orbit at 0 AU.
+        raise Error(
+            f"{caller}: error in get_orbital_elements(): object {ipl} not valid"
+        )
 
 
 def _nodaps_to_j2000(lon_deg: float, lat_deg: float, jd_tt: float) -> tuple:
@@ -7990,8 +8055,10 @@ def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, 
 
     Divergences (documented, intentional): the Sun, the lunar nodes/apogees
     (10-13) and the interpolated apsides (21, 22) raise ``object N not valid``;
-    ids 23-39 raise ``illegal planet number``; negatives raise
-    ``object N not valid``. The fictitious/hypothetical bodies (40-58) are
+    ids 23-39 raise ``illegal planet number``; negatives and the sourceless
+    block between the last fictitious body (58) and the numbered-asteroid
+    offset raise ``object N not valid`` (the reference rejects the same ids
+    through its element-file lookup). The fictitious/hypothetical bodies (40-58) are
     reduced from the library's *own* runtime models rather than a foreign
     element set, so where the two models disagree by arbitration the elements
     differ (e.g. Isis/Transpluto a=77.755 here vs 77.775; the White Moon (56)
@@ -8323,7 +8390,10 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # heliocentric state served by the position pipeline. Same membership
     # test as _calc_nod_aps so the two paths stay in lockstep, and never a
     # silent zero-element tuple, which would read as a real orbit at 0 AU.
-    if ipl in _MINOR_BODY_NODAPS or (AST_OFFSET < ipl < FIXSTAR_OFFSET):
+    if ipl in _MINOR_BODY_NODAPS or (AST_OFFSET <= ipl < FIXSTAR_OFFSET):
+        # AST_OFFSET itself ("asteroid 0") is included so the position
+        # pipeline's typed UnknownBodyError propagates (the reference raises
+        # for it too) instead of falling through to the zero-tuple below.
         return _calc_orbital_elements_minor(t, ipl, iflag)
 
     # Fictitious/hypothetical bodies (40-58): osculating elements from the
@@ -8333,9 +8403,14 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     if CUPIDO <= ipl <= WALDEMATH:
         return _calc_orbital_elements_fictitious(t, ipl)
 
-    # Get target and center bodies
+    # Get target and center bodies. Every public caller has already passed
+    # _validate_orbital_object, so an id missing from the planet map here is
+    # an internal-routing bug: raise the same typed error instead of leaking
+    # a zero-initialized tuple that would read as a real orbit at 0 AU.
     if ipl not in _PLANET_MAP:
-        return zero_elements
+        from .exceptions import Error
+
+        raise Error(f"error in get_orbital_elements(): object {ipl} not valid")
 
     target_name = _PLANET_MAP[ipl]
     # Represent Earth's heliocentric orbit by the Earth-Moon system barycentre,

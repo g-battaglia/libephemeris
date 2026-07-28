@@ -266,3 +266,27 @@ class TestCenterBodyRetflagEcho:
             assert le.calc_ut(JD, 0, 2 | self.CB)[1] == 2, mode
             assert le.calc_ut(JD, 15, 2 | self.CB)[1] == 2 | self.CB, mode
         le.set_calc_mode("auto")
+
+
+class TestJplhorRetflagConsumed:
+    """FLG_JPLHOR / FLG_JPLHOR_APPROX are consumed, never echoed.
+
+    This library performs no JPL-Horizons dpsi/deps Earth-orientation
+    reduction (the flags are accepted for API compatibility only), so the
+    measured retflag convention is mirrored: the bits are stripped and the
+    position equals the plain request on both time arguments and backends.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [0, 2, 4])
+    def test_bits_stripped_and_position_plain(self, body: int) -> None:
+        from libephemeris.constants import FLG_JPLHOR, FLG_JPLHOR_APPROX
+
+        for bit in (FLG_JPLHOR, FLG_JPLHOR_APPROX):
+            pos, rf = le.calc_ut(JD, body, 2 | bit)
+            plain, rf_plain = le.calc_ut(JD, body, 2)
+            assert rf == rf_plain == 2
+            assert pos[0] == pytest.approx(plain[0], abs=1e-12)
+            pos_tt, rf_tt = le.calc(JD, body, 2 | bit)
+            assert rf_tt == 2
+            assert pos_tt[0] == pytest.approx(le.calc(JD, body, 2)[0][0], abs=1e-12)

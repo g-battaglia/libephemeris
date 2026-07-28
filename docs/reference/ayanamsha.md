@@ -176,6 +176,32 @@ freedom toward any other implementation's output:
   freedom described above. None of these constants is published; the
   library keeps the literal anchors.
 
+### `SIDBIT_ECL_T0` projection plane
+
+Under `SIDBIT_ECL_T0` a mode's coordinates are projected onto the mean ecliptic
+and equinox of the mode's **classical defining epoch** — the epoch its authors
+referred the sidereal zero to. For several modes this differs from the epoch of
+the value anchor tabulated above, and the projection plane follows the
+classical defining epoch, not the value anchor:
+
+- **De Luce (2)** and **Britton (38)** — year 0.0 (the beginning of the common
+  era). De Luce (1963, p. 5) fixes the constellational/sign coincidence at
+  1 A.D.; Britton's displacement Δλ\* = C − 1.3828°·Y is anchored by its
+  constant term C = 3.20° at Y = 0. (JD 1721057.5.)
+- **Djwhal Khul (6)** and **Lahiri 1940 (43)** — 1900.0, the standard epoch at
+  which each tradition specifies its value (the Synetic Vernal Point at 1900
+  for Djwhal Khul; the early Indian-ephemeris tabulation for Lahiri 1940).
+  (JD 2415020.0.)
+- **Lahiri (1)** — the Calendar Reform Committee anchor, the vernal equinox of
+  1956 (JD 2435553.5), even though the value realization follows the J2000 IAE
+  tabulation.
+
+**Aldebaran = 15 Tau (14)** is defined by a *live* star direction, so its
+`SIDBIT_ECL_T0` zero point would have to be evaluated at the Babylonian norm
+epoch −100, outside the base/medium (DE440) coverage; a range-safe evaluation
+of a dynamic zero point at the plane epoch is required before this mode can
+adopt its classical −100 plane, so it is not yet overridden.
+
 ## User-defined mode
 
 ```python

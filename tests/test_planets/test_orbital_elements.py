@@ -109,6 +109,34 @@ class TestOrbitalElementsBasic:
         assert str(exc.value) == f"get_orbital_elements: illegal planet number {ipl}."
 
     @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [59, 69, 99, 200, 9001, 9999])
+    def test_sourceless_block_raises_not_valid(self, ipl):
+        """Ids between the last fictitious body (58) and AST_OFFSET have no
+        element source: the measured reference raises for the whole block,
+        and the library's own position pipeline rejects them too. A missing
+        guard used to leak a zero-initialized 50-tuple here (a "real orbit"
+        at 0 AU)."""
+        from libephemeris.exceptions import Error
+
+        jd = 2451545.0
+        with pytest.raises(Error) as exc:
+            ephem.get_orbital_elements(jd, ipl, 0)
+        assert f"object {ipl} not valid" in str(exc.value)
+
+    @pytest.mark.unit
+    def test_asteroid_zero_raises_typed_error(self):
+        """AST_OFFSET itself ("asteroid 0") propagates the position
+        pipeline's typed error (a subclass of Error) instead of returning
+        zeros; real numbered asteroids keep their elements."""
+        from libephemeris.exceptions import Error
+
+        jd = 2451545.0
+        with pytest.raises(Error):
+            ephem.get_orbital_elements(jd, 10000, 0)
+        elems = ephem.get_orbital_elements(jd, 10001, 0)
+        assert elems[0] > 1.0  # Ceres semi-major axis ~2.77 AU
+
+    @pytest.mark.unit
     @pytest.mark.parametrize(
         "ipl,a_expected,e_expected",
         [

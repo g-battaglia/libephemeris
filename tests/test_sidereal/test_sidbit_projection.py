@@ -464,3 +464,92 @@ class TestSidbitFixstar:
         proj = ephem.fixstar_ut("Aldebaran", JD, FLG_SIDEREAL)[0]
         assert proj[0] == pytest.approx(plain[0], abs=1e-9)
         assert proj[1] == pytest.approx(plain[1], abs=1e-9)
+
+
+class TestClassicalEclT0Epochs:
+    """Pin the classical SIDBIT_ECL_T0 projection-plane epochs (finding AI-F1).
+
+    The SIDBIT_ECL_T0 projection must refer each mode to the mean ecliptic and
+    equinox of its CLASSICAL DEFINING epoch, which for these modes differs from
+    the epoch of the value anchor stored in ``AYANAMSHA_DEFINING``. Resolving
+    the plane from the value anchor mis-orients the mean equator/ecliptic by up
+    to ~29° in RA and tens of arcsec in ecliptic latitude. Each epoch pinned
+    below is the round conventional epoch named by the mode's published
+    defining statement:
+
+      * DELUCE -> year 0.0 (beginning of the Christian era). Robert De Luce,
+        "Constellational Astrology According to the Hindu System" (De Luce
+        Publishing Co., Los Angeles, 1963): the constellational and sign
+        zodiacs coincide (ayanamsha zero) at the start of the Christian era.
+        JD 1721057.5 = 0000 Jan 1.0 (Julian).
+      * DJWHAL_KHUL -> 1900.0. The Bailey/Djwhal Khul Aquarian-age doctrine
+        (channelled 1940; astronomical realization in Phillip Lindsay, "The
+        Beginning of the Age of Aquarius", 2006) sets the Age of Aquarius at
+        2117 = 30° and specifies the value via the Synetic Vernal Point at the
+        standard epoch 1900.0. JD 2415020.0 = 1900 Jan 0.5.
+      * LAHIRI_1940 -> 1900.0. N.C. Lahiri, "Indian Ephemeris of Planets'
+        Positions" (1st ed. 1939/1940) — the early Lahiri tradition, tabulated
+        at the standard epoch 1900.0 (as are the Raman and Krishnamurti Indian
+        ayanamshas). JD 2415020.0 = 1900 Jan 0.5.
+      * BABYL_BRITTON -> year 0.0 (beginning of the common era). J.P. Britton,
+        "Studies in Babylonian lunar theory: Part III. The introduction of the
+        uniform zodiac" (Archive for History of Exact Sciences 64, 2010)
+        writes the displacement as Δλ* = C − 1.3828°·Y with C = 3.20° and Y in
+        centuries from the common era, so the constant term is anchored at
+        Y = 0 (year 0.0). JD 1721057.5 = 0000 Jan 1.0 (Julian).
+
+    One of the five modes in the finding is intentionally NOT overridden here;
+    ``test_aldebaran_15tau_pending_projection_range_support`` documents why and
+    pins the current (un-overridden) fallback so the exclusion is explicit and
+    cannot be silently reverted.
+    """
+
+    @pytest.mark.unit
+    def test_deluce_plane_is_christian_era(self):
+        from libephemeris.constants import SIDM_DELUCE
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        assert _ecl_t0_epoch_jd(SIDM_DELUCE) == pytest.approx(1721057.5)
+
+    @pytest.mark.unit
+    def test_djwhal_khul_plane_is_1900(self):
+        from libephemeris.constants import SIDM_DJWHAL_KHUL
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        assert _ecl_t0_epoch_jd(SIDM_DJWHAL_KHUL) == pytest.approx(2415020.0)
+
+    @pytest.mark.unit
+    def test_lahiri_1940_plane_is_1900(self):
+        from libephemeris.constants import SIDM_LAHIRI_1940
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        assert _ecl_t0_epoch_jd(SIDM_LAHIRI_1940) == pytest.approx(2415020.0)
+
+    @pytest.mark.unit
+    def test_britton_plane_is_common_era(self):
+        from libephemeris.constants import SIDM_BABYL_BRITTON
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        assert _ecl_t0_epoch_jd(SIDM_BABYL_BRITTON) == pytest.approx(1721057.5)
+
+    @pytest.mark.unit
+    def test_aldebaran_15tau_pending_projection_range_support(self):
+        """ALDEBARAN_15TAU (14) is NOT overridden pending a projection change.
+
+        Its classical defining plane is the Babylonian norm epoch -100 (year
+        -100.0, JD 1684532.5; C. Fagan, "Zodiacs Old and New", Llewellyn,
+        1950, and the Babylonian exaltation-degree tradition, cf. Huber,
+        Centaurus 5, 1958). This is a live/dynamic star mode, so the ECL_T0
+        ecliptic zero point is evaluated at the plane epoch itself; year -100
+        lies outside the base/medium (DE440) coverage, so setting the epoch
+        would make ecliptic SIDBIT_ECL_T0 output raise EphemerisRangeError in
+        the default tier (breaking the base-tier projection tests). A range-safe
+        dynamic zero point in the projection path is out of this finding's
+        scope, so the epoch stays at the J2000 fallback pending owner
+        arbitration.
+        """
+        from libephemeris.constants import SIDM_ALDEBARAN_15TAU
+        from libephemeris.planets import _ECL_T0_CLASSICAL_EPOCHS, _ecl_t0_epoch_jd
+
+        assert SIDM_ALDEBARAN_15TAU not in _ECL_T0_CLASSICAL_EPOCHS
+        assert _ecl_t0_epoch_jd(SIDM_ALDEBARAN_15TAU) == pytest.approx(2451545.0)
