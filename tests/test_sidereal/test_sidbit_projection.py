@@ -571,3 +571,33 @@ class TestFixedEpochJ2000Echo:
         rf_p = ephem.calc_ut(JD, SUN, base)[1]
         assert rf_j & FLG_J2000
         assert rf_j == rf_p | FLG_J2000
+
+
+class TestBabylonianFamilyEclT0Epochs:
+    """The Kugler triplet shares one classical projection plane (the
+    Babylonian norm epoch, year -100; Huber, Centaurus 5, 1958) and
+    Hipparchos uses Hipparchus's own era (~-128, Mercier's Hipparchan
+    norm): the three Kugler ECL_T0 increments must be identical and the
+    epochs pinned."""
+
+    @pytest.mark.unit
+    def test_epochs_pinned(self):
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        for mode in (9, 10, 11):
+            assert _ecl_t0_epoch_jd(mode) == pytest.approx(1684532.5)
+        assert _ecl_t0_epoch_jd(15) == pytest.approx(1674484.0)
+
+    @pytest.mark.unit
+    def test_kugler_triplet_shares_one_plane(self):
+        jd = 2450614.5
+        incrs = []
+        for mode in (9, 10, 11):
+            ephem.set_sid_mode(mode, 0.0, 0.0)
+            plain = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)[0][1]
+            ephem.set_sid_mode(mode | SIDBIT_ECL_T0, 0.0, 0.0)
+            proj = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)[0][1]
+            incrs.append((proj - plain) * 3600.0)
+        assert incrs[0] == pytest.approx(incrs[1], abs=0.01)
+        assert incrs[1] == pytest.approx(incrs[2], abs=0.01)
+        assert abs(incrs[0]) > 500.0  # a genuinely ancient plane

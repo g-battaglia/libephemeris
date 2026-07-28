@@ -6241,6 +6241,23 @@ def _ecl_t0_epoch_jd(sid_mode: int) -> float:
 # Astronomical Ephemeris introduction). JD 2435553.5 = 1956 March 21.0.
 _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
     SIDM_LAHIRI: 2435553.5,
+    # BABYL_KUGLER1/2/3: the three Kugler solutions (Sternkunde und
+    # Sterndienst in Babel II) are alternative VALUE readings of one and the
+    # same Babylonian sidereal zodiac; the classical norm epoch of that
+    # zodiac is ~-100 (P. Huber, "Ueber den Nullpunkt der babylonischen
+    # Ekliptik", Centaurus 5, 1958; cf. Fagan, Zodiacs Old and New, 1950),
+    # so the whole family shares the mean ecliptic of year -100 as its
+    # projection plane. JD 1684532.5 = -100 Jan 1.0 (Julian). Measured
+    # reference behavior confirms one shared plane for the triplet.
+    SIDM_BABYL_KUGLER1: 1684532.5,
+    SIDM_BABYL_KUGLER2: 1684532.5,
+    SIDM_BABYL_KUGLER3: 1684532.5,
+    # HIPPARCHOS: the Hipparchan sidereal norm (R. Mercier, "Studies in the
+    # Medieval Conception of Precession") is anchored to Hipparchus's own
+    # observational era, ~-128 (the epoch of his catalog and equinox
+    # observations quoted by Ptolemy, Almagest III); the projection plane is
+    # the mean ecliptic of that era. JD 1674484.0 (~-128.5 Julian).
+    SIDM_HIPPARCHOS: 1674484.0,
     # DELUCE: Robert De Luce, "Constellational Astrology According to the
     # Hindu System" (De Luce Publishing Co., Los Angeles, 1963) fixes the
     # coincidence of the constellational and sign zodiacs (ayanamsha zero) at
