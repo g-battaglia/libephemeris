@@ -1769,15 +1769,39 @@ def _sidbit_projection_calc(
       * SIDBIT_ECL_T0 -> the mean ecliptic and equinox of the mode's reference
         epoch t0; the zero point is the mode's ayanamsha at t0.
 
-    Only ecliptic output (spherical or FLG_XYZ) is routed here; equatorial
-    requests keep the base behavior (SSY_PLANE leaves the equator unchanged).
+    Ecliptic output (spherical or FLG_XYZ) is projected onto the plane.
+    Equatorial output under SIDBIT_ECL_T0 is the J2000|NONUT mean-frame
+    position itself — measured reference behavior: RA/Dec and their speeds
+    are bit-identical to the FLG_J2000|FLG_NONUT request (no ayanamsha
+    subtraction, no further precession to t0), with the plain sidereal
+    retflag echo. Equatorial output under SIDBIT_SSY_PLANE alone keeps the
+    base behavior (the invariable-plane projection leaves the equator
+    unchanged); the callers' guard routes only ECL_T0 equatorial here.
     """
     from .sidereal_epoch import (
         fixed_epoch_request_flags,
+        fixed_epoch_retflag,
         sidbit_ecliptic_matrix,
         ssy_plane_zero_point_deg,
         transform_sidbit_result,
     )
+
+    if flags & FLG_EQUATORIAL:
+        # SIDBIT_ECL_T0 equatorial: the star of the request is reduced to the
+        # MEAN EQUATOR AND EQUINOX of the mode's t0 — measured reference
+        # behavior on both calc and fixstar paths: no ayanamsha subtraction,
+        # position and velocity in the t0 mean frame, plain sidereal retflag
+        # echo. Re-dispatch as the J2000|NONUT request and precess to t0.
+        from .sidereal_epoch import transform_equatorial_epoch_result
+
+        sub_xx, sub_rf = calc_fn(tjd, planet, fixed_epoch_request_flags(flags))
+        xx_eq = transform_equatorial_epoch_result(
+            sub_xx, flags, _ecl_t0_epoch_jd(sid_mode)
+        )
+        return (
+            _to_native_floats(xx_eq),
+            _echo_request_bits(fixed_epoch_retflag(sub_rf, flags), raw_flags),
+        )
 
     # Measured reference behavior: with BOTH projection bits set,
     # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE.
@@ -1938,15 +1962,18 @@ def calc_ut(
                 )
             return result
 
-        # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections (ecliptic output).
-        # The star/galactic "true" modes define their zero on the ecliptic of
-        # date, so the reference leaves the projection inert for them (see
-        # _SIDBIT_PROJECTION_SUPPRESS_MODES): fall through to the base sidereal
-        # path, which reproduces the un-projected baseline longitude.
+        # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections. Ecliptic output
+        # is projected onto the plane; equatorial output is routed only for
+        # SIDBIT_ECL_T0 (measured: the J2000|NONUT mean frame), while
+        # SSY_PLANE alone leaves the equator unchanged. The star/galactic
+        # "true" modes define their zero on the ecliptic of date, so the
+        # reference leaves the projection inert for them (see
+        # _SIDBIT_PROJECTION_SUPPRESS_MODES): fall through to the base
+        # sidereal path, which reproduces the un-projected baseline.
         _bits = _get_sidereal_bits()
         if (
             (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE))
-            and not (flags & FLG_EQUATORIAL)
+            and (not (flags & FLG_EQUATORIAL) or (_bits & SIDBIT_ECL_T0))
             and _sidm not in _SIDBIT_PROJECTION_SUPPRESS_MODES
         ):
             return _sidbit_projection_calc(
@@ -2237,15 +2264,18 @@ def calc(
                 )
             return result
 
-        # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections (ecliptic output).
-        # The star/galactic "true" modes define their zero on the ecliptic of
-        # date, so the reference leaves the projection inert for them (see
-        # _SIDBIT_PROJECTION_SUPPRESS_MODES): fall through to the base sidereal
-        # path, which reproduces the un-projected baseline longitude.
+        # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections. Ecliptic output
+        # is projected onto the plane; equatorial output is routed only for
+        # SIDBIT_ECL_T0 (measured: the J2000|NONUT mean frame), while
+        # SSY_PLANE alone leaves the equator unchanged. The star/galactic
+        # "true" modes define their zero on the ecliptic of date, so the
+        # reference leaves the projection inert for them (see
+        # _SIDBIT_PROJECTION_SUPPRESS_MODES): fall through to the base
+        # sidereal path, which reproduces the un-projected baseline.
         _bits = _get_sidereal_bits()
         if (
             (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE))
-            and not (flags & FLG_EQUATORIAL)
+            and (not (flags & FLG_EQUATORIAL) or (_bits & SIDBIT_ECL_T0))
             and _sidm not in _SIDBIT_PROJECTION_SUPPRESS_MODES
         ):
             return _sidbit_projection_calc(
@@ -6023,7 +6053,23 @@ def _ecl_t0_epoch_jd(sid_mode: int) -> float:
         from .time_utils import deltat
 
         return VALENS_MOON_T0_UT + deltat(VALENS_MOON_T0_UT)
-    return AYANAMSHA_DEFINING.get(sid_mode, (0.0, _J2000_JD))[1]
+    return _ECL_T0_CLASSICAL_EPOCHS.get(
+        sid_mode, AYANAMSHA_DEFINING.get(sid_mode, (0.0, _J2000_JD))[1]
+    )
+
+
+# Classical defining epochs for the ECL_T0 projection plane, where they
+# differ from the epoch of the mode's VALUE anchor in AYANAMSHA_DEFINING.
+# Lahiri's value realization deliberately follows the Indian Astronomical
+# Ephemeris tabulation anchored at J2000 (see ayanamsha_definitions.py), but
+# the mode's classical defining epoch — and therefore the ecliptic the
+# ECL_T0 projection refers to — is the Calendar Reform Committee anchor:
+# mean ayanamsha 23°15' at the vernal equinox of 1956 (Report of the
+# Calendar Reform Committee, CSIR, New Delhi, 1955; restated in the Indian
+# Astronomical Ephemeris introduction). JD 2435553.5 = 1956 March 21.0.
+_ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
+    SIDM_LAHIRI: 2435553.5,
+}
 
 
 def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:

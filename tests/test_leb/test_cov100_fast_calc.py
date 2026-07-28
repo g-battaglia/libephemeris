@@ -974,3 +974,27 @@ class TestEquatorialSpeedSelfConsistency:
                 assert abs(rep[4] - num_ddec) * 3600.0 < 0.06
         finally:
             le.set_calc_mode(prev)
+
+    def test_oscu_apog_equatorial_j2000_speed_matches_own_derivative(self):
+        """The combined EQUATORIAL|J2000 branch shares the centered stencil:
+        the one-sided step it retained after the of-date fix left a
+        ~0.29\"/day J2000 declination-rate backend split at fast-swinging
+        epochs (measured at 1944/2062)."""
+        import libephemeris as le
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                # Fast-swinging epoch where the one-sided bias reached
+                # 0.23"/day of dDec.
+                jd = 2431097.564506
+                f = le.FLG_SWIEPH | le.FLG_EQUATORIAL | le.FLG_J2000 | le.FLG_SPEED
+                rep = le.calc_ut(jd, 13, f)[0]
+                h = 300.0 / 86400.0
+                p_m = le.calc_ut(jd - h, 13, f)[0]
+                p_p = le.calc_ut(jd + h, 13, f)[0]
+                num_ddec = (p_p[1] - p_m[1]) / (2 * h)
+                assert abs(rep[4] - num_ddec) * 3600.0 < 0.06, mode
+        finally:
+            le.set_calc_mode(prev)

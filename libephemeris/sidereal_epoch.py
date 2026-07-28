@@ -304,6 +304,50 @@ def transform_sidbit_result(
     return out
 
 
+def equatorial_epoch_matrix(t0_jd: float) -> np.ndarray:
+    """J2000 mean equatorial -> mean equatorial and equinox of ``t0_jd``.
+
+    Same construction as the fixed-epoch chain in :func:`_epoch_matrices`
+    (Vondrak et al. 2011 long-term precession; the ICRS frame bias cancels
+    in the product), for an arbitrary epoch instead of a mode-table one.
+    """
+    if t0_jd == _J2000:
+        return np.eye(3)
+    v_t0 = np.array(vondrak_precession_matrix(t0_jd))
+    v_j2k = np.array(vondrak_precession_matrix(_J2000))
+    return v_t0 @ v_j2k.T
+
+
+def transform_equatorial_epoch_result(
+    xx: Tuple[float, ...], iflag: int, t0_jd: float
+) -> Tuple[float, ...]:
+    """Map a FLG_J2000|FLG_NONUT *equatorial* result onto the mean equator
+    and equinox of ``t0_jd``.
+
+    ``xx`` is the raw 6-tuple from the rewritten request (degrees / AU;
+    FLG_RADIANS was stripped from the rewrite). Handles the spherical and
+    FLG_XYZ representations and re-applies FLG_RADIANS at the end. The
+    rotation is time-independent, so position and velocity rotate with the
+    same matrix.
+    """
+    m_eq = equatorial_epoch_matrix(t0_jd)
+    if iflag & FLG_XYZ:
+        pos = m_eq @ np.array(xx[:3])
+        vel = m_eq @ np.array(xx[3:6])
+        return tuple(float(c) for c in pos) + tuple(float(c) for c in vel)
+    out = _rotate_spherical(tuple(xx), m_eq)  # type: ignore[arg-type]
+    if iflag & FLG_RADIANS:
+        out = (
+            math.radians(out[0]),
+            math.radians(out[1]),
+            out[2],
+            math.radians(out[3]),
+            math.radians(out[4]),
+            out[5],
+        )
+    return out
+
+
 def transform_fixed_epoch_result(
     xx: Tuple[float, ...], iflag: int, sid_mode: int
 ) -> Tuple[float, ...]:

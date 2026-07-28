@@ -2005,19 +2005,28 @@ def _pipeline_ecliptic(
             lo_j, la_j = _precess_ecliptic(lo, la, src_epoch, J2000)
             return _cotrans(lo_j, la_j, -eps)
 
-        # Velocity via finite difference on original ecliptic coords
-        dt_step = 0.001  # days
+        # Velocity: CENTERED difference of the mapped ecliptic path, for the
+        # same reason as the sibling equatorial-of-date and J2000-ecliptic
+        # branches below: a one-sided forward step leaves a first-order
+        # truncation term proportional to the curvature of the
+        # ecliptic->equatorial mapping along the path, which reached
+        # ~0.29"/day of J2000 declination-rate backend split on the
+        # fast-swinging osculating apogee; the centered stencil cancels it.
+        dt_step = 0.001  # days (half-step of the centered stencil)
         eq_now_lon, eq_now_lat = _ecl_date_to_eq_j2000(lon, lat, jd_tt)
         eq_fwd_lon, eq_fwd_lat = _ecl_date_to_eq_j2000(
             lon + dlon * dt_step, lat + dlat * dt_step, jd_tt + dt_step
         )
-        d_eq_lon = eq_fwd_lon - eq_now_lon
+        eq_bwd_lon, eq_bwd_lat = _ecl_date_to_eq_j2000(
+            lon - dlon * dt_step, lat - dlat * dt_step, jd_tt - dt_step
+        )
+        d_eq_lon = eq_fwd_lon - eq_bwd_lon
         if d_eq_lon > 180.0:
             d_eq_lon -= 360.0
         elif d_eq_lon < -180.0:
             d_eq_lon += 360.0
-        dlon = d_eq_lon / dt_step
-        dlat = (eq_fwd_lat - eq_now_lat) / dt_step
+        dlon = d_eq_lon / (2.0 * dt_step)
+        dlat = (eq_fwd_lat - eq_bwd_lat) / (2.0 * dt_step)
         lon = eq_now_lon
         lat = eq_now_lat
 

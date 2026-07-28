@@ -131,8 +131,9 @@ class TestEclT0Applied:
 
     @pytest.mark.unit
     def test_equatorial_reflects_mean_equator_of_t0(self):
-        """Under SIDBIT_ECL_T0 the equatorial channel is not projected (the
-        base sidereal equator is returned); it is finite and in range."""
+        """Under SIDBIT_ECL_T0 the equatorial channel is the mean frame of
+        the mode's t0 (see TestEclT0EquatorialFrame); it is finite and in
+        range."""
         ephem.set_sid_mode(SIDM_LAHIRI | SIDBIT_ECL_T0)
         ecl, _ = ephem.calc_ut(JD, MARS, FLG_SIDEREAL | FLG_EQUATORIAL)
         assert 0.0 <= ecl[0] < 360.0
@@ -346,3 +347,120 @@ class TestUserEclT0Epoch:
         shift_j2000 = self._lat_shift(JD)
         assert abs(shift_1900) > 20.0
         assert abs(shift_1900) > 2.0 * abs(shift_j2000)
+
+
+class TestEclT0EquatorialFrame:
+    """Equatorial output under SIDBIT_ECL_T0 is the t0 mean-frame position.
+
+    Measured reference behavior (calc and fixstar paths alike): RA/Dec and
+    their speeds are the FLG_J2000|FLG_NONUT request reduced to the mean
+    equator and equinox of the mode's t0, with no ayanamsha subtraction and
+    the plain sidereal retflag echo. SIDBIT_SSY_PLANE alone leaves the calc
+    equatorial channel unchanged.
+    """
+
+    @pytest.mark.unit
+    def test_user_t0_j2000_matches_j2000_request(self):
+        from libephemeris.constants import FLG_J2000
+
+        # t0 = J2000: the t0 reduction is the identity, so the output must
+        # be bit-identical to the plain FLG_J2000|FLG_NONUT request.
+        ephem.set_sid_mode(SIDM_USER | SIDBIT_ECL_T0, JD, 24.0)
+        proj, rf = ephem.calc_ut(JD + 6700.0, MARS, FLG_SIDEREAL | FLG_EQUATORIAL)
+        base, _ = ephem.calc_ut(
+            JD + 6700.0, MARS, FLG_J2000 | FLG_NONUT | FLG_EQUATORIAL
+        )
+        assert proj[0] == pytest.approx(base[0], abs=1e-9)
+        assert proj[1] == pytest.approx(base[1], abs=1e-9)
+        assert rf & FLG_SIDEREAL and rf & FLG_NONUT
+
+    @pytest.mark.unit
+    def test_user_t0_1900_moves_the_frame(self):
+        from libephemeris.constants import FLG_J2000
+
+        # t0 = 1900: the frame differs from J2000 by ~a century of general
+        # precession (~46"/yr in RA), and from the plain sidereal equator by
+        # the ayanamsha-free reduction: both deltas are large.
+        ephem.set_sid_mode(SIDM_USER | SIDBIT_ECL_T0, 2415021.0, 24.0)
+        proj, _ = ephem.calc_ut(JD + 6700.0, MARS, FLG_SIDEREAL | FLG_EQUATORIAL)
+        j2k, _ = ephem.calc_ut(
+            JD + 6700.0, MARS, FLG_J2000 | FLG_NONUT | FLG_EQUATORIAL
+        )
+        d_ra = abs((proj[0] - j2k[0] + 180.0) % 360.0 - 180.0) * 3600.0
+        assert 3000.0 < d_ra < 8000.0
+
+    @pytest.mark.unit
+    def test_ssy_plane_alone_keeps_calc_equator(self):
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        base, _ = ephem.calc_ut(JD, MARS, FLG_SIDEREAL | FLG_EQUATORIAL)
+        ephem.set_sid_mode(SIDM_LAHIRI | SIDBIT_SSY_PLANE)
+        ssy, _ = ephem.calc_ut(JD, MARS, FLG_SIDEREAL | FLG_EQUATORIAL)
+        assert ssy[0] == pytest.approx(base[0], abs=1e-9)
+        assert ssy[1] == pytest.approx(base[1], abs=1e-9)
+
+    @pytest.mark.unit
+    def test_lahiri_classical_projection_epoch(self):
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        # The Lahiri VALUE realization is anchored at J2000 (IAE), but the
+        # ECL_T0 projection uses the Calendar Reform Committee defining
+        # epoch: 23°15' at the vernal equinox of 1956 (CSIR 1955).
+        assert _ecl_t0_epoch_jd(SIDM_LAHIRI) == pytest.approx(2435553.5)
+
+
+class TestSidbitFixstar:
+    """SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE are applied on the fixed-star path.
+
+    Measured reference behavior: the star pipeline projects ecliptic output
+    onto the plane (same machinery as calc) and reduces equatorial output
+    to the mean frame of the projection epoch; before the fix both bits
+    were silent no-ops on fixstar (0.000" shift) while the reference moved
+    the star by up to ~400" (ecliptic SSY) / ~24° (equatorial).
+    """
+
+    @pytest.mark.unit
+    def test_ecl_t0_lat_shift_vanishes_at_t0_equal_date(self):
+        # SIDM_USER with t0 = date: the projection plane IS the plane of
+        # date, so the star's latitude shift collapses; a distant t0 moves
+        # it by the secular inclination drift.
+        jd = 2448077.0
+        ephem.set_sid_mode(SIDM_USER, jd, 24.0)
+        plain = ephem.fixstar_ut("Aldebaran", jd, FLG_SIDEREAL)[0]
+        ephem.set_sid_mode(SIDM_USER | SIDBIT_ECL_T0, jd, 24.0)
+        proj = ephem.fixstar_ut("Aldebaran", jd, FLG_SIDEREAL)[0]
+        assert abs(proj[1] - plain[1]) * 3600.0 < 0.1
+        ephem.set_sid_mode(SIDM_USER | SIDBIT_ECL_T0, 2415021.0, 24.0)
+        far = ephem.fixstar_ut("Aldebaran", jd, FLG_SIDEREAL)[0]
+        assert abs(far[1] - plain[1]) * 3600.0 > 10.0
+
+    @pytest.mark.unit
+    def test_ssy_plane_moves_ecliptic_latitude(self):
+        # Aldebaran sits ~5.5 deg below the ecliptic; the invariable plane
+        # (Souami & Souchay 2012) is inclined ~1.58 deg, so the projected
+        # latitude moves by a large fraction of a degree.
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        plain = ephem.fixstar_ut("Aldebaran", JD, FLG_SIDEREAL)[0]
+        ephem.set_sid_mode(SIDM_LAHIRI | SIDBIT_SSY_PLANE)
+        ssy = ephem.fixstar_ut("Aldebaran", JD, FLG_SIDEREAL)[0]
+        assert abs(ssy[1] - plain[1]) * 3600.0 > 300.0
+
+    @pytest.mark.unit
+    def test_ssy_equatorial_is_j2000_frame(self):
+        from libephemeris.constants import FLG_J2000
+
+        ephem.set_sid_mode(SIDM_LAHIRI | SIDBIT_SSY_PLANE)
+        proj = ephem.fixstar_ut("Aldebaran", JD, FLG_SIDEREAL | FLG_EQUATORIAL)[0]
+        base = ephem.fixstar_ut(
+            "Aldebaran", JD, FLG_J2000 | FLG_NONUT | FLG_EQUATORIAL
+        )[0]
+        assert proj[0] == pytest.approx(base[0], abs=1e-9)
+        assert proj[1] == pytest.approx(base[1], abs=1e-9)
+
+    @pytest.mark.unit
+    def test_suppressed_mode_stays_inert_on_fixstar(self):
+        ephem.set_sid_mode(SIDM_TRUE_CITRA)
+        plain = ephem.fixstar_ut("Aldebaran", JD, FLG_SIDEREAL)[0]
+        ephem.set_sid_mode(SIDM_TRUE_CITRA | SIDBIT_ECL_T0)
+        proj = ephem.fixstar_ut("Aldebaran", JD, FLG_SIDEREAL)[0]
+        assert proj[0] == pytest.approx(plain[0], abs=1e-9)
+        assert proj[1] == pytest.approx(plain[1], abs=1e-9)

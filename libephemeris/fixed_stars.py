@@ -3264,6 +3264,108 @@ def _fixed_epoch_star_call(
     return result
 
 
+def _sidbit_star_call(
+    entry_fn,
+    star,
+    tjd,
+    flags,
+    *,
+    verbatim_echo=False,
+    flexible_lookup=False,
+):
+    """SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE projections for fixed stars.
+
+    Measured reference behavior on the fixed-star path (distinct from the
+    calc path, whose equatorial convention differs):
+
+      * ecliptic output is projected onto the mean ecliptic of the mode's
+        t0 (SIDBIT_ECL_T0) or the solar-system invariable plane
+        (SIDBIT_SSY_PLANE), with the sidereal zero point removed — the
+        same projection the calc path applies (see
+        planets._sidbit_projection_calc);
+      * equatorial output is the star on the MEAN EQUATOR AND EQUINOX of
+        the projection epoch — the mode's t0 for SIDBIT_ECL_T0, J2000 for
+        SIDBIT_SSY_PLANE — with no ayanamsha subtraction (for
+        SIDBIT_SSY_PLANE it is bit-identical to the FLG_J2000|FLG_NONUT
+        request);
+      * the star/galactic "true" modes suppress the projection (the base
+        sidereal position is returned), and SIDBIT_ECL_T0 takes precedence
+        when both bits are set — the same suppression set and precedence
+        as the calc path.
+
+    Returns the (xx, name, retflag) result, or None when this is not an
+    applied-SIDBIT sidereal request.
+    """
+    if not flags & FLG_SIDEREAL:
+        return None
+    from .constants import SIDBIT_ECL_T0, SIDBIT_SSY_PLANE
+    from .planets import (
+        _SIDBIT_PROJECTION_SUPPRESS_MODES,
+        _calc_ayanamsa,
+        _ecl_t0_epoch_jd,
+        _get_sidereal_bits,
+    )
+    from .sidereal_epoch import (
+        fixed_epoch_request_flags,
+        fixed_epoch_retflag,
+        is_fixed_epoch_request,
+        sidbit_ecliptic_matrix,
+        ssy_plane_zero_point_deg,
+        transform_equatorial_epoch_result,
+        transform_sidbit_result,
+    )
+    from .state import get_sid_mode
+
+    sidm = get_sid_mode()
+    if is_fixed_epoch_request(flags, sidm):
+        return None  # fixed-epoch modes take their dedicated path
+    bits = _get_sidereal_bits()
+    if not bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE):
+        return None
+    if sidm in _SIDBIT_PROJECTION_SUPPRESS_MODES:
+        return None
+
+    suppress_token = _fixed_star_record_suppressed.set(True)
+    try:
+        xx, name, rf = entry_fn(star, tjd, fixed_epoch_request_flags(flags))
+    finally:
+        _fixed_star_record_suppressed.reset(suppress_token)
+
+    # Measured reference behavior: SIDBIT_ECL_T0 takes precedence over
+    # SIDBIT_SSY_PLANE when both are set (same as the calc path).
+    if bits & SIDBIT_ECL_T0:
+        t0_jd = _ecl_t0_epoch_jd(sidm)
+    else:
+        t0_jd = J2000
+    if flags & FLG_EQUATORIAL:
+        xx_p = transform_equatorial_epoch_result(xx, flags, t0_jd)
+    else:
+        if bits & SIDBIT_ECL_T0:
+            zero_point = _calc_ayanamsa(t0_jd, sidm)
+        else:
+            zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(t0_jd, sidm))
+        m_ecl = sidbit_ecliptic_matrix(bits, t0_jd, zero_point)
+        assert m_ecl is not None  # a projection bit is set (guard above)
+        xx_p = transform_sidbit_result(xx, flags, m_ecl)
+
+    result = (
+        tuple(float(v) for v in xx_p),
+        name,
+        flags if verbatim_echo else fixed_epoch_retflag(rf, flags),
+    )
+    if flexible_lookup:
+        entry, error = _resolve_star2(star)
+        if error or entry is None:
+            raise Error(error or "could not find star name")
+        star_id = entry.id
+    else:
+        star_id, error, _canonical_name = _resolve_star_id(star)
+        if error:
+            raise Error(error)
+    _record_fixed_star_success(star_id, tjd, _get_fixed_star_source())
+    return result
+
+
 def fixstar_ut(
     star: str, tjdut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
@@ -3298,6 +3400,9 @@ def fixstar_ut(
     _fe = _fixed_epoch_star_call(fixstar_ut, star, tjdut, flags)
     if _fe is not None:
         return _fe
+    _sb = _sidbit_star_call(fixstar_ut, star, tjdut, flags)
+    if _sb is not None:
+        return _sb
 
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
@@ -3690,6 +3795,9 @@ def fixstar(
     _fe = _fixed_epoch_star_call(fixstar, star, tjdet, flags, verbatim_echo=True)
     if _fe is not None:
         return _fe
+    _sb = _sidbit_star_call(fixstar, star, tjdet, flags, verbatim_echo=True)
+    if _sb is not None:
+        return _sb
 
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
@@ -3904,6 +4012,9 @@ def fixstar2_ut(
     _fe = _fixed_epoch_star_call(fixstar2_ut, star, tjdut, flags, flexible_lookup=True)
     if _fe is not None:
         return _fe
+    _sb = _sidbit_star_call(fixstar2_ut, star, tjdut, flags, flexible_lookup=True)
+    if _sb is not None:
+        return _sb
 
     ret_flags = _fixstar_ret_flags(flags, implied=True)
     flags = _preprocess_flags(flags)
@@ -4001,6 +4112,16 @@ def fixstar2(
     )
     if _fe is not None:
         return _fe
+    _sb = _sidbit_star_call(
+        fixstar2,
+        star,
+        tjdet,
+        flags,
+        verbatim_echo=True,
+        flexible_lookup=True,
+    )
+    if _sb is not None:
+        return _sb
 
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
