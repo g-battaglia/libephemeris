@@ -281,6 +281,18 @@ any canonical variant (geocentric, topocentric, or eclipse-k
 semidiameter). The timing effect is below 0.15 s at ordinary latitudes and
 reaches ~0.6 s only for grazing polar rises of the perigee Moon.
 
+## Orbital distance extremes are solved on the true 3D geometry
+
+`orbit_max_min_true_distance` solves the minimum and maximum attainable
+distance on the actual pair of osculating orbits in three dimensions. For
+a near-circular, inclined orbit seen geocentrically (Venus: e ≈ 0.0068,
+i ≈ 3.4°) the distance extreme is near-tangent, and an approximate
+treatment can misplace it: measured externally, the reported geocentric
+minimum for Venus sits ~9e-5 AU above distances the geometry actually
+reaches, while LibEphemeris lands on the brute-force true minimum to
+~1e-7 AU (verified from the same shared elements). The maxima agree to
+the normal reduction floor.
+
 ## Fixed-star speeds under `FLG_SPEED3`
 
 For fixed stars, at least one external implementation returns zero speed
