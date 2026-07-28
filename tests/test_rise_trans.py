@@ -622,6 +622,40 @@ class TestRiseTransGeoctrNoEclLat:
                 )
                 assert alt_true == pytest.approx(0.0, abs=0.01)
 
+    def test_high_lat_circumpolar_decision_uses_projected_declination(self):
+        """The circumpolar pre-check must use the SAME latitude-zeroed
+        declination as the solve when BIT_GEOCTR_NO_ECL_LAT is set.
+
+        At 64.13N in 1988 the Moon's TRUE declination (~+28.3 deg) makes it
+        circumpolar (never sets -> plain rise res=-2), but its ecliptic-
+        latitude-zeroed projected place (dec ~+23.4 deg) does rise and set.
+        Judging circumpolarity on the true declination while solving on the
+        projected place spuriously reported res=-2 for the projected event;
+        the projected event exists and must be returned. Backend agnostic
+        (leb and skyfield agree to the position precision).
+        """
+        from libephemeris import calc_ut, azalt
+        from libephemeris.utils import ECL2HOR
+
+        reykjavik = [-21.9, 64.13, 60.0]
+        jd_start = 2447327.0  # 1988: Moon near maximum ecliptic latitude
+        # Plain (true) place: the Moon is circumpolar here.
+        r_plain, _ = rise_trans(jd_start, MOON, CALC_RISE, reykjavik)
+        assert r_plain == -2
+        # Projected place (128 alone and the full 896 Hindu combo): real event.
+        for mask in (BIT_GEOCTR_NO_ECL_LAT, BIT_HINDU_RISING):
+            r, tret = rise_trans(jd_start, MOON, CALC_RISE | mask, reykjavik)
+            assert r == 0
+            assert tret[0] > jd_start
+        # For 896 (disc center, no refraction) the latitude-zeroed geocentric
+        # direction is on the flat horizon at the returned time.
+        _r, tret = rise_trans(jd_start, MOON, CALC_RISE | BIT_HINDU_RISING, reykjavik)
+        pos, _ = calc_ut(tret[0], MOON)
+        _az, alt_true, _app = azalt(
+            tret[0], ECL2HOR, tuple(reykjavik), 0.0, 0.0, (pos[0], 0.0, pos[2])
+        )
+        assert alt_true == pytest.approx(0.0, abs=0.01)
+
 
 class TestRiseTransExtendedBodies:
     """rise_trans/rise_trans_true_hor for bodies outside the classical

@@ -2192,26 +2192,33 @@ def _calculate_eclipse_phases_besselian(
 
     # tret[1]: time when the eclipse takes place at local apparent noon —
     # the shadow axis crosses the x = 0 plane (Besselian x sign change)
-    # within the eclipse window.
+    # WITHIN the resolved eclipse window [P1, P4]. "Local apparent noon" is
+    # only defined while the penumbra is in contact with Earth, so the search
+    # is bracketed by the first/last penumbral contacts rather than by a fixed
+    # window around the maximum. When those contacts do not resolve — an
+    # ultra-shallow graze whose penumbra never fully lands, so tret[2]/[3] are
+    # left 0 — there is no such window and tret[1] stays 0. Measured reference
+    # behavior: that degenerate partial returns tret[1] = 0. The earlier
+    # fabricated jd_max +- 0.15 d bracket produced a spurious noon instant
+    # tens of minutes from the maximum for exactly those events.
     t_noon = 0.0
-    t_lo = t_first_contact if t_first_contact else jd_max - 0.15
-    t_hi = t_fourth_contact if t_fourth_contact else jd_max + 0.15
-    try:
-        x_lo = calc_besselian_x(t_lo)
-        x_hi = calc_besselian_x(t_hi)
-        if x_lo * x_hi < 0:
-            a, b, fa = t_lo, t_hi, x_lo
-            for _ in range(60):
-                mid = 0.5 * (a + b)
-                fm = calc_besselian_x(mid)
-                if fa * fm <= 0:
-                    b = mid
-                else:
-                    a, fa = mid, fm
-            t_noon = 0.5 * (a + b)
-    except (KeyError, ValueError, ArithmeticError) as _exc:
-        _reraise_if_leb_range_error(_exc)
-        t_noon = 0.0
+    if t_first_contact and t_fourth_contact:
+        try:
+            x_lo = calc_besselian_x(t_first_contact)
+            x_hi = calc_besselian_x(t_fourth_contact)
+            if x_lo * x_hi < 0:
+                a, b, fa = t_first_contact, t_fourth_contact, x_lo
+                for _ in range(60):
+                    mid = 0.5 * (a + b)
+                    fm = calc_besselian_x(mid)
+                    if fa * fm <= 0:
+                        b = mid
+                    else:
+                        a, fa = mid, fm
+                t_noon = 0.5 * (a + b)
+        except (KeyError, ValueError, ArithmeticError) as _exc:
+            _reraise_if_leb_range_error(_exc)
+            t_noon = 0.0
 
     # tret[6]/[7]: center-line begin/end — only when the eclipse is
     # ellipsoidally CENTRAL (the shadow axis actually pierces the flattened
@@ -7697,6 +7704,46 @@ def _rise_trans_true_hor_impl(
         )
         return alt_true, az, dist_b
 
+    def _get_body_ra_dec_geoctr_nolat(jd: float) -> Tuple[float, float]:
+        """Apparent RA (hours) and Dec (deg) of the ecliptic-latitude-zeroed
+        geocentric place used by the Hindu-rising path.
+
+        The rise/set solver's circumpolar pre-check derives the culmination
+        altitudes from a declination. Under BIT_GEOCTR_NO_ECL_LAT the body is
+        projected onto the ecliptic (latitude 0) BEFORE the horizon rotation,
+        which lowers |Dec|, so that pre-check must use the SAME projected
+        declination the solve uses. Otherwise a body far from the ecliptic (the
+        Moon near its maximum latitude) is judged circumpolar on its true,
+        higher declination while the solve — already working on the lower
+        projected declination — would have found the event: the two disagree
+        and rise/set is spuriously reported circumpolar (res=-2) at high
+        geographic latitude. Measured reference behavior: the event exists and
+        is returned there.
+
+        The projection uses the same of-date true obliquity azalt applies in
+        _get_body_altaz_geoctr_nolat, so this declination is exactly the one the
+        horizon rotation sees.
+        """
+        import erfa
+
+        from .precession_vondrak import vondrak_mean_obliquity_deg
+        from .utils import cotrans
+
+        if is_fixed_star:
+            from .fixed_stars import fixstar_ut
+
+            pos_s, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
+            lon_b, dist_b = float(pos_s[0]), float(pos_s[2])
+        else:
+            pos_p, _ = calc_ut(jd, planet, FLG_SPEED)
+            lon_b, dist_b = float(pos_p[0]), float(pos_p[2])
+        jd_tt = get_timescale().ut1_jd(jd).tt
+        eps0 = vondrak_mean_obliquity_deg(jd_tt)
+        _, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
+        eps = eps0 + math.degrees(deps_rad)
+        ra, dec, _ = cotrans((lon_b, 0.0, dist_b), -eps)
+        return ra / 15.0, dec
+
     # The ordinary (non-Hindu) altitude and the transit RA/Dec both flow
     # through the shared, backend-agnostic _get_body_altaz / _get_body_ra_dec
     # above (calc_ut/fixstar_ut + azalt), so in-map bodies, out-of-map bodies
@@ -7706,6 +7753,13 @@ def _rise_trans_true_hor_impl(
         _get_body_altaz_geoctr_nolat if use_geoctr_nolat else _get_body_altaz
     )
     _ra_dec_for_event = _get_body_ra_dec
+    # The rise/set circumpolar pre-check must see the SAME declination the
+    # altitude solve uses. Under the Hindu bit that is the ecliptic-latitude-
+    # zeroed projected declination (see _get_body_ra_dec_geoctr_nolat); the
+    # transit path keeps the true RA/Dec (the bit is ignored for transits).
+    _ra_dec_for_circumpolar = (
+        _get_body_ra_dec_geoctr_nolat if use_geoctr_nolat else _get_body_ra_dec
+    )
 
     # The ordinary rise/set path samples the TOPOCENTRIC apparent altitude
     # (calc_ut(FLG_TOPOCTR)) for every planet/point; set the observer once for
@@ -7758,7 +7812,7 @@ def _rise_trans_true_hor_impl(
             lat,
             event_type,
             _event_height,
-            _ra_dec_for_event,
+            _ra_dec_for_circumpolar,
             CALC_RISE,
             CALC_SET,
             horizon_alt,

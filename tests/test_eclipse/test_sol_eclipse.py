@@ -257,6 +257,31 @@ class TestSolEclipseWhenGlob:
                 f"but found {year}-{month}-{eclipse_day}"
             )
 
+    def test_local_noon_defined_only_within_resolved_window(self):
+        """tret[1] (eclipse at local apparent noon) is a within-window instant.
+
+        For a regular partial the local-apparent-noon time lies inside the
+        eclipse window [P1, P4]. For an ultra-shallow graze whose penumbra
+        never fully lands on Earth — tret[2]/tret[3] (P1/P4) unresolved (0) —
+        there is no window in which local noon is defined, so tret[1] must be
+        0 rather than a fabricated instant offset from the maximum. Measured
+        reference behavior. Backend agnostic (leb and skyfield agree).
+        """
+        # Regular partial: noon time sits within the resolved [P1, P4] window.
+        _, reg = sol_eclipse_when_glob(2425562.9 - 2.0, FLG_SWIEPH, ECL_PARTIAL)
+        t0, t1, p1, p4 = reg[0], reg[1], reg[2], reg[3]
+        assert p1 and p4  # window resolved
+        assert t1 != 0.0
+        assert p1 <= t1 <= p4
+
+        # Degenerate graze: penumbra never fully lands, so P1/P4 are 0 and the
+        # noon slot collapses to 0 (previously a spurious jd_max +- window time).
+        rf, deg = sol_eclipse_when_glob(2427807.73 - 2.0, FLG_SWIEPH, ECL_PARTIAL)
+        assert rf & ECL_PARTIAL
+        assert abs(deg[0] - 2427807.73) < 0.5  # the same ultra-shallow partial
+        assert deg[2] == 0.0 and deg[3] == 0.0  # P1/P4 unresolved
+        assert deg[1] == 0.0  # no local-apparent-noon instant
+
 
 class TestNewMoonFinding:
     """Tests for internal New Moon finding logic."""
