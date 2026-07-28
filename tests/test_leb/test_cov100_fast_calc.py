@@ -1049,3 +1049,30 @@ class TestTopoNoopLunarPoints:
                     assert 0.0 <= pos[0] < 360.0
         finally:
             le.set_calc_mode(prev)
+
+
+class TestDeflectionConjunctionLimiter:
+    """The PPN deflection denominator is clamped near superior conjunction
+    (ERFA eraLdsun dlim convention): a planet geometrically inside the
+    solar disk stays bounded (~arcsec) instead of blowing up to ~9", and
+    the observable regime (outside the disk) is untouched."""
+
+    def test_mercury_superior_conjunction_bounded(self):
+        import libephemeris as le
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                with_defl = le.calc(2431039.0, 2, 2 | 256)[0][0]
+                no_defl = le.calc(2431039.0, 2, 2 | 256 | le.FLG_NOGDEFL)[0][0]
+                # Bounded deflection: well under the former ~8.8" blow-up.
+                assert (
+                    abs((with_defl - no_defl + 180.0) % 360.0 - 180.0) * 3600.0 < 2.0
+                ), mode
+                # Outside the disk: deflection remains sub-arcsecond and active.
+                w2 = le.calc(2451545.0, 2, 2 | 256)[0][0]
+                n2 = le.calc(2451545.0, 2, 2 | 256 | le.FLG_NOGDEFL)[0][0]
+                assert abs((w2 - n2 + 180.0) % 360.0 - 180.0) * 3600.0 < 0.1, mode
+        finally:
+            le.set_calc_mode(prev)
