@@ -1334,8 +1334,14 @@ def deg_midp(x1: float, x2: float) -> float:
     # Calculate midpoint along the chosen arc
     midp = x1 + diff / 2.0
 
-    # Normalize result to [0, 360)
-    return midp % 360.0
+    # Normalize result to [0, 360). A tiny-negative midpoint makes the float
+    # modulo round to exactly 360.0 ((-2.3e-14) % 360.0 == 360.0), which
+    # would violate the documented half-open range: snap it to 0.0, the same
+    # guard degnorm applies.
+    result = midp % 360.0
+    if result >= 360.0:
+        return 0.0
+    return result
 
 
 def rad_midp(x: float, y: float) -> float:

@@ -8993,9 +8993,15 @@ def _orbital_elements_from_ecliptic_state(
     # Tropical orbital period (return to same ecliptic longitude)
     # Accounts for general precession in longitude (~50.29"/year)
     _PRECESSION_DEG_PER_DAY = 50.2882 / 3600.0 / 365.25
+    # Measured reference behavior: the reported value carries an extra
+    # sidereal-to-tropical year ratio (365.256363/365.242190 = 1.0000388,
+    # constant across every planet and flag), i.e. the tropical-period slot
+    # is stated in a sidereal-year-based unit convention rather than the
+    # bare tropical-year quotient.
+    _SID_OVER_TROP_YEAR = 365.256363 / 365.242190
     if n_deg > 0:
         P_trop_days = 360.0 / (n_deg + _PRECESSION_DEG_PER_DAY)
-        P_trop_years = P_trop_days / 365.24219
+        P_trop_years = P_trop_days / 365.24219 * _SID_OVER_TROP_YEAR
     else:
         P_trop_years = float("inf")
 
@@ -9009,7 +9015,10 @@ def _orbital_elements_from_ecliptic_state(
     # Synodic period (relative to Earth's orbital motion)
     # P_syn = P_earth * P_planet / (P_planet - P_earth)
     # Negative for inner planets and Moon (P_planet < P_earth), positive for outer
-    P_earth_days = 365.24219
+    # Measured reference behavior: the synodic formula uses the SIDEREAL
+    # year for Earth's period (the outer-planet synodic values inherit the
+    # same sidereal/tropical factor as the tropical-period slot).
+    P_earth_days = 365.256363
     if P_days > 0 and P_days < float("inf") and ipl != EARTH:
         denom = P_days - P_earth_days
         if abs(denom) > 1e-10:

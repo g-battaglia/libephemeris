@@ -111,9 +111,14 @@ def fixed_epoch_retflag(retflag: int, iflag: int) -> int:
     The reference echoes the caller's flags plus FLG_NONUT; the internal
     FLG_J2000 rewrite is not exposed. Bits the backend added on top of the
     rewritten request (ephemeris echo bits, implied bits) are kept, minus
-    the internal FLG_J2000.
+    the internal FLG_J2000 — but a J2000 bit the CALLER passed explicitly
+    is still echoed back (measured reference retflag keeps it).
     """
-    return (retflag & ~FLG_J2000) | (iflag & (FLG_SIDEREAL | FLG_RADIANS)) | FLG_NONUT
+    return (
+        (retflag & ~FLG_J2000)
+        | (iflag & (FLG_SIDEREAL | FLG_RADIANS | FLG_J2000))
+        | FLG_NONUT
+    )
 
 
 @lru_cache(maxsize=8)

@@ -580,3 +580,29 @@ class TestOrbitalElementsAstronomicalAlmanac:
         a_default = ephem.get_orbital_elements(self.JD, CERES, 0)[0]
         a_almanac = ephem.get_orbital_elements(self.JD, CERES, ephem.FLG_ORBEL_AA)[0]
         assert a_almanac < a_default
+
+
+class TestPeriodSlotConventions:
+    """Slots [12]/[13] follow the measured sidereal-year unit convention.
+
+    The tropical-period slot carries the constant sidereal/tropical year
+    ratio (1.0000388) on top of the bare 360/(n+p) quotient, and the
+    synodic formula uses the sidereal year for Earth; slot [10] stays the
+    plain sidereal period.
+    """
+
+    @pytest.mark.unit
+    def test_tropical_slot_carries_sidereal_year_ratio(self):
+        el = ephem.get_orbital_elements(2451545.0, 5, 0)
+        # Jupiter: P_trop must exceed P_sid-as-computed-from-n by ~3.88e-5
+        # relative (the year-unit factor dominates the tiny precession term).
+        assert el[12] == pytest.approx(11.86790, abs=2e-4)
+        assert el[13] == pytest.approx(398.851, abs=0.02)
+
+    @pytest.mark.unit
+    def test_deg_midp_stays_in_range(self):
+        import libephemeris as le
+
+        assert le.deg_midp(0.1, 359.9) == 0.0
+        assert le.deg_midp(0.6, 359.4) == 0.0
+        assert 0.0 <= le.deg_midp(2.0, 358.0) < 360.0

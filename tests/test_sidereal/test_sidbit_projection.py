@@ -553,3 +553,21 @@ class TestClassicalEclT0Epochs:
 
         assert SIDM_ALDEBARAN_15TAU not in _ECL_T0_CLASSICAL_EPOCHS
         assert _ecl_t0_epoch_jd(SIDM_ALDEBARAN_15TAU) == pytest.approx(2451545.0)
+
+
+class TestFixedEpochJ2000Echo:
+    """An explicit caller FLG_J2000 bit is echoed back by the fixed-epoch
+    sidereal modes (18/19/20/34): only the INTERNAL J2000 rewrite bit is
+    hidden (measured reference retflag keeps the caller's bit)."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("mode", [18, 19, 20, 34])
+    def test_caller_j2000_bit_echoed(self, mode):
+        from libephemeris.constants import FLG_J2000, FLG_SPEED, FLG_SWIEPH
+
+        ephem.set_sid_mode(mode, 0.0, 0.0)
+        base = FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL
+        rf_j = ephem.calc_ut(JD, SUN, base | FLG_J2000)[1]
+        rf_p = ephem.calc_ut(JD, SUN, base)[1]
+        assert rf_j & FLG_J2000
+        assert rf_j == rf_p | FLG_J2000

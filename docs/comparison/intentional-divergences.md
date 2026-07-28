@@ -250,6 +250,13 @@ report the following day's; LibEphemeris returns the real next event. When
 comparing rise/set series externally, either start the search a few minutes
 before the expected event or tolerate a one-day offset in this edge case.
 
+The search is also complete at the far end: when the body stays below the
+horizon for more than a day (the high-latitude Moon does so roughly once
+per declination cycle), the next rise falls beyond the ~1-day forward
+window some implementations scan, which then report a spurious
+"circumpolar, no rise" result; LibEphemeris keeps searching and returns
+the true event, however far ahead it lies.
+
 ## Meridian transits are solved to the geometric condition
 
 `CALC_MTRANSIT`/`CALC_ITRANSIT` are refined until the body's apparent hour
