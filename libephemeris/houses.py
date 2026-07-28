@@ -1658,65 +1658,6 @@ def _hsys_to_char(hsys: int | bytes | str) -> str:
 
 # House systems whose reference cusp SPEEDS follow a closed-form analytic rule
 # instead of the finite-difference derivative of the reported cusp positions.
-_ANALYTIC_CUSP_SPEED_SYSTEMS = frozenset({"O", "W", "N"})
-
-
-def _reference_cusp_speeds(
-    hsys_char: str, ascmc_speed: tuple[float, ...], is_sidereal: bool = False
-) -> tuple[float, ...] | None:
-    """Reference cusp-speed rule for systems that do not finite-difference.
-
-    Returns the 12 cusp velocities (deg/day) the reference API reports for
-    Porphyry ('O'), Whole-Sign ('W') and Aries ('N'), or ``None`` for every
-    other system (whose finite-difference speeds are kept). ``dAsc``/``dMC``
-    are the (correct) Ascendant/MC velocities in ``ascmc_speed``.
-
-    This is *measured reference behavior*: for these systems the reference does
-    NOT report the time-derivative of its own cusp positions. The rule below
-    reproduces the reference output to 0 deg/day across latitude 0-78, four
-    epochs, tropical and sidereal:
-
-    * Porphyry ('O'), tropical and sidereal alike: with ``step = (dAsc-dMC)/3``,
-      ``[dAsc, dAsc-step, dAsc-2*step, dMC, dAsc+step, dAsc+2*step]`` repeated
-      over both halves of the wheel. Central-differencing the reference's own
-      cusp 5 gives the trisection derivative ``dMC + step``, yet the reference
-      reports ``dAsc + step`` -- its second/fourth quadrants are re-based on
-      ``dAsc`` rather than on the IC/MC speed, so the reported speeds are not the
-      derivative of the trisected positions.
-    * Aries ('N'), tropical and sidereal, and Whole-Sign ('W') *tropical*: the
-      four angular cusps carry the Asc/MC speed (cusps 1,7 -> dAsc; 4,10 -> dMC);
-      every intermediate cusp is 0.
-    * Whole-Sign ('W') *sidereal*: the reference reports dAsc for ALL twelve
-      cusps (they share the sidereal Ascendant's motion), not the tropical
-      angular pattern. This W-only tropical/sidereal split is a reference quirk.
-    """
-    if hsys_char not in _ANALYTIC_CUSP_SPEED_SYSTEMS:
-        return None
-    d_asc = ascmc_speed[0]
-    d_mc = ascmc_speed[1]
-    if hsys_char == "O":
-        step = (d_asc - d_mc) / 3.0
-        return (
-            d_asc,
-            d_asc - step,
-            d_asc - 2.0 * step,
-            d_mc,
-            d_asc + step,
-            d_asc + 2.0 * step,
-            d_asc,
-            d_asc - step,
-            d_asc - 2.0 * step,
-            d_mc,
-            d_asc + step,
-            d_asc + 2.0 * step,
-        )
-    if hsys_char == "W" and is_sidereal:
-        # Sidereal Whole-Sign: every cusp shares the sidereal Ascendant speed.
-        return (d_asc,) * 12
-    # Aries ('N') and tropical Whole-Sign ('W'): angular cusps only.
-    return (d_asc, 0.0, 0.0, d_mc, 0.0, 0.0, d_asc, 0.0, 0.0, d_mc, 0.0, 0.0)
-
-
 def houses_armc_ex2(
     armc: float,
     lat: float,
@@ -1820,14 +1761,6 @@ def houses_armc_ex2(
     ascmc_speed = tuple(
         fd_speed(ascmc_after[i], ascmc_before[i]) for i in range(len(ascmc))
     )
-
-    # Porphyry ('O'), Whole-Sign ('W') and Aries ('N') report analytic cusp
-    # speeds rather than the finite-difference derivative of their positions;
-    # replicate the reference API's rule (see ``_reference_cusp_speeds``) so the
-    # ARMC entry point matches ``houses_ex2`` and the reference.
-    _analytic_speeds = _reference_cusp_speeds(_hsys_to_char(hsys), ascmc_speed)
-    if _analytic_speeds is not None:
-        cusps_speed = _analytic_speeds
 
     # The speeds are the derivative of the reported cusp functions with respect
     # to ARMC, scaled by the sidereal rate. This is the most accurate speed
@@ -2416,17 +2349,13 @@ def houses_ex2(
         for i in range(len(ascmc))
     )
 
-    # Porphyry ('O'), Whole-Sign ('W') and Aries ('N') report analytic cusp
-    # speeds that are NOT the finite-difference derivative of their cusp
-    # positions (the quadrant-trisected Porphyry speeds are re-based on dAsc,
-    # and the snapped Whole-Sign/Aries cusps carry the angle speeds only at the
-    # four angular houses). Replicate the reference API's rule; see
-    # ``_reference_cusp_speeds`` for the measured behavior.
-    _analytic_speeds = _reference_cusp_speeds(
-        _hsys_to_char(hsys), ascmc_speed, bool(flags & FLG_SIDEREAL)
-    )
-    if _analytic_speeds is not None:
-        cusps_speed = _analytic_speeds
+    # Cusp speeds are ALWAYS the finite-difference time derivative of the
+    # reported cusp positions, for every house system: the speed contract is
+    # "derivative of what this function returns". An external implementation
+    # reports, for Porphyry/Whole-Sign/Aries, analytic values that are not the
+    # derivative of its own cusps (see docs/comparison/intentional-divergences
+    # "Cusp and angle speeds"); that behavioral rule is not reproducible from
+    # any published definition and is intentionally not replicated.
 
     # degnorm on the angle outputs (not the speeds) snaps the bare-%360
     # artifact (exactly 360.0 from a tiny-negative angle) back to 0.0.

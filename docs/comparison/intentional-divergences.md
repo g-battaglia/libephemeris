@@ -125,14 +125,14 @@ reproduced from external implementations:
   ~29°/day at latitude 60° (growing with latitude from a ~0.002°/day
   equatorial floor). LibEphemeris reports the genuine derivative.
 
-Porphyry (`O`), Whole Sign (`W`) and Aries (`N`) are the exception: the
-reference API reports an *analytic* cusp speed for these that is not the
-derivative of its own cusp positions (its Porphyry second/fourth quadrants
-are re-based on the ascendant speed, and its pinned Whole Sign / Aries cusps
-expose the ascendant's speed in the 1/7 slots and the MC's in 4/10, with the
-sidereal Whole Sign case exposing the ascendant speed in every slot).
-LibEphemeris replicates that measured convention exactly for 1:1
-compatibility.
+- Porphyry (`O`), Whole Sign (`W`) and Aries (`N`) belong to the same
+  class: an external implementation reports analytic cusp speeds for these
+  that are not the derivative of its own cusp positions and do not follow
+  from the published house definitions (the derivative of the published
+  Porphyry trisection, and the zero derivative of sign-boundary-pinned
+  cusps, differ from what it reports). LibEphemeris reports the genuine
+  finite-difference derivative of its reported cusps here as well; the
+  external analytic rule is not reproduced.
 
 ## Phase-angle geometry in `pheno`
 

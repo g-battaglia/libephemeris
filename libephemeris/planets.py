@@ -7329,30 +7329,34 @@ _SUN_MASS_RATIOS = {
 # osculating ellipse is taken about the Earth rather than the Sun.
 _SUN_EARTH_MASS_RATIO = 332946.0487
 
-# --- Astronomical Almanac osculating-element central mass (FLG_ORBEL_AA) ---
+# --- Astronomical-Almanac-style osculating central mass (FLG_ORBEL_AA) ---
 #
-# Measured reference behavior: with FLG_ORBEL_AA the two-body osculating fit
-# adds, to the Sun, every major planetary system whose orbit lies at or
-# interior to the body's own orbit -- the "Sun + interior planets" central mass
-# used for Keplerian elements referred to the perihelion (Explanatory Supplement
-# to the Astronomical Almanac, 3rd ed.). Characterization across Mercury..Pluto
-# and the belt asteroids at three epochs reproduced, to <=6e-10 relative, the
-# effective GM
-#     GM_eff = GM_sun * (1 + sum_{Q: a_Q <= a_body} 1/ratio_Q)
-# where Q runs over the nine major planetary systems, Earth is counted as the
-# Earth+Moon barycentre (using it Earth-alone would mismatch by ~4e-8), the
-# main-belt asteroids are NOT perturbers (including them would mismatch Jupiter
-# by ~7e-10), and a major planet counts itself. Only the osculating GEOMETRY
-# (a, e, q, Q and the perihelion-referred angles om/varpi/M/nu/E) responds:
-# a shrinks, the angles shift solidly about the perihelion, and the mean
-# longitude L stays invariant. The derived period family keeps the pure solar
-# GM, so its slots move only through the changed a (verified: n_aa ==
-# sqrt(GM_sun / a_aa^3) to ~1e-13). The Moon's geocentric orbit is unaffected.
+# Under FLG_ORBEL_AA the two-body osculating fit uses the hierarchical
+# JACOBI-coordinate central mass of classical celestial mechanics: ordering
+# the planetary systems outward from the Sun, the Kepler part of the Jacobi
+# Hamiltonian for the k-th body carries the gravitational parameter
+#     GM_eff(k) = G * (M_sun + m_1 + ... + m_k),
+# i.e. the Sun plus every planetary system at or interior to the body's own
+# orbit, the body's own system included (Murray & Dermott, "Solar System
+# Dynamics", Cambridge University Press, 1999, ch. 2 - the Jacobi reduction;
+# cf. the osculating-element conventions in the Explanatory Supplement to
+# the Astronomical Almanac, 3rd ed., ch. 8). For a minor body the same
+# hierarchy gives the restricted-problem parameter Sun + interior planets
+# with no self term, its own mass being negligible; minor bodies are not
+# themselves perturbers in the hierarchy, whose members are the nine major
+# planetary systems. The "mass of a planet" is the mass of its SYSTEM
+# (planet plus satellites), the published convention of the DE ephemerides -
+# Earth therefore enters as the Earth+Moon barycentre.
 #
-# Reciprocal system-mass ratios come from _SUN_MASS_RATIOS (DE440; Park et al.
-# 2021, cf. Astronomical Almanac Table K7). Nominal semi-major axes only order
-# the nine systems and decide which planets are interior to a minor body's
-# orbit; the ordering itself is fixed.
+# Only the osculating GEOMETRY (a, e, q, Q and the perihelion-referred
+# angles om/varpi/M/nu/E) responds to the changed parameter: a shrinks and
+# the angles shift solidly about the perihelion while the mean longitude L
+# stays invariant; the derived period family keeps the pure solar GM, so its
+# slots move only through the changed a. The Moon's geocentric orbit is
+# unaffected. Reciprocal system-mass ratios come from _SUN_MASS_RATIOS
+# (DE440; Park et al. 2021, cf. Astronomical Almanac Table K7). Nominal
+# semi-major axes only order the nine systems and decide which planets are
+# interior to a minor body's orbit; the ordering itself is fixed.
 _ORBEL_AA_ORDER: tuple[int, ...] = (
     MERCURY,
     VENUS,
@@ -7395,8 +7399,9 @@ _ORBEL_AA_CUM_THROUGH_SELF: dict[int, float] = _orbel_aa_cumulative_through_self
 def _orbel_aa_interior_mass_sum(a_au: float) -> float:
     """Summed reciprocal system-mass ratios of the major planets strictly
     interior to semi-major axis ``a_au`` -- the FLG_ORBEL_AA central-mass excess
-    for a minor body (Sun + every major planet inside its orbit; the body's own
-    negligible mass is not added, matching the measured reference)."""
+    for a minor body: the restricted-problem Jacobi parameter (Sun + every
+    major planet inside its orbit; the body's own negligible mass adds no
+    term, and minor bodies are not members of the hierarchy)."""
     total = 0.0
     for pid in _ORBEL_AA_ORDER:
         if _ORBEL_AA_NOMINAL_A_AU[pid] < a_au:
