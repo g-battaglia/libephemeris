@@ -208,9 +208,22 @@ These residuals do not grow monotonically toward remote epochs — Jupiter's
 descending-node difference is ≈0.001″ near 1900 and ≈3″ near 2000 — which rules
 out a precession, nutation, or epoch error. They are the inherent sensitivity
 of the osculating decomposition to sub-milliarcsecond differences between two
-independent ephemeris realizations, not a correctable offset; the underlying
-orbital-plane orientation agrees closely (node and apse *latitudes* match to
-≈1e-5°).
+independent ephemeris realizations, not a correctable offset; in the ecliptic
+of date the underlying orbital-plane orientation agrees closely (node and apse
+*latitudes* match to ≈1e-5°).
+
+Under `FLG_J2000` the node/apse are still built on the ecliptic of date; only
+their ecliptic *longitude* is precessed to J2000, after which the point is
+re-projected geocentrically against the Earth referred to the J2000 ecliptic.
+Because a point referred to the of-date plane is viewed against an Earth that
+carries the of-date-to-J2000 ecliptic tilt, the J2000 *latitude* is a
+distance-dependent parallax reduction of the of-date node — vanishing at J2000
+and growing to roughly 130″ of latitude shift a century away — rather than a
+rigid frame rotation of the of-date latitude (a rotation would be
+distance-independent, but the reduction scales with 1/geocentric-distance).
+LibEphemeris reproduces this reduction to ≈1″ for the nodes and to within a few
+arcseconds for the high-latitude perihelia at century-scale separations from
+J2000.
 
 ### `pheno*`
 

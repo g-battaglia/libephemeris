@@ -8221,15 +8221,90 @@ def _calc_nod_aps(
     geo_peri = _to_geo_lonlat(pos_peri)
     geo_aphe = _to_geo_lonlat(pos_aphe)
 
-    # J2000 output: precess the finished of-date coordinates (the
-    # reference does not remove nutation from nod_aps J2000 output).
+    # J2000 output. Measured reference behavior: the FLG_J2000 node/apse are
+    # NOT a rigid frame rotation of the finished of-date geocentric point. The
+    # reference precesses only the ecliptic LONGITUDE of the heliocentric
+    # node/apse (a rotation about the ecliptic pole by the accumulated general
+    # precession in longitude), keeping the point's of-date ecliptic latitude,
+    # then re-projects it geocentrically against the Earth expressed in the
+    # J2000 ecliptic. Because a point referred to the of-date plane is projected
+    # against an Earth that carries the of-date-to-J2000 ecliptic tilt, the
+    # J2000 node/apse acquire a distance-dependent (parallactic) latitude --
+    # near zero at J2000, up to ~130" of latitude shift at |t-J2000| ~ 1
+    # century -- that a rotation of the geocentric direction cannot reproduce
+    # (a rotation is distance-independent, but the measured shift scales with
+    # 1/geocentric-distance). Algebraically the observed map is
+    #     geo_j2000 = Rz(delta) . geo_of_date + C,
+    #     C = Rz(delta) . r_obs_of_date - r_obs_j2000,
+    # where r_obs is the observer subtracted in the geocentric projection above
+    # and delta is the ecliptic longitude of the of-date equinox measured in the
+    # J2000 ecliptic. C vanishes for a heliocentric/centred request (no observer
+    # subtraction) and for the Sun's mirrored apparent orbit, which reduce to a
+    # pure longitude precession.
     if iflag & FLG_J2000:
+        # The longitude precession and the observer's J2000 offset are both
+        # referred to the MEAN ecliptic of date and of J2000 (no nutation): the
+        # measured reference longitude reduction is the accumulated general
+        # precession only, so folding the of-date nutation into the rotation
+        # would mis-precess the longitude by the nutation-in-longitude term
+        # (~16" near 1900). The of-date node/apse coordinates themselves retain
+        # their nutation; only the frame-to-frame rotation is mean.
+        _pn_mean = vondrak_precession_matrix(jd_tt)
+        _eps_mean = vondrak_mean_obliquity_rad(jd_tt)
+        _cm, _sm = math.cos(_eps_mean), math.sin(_eps_mean)
+
+        def _mean_ecl_to_icrs(vec):
+            xq = vec[0]
+            yq = vec[1] * _cm - vec[2] * _sm
+            zq = vec[1] * _sm + vec[2] * _cm
+            return (
+                _pn_mean[0][0] * xq + _pn_mean[1][0] * yq + _pn_mean[2][0] * zq,
+                _pn_mean[0][1] * xq + _pn_mean[1][1] * yq + _pn_mean[2][1] * zq,
+                _pn_mean[0][2] * xq + _pn_mean[1][2] * yq + _pn_mean[2][2] * zq,
+            )
+
+        def _to_ecl_j2000(vec_icrs):
+            pj = vondrak_precession_matrix(_J2000_JD)
+            eps_j = vondrak_mean_obliquity_rad(_J2000_JD)
+            cj, sj = math.cos(eps_j), math.sin(eps_j)
+            xq = (
+                pj[0][0] * vec_icrs[0] + pj[0][1] * vec_icrs[1] + pj[0][2] * vec_icrs[2]
+            )
+            yq = (
+                pj[1][0] * vec_icrs[0] + pj[1][1] * vec_icrs[1] + pj[1][2] * vec_icrs[2]
+            )
+            zq = (
+                pj[2][0] * vec_icrs[0] + pj[2][1] * vec_icrs[1] + pj[2][2] * vec_icrs[2]
+            )
+            return (xq, yq * cj + zq * sj, -yq * sj + zq * cj)
+
+        _eqx = _to_ecl_j2000(_mean_ecl_to_icrs((1.0, 0.0, 0.0)))
+        _delta = math.atan2(_eqx[1], _eqx[0])
+        _cd, _sd = math.cos(_delta), math.sin(_delta)
+        if r_obs_ecl is None or mirror_sun:
+            _cvec = (0.0, 0.0, 0.0)
+        else:
+            _obs_j = _to_ecl_j2000(_mean_ecl_to_icrs(r_obs_ecl))
+            _cvec = (
+                _cd * r_obs_ecl[0] - _sd * r_obs_ecl[1] - _obs_j[0],
+                _sd * r_obs_ecl[0] + _cd * r_obs_ecl[1] - _obs_j[1],
+                r_obs_ecl[2] - _obs_j[2],
+            )
 
         def _prec_j2000(g):
             if g[2] == 0.0:
                 return g
-            lon_j, lat_j = _nodaps_to_j2000(g[0], g[1], jd_tt)
-            return (lon_j, lat_j, g[2])
+            cl = math.cos(math.radians(g[1]))
+            vx = g[2] * cl * math.cos(math.radians(g[0]))
+            vy = g[2] * cl * math.sin(math.radians(g[0]))
+            vz = g[2] * math.sin(math.radians(g[1]))
+            rx = _cd * vx - _sd * vy + _cvec[0]
+            ry = _sd * vx + _cd * vy + _cvec[1]
+            rz = vz + _cvec[2]
+            rr = math.sqrt(rx * rx + ry * ry + rz * rz)
+            lon_j = math.degrees(math.atan2(ry, rx)) % 360.0
+            lat_j = math.degrees(math.asin(max(-1.0, min(1.0, rz / rr))))
+            return (lon_j, lat_j, rr)
 
         geo_asc = _prec_j2000(geo_asc)
         geo_dsc = _prec_j2000(geo_dsc)

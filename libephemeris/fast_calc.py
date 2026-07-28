@@ -2416,7 +2416,16 @@ def fast_calc_ut(
 
             _topo_obj = get_topo()
             if _topo_obj is None:
-                raise ValueError("set_topo() must be called before FLG_TOPOCTR")
+                # ConfigurationError (an Error subclass, NOT a ValueError):
+                # the sealed curated-asteroid coverage fallback catches
+                # ValueError to detect ABSENT bodies, and a ValueError here
+                # made it swallow this precondition failure and silently
+                # serve a Keplerian geocentric position. The measured
+                # reference and the Skyfield path both raise for a missing
+                # observer, so the typed error must propagate on every path.
+                from .exceptions import ConfigurationError
+
+                raise ConfigurationError("set_topo() must be called before FLG_TOPOCTR")
             topo_geopos = (
                 float(_topo_obj.longitude.degrees),
                 float(_topo_obj.latitude.degrees),
@@ -2518,7 +2527,16 @@ def fast_calc_tt(
 
             _topo_obj = get_topo()
             if _topo_obj is None:
-                raise ValueError("set_topo() must be called before FLG_TOPOCTR")
+                # ConfigurationError (an Error subclass, NOT a ValueError):
+                # the sealed curated-asteroid coverage fallback catches
+                # ValueError to detect ABSENT bodies, and a ValueError here
+                # made it swallow this precondition failure and silently
+                # serve a Keplerian geocentric position. The measured
+                # reference and the Skyfield path both raise for a missing
+                # observer, so the typed error must propagate on every path.
+                from .exceptions import ConfigurationError
+
+                raise ConfigurationError("set_topo() must be called before FLG_TOPOCTR")
             topo_geopos = (
                 float(_topo_obj.longitude.degrees),
                 float(_topo_obj.latitude.degrees),

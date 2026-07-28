@@ -801,10 +801,15 @@ def test_fast_calc_tt_topo_missing_raises(reader):
     """fast_calc_tt FLG_TOPOCTR without set_topo() raises (lines 1823-1824)."""
     from libephemeris import state
 
+    from libephemeris.exceptions import ConfigurationError
+
     saved = state._TOPO
     state._TOPO = None
     try:
-        with pytest.raises(ValueError, match="set_topo"):
+        # ConfigurationError, NOT ValueError: a ValueError here was caught by
+        # the sealed curated-asteroid coverage fallback, which then silently
+        # served a Keplerian geocentric position (Round AP finding).
+        with pytest.raises(ConfigurationError, match="set_topo"):
             fast_calc_tt(reader, JD, SUN, FLG_TOPOCTR)
     finally:
         state._TOPO = saved
@@ -996,5 +1001,30 @@ class TestEquatorialSpeedSelfConsistency:
                 p_p = le.calc_ut(jd + h, 13, f)[0]
                 num_ddec = (p_p[1] - p_m[1]) / (2 * h)
                 assert abs(rep[4] - num_ddec) * 3600.0 < 0.06, mode
+        finally:
+            le.set_calc_mode(prev)
+
+
+class TestTopoWithoutObserverRaisesUniformly:
+    """FLG_TOPOCTR without set_topo raises the typed ConfigurationError on
+    every body class and backend: the guard must NOT be a ValueError, or the
+    sealed curated-asteroid coverage fallback swallows it and silently
+    serves a Keplerian geocentric position (measured reference raises)."""
+
+    def test_curated_asteroids_raise_like_planets(self):
+        import libephemeris as le
+        from libephemeris.exceptions import ConfigurationError
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                le.close()  # drop any observer set by earlier tests
+                for body in (15, 17, 10001, 6, 40):
+                    try:
+                        le.calc_ut(2452000.5, body, 2 | le.FLG_TOPOCTR)
+                        raise AssertionError(f"{mode}/{body}: no raise")
+                    except ConfigurationError:
+                        pass
         finally:
             le.set_calc_mode(prev)
