@@ -2408,7 +2408,14 @@ def fast_calc_ut(
     # FLG_TOPOCTR: an explicit topo override (context calls) wins over
     # the global state set via set_topo().
     topo_offset = None
-    if iflag & FLG_TOPOCTR:
+    topo_geopos = None
+    if iflag & FLG_TOPOCTR and ipl in _TOPO_NOOP_POINTS:
+        # Parallax is a no-op for the geocentric-defined lunar points: the
+        # measured reference (and the Skyfield path) compute them under
+        # FLG_TOPOCTR without an observer and echo the bit. Leave
+        # topo_geopos unset so the offset stages below are skipped.
+        pass
+    elif iflag & FLG_TOPOCTR:
         if topo is not None:
             topo_geopos = (float(topo[0]), float(topo[1]), float(topo[2]))
         else:
@@ -2450,8 +2457,8 @@ def fast_calc_ut(
     jd_tt = tjd_ut + delta_t
 
     topo_offset_fn = None
-    if iflag & FLG_TOPOCTR:
-        _tgp = topo_geopos  # type: ignore[possibly-undefined]
+    if iflag & FLG_TOPOCTR and topo_geopos is not None:
+        _tgp = topo_geopos
         topo_offset = _topocentric_offset(_tgp, jd_tt, tjd_ut, reader)
         if iflag & FLG_SPEED:
             # Provider used by the velocity central difference to recover the
@@ -2479,6 +2486,13 @@ def fast_calc_ut(
         if escalated is not None:
             raise escalated from err
         raise
+
+
+# Geocentric-defined lunar points (nodes, apogees, interpolated apsides):
+# topocentric parallax is a no-op for them, and the measured reference (and
+# the Skyfield path) compute them under FLG_TOPOCTR without requiring an
+# observer. The missing-observer guard must not fire for these ids.
+_TOPO_NOOP_POINTS = frozenset({10, 11, 12, 13, 21, 22})
 
 
 def fast_calc_tt(
@@ -2519,7 +2533,14 @@ def fast_calc_tt(
     # FLG_TOPOCTR: an explicit topo override (context calls) wins over
     # the global state set via set_topo().
     topo_offset = None
-    if iflag & FLG_TOPOCTR:
+    topo_geopos = None
+    if iflag & FLG_TOPOCTR and ipl in _TOPO_NOOP_POINTS:
+        # Parallax is a no-op for the geocentric-defined lunar points: the
+        # measured reference (and the Skyfield path) compute them under
+        # FLG_TOPOCTR without an observer and echo the bit. Leave
+        # topo_geopos unset so the offset stages below are skipped.
+        pass
+    elif iflag & FLG_TOPOCTR:
         if topo is not None:
             topo_geopos = (float(topo[0]), float(topo[1]), float(topo[2]))
         else:
@@ -2570,8 +2591,8 @@ def fast_calc_tt(
         tjd_ut = tjd_tt - reader.delta_t(tjd_tt)
 
     topo_offset_fn = None
-    if iflag & FLG_TOPOCTR:
-        _tgp = topo_geopos  # type: ignore[possibly-undefined]
+    if iflag & FLG_TOPOCTR and topo_geopos is not None:
+        _tgp = topo_geopos
         topo_offset = _topocentric_offset(_tgp, tjd_tt, tjd_ut, reader)
         if iflag & FLG_SPEED:
             # Provider used by the velocity central difference to recover the

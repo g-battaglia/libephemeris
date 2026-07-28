@@ -1028,3 +1028,24 @@ class TestTopoWithoutObserverRaisesUniformly:
                         pass
         finally:
             le.set_calc_mode(prev)
+
+
+class TestTopoNoopLunarPoints:
+    """The geocentric-defined lunar points compute under FLG_TOPOCTR without
+    an observer (parallax no-op; measured reference echoes the bit), while
+    parallax-bearing bodies keep the typed ConfigurationError."""
+
+    def test_lunar_points_compute_without_observer(self):
+        import libephemeris as le
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                le.close()
+                for body in (10, 11, 12, 13, 21, 22):
+                    pos, rf = le.calc_ut(2451545.0, body, 2 | le.FLG_TOPOCTR)
+                    assert rf & le.FLG_TOPOCTR, (mode, body)
+                    assert 0.0 <= pos[0] < 360.0
+        finally:
+            le.set_calc_mode(prev)
