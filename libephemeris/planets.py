@@ -10151,10 +10151,34 @@ def _calc_pheno_asteroid(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     )
 
     if geo_dist > 0 and helio_dist > 0:
-        cos_pa = (geo_dist**2 + helio_dist**2 - sun_dist**2) / (
-            2.0 * geo_dist * helio_dist
+        # Vector apparent-triangle phase angle (Sun-body-Earth angle at the
+        # body), from the apparent geocentric and heliocentric directions -
+        # the same convention as the planet path and the LEB backend. The
+        # scalar law of cosines on the three apparent distances is NOT
+        # consistent here (light time and aberration make them a
+        # non-Euclidean triangle) and split the backends by up to ~10".
+        def _vec(lon_deg: float, lat_deg: float, r: float) -> tuple:
+            lo = math.radians(lon_deg)
+            la = math.radians(lat_deg)
+            return (
+                r * math.cos(la) * math.cos(lo),
+                r * math.cos(la) * math.sin(lo),
+                r * math.sin(la),
+            )
+
+        b_vec = _vec(float(target_pos[0]), float(target_pos[1]), geo_dist)
+        s_vec = _vec(float(sun_pos[0]), float(sun_pos[1]), sun_dist)
+        be = (-b_vec[0], -b_vec[1], -b_vec[2])
+        bs = (s_vec[0] - b_vec[0], s_vec[1] - b_vec[1], s_vec[2] - b_vec[2])
+        cx = be[1] * bs[2] - be[2] * bs[1]
+        cy = be[2] * bs[0] - be[0] * bs[2]
+        cz = be[0] * bs[1] - be[1] * bs[0]
+        phase_angle = math.degrees(
+            math.atan2(
+                math.sqrt(cx * cx + cy * cy + cz * cz),
+                be[0] * bs[0] + be[1] * bs[1] + be[2] * bs[2],
+            )
         )
-        phase_angle = math.degrees(math.acos(max(-1.0, min(1.0, cos_pa))))
     else:
         phase_angle = 0.0
     phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
