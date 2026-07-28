@@ -516,6 +516,7 @@ class SchaeferModel:
         observer: Optional[ObserverParams] = None,
         latitude: float = 0.0,
         jd: float = 2451545.0,
+        pressure_scales_extinction: bool = False,
     ):
         """
         Initialize the Schaefer model with atmospheric and observer conditions.
@@ -547,6 +548,18 @@ class SchaeferModel:
             )
 
         self.atmo = atmo
+
+        # Measured reference behavior: the heliacal extinction coefficient is
+
+        # pressure-INDEPENDENT (identical at 700 and 1013.25 mbar), while the
+
+        # limiting-magnitude surface scales Rayleigh with P/1013.25 (Schaefer
+
+        # 1993). The constructor toggle selects which convention this model
+
+        # instance uses; 0.0 selects the standard-atmosphere altitude form.
+
+        self._extinction_pressure = atmo.pressure if pressure_scales_extinction else 0.0
         self.observer = observer
         self.latitude = latitude
         self.jd = jd
@@ -570,7 +583,7 @@ class SchaeferModel:
             self.atmo.altitude,
             self.latitude,
             self.jd,
-            pressure_mbar=self.atmo.pressure,
+            pressure_mbar=self._extinction_pressure,
         )
         mr = self.atmo.met_range
         if 0.0 < mr < 1.0:
@@ -1025,6 +1038,7 @@ def create_schaefer_model(
     transmission: float = 1.0,
     latitude: float = 0.0,
     jd: float = 2451545.0,
+    pressure_scales_extinction: bool = False,
 ) -> SchaeferModel:
     """
     Create a SchaeferModel instance with given parameters.
@@ -1067,7 +1081,13 @@ def create_schaefer_model(
         aperture=aperture,
         transmission=transmission,
     )
-    return SchaeferModel(atmo, observer, latitude=latitude, jd=jd)
+    return SchaeferModel(
+        atmo,
+        observer,
+        latitude=latitude,
+        jd=jd,
+        pressure_scales_extinction=pressure_scales_extinction,
+    )
 
 
 # Outer planets (orbit outside Earth's orbit)
@@ -2451,6 +2471,7 @@ def _vis_limit_mag_leb(
         transmission=obs_transmission,
         latitude=lat,
         jd=tjdut,
+        pressure_scales_extinction=True,
     )
 
     # Moon phase and angular separations via LEB ecliptic positions
@@ -4878,6 +4899,7 @@ def vis_limit_mag(
         transmission=obs_transmission,
         latitude=lat,
         jd=tjdut,
+        pressure_scales_extinction=True,
     )
 
     # Calculate Moon phase for sky brightness
