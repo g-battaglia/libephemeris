@@ -2223,10 +2223,15 @@ def houses_ex(
             return cusps, ascmc
 
         # Sidereal house cusps use the MEAN-equinox ayanamsha (no nutation
-        # term — houses are geometric ARMC-frame quantities).
+        # term — houses are geometric ARMC-frame quantities). FLG_TRUEPOS /
+        # FLG_NOABERR are honoured: for the star/galactic-center anchored
+        # modes the anchor's annual aberration is removed from the subtracted
+        # value (measured reference behavior: every cusp and angle shifts by
+        # the same amount as the calc sidereal path under those bits).
+        from .constants import FLG_NOABERR, FLG_TRUEPOS
         from .planets import get_ayanamsa_ex_ut
 
-        ayanamsa = get_ayanamsa_ex_ut(tjdut, 0)[1]
+        ayanamsa = get_ayanamsa_ex_ut(tjdut, flags & (FLG_TRUEPOS | FLG_NOABERR))[1]
 
         # Compute sidereal angles
         # All ecliptic longitudes in ascmc get ayanamsa correction EXCEPT

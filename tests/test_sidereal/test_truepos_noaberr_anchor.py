@@ -133,3 +133,35 @@ def test_sidereal_calc_subtracts_the_aberration_free_ayanamsha(jd: float) -> Non
     buggy = (tropical - aya_plain) % 360.0
     if abs(_signed_arcsec(aya_truepos - aya_plain)) > 1.0:
         assert abs(_signed_arcsec(sid_actual - buggy)) > 0.5
+
+
+class TestAnchoredAberrationOnHousesAndFixstar:
+    """The houses and fixed-star sidereal paths consume the same anchored
+    ayanamsha aberration toggle as the calc chain (measured reference
+    behavior: every cusp/angle and star longitude shifts uniformly under
+    FLG_TRUEPOS/FLG_NOABERR for the anchored modes, and not at all for the
+    epoch-anchored ones)."""
+
+    def test_houses_and_fixstar_shift_for_anchored_mode(self):
+        import libephemeris as le
+
+        jd = 2437500.5
+        f = le.FLG_SWIEPH | le.FLG_SIDEREAL
+        le.set_sid_mode(27, 0.0, 0.0)  # True Citra (anchored)
+        a0 = le.houses_ex(jd, 45.0, 12.5, b"P", f)[1][0]
+        at = le.houses_ex(jd, 45.0, 12.5, b"P", f | le.FLG_TRUEPOS)[1][0]
+        assert abs((at - a0 + 180.0) % 360.0 - 180.0) * 3600.0 > 0.5
+        s0 = le.fixstar2_ut("Aldebaran", jd, f)[0][0]
+        st = le.fixstar2_ut("Aldebaran", jd, f | le.FLG_TRUEPOS)[0][0]
+        # Star shift = star's own aberration + anchor toggle; differs from
+        # the non-anchored baseline below by the anchor's response.
+        anchored = ((st - s0 + 180.0) % 360.0 - 180.0) * 3600.0
+        le.set_sid_mode(1, 0.0, 0.0)  # Lahiri (epoch-anchored)
+        b0 = le.fixstar2_ut("Aldebaran", jd, f)[0][0]
+        bt = le.fixstar2_ut("Aldebaran", jd, f | le.FLG_TRUEPOS)[0][0]
+        plainmode = ((bt - b0 + 180.0) % 360.0 - 180.0) * 3600.0
+        assert abs(anchored - plainmode) > 0.5
+        # Epoch-anchored houses stay put.
+        h0 = le.houses_ex(jd, 45.0, 12.5, b"P", f)[1][0]
+        ht = le.houses_ex(jd, 45.0, 12.5, b"P", f | le.FLG_TRUEPOS)[1][0]
+        assert abs((ht - h0 + 180.0) % 360.0 - 180.0) * 3600.0 < 0.001

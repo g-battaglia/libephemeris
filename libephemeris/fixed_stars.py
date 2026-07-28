@@ -3116,9 +3116,17 @@ def _apply_fixstar_flags(
 
             tjd_ut = get_timescale().tt_jd(jd).ut1
 
-            from .planets import get_ayanamsa_ut
+            from .planets import get_ayanamsa_ex_ut
 
-            plon = (plon - get_ayanamsa_ut(tjd_ut)) % 360.0
+            # Honour FLG_TRUEPOS/FLG_NOABERR on the subtracted ayanamsha:
+            # for the star/galactic-center anchored modes the anchor's
+            # annual aberration is removed (measured reference behavior;
+            # same toggle as the calc sidereal path). FLG_NONUT keeps the
+            # MEAN value this path has always subtracted (see step 3 note
+            # above): with neither aberration bit set this is exactly the
+            # former get_ayanamsa_ut mean value.
+            _ab_bits = iflag & (FLG_TRUEPOS | FLG_NOABERR)
+            plon = (plon - get_ayanamsa_ex_ut(tjd_ut, FLG_NONUT | _ab_bits)[1]) % 360.0
 
         return plon, plat, pdist
 
