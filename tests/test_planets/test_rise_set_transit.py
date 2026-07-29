@@ -113,7 +113,10 @@ class TestRiseTransLocations:
     def test_sun_rise_at_location(self, lat: float, lon: float, alt: int, name: str):
         """Sun rise is found at standard locations."""
         jd = 2451545.0
-        geopos = (lat, lon, alt)
+        # geopos is (longitude, latitude, altitude) per the public contract:
+        # the swapped order passed Tokyo/Sydney longitudes as latitudes >90
+        # and now trips the geodetic-domain validation.
+        geopos = (lon, lat, alt)
         res, tret = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
         assert res in (0, -2), f"{name}: result={res}"
 
@@ -122,7 +125,7 @@ class TestRiseTransLocations:
     def test_moon_rise_at_location(self, lat: float, lon: float, alt: int, name: str):
         """Moon rise is found at standard locations."""
         jd = 2451545.0
-        geopos = (lat, lon, alt)
+        geopos = (lon, lat, alt)
         res, tret = swe.rise_trans(jd, MOON, CALC_RISE, geopos)
         assert res in (0, -2), f"{name}: result={res}"
 

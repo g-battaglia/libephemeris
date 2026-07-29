@@ -27,9 +27,8 @@ argument (ΔT) and obliquity realization between body positions and house
 angles. Model accuracy depends on body class and source; the documented strict
 precision controls prevent an unnoticed minor-body downgrade.
 
-No numerical model is admitted only because it agrees with another software
-package. Each model, coefficient family, generated table, and public-data input
-has an explicit provenance boundary; every project-selected threshold or
+Each model, coefficient family, generated table, and public-data input
+has an explicit documented provenance; every project-selected threshold or
 approximation is identified separately and justified by a mathematical
 invariant, convergence argument, or measured error budget. The complete,
 machine-checked inventory is
@@ -144,9 +143,8 @@ astronomy tools during development:
 - **IAU 2015 Resolution B3** — official nominal values for solar and planetary
   radii, used for apparent-diameter calculations.
 
-For API semantics, known differences, and the clean-room validation methodology,
-see
-[Swiss Ephemeris Comparison](../comparison/index.md).
+For API semantics, known differences, and the validation methodology, see the
+[Compatibility Comparison](../comparison/index.md).
 
 ## References
 

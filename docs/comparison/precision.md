@@ -2,12 +2,10 @@
 
 LibEphemeris validates astronomical accuracy against independent sources:
 NASA JPL DE440/DE441 and Horizons, ERFA/SOFA, IERS, Hipparcos/Gaia/SIMBAD,
-Astropy, and published defining equations. PySwissEphemeris may be called only
-as an external reference API for compatibility comparison. Those observations
-are ephemeral: no returned value is stored in this page, a fixture, a
-coefficient, a table, or a generated artifact.
+Astropy, and published defining equations. Compatibility with the reference
+API is checked behaviorally, by comparing public outputs.
 
-This page therefore reports model classes and non-reconstructive aggregate
+This page reports model classes and non-reconstructive aggregate
 behavior rather than per-date reference output. Exact regression tolerances
 are documented next to their tests and justified from the relevant source's
 accuracy, a propagated numerical error budget, or a declared project acceptance
@@ -53,9 +51,8 @@ policy. A finite sampled test is not presented as proof of a continuous maximum.
 | Interpolated Apogee/Perigee | DE440 apsis passages + Delaunay series + hash-pinned residual tables | Exactness at the DE440 passages, endpoint, continuity, and derivative checks |
 
 Interpolated points are anchored to the actual DE440 apsis passages
-(exact there by construction); ephemeral comparison with external
-implementations between passages stays within ~0.05° in longitude and
-`0.25°` in latitude, without retaining any sampled output.
+(exact there by construction); between passages they stay within ~0.05° in
+longitude and `0.25°` in latitude of an external implementation.
 
 ## Independent triangulation
 

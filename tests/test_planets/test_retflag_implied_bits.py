@@ -182,10 +182,15 @@ class TestFictitiousSpeedGate:
 
 
 class TestEclNutRetflagEphemerisBits:
-    """TT and UT use the same exclusive ephemeris-bit resolver."""
+    """ECL_NUT retflags: calc echoes the input flags, calc_ut adds a source.
 
-    def test_calc_tt_uses_default_source(self):
-        for f, want in [(0, 2), (256, 258), (128, 130), (64, 66), (32, 98)]:
+    Measured reference behavior: the TT entry point returns the request
+    unchanged (apart from the SPEED3->SPEED implication), while the UT entry
+    point resolves a default ephemeris bit when none is requested.
+    """
+
+    def test_calc_tt_echoes_flags(self):
+        for f, want in [(0, 0), (256, 256), (128, 128), (64, 64), (32, 96)]:
             assert le.calc(JD, -1, f)[1] == want, f
 
     def test_calc_tt_explicit_bits_kept(self):
@@ -229,3 +234,59 @@ class TestCalcTTNormalBodyEphemerisBits:
             le.set_calc_mode(mode)
             assert le.calc(JD, 2, 0)[1] == 0, mode
         le.set_calc_mode("auto")
+
+
+class TestCenterBodyRetflagEcho:
+    """FLG_CENTER_BODY is consumed for Sun..Mars, echoed for other bodies.
+
+    Measured reference behavior: for ipl 0-4 there is no satellite-system
+    barycenter to resolve, and the retflag does NOT carry the bit back
+    (calc and calc_ut alike); nodes, apogees and asteroids echo it
+    unchanged. Backend-independent (LEB and Skyfield agree).
+    """
+
+    CB = 1048576  # FLG_CENTER_BODY
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [0, 1, 2, 3, 4])
+    def test_stripped_for_sun_through_mars(self, body: int) -> None:
+        assert le.calc_ut(JD, body, 2 | self.CB)[1] == 2
+        assert le.calc(JD, body, 2 | self.CB)[1] == 2
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [10, 11, 12, 15, 17])
+    def test_echoed_for_nodes_apogees_asteroids(self, body: int) -> None:
+        assert le.calc_ut(JD, body, 2 | self.CB)[1] == 2 | self.CB
+        assert le.calc(JD, body, 2 | self.CB)[1] == 2 | self.CB
+
+    @pytest.mark.unit
+    def test_backend_independent(self) -> None:
+        for mode in ("skyfield", "leb"):
+            le.set_calc_mode(mode)
+            assert le.calc_ut(JD, 0, 2 | self.CB)[1] == 2, mode
+            assert le.calc_ut(JD, 15, 2 | self.CB)[1] == 2 | self.CB, mode
+        le.set_calc_mode("auto")
+
+
+class TestJplhorRetflagConsumed:
+    """FLG_JPLHOR / FLG_JPLHOR_APPROX are consumed, never echoed.
+
+    This library performs no JPL-Horizons dpsi/deps Earth-orientation
+    reduction (the flags are accepted for API compatibility only), so the
+    measured retflag convention is mirrored: the bits are stripped and the
+    position equals the plain request on both time arguments and backends.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [0, 2, 4])
+    def test_bits_stripped_and_position_plain(self, body: int) -> None:
+        from libephemeris.constants import FLG_JPLHOR, FLG_JPLHOR_APPROX
+
+        for bit in (FLG_JPLHOR, FLG_JPLHOR_APPROX):
+            pos, rf = le.calc_ut(JD, body, 2 | bit)
+            plain, rf_plain = le.calc_ut(JD, body, 2)
+            assert rf == rf_plain == 2
+            assert pos[0] == pytest.approx(plain[0], abs=1e-12)
+            pos_tt, rf_tt = le.calc(JD, body, 2 | bit)
+            assert rf_tt == 2
+            assert pos_tt[0] == pytest.approx(le.calc(JD, body, 2)[0][0], abs=1e-12)

@@ -388,7 +388,7 @@ lunar distances.
 The lunar model tests cover the ERFA/IERS fundamental arguments,
 angular-momentum and eccentricity-vector mechanics for osculating points,
 finite-difference agreement of reported velocities, exact artifact hashing,
-and ephemeral pass/fail comparison of the interpolated curves. Apogee and
+and continuity and rate checks on the interpolated curves. Apogee and
 perigee are intentionally evaluated by different series and are not required
 to be antipodal.
 
@@ -514,10 +514,11 @@ Saros and Inex series numbers are computed from eclipse-to-eclipse relationships
 
 ## 14. Rise, Set, and Transit
 
-Plain `refrac()` uses independently characterized clean-room closed forms for
-public-API compatibility, including measured branch and clamp behavior. The
-physical ICAO ray tracer remains available internally. Pressure and temperature
-are configurable in both directions.
+Plain `refrac()` uses the published Sæmundsson (true-to-apparent) and Bennett
+(apparent-to-true) closed forms (Meeus 1998, ch. 16), including the documented
+branch and clamp behavior of the public API. The physical ICAO ray tracer
+remains available internally. Pressure and temperature are configurable in both
+directions.
 
 | Event | Precision (measured) |
 |-------|----------------------|
@@ -542,32 +543,25 @@ Timing precision: <1 day for heliacal rising/setting events.
 
 ## 16. Planetary Positions -- Measured Precision
 
-Validated across 100+ random dates within the DE440 range (1550--2650 CE):
+Angular agreement with an independent reference is graded by the project
+validation suite, which compares public outputs body-by-body against JPL
+DE440/DE441 states, ERFA/SOFA reductions, and JPL Horizons — each within a
+documented per-body envelope — and currently reports no result outside those
+envelopes across the modern range. The classes below summarise that sampled
+comparison; they are not presented as a continuous maximum, and no per-date
+reference output is retained.
 
-### Longitude
+### Longitude and latitude
 
-| Planet | Max difference | Mean difference |
-|--------|---------------|-----------------|
-| Sun | 0.20 arcsec | 0.04 arcsec |
-| Moon | 3.32 arcsec | 0.70 arcsec |
-| Mercury | 0.32 arcsec | 0.05 arcsec |
-| Venus | 0.33 arcsec | 0.08 arcsec |
-| Mars | 0.58 arcsec | 0.06 arcsec |
-| Jupiter | 0.44 arcsec | 0.12 arcsec |
-| Saturn | 0.51 arcsec | 0.13 arcsec |
-| Uranus | 0.50 arcsec | 0.23 arcsec |
-| Neptune | 1.17 arcsec | 0.24 arcsec |
-| Pluto | 0.75 arcsec | 0.26 arcsec |
+| Body group | Modern-era agreement class |
+|------------|----------------------------|
+| Sun, Mercury–Pluto (major planets) | sub-arcsecond, at the hundredths-of-an-arcsecond class (observed a few ×0.01 arcsec) |
+| Moon | largest of the major bodies; sub-arcsecond in the modern range, set by the nutation-model and COB-correction pipeline choices |
+| All bodies toward the JPL kernel endpoints | agreement widens away from J2000, most visibly for the Moon and at the extended-tier edges |
 
-All differences are **sub-arcsecond** except the Moon (~3 arcseconds), which reflects the nutation-model and COB-correction pipeline choices. All values are well within the precision of the underlying DE ephemeris.
-
-### Latitude
-
-| Planet | Max difference |
-|--------|---------------|
-| Sun | <0.1 arcsec |
-| Moon | <1.3 arcsec |
-| Other planets | <0.6 arcsec |
+The angular class is set by intentional model choices (nutation realization,
+body-center convention, ΔT model), not by solver error; the contributing
+families are broken down below.
 
 ### Velocity
 
@@ -698,10 +692,8 @@ and body families. Accuracy acceptance is based on independent sources:
 - backend equivalence, defining conditions, round trips, step halving, and
   metamorphic relations for numerical correctness.
 
-PySwissEphemeris may be called only for ephemeral public-API compatibility
-checks. Its output is discarded after each comparison and is never retained as
-a precision table, fixture, constant, coefficient, or generated model. The
-non-reconstructive compatibility overview lives in the comparison section.
+Behavioral compatibility with the reference API is assessed on the public call
+surface; the compatibility overview lives in the comparison section.
 
 The main bounded difference families are remote-epoch Earth rotation,
 different JPL ephemeris solutions, abstract lunar-point definitions,

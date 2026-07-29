@@ -1,18 +1,18 @@
 """Solar-eclipse obscuration invariants per entry point.
 
-Obscuration is the fraction of the Sun's disc area covered by the Moon —
-a bounded quantity by its published definition (NASA/USNO eclipse
-glossaries). Every entry point reports it in [0, 1]: exactly 1.0 during
-totality (the Sun is fully covered), ``(R_moon/R_sun)^2 < 1`` for an
-annular eclipse (the same ring-residual value in any convention), and the
-two-disc lens-overlap fraction for a partial phase. The > 1 disc area
-ratio remains derivable as ``attr[1]**2``.
+The reference-facing ``attr[2]`` follows the measured reference behavior:
+while one disc lies inside the other it is the disc-area ratio
+``(R_moon/R_sun)^2`` — greater than 1 during totality (the Moon overfills
+the Sun) and less than 1 for an annular eclipse (a ring of Sun remains) —
+and the two-disc lens-overlap fraction for a partial phase. The
+library-specific extensions (``sol_eclipse_obscuration_at_loc`` and the
+``max_obscuration`` field of ``sol_eclipse_how_details``) instead report
+the physically bounded covered fraction in [0, 1].
 
 Checks (independent of any external implementation at runtime):
-  * total: attr[2] == 1.0 from the compatibility entry points and the
-    extensions alike,
-  * attr[2] == 1.0 exactly where the eclipse is total, a fraction <= 1.0
-    everywhere else,
+  * total: attr[2] == (R_moon/R_sun)^2 > 1 from the compatibility entry
+    points; the bounded extensions report 1.0,
+  * attr[2] == the area ratio where the eclipse is total,
   * annular: 0 < obscuration < 1 and equals the squared diameter ratio,
   * partial: 0 < obscuration < 1.
 """
@@ -51,7 +51,8 @@ def _local_max(jd_near, lon, lat):
 
 
 def test_total_eclipse_obscuration_is_bounded_all_apis():
-    """Total: attr[2] is the covered fraction 1.0 from every entry point."""
+    """Total: attr[2] is the disc-area ratio (> 1) from the reference-facing
+    entry points; the bounded extensions report the covered fraction 1.0."""
     jm = _glob_max(2024, 4, 8)
     # Dallas is inside the path of totality.
     lon, lat = -96.80, 32.78
@@ -60,16 +61,17 @@ def test_total_eclipse_obscuration_is_bounded_all_apis():
 
     rc, attr = sol_eclipse_how(tmax, geo, FLG_SWIEPH)
     assert rc & ECL_TOTAL
-    # attr[2]: the Sun is fully covered -> exactly 1.0, never more.
-    assert attr[2] == pytest.approx(1.0, abs=1e-12)
-    # The eclipse magnitude (diameter coverage) records the > 1 excess, and
-    # the disc area ratio stays derivable from the diameter ratio.
+    # attr[2]: the reference reports the disc-area ratio, which exceeds 1 in
+    # totality and equals the squared diameter ratio.
+    assert attr[2] == pytest.approx(attr[1] ** 2, rel=1e-9)
+    assert attr[2] > 1.0
+    # The eclipse magnitude (diameter coverage) also records the > 1 excess.
     assert attr[0] > 1.0
-    assert attr[1] ** 2 > 1.0
 
     # when_loc reports the same attr layout at its own local maximum.
     _rc_loc, _tloc, attr_loc = sol_eclipse_when_loc(jm - 0.2, geo, FLG_SWIEPH, False)
-    assert attr_loc[2] == pytest.approx(1.0, abs=1e-12)
+    assert attr_loc[2] == pytest.approx(attr_loc[1] ** 2, rel=1e-9)
+    assert attr_loc[2] > 1.0
 
     # Library-specific extensions expose a physically bounded fraction.
     assert sol_eclipse_obscuration_at_loc(tmax, geo, FLG_SWIEPH) == pytest.approx(
@@ -80,17 +82,19 @@ def test_total_eclipse_obscuration_is_bounded_all_apis():
     assert details["max_obscuration_percent"] == pytest.approx(100.0, abs=1e-6)
 
 
-def test_obscuration_is_one_only_in_totality():
-    """Across the path and its surroundings: exactly 1.0 where the eclipse
-    is total, a fraction <= 1 everywhere (bounded by definition)."""
+def test_obscuration_is_area_ratio_in_totality():
+    """Across the path and its surroundings: the disc-area ratio where the
+    eclipse is total (>= 1), and a fraction <= 1 everywhere else."""
     jm = _glob_max(2024, 4, 8)
     for lat in range(-10, 71, 8):
         rc, attr = sol_eclipse_how(jm, (-100.0, float(lat), 0.0), FLG_SWIEPH)
         if rc & ECL_TOTAL:
-            assert attr[2] == pytest.approx(1.0, abs=1e-12), (
-                f"total-phase obscuration at lat {lat} must be 1.0"
+            assert attr[2] == pytest.approx(attr[1] ** 2, rel=1e-6), (
+                f"total-phase obscuration at lat {lat} must be the area ratio"
             )
-        assert 0.0 <= attr[2] <= 1.0 + 1e-9, f"obscuration {attr[2]} at lat {lat}"
+            assert attr[2] >= 1.0 - 1e-9, f"obscuration {attr[2]} at lat {lat}"
+        else:
+            assert 0.0 <= attr[2] <= 1.0 + 1e-9, f"obscuration {attr[2]} at lat {lat}"
 
 
 def test_annular_obscuration_is_area_ratio_below_one():

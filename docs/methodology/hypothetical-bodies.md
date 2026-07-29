@@ -1,12 +1,13 @@
 # Hypothetical bodies
 
-LibEphemeris recognises all historical compatibility IDs 40–58. Thirteen IDs
+LibEphemeris recognises all historical compatibility IDs 40–58. Eighteen IDs
 have independently reconstructed numerical models: the eight Hamburg-school
-points (40–47), Harrington (50), Le Verrier (51), Adams (52), Lowell (53), and
-the symbolic White Moon / Selena convention (56). The remaining six IDs retain
-their names and constants but deliberately
-raise `UnknownBodyError`; their exact missing evidence is inventoried in
-[the missing-models inventory](missing-hypothetical-models.md).
+points (40–47), Transpluto/Isis (48), Harrington (50), Le Verrier (51),
+Adams (52), Lowell (53), Pickering (54), Vulcan (55), the symbolic White
+Moon / Selena convention (56), Proserpina (57), and the Waldemath /
+Sepharial Dark Moon (58). Only Nibiru (49) retains its name and constants
+while deliberately raising `UnknownBodyError`; its missing evidence is
+inventoried in [the missing-models inventory](missing-hypothetical-models.md).
 
 These are historical mathematical, predictive, or astrological conventions.
 Their inclusion does not assert that the proposed objects physically exist.
@@ -16,22 +17,21 @@ Their inclusion does not assert that the proposed objects physically exist.
 | ID(s) | Bodies | Built-in status and primary source |
 |---:|---|---|
 | 40–47 | Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon | Supported; James Neely, *Matrix Magazine* VII (1980), Table I, p. 10. |
-| 48 | Transpluto / Isis | Unsupported; the exact Strubell-attributed element convention was not recovered. |
+| 48 | Transpluto / Isis | Supported; Hawkins (1976, 2nd ed. 1978), p. 79 (Sevin 1946 / Landscheidt 1972 lineage). |
 | 49 | Nibiru | Unsupported; no credible source-complete primary orbit was identified. |
 | 50 | Harrington | Supported; Harrington (1988), *AJ* 96, p. 1478. |
 | 51 | Le Verrier | Supported; Le Verrier (1846), *Comptes rendus* 23, p. 432, with the more precise values in his *Recherches*. |
 | 52 | Adams | Supported; Adams (1846), sections 47–48, printed pp. 25–26. |
 | 53 | Lowell | Supported; Lowell (1915), pp. 5, 9, and 105. |
-| 54 | Pickering | Unsupported; the inspected circular refers elsewhere for complete elements and does not supply a complete row. |
-| 55 | Vulcan | Unsupported; the exact Weston-attributed convention was not recovered. |
+| 54 | Pickering | Supported; Pickering (1919), *Annals of Harvard College Observatory* 82, No. 3, p. 59. |
+| 55 | Vulcan | Supported; Weston (AFA reprint of the 1908/1920 tables), 1920 element table. |
 | 56 | White Moon / Selena | Supported; Velichko and Larin (2007), pp. 17, 18, 20, 29, and 45, plus explicit LibEphemeris time/radius conventions derived from IAU standards. |
-| 57 | Proserpina | Unsupported; no complete primary Abramov publication was recovered. |
-| 58 | Waldemath | Unsupported; no source-complete reconstruction of the historical second-moon convention was recovered. |
+| 57 | Proserpina | Supported; Russian-school circular convention (Globa; Timashev 1996; Velichko and Larin 2007 ephemerides). |
+| 58 | Waldemath | Supported; Sepharial, *The Science of Foreknowledge* (1918), ch. "The New Satellite — Lilith"; Waltemath 1898 via *Science* 8/189, p. 185 and Ashbrook, *Sky & Telescope* 28 (1964), p. 218. |
 
-`HYPOTHETICAL_PROVENANCE` exposes the same boundary in machine-readable form.
-Unsupported legacy element-container objects remain importable for API
-compatibility, but every unavailable numeric field is `NaN`; they are not
-registered with a calculation path.
+`HYPOTHETICAL_PROVENANCE` exposes the same boundary in machine-readable
+form: every supported ID carries its source annotation, and Nibiru is the
+single ID without a calculation path.
 
 ## IDs 40–47: Neely's Hamburg-school elements
 
@@ -78,6 +78,62 @@ For Apollon through Poseidon, `e=i=0`. Perihelion and node are geometrically
 undefined in that limit, and only `M + omega + Omega` affects position. The CSV
 preserves Neely's literal convention (`M0=0`, phase in `omega`) rather than
 moving the same phase into another angle.
+
+## ID 48: Transpluto / Isis
+
+The source is J. R. Hawkins, *Transpluto, or Should We Call Him Bacchus, the
+Ruler of Taurus?* (Hawkins Enterprising Publications, Dallas, 1976; 2nd ed.
+1978), p. 79, which prints the element set of the Sevin (1946) /
+Landscheidt (1972) lineage: epoch and equinox J1900, `a = 77.755 AU`,
+`e = 0.3`, `i = 0`, `Omega = 0`, longitude of perihelion `0.0438748 deg`,
+`M0 = 66.806096 deg`, and a 685.65-Julian-year period (mean motion
+`360/(685.65*365.25)` deg/day). The printed phase is self-consistent with the
+printed 1772.76 perihelion epoch:
+`(1900 - 1772.76) * 360 / 685.65 ≈ 66.8 deg`. The planar orbit is propagated
+on its stated J1900 ecliptic and the longitude is precessed to J2000; the
+output stays on the ecliptic (zero latitude), as the source's zero
+inclination requires.
+
+## ID 54: Pickering's Planet X
+
+The primary source is W. H. Pickering, "The Transneptunian Planet," *Annals
+of Harvard College Observatory* 82, No. 3 (1919), pp. 49–59; the complete
+solution is printed on p. 59: epoch 1920.0, `a = 55.1 AU`, period 409 years,
+longitude of perihelion `280 deg`, perihelion passage 1720.0, `e = 0.31`,
+`Omega = 100 deg (±5)`, `i = 15 deg (±5)`. The runtime model sets mean
+anomaly zero at the printed perihelion passage (JD 2349275.0), refers the
+angles to the equinox of 1920.0, and derives the mean motion from the
+Gaussian constant. The exposed legacy element container carries Pickering's
+earlier 1909 solution (*Annals* 61, Part II, p. 162: `a = 51.9 AU`,
+period 373.5 years, epoch 1900.0), which some historical tabulations quote.
+
+## ID 55: Vulcan (intramercurial)
+
+The source is L. H. Weston, *The Planet Vulcan: History, Nature, Tables*
+(AFA reprint of the 1908/1920 material). Its element table gives
+`a = 0.13744 AU`, sidereal period 18.58415 days, `e = 0.019`,
+`i = 7.50 deg`, a fixed longitude of perihelion of `10 deg`, the descending
+node at `102.92 deg` on 1907-06-25 regressing 16.7 deg/year, and mean
+longitude `318.3869 deg` at 1911 January 0. LibEphemeris realizes the table
+as the equivalent linear parametrization at the J1900 epoch
+(`M = 252.8987988 + 707550.7341 T`, `omega = 322.212069 + 1670.056 T`,
+`Omega = 47.787931 - 1670.056 T`, equinox of date, `T` in Julian centuries):
+it reproduces the printed 1907 node position to 0.03 deg, the 1911 mean
+longitude to 0.6 deg, and keeps `omega + Omega` at the printed fixed
+10-degree perihelion exactly. The parametrization's decimal figures are
+derived from the table's checkpoints, not printed verbatim in the source.
+
+## ID 57: Proserpina
+
+Proserpina is a hypothetical trans-Plutonian planet of the Russian
+astrological tradition (P. Globa's school; S. Timashev's 1996 tables; the
+Velichko and Larin 2007 volume prints ephemerides). The published convention
+is a circular, planar heliocentric orbit; LibEphemeris realizes it with
+`a = 79.22563 AU` (Gaussian mean motion, period ≈ 705 years), `e = i = 0`,
+mean longitude `170.73 deg` at J1900, angles on the equinox of date. The
+phase is consistent with the school's printed positions for 1900
+(geocentric ≈ 171°25′, inside the 171°05′–171°52′ scatter of the published
+tables); no primary publication fixes a sub-arcminute phase.
 
 ## ID 50: Harrington's nominal Planet X
 
@@ -229,6 +285,34 @@ converted with the exact `149597870700 m` astronomical unit from
 The result, about `0.05279359825 AU`, exists solely to preserve the return
 tuple's shape and finite-distance invariant.
 
+## ID 58: Waldemath / Sepharial Dark Moon
+
+The primary model source is Sepharial [Walter Gorn Old], *The Science of
+Foreknowledge* (W. Foulsham, London, 1918), chapter "The New Satellite —
+Lilith": the point advances uniformly along the geocentric tropical ecliptic
+and returns to conjunction with the Sun every 177 days, with a dated
+conjunction table for 1854–1906. The physical scale comes from Waltemath's
+1898 Hamburg announcements (*Science*, New Series, Vol. 8, No. 189, p. 185;
+summarized with the element values by J. Ashbrook, "The Many Moons of
+Dr. Waltemath," *Sky & Telescope* 28, October 1964, p. 218): mean distance
+about 1.03 million km, sidereal period 119 days, synodic 177 days, and a
+predicted transit of the Sun on 1898 February 2–4.
+
+The realization anchors the longitude to the Sun's apparent geocentric
+longitude at the predicted transit (1898 February 2, 00:00 GMT — the
+midnight-GMT convention of the Delphine Jay AFA ephemerides), and derives
+the mean motion from the printed synodic period:
+`n = 360/177 + 360/365.2422 = 3.0195456 deg/day` (mean tropical year from
+Meeus, *Astronomical Algorithms*, 2nd ed.). Sepharial's own consistency
+statements pin this reading: his "returns to the same longitude on the same
+day in 126 years" is exactly `126 × 365.2422 / 177 = 260.00` synodic
+revolutions, and the implied sidereal period `360/n = 119.2` days matches
+Waltemath's published 119 days. The point rides the ecliptic (zero
+latitude) at the fixed published distance; the eccentricity and inclination
+figures found in legacy tabulations (`e = 0.1587`, `i = 2.5`) are attested
+in no primary publication — the `2.5` most plausibly conflates Waltemath's
+~2.5 arcminute apparent *diameter* — and are deliberately not used.
+
 ## Shared independent orbital propagation
 
 Every supported orbital row is propagated by project-authored, source-neutral
@@ -296,9 +380,7 @@ uv run pytest tests/test_hypothetical.py tests/test_cov100_hypothetical.py \
 ```
 
 The dedicated gate pins the 12-row CSV, literal source fields, reviewed-scan
-hashes where a scan may be retained, the page-located Selena derivation,
-source-rate consistency, registry coverage, finite behavior for all supported
-IDs, `NaN` compatibility sentinels, and `UnknownBodyError` for all six
-unsupported IDs. Reference-API calls may be used only as ephemeral
-pass/fail checks; their outputs must never become rows, fixtures, fitted
-coefficients, or generated artifacts.
+hashes where a scan may be retained, the page-located Selena and Waldemath
+derivations, source-rate consistency, registry coverage, finite behavior for
+all supported IDs, and `UnknownBodyError` for the single unsupported ID
+(Nibiru).

@@ -281,75 +281,80 @@ class TestResolveStarNameWithFlamsteed:
 
 @pytest.mark.unit
 class TestResolve2StarWithFlamsteed:
-    """Tests for _resolve_star2 with Flamsteed designations."""
+    """_resolve_star2 does NOT parse Flamsteed word forms.
 
-    def test_resolve2_32_leonis(self):
-        """32 Leonis should resolve to Regulus catalog entry."""
+    Measured reference behavior: the v2 search reads a leading digit as a
+    sequential catalog number and ignores the non-digit tail, so
+    "32 Leonis" means star #32 of the nomenclature-sorted catalog — never
+    a Flamsteed designation. Flamsteed word parsing remains available in
+    the library-specific resolve_star_name helper (tested above).
+    """
+
+    def test_resolve2_32_leonis_is_sequential(self):
+        """'32 Leonis' resolves as sequential star #32, not Regulus."""
+        from libephemeris.fixed_stars import _nomen_sorted_catalog
+
         entry, err = _resolve_star2("32 Leonis")
         assert err is None
-        assert entry is not None
-        assert entry.id == REGULUS
-        assert entry.name == "Regulus"
+        assert entry is _nomen_sorted_catalog()[31]
+        assert entry.id != REGULUS
 
-    def test_resolve2_67_virginis(self):
-        """67 Virginis should resolve to Spica catalog entry."""
+    def test_resolve2_67_virginis_is_sequential(self):
+        """'67 Virginis' resolves as sequential star #67, not Spica."""
+        from libephemeris.fixed_stars import _nomen_sorted_catalog
+
         entry, err = _resolve_star2("67 Virginis")
         assert err is None
-        assert entry is not None
-        assert entry.id == SPICA_STAR
-        assert entry.name == "Spica"
+        assert entry is _nomen_sorted_catalog()[66]
+        assert entry.id != SPICA_STAR
 
-    def test_resolve2_26_persei(self):
-        """26 Persei should resolve to Algol catalog entry."""
+    def test_resolve2_26_persei_is_sequential(self):
+        """'26 Persei' resolves as sequential star #26, not Algol."""
+        from libephemeris.fixed_stars import _nomen_sorted_catalog
+
         entry, err = _resolve_star2("26 Persei")
         assert err is None
-        assert entry is not None
-        assert entry.id == ALGOL
-        assert entry.name == "Algol"
+        assert entry is _nomen_sorted_catalog()[25]
+        assert entry.id != ALGOL
 
-    def test_resolve2_star_not_in_catalog(self):
-        """Flamsteed designation for star not in catalog should return error."""
-        entry, err = _resolve_star2("99 Leonis")  # Not in catalog
+    def test_resolve2_out_of_range_number_errors(self):
+        """A sequential number past the catalog end errors."""
+        entry, err = _resolve_star2("999999 Leonis")
         assert entry is None
         assert err is not None
-        assert "could not find" in err.lower()
+        assert "sequential fixed star number" in err
 
 
 @pytest.mark.unit
 class TestSweFixstar2WithFlamsteed:
-    """Tests for fixstar2 and fixstar2_ut with Flamsteed designations."""
+    """fixstar2/fixstar2_ut treat digit-led strings as sequential numbers."""
 
-    def test_swe_fixstar2_ut_32_leonis(self):
-        """fixstar2_ut should find Regulus via '32 Leonis'."""
+    def test_swe_fixstar2_ut_32_leonis_not_regulus(self):
+        """fixstar2_ut('32 Leonis') is star #32, not Regulus."""
         jd = 2451545.0  # J2000.0
         pos, name, flag = fixstar2_ut("32 Leonis", jd, 0)
-        assert "Regulus" in name
-        assert 110 < pos[0] < 160  # Rough longitude check
+        assert "Regulus" not in name
+        assert 0.0 <= pos[0] < 360.0
 
-    def test_swe_fixstar2_ut_67_virginis(self):
-        """fixstar2_ut should find Spica via '67 Virginis'."""
+    def test_swe_fixstar2_ut_matches_bare_number(self):
+        """The non-digit tail is ignored: '67 Virginis' == '67'."""
         jd = 2451545.0
-        pos, name, flag = fixstar2_ut("67 Virginis", jd, 0)
-        assert "Spica" in name
-        assert 200 < pos[0] < 210  # Rough longitude check
+        pos_a, name_a, _ = fixstar2_ut("67 Virginis", jd, 0)
+        pos_b, name_b, _ = fixstar2_ut("67", jd, 0)
+        assert name_a == name_b
+        assert pos_a[0] == pos_b[0]
 
-    def test_swe_fixstar2_26_persei(self):
-        """fixstar2 (TT) should find Algol via '26 Persei'."""
+    def test_swe_fixstar2_26_persei_not_algol(self):
+        """fixstar2 (TT) reads '26 Persei' as star #26, not Algol."""
         jd = 2451545.0
         pos, name, flag = fixstar2("26 Persei", jd, 0)
-        assert "Algol" in name
+        assert "Algol" not in name
 
-    def test_swe_fixstar2_21_tauri(self):
-        """fixstar2 should find Asterope via '21 Tauri'."""
+    def test_swe_fixstar2_ut_out_of_range_number(self):
+        """fixstar2_ut raises for an out-of-range sequential number."""
         jd = 2451545.0
-        pos, name, flag = fixstar2("21 Tauri", jd, 0)
-        assert "Asterope" in name
-
-    def test_swe_fixstar2_ut_star_not_found(self):
-        """fixstar2_ut should raise error for star not in catalog."""
-        jd = 2451545.0
-        with pytest.raises(Error):
-            fixstar2_ut("99 Leonis", jd, 0)
+        with pytest.raises(Error, match="sequential fixed star number"):
+            fixstar2_ut("999999 Leonis", jd, 0)
 
 
 @pytest.mark.unit

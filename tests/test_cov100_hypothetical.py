@@ -158,10 +158,12 @@ def test_fictitious_position_rejects_nonclassical_id_with_body_id() -> None:
     assert raised.value.body_id == ISIS
 
 
-def test_transpluto_raw_rejects_unverified_elements() -> None:
-    with pytest.raises(UnknownBodyError) as raised:
-        _calc_transpluto_raw(J2000)
-    assert raised.value.body_id == ISIS
+def test_transpluto_raw_returns_planar_published_state() -> None:
+    longitude, latitude, distance = _calc_transpluto_raw(J2000)
+    assert 0.0 <= longitude < 360.0
+    assert latitude == 0.0
+    # r must stay inside the published a=77.755, e=0.3 orbit bounds.
+    assert 77.755 * 0.7 <= distance <= 77.755 * 1.3
 
 
 def test_dispatch_calculates_reviewed_uranian_id() -> None:

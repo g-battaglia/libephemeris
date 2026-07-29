@@ -357,20 +357,21 @@ def test_resolve_star_ref_digit_then_nondigit():
 
 
 def test_resolve_star_ref_sequential_out_of_range():
-    """Out-of-range sequential number errors (2546)."""
+    """Out-of-range sequential number errors with the v1 message (2546)."""
     star_id, error, name = fs._resolve_star_ref("999999")
     assert star_id == -1
-    assert "sequential" in error
+    assert error == "star 999999 not found"
 
 
 def test_resolve_star_ref_rejects_wildcard():
     """The v1 family treats '%' strings as plain unmatched names (the
     reference API rejects wildcards on fixstar/fixstar_ut/fixstar_mag;
-    the prefix search belongs to the fixstar2 family only)."""
+    the prefix search belongs to the fixstar2 family only). The v1 error
+    echoes the raw search string."""
     for q in ("Reg%", "Sir%", "Reg%ul", "Reg%%", "Zzzzq%"):
         star_id, error, _ = fs._resolve_star_ref(q)
         assert star_id == -1
-        assert "could not find star name" in error
+        assert error == f"star {q} not found"
 
 
 def test_resolve_star2_wildcard_prefix():
@@ -387,14 +388,21 @@ def test_resolve_star2_wildcard_prefix():
 
 def test_resolve_star2_wildcard_invalid_and_no_match():
     """A '%' anywhere but as the sole trailing char is invalid; an
-    unmatched prefix errors."""
+    unmatched prefix gets the dedicated did-not-match message."""
     for q in ("%Spica", "Sir%%", "Re%g"):
         entry, error = fs._resolve_star2(q)
         assert entry is None
         assert "invalid search string" in error
     entry, error = fs._resolve_star2("Zzzzq%")
     assert entry is None
-    assert "could not find star name" in error
+    assert error == "star search string zzzzq% did not match"
+
+
+def test_resolve_star2_wildcard_empty_prefix():
+    """A bare '%' (empty prefix) matches the first sorted-catalog entry."""
+    entry, error = fs._resolve_star2("%")
+    assert error is None
+    assert entry is fs._ref_sorted_catalog()[0]
 
 
 def test_resolve_star_ref_alias_id_without_entry(monkeypatch):
@@ -717,29 +725,33 @@ def test_resolve_star2_name_hip_fix():
     assert error is None
 
 
-def test_resolve_star2_bayer():
-    """Bayer designation resolves via nomenclature (3188).
+def test_resolve_star2_no_bayer_word_parsing():
+    """Bayer designations in words do NOT resolve in the v2 search.
 
-    "Theta Octantis" is not an exact name/alias/nomenclature/name-fix, so the
-    Bayer-parser tier handles it.
+    The reference v2 search errors on "Alpha Centauri"-style strings: bare
+    forms resolve by traditional name only. ",thOct" (nomenclature after a
+    comma) is the supported spelling.
     """
     entry, error = fs._resolve_star2("Theta Octantis")
-    assert entry is not None
-    assert entry.nomenclature == "thOct"
+    assert entry is None
+    assert error == "could not find star name thetaoctantis"
+    entry, error = fs._resolve_star2(",thOct")
+    assert error is None
+    assert entry is not None and entry.nomenclature == "thOct"
 
 
-def test_resolve_star2_partial_nomenclature_single():
-    """A unique partial nomenclature match resolves (3215, 3218)."""
+def test_resolve_star2_no_partial_nomenclature():
+    """Partial nomenclature strings do not resolve (no implicit prefix)."""
     entry, error = fs._resolve_star2("zePh")
-    assert entry is not None
-    assert entry.nomenclature == "zePhe"
+    assert entry is None
+    assert error == "could not find star name zeph"
 
 
-def test_resolve_star2_partial_nomenclature_ambiguous():
-    """An ambiguous partial nomenclature match errors (3220-3221)."""
+def test_resolve_star2_no_ambiguous_partial():
+    """A short partial errors as unknown, never as an ambiguity report."""
     entry, error = fs._resolve_star2("ALE")
     assert entry is None
-    assert "Ambiguous" in error
+    assert error == "could not find star name ale"
 
 
 def test_resolve_star2_alias_id_without_entry(monkeypatch):
@@ -751,13 +763,16 @@ def test_resolve_star2_alias_id_without_entry(monkeypatch):
     assert entry is None
 
 
-def test_resolve_star2_flamsteed_id_without_entry(monkeypatch):
-    """A Flamsteed alias id without a catalog entry falls through (3196->3201)."""
-    aliases = dict(fs.STAR_ALIASES)
-    aliases["99 LEO"] = 88888888
-    monkeypatch.setattr(fs, "STAR_ALIASES", aliases)
+def test_resolve_star2_no_flamsteed_word_parsing():
+    """Flamsteed designations in words do not resolve in the v2 search.
+
+    "99 Leonis" starts with a digit, so the v2 rules read it as sequential
+    star number 99 (the "leonis" tail is ignored) — never as a Flamsteed
+    word form.
+    """
     entry, error = fs._resolve_star2("99 Leonis")
-    assert entry is None
+    assert error is None
+    assert entry is fs._nomen_sorted_catalog()[98]
 
 
 # ---------------------------------------------------------------------------

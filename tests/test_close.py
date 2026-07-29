@@ -111,13 +111,21 @@ class TestCloseFunction:
 
         assert state._TIDAL_ACCELERATION is None
 
-    def test_close_resets_delta_t_userdef(self):
-        """close() should reset user-defined delta T to None."""
+    def test_close_preserves_delta_t_userdef(self):
+        """close() preserves a user-defined delta T (measured reference behavior).
+
+        The reference API keeps set_delta_t_userdef() across close(); it is
+        treated as configuration, not per-session state, and is only cleared by
+        an explicit set_delta_t_userdef(None).
+        """
         libephemeris.set_delta_t_userdef(0.001)
         assert state._DELTA_T_USERDEF == 0.001
 
         close()
 
+        assert state._DELTA_T_USERDEF == 0.001
+
+        libephemeris.set_delta_t_userdef(None)
         assert state._DELTA_T_USERDEF is None
 
     def test_close_resets_lapse_rate(self):

@@ -186,6 +186,70 @@ class TestOrbitMaxMinTrueDistanceOuterPlanets:
         assert 48.0 < max_dist < 52.0
 
 
+class TestOrbitMaxMinTrueDistanceInvalidObjects:
+    """Objects without an orbit raise the reference-format Error."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [10, 11, 12, 13, 21, 22, -1])
+    def test_points_without_orbit_raise(self, ipl):
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error) as exc:
+            ephem.orbit_max_min_true_distance(2451545.0, ipl, 0)
+        assert str(exc.value) == (
+            f"orbit_max_min_true_distance: error in get_orbital_elements(): "
+            f"object {ipl} not valid"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [23, 30, 39])
+    def test_undefined_block_raises_illegal(self, ipl):
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error) as exc:
+            ephem.orbit_max_min_true_distance(2451545.0, ipl, 0)
+        assert str(exc.value) == (
+            f"orbit_max_min_true_distance: illegal planet number {ipl}."
+        )
+
+    @pytest.mark.unit
+    def test_sun_is_valid_here(self):
+        """Unlike get_orbital_elements, the Sun is a valid target for
+        orbit_max_min_true_distance (Earth-orbit range)."""
+        max_dist, min_dist, _ = ephem.orbit_max_min_true_distance(2451545.0, SUN, 0)
+        assert 1.01 < max_dist < 1.02
+        assert 0.98 < min_dist < 0.99
+
+
+class TestOrbitMaxMinHelctrIgnored:
+    """FLG_HELCTR is ignored for the Sun and Moon (hel == geo)."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [SUN, MOON])
+    def test_helctr_matches_geo(self, ipl):
+        geo = ephem.orbit_max_min_true_distance(2451545.0, ipl, 0)
+        hel = ephem.orbit_max_min_true_distance(2451545.0, ipl, ephem.FLG_HELCTR)
+        for g, h in zip(geo, hel):
+            assert g == pytest.approx(h, abs=1e-9)
+
+
+class TestOrbitMaxMinGeocentricFictitious:
+    """White Moon (56) / Waldemath (58): geocentric circular constructions."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [56, 58])
+    def test_max_min_true_are_the_model_radius(self, ipl):
+        max_dist, min_dist, true_dist = ephem.orbit_max_min_true_distance(
+            2451545.0, ipl, 0
+        )
+        # Near-circular geocentric model: the three distances collapse onto the
+        # small Earth-relative radius (~0.05 / ~0.007 AU), not the reference's
+        # eccentric heliocentric range.
+        assert max_dist < 0.1
+        assert min_dist == pytest.approx(max_dist, rel=0.05)
+        assert min_dist - 1e-9 <= true_dist <= max_dist + 1e-9
+
+
 class TestOrbitMaxMinTrueDistanceAliases:
     """Test that function aliases work."""
 
@@ -275,3 +339,25 @@ class TestCalcPctrTimeScale:
         assert 0.0 <= pos_pctr[0] < 360.0
         # Sun-Mars distance should be roughly 1.5 AU
         assert 1.0 < pos_pctr[2] < 2.0
+
+
+class TestTrueDistanceSlotIsGeometric:
+    """The 3rd slot is the GEOMETRIC (light-time-free) distance.
+
+    Measured reference behavior returns the FLG_TRUEPOS distance in the
+    true-distance slot; a missing flag used to leak the apparent,
+    light-time-corrected value (up to ~1.6e-4 AU short on Mercury, where
+    the radial rate is fastest).
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [2, 4, 9])
+    def test_slot_matches_truepos_distance(self, ipl):
+        jd = 2458849.5
+        td = ephem.orbit_max_min_true_distance(jd, ipl, ephem.FLG_SWIEPH)[2]
+        true = ephem.calc(jd, ipl, ephem.FLG_SWIEPH | ephem.FLG_TRUEPOS)[0][2]
+        apparent = ephem.calc(jd, ipl, ephem.FLG_SWIEPH)[0][2]
+        assert td == pytest.approx(true, abs=1e-12)
+        # Sanity: the two reductions genuinely differ at this instant, so
+        # the assertion above discriminates.
+        assert abs(true - apparent) > 1e-9

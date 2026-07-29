@@ -66,6 +66,12 @@ from libephemeris.erfa_nutation import get_erfa_obliquity_iau2006
 obliquity = get_erfa_obliquity_iau2006(jd_tt)  # Returns radians
 ```
 
+This helper is used for validation and model comparison. The mean obliquity
+used in runtime coordinate reductions is the long-term Vondrák pole-angle
+realization described under
+[Long-Term Precession](#long-term-precession-vondrák-2011); near J2000 the two
+agree at the sub-milliarcsecond level.
+
 ### Precession-Nutation Matrix
 
 For complete coordinate transformations from J2000 to a date of interest:
@@ -87,8 +93,8 @@ intervals" (A&A 534, A22), which is fitted to a numerical integration and stays
 accurate over ±200,000 years while agreeing with IAU 2006 to sub-milliarcsecond
 precision near J2000.
 
-The model is obtained directly from PyERFA's reference Vondrák routines — no
-coefficients are transcribed by hand and no copyleft source is consulted:
+The precession matrix is evaluated through PyERFA's reference Vondrák
+routines:
 
 ```python
 import erfa
@@ -98,22 +104,31 @@ P = erfa.ltpb(epj)      # ICRS -> mean equator/equinox of date (frame bias inclu
 
 `libephemeris/precession_vondrak.py` wraps these into the matrix builders used by
 every reduction path (the LEB fast path, the Skyfield reference path, and the
-ecliptic-body / SPK / fixed-star paths). The of-date mean obliquity is evaluated
-from Vondrák's direct published `ε_A` polynomial-plus-periodic series in
-`sidereal_longterm.mean_obliquity_series_rad()`. Nutation remains IAU
+ecliptic-body / SPK / fixed-star paths). The of-date mean obliquity is the
+angle between the Vondrák ecliptic-pole and equator-pole series, evaluated in
+`sidereal_longterm.mean_obliquity_rad()`. Nutation remains IAU
 2006/2000A and is layered on top of the Vondrák precession.
 
 The remaining model floor at deep-BCE dates is the underlying ephemeris generation
 (DE441), which the precession model does not affect.
 
-#### Of-date mean obliquity — direct Vondrák series
+#### Of-date mean obliquity — pole-angle realization
 
 The of-date mean obliquity used in every reduction and reported by the
-`ECL_NUT` pseudo-body is the direct Vondrák `ε_A` series. It is long-term valid,
-avoids extrapolating the short-range IAU 2006 polynomial at remote epochs, and
-reproduces the measured public convention from years −5000 through +5000. The
-separate pole-angle diagnostic is retained internally but is not used for
-public coordinate reductions.
+`ECL_NUT` pseudo-body is the **pole-angle realization**: the angle between the
+Vondrák ecliptic-pole and equator-pole series
+(`sidereal_longterm.mean_obliquity_rad()`) — the same two poles that build the
+long-term precession matrix. Deriving the obliquity from those poles keeps the
+precession and every equator↔ecliptic-of-date rotation in one self-consistent
+frame, so a direction lying in the mean ecliptic of date (the Sun, by
+definition) reduces to ~0 ecliptic latitude at every epoch. Vondrák 2011 also
+publishes a direct `ε_A` polynomial-plus-periodic series; it is a separate fit,
+and pairing it with the pole-based precession would tilt the of-date ecliptic
+away from its own pole by up to ~6.5″ at −3000, surfacing as a spurious
+ecliptic latitude on the Sun. The two realizations agree to <0.001″ across
+1900–2100 (identically 0 at J2000); the direct series remains available as
+`sidereal_longterm.mean_obliquity_series_rad()` for reference and model
+comparison but is not used in public coordinate reductions.
 
 ### Cached Nutation
 

@@ -23,6 +23,11 @@ from libephemeris import (
     WHITE_MOON,
     PROSERPINA,
     WALDEMATH,
+    VULKANUS,
+    NEPTUNE_LEVERRIER,
+    NEPTUNE_ADAMS,
+    PLUTO_LOWELL,
+    PLUTO_PICKERING,
 )
 
 
@@ -74,10 +79,28 @@ class TestGetPlanetName:
         result = get_planet_name(-1)
         assert result == ""
 
-    def test_constants_without_builtin_elements_have_no_name(self):
-        """IDs 55-58 are constants only and have no built-in names."""
-        for body_id in (VULCAN, WHITE_MOON, PROSERPINA, WALDEMATH):
-            assert get_planet_name(body_id) == ""
+    def test_symbolic_points_have_names(self):
+        """IDs 55-58 are computed symbolic points, so they carry names.
+
+        The runtime returns positions for Vulcan, the White Moon (Selena),
+        Proserpina and Waldemath, so the metadata contract exposes their
+        published names rather than an empty string.
+        """
+        assert get_planet_name(VULCAN) == "Vulcan"
+        assert get_planet_name(WHITE_MOON) == "Selena/White Moon"
+        assert get_planet_name(PROSERPINA) == "Proserpina"
+        assert get_planet_name(WALDEMATH) == "Waldemath"
+
+    def test_vulcanus_hamburg_spelling(self):
+        """The seventh Uranian planet displays as 'Vulcanus' (Hamburg School)."""
+        assert get_planet_name(VULKANUS) == "Vulcanus"
+
+    def test_historical_predictions_annotated(self):
+        """Historical predictions carry the parenthetical target planet."""
+        assert get_planet_name(NEPTUNE_LEVERRIER) == "Leverrier (Neptune)"
+        assert get_planet_name(NEPTUNE_ADAMS) == "Adams (Neptune)"
+        assert get_planet_name(PLUTO_LOWELL) == "Lowell (Pluto)"
+        assert get_planet_name(PLUTO_PICKERING) == "Pickering (Pluto)"
 
     def test_return_type(self):
         """Test that get_planet_name always returns a string."""

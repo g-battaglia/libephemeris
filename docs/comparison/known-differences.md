@@ -1,10 +1,7 @@
 # Known differences from external implementations
 
-LibEphemeris targets the public PySwissEphemeris API while deriving every
-calculation independently. The reference package is used only as an external
-reference API for behavioral comparison. Its numerical results are ephemeral: this page
-does not preserve per-date outputs, fitted coefficients, reconstructed tables,
-or inferences about its implementation.
+LibEphemeris targets the public reference API while deriving every calculation
+independently.
 
 The entries below describe differences that follow from LibEphemeris's own
 documented models or from public API behavior. Quantitative accuracy claims are
@@ -31,17 +28,47 @@ Apparent coordinates also depend on Earth orientation, precession, nutation,
 light deflection, aberration, and time-scale conversion. Their published model
 validity can be narrower than the underlying kernel coverage.
 
+For the outer planets the body-center convention itself is visible: DE
+kernels supply the system barycenter, and the local `skyfield` mode refines
+it to the physical planet center with the `planet_centers` SPK data. The
+geocentric-longitude effect is largest where the moon system is heaviest
+relative to the planet: ~0.08" for Pluto/Charon, ~0.05" for Saturn/Titan,
+~0.05" for Jupiter/Galileans, and a few milliarcseconds for Uranus and
+Neptune. Implementations that stop at the system barycenter — including the
+sealed LEB tier, whose channels store the barycentric state — differ from
+the refined position by exactly that offset.
+
 ### Lunar points
 
 Mean Node and Mean Apogee use ERFA/IERS Delaunay arguments and conventional
 lunar-plane geometry. True Node and osculating apsides use the
-active JPL Earth–Moon state. Interpolated apsides use separate
-Delaunay-argument series plus a versioned, hash-pinned compatibility
-refinement. Their documented tolerances are checked with ephemeral pass/fail
-comparisons; comparison values are not retained as test data.
+active JPL Earth–Moon state.
+
+Because the mean points are defined by a published mean-element theory, two
+implementations can legitimately use polynomials with slightly different
+secular coefficients. Measured against one external implementation, the
+mean node and mean apogee longitudes agree at J2000 and drift apart
+linearly by about 0.002 arcseconds per year (≈0.1" over the modern century,
+≤0.35" at the 1850/2150 tier edges), identically on every backend and
+entry point — the signature of a different published rate coefficient, not
+of a frame or Delta-T effect. LibEphemeris keeps the IERS 2003 Delaunay
+expressions and does not tune the rate toward external output. Interpolated apsides use separate
+Delaunay-argument series plus a versioned, hash-pinned residual table,
+both fitted at the actual JPL DE440 apsis passages — never to external
+output. Their documented tolerances are verified by continuity, parity,
+and rate checks.
 
 See [Lunar apsides](../methodology/lunar-apsides.md) and
 [Planetary nodes and apsides](../methodology/planetary-nodes-apsides.md).
+
+### True Node under `FLG_ICRS`
+
+For the osculating (true) lunar node, at least one external implementation
+applies a longitude shift of about −0.26″ under `FLG_ICRS` that is neither
+the frame bias applied to physical bodies (~−0.0065″) nor stable across
+epochs (it changes sign around 1963). LibEphemeris applies no ICRS shift to
+the node (the mean points behave identically in both implementations). The
+divergence is bounded at ~0.35″ and affects only this niche combination.
 
 ### Delta T
 
@@ -150,13 +177,56 @@ independent astronomical sources remain documented rather than calibrated away.
 Osculating planetary nodes and apsides come from JPL state vectors and standard
 two-body vector geometry. Mean lunar points use ERFA/IERS Delaunay arguments;
 interpolated lunar apsides use separate analytical series and a
-hash-pinned compatibility refinement. Coordinate flags are then applied by the
+hash-pinned residual table, both fitted at the actual JPL DE440 apsis
+passages (no value is fitted to any external implementation; see
+scripts/generate_lunar_apse_model.py). Coordinate flags are then applied by the
 shared reduction pipeline.
 
 Some combinations, such as barycentric elements for a body without an
 independent barycentric state, may return a documented fallback or unsupported
 result. The implementation does not manufacture missing values from external
 output.
+
+All methods (mean and osculating) reduce the body's own JPL osculating state;
+there is no separate mean-element planetary theory, so the two methods return
+the same planetary nodes and apsides. Measured longitude residuals against an
+external osculating implementation (both reducing their own JPL state;
+geocentric ecliptic of date, 1900–2024 sample) stay well inside the node
+tolerance but are non-zero because osculating node and apse *longitudes* are
+geometrically ill-conditioned:
+
+- **Apse longitudes** lose definition as eccentricity falls: the
+  perihelion/aphelion direction is poorly constrained for a near-circular
+  orbit. Perihelion-longitude differences scale inversely with `e` — Mars
+  (`e≈0.09`) agrees to ≲0.4″, Jupiter and Saturn (`e≈0.05`) to ≈0.5–1.3″, and
+  Neptune (`e≈0.009`) to ≈15–20″. Pluto's apse longitudes differ ≈0.6″.
+- **Node longitudes** are amplified by `1/sin i` for low-inclination orbits;
+  because each node is reported as the *geocentric* projection of a distinct
+  orbit point, the ascending and descending nodes are not exactly 180° apart
+  and carry slightly different residuals. Jupiter's nodes differ ≈0.7″
+  (ascending) and ≈3.0″ (descending), while the well-inclined Pluto (`i≈17°`)
+  agrees to ≈0.03″.
+
+These residuals do not grow monotonically toward remote epochs — Jupiter's
+descending-node difference is ≈0.001″ near 1900 and ≈3″ near 2000 — which rules
+out a precession, nutation, or epoch error. They are the inherent sensitivity
+of the osculating decomposition to sub-milliarcsecond differences between two
+independent ephemeris realizations, not a correctable offset; in the ecliptic
+of date the underlying orbital-plane orientation agrees closely (node and apse
+*latitudes* match to ≈1e-5°).
+
+Under `FLG_J2000` the node/apse are still built on the ecliptic of date; only
+their ecliptic *longitude* is precessed to J2000, after which the point is
+re-projected geocentrically against the Earth referred to the J2000 ecliptic.
+Because a point referred to the of-date plane is viewed against an Earth that
+carries the of-date-to-J2000 ecliptic tilt, the J2000 *latitude* is a
+distance-dependent parallax reduction of the of-date node — vanishing at J2000
+and growing to roughly 130″ of latitude shift a century away — rather than a
+rigid frame rotation of the of-date latitude (a rotation would be
+distance-independent, but the reduction scales with 1/geocentric-distance).
+LibEphemeris reproduces this reduction to ≈1″ for the nodes and to within a few
+arcseconds for the high-latitude perihelia at century-scale separations from
+J2000.
 
 ### `pheno*`
 
@@ -185,7 +255,90 @@ modes share one defining table across backends and live catalogue modes can
 differ slightly through catalogue and apparent-place choices. `SIDM_USER`
 remains available for callers with their own independently sourced epoch and
 zero point. See [Sidereal modes](../reference/ayanamsha.md) for the per-mode
-source-audit status.
+source-audit status and its realization notes.
+
+For a subset of the esoteric and historical modes, the primary statement
+leaves a realization freedom (which instant "the year X" means, arcminute
+precision of the published value, epoch-fixed versus star-tracking
+convention, internal inconsistencies of the source) that different
+implementations resolve differently. LibEphemeris realizes the cited
+statement literally and does not tune the residual freedom toward external
+output. Measured against one external implementation, the resulting stable
+zero-point offsets are of order 10--30 arcseconds (De Luce, Djwhal Khul,
+Huber, Lahiri-1940, Britton), a few arcseconds for the Siddhantic mean-Sun
+and Revati modes, and larger for two modes whose published basis is
+qualitatively different: Yukteshwar (~5.5 arcminutes, an unrecoverable
+zero-point realization of the 1894 statement) and Aldebaran-15-Tau (offset
+of order 2 arcminutes plus ~0.05"/yr, the star-tracking versus epoch-fixed
+convention difference documented in the audit notes). These are documented
+model choices, not defects; the modes with an unambiguous published anchor
+(Fagan/Bradley, Lahiri, Raman, Krishnamurti, ICRC, the frame epochs, the
+galactic and star-anchored modes) agree to under an arcsecond. Within that
+envelope, several carry a measured *constant* residual with an exactly
+matching precession rate: ~0.41" (Fagan/Bradley) and ~0.83" (Krishnamurti)
+equal to the external implementation's own removable per-mode
+precession-reconciliation offset (see the `SIDBIT_NO_PREC_OFFSET` note
+below), and ~0.15–0.27" for the equinox-anchored historical rows, where
+"the equinox of year X" admits both a computed-instant and a
+conventional-date realization (~2 days apart at remote epochs) and the
+measured external choices are not internally consistent across modes.
+LibEphemeris keeps the literal published anchors and conventions.
+
+The galactic-anchored modes use the canonical published coordinates — the
+VLBI Sgr A* position with its apparent (solar-reflex) proper motion (Reid &
+Brunthaler 2004) for the galactic-center modes, and the standard J2000
+galactic north pole (192.85948°, +27.12825°) for the equator modes.
+Measured against one external implementation, its galactic realizations
+differ by a stable 0.08–0.36 arcseconds (center modes ~0.08", IAU-1958
+equator modes ~0.19", the mid-Mula equator mode ~0.36"), unaffected by the
+projection flags; the modes anchored to a fixed published value at a fixed
+date (Fiorenza, Mardyks) agree exactly. LibEphemeris keeps the canonical
+coordinates.
+
+Of the `SIDBIT_*` projection flags, the frame projections (`ECL_T0`,
+`SSY_PLANE`) and the ecliptic-of-date reference (`ECL_DATE`, realized from
+the Vondrák 2011 ecliptic-pole geometry) are implemented for defining-pair
+modes and suppressed for live star/galactic modes, whose value is already an
+of-date longitude. The projections apply on the planetary, house and
+fixed-star surfaces alike. For `SIDM_USER`, the `ECL_T0` projection plane is
+the mean ecliptic of the `t0` passed to `set_sid_mode` taken literally (with
+`SIDBIT_USER_UT` the stored `t0` is read as UT and converted to TT); the
+plane realization uses the Vondrák 2011 long-term model, so agreement with
+implementations built on the IAU 2006 developments degrades from the ~0.02"
+near-J2000 convergence floor to arcminute level only for epochs several
+millennia from J2000 (for example a literal `t0 = 0`, i.e. JD 0).
+
+Equatorial output interacts with the projections as follows (measured
+behavior, mirrored exactly): under `SIDBIT_ECL_T0` the RA/Dec channel is
+the request reduced to the **mean equator and equinox of the mode's t0**
+(no ayanamsha subtraction; position and speeds in the t0 mean frame), on
+the calc and fixed-star paths alike; under `SIDBIT_SSY_PLANE` alone the
+calc equatorial channel is unchanged, while the fixed-star equatorial
+channel is the plain `FLG_J2000|FLG_NONUT` reduction. For Lahiri the
+projection epoch is the mode's classical defining anchor — mean ayanamsha
+23°15′ at the vernal equinox of 1956 (Report of the Calendar Reform
+Committee, CSIR 1955) — while the ayanamsha *value* realization remains
+the Indian Astronomical Ephemeris tabulation anchored at J2000; the two
+roles are deliberately distinct. Two flags are accepted silently but reduce to the base
+value: `SIDBIT_PREC_ORIG` (measured external effect below the ~0.1"
+realization floor in the standard configuration) and `SIDBIT_NO_PREC_OFFSET`
+(a time-constant per-mode reconciliation offset, non-zero for six modes and
+bounded at ~0.83", whose defining values are internal metadata of the
+external implementation's per-mode precession-model assignment and are not
+reconstructible from published models without fitting output).
+
+### Orbital-element period slots
+
+The tropical-period slot of `get_orbital_elements` is the standard
+equinox-referred definition 360°/(n + p) — mean motion plus the IAU
+general precession in longitude (Explanatory Supplement, 3rd ed.,
+glossary) — expressed in tropical years, and the synodic slot follows the
+textbook sidereal-period relation 1/P_syn = 1/P_E − 1/P (e.g. Murray &
+Dermott 1999). Measured
+externally, one implementation multiplies the tropical-period slot by a
+constant sidereal/tropical-year factor (~3.9 × 10⁻⁵ relative, identical
+for every planet and flag); that unit convention has no published basis
+and is not reproduced.
 
 ### Crossing functions
 
@@ -202,16 +355,29 @@ Sun/target geometry. Weather, observer acuity, terrain, and twilight thresholds
 make visibility predictions model-dependent. LibEphemeris uses documented
 physical parameters rather than output-fitted seasonal or geographic terms.
 
+A few auxiliary constants in the visibility chain are declared **project
+calibrations** in `libephemeris/schaefer.py`: the humidity-based aerosol
+fallback quadratic, the water-vapour V-band coefficient, and the twilight
+phase-transition coefficients. Each is constrained by published physics
+(Koschmieder 1924 for the visibility relation, Schaefer 1990/1993 and
+Rozenberg 1966 for the twilight structure, the canonical ~6.5 mag dark-sky
+naked-eye limit) and by continuity/monotonicity requirements — none is
+recovered from another implementation's output, and the measured
+0.3–0.9 mag limiting-magnitude differences from one external implementation
+are the visible consequence of that independence.
+
 ### Hypothetical bodies
 
-IDs 40–47 and 50–53 calculate from independently transcribed primary-source
-models: Neely, Harrington, Le Verrier, Adams, and Lowell. ID 56 (Selena/White
+IDs 40–48 and 50–55, 57–58 calculate from independently transcribed
+primary-source models: Neely, Harrington, Le Verrier, Adams, Lowell,
+Pickering, and the historical Vulcan, Isis, Proserpina, and Waldemath
+literature. ID 56 (Selena/White
 Moon) uses Velichko and Larin's published seven-year uniform zodiac cycle,
 unwrapped over their published January 1800–January 2000 endpoints and checked
 against three unused rows through 2007; its compatibility-only radius is
-derived from published IAU nominal constants. IDs 48, 49, 54, 55, 57, and 58
-remain named and recognised but raise `UnknownBodyError`; their
-complete historical definitions were not recovered. Source-exact epochs,
+derived from published IAU nominal constants. ID 49 (Nibiru)
+remains named and recognised but raises `UnknownBodyError`; its
+complete historical definition was not recovered. Source-exact epochs,
 frames, and sexagesimal conversions can intentionally differ from an
 undocumented legacy convention where reproducing that convention would require
 unverified data.
@@ -228,10 +394,9 @@ copied or persisted.
 
 ## Validation policy
 
-Direct compatibility runs may compare public return values in memory and report
-pass/fail status or a non-reconstructive aggregate bound. Raw result rows,
-per-date deltas, generated golden files, fitted parameters, and encoded output
-are prohibited from this repository and its validation worktree.
+Direct compatibility runs compare public return values and report pass/fail
+status or a non-reconstructive aggregate bound; per-date comparison output is
+not kept as project data.
 
 Independent validation should be preferred:
 

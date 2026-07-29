@@ -89,13 +89,25 @@ class TestNodApsBasic:
         assert abs(aphe[2] - 1.0167) < 0.001
 
     @pytest.mark.unit
-    def test_earth_returns_zeros(self):
-        """Earth should return zero positions (no heliocentric orbit)."""
+    def test_earth_apsides_zero_nodes(self):
+        """Earth returns its geocentric orbital apsides with zero nodes.
+
+        Measured reference behavior: Earth's orbit defines the ecliptic, so
+        its node slots are zeros, but the perihelion/aphelion of the
+        Earth-Moon barycentre orbit are reported geocentrically. At J2000 the
+        perihelion point sits near lon 191.70 deg (Earth is close to it, so
+        the geocentric distance is small ~0.044 AU) and the aphelion point on
+        the far side near lon 281.67 deg at ~2.0 AU.
+        """
         jd = 2451545.0
         nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, EARTH, NODBIT_MEAN)
 
         assert nasc[0] == 0.0
-        assert peri[0] == 0.0
+        assert ndsc[0] == 0.0
+        assert abs(peri[0] - 191.6996) < 0.01
+        assert abs(aphe[0] - 281.6693) < 0.01
+        assert abs(peri[2] - 0.04392) < 0.001
+        assert abs(aphe[2] - 1.99954) < 0.001
 
 
 class TestNodApsOrbitalRelationships:

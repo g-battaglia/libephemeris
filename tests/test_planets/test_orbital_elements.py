@@ -61,14 +61,108 @@ class TestOrbitalElementsBasic:
             assert isinstance(val, (int, float)), f"Element {i} should be numeric"
 
     @pytest.mark.unit
-    def test_sun_returns_zeros(self):
-        """Sun should return zero elements (no heliocentric orbit)."""
-        jd = 2451545.0
-        elements = ephem.get_orbital_elements(jd, SUN, 0)
+    def test_sun_raises_not_valid(self):
+        """Sun has no heliocentric orbit: get_orbital_elements raises, matching
+        the measured reference (``object 0 not valid``) rather than returning a
+        silent all-zeros tuple."""
+        from libephemeris.exceptions import Error
 
-        # All elements should be zero for Sun
-        assert elements[0] == 0.0  # Semi-major axis
-        assert elements[1] == 0.0  # Eccentricity
+        jd = 2451545.0
+        with pytest.raises(Error) as exc:
+            ephem.get_orbital_elements(jd, SUN, 0)
+        assert (
+            str(exc.value) == "get_orbital_elements: error in get_orbital_elements(): "
+            "object 0 not valid"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [10, 11, 12, 13, 21, 22, -1, -2])
+    def test_points_without_orbit_raise_not_valid(self, ipl):
+        """Lunar nodes/apogees (10-13), interpolated apsides (21, 22) and
+        negatives raise ``object N not valid`` for both time scales."""
+        from libephemeris.exceptions import Error
+
+        jd = 2451545.0
+        expected = (
+            f"get_orbital_elements: error in get_orbital_elements(): "
+            f"object {ipl} not valid"
+        )
+        with pytest.raises(Error) as exc:
+            ephem.get_orbital_elements(jd, ipl, 0)
+        assert str(exc.value) == expected
+        expected_ut = expected.replace(
+            "get_orbital_elements:", "get_orbital_elements_ut:", 1
+        )
+        with pytest.raises(Error) as exc_ut:
+            ephem.get_orbital_elements_ut(jd, ipl, 0)
+        assert str(exc_ut.value) == expected_ut
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [23, 30, 39])
+    def test_undefined_block_raises_illegal_planet(self, ipl):
+        """Ids 23-39 are an undefined block: ``illegal planet number N``."""
+        from libephemeris.exceptions import Error
+
+        jd = 2451545.0
+        with pytest.raises(Error) as exc:
+            ephem.get_orbital_elements(jd, ipl, 0)
+        assert str(exc.value) == f"get_orbital_elements: illegal planet number {ipl}."
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ipl", [59, 69, 99, 200, 9001, 9999])
+    def test_sourceless_block_raises_not_valid(self, ipl):
+        """Ids between the last fictitious body (58) and AST_OFFSET have no
+        element source: the measured reference raises for the whole block,
+        and the library's own position pipeline rejects them too. A missing
+        guard used to leak a zero-initialized 50-tuple here (a "real orbit"
+        at 0 AU)."""
+        from libephemeris.exceptions import Error
+
+        jd = 2451545.0
+        with pytest.raises(Error) as exc:
+            ephem.get_orbital_elements(jd, ipl, 0)
+        assert f"object {ipl} not valid" in str(exc.value)
+
+    @pytest.mark.unit
+    def test_asteroid_zero_raises_typed_error(self):
+        """AST_OFFSET itself ("asteroid 0") propagates the position
+        pipeline's typed error (a subclass of Error) instead of returning
+        zeros; real numbered asteroids keep their elements."""
+        from libephemeris.exceptions import Error
+
+        jd = 2451545.0
+        with pytest.raises(Error):
+            ephem.get_orbital_elements(jd, 10000, 0)
+        elems = ephem.get_orbital_elements(jd, 10001, 0)
+        assert elems[0] > 1.0  # Ceres semi-major axis ~2.77 AU
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "ipl,a_expected,e_expected",
+        [
+            (40, 40.99837, 0.00460),  # Cupido
+            (44, 70.29949, 0.0),  # Apollon
+            (47, 83.66907, 0.0),  # Poseidon
+        ],
+    )
+    def test_uranian_elements_from_published_neely_rows(self, ipl, a_expected, e_expected):
+        """The Uranians (40-47) are propagated from Neely's published element
+        rows (Hamburg school); the pinned values are this library's own
+        regression output for those published elements."""
+        jd = 2451545.0
+        el = ephem.get_orbital_elements(jd, ipl, 0)
+        assert el[0] == pytest.approx(a_expected, abs=1e-3)
+        assert el[1] == pytest.approx(e_expected, abs=1e-3)
+
+    @pytest.mark.unit
+    def test_white_moon_is_geocentric_model(self):
+        """White Moon (56) is a geocentric circular construction here: its
+        osculating semi-major axis is Earth-relative (~0.053 AU), an intentional
+        divergence from the reference's ~0.909 AU heliocentric element set."""
+        jd = 2451545.0
+        el = ephem.get_orbital_elements(jd, 56, 0)
+        assert 0.04 < el[0] < 0.07  # geocentric radius, not the reference's 0.909
+        assert el[1] < 0.01  # near-circular
 
 
 class TestOrbitalElementsValues:
@@ -386,3 +480,131 @@ class TestOrbitalElementsAliases:
         result = ephem.get_orbital_elements_ut(2451545.0, MARS, 0)
         assert len(result) == 50
         assert isinstance(result[0], float)
+
+
+class TestOrbitalElementsAstronomicalAlmanac:
+    """FLG_ORBEL_AA (Astronomical Almanac central mass) osculating elements.
+
+    With FLG_ORBEL_AA the two-body fit is reduced about the Sun plus every major
+    planet at or interior to the body's orbit (Earth = Earth+Moon barycentre).
+    The semi-major axis shrinks, the perihelion-referred angles shift solidly,
+    and the mean longitude and the orbit-plane elements (i, node) stay put.
+    These properties are backend-independent and need no external reference.
+    """
+
+    JD = 2451545.0  # J2000
+
+    @pytest.mark.unit
+    def test_flag_is_exported(self):
+        assert ephem.FLG_ORBEL_AA == 32768
+
+    @pytest.mark.unit
+    def test_mercury_aa_equals_default(self):
+        """Mercury has no interior planet, so its Almanac central mass equals
+        the default Sun+Mercury mass: every element is unchanged."""
+        default = ephem.get_orbital_elements(self.JD, MERCURY, 0)
+        almanac = ephem.get_orbital_elements(self.JD, MERCURY, ephem.FLG_ORBEL_AA)
+        for i in range(17):
+            assert almanac[i] == pytest.approx(default[i], abs=1e-12, rel=1e-12)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "planet_id", [MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO]
+    )
+    def test_outer_planet_semimajor_axis_shrinks(self, planet_id):
+        """Adding interior planetary mass to the central body raises the
+        effective GM, so the osculating semi-major axis shrinks."""
+        a_default = ephem.get_orbital_elements(self.JD, planet_id, 0)[0]
+        a_almanac = ephem.get_orbital_elements(self.JD, planet_id, ephem.FLG_ORBEL_AA)[
+            0
+        ]
+        assert a_almanac < a_default
+
+    @pytest.mark.unit
+    def test_saturn_jump_dominated_by_jupiter_mass(self):
+        """The Almanac shrink jumps sharply from Jupiter to Saturn because
+        Jupiter's own (large) mass enters the interior sum at Saturn: Saturn's
+        fractional shrink is far larger than the terrestrial-only shrink at
+        Mars or the still-interior-only shrink at Jupiter."""
+
+        def frac_shrink(pid):
+            a_d = ephem.get_orbital_elements(self.JD, pid, 0)[0]
+            a_a = ephem.get_orbital_elements(self.JD, pid, ephem.FLG_ORBEL_AA)[0]
+            return (a_d - a_a) / a_d
+
+        mars = frac_shrink(MARS)
+        jupiter = frac_shrink(JUPITER)
+        saturn = frac_shrink(SATURN)
+        # Jupiter's mass ratio (~1/1047) dwarfs the terrestrial interior sum
+        # (~6e-6), so the Saturn jump is orders of magnitude larger.
+        assert saturn > 20.0 * mars
+        assert saturn > 20.0 * jupiter
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("planet_id", [MARS, JUPITER, SATURN, NEPTUNE, PLUTO])
+    def test_mean_longitude_invariant(self, planet_id):
+        """The perihelion-referred angles shift solidly (omega up, M down), so
+        the mean longitude L = node + omega + M is left essentially invariant."""
+        default = ephem.get_orbital_elements(self.JD, planet_id, 0)
+        almanac = ephem.get_orbital_elements(self.JD, planet_id, ephem.FLG_ORBEL_AA)
+        d_L = abs(((almanac[9] - default[9]) + 180.0) % 360.0 - 180.0)
+        assert d_L < 0.01
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("planet_id", [MARS, JUPITER, SATURN, NEPTUNE, PLUTO])
+    def test_orbit_plane_elements_unchanged(self, planet_id):
+        """Inclination and node depend only on the angular-momentum direction,
+        not on the central GM, so they are untouched by FLG_ORBEL_AA."""
+        default = ephem.get_orbital_elements(self.JD, planet_id, 0)
+        almanac = ephem.get_orbital_elements(self.JD, planet_id, ephem.FLG_ORBEL_AA)
+        assert almanac[2] == pytest.approx(default[2], abs=1e-9)  # inclination
+        d_node = abs(((almanac[3] - default[3]) + 180.0) % 360.0 - 180.0)
+        assert d_node < 1e-6
+
+    @pytest.mark.unit
+    def test_perihelion_angle_shifts_solidly(self):
+        """omega (argument of perihelion) and M (mean anomaly) shift by equal
+        and opposite amounts under the Almanac central mass."""
+        default = ephem.get_orbital_elements(self.JD, NEPTUNE, 0)
+        almanac = ephem.get_orbital_elements(self.JD, NEPTUNE, ephem.FLG_ORBEL_AA)
+        d_omega = ((almanac[4] - default[4]) + 180.0) % 360.0 - 180.0
+        d_M = ((almanac[6] - default[6]) + 180.0) % 360.0 - 180.0
+        assert abs(d_omega) > 1.0  # a real, several-degree shift
+        assert d_omega == pytest.approx(-d_M, rel=0.02)
+
+    @pytest.mark.unit
+    def test_asteroid_semimajor_axis_shrinks(self):
+        """A main-belt asteroid (interior planets: Mercury..Mars) also shrinks
+        under the Almanac central mass, via the minor-body element path."""
+        from libephemeris.constants import CERES
+
+        a_default = ephem.get_orbital_elements(self.JD, CERES, 0)[0]
+        a_almanac = ephem.get_orbital_elements(self.JD, CERES, ephem.FLG_ORBEL_AA)[0]
+        assert a_almanac < a_default
+
+
+class TestPeriodSlotConventions:
+    """Slots [12]/[13] follow the published period definitions.
+
+    The tropical-period slot is 360/(n + p) with p the IAU general
+    precession in longitude, expressed in tropical years (Explanatory
+    Supplement, 3rd ed., glossary); the synodic slot uses the textbook
+    sidereal-period relation 1/P_syn = 1/P_E - 1/P (e.g. Murray &
+    Dermott 1999) with Earth's sidereal year. The constant ~3.9e-5 unit factor
+    an external implementation adds to slot [12] has no published basis
+    and is a documented intentional divergence.
+    """
+
+    @pytest.mark.unit
+    def test_tropical_slot_is_published_definition(self):
+        el = ephem.get_orbital_elements(2451545.0, 5, 0)
+        assert el[12] == pytest.approx(11.86743, abs=2e-4)
+        assert el[13] == pytest.approx(398.851, abs=0.02)
+
+    @pytest.mark.unit
+    def test_deg_midp_stays_in_range(self):
+        import libephemeris as le
+
+        assert le.deg_midp(0.1, 359.9) == 0.0
+        assert le.deg_midp(0.6, 359.4) == 0.0
+        assert 0.0 <= le.deg_midp(2.0, 358.0) < 360.0

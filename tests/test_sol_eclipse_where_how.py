@@ -141,8 +141,12 @@ class TestSweSolEclipseWhereApril2024:
         # Ratio should be around 1.0
         assert 0.9 < ratio < 1.1, f"Ratio {ratio} out of range"
 
-        # Obscuration for total eclipses is the bounded covered fraction.
-        assert 0.9 < obscuration <= 1.0, f"Obscuration {obscuration} out of range"
+        # Obscuration for a total eclipse is the disc-area ratio (> 1), the
+        # measured reference behavior: obscuration == (r_moon/r_sun)**2 == ratio**2.
+        assert obscuration == pytest.approx(ratio**2, rel=1e-6), (
+            f"Obscuration {obscuration} should equal ratio**2 {ratio**2}"
+        )
+        assert obscuration > 1.0, f"total obscuration {obscuration} should exceed 1.0"
 
         # Path width is negative for total eclipses (sign convention)
         assert path_width < 0, (
@@ -251,7 +255,8 @@ class TestSweSolEclipseHowDallasApril2024:
         retflag, attr = sol_eclipse_how(self.tjd_ut, self.geopos_dallas, FLG_SWIEPH)
 
         obscuration = attr[2]
-        # For total eclipse, obscuration should be ~1.0 (within 1%)
+        # For a total eclipse the reference reports the disc-area ratio, which
+        # is >= 1 (the Sun is fully covered, and the Moon overfills it).
         assert obscuration >= 0.99, (
             f"Obscuration {obscuration:.3f} is less than expected 0.99 for total eclipse"
         )
@@ -275,8 +280,12 @@ class TestSweSolEclipseHowDallasApril2024:
         # Ratio should be around 1.0
         assert 0.9 < ratio < 1.1, f"Ratio {ratio} out of range"
 
-        # Obscuration for total eclipses is the bounded covered fraction.
-        assert 0.9 < obscuration <= 1.0, f"Obscuration {obscuration} out of range"
+        # Obscuration for a total eclipse is the disc-area ratio (> 1), the
+        # measured reference behavior: obscuration == (r_moon/r_sun)**2 == ratio**2.
+        assert obscuration == pytest.approx(ratio**2, rel=1e-6), (
+            f"Obscuration {obscuration} should equal ratio**2 {ratio**2}"
+        )
+        assert obscuration > 1.0, f"total obscuration {obscuration} should exceed 1.0"
 
         # Shadow width is negative for total eclipses (sign convention)
         assert shadow_width < 0, (

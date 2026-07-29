@@ -457,3 +457,33 @@ class TestVisLimitMagRealistic:
             # At least verify we got valid calculations
             for lm in limiting_mags:
                 assert -5 < lm < 10
+
+
+class TestMoonSelfExclusion:
+    """Observing the Moon itself: its own light is not hindering sky glow.
+
+    Measured reference behavior removes the moonlight term when the object
+    IS the Moon (as if VISLIM_NOMOON were set), so the limiting magnitude
+    stays at the dark-sky level instead of collapsing by ~3 magnitudes.
+    """
+
+    def test_moon_object_matches_nomoon_sky(self):
+        import libephemeris as le
+        from libephemeris.constants import HELFLAG_VISLIM_NOMOON
+
+        jd = le.julday(2000, 1, 15, 20.0)
+        geopos = [12.4964, 41.9028, 50.0]
+        atmo = [1013.25, 15.0, 40.0, 0.0]
+        obs = [36.0, 1.0, 0, 0, 0, 0]
+        res_plain, d_plain = le.vis_limit_mag(
+            jd, geopos, atmo, obs, "Moon", le.FLG_SWIEPH
+        )
+        res_nomoon, d_nomoon = le.vis_limit_mag(
+            jd, geopos, atmo, obs, "Moon", le.FLG_SWIEPH | HELFLAG_VISLIM_NOMOON
+        )
+        # The implicit self-exclusion equals the explicit NOMOON request.
+        assert res_plain == res_nomoon
+        assert d_plain[0] == pytest.approx(d_nomoon[0], abs=1e-9)
+        # And the sky is genuinely dark (photopic collapse would sit ~3 mag
+        # lower with the full Moon above the horizon at this instant).
+        assert d_plain[0] > 5.0

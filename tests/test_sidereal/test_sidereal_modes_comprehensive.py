@@ -430,14 +430,15 @@ class TestAyanamsaStarModeOutOfRange:
     """
 
     # Live catalog-direction modes reach the Skyfield star pipeline. Formula
-    # modes remain available outside the numerical ephemeris range —
-    # including TRUE_SHEORAN, which is defined by its published
-    # Mahabharata-epoch pair rather than by a live star direction.
+    # modes remain available outside the numerical ephemeris range.
+    # TRUE_SHEORAN is a live star mode: the author's rigorous definition
+    # anchors delta Cancri at a fixed sidereal longitude.
     _STAR_MODES = [
         SIDM_GALCENT_0SAG,
         SIDM_TRUE_CITRA,
         SIDM_TRUE_REVATI,
         SIDM_TRUE_PUSHYA,
+        SIDM_TRUE_SHEORAN,
         SIDM_GALCENT_RGILBRAND,
         SIDM_GALEQU_IAU1958,
         SIDM_GALEQU_TRUE,

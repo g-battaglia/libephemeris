@@ -11,7 +11,7 @@ import pytest
 import libephemeris as le
 from libephemeris.ayanamsha_definitions import MARDYKS_DEFINING
 from libephemeris.planets import _iau2006_general_precession_deg
-from libephemeris.sidereal_epoch import FIXED_EPOCH_T0
+from libephemeris.sidereal_epoch import FIXED_EPOCH_LON_OFFSET, FIXED_EPOCH_T0
 
 
 MODE = le.SIDM_GALALIGN_MARDYKS
@@ -28,8 +28,12 @@ def _signed_angle(angle: float) -> float:
     return (angle + 180.0) % 360.0 - 180.0
 
 
-def test_mardyks_is_an_ayanamsha_not_a_fixed_epoch_frame() -> None:
-    assert MODE not in FIXED_EPOCH_T0
+def test_mardyks_is_a_fixed_epoch_frame_mode() -> None:
+    # Mode 34 is a full fixed-epoch frame request anchored at the published
+    # defining epoch, with the defining 30 degree ayanamsha as a constant
+    # ecliptic-longitude offset of the t0 frame.
+    assert FIXED_EPOCH_T0[MODE] == MARDYKS_DEFINING[1]
+    assert FIXED_EPOCH_LON_OFFSET[MODE] == MARDYKS_DEFINING[0]
 
 
 @pytest.mark.parametrize("jd_ut", [2415020.0, 2451545.0, 2488070.0])
@@ -49,29 +53,26 @@ def test_mardyks_uses_its_restored_precession_anchor(jd_ut: float) -> None:
 
 
 @pytest.mark.parametrize(
-    ("channel", "is_ecliptic"),
+    "channel",
     [
-        (0, True),
-        (le.FLG_XYZ, True),
-        (le.FLG_EQUATORIAL, False),
-        (le.FLG_XYZ | le.FLG_EQUATORIAL, False),
+        0,
+        le.FLG_XYZ,
+        le.FLG_EQUATORIAL,
+        le.FLG_XYZ | le.FLG_EQUATORIAL,
     ],
 )
-def test_mardyks_is_distinct_from_fagan_bradley(
-    channel: int, is_ecliptic: bool
-) -> None:
+def test_mardyks_is_distinct_from_fagan_bradley(channel: int) -> None:
     flags = le.FLG_SPEED | le.FLG_SIDEREAL | channel
     le.set_sid_mode(MODE)
     actual = le.calc_ut(2432000.5, le.MARS, flags)
     le.set_sid_mode(le.SIDM_FAGAN_BRADLEY)
     fagan = le.calc_ut(2432000.5, le.MARS, flags)
-    if is_ecliptic:
-        assert actual[0] != pytest.approx(fagan[0], abs=1e-5)
-    else:
-        # Equatorial sidereal output is a frame projection and carries no
-        # scalar ayanamsha subtraction.
-        assert actual[0] == pytest.approx(fagan[0], abs=2e-12)
-    assert actual[1] == fagan[1]
+    # Every representation differs: the fixed-epoch frame projection
+    # (equatorial of t0, offset t0 ecliptic) is not a scalar shift of the
+    # Fagan/Bradley of-date output on any channel.
+    assert actual[0] != pytest.approx(fagan[0], abs=1e-5)
+    # Frame modes echo FLG_NONUT on top of the caller's flags.
+    assert actual[1] == fagan[1] | le.FLG_NONUT
 
 
 def test_context_and_module_use_the_same_definition() -> None:

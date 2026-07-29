@@ -1,6 +1,9 @@
 """
-Tests for fixstar2_ut: flexible star lookup by partial name,
-HIP number, nomenclature, and fuzzy matching.
+Tests for fixstar2_ut: v2-family star lookup by exact name,
+comma-nomenclature, sequential number, and '%' prefix wildcard.
+
+Bare HIP numbers, bare nomenclature, and implicit partial matching
+do NOT resolve (measured reference behavior).
 """
 
 from __future__ import annotations
@@ -66,27 +69,26 @@ class TestFixstar2ExactName:
 
 
 class TestFixstar2HIPNumber:
-    """Test fixstar2_ut with Hipparcos catalog numbers."""
+    """HIP numbers are NOT a supported v2 lookup (reference behavior)."""
 
     @pytest.mark.unit
     def test_hip_number_direct(self):
-        """Lookup by bare HIP number."""
-        # HIP 32349 = Sirius
-        pos, name_out, _ = swe.fixstar2_ut("32349", JD_J2000)
-        assert 0.0 <= pos[0] < 360.0
-        assert "Sirius" in name_out or "alCMa" in name_out
+        """A bare number reads as a sequential index, not a HIP number."""
+        # HIP 32349 (Sirius) is far beyond the catalog size.
+        with pytest.raises(swe.Error, match="sequential fixed star number"):
+            swe.fixstar2_ut("32349", JD_J2000)
 
     @pytest.mark.unit
     def test_hip_with_comma(self):
-        """Lookup by HIP number with leading comma."""
-        pos, name_out, _ = swe.fixstar2_ut(",32349", JD_J2000)
-        assert 0.0 <= pos[0] < 360.0
+        """A comma form keys on the nomenclature, never on a HIP number."""
+        with pytest.raises(swe.Error, match="could not find star name ,32349"):
+            swe.fixstar2_ut(",32349", JD_J2000)
 
     @pytest.mark.unit
     def test_hip_prefix(self):
-        """Lookup by 'HIP 32349' format."""
-        pos, name_out, _ = swe.fixstar2_ut("HIP 32349", JD_J2000)
-        assert 0.0 <= pos[0] < 360.0
+        """'HIP 32349' is not a name and does not resolve."""
+        with pytest.raises(swe.Error, match="could not find star name hip32349"):
+            swe.fixstar2_ut("HIP 32349", JD_J2000)
 
 
 class TestFixstar2Nomenclature:
@@ -94,10 +96,12 @@ class TestFixstar2Nomenclature:
 
     @pytest.mark.unit
     def test_nomenclature_code(self):
-        """Lookup by nomenclature like 'alLeo' for Regulus."""
-        pos, name_out, _ = swe.fixstar2_ut("alLeo", JD_J2000)
+        """Nomenclature resolves after a comma; the bare form errors."""
+        pos, name_out, _ = swe.fixstar2_ut(",alLeo", JD_J2000)
         assert 0.0 <= pos[0] < 360.0
-        assert "Regulus" in name_out or "alLeo" in name_out
+        assert "Regulus" in name_out
+        with pytest.raises(swe.Error, match="could not find star name alleo"):
+            swe.fixstar2_ut("alLeo", JD_J2000)
 
     @pytest.mark.unit
     def test_comma_separated_format(self):

@@ -18,15 +18,10 @@ from libephemeris.constants import (
 from libephemeris.exceptions import UnknownBodyError
 
 UNVERIFIED_FICTITIOUS_BODIES = [
-    (48, "Transpluto"),
     (49, "Nibiru"),
-    (54, "Pickering"),
-    (55, "Vulcan"),
-    (57, "Proserpina"),
-    (58, "Waldemath"),
 ]
 
-REVIEWED_FICTITIOUS_BODIES = [*range(40, 48), 50, 51, 52, 53, 56]
+REVIEWED_FICTITIOUS_BODIES = [*range(40, 49), *range(50, 59)]
 
 
 @pytest.mark.unit
