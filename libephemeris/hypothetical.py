@@ -21,8 +21,12 @@ The supported set is deliberately explicit:
 * ID 56 is the published uniform seven-year Selena convention; and
 * ID 57 uses the Russian-school circular Proserpina orbit.
 
-IDs 49 (Nibiru) and 58 (Waldemath) stay fail-closed: no publicly published
-element set has been recovered for them.
+* ID 58 (Waldemath) follows Sepharial's published dark-moon convention
+  (Sepharial, "The Science of Foreknowledge", 1918: 177-day synodic figure
+  and the predicted 1898-02-02 transit anchor).
+
+ID 49 (Nibiru) stays fail-closed: no publicly published element set has
+been recovered for it.
 
 The source transcription, frame choices and arithmetic transformations are
 documented beside the constants below, in ``fictitious_orbits.csv`` and in

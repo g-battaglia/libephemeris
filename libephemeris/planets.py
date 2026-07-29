@@ -7619,11 +7619,11 @@ def _calc_nod_aps(
 
     # Interpolated lunar apsides (INTP_APOG / INTP_PERG): the interpolated
     # point is not an orbital-element body, so it has no node/apse
-    # decomposition. Measured reference behavior returns a not-a-number in the
-    # three position slots (longitude, latitude, distance) but leaves the three
-    # speed slots at 0.0 — never NaN — for every method, with or without
-    # FLG_SPEED. Mirror that exactly so callers can detect the undefined place
-    # while the speed channels stay well-formed floats.
+    # decomposition. Measured reference behavior returns not-a-number in the
+    # three position slots (longitude, latitude, distance) for every method;
+    # the speed slots stay 0.0 on a plain request, while an explicit
+    # FLG_SPEED request propagates NaN through the speed channel too.
+    # Mirror both cases exactly so callers can detect the undefined place.
     if ipl in (INTP_APOG, INTP_PERG):
         # Measured reference behavior: the undefined point keeps ZERO speed
         # slots on a plain request, but an explicit FLG_SPEED request

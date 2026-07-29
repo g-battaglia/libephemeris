@@ -249,8 +249,10 @@ def calc_aerosol_coefficient(
     if visibility_km is not None and visibility_km > 0:
         # Direct calculation from meteorological visibility using the
         # Koschmieder (1924) relation V = 3.912 / beta (beta = extinction per
-        # unit path); the standard ICQ extinction procedure of Green (1992)
-        # uses the same 3.912 constant. The molecular part (~0.1066
+        # unit path). The constant is -ln(0.02) for the canonical 2% human
+        # contrast threshold; the standard ICQ extinction procedure of
+        # Green (1992, International Comet Quarterly 14, 55) uses the same
+        # 3.912 value. The molecular part (~0.1066
         # mag/airmass at V) is removed to leave the aerosol coefficient.
         k_aerosol = 3.912 / visibility_km - 0.1066
         return max(0.0, k_aerosol)

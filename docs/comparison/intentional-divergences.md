@@ -326,8 +326,10 @@ instead of reproducing the failure:
   subsequent lunar meridian transit by ~31 s until the topocentric
   observer is explicitly reset.
 - Geographic coordinates are validated against the geodetic domain before
-  use: `set_topo` and the house functions raise the typed
-  `CoordinateError` for finite out-of-range values (latitude outside
+  use: `set_topo`, the house functions and the event searches that take an
+  observer (`rise_trans` and related entry points route through the same
+  observer state) raise the typed `CoordinateError` for finite
+  out-of-range values (latitude outside
   [−90, 90], longitude outside [−180, 360]) as well as for NaN/infinite
   input. The external implementation accepts finite out-of-range values
   and returns the mathematically continued position (an observer latitude

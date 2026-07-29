@@ -1957,6 +1957,13 @@ def _get_ephemeris_range() -> Tuple[float, float]:
     """
     from .state import _JPL_SOURCE_ACCESS, get_calc_mode, get_leb_reader
 
+    # _JPL_SOURCE_ACCESS is the sanctioned provisioning window of
+    # state._allow_jpl_source(): only offline LEB GENERATORS enter it (their
+    # purpose is reading the registered source kernels), never a runtime
+    # calculation - so this gate cannot open JPL under sealed runtime use.
+    # With no reader/coverage the generic fallback below is a conservative
+    # SUBSET of every tier's real coverage (it under-promises; an actual
+    # out-of-coverage computation still raises its typed error later).
     if get_calc_mode() == "leb" and not _JPL_SOURCE_ACCESS.get():
         try:
             reader = get_leb_reader()

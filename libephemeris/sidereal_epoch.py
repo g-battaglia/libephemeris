@@ -219,10 +219,24 @@ def _invariable_plane_matrix() -> np.ndarray:
 
 
 def _ecliptic_of_t0_matrix(t0_jd: float) -> np.ndarray:
-    """J2000 mean ecliptic -> mean ecliptic and equinox of t0 (IAU 2006)."""
-    m_eq = np.array(erfa.pmat06(_J2000, t0_jd - _J2000))
-    eps0 = erfa.obl06(_J2000, 0.0)
-    epst = erfa.obl06(t0_jd, 0.0)
+    """J2000 mean ecliptic -> mean ecliptic and equinox of t0.
+
+    Built from the Vondrak et al. (2011, A&A 534, A22) long-term precession
+    chain — the same realization every other epoch rotation in this module
+    uses — because several classical ECL_T0 epochs are ancient (year -100,
+    -128, 0), far outside the published 1800-2200 optimum of the IAU 2006
+    development, while the Vondrak model is valid for +/-200 millennia.
+    The equatorial precession part cancels the ICRS frame bias in the
+    product, and the ecliptic rotations use the Vondrak mean obliquity at
+    each epoch for frame self-consistency.
+    """
+    from .precession_vondrak import vondrak_mean_obliquity_deg
+
+    v_t0 = np.array(vondrak_precession_matrix(t0_jd))
+    v_j2k = np.array(vondrak_precession_matrix(_J2000))
+    m_eq = v_t0 @ v_j2k.T
+    eps0 = math.radians(vondrak_mean_obliquity_deg(_J2000))
+    epst = math.radians(vondrak_mean_obliquity_deg(t0_jd))
     return _rot_x(epst) @ m_eq @ _rot_x(-eps0)
 
 

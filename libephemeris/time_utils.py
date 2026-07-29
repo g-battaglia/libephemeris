@@ -753,10 +753,14 @@ def _snap_reconstructed_second(
     if sec_round < 60:
         return year, month, day, hour, minute, float(sec_round)
     if sec_round == 60:
+        from .exceptions import Error
+
         try:
             utc_to_jd(year, month, day, hour, minute, 60.0, GREG_CAL)
             return year, month, day, hour, minute, 60.0
-        except Exception:
+        except (Error, ValueError):
+            # Only the expected "not a real leap second" rejection is
+            # swallowed; anything else propagates as a genuine bug.
             pass
     total = hour * 3600 + minute * 60 + int(sec_round)
     if total < 86400:
