@@ -53,8 +53,9 @@ linearly by about 0.002 arcseconds per year (≈0.1" over the modern century,
 entry point — the signature of a different published rate coefficient, not
 of a frame or Delta-T effect. LibEphemeris keeps the IERS 2003 Delaunay
 expressions and does not tune the rate toward external output. Interpolated apsides use separate
-Delaunay-argument series plus a versioned, hash-pinned compatibility
-refinement. Their documented tolerances are verified by continuity, parity,
+Delaunay-argument series plus a versioned, hash-pinned residual table,
+both fitted at the actual JPL DE440 apsis passages — never to external
+output. Their documented tolerances are verified by continuity, parity,
 and rate checks.
 
 See [Lunar apsides](../methodology/lunar-apsides.md) and
@@ -176,7 +177,9 @@ independent astronomical sources remain documented rather than calibrated away.
 Osculating planetary nodes and apsides come from JPL state vectors and standard
 two-body vector geometry. Mean lunar points use ERFA/IERS Delaunay arguments;
 interpolated lunar apsides use separate analytical series and a
-hash-pinned compatibility refinement. Coordinate flags are then applied by the
+hash-pinned residual table, both fitted at the actual JPL DE440 apsis
+passages (no value is fitted to any external implementation; see
+scripts/generate_lunar_apse_model.py). Coordinate flags are then applied by the
 shared reduction pipeline.
 
 Some combinations, such as barycentric elements for a body without an
