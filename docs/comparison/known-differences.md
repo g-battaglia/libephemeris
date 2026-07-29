@@ -329,10 +329,12 @@ reconstructible from published models without fitting output).
 
 ### Orbital-element period slots
 
-The tropical-period slot of `get_orbital_elements` is the published
-definition 360°/(n + p) — mean motion plus the IAU general precession in
-longitude — expressed in tropical years, and the synodic slot follows the
-published sidereal-period relation 1/P_syn = 1/P_E − 1/P. Measured
+The tropical-period slot of `get_orbital_elements` is the standard
+equinox-referred definition 360°/(n + p) — mean motion plus the IAU
+general precession in longitude (Explanatory Supplement, 3rd ed.,
+glossary) — expressed in tropical years, and the synodic slot follows the
+textbook sidereal-period relation 1/P_syn = 1/P_E − 1/P (e.g. Murray &
+Dermott 1999). Measured
 externally, one implementation multiplies the tropical-period slot by a
 constant sidereal/tropical-year factor (~3.9 × 10⁻⁵ relative, identical
 for every planet and flag); that unit convention has no published basis

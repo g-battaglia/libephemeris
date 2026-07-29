@@ -7337,10 +7337,12 @@ _SUN_EARTH_MASS_RATIO = 332946.0487
 # Hamiltonian for the k-th body carries the gravitational parameter
 #     GM_eff(k) = G * (M_sun + m_1 + ... + m_k),
 # i.e. the Sun plus every planetary system at or interior to the body's own
-# orbit, the body's own system included (Murray & Dermott, "Solar System
-# Dynamics", Cambridge University Press, 1999, ch. 2 - the Jacobi reduction;
-# cf. the osculating-element conventions in the Explanatory Supplement to
-# the Astronomical Almanac, 3rd ed., ch. 8). For a minor body the same
+# orbit, the body's own system included — the hierarchical Jacobi
+# decomposition of the N-body problem, a standard construction of
+# celestial mechanics (see e.g. H.C. Plummer, "An Introductory Treatise
+# on Dynamical Astronomy", 1918; A. Morbidelli, "Modern Celestial
+# Mechanics", 2002; cf. the osculating-element conventions of the
+# Explanatory Supplement to the Astronomical Almanac, 3rd ed.). For a minor body the same
 # hierarchy gives the restricted-problem parameter Sun + interior planets
 # with no self term, its own mass being negligible; minor bodies are not
 # themselves perturbers in the hierarchy, whose members are the nine major
@@ -9092,10 +9094,10 @@ def _orbital_elements_from_ecliptic_state(
     _PRECESSION_DEG_PER_DAY = 50.2882 / 3600.0 / 365.25
     # Tropical period: the time to return to the same equinox-referred
     # longitude, i.e. 360 deg divided by the mean motion augmented by the
-    # IAU general precession in longitude (~50.29"/yr; Explanatory
-    # Supplement to the Astronomical Almanac, 3rd ed., glossary "tropical
-    # period"; Meeus, Astronomical Algorithms, ch. 31), expressed in
-    # tropical years. External implementations carry a constant extra
+    # IAU general precession in longitude (~50.29"/yr) — the standard
+    # equinox-referred period (Explanatory Supplement to the Astronomical
+    # Almanac, 3rd ed., glossary, "tropical") — expressed in tropical
+    # years. External implementations carry a constant extra
     # sidereal/tropical-year factor (~3.9e-5 relative) on this slot whose
     # unit convention has no published basis; that factor is intentionally
     # NOT reproduced (see docs/comparison/known-differences.md).
@@ -9115,11 +9117,11 @@ def _orbital_elements_from_ecliptic_state(
     # Synodic period (relative to Earth's orbital motion)
     # P_syn = P_earth * P_planet / (P_planet - P_earth)
     # Negative for inner planets and Moon (P_planet < P_earth), positive for outer
-    # Synodic period from the published relation 1/P_syn = 1/P_E - 1/P
-    # between SIDEREAL periods (Meeus, Astronomical Algorithms, ch. 33;
-    # Murray & Dermott, Solar System Dynamics, 1999, sec. 1.3): Earth's
-    # period in that relation is therefore the sidereal year
-    # (365.256363 days, IAU/DE convention).
+    # Synodic period from the standard relation 1/P_syn = 1/P_E - 1/P
+    # between SIDEREAL periods (textbook definition; e.g. Murray &
+    # Dermott, "Solar System Dynamics", 1999): Earth's period in that
+    # relation is therefore the sidereal year (365.256363 days, IAU/DE
+    # convention).
     P_earth_days = 365.256363
     if P_days > 0 and P_days < float("inf") and ipl != EARTH:
         denom = P_days - P_earth_days

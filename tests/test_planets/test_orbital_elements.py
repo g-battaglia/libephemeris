@@ -588,9 +588,9 @@ class TestPeriodSlotConventions:
 
     The tropical-period slot is 360/(n + p) with p the IAU general
     precession in longitude, expressed in tropical years (Explanatory
-    Supplement, 3rd ed.; Meeus ch. 31); the synodic slot uses the
-    published sidereal-period relation 1/P_syn = 1/P_E - 1/P (Meeus
-    ch. 33) with Earth's sidereal year. The constant ~3.9e-5 unit factor
+    Supplement, 3rd ed., glossary); the synodic slot uses the textbook
+    sidereal-period relation 1/P_syn = 1/P_E - 1/P (e.g. Murray &
+    Dermott 1999) with Earth's sidereal year. The constant ~3.9e-5 unit factor
     an external implementation adds to slot [12] has no published basis
     and is a documented intentional divergence.
     """
