@@ -1201,7 +1201,7 @@ def cs2lonlatstr(cs: int, plus: "str | bytes", minus: "str | bytes") -> str:
             minutes = 0
             degrees += 1
 
-    # Format matching the reference ephemeris: "{deg}{char}{min:02d}" or
+    # Format matching the reference API: "{deg}{char}{min:02d}" or
     # "{deg}{char}{min:02d}'{sec:02d}"
     if seconds == 0:
         return f"{degrees}{direction}{minutes:02d}"

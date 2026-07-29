@@ -38,7 +38,11 @@ AYANAMSHA_DEFINING: dict[int, tuple[float, float]] = {
     2: (26.413055555555555, 2415020.31352),
     # RAMAN: Raman, Hindu Predictive Astrology App. A: (year-397) x 50 1/3", anchored at 1900.0
     3: (21.014166666666668, 2415020.0),
-    # USHASHASHI: Usha & Shashi (1978); traditional zero epoch 559 CE (primary transcription pending)
+    # USHASHASHI: Usha & Shashi, "Hindu Astrological Calculations" (Sagar,
+    # 1978) — the mode's attributed publication. Zero epoch 559 CE is the
+    # value stated by that tradition; the primary page transcription is
+    # still pending acquisition (value corroborated only against secondary
+    # compilations, never fitted to external output).
     4: (0.0, 1925312.0),
     # KRISHNAMURTI: Krishnamurti Paddhati: 22°21'50" at 1900 January 0.5
     5: (22.36388888888889, 2415020.0),
@@ -46,17 +50,31 @@ AYANAMSHA_DEFINING: dict[int, tuple[float, float]] = {
     6: (30.0, 2494279.0),
     # YUKTESHWAR: Sri Yukteswar, The Holy Science (1894): 20°54'36" at the spring 1894 equinox
     7: (20.91, 2412908.1187773715),
-    # JN_BHASIN: J.N. Bhasin; traditional zero epoch 364 CE (primary transcription pending)
+    # JN_BHASIN: J.N. Bhasin (published Hindu-astrology author, e.g.
+    # "Sidereal Astrology") — attributed originator. Zero epoch 364 CE per
+    # the circulating tradition; primary page transcription pending
+    # (corroborated against secondary compilations only, never fitted).
     8: (0.0, 1854089.0),
-    # BABYL_KUGLER1: Kugler, Sternkunde II, solution 1; zero epoch 309 CE (primary transcription pending)
+    # BABYL_KUGLER1: F.X. Kugler, "Sternkunde und Sterndienst in Babel" II,
+    # solution 1. Zero epoch 309 CE as tabulated in the scholarly secondary
+    # literature on the Babylonian zodiac norms (B.L. van der Waerden,
+    # "History of the Zodiac", Archiv fuer Orientforschung 16, 1953,
+    # 216-230; cf. Huber, Centaurus 5, 1958); Kugler primary transcription
+    # pending.
     9: (0.0, 1834000.0),
-    # BABYL_KUGLER2: Kugler, Sternkunde II, solution 2; zero epoch 208 CE (primary transcription pending)
+    # BABYL_KUGLER2: Kugler, Sternkunde II, solution 2. Zero epoch 208 CE
+    # per the van der Waerden (1953) / Huber (1958) tabulation of the
+    # Babylonian norms; Kugler primary transcription pending.
     10: (0.0, 1797110.0),
-    # BABYL_KUGLER3: Kugler, Sternkunde II, solution 3; zero epoch 146 CE (primary transcription pending)
+    # BABYL_KUGLER3: Kugler, Sternkunde II, solution 3. Zero epoch 146 CE
+    # per the van der Waerden (1953) / Huber (1958) tabulation of the
+    # Babylonian norms; Kugler primary transcription pending.
     11: (0.0, 1774464.0),
     # BABYL_HUBER: Huber, Centaurus 5 (1958): vernal point at Babylonian Aries 4°28' in -100
     12: (-4.466666666666667, 1684613.0),
-    # BABYL_ETPSC: eta Piscium Babylonian norm (Mercier); zero epoch 237 CE (primary transcription pending)
+    # BABYL_ETPSC: eta Piscium Babylonian norm as discussed by R. Mercier
+    # ("Studies in the Medieval Conception of Precession"); zero epoch
+    # 237 CE per that secondary tabulation; primary transcription pending.
     13: (0.0, 1807702.0),
     # HIPPARCHOS: Mercier, Studies in the Medieval Conception of Precession: Hipparchan norm zero 545 CE
     15: (0.0, 1920199.0),
@@ -82,11 +100,20 @@ AYANAMSHA_DEFINING: dict[int, tuple[float, float]] = {
     26: (2.1105983371992068, 1903395.1338202194),
     # ARYABHATA_522: Aryabhata 522 CE tradition: zero at the 522 CE spring equinox
     37: (0.0, 1911798.0),
-    # BABYL_BRITTON: Britton, AHES 64 (2010) uniform zodiac; zero epoch 230 CE (primary transcription pending)
+    # BABYL_BRITTON: J.P. Britton, "Studies in Babylonian lunar theory,
+    # Part III" (Archive for History of Exact Sciences 64, 2010): the
+    # uniform-zodiac displacement Delta-lambda* = 3.20 deg - 1.3828 deg/cy
+    # * Y. The zero epoch is DERIVED from that published formula:
+    # Y = 3.20/1.3828 = 2.314 centuries after the common-era origin,
+    # i.e. ~231 CE (rounded 230 CE here). Not a transcription gap: the
+    # epoch follows arithmetically from Britton's printed constants.
     38: (0.0, 1805145.0),
     # GALEQU_FIORENZA: Fiorenza: galactic-equator ayanamsha 25° at 2000-01-01
     41: (25.0, 2451544.5),
-    # LAHIRI_1940: Lahiri (1940) tradition; zero epoch 286 CE (primary transcription pending)
+    # LAHIRI_1940: the early N.C. Lahiri tradition (Indian Ephemeris, 1st
+    # ed.). Zero epoch ~285/286 CE is the Chitrapaksha coincidence year
+    # discussed in the Report of the Calendar Reform Committee (CSIR, New
+    # Delhi, 1955); first-edition page transcription pending.
     43: (0.0, 1825599.0),
     # LAHIRI_VP285: Vernal-point convention: zero at the 285 CE spring equinox
     44: (0.0, 1825233.3060523525),

@@ -1337,7 +1337,7 @@ def _calc_planet_angular_radius(planet_id: int, dist_au: float) -> float:
     """Compute angular radius of a planet in degrees from its geocentric distance.
 
     Uses the exact geometric formula: angular_radius = arcsin(physical_radius / distance),
-    matching the reference ephemeris approach of computing angular sizes dynamically from
+    matching the reference API approach of computing angular sizes dynamically from
     physical radii and actual distance rather than using static lookup tables.
 
     Args:
@@ -3091,7 +3091,7 @@ def sol_eclipse_when_glob(
             the direction strings understood by :func:`_coerce_backwards`.
 
     Returns:
-        Tuple of (retflag, tret) matching the reference ephemeris.
+        Tuple of (retflag, tret) matching the reference API.
     """
     flags = _strip_one_try_bit(flags)
     direction = "backward" if _coerce_backwards(backwards) else "forward"
@@ -5692,7 +5692,7 @@ def lun_eclipse_when(
             the direction strings understood by :func:`_coerce_backwards`.
 
     Returns:
-        Tuple of (retflag, tret) matching the reference ephemeris.
+        Tuple of (retflag, tret) matching the reference API.
     """
     flags = _strip_one_try_bit(flags)
     return _lun_eclipse_when_pythonic(
@@ -5917,7 +5917,7 @@ def lun_eclipse_when_loc(
             the direction strings understood by :func:`_coerce_backwards`.
 
     Returns:
-        Tuple of (retflag, tret, attr) matching the reference ephemeris.
+        Tuple of (retflag, tret, attr) matching the reference API.
     """
     flags = _strip_one_try_bit(flags)
     if len(geopos) < 3:
@@ -6933,7 +6933,7 @@ def lun_occult_where(
         flags: Calculation flags (default FLG_SWIEPH).
 
     Returns:
-        Tuple of (retflag, geopos, attr) matching the reference ephemeris.
+        Tuple of (retflag, geopos, attr) matching the reference API.
     """
     if isinstance(body, int) and body == MOON:
         # Degenerate self-request: the Moon cannot occult itself. Raise the

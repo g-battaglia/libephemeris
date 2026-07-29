@@ -327,6 +327,17 @@ bounded at ~0.83", whose defining values are internal metadata of the
 external implementation's per-mode precession-model assignment and are not
 reconstructible from published models without fitting output).
 
+### Orbital-element period slots
+
+The tropical-period slot of `get_orbital_elements` is the published
+definition 360°/(n + p) — mean motion plus the IAU general precession in
+longitude — expressed in tropical years, and the synodic slot follows the
+published sidereal-period relation 1/P_syn = 1/P_E − 1/P. Measured
+externally, one implementation multiplies the tropical-period slot by a
+constant sidereal/tropical-year factor (~3.9 × 10⁻⁵ relative, identical
+for every planet and flag); that unit convention has no published basis
+and is not reproduced.
+
 ### Crossing functions
 
 Crossing searches scan and bracket the independently computed longitude or
@@ -341,6 +352,17 @@ physical extinction, atmospheric refraction, object photometry, and local
 Sun/target geometry. Weather, observer acuity, terrain, and twilight thresholds
 make visibility predictions model-dependent. LibEphemeris uses documented
 physical parameters rather than output-fitted seasonal or geographic terms.
+
+A few auxiliary constants in the visibility chain are declared **project
+calibrations** in `libephemeris/schaefer.py`: the humidity-based aerosol
+fallback quadratic, the water-vapour V-band coefficient, and the twilight
+phase-transition coefficients. Each is constrained by published physics
+(Koschmieder 1924 for the visibility relation, Schaefer 1990/1993 and
+Rozenberg 1966 for the twilight structure, the canonical ~6.5 mag dark-sky
+naked-eye limit) and by continuity/monotonicity requirements — none is
+recovered from another implementation's output, and the measured
+0.3–0.9 mag limiting-magnitude differences from one external implementation
+are the visible consequence of that independence.
 
 ### Hypothetical bodies
 

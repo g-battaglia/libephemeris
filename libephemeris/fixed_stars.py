@@ -5308,7 +5308,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     Lightweight function that returns only the magnitude, useful for
     visibility calculations where position is not needed.
 
-    Compatible with the reference ephemeris: returns (magnitude, star_name) on success,
+    Compatible with the reference API: returns (magnitude, star_name) on success,
     raises Error if the star is not found.
 
     Args:
@@ -5334,7 +5334,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     if star_id not in _STAR_MAGNITUDES:
         raise Error(f"Magnitude not available for star ID {star_id}")
 
-    # Build "Name,Nomenclature" format matching the reference ephemeris
+    # Build "Name,Nomenclature" format matching the reference API
     for entry in STAR_CATALOG:
         if entry.id == star_id:
             star_name_out = _format_star_name(entry)
@@ -5358,7 +5358,7 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
     Returns the magnitude and the full star name, useful for
     visibility calculations where position is not needed.
 
-    Compatible with the reference ephemeris: returns (magnitude, star_name) on success,
+    Compatible with the reference API: returns (magnitude, star_name) on success,
     raises Error if the star is not found.
 
     Args:

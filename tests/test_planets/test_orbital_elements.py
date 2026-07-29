@@ -145,9 +145,10 @@ class TestOrbitalElementsBasic:
             (47, 83.66907, 0.0),  # Poseidon
         ],
     )
-    def test_uranian_elements_match_reference(self, ipl, a_expected, e_expected):
-        """The Uranians (40-47) share the Neely runtime with the reference, so
-        their osculating elements agree to well under the arbitration level."""
+    def test_uranian_elements_from_published_neely_rows(self, ipl, a_expected, e_expected):
+        """The Uranians (40-47) are propagated from Neely's published element
+        rows (Hamburg school); the pinned values are this library's own
+        regression output for those published elements."""
         jd = 2451545.0
         el = ephem.get_orbital_elements(jd, ipl, 0)
         assert el[0] == pytest.approx(a_expected, abs=1e-3)
@@ -583,20 +584,21 @@ class TestOrbitalElementsAstronomicalAlmanac:
 
 
 class TestPeriodSlotConventions:
-    """Slots [12]/[13] follow the measured sidereal-year unit convention.
+    """Slots [12]/[13] follow the published period definitions.
 
-    The tropical-period slot carries the constant sidereal/tropical year
-    ratio (1.0000388) on top of the bare 360/(n+p) quotient, and the
-    synodic formula uses the sidereal year for Earth; slot [10] stays the
-    plain sidereal period.
+    The tropical-period slot is 360/(n + p) with p the IAU general
+    precession in longitude, expressed in tropical years (Explanatory
+    Supplement, 3rd ed.; Meeus ch. 31); the synodic slot uses the
+    published sidereal-period relation 1/P_syn = 1/P_E - 1/P (Meeus
+    ch. 33) with Earth's sidereal year. The constant ~3.9e-5 unit factor
+    an external implementation adds to slot [12] has no published basis
+    and is a documented intentional divergence.
     """
 
     @pytest.mark.unit
-    def test_tropical_slot_carries_sidereal_year_ratio(self):
+    def test_tropical_slot_is_published_definition(self):
         el = ephem.get_orbital_elements(2451545.0, 5, 0)
-        # Jupiter: P_trop must exceed P_sid-as-computed-from-n by ~3.88e-5
-        # relative (the year-unit factor dominates the tiny precession term).
-        assert el[12] == pytest.approx(11.86790, abs=2e-4)
+        assert el[12] == pytest.approx(11.86743, abs=2e-4)
         assert el[13] == pytest.approx(398.851, abs=0.02)
 
     @pytest.mark.unit

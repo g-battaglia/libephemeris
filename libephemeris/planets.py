@@ -3597,7 +3597,7 @@ def _degenerate_origin_result() -> Tuple[float, float, float, float, float, floa
     Earth observed geocentrically and the Sun observed heliocentrically are
     both trivially the zero vector: latitude, distance and every speed are zero
     and the longitude direction is physically meaningless. Measured reference
-    behavior: the reference ephemeris returns the exact zero vector here for
+    behavior: the reference API returns the exact zero vector here for
     every frame -- including a sidereal ecliptic request, where the ayanamsha
     is NOT subtracted from the (undefined) zero-length longitude. Mirror that;
     the LEB fast path skips the same subtraction on a zero-length state (see
@@ -3721,7 +3721,7 @@ def _calc_body(
             # The clean-room model returns the mean ecliptic of date.
             # The reference ephemeris outputs in the true ecliptic of date,
             # so add nutation in longitude (dpsi) unless NONUT is set.
-            # When SIDEREAL+EQUATORIAL, the reference ephemeris outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference API outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so skip dpsi.
             # J2000 output is likewise the mean ecliptic precessed to J2000:
             # the reference treats FLG_J2000 as implying no nutation here.
@@ -3766,7 +3766,7 @@ def _calc_body(
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
             # TrueNode includes nutation effects in its perturbation terms.
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
-            # When SIDEREAL+EQUATORIAL, the reference ephemeris also outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference API also outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so strip dpsi too.
             # J2000 output is likewise nutation-free (mean ecliptic precessed
             # to J2000), matching the reference.
@@ -3852,7 +3852,7 @@ def _calc_body(
             # The clean-room model returns the mean ecliptic of date.
             # The reference ephemeris outputs in the true ecliptic of date,
             # so add nutation in longitude (dpsi) unless NONUT is set.
-            # When SIDEREAL+EQUATORIAL, the reference ephemeris outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference API outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so skip dpsi.
             # J2000 output is likewise the mean ecliptic precessed to J2000:
             # the reference treats FLG_J2000 as implying no nutation here.
@@ -3890,7 +3890,7 @@ def _calc_body(
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
             # OscuApog includes nutation effects in its orbital computation.
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
-            # When SIDEREAL+EQUATORIAL, the reference ephemeris also outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference API also outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so strip dpsi too.
             # J2000 output is likewise nutation-free (mean ecliptic precessed
             # to J2000), matching the reference.
@@ -7290,7 +7290,7 @@ class HeliocentricNodApsWarning(UserWarning):
 
     .. deprecated::
         This warning is no longer emitted since libephemeris now uses geocentric
-        osculating elements for nod_aps calculations, matching the reference ephemeris's
+        osculating elements for nod_aps calculations, matching the reference API's
         approach. Kept for backward compatibility.
     """
 
@@ -9090,15 +9090,18 @@ def _orbital_elements_from_ecliptic_state(
     # Tropical orbital period (return to same ecliptic longitude)
     # Accounts for general precession in longitude (~50.29"/year)
     _PRECESSION_DEG_PER_DAY = 50.2882 / 3600.0 / 365.25
-    # Measured reference behavior: the reported value carries an extra
-    # sidereal-to-tropical year ratio (365.256363/365.242190 = 1.0000388,
-    # constant across every planet and flag), i.e. the tropical-period slot
-    # is stated in a sidereal-year-based unit convention rather than the
-    # bare tropical-year quotient.
-    _SID_OVER_TROP_YEAR = 365.256363 / 365.242190
+    # Tropical period: the time to return to the same equinox-referred
+    # longitude, i.e. 360 deg divided by the mean motion augmented by the
+    # IAU general precession in longitude (~50.29"/yr; Explanatory
+    # Supplement to the Astronomical Almanac, 3rd ed., glossary "tropical
+    # period"; Meeus, Astronomical Algorithms, ch. 31), expressed in
+    # tropical years. External implementations carry a constant extra
+    # sidereal/tropical-year factor (~3.9e-5 relative) on this slot whose
+    # unit convention has no published basis; that factor is intentionally
+    # NOT reproduced (see docs/comparison/known-differences.md).
     if n_deg > 0:
         P_trop_days = 360.0 / (n_deg + _PRECESSION_DEG_PER_DAY)
-        P_trop_years = P_trop_days / 365.24219 * _SID_OVER_TROP_YEAR
+        P_trop_years = P_trop_days / 365.24219
     else:
         P_trop_years = float("inf")
 
@@ -9112,9 +9115,11 @@ def _orbital_elements_from_ecliptic_state(
     # Synodic period (relative to Earth's orbital motion)
     # P_syn = P_earth * P_planet / (P_planet - P_earth)
     # Negative for inner planets and Moon (P_planet < P_earth), positive for outer
-    # Measured reference behavior: the synodic formula uses the SIDEREAL
-    # year for Earth's period (the outer-planet synodic values inherit the
-    # same sidereal/tropical factor as the tropical-period slot).
+    # Synodic period from the published relation 1/P_syn = 1/P_E - 1/P
+    # between SIDEREAL periods (Meeus, Astronomical Algorithms, ch. 33;
+    # Murray & Dermott, Solar System Dynamics, 1999, sec. 1.3): Earth's
+    # period in that relation is therefore the sidereal year
+    # (365.256363 days, IAU/DE convention).
     P_earth_days = 365.256363
     if P_days > 0 and P_days < float("inf") and ipl != EARTH:
         denom = P_days - P_earth_days
@@ -9188,7 +9193,7 @@ def orbit_max_min_true_distance(
 
     Returns:
         Tuple of (max_distance, min_distance, true_distance) in AU.
-        Order matches the reference ephemeris: (max, min, true).
+        Order matches the reference API: (max, min, true).
 
     Example:
         >>> from libephemeris import orbit_max_min_true_distance, MARS
@@ -9909,7 +9914,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         iflag: Calculation flags.
 
     Returns:
-        Tuple of 20 floats (matching the reference ephemeris).
+        Tuple of 20 floats (matching the reference API).
 
     Raises:
         KeyError: If the body is not available in the LEB reader.
@@ -10262,7 +10267,7 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
         flags: Calculation flags
 
     Returns:
-        Tuple of 20 floats (matching the reference ephemeris):
+        Tuple of 20 floats (matching the reference API):
             - [0]: Phase angle, [1]: Phase, [2]: Elongation,
             - [3]: Diameter, [4]: Magnitude, [5-19]: Reserved (0.0)
 
@@ -10365,7 +10370,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         iflag: Calculation flags
 
     Returns:
-        Tuple of 20 floats (bare tuple, matching the reference ephemeris).
+        Tuple of 20 floats (bare tuple, matching the reference API).
     """
 
     from .cache import get_cached_observer_at

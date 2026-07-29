@@ -13,7 +13,7 @@ This module maintains the library's singleton state including:
 - SPK kernel registry for minor body calculations
 
 All state is stored in module-level globals to provide a stateful module-level API
-compatible with the reference ephemeris's threading model (thread-unsafe by design).
+compatible with the reference API's threading model (thread-unsafe by design).
 
 Provenance:
     Project-authored resource ownership, configuration, and compatibility-state
@@ -3010,7 +3010,7 @@ def get_iers_delta_t_enabled() -> bool:
 #     Meeus (2006) NASA polynomial set (published coefficients).
 # Neither derives from the reference (copyleft) ephemeris; the project
 # depends only on permissively-licensed ephemeris tooling (Skyfield/pyerfa).
-# Exact parity with the reference ephemeris (for validation only) is injected
+# Exact parity with the reference API (for validation only) is injected
 # externally via set_delta_t_userdef() in the validation harness.
 # The models only differ outside the IERS-observed range (chiefly ancient and
 # far-future dates); within the well-observed range they agree closely.
@@ -3036,7 +3036,7 @@ def set_delta_t_model(model: Optional[str]) -> None:
     Args:
         model: ``"smh2016"`` (Stephenson-Morrison-Hohenkerk 2016, the default,
             via Skyfield), ``"espenak_meeus"`` (Espenak & Meeus 2006 polynomials,
-            compatible with the reference ephemeris), or ``None`` to defer to the
+            compatible with the reference API), or ``None`` to defer to the
             ``LIBEPHEMERIS_DELTAT_MODEL`` environment variable / TOML config.
 
     Raises:

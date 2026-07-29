@@ -1047,14 +1047,14 @@ NAIF_CHARON: int = 901
 # =============================================================================
 # BARE-NAME CONSTANTS (reference-API compatibility)
 # =============================================================================
-# These provide the canonical bare constant names that the reference ephemeris
+# These provide the canonical bare constant names that the reference API
 # exposes as module-level attributes (e.g. ECL_NUT, MEAN_NODE, CHIRON, etc.).
 
 # Special values
 
 # ADDITIONAL REFERENCE-API-COMPATIBLE CONSTANTS
 # =============================================================================
-# These constants match the reference ephemeris module-level attributes that were not
+# These constants match the reference API module-level attributes that were not
 # previously exported. Added for full API compatibility.
 
 # House cusps and special points
