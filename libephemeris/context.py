@@ -257,20 +257,39 @@ class EphemerisContext:
     def get_leb_reader(self) -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
         """Get the active LEBReader for this context, if any.
 
-        If the .leb file path is invalid or corrupted, logs a warning and
-        returns None. The process calculation mode decides whether that is a
-        provisioning error or whether another backend may be tried.
+        A truncated or corrupt file (``LEBCorruptionError``) is always fatal
+        and re-raised: it must never trigger a silent fallback to the global
+        reader. For other open failures, sealed ``leb`` mode with a configured
+        context ``.leb`` fails loudly with the same message as the module path
+        (:func:`state.get_leb_reader`); every other mode logs a warning and
+        returns None so the process calculation mode can try another backend.
 
         Returns:
             LEBReader instance if a .leb file is configured and valid,
             None otherwise.
+
+        Raises:
+            LEBCorruptionError: The configured file is truncated/corrupt.
+            RuntimeError: Mode is ``leb`` and the configured file could not be
+                opened for another reason.
         """
         if self._leb_reader is None and self._leb_file is not None:
             try:
                 from .leb_reader import open_leb
 
                 self._leb_reader = open_leb(self._leb_file)
+            except LEBCorruptionError:
+                # Fatal provisioning error — never fall back to the global
+                # reader (mirrors the sealed-mode contract in state.py).
+                raise
             except (FileNotFoundError, ValueError, OSError) as e:
+                from . import state
+
+                if state.get_calc_mode() == "leb":
+                    raise RuntimeError(
+                        f"LIBEPHEMERIS_MODE=leb but failed to open LEB file "
+                        f"{self._leb_file}: {e}"
+                    ) from e
                 from .logging_config import get_logger
 
                 get_logger().warning(
@@ -624,6 +643,7 @@ class EphemerisContext:
             from .planets import (
                 _calc_nutation_obliquity,
                 _calc_nutation_obliquity_tt,
+                _calc_tt_epheflag_echo,
                 _exclusive_ephemeris_bit,
                 _implied_retflag_bits,
                 _resolve_center_flags,
@@ -636,9 +656,16 @@ class EphemerisContext:
             nut_flags = _exclusive_ephemeris_bit(res_flags)
             if ut:
                 pos, retflag = _calc_nutation_obliquity(tjd, nut_flags)
+                echoed = retflag | _implied_retflag_bits(res_flags)
             else:
                 pos, retflag = _calc_nutation_obliquity_tt(tjd, nut_flags)
-            result = (pos, retflag | _implied_retflag_bits(res_flags))
+                # calc() (TT) echoes only the ephemeris-selection bits the
+                # caller passed (a zero-flag request returns retflag 0), while
+                # calc_ut() injects the SWIEPH default. Mirror the module path.
+                echoed = _calc_tt_epheflag_echo(
+                    retflag | _implied_retflag_bits(res_flags), iflag
+                )
+            result = (pos, echoed)
             from .logging_config import get_logger
 
             get_logger().debug(

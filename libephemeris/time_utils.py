@@ -388,7 +388,8 @@ def deltat(tjdut: float) -> float:
 
         Outside the SMH-2016 spline interval, Skyfield's implementation uses
         the long-term parabola ``Delta T = -320 + 32.5 * u**2`` seconds, where
-        ``u = (year - 1825) / 100``.
+        ``u = (year - 1825) / 100`` (Morrison & Stephenson 2004, Journal for
+        the History of Astronomy 35, 327-336).
 
         The selected Delta-T value drives calculations that convert UT to TT
         through this function, including LEB, Horizons, event searches, and
@@ -551,6 +552,33 @@ def _is_leap_second_date(year: int, month: int, day: int) -> bool:
     return (year, month, day) in _LEAP_SECOND_DATES
 
 
+def _days_in_month(year: int, month: int, cal: int) -> int:
+    """Return the number of days in a calendar month.
+
+    The leap-year rule is calendar-aware, using astronomical year numbering
+    (year 0 exists, and e.g. -100 is divisible by 4): the Julian calendar
+    intercalates every 4th year, the proleptic Gregorian calendar skips
+    century years not divisible by 400.
+
+    Args:
+        year: Astronomical year number.
+        month: Month (1-12).
+        cal: GREG_CAL or JUL_CAL.
+
+    Returns:
+        Number of days (28-31).
+    """
+    if month in (4, 6, 9, 11):
+        return 30
+    if month != 2:
+        return 31
+    if cal == GREG_CAL:
+        leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    else:
+        leap = year % 4 == 0
+    return 29 if leap else 28
+
+
 def utc_to_jd(
     year: int,
     month: int,
@@ -581,6 +609,13 @@ def utc_to_jd(
             - jd_et: Julian Day in TT (Terrestrial Time / Ephemeris Time)
             - jd_ut: Julian Day in UT1 (Universal Time)
 
+    Raises:
+        Error: If the date does not exist in the requested calendar
+            ("invalid date: ...") or the clock time is out of range
+            ("invalid time: ..."); seconds 60.0-60.999... are accepted
+            only at 23:59 on an IERS leap-second date.
+        ValueError: If calendar is neither GREG_CAL nor JUL_CAL.
+
     Note:
         - UTC includes leap seconds while UT1 follows Earth's rotation
         - ``abs(UTC - UT1)`` is always less than 0.9 seconds by definition
@@ -601,6 +636,28 @@ def utc_to_jd(
     # Julian in julday() but Gregorian here (and even flip interpretation
     # across the 1972 boundary, where the pre-UTC branch defers to julday).
     _validate_calendar(calendar, "utc_to_jd")
+
+    # Reference-API parity: validate the calendar date before the clock time
+    # (a bad date wins even when the time is also invalid), against the raw
+    # input fields in the requested calendar. Rejection, not normalization:
+    # month 13 or Feb 30 must not roll over into the next month.
+    if (
+        month < 1
+        or month > 12
+        or day < 1
+        or day > _days_in_month(year, month, calendar)
+    ):
+        from .exceptions import Error
+
+        raise Error(f"invalid date: year = {year}, month = {month}, day = {day}")
+
+    # Reference-API parity: reject out-of-range clock fields (hour 24 included).
+    # Seconds in [60, 61) are provisionally admitted here; the leap-second
+    # check below decides whether such a 23:59:60.x label really exists.
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59 or second < 0.0:
+        from .exceptions import Error
+
+        raise Error(f"invalid time: {hour}:{minute}:{second:.2f}")
 
     # Leap-second dates and the beginning of the UTC era are defined in the
     # Gregorian calendar.  Map a Julian-calendar label to that physical
@@ -628,11 +685,9 @@ def utc_to_jd(
         # label on a date without an IERS leap-second insertion. Pre-1972 dates
         # have no leap-second UTC and therefore fall in the former category.
         if second >= 61.0 or hour != 23 or minute != 59 or greg_year < 1972:
-            raise Error(f"invalid time: {hour}:{minute}:{second:05.2f}")
+            raise Error(f"invalid time: {hour}:{minute}:{second:.2f}")
         if not _is_leap_second_date(greg_year, greg_month, greg_day):
-            raise Error(
-                f"invalid time (no leap second!): {hour}:{minute}:{second:05.2f}"
-            )
+            raise Error(f"invalid time (no leap second!): {hour}:{minute}:{second:.2f}")
 
     # Before 1972 UTC (with leap seconds) did not exist; the reference API
     # treats the input as UT1 directly: jd_ut1 is the literal calendar JD
@@ -640,6 +695,21 @@ def utc_to_jd(
     # would clamp TAI-UTC to 10 s, drifting up to tens of minutes in
     # antiquity — verified +24 s at 1800, -27 min at year 1000.)
     if greg_year < 1972:
+        decimal_hour = hour + minute / 60.0 + second / 3600.0
+        jd_ut1 = julday(year, month, day, decimal_hour, calendar)
+        jd_et = jd_ut1 + deltat(jd_ut1)
+        return float(jd_et), float(jd_ut1)
+
+    # From 2035 on, leap-second UTC ends: CGPM Resolution 4 (27th CGPM, 2022)
+    # decides that the UT1-UTC tolerance will be increased by or before 2035,
+    # so the leap-second table cannot describe later civil labels. Like the
+    # pre-1972 branch (and the measured reference behavior, which converges
+    # to it once Delta T exceeds the frozen TAI-UTC offset), a far-future
+    # civil label is treated as UT1: jd_ut1 is the literal calendar JD and
+    # jd_et = jd_ut1 + Delta T. Keeping Skyfield's frozen-offset UTC chain
+    # here instead would diverge without bound (measured -208,000 s in TT by
+    # year 9999).
+    if greg_year >= 2035:
         decimal_hour = hour + minute / 60.0 + second / 3600.0
         jd_ut1 = julday(year, month, day, decimal_hour, calendar)
         jd_et = jd_ut1 + deltat(jd_ut1)
@@ -663,6 +733,46 @@ def utc_to_jd(
     return float(t.tt), float(t.ut1)
 
 
+def _snap_reconstructed_second(
+    year: int, month: int, day: int, hour: int, minute: int, second: float
+) -> tuple[int, int, int, int, int, float]:
+    """Snap a reconstructed Gregorian clock reading to its round instant.
+
+    A modern Julian Day has a ~40 microsecond ulp, so any calendar
+    reconstruction from a float JD carries a ~+-20 microsecond floor;
+    measured reference behavior recovers round instants exactly. A reading
+    within 200 microseconds of a whole second is therefore snapped, with
+    the carry cascading through the calendar. A genuine leap-second minute
+    keeps its second-60 reading (probed through utc_to_jd); the end of a
+    leap second (60.99998 -> 61) rolls into the next day like an ordinary
+    midnight carry.
+    """
+    sec_round = round(second)
+    if second == sec_round or abs(second - sec_round) >= 2e-4:
+        return year, month, day, hour, minute, second
+    if sec_round < 60:
+        return year, month, day, hour, minute, float(sec_round)
+    if sec_round == 60:
+        try:
+            utc_to_jd(year, month, day, hour, minute, 60.0, GREG_CAL)
+            return year, month, day, hour, minute, 60.0
+        except Exception:
+            pass
+    total = hour * 3600 + minute * 60 + int(sec_round)
+    if total < 86400:
+        return (
+            year,
+            month,
+            day,
+            total // 3600,
+            (total % 3600) // 60,
+            float(total % 60),
+        )
+    jd_next = julday(year, month, day, 12.0, GREG_CAL) + 1.0
+    ny, nm, nd, _ = revjul(jd_next, GREG_CAL)
+    return ny, nm, nd, 0, 0, 0.0
+
+
 def _jd_to_calendar_tuple(
     jd: float, calendar: int
 ) -> tuple[int, int, int, int, int, float]:
@@ -672,6 +782,16 @@ def _jd_to_calendar_tuple(
     minute_frac = (decimal_hour - hh) * 60.0
     mm = int(minute_frac)
     ss = (minute_frac - mm) * 60.0
+    # Snap the float-JD reconstruction floor (see _snap_reconstructed_second);
+    # no leap seconds exist on these paths, so the plain carry applies.
+    sec_round = round(ss)
+    if ss != sec_round and abs(ss - sec_round) < 2e-4:
+        total = hh * 3600 + mm * 60 + int(sec_round)
+        if total < 86400:
+            return y, m, d, total // 3600, (total % 3600) // 60, float(total % 60)
+        jd_next = julday(y, m, d, 12.0, calendar) + 1.0
+        ny, nm, nd, _ = revjul(jd_next, calendar)
+        return ny, nm, nd, 0, 0, 0.0
     return y, m, d, hh, mm, ss
 
 
@@ -728,6 +848,11 @@ def jdet_to_utc(
     if revjul(jd_ut1_est, GREG_CAL)[0] < 1972 and not near_utc_epoch:
         return _jd_to_calendar_tuple(jd_ut1_est, calendar)
 
+    # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
+    # mirror utc_to_jd and return the UT1 calendar label directly.
+    if revjul(jd_ut1_est, GREG_CAL)[0] >= 2035:
+        return _jd_to_calendar_tuple(jd_ut1_est, calendar)
+
     ts = get_timescale()
 
     # Create a Skyfield Time object from the Julian Day. In the boundary band
@@ -750,6 +875,9 @@ def jdet_to_utc(
     g_hour = int(utc_data[3])
     g_minute = int(utc_data[4])
     g_second = float(utc_data[5])
+    g_year, g_month, g_day, g_hour, g_minute, g_second = _snap_reconstructed_second(
+        g_year, g_month, g_day, g_hour, g_minute, g_second
+    )
 
     if calendar == JUL_CAL:
         # Only the calendar DATE differs between Gregorian and Julian (a
@@ -815,6 +943,11 @@ def jdut1_to_utc(
     if revjul(jd_ut1, GREG_CAL)[0] < 1972 and not near_utc_epoch:
         return _jd_to_calendar_tuple(jd_ut1, calendar)
 
+    # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
+    # mirror utc_to_jd and return the UT1 calendar label directly.
+    if revjul(jd_ut1, GREG_CAL)[0] >= 2035:
+        return _jd_to_calendar_tuple(jd_ut1, calendar)
+
     # Create a Skyfield Time object from UT1 Julian Day
     t = ts.ut1_jd(jd_ut1)
 
@@ -832,6 +965,9 @@ def jdut1_to_utc(
     g_hour = int(utc_data[3])
     g_minute = int(utc_data[4])
     g_second = float(utc_data[5])
+    g_year, g_month, g_day, g_hour, g_minute, g_second = _snap_reconstructed_second(
+        g_year, g_month, g_day, g_hour, g_minute, g_second
+    )
 
     if calendar == JUL_CAL:
         # Only the calendar DATE differs between Gregorian and Julian (a

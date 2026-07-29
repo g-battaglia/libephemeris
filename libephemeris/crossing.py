@@ -416,11 +416,89 @@ def _nearest_past_helio_crossing(
     return jd_newton
 
 
+def _helio_cross_bracketed(
+    get_position_func: Callable[[float], Tuple[float, float]],
+    x2cross: float,
+    tjd: float,
+    mean_rate_deg_day: float,
+    backwards: bool,
+) -> float:
+    """Bracket-and-refine heliocentric crossing for out-of-table slow bodies.
+
+    Scans up to three revolutions on the requested side of ``tjd`` (the
+    instantaneous rate used to size the revolution can differ from the mean
+    rate by the orbit's eccentric variation, so the window keeps generous
+    headroom), brackets the first sign change adjacent to ``tjd`` and
+    refines it with Brent's method. The heliocentric longitude is strictly
+    monotonic in time, so the first bracketed crossing is the correct one.
+
+    Raises:
+        Error: If no crossing exists inside the scanned window.
+    """
+    period_days = 360.0 / mean_rate_deg_day if mean_rate_deg_day > 1e-9 else 720.0
+    window = 3.0 * period_days
+    num_samples = max(120, min(4000, int(window / 15.0)))
+    if backwards:
+        jd_a, jd_b = _find_bracket_for_crossing(
+            get_position_func,
+            x2cross,
+            tjd - window,
+            tjd - 1e-6,
+            num_samples=num_samples,
+            from_end=True,
+        )
+    else:
+        jd_a, jd_b = _find_bracket_for_crossing(
+            get_position_func,
+            x2cross,
+            tjd + 1e-6,
+            tjd + window,
+            num_samples=num_samples,
+            from_end=False,
+        )
+    return _brent_find_crossing(
+        get_position_func, x2cross, jd_a, jd_b, NR_TOLERANCE, 200
+    )
+
+
+def _first_forward_helio_crossing(
+    get_position_func: Callable[[float], Tuple[float, float]],
+    x2cross: float,
+    tjd: float,
+    period_days: float,
+    tolerance: float,
+) -> float:
+    """First heliocentric crossing strictly after ``tjd``.
+
+    Forward-search repair used when Newton converges into the basin of a PAST
+    revolution (the linear guess can point backward when the start epoch sits
+    just past the target on a slow eccentric orbit). Scans one revolution
+    ahead of ``tjd`` for the genuine first crossing and refines it.
+
+    Raises:
+        Error: If no crossing exists within ~1.25 revolutions of ``tjd``.
+    """
+    window = 1.25 * period_days
+    num_samples = max(60, int(window / 30.0))
+    jd_a, jd_b = _find_bracket_for_crossing(
+        get_position_func,
+        x2cross,
+        tjd + 1e-6,
+        tjd + window,
+        num_samples=num_samples,
+        from_end=False,
+    )
+    return _brent_find_crossing(get_position_func, x2cross, jd_a, jd_b, tolerance, 100)
+
+
 # Retrograde-loop arc (deg) each planet sweeps: a target within this arc of the
 # planet is reachable via an imminent retrograde dip rather than a full orbit
 # ahead. Also reused as the "fine scan band" of the forward first-crossing guard.
+# Approximate per-planet values (order of the synodic geometry, cf. Meeus
+# ch. 31); scan-band seeds only, non-final.
 _RETRO_ARC = {2: 16.0, 3: 18.0, 4: 22.0, 5: 12.0, 6: 9.0, 7: 6.0, 8: 5.0, 9: 4.0}
-# Synodic period (days) — the spacing between successive retrograde loops.
+# Synodic period (days) — the spacing between successive retrograde loops,
+# approximate mean values (Meeus ch. 31); bracketing seeds only, non-final.
 _SYNODIC = {
     2: 116.0,
     3: 584.0,
@@ -658,7 +736,9 @@ def solcross_ut(
 
     # Initial time estimate (linear approximation)
     if speed == 0:
-        speed = 0.9856  # Average Sun motion ~1°/day
+        # Sun mean motion ~0.9856 deg/day (Meeus ch. 25/31);
+        # root-finder seed only, non-final.
+        speed = 0.9856
 
     # Calculate angular distance to target — direction-aware
     diff = (x2cross - lon_start) % 360.0  # in [0, 360)
@@ -790,7 +870,9 @@ def solcross(
 
     # Initial time estimate (linear approximation)
     if speed == 0:
-        speed = 0.9856  # Average Sun motion ~1°/day
+        # Sun mean motion ~0.9856 deg/day (Meeus ch. 25/31);
+        # root-finder seed only, non-final.
+        speed = 0.9856
 
     # Calculate angular distance to target — direction-aware
     diff = (x2cross - lon_start) % 360.0
@@ -900,7 +982,9 @@ def mooncross_ut(
 
     # Initial time estimate
     if speed == 0:
-        speed = 13.176  # Average Moon motion ~13.18°/day
+        # Moon mean motion ~13.176 deg/day (Meeus ch. 47);
+        # root-finder seed only, non-final.
+        speed = 13.176
 
     # Calculate initial guess — direction-aware
     diff = (x2cross - lon_start) % 360.0
@@ -1023,7 +1107,9 @@ def mooncross(
 
     # Initial time estimate
     if speed == 0:
-        speed = 13.176  # Average Moon motion ~13.18°/day
+        # Moon mean motion ~13.176 deg/day (Meeus ch. 47);
+        # root-finder seed only, non-final.
+        speed = 13.176
 
     # Calculate initial guess — direction-aware
     diff = (x2cross - lon_start) % 360.0
@@ -1198,7 +1284,8 @@ def mooncross_node(
     """
     backwards = _coerce_backwards(backwards)
 
-    # Half nodal month - time between successive node crossings
+    # Half nodal (draconic) month ~13.6 days between successive node crossings
+    # (Meeus ch. 47); root-finder seed only, non-final.
     HALF_NODAL_MONTH = 13.6
     direction = -1.0 if backwards else 1.0
 
@@ -1208,12 +1295,27 @@ def mooncross_node(
     except (EphemerisRangeError, CalculationError, ValueError) as e:
         raise Error(f"Failed to calculate Moon position: {e}") from e
 
-    # If starting essentially at a node crossing, the linear estimate is
-    # dominated by FP noise and NR would converge on the start point
-    # (failing the direction check and bouncing forever). Take a full
-    # half-nodal-month step in the requested direction instead.
+    # If starting essentially at a node crossing, first check WHERE the
+    # nearby root lies: a start a fraction of a second BEFORE the node must
+    # return that imminent crossing (measured reference behavior), while a
+    # start exactly at or just past the node takes a half-nodal-month step
+    # (the linear estimate there is FP noise and NR would converge on the
+    # start point, failing the direction check and bouncing forever).
+    accept_eps = 1e-6
     if abs(lat) < 10 * NR_TOLERANCE_MOON:
-        jd_guess = tjdet + HALF_NODAL_MONTH * direction
+        # The NR tolerance band is ~17 ms wide in time (0.001" at the
+        # ~1.38 deg/day nodal latitude rate), so a restart from a previous
+        # result sees latitude noise anywhere inside it. The imminent-root
+        # branch below must only fire ABOVE that band: 2.5e-7 day (~22 ms)
+        # clears the noise while still accepting the measured reference
+        # behavior (a start ~0.04 s before a node returns that node).
+        lat_speed0 = pos[4]
+        t_est = -lat / lat_speed0 if abs(lat_speed0) > 0.1 else 0.0
+        if t_est * direction > 2.5e-7:
+            jd_guess = tjdet + t_est
+            accept_eps = 2.5e-7
+        else:
+            jd_guess = tjdet + HALF_NODAL_MONTH * direction
     else:
         # Locate the FIRST latitude sign change in the requested direction with
         # a bracket scan whose step provably cannot skip a root: successive Moon
@@ -1284,8 +1386,8 @@ def mooncross_node(
             # seconds before/after tjdet yet wide enough to reject the
             # numerically identical "same event" case when the caller starts
             # at the exact node crossing itself.
-            if (not backwards and jd > tjdet + 1e-6) or (
-                backwards and jd < tjdet - 1e-6
+            if (not backwards and jd > tjdet + accept_eps) or (
+                backwards and jd < tjdet - accept_eps
             ):
                 return (jd, pos[0], lat)
             # Converged on the wrong side of tjdet — nudge to the next
@@ -1353,7 +1455,8 @@ def cross_ut(
     # Estimate typical speed if near zero
     # Geocentric average speeds (°/day) - slower planets need more iterations
     # Note: geocentric speeds are affected by retrograde motion, values are
-    # approximate averages during direct motion
+    # approximate averages during direct motion (order of the mean motions,
+    # cf. Meeus ch. 31); root-finder seeds only, non-final.
     typical_speeds = {
         2: 1.4,  # Mercury
         3: 1.2,  # Venus
@@ -1737,7 +1840,16 @@ def helio_cross_ut(
         8: 0.006,  # Neptune
         9: 0.004,  # Pluto
     }
-    speed_default = typical_speeds.get(planet, 0.5)
+    speed_default = typical_speeds.get(planet, 0.0)
+    if speed_default <= 0.0:
+        # Body outside the table (asteroids, centaurs, TNOs, fictitious ids):
+        # a fixed 0.5 deg/day fallback can overestimate a slow body's mean
+        # motion by an order of magnitude (Chiron ~0.02 deg/day), poisoning
+        # the initial guess, the search windows and the divergence guard.
+        # Estimate the mean rate from the measured heliocentric state: on a
+        # bound orbit the instantaneous rate stays within a bounded factor
+        # of the mean rate, which the window scaling below absorbs.
+        speed_default = abs(speed) if abs(speed) > 1e-6 else 0.5
 
     # Calculate initial guess
     diff = (x2cross - lon_start) % 360.0
@@ -1779,6 +1891,19 @@ def helio_cross_ut(
     def get_helio_position(jd_time: float) -> Tuple[float, float]:
         pos_result, _ = calc_ut(jd_time, planet, helio_flag)
         return pos_result[0], pos_result[3]
+
+    if planet not in typical_speeds:
+        # Out-of-table slow bodies (asteroids, centaurs, TNOs): Newton with
+        # the wrapped nearest-crossing step oscillates between revolution
+        # basins when the instantaneous rate swings by the orbit's
+        # eccentricity (Chiron: x4 between perihelion and aphelion) and can
+        # land on a past root. The heliocentric longitude is strictly
+        # monotonic in time, so a deterministic bracket scan over the
+        # revolution ahead (or behind) plus Brent refinement is both robust
+        # and provably on the requested side of the start epoch.
+        return _helio_cross_bracketed(
+            get_helio_position, x2cross, tjdut, speed_default, backwards
+        )
 
     # Check if we're dealing with a very slow planet - use Brent's method for robustness
     # Heliocentric planets don't have true stations but very slow planets can still
@@ -1843,6 +1968,16 @@ def helio_cross_ut(
                     360.0 / speed_default if speed_default > 1e-9 else 720.0,
                     NR_TOLERANCE,
                 )
+            if jd < tjdut - 1e-6:
+                # Newton slipped into a PAST revolution; a forward search
+                # must return a crossing after the start epoch.
+                return _first_forward_helio_crossing(
+                    get_helio_position,
+                    x2cross,
+                    tjdut,
+                    360.0 / speed_default if speed_default > 1e-9 else 720.0,
+                    NR_TOLERANCE,
+                )
             return jd
 
         # Update max_iter based on current speed (may change during iteration)
@@ -1856,9 +1991,18 @@ def helio_cross_ut(
         # Safety: scale max_range with dt_guess so slow planets have enough room.
         # Heliocentric orbits are smooth (no retrograde), so NR converges well —
         # but the initial guess may be off by a significant fraction of dt_guess
-        # due to elliptical orbit speed variation.
+        # due to elliptical orbit speed variation. A single-longitude crossing
+        # lies at most one revolution away, and the linear guess can undershoot
+        # by the orbit's eccentric speed variation, so always allow the full
+        # revolution (plus margin) before declaring divergence.
         base_range = 500.0 if abs(speed_default) < 0.05 else 400.0
-        max_range = max(base_range, abs(dt_guess) * 2.0)
+        period_days = 360.0 / speed_default if speed_default > 1e-9 else 720.0
+        # 3x the revolution: Newton's iterates on an eccentric slow orbit
+        # legitimately overshoot past one full period before settling (the
+        # step is diff/instantaneous-speed, and the instantaneous rate at
+        # aphelion runs well below the mean), so the failsafe must not cut
+        # the transient oscillation short.
+        max_range = max(base_range, abs(dt_guess) * 2.0, 3.0 * period_days)
         if abs(jd - tjdut) > max_range:
             raise Error("Heliocentric crossing search diverged")
 
@@ -1939,7 +2083,16 @@ def helio_cross(
         8: 0.006,  # Neptune
         9: 0.004,  # Pluto
     }
-    speed_default = typical_speeds.get(planet, 0.5)
+    speed_default = typical_speeds.get(planet, 0.0)
+    if speed_default <= 0.0:
+        # Body outside the table (asteroids, centaurs, TNOs, fictitious ids):
+        # a fixed 0.5 deg/day fallback can overestimate a slow body's mean
+        # motion by an order of magnitude (Chiron ~0.02 deg/day), poisoning
+        # the initial guess, the search windows and the divergence guard.
+        # Estimate the mean rate from the measured heliocentric state: on a
+        # bound orbit the instantaneous rate stays within a bounded factor
+        # of the mean rate, which the window scaling below absorbs.
+        speed_default = abs(speed) if abs(speed) > 1e-6 else 0.5
 
     # Calculate initial guess
     diff = (x2cross - lon_start) % 360.0
@@ -1977,6 +2130,13 @@ def helio_cross(
     def get_helio_position_tt(jd_time: float) -> Tuple[float, float]:
         pos_result, _ = calc(jd_time, planet, helio_flag)
         return pos_result[0], pos_result[3]
+
+    if planet not in typical_speeds:
+        # See the UT twin: deterministic bracket+Brent for out-of-table
+        # slow bodies on the strictly monotonic heliocentric longitude.
+        return _helio_cross_bracketed(
+            get_helio_position_tt, x2cross, tjdet, speed_default, backwards
+        )
 
     # Check if we're dealing with a very slow planet - use Brent's method for robustness
     if _is_near_station(speed):
@@ -2039,6 +2199,16 @@ def helio_cross(
                     360.0 / speed_default if speed_default > 1e-9 else 720.0,
                     NR_TOLERANCE,
                 )
+            if jd < tjdet - 1e-6:
+                # Newton slipped into a PAST revolution; a forward search
+                # must return a crossing after the start epoch.
+                return _first_forward_helio_crossing(
+                    get_helio_position_tt,
+                    x2cross,
+                    tjdet,
+                    360.0 / speed_default if speed_default > 1e-9 else 720.0,
+                    NR_TOLERANCE,
+                )
             return jd
 
         # Update max_iter based on current speed (may change during iteration)
@@ -2049,9 +2219,18 @@ def helio_cross(
 
         jd += diff / speed
 
-        # Safety: scale max_range with dt_guess so slow planets have enough room
+        # Safety: scale max_range with dt_guess so slow planets have enough
+        # room. A single-longitude crossing lies at most one revolution away,
+        # and the linear guess can undershoot by the orbit's eccentric speed
+        # variation, so always allow the full revolution (plus margin).
         base_range = 500.0 if abs(speed_default) < 0.05 else 400.0
-        max_range = max(base_range, abs(dt_guess) * 2.0)
+        period_days = 360.0 / speed_default if speed_default > 1e-9 else 720.0
+        # 3x the revolution: Newton's iterates on an eccentric slow orbit
+        # legitimately overshoot past one full period before settling (the
+        # step is diff/instantaneous-speed, and the instantaneous rate at
+        # aphelion runs well below the mean), so the failsafe must not cut
+        # the transient oscillation short.
+        max_range = max(base_range, abs(dt_guess) * 2.0, 3.0 * period_days)
         if abs(jd - tjdet) > max_range:
             raise Error("Heliocentric crossing search diverged")
 

@@ -248,7 +248,7 @@ NAIF_RYUGU: int = 2162173  # 162173 Ryugu (Apollo asteroid)
 # =============================================================================
 # SPK BODY NAME MAPPING
 # =============================================================================
-# Mapping from libephemeris body IDs (SE_*) to JPL Horizons target designations.
+# Mapping from libephemeris body IDs to JPL Horizons target designations.
 # This is used for automatic SPK downloads. The tuple contains:
 #   (horizons_id: str, naif_id: int)
 # where horizons_id is the identifier used in JPL Horizons queries (typically
@@ -396,7 +396,7 @@ def get_spk_body_info_from_map(ipl: int) -> tuple[str, int] | None:
 # At runtime these bodies skip the auto-download attempt and the strict-
 # precision check, allowing the fallback chain (ASSIST / Keplerian) to proceed.
 #
-# The dict maps SE_* body ID -> human-readable reason string.
+# The dict maps a body ID -> human-readable reason string.
 # Adding a new body is a one-line change.
 
 SPK_AUTO_DOWNLOAD_BLOCKED: dict[int, str] = {
@@ -673,10 +673,10 @@ FLG_SIDEREAL: int = 65536  # Sidereal positions
 FLG_ICRS: int = 131072  # ICRS reference frame
 
 # =============================================================================
-# REFERENCE API-COMPATIBLE FLAG ALIASES (FLG_* instead of SEFLG_*)
+# REFERENCE API-COMPATIBLE FLAG ALIASES (bare FLG_* names)
 # =============================================================================
-# FLG_* prefix aliases for SEFLG_* flags
-# These aliases provide full API compatibility
+# Bare FLG_* flag aliases
+# These aliases provide full reference-API flag compatibility
 
 # SIDEREAL (AYANAMSHA) MODES
 # =============================================================================
@@ -763,6 +763,9 @@ GREG_CAL: int = 1  # Gregorian calendar
 
 AUNIT: float = 149597870.7  # Astronomical Unit in km (IAU 2012 standard)
 
+# Conventional mean lunar orbit: 384400 km mean Earth-Moon distance (Meeus,
+# Astronomical Algorithms, ch. 47; Astronomical Almanac) and 0.054900489 mean
+# eccentricity (the ELP-2000/Meeus ch. 47 value).
 _MOON_MEAN_DIST_KM: float = 384400.0  # Mean Earth-Moon distance in km
 _MOON_MEAN_ECC: float = 0.054900489  # Mean lunar orbital eccentricity
 _MOON_MEAN_DIST_AU: float = _MOON_MEAN_DIST_KM / AUNIT  # ~0.002569555 AU
@@ -941,7 +944,9 @@ J1991_25: float = 2448349.0625
 # J1900.0 epoch: Jan 0.5, 1900 TT - Historical reference epoch
 J1900: float = 2415020.0
 
-# B1950.0 epoch: Jan 0.923, 1950 - Besselian epoch for FK4 catalog
+# B1950.0 epoch (JD 2433282.42345905), the Besselian epoch of the FK4 catalog.
+# From the Besselian-year relation JED = 2415020.31352 + 365.242198781*(B-1900)
+# with B = 1950 (Lieske 1979, A&A 73, 282).
 B1950: float = 2433282.42345905
 
 # Days per Julian year (exactly 365.25 days)
@@ -1040,17 +1045,16 @@ NAIF_DEIMOS: int = 402
 NAIF_CHARON: int = 901
 
 # =============================================================================
-# BARE ALIASES FOR SE_* CONSTANTS (reference-API compatibility)
+# BARE-NAME CONSTANTS (reference-API compatibility)
 # =============================================================================
-# These provide the same constants without the SE_ prefix, matching the names
-# that the reference ephemeris exposes as module-level attributes (e.g. ECL_NUT,
-# MEAN_NODE, CHIRON, etc.).
+# These provide the canonical bare constant names that the reference API
+# exposes as module-level attributes (e.g. ECL_NUT, MEAN_NODE, CHIRON, etc.).
 
 # Special values
 
 # ADDITIONAL REFERENCE-API-COMPATIBLE CONSTANTS
 # =============================================================================
-# These constants match the reference ephemeris module-level attributes that were not
+# These constants match the reference API module-level attributes that were not
 # previously exported. Added for full API compatibility.
 
 # House cusps and special points
@@ -1204,6 +1208,11 @@ MOD_NPREC: int = 11
 
 # Heliacal/rise-set bit flags
 BIT_FORCE_SLOW_METHOD: int = 32768
+# Use the GEOCENTRIC apparent place with the ecliptic latitude zeroed (the body
+# projected onto the ecliptic) for the rise/set/twilight event, instead of the
+# ordinary topocentric place. This is the Hindu-rising convention; together with
+# BIT_DISC_CENTER (256) and BIT_NO_REFRACTION (512) it makes up BIT_HINDU_RISING.
+BIT_GEOCTR_NO_ECL_LAT: int = 128
 BIT_HINDU_RISING: int = 896
 
 # Rise/set type constants
@@ -1211,10 +1220,12 @@ ACRONYCHAL_RISING: int = 5
 ACRONYCHAL_SETTING: int = 6
 COSMICAL_SETTING: int = 6
 
-# Tidal acceleration constants
+# Tidal acceleration of the Moon (arcsec/century^2)
 TIDAL_26: float = -26.0
 TIDAL_JPLEPH: float = -25.8
 TIDAL_MOSEPH: float = -25.58
+# -25.85 from Stephenson, Morrison & Hohenkerk (2016), "Measurement of the
+# Earth's rotation: 720 BC to AD 2015", Proc. R. Soc. A 472, 20160404.
 TIDAL_STEPHENSON_2016: float = -25.85
 TIDAL_SWIEPH: float = -25.8
 
@@ -1233,9 +1244,14 @@ SE_FNAME_DE431: str = FNAME_DE431
 STARFILE: str = "sefstars.txt"
 STARFILE_OLD: str = "fixstars.cat"
 
-# Unit conversion constants
+# Unit conversion constants.
+# AU in km: the exact IAU 2012 (Resolution B2) astronomical unit, 149597870700 m.
 AUNIT_TO_KM: float = 149597870.7
+# AU per light-year: AU / (c * Julian year), with c exact (SI) and the Julian
+# year of 365.25 d; equals the IAU 2012 au divided by 9.4607304725808e15 m.
 AUNIT_TO_LIGHTYEAR: float = 1.5812507409819728e-05
+# AU per parsec = pi / 648000, the exact IAU 2015 (Resolution B2) definition
+# of the parsec (1 pc = 648000/pi au).
 AUNIT_TO_PARSEC: float = 4.848136811095274e-06
 
 # Miscellaneous

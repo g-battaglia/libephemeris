@@ -558,7 +558,10 @@ def calc_moon_position(
     # parent barycenter again would double-count it (~5-30 AU error).
     from .astrometry import apply_aberration_to_position
 
-    C_AU_DAY = 173.144632674240  # speed of light in AU/day (IAU)
+    # Speed of light in AU/day, NOVAS/Skyfield C_AUDAY realization (c exact
+    # from SI with the IAU 1976 au) — the single value shared by every
+    # light-time iteration in the library (see astrometry.py, fast_calc.py).
+    C_AU_DAY = 173.1446326846693
     # Light-time retardation applies to every observation center unless
     # FLG_TRUEPOS.  The iteration below always uses the physical
     # satellite-minus-observer distance, including Sun and SSB observers.

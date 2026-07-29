@@ -108,14 +108,16 @@ from .constants import (
 # GM of Sun (k^2 where k is Gaussian gravitational constant)
 GM_SUN = 0.00029591220828559  # AU^3/day^2
 
-# Mass ratios relative to Sun (m_planet / m_sun)
-# Source: IAU nominal values and JPL DE441
+# Reciprocal Sun/planet system-mass ratios (m_planet / m_sun).
+# Source: JPL DE440/DE441 planetary masses (Park, Folkner, Williams & Boggs
+# 2021, AJ 161, 105).
 MASS_RATIO_JUPITER = 1.0 / 1047.348644  # ~9.546e-4
 MASS_RATIO_SATURN = 1.0 / 3497.901768  # ~2.858e-4
 
-# Mean orbital elements of perturbing planets (J2000.0 values)
-# These are used for secular perturbation calculations
-# Source: JPL Horizons, mean elements at J2000.0
+# Mean orbital elements of perturbing planets (J2000.0 values), used for the
+# secular perturbation theory below. Source: Standish, "Keplerian Elements for
+# Approximate Positions of the Major Planets" (JPL, 1992/2006), consistent with
+# JPL Horizons mean elements at J2000.0.
 
 # Jupiter mean elements (for secular perturbation theory)
 JUPITER_A = 5.2026  # Semi-major axis (AU)
@@ -158,7 +160,8 @@ MASS_RATIO_NEPTUNE = 1.0 / 19412  # ~5.153e-5
 
 
 # L4: Linear rates for planet orbital elements (per Julian century from J2000.0)
-# Source: Simon et al. (1994) A&A 282, 663; Standish (1992)
+# Source: Simon et al. (1994) A&A 282, 663; Standish, "Keplerian Elements for
+# Approximate Positions of the Major Planets" (JPL, 1992/2006).
 # These allow the forced eccentricity/inclination vectors to evolve with time,
 # improving accuracy over century-scale propagations.
 # Rates are in the same units as the base values (AU, dimensionless, degrees)
@@ -357,8 +360,10 @@ DEFAULT_RESONANCE_TOLERANCE = 0.02  # 2%
 # J2000.0 epoch for reference (JD 2451545.0 = 2000-Jan-01 12:00 TT)
 J2000_EPOCH = 2451545.0
 
-# Neptune's mean longitude at J2000.0 (degrees)
-# This is needed for calculating the resonant argument φ
+# Neptune's mean longitude at J2000.0 (degrees), needed for the resonant
+# argument φ. Value from Standish, "Keplerian Elements for Approximate
+# Positions of the Major Planets" (JPL Solar System Dynamics, 1992/2006),
+# Table 1 (1800-2050 fit).
 NEPTUNE_MEAN_LONGITUDE_J2000 = 304.88003  # degrees at J2000.0
 
 
@@ -388,9 +393,11 @@ class LibrationParameters(NamedTuple):
     resonance_q: int  # q in p:q resonance
 
 
-# Libration parameters for known resonant TNOs
-# Calibrated from multi-decade JPL Horizons integrations
-# Period ~20,000 years = ~7,305,000 days for typical plutinos
+# Libration parameters for known resonant TNOs.
+# These are a project fit to publicly sampled JPL Horizons states over multiple
+# decades (Horizons is NASA/JPL's numerical integration, a primary source), not
+# transcribed from a published libration solution.
+# Period ~20,000 years = ~7,305,000 days for typical plutinos.
 PLUTINO_LIBRATION_PARAMS: dict[int, LibrationParameters] = {
     # Ixion (28978): Well-characterized plutino (2:3 Neptune resonance)
     # Libration amplitude ~78°, period ~19,800 years
@@ -414,16 +421,17 @@ PLUTINO_LIBRATION_PARAMS: dict[int, LibrationParameters] = {
         resonance_p=2,
         resonance_q=3,
     ),
-    # M2: Gonggong (225088): 3:10 Neptune resonance
-    # Libration amplitude ~30°, period ~25,000 years (~9.1 million days)
-    # Center at 180° (symmetric libration)
-    # Parameters estimated from orbital integration studies
-    # (Bannister et al. 2018, Brown & Butler 2018)
+    # M2: Gonggong (225088): 3:10 Neptune resonance.
+    # The amplitude (~30°), period (~25,000 yr) and phase are PROJECT ESTIMATES,
+    # not transcribed from a published libration fit. Gonggong's 3:10 resonance
+    # membership is discussed in the TNO literature (e.g. Bannister et al. 2018);
+    # Brown & Butler (2018, AJ 156, 164) concerns Gonggong's satellite and mass,
+    # not these dynamical parameters, so it is not the source here.
     GONGGONG: LibrationParameters(
-        amplitude=30.0,  # degrees
-        period=9_131_000.0,  # ~25,000 years in days
+        amplitude=30.0,  # degrees (project estimate)
+        period=9_131_000.0,  # ~25,000 years in days (project estimate)
         center=180.0,  # degrees
-        phase_j2000=1.05,  # radians, estimated
+        phase_j2000=1.05,  # radians, project estimate
         resonance_p=3,
         resonance_q=10,
     ),
@@ -2968,12 +2976,12 @@ def _build_local_name_cache() -> None:
     Build a lookup cache from asteroid names to their catalog numbers.
 
     Populates the cache using bodies in MINOR_BODY_ELEMENTS and known mappings
-    for asteroids with dedicated SE_* constants (Chiron, Pholus, Ceres, etc.).
+    for asteroids with dedicated body constants (Chiron, Pholus, Ceres, etc.).
     """
     if _ASTEROID_NAME_CACHE:
         return  # Already built
 
-    # Known mappings for bodies with dedicated SE_* constants
+    # Known mappings for bodies with dedicated body constants
     known_mappings = {
         "chiron": 2060,
         "pholus": 5145,
@@ -3412,7 +3420,9 @@ def auto_download_asteroid_spk(
             jd_end = current_jd + 3652.5  # ~10 years after
 
         if not math.isfinite(boundary_padding_days) or boundary_padding_days < 0.0:
-            raise ValueError("boundary_padding_days must be a non-negative finite value")
+            raise ValueError(
+                "boundary_padding_days must be a non-negative finite value"
+            )
         clamp_start = HORIZONS_SPK_JD_MIN - boundary_padding_days
         clamp_end = HORIZONS_SPK_JD_MAX + boundary_padding_days
 
@@ -3668,7 +3678,7 @@ def calc_asteroid_by_number(
         return calc_minor_body_heliocentric(body_id, jd_tt)
 
     # Check special cases for low-numbered asteroids that use different IDs
-    # (Chiron, Pholus, Ceres, Pallas, Juno, Vesta have dedicated SE_* constants)
+    # (Chiron, Pholus, Ceres, Pallas, Juno, Vesta have dedicated body constants)
     from .constants import (
         CHIRON,
         PHOLUS,

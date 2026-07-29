@@ -61,8 +61,8 @@ I_RAD: float = math.radians(156.865)
 NODE_J2000_RAD: float = math.radians(177.608)
 
 # Node precession rate (radians per day)
-# Triton's node precesses with ~688 year period due to Neptune's J2
-# This is retrograde precession for a retrograde orbit
+# Triton's node precesses with a ~688 year period due to Neptune's J2
+# (Jacobson 2009, AJ 137, 4322). Retrograde precession for a retrograde orbit.
 NODE_RATE_RAD_DAY: float = -2.0 * math.pi / (688.0 * 365.25)
 
 # AU in km for conversion

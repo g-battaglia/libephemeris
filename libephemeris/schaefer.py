@@ -43,24 +43,33 @@ from typing import Tuple
 # PHYSICAL CONSTANTS
 # =============================================================================
 
-# Rayleigh scattering constants (at sea level, wavelength ~550nm)
-# From Schaefer (1990) Table 1
+# Rayleigh (molecular) scattering coefficient at sea level, V band (~550 nm).
+# The 0.1451 mag/airmass V-band value derives from the atmospheric-extinction
+# model of Hayes, D.S. & Latham, D.W. (1975), "A rediscussion of the
+# atmospheric extinction and the absolute spectral-energy distribution of
+# Vega", ApJ 197, 593-601. RAYLEIGH_SCALE_HEIGHT is the standard atmospheric
+# density scale height.
 RAYLEIGH_COEFF_SEA_LEVEL = 0.1451  # mag/airmass at 550nm
 RAYLEIGH_SCALE_HEIGHT = 8500.0  # meters (atmospheric scale height)
 
-# Aerosol scattering constants
-# k_aerosol = 0.12 * V^(-1.3) where V is visual range in km
-# For V=25km (clear conditions): k_aerosol ~ 0.05
-# For V=10km (average): k_aerosol ~ 0.12
-# For V=5km (poor): k_aerosol ~ 0.25
+# Aerosol (Mie) scattering coefficients. Aerosol extinction follows the
+# wavelength power law of Angstrom, A. (1929), "On the atmospheric
+# transmission of sun radiation and on dust in the air", Geografiska Annaler
+# 11, 156-166; the representative clear/average/poor values below correspond
+# to meteorological visual ranges V via the Koschmieder (1924) relation
+# k ~ 3.912/V (see calc_aerosol_extinction). These three bracket values are
+# project-chosen labels, not transcribed from a single table.
 AEROSOL_COEFF_CLEAR = 0.05  # Very clear (V > 40km)
 AEROSOL_COEFF_AVERAGE = 0.12  # Average (V ~ 20km)
 AEROSOL_COEFF_POOR = 0.25  # Poor (V ~ 5km)
 
-# Ozone absorption coefficient
+# Ozone absorption coefficient - small, roughly constant contribution at
+# visual wavelengths (Chappuis bands); representative V-band value used by
+# Schaefer (1990), PASP 102, 212.
 OZONE_COEFF = 0.016  # mag/airmass (essentially constant)
 
-# Water vapor absorption (simplified)
+# Water vapor absorption (project-calibrated, minor at V). Representative
+# V-band value scaled linearly by humidity in calc_water_vapor_extinction.
 WATER_VAPOR_COEFF = 0.014  # mag/airmass at ~50% humidity
 
 # =============================================================================
@@ -70,37 +79,46 @@ WATER_VAPOR_COEFF = 0.014  # mag/airmass at ~50% humidity
 # Sky brightness in nanoLamberts (nL) / mag/arcsec^2
 # Reference: dark sky = 21.5 mag/arcsec^2 = ~250 nL
 
-# Airglow brightness (minimum sky brightness, no Moon, astronomical twilight)
+# Airglow brightness (minimum natural sky brightness, no Moon, astronomical
+# twilight). Standard dark-night airglow level (Allen, "Astrophysical
+# Quantities"; Roach, F.E. & Gordon, J.L. (1973), "The Light of the Night
+# Sky").
 AIRGLOW_BRIGHTNESS_NL = 145.0  # nanoLamberts
 AIRGLOW_MAG_ARCSEC2 = 22.0  # mag/arcsec^2 (approximate)
 
-# Zodiacal light brightness (varies with ecliptic coordinates)
+# Zodiacal light brightness (varies with ecliptic coordinates). Representative
+# pole/near-ecliptic bracket values (Allen, "Astrophysical Quantities"; Roach
+# & Gordon 1973).
 ZODIACAL_MIN_NL = 40.0  # At ecliptic poles
 ZODIACAL_MAX_NL = 500.0  # Near ecliptic plane, elongation ~90
 
-# Full Moon sky brightness increase
+# Full Moon sky brightness increase (project-representative value).
 FULL_MOON_SKY_BRIGHTNESS_NL = 20000.0  # Can increase sky to ~18 mag/arcsec^2
 
-# Twilight sky brightness parameters
-# Based on Rozenberg and Schaefer models
+# Twilight sky brightness parameters. The 16 deg dark-sky transition depression
+# is a project-chosen value in the range of the Rozenberg, G.V. (1966),
+# "Twilight: A Study in Atmospheric Optics" twilight model.
 TWILIGHT_TRANSITION_ZENITH = 16.0  # degrees below horizon for dark sky
 
 # =============================================================================
 # OBSERVER PARAMETERS
 # =============================================================================
 
-# Eye adaptation parameters
-# Dark adapted eye: pupil ~7mm diameter
-# Light adapted: pupil ~2mm diameter
+# Eye adaptation parameters (classical dark- vs light-adapted pupil diameters).
+# The dark-adapted maximum ~7 mm and its use in the light-grasp relations
+# follow Schaefer, B.E. (1990), "Telescopic Limiting Magnitudes", PASP 102,
+# 212-229.
 DARK_ADAPTED_PUPIL_MM = 7.0
 LIGHT_ADAPTED_PUPIL_MM = 2.5
 
-# Naked eye limiting magnitude under ideal conditions
-# Young observer, dark sky, high altitude
+# Naked-eye limiting magnitude under ideal conditions (young, dark-adapted
+# observer at a dark high-altitude site); classical 6.5 limit (Schaefer (1990),
+# PASP 102, 212).
 IDEAL_NAKED_EYE_LIMIT_MAG = 6.5
 
-# Age degradation factor (Schaefer 1993)
-# Vision degrades ~0.1 mag per decade after age 20
+# Age degradation factor. Naked-eye vision degrades by roughly 0.1 mag per
+# decade past a ~20 yr baseline (Schaefer (1993), "Astronomy and the Limits of
+# Vision", Vistas in Astronomy 36, 311-361).
 AGE_DEGRADATION_PER_DECADE = 0.1
 AGE_BASELINE = 20.0
 
@@ -153,7 +171,9 @@ def calc_rayleigh_extinction(pressure_mbar: float, altitude_m: float) -> float:
         Rayleigh extinction coefficient in mag/airmass
 
     Reference:
-        Schaefer (1990) Eq. 1
+        V-band sea-level coefficient 0.1451 mag/airmass from Hayes, D.S. &
+        Latham, D.W. (1975), ApJ 197, 593-601; pressure/altitude column
+        scaling as used by Schaefer (1990), PASP 102, 212.
     """
     # Pressure correction (Rayleigh scattering proportional to density)
     pressure_factor = pressure_mbar / 1013.25
@@ -191,12 +211,15 @@ def calc_aerosol_extinction(
         Aerosol extinction coefficient in mag/airmass
 
     Reference:
-        Schaefer (1990) Section 3.2
+        Koschmieder, H. (1924), "Theorie der horizontalen Sichtweite", Beitr.
+        Phys. freien Atmos. 12, 33-53, for the visibility-range relation; the
+        humidity-based fallback below is a project-calibrated estimate.
     """
     # If meteorological range is given directly
     if met_range_km >= 1.0:
-        # k_aerosol = 3.912 / V - k_rayleigh_approx
-        # Simplified: k_aerosol = 3.912 / V - 0.106 (for visual wavelengths)
+        # Koschmieder (1924): k_extinction = 3.912 / V. Subtracting the
+        # approximate molecular part (~0.106 mag/airmass at V band) leaves the
+        # aerosol coefficient.
         k_aerosol = max(0.0, 3.912 / met_range_km - 0.106)
     elif 0 < met_range_km < 1.0:
         # Direct aerosol coefficient given at the observer site: it is already
@@ -204,9 +227,10 @@ def calc_aerosol_extinction(
         # (which applies only to coefficients derived from visibility/humidity).
         return met_range_km
     else:
-        # Estimate from humidity
-        # Higher humidity leads to more aerosol scattering
-        # Base aerosol ~0.05 at 0% humidity, increases with humidity
+        # Estimate from humidity (project-calibrated quadratic: aerosol
+        # scattering grows with the hygroscopic uptake of water; base ~0.04
+        # mag/airmass at 0% humidity). The coefficients here are a project fit,
+        # not transcribed from a published table.
         k_aerosol = 0.04 + 0.18 * humidity_fraction + 0.12 * humidity_fraction**2
 
     # Altitude correction - aerosols decrease faster than air
@@ -353,7 +377,12 @@ def calc_twilight_brightness(sun_altitude_deg: float) -> float:
         Sky brightness in nanoLamberts
 
     Reference:
-        Schaefer (1993) twilight model; Rozenberg (1966)
+        Qualitative three-phase twilight behaviour follows Rozenberg, G.V.
+        (1966), "Twilight: A Study in Atmospheric Optics" and Schaefer (1993),
+        Vistas in Astronomy 36, 311-361. The specific exponential coefficients
+        and phase breakpoints below are a project-calibrated fit chosen to make
+        the brightness continuous and monotonic across the civil/nautical/
+        astronomical boundaries; they are not transcribed constants.
     """
     if sun_altitude_deg >= 0:
         # Daytime - very bright sky
@@ -408,7 +437,13 @@ def calc_moon_brightness(
     """
     Calculate sky brightness contribution from moonlight.
 
-    Based on Krisciunas & Schaefer (1991) model.
+    Simplified project heuristic inspired by Krisciunas & Schaefer (1991):
+    it reproduces the qualitative dependence on illuminated fraction, Moon
+    airmass, and angular distance, but the base brightness (3000 nL), the
+    piecewise distance factor, and the extinction factor are project-chosen
+    values, NOT the paper's f(rho) scattering equations. The verbatim K&S
+    (1991) scattered-moonlight model is implemented in the VISLIMIT path
+    (see ``heliacal.SchaeferModel._sky_brightness_bl``).
 
     Args:
         moon_altitude_deg: Moon altitude in degrees
@@ -419,7 +454,9 @@ def calc_moon_brightness(
         Sky brightness contribution in nanoLamberts
 
     Reference:
-        Krisciunas, K. & Schaefer, B.E. (1991) PASP 103, 1033
+        Krisciunas, K. & Schaefer, B.E. (1991), "A model of the brightness of
+        moonlight", PASP 103, 1033-1039, DOI 10.1086/132921 (qualitative basis
+        only; see note above).
     """
     if moon_altitude_deg <= 0:
         return 0.0  # Moon below horizon
@@ -583,14 +620,16 @@ def brightness_to_mag_arcsec2(brightness_nl: float) -> float:
         Surface brightness in mag/arcsec^2 (higher = darker)
 
     Reference:
-        1 nL = 27.78 mag/arcsec^2 at 0 nL limit
-        Dark sky (~22 mag/arcsec^2) = ~250 nL
+        Standard nanoLambert-to-surface-brightness relation in the form used
+        by Garstang, R.H. (1989), "Night-sky brightness at observatories and
+        sites", PASP 101, 306-329: m = 26.33 - 2.5*log10(B). The 26.33 term is
+        the photometric zero point relating 1 nL to mag/arcsec^2; a dark sky
+        (~22 mag/arcsec^2) corresponds to ~250 nL.
     """
     if brightness_nl <= 0:
         return 22.0  # Dark sky limit
 
-    # Garstang (1989) formula
-    # m = 26.33 - 2.5 * log10(B) where B is in nanoLamberts
+    # m = 26.33 - 2.5 * log10(B), B in nanoLamberts (Garstang 1989 form).
     mag_arcsec2 = 26.33 - 2.5 * math.log10(brightness_nl)
 
     return mag_arcsec2
@@ -624,7 +663,13 @@ def calc_limiting_magnitude(
     """
     Calculate limiting visual magnitude for naked eye observation.
 
-    Based on Schaefer (1990) visibility model.
+    Simplified linear approximation of the Schaefer (1990) limiting-magnitude
+    model. The dominant term 2.5*log10(B/250) captures the sky-brightness
+    dependence, with additive linear corrections for observer age, Snellen
+    ratio, and differential extinction. This is deliberately NOT a verbatim
+    evaluation of Schaefer's full retinal contrast-threshold model (his
+    Eq. 18-22); it is a compact convenience relation calibrated to reproduce
+    the standard ~6.5 mag dark-sky limit.
 
     Args:
         sky_brightness_nl: Sky brightness in nanoLamberts
@@ -637,7 +682,9 @@ def calc_limiting_magnitude(
         Limiting magnitude (objects brighter than this are visible)
 
     Reference:
-        Schaefer (1990) Eq. 18-22
+        Schaefer, B.E. (1990), "Telescopic Limiting Magnitudes", PASP 102,
+        212-229 (model family; the linear form here is a project approximation
+        of it).
     """
     # Base limiting magnitude for dark, clear sky
     # Young observer with good vision
@@ -836,6 +883,11 @@ def get_optimal_sun_altitude(object_magnitude: float, is_morning: bool) -> float
 
     Returns:
         Optimal Sun altitude in degrees (negative = below horizon)
+
+    Source status:
+        The magnitude-to-Sun-depression bands below are a project-calibrated
+        convenience table (brighter objects tolerate a shallower Sun
+        depression). They are not transcribed from a published table.
     """
     # Brighter objects can be seen with Sun closer to horizon
     if object_magnitude < -2:
@@ -869,6 +921,12 @@ def calc_heliacal_altitude_threshold(
 
     Returns:
         Minimum object altitude in degrees
+
+    Source status:
+        The extinction_factor and sun_factor multipliers below are project
+        heuristics that scale the base arcus visionis; the base value itself
+        comes from the project-authored ``PTOLEMY_ARCUS_VISIONIS`` table.
+        None of these are transcribed published constants.
     """
     # Base arcus visionis
     base_av = get_arcus_visionis(object_magnitude)

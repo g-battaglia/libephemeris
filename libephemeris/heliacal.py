@@ -22,11 +22,20 @@ Historical Note:
 
 References:
     - Schaefer, B.E. (1990), "Telescopic Limiting Magnitudes", PASP 102,
-      212-229, DOI 10.1086/132629; and Schaefer (1993), "Astronomy and the
-      Limits of Vision", Vistas in Astronomy 36, 311-361
-    - Yallop (1997), NAO Technical Note 69, lunar-crescent q criterion
-    - Kasten & Young (1989), "Revised optical air mass tables and
-      approximation formula", DOI 10.1364/AO.28.004735
+      212-229, DOI 10.1086/132629
+    - Schaefer, B.E. (1993), "Astronomy and the Limits of Vision", Vistas in
+      Astronomy 36, 311-361; and Schaefer, B.E. (1998), "To the Visual
+      Limits", Sky & Telescope 95(5), 57-60. Together these define the
+      VISLIMIT V-band limiting-magnitude algorithm and its per-component
+      relative-airmass relations used by this module's active path (the
+      low-altitude airmass form follows Rozenberg, G.V. (1966), "Twilight: A
+      Study in Atmospheric Optics"; Kasten & Young (1989) is NOT used here).
+    - Krisciunas, K. & Schaefer, B.E. (1991), "A model of the brightness of
+      moonlight", PASP 103, 1033-1039, DOI 10.1086/132921 (scattered
+      moonlight and the daylight sky-scattering terms)
+    - Yallop, B.D. (1997), NAO Technical Note No. 69 (lunar-crescent q
+      criterion); Bruin, F. (1977), "The first visibility of the lunar
+      crescent", Vistas in Astronomy 21, 331-358 (crescent width)
 
 Provenance:
     Body positions and photometry come from the registered ephemeris pipeline;
@@ -103,6 +112,31 @@ def _yallop_visibility_code(q: float) -> float:
     return 6.0
 
 
+def _arc_of_light(arcv_deg: float, daz_deg: float) -> float:
+    """Arc of light (ARCL) from the arcus visionis and azimuth separation.
+
+    ARCV (vertical), DAZ (horizontal), and ARCL (the hypotenuse arc between the
+    body and the Sun) form a right-angled spherical triangle, so
+    ``cos ARCL = cos ARCV * cos DAZ`` (see, e.g., Yallop, B.D. (1997), NAO
+    Technical Note No. 69, and Bruin, F. (1977), Vistas in Astronomy 21, 331).
+    The result is a non-negative arc in [0, 180] degrees.
+
+    This is the exact spherical relation, not the ``sqrt(ARCV^2 + DAZ^2)``
+    small-angle (planar) approximation, which underestimates the arc as the
+    body moves away from the Sun. ``cos`` is even and 360-periodic, so the
+    result is invariant to how ``daz_deg`` is normalised.
+
+    Args:
+        arcv_deg: Geocentric arcus visionis (object-minus-Sun altitude), deg.
+        daz_deg: Object-minus-Sun azimuth separation, deg.
+
+    Returns:
+        Arc of light between the body and the Sun, in degrees.
+    """
+    c = math.cos(math.radians(arcv_deg)) * math.cos(math.radians(daz_deg))
+    return math.degrees(math.acos(max(-1.0, min(1.0, c))))
+
+
 # Detection margin (magnitudes) for the twilight visibility test used by the
 # heliacal-event search. With the published VISLIMIT limiting-magnitude model
 # (dret[0] is a catalog-magnitude limit, extinction folded in) an object is at
@@ -130,48 +164,72 @@ _HELIACAL_VIS_MARGIN = 0.0
 
 class SchaeferConstants:
     """
-    Constants for the Schaefer atmospheric model.
+    Legacy descriptive constants for a Schaefer-style atmospheric model.
 
-    Based on Schaefer (1990).
+    NOTE: these values are documentation/compatibility defaults only. The
+    active VISLIMIT limiting-magnitude path (``SchaeferModel`` and the
+    ``_vl_*`` helpers above) does not read this class; it uses its own
+    coefficients. Citations below are given for the published origin of each
+    representative value, not because this class drives any result.
     """
 
-    # Rayleigh scattering coefficient at sea level (per airmass)
-    # At 550nm (V-band), k_r = 0.1451 at sea level
+    # Rayleigh (molecular) scattering coefficient at sea level, V band
+    # (~550 nm), per unit airmass. The 0.1451 mag/airmass V-band value derives
+    # from the atmospheric-extinction model of Hayes, D.S. & Latham, D.W.
+    # (1975), "A rediscussion of the atmospheric extinction and the absolute
+    # spectral-energy distribution of Vega", ApJ 197, 593-601.
     K_RAYLEIGH_SEA_LEVEL = 0.1451
 
-    # Ozone absorption coefficient (per airmass)
-    # Small contribution at visual wavelengths
+    # Ozone absorption coefficient (per airmass). Small, roughly constant
+    # contribution at visual wavelengths (Chappuis bands); representative
+    # V-band value used by Schaefer (1990), PASP 102, 212.
     K_OZONE = 0.016
 
-    # Aerosol scattering base coefficient
-    # Typical value 0.05-0.15 depending on conditions
+    # Aerosol (Mie) scattering base coefficient at V, clear-air baseline.
+    # Aerosol extinction follows the wavelength power law of Angstrom, A.
+    # (1929), "On the atmospheric transmission of sun radiation and on dust in
+    # the air", Geografiska Annaler 11, 156-166.
     K_AEROSOL_BASE = 0.08
 
-    # Scale height for pressure (km)
+    # Scale height for pressure (km) - standard atmospheric density scale.
     SCALE_HEIGHT_PRESSURE = 8.5
 
-    # Scale height for aerosols (km)
+    # Scale height for aerosols (km) - aerosols are concentrated in the lower
+    # troposphere (order 1-2 km; e.g. Allen, "Astrophysical Quantities").
     SCALE_HEIGHT_AEROSOL = 1.5
 
-    # Airglow brightness (nanoLamberts) - natural sky glow
+    # Airglow brightness (nanoLamberts) - natural minimum sky glow. Standard
+    # dark-night airglow level (Allen, "Astrophysical Quantities"; Roach, F.E.
+    # & Gordon, J.L. (1973), "The Light of the Night Sky").
     AIRGLOW = 145.0
 
-    # Zodiacal light brightness (nanoLamberts) - typical value
+    # Zodiacal light brightness (nanoLamberts) - representative near-ecliptic
+    # value (Allen, "Astrophysical Quantities"; Roach & Gordon 1973).
     ZODIACAL_LIGHT = 100.0
 
-    # Dark sky brightness at zenith (mag/arcsec^2)
+    # Dark sky brightness at zenith (mag/arcsec^2) - representative excellent
+    # dark-site V-band value.
     DARK_SKY_MAG = 21.6
 
-    # Full Moon brightness relative to Sun (magnitude difference)
+    # Full Moon brightness relative to Sun (magnitude difference). The Sun-Moon
+    # magnitude offset near full phase is ~14 mag (Allen, "Astrophysical
+    # Quantities").
     FULL_MOON_MAG_DIFF = 14.0
 
-    # Visual limiting magnitude for perfect dark sky conditions
+    # Visual limiting magnitude for perfect dark-sky conditions - classic
+    # naked-eye limit for a young dark-adapted observer (Schaefer (1990),
+    # PASP 102, 212).
     PERFECT_SKY_LIM_MAG = 6.5
 
     # Legacy descriptive defaults retained for callers inspecting this class.
     # The active arcus-visionis calculation below root-solves the Schaefer
     # limiting-magnitude model and does not read this mapping. These exact
-    # object values are project defaults, not a transcription from Ptolemy.
+    # object values are project defaults; they lie in the same range as the
+    # classical Schoch/Ptolemaic arcus-visionis thresholds discussed in the
+    # heliacal-visibility literature (e.g. Schaefer, B.E. (1987), "Heliacal
+    # Rise Phenomena", Journal for the History of Astronomy 18,
+    # Archaeoastronomy Suppl. 11, S19-S33) but are not a verbatim
+    # transcription of any historical table.
     ARCUS_VISIONIS = {
         "venus": 5.0,
         "mercury": 10.0,
@@ -183,13 +241,18 @@ class SchaeferConstants:
         "star_faint": 13.0,  # Stars fainter than mag 3
     }
 
-    # Threshold contrast for naked-eye visibility (log units)
-    THRESHOLD_CONTRAST = 0.0094  # Schaefer's value
+    # Representative threshold-contrast constant for naked-eye point-source
+    # detection from the Schaefer visibility framework (Schaefer (1990),
+    # PASP 102, 212; Schaefer (1993), Vistas in Astronomy 36, 311). Legacy
+    # descriptive value; not read by the active VISLIMIT path.
+    THRESHOLD_CONTRAST = 0.0094
 
-    # Eye pupil diameter in dark-adapted conditions (mm)
+    # Eye pupil diameter in dark-adapted conditions (mm) - classical maximum
+    # dark-adapted pupil; the active path instead uses the age-dependent
+    # relation _vl_eye_pupil (Schaefer 1990/1998).
     DARK_PUPIL_DIAMETER = 7.0
 
-    # Eye pupil diameter in bright conditions (mm)
+    # Eye pupil diameter in bright (photopic) conditions (mm).
     BRIGHT_PUPIL_DIAMETER = 2.0
 
 
@@ -244,6 +307,13 @@ _VL_DARK_SKY_MAG_ARCSEC2 = 22.0
 _VL_DARK_SKY_NL = (
     108000.0 * 10.0 ** (-0.4 * _VL_DARK_SKY_MAG_ARCSEC2) * math.pi / 1.0e-5
 )
+# Unit-scale factor converting nanoLamberts to the VISLIMIT model's internal
+# radiance scale, on which the additive daylight/twilight/moonlight scattering
+# terms below are expressed (their absolute coefficients such as 43.27 and the
+# 6.2e7/10**6.15/10**5.36 scattering constants come from Schaefer's VISLIMIT
+# algorithm, Sky & Telescope 95(5), 57). It cancels for the dark-sky term
+# (which is multiplied and then divided by it) and fixes the relative weight of
+# the scattered-light terms; the sum is divided back out to return nanoLamberts.
 _VL_MODEL_RADIANCE_PER_NL = 1.11e-15
 # Reijs refined scale heights (m)
 _VL_SH_RAY = 8515.0
@@ -275,6 +345,7 @@ def _vl_extinction_components(
     altitude_m: float,
     latitude: float,
     jd: float,
+    pressure_mbar: float = 0.0,
 ) -> Tuple[float, float, float, float]:
     """Return the four V-band extinction coefficients (KR, KA, KO, KW).
 
@@ -282,12 +353,21 @@ def _vl_extinction_components(
     ozone term. Coefficients are per unit airmass.  Aerosol extinction varies
     with humidity and altitude; no empirically recovered seasonal multiplier
     is applied.
+
+    Rayleigh scattering is proportional to the molecular column mass, i.e.
+    to the site pressure (Schaefer 1993): an explicit barometric pressure
+    (``pressure_mbar > 0``) therefore scales the molecular coefficient as
+    P/1013.25; with the sentinel 0 the standard-atmosphere altitude form
+    ``exp(-h/H)`` is used, which is the same quantity for a standard site.
     """
     Mc = _vl_month_cont(jd)
     RA = (Mc - 3.0) * 30.0 * _RD
     LT = latitude * _RD
     RH = min(max(humidity_pct, 1.0), 99.5)
-    kr = 0.1066 * math.exp(-altitude_m / _VL_SH_RAY)
+    if pressure_mbar > 0.0:
+        kr = 0.1066 * (pressure_mbar / 1013.25)
+    else:
+        kr = 0.1066 * math.exp(-altitude_m / _VL_SH_RAY)
     ka = (
         0.1
         * math.exp(-altitude_m / _VL_SH_AER)
@@ -305,7 +385,14 @@ def _vl_extinction_components(
 
 
 def _vl_airmass(alt_deg: float) -> float:
-    """Schaefer sky airmass (gas) as a function of altitude."""
+    """Sky airmass vs altitude, Rozenberg (1966) low-altitude form.
+
+    ``X = 1 / (cos z + 0.025 * exp(-11 cos z))``, valid to the horizon, from
+    Rozenberg, G.V. (1966), "Twilight: A Study in Atmospheric Optics". This is
+    the general sky airmass used by Schaefer's VISLIMIT model (NOT the Kasten &
+    Young relation, which appears in the standalone extinction/schaefer helper
+    modules).
+    """
     if alt_deg <= 0.0:
         return 40.0
     c = math.cos((90.0 - alt_deg) * _RD)
@@ -313,19 +400,19 @@ def _vl_airmass(alt_deg: float) -> float:
 
 
 def _vl_airmass_gas(alt_deg: float) -> float:
-    """Return Schaefer VISLIMIT's gas/Rayleigh relative airmass."""
+    """Gas/Rayleigh relative airmass, Schaefer VISLIMIT (S&T 95(5), 57)."""
     c = math.cos((90.0 - alt_deg) * _RD)
     return 1.0 / (c + 0.0286 * math.exp(-10.5 * c))
 
 
 def _vl_airmass_aer(alt_deg: float) -> float:
-    """Return Schaefer VISLIMIT's aerosol relative airmass."""
+    """Aerosol relative airmass, Schaefer VISLIMIT (S&T 95(5), 57)."""
     c = math.cos((90.0 - alt_deg) * _RD)
     return 1.0 / (c + 0.0123 * math.exp(-24.5 * c))
 
 
 def _vl_airmass_ozone(alt_deg: float) -> float:
-    """Return the spherical-shell ozone airmass used by VISLIMIT."""
+    """Spherical-shell ozone airmass, Schaefer VISLIMIT (S&T 95(5), 57)."""
     s = math.sin((90.0 - alt_deg) * _RD)
     val = 1.0 - (s / (1.0 + 20.0 / 6378.0)) ** 2
     return 1.0 / math.sqrt(val) if val > 0 else 40.0
@@ -335,7 +422,9 @@ def _vl_hecht_threshold(bl: float) -> float:
     """Hecht/Knoll-Schaefer contrast threshold (foot-candles) for sky ``bl``.
 
     Two photoreceptor regimes (photopic above / scotopic below 1500 nL), exactly
-    as in Schaefer's VISLIMIT: ``TH = C1 * (1 + sqrt(C2 * BL))**2``.
+    as in Schaefer's VISLIMIT algorithm (Schaefer (1998), Sky & Telescope
+    95(5), 57): ``TH = C1 * (1 + sqrt(C2 * BL))**2``, with the C1/C2 pairs the
+    published photopic and scotopic Hecht-model constants.
     """
     if bl > 1500.0:
         c1 = 10.0**-8.350001
@@ -427,6 +516,7 @@ class SchaeferModel:
         observer: Optional[ObserverParams] = None,
         latitude: float = 0.0,
         jd: float = 2451545.0,
+        pressure_scales_extinction: bool = False,
     ):
         """
         Initialize the Schaefer model with atmospheric and observer conditions.
@@ -458,6 +548,18 @@ class SchaeferModel:
             )
 
         self.atmo = atmo
+
+        # Measured reference behavior: the heliacal extinction coefficient is
+
+        # pressure-INDEPENDENT (identical at 700 and 1013.25 mbar), while the
+
+        # limiting-magnitude surface scales Rayleigh with P/1013.25 (Schaefer
+
+        # 1993). The constructor toggle selects which convention this model
+
+        # instance uses; 0.0 selects the standard-atmosphere altitude form.
+
+        self._extinction_pressure = atmo.pressure if pressure_scales_extinction else 0.0
         self.observer = observer
         self.latitude = latitude
         self.jd = jd
@@ -481,6 +583,7 @@ class SchaeferModel:
             self.atmo.altitude,
             self.latitude,
             self.jd,
+            pressure_mbar=self._extinction_pressure,
         )
         mr = self.atmo.met_range
         if 0.0 < mr < 1.0:
@@ -492,7 +595,10 @@ class SchaeferModel:
             k_total = max(mr, floor)
             ka = max(0.0, k_total - floor)
         elif mr >= 1.0:
-            # Meteorological visual range (km): Koschmieder aerosol.
+            # Meteorological visual range V (km) -> aerosol coefficient via
+            # the Koschmieder (1924) relation, k = 3.912 / V, with the
+            # molecular part kr removed. Koschmieder, H. (1924), "Theorie der
+            # horizontalen Sichtweite", Beitr. Phys. freien Atmos. 12, 33-53.
             ka = max(0.0, 3.912 / mr - kr)
         self.k_rayleigh = kr
         self.k_aerosol = ka
@@ -567,7 +673,12 @@ class SchaeferModel:
         ZZ = Z * _RD
         year = 2000.0 + (self.jd - 2451545.0) / 365.25
 
-        # Dark night sky
+        # Dark night sky (Schaefer VISLIMIT dark-sky term, Schaefer (1998),
+        # Sky & Telescope 95(5), 57): a 0.3-amplitude 11-year solar-cycle
+        # modulation of airglow, a van Rhijn zenith-distance brightening
+        # (0.4 + 0.6/sqrt(1 - 0.96 sin^2 Z)), and extinction 10**(-0.4 K X)
+        # to the object altitude. The absolute level is set by the published
+        # natural dark-sky luminance in _VL_DARK_SKY_NL.
         bn = _VL_DARK_SKY_NL * _VL_MODEL_RADIANCE_PER_NL
         bn *= 1.0 + 0.3 * math.cos(6.283 * (year - 1992.0) / 11.0)
         bn *= 0.4 + 0.6 / math.sqrt(1.0 - 0.96 * (math.sin(ZZ)) ** 2)
@@ -580,6 +691,12 @@ class SchaeferModel:
             # Daylight scattering (Sun above the horizon). The twilight term
             # BT is only valid for a Sun below the horizon (its -HS factor
             # diverges for HS > 0), so daylight uses BD alone.
+            # fs is the angular scattering function f(rho) of Krisciunas, K. &
+            # Schaefer, B.E. (1991), PASP 103, 1033 (their scattered-light
+            # relations, eqs. 15-21): an aureole/forward term (6.2e7*rho^-2),
+            # an intermediate-angle term (10**(6.15 - rho/40)), and a
+            # Rayleigh+Mie term (10**5.36*(1.06 + cos^2 rho)), with rho the
+            # Sun-object sky angle in degrees.
             xs = _vl_airmass(sun_alt)
             c4 = 10.0 ** (-0.4 * K * xs)
             fs = (
@@ -593,19 +710,29 @@ class SchaeferModel:
                 * (fs * c4 + 440000.0 * (1.0 - c4))
             )
         else:
-            # Twilight brightness (Sun below the horizon).
+            # Twilight brightness (Sun below the horizon), from Schaefer's
+            # VISLIMIT twilight term (Schaefer (1998), Sky & Telescope 95(5),
+            # 57): the 32.5 offset and the -HS / -(Z/(360 K)) dependence on
+            # Sun depression and object zenith distance are the published
+            # BT relation.
             bt = 10.0 ** (
                 -0.4 * (_VL_MS - _VL_MOI + 32.5 - sun_alt - (Z / (360.0 * K)))
             )
             b += bt * (100.0 / rs) * one_minus
 
-        # Moonlight
+        # Moonlight, following Krisciunas, K. & Schaefer, B.E. (1991),
+        # "A model of the brightness of moonlight", PASP 103, 1033-1039,
+        # DOI 10.1086/132921.
         if moon_alt > 0.0:
             rm = max(moon_obj_angle, 1.0)
             am = math.degrees(math.acos(min(1.0, max(-1.0, 2.0 * moon_phase - 1.0))))
+            # Moon V magnitude as a function of phase angle am (deg): their
+            # eq. 9, m = -12.73 + 0.026*|am| + 4e-9*am**4.
             mm = -12.73 + 0.026 * abs(am) + 4e-9 * (am**4)
             xm = _vl_airmass(moon_alt)
             c3 = 10.0 ** (-0.4 * K * xm)
+            # fm is the same K&S (1991) scattering function f(rho) as fs above
+            # (eqs. 15-21), evaluated at the Moon-object sky angle rm.
             fm = (
                 6.2e7 * (rm**-2)
                 + 10.0 ** (6.15 - rm / 40.0)
@@ -670,6 +797,10 @@ class SchaeferModel:
         th = _vl_hecht_threshold(bl)  # foot-candles
 
         # Extinction to the object (magnitudes) is included in the limit.
+        # The -16.57 magnitude zero point converts the Hecht/Knoll-Schaefer
+        # threshold illuminance (foot-candles) into a V-band limiting
+        # magnitude, per Schaefer's VISLIMIT algorithm (Schaefer (1998),
+        # Sky & Telescope 95(5), 57).
         dm = self.extinction(obj_alt)
         m_lim = -16.57 - 2.5 * math.log10(th) - dm
 
@@ -907,6 +1038,7 @@ def create_schaefer_model(
     transmission: float = 1.0,
     latitude: float = 0.0,
     jd: float = 2451545.0,
+    pressure_scales_extinction: bool = False,
 ) -> SchaeferModel:
     """
     Create a SchaeferModel instance with given parameters.
@@ -949,7 +1081,13 @@ def create_schaefer_model(
         aperture=aperture,
         transmission=transmission,
     )
-    return SchaeferModel(atmo, observer, latitude=latitude, jd=jd)
+    return SchaeferModel(
+        atmo,
+        observer,
+        latitude=latitude,
+        jd=jd,
+        pressure_scales_extinction=pressure_scales_extinction,
+    )
 
 
 # Outer planets (orbit outside Earth's orbit)
@@ -975,7 +1113,7 @@ def _get_star_magnitude(star_id: int) -> float:
     Get the visual magnitude of a fixed star from the catalog.
 
     Args:
-        star_id: Star ID (SE_* constant, e.g., SIRIUS)
+        star_id: Star ID (body constant, e.g., SIRIUS)
 
     Returns:
         Visual magnitude of the star. Brighter stars have lower/negative values.
@@ -1027,6 +1165,48 @@ def _star_name_from_id(star_id: int) -> str:
     raise Error(f"Star ID {star_id} not found in catalog")
 
 
+def _altaz_from_radec(
+    ra_hours: float,
+    dec_deg: float,
+    lon_deg: float,
+    lat_deg: float,
+    gast_hours: float,
+) -> tuple[float, float]:
+    """Altitude/azimuth from of-date equatorial coordinates via the hour angle.
+
+    Standard spherical-astronomy reduction (Explanatory Supplement to the
+    Astronomical Almanac; Meeus, Astronomical Algorithms, ch. 13). The azimuth
+    is returned in the north-zero, eastward-positive convention to match
+    Skyfield's ``altaz()`` and the public heliacal azimuth slots.
+
+    Args:
+        ra_hours: Right ascension of date, in hours.
+        dec_deg: Declination of date, in degrees.
+        lon_deg: Observer geographic longitude (east positive), degrees.
+        lat_deg: Observer geographic latitude, degrees.
+        gast_hours: Greenwich apparent sidereal time, in hours.
+
+    Returns:
+        ``(altitude_deg, azimuth_deg)``; altitude is geometric (unrefracted).
+    """
+    lst_hours = gast_hours + lon_deg / 15.0
+    ha_rad = math.radians((lst_hours - ra_hours) * 15.0)
+    dec_rad = math.radians(dec_deg)
+    lat_rad = math.radians(lat_deg)
+    sin_alt = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
+        dec_rad
+    ) * math.cos(ha_rad)
+    alt_deg = math.degrees(math.asin(max(-1.0, min(1.0, sin_alt))))
+    # Azimuth from South (classic hour-angle form), rotated by 180 deg to the
+    # north-zero convention.
+    y = math.sin(ha_rad) * math.cos(dec_rad)
+    x = math.cos(ha_rad) * math.sin(lat_rad) * math.cos(dec_rad) - math.sin(
+        dec_rad
+    ) * math.cos(lat_rad)
+    az_deg = (math.degrees(math.atan2(y, x)) + 180.0) % 360.0
+    return alt_deg, az_deg
+
+
 def _leb_body_altaz(
     reader,
     jd_ut: float,
@@ -1042,7 +1222,7 @@ def _leb_body_altaz(
     Args:
         reader: LEBReader instance.
         jd_ut: Julian Day UT1.
-        body_id: SE_* body constant.
+        body_id: Body constant.
         geopos_lonlat: (lon_deg, lat_deg, alt_m) for the observer.
         atpress: Atmospheric pressure in mbar.
         attemp: Atmospheric temperature in Celsius.
@@ -1234,6 +1414,34 @@ def _heliacal_ut_leb(
             star_name=star_name,
         )
         return angular_separation(sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1])
+
+    def _sun_body_lon_diff(jd: float) -> float:
+        """Signed ecliptic longitude of the body minus the Sun, in (-180, 180].
+
+        Negative means the body is WEST of the Sun (rises before it -- a
+        morning apparition); positive means EAST (sets after it -- an evening
+        apparition). Mirrors the Skyfield twin so the two backends reject the
+        same wrong-apparition twilight detections (see that helper).
+        """
+        sun_ecl = _leb_ecliptic_pos(reader, jd, SUN, geopos)
+        body_ecl = _leb_ecliptic_pos(
+            reader,
+            jd,
+            body,
+            geopos,
+            is_star=is_star,
+            star_name=star_name,
+        )
+        return (body_ecl[0] - sun_ecl[0] + 180.0) % 360.0 - 180.0
+
+    def _event_side_ok(jd: float, morning: bool) -> bool:
+        """Whether a visibility at ``jd`` is on the side the event requires.
+
+        Morning events require the body WEST of the Sun; evening events require
+        it EAST. Structural mirror of the Skyfield twin.
+        """
+        lon_diff = _sun_body_lon_diff(jd)
+        return (lon_diff < 0.0) if morning else (lon_diff > 0.0)
 
     def _get_body_magnitude(jd: float) -> float:
         if is_star:
@@ -1441,7 +1649,7 @@ def _heliacal_ut_leb(
                 moon_obj_angle=180.0,
                 margin=_HELIACAL_VIS_MARGIN,
             )
-            if visible:
+            if visible and _event_side_ok(jd_check, morning):
                 return True, jd_check
         return False, 0.0
 
@@ -1738,18 +1946,43 @@ def _heliacal_pheno_ut_leb(
     geopos = (lon, lat, altitude)
 
     # --- positions via LEB ---
-    # Sun
-    sun_az, sun_alt_deg, _ = _leb_body_altaz(
-        reader,
-        jd,
-        SUN,
-        geopos,
-        pressure,
-        temperature,
-    )
+    # Geometric (TRUEPOS-like) topocentric places drive the geometric output
+    # slots (AltO, GeoAltO, AziO, AltS, AziS and the derived arcs): the
+    # reference reports them from the astrometric direction (no aberration /
+    # light-time), matching the Skyfield pheno path. The refracted AppAltO slot
+    # keeps the apparent altitude and the arbitrated refraction model, and the
+    # visibility detector (which calls the shared _leb_body_altaz) is untouched.
+    from .utils import azalt as _azalt_hp, ECL2HOR as _ECL2HOR_hp
+    from .constants import FLG_TRUEPOS as _FLG_TRUEPOS_hp
+    from .fast_calc import _topo_ecliptic as _topo_ecliptic_hp
+    from .time_utils import deltat as _deltat_hp
 
-    # Body
-    body_az_deg, body_alt_deg, _body_app_alt = _leb_body_altaz(
+    _jd_tt_hp = jd + _deltat_hp(jd)
+
+    def _geom_topo_altaz(bid: int, star: bool) -> tuple[float, float]:
+        """Geometric topocentric (north-zero azimuth, unrefracted altitude)."""
+        if star:
+            from .fixed_stars import fixstar_ut as _fsu_hp
+
+            assert star_name is not None
+            _p, _, _ = _fsu_hp(star_name, jd, _FLG_TRUEPOS_hp)
+            _elon, _elat, _edist = _p[0], _p[1], _p[2]
+        else:
+            _tp = _topo_ecliptic_hp(
+                reader, _jd_tt_hp, jd, bid, geopos, iflag=_FLG_TRUEPOS_hp
+            )
+            _elon, _elat, _edist = _tp[0], _tp[1], _tp[2]
+        _az, _alt_true, _ = _azalt_hp(
+            jd, _ECL2HOR_hp, geopos, 0.0, 0.0, (_elon, _elat, _edist)
+        )
+        return (_az + 180.0) % 360.0, _alt_true
+
+    # Sun: geometric topocentric altitude/azimuth (AltS, AziS).
+    sun_az, sun_alt_deg = _geom_topo_altaz(SUN, False)
+
+    # Object apparent topocentric altitude, retained ONLY as the refracted
+    # AppAltO base (the refraction model is unchanged).
+    _body_az_app, _body_alt_app, _ = _leb_body_altaz(
         reader,
         jd,
         body,
@@ -1760,19 +1993,23 @@ def _heliacal_pheno_ut_leb(
         star_name=star_name,
     )
 
-    # Atmospheric refraction from true altitude, in arcminutes:
+    # Object: geometric topocentric altitude/azimuth (AltO, AziO).
+    body_az_deg, body_alt_deg = _geom_topo_altaz(body, is_star)
+
+    # Atmospheric refraction from the APPARENT true altitude, in arcminutes:
     # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
     # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
     # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
-    # Below h = -1° the 0.5° fallback approximates horizon refraction.
-    if body_alt_deg > -1:
+    # Below h = -1° the 0.5° fallback approximates horizon refraction. The
+    # refracted AppAltO slot stays on the apparent base and the arbitrated model.
+    if _body_alt_app > -1:
         refraction = 1.02 / math.tan(
-            math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
+            math.radians(_body_alt_app + 10.3 / (_body_alt_app + 5.11))
         )
         refraction /= 60.0
     else:
         refraction = 0.5
-    app_alt_deg = body_alt_deg + refraction
+    app_alt_deg = _body_alt_app + refraction
 
     # Get ecliptic positions for parallax and elongation calculations
     body_ecl = _leb_ecliptic_pos(
@@ -1789,19 +2026,22 @@ def _heliacal_pheno_ut_leb(
     # GAST is referenced to the true equinox of date, so the RA/Dec must be of
     # date (FLG_EQUATORIAL alone, NOT FLG_J2000) to keep the hour-angle frame
     # consistent. Mixing J2000 RA with of-date GAST injected the full
-    # J2000→date precession+nutation into the hour angle.
+    # J2000→date precession+nutation into the hour angle. FLG_TRUEPOS uses the
+    # astrometric (aberration/light-time-free) direction, matching the reference.
     from .constants import FLG_EQUATORIAL
 
     if is_star:
         from .fixed_stars import fixstar_ut
 
         assert star_name is not None
-        _eq_pos, _, _ = fixstar_ut(star_name, jd, FLG_EQUATORIAL | FLG_SPEED)
+        _eq_pos, _, _ = fixstar_ut(
+            star_name, jd, FLG_EQUATORIAL | _FLG_TRUEPOS_hp | FLG_SPEED
+        )
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
     else:
         from .planets import calc_ut as _scu_hp
 
-        _eq_pos, _ = _scu_hp(jd, body, FLG_EQUATORIAL | FLG_SPEED)
+        _eq_pos, _ = _scu_hp(jd, body, FLG_EQUATORIAL | _FLG_TRUEPOS_hp | FLG_SPEED)
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
 
     # Use GAST to match the Skyfield path's of-date RA + t.gast
@@ -1857,7 +2097,9 @@ def _heliacal_pheno_ut_leb(
             magnitude = 0.0
             phase_angle = 0.0
 
-    arcl_act = math.sqrt(arcv_act**2 + daz_act**2)
+    # ARCLact: arc of light between the body and the Sun via the exact
+    # right-spherical-triangle relation cos ARCL = cos ARCV * cos DAZ.
+    arcl_act = _arc_of_light(arcv_act, daz_act)
 
     (
         _obs_age,
@@ -1950,7 +2192,9 @@ def _heliacal_pheno_ut_leb(
             moon_diameter = (
                 moon_pheno[3] if len(moon_pheno) > 3 and moon_pheno[3] > 0 else 0.5
             )
-            # Crescent width (Yallop/Bruin): W = SD * (1 - cos ARCL), where
+            # Crescent width W = SD * (1 - cos ARCL) from Bruin, F. (1977),
+            # "The first visibility of the lunar crescent", Vistas in Astronomy
+            # 21, 331-358 (adopted by Yallop's q-test below), where
             # ARCL is the arc of light (Sun-Moon elongation, moon_pheno[2]) and
             # SD is the Moon's apparent semidiameter in arcmin (moon_pheno[3]
             # is the apparent diameter in degrees). Near new moon ARCL -> 0 so
@@ -1964,6 +2208,9 @@ def _heliacal_pheno_ut_leb(
             pass
 
     if body == MOON:
+        # Yallop q-test (Yallop, B.D. (1997), NAO Technical Note No. 69):
+        # the cubic criterion in the crescent width w (arcmin) and the
+        # q = (ARCV - criterion) / 10 statistic.
         w = w_moon * 60.0
         q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
         q_yallop = (arcv_act - q_criterion) / 10.0
@@ -2203,6 +2450,13 @@ def _vis_limit_mag_leb(
     if exclude_moon:
         moon_alt = -90.0
 
+    if body_id == MOON:
+        # Measured reference behavior: when the observed object IS the Moon,
+        # its own light is not sky glow hindering the observation, so the
+        # moonlight term is removed exactly as with VISLIM_NOMOON (the sky
+        # stays dark and the limiting magnitude reflects the object alone).
+        moon_alt = -90.0
+
     schaefer = create_schaefer_model(
         pressure=pressure,
         temperature=temperature,
@@ -2217,6 +2471,7 @@ def _vis_limit_mag_leb(
         transmission=obs_transmission,
         latitude=lat,
         jd=tjdut,
+        pressure_scales_extinction=True,
     )
 
     # Moon phase and angular separations via LEB ecliptic positions
@@ -2375,9 +2630,11 @@ def _heliacal_ut_pythonic(
     References:
         - Schaefer (1990), PASP 102, 212-229, DOI 10.1086/132629,
           limiting-magnitude/observer model.
-        - Schaefer (1993), Vistas in Astronomy 36, 311-361, visibility
-          context and observer effects.
-        - Kasten & Young (1989), DOI 10.1364/AO.28.004735, optical airmass.
+        - Schaefer (1993), Vistas in Astronomy 36, 311-361; Schaefer (1998),
+          Sky & Telescope 95(5), 57-60 (the VISLIMIT V-band model and its
+          per-component relative airmasses actually used here).
+        - Rozenberg (1966), "Twilight: A Study in Atmospheric Optics"
+          (low-altitude sky airmass form used by the VISLIMIT path).
 
         The historical note above is context only; it does not provide the
         numerical event algorithm or its thresholds.
@@ -2572,6 +2829,38 @@ def _heliacal_ut_pythonic(
         else:
             body_app = earth.at(t).observe(target).apparent()
         return body_app.separation_from(sun_app).degrees
+
+    def _sun_body_lon_diff(jd: float) -> float:
+        """Signed geocentric ecliptic longitude of the body minus the Sun.
+
+        Normalised to (-180, 180]. Negative means the body is WEST of the Sun
+        (rises before it -- a morning apparition); positive means EAST of the
+        Sun (sets after it -- an evening apparition). Used to reject a twilight
+        detection whose Sun-relative side contradicts the requested event: at
+        high latitudes in summer the morning and evening twilights are only a
+        few hours apart, so a scan window centred near local midnight can spill
+        into the opposite twilight and latch the wrong apparition.
+        """
+        t = ts.ut1_jd(jd)
+        _, sun_lon, _ = earth.at(t).observe(sun).apparent().ecliptic_latlon()
+        if is_star and star_object is not None:
+            _, body_lon, _ = (
+                earth.at(t).observe(star_object).apparent().ecliptic_latlon()
+            )
+        else:
+            _, body_lon, _ = earth.at(t).observe(target).apparent().ecliptic_latlon()
+        return (body_lon.degrees - sun_lon.degrees + 180.0) % 360.0 - 180.0
+
+    def _event_side_ok(jd: float, morning: bool) -> bool:
+        """Whether a visibility at ``jd`` is on the side the event requires.
+
+        Morning events (heliacal rising, morning last) require the body WEST of
+        the Sun; evening events (heliacal setting, evening first) require it
+        EAST. Rejects an opposite-apparition detection that a spilled twilight
+        window would otherwise accept.
+        """
+        lon_diff = _sun_body_lon_diff(jd)
+        return (lon_diff < 0.0) if morning else (lon_diff > 0.0)
 
     def _get_body_magnitude(jd: float) -> float:
         """Get the visual magnitude of the body."""
@@ -3001,7 +3290,7 @@ def _heliacal_ut_pythonic(
                 moon_obj_angle=180.0,
                 margin=_HELIACAL_VIS_MARGIN,
             )
-            if visible:
+            if visible and _event_side_ok(float(scan_jds[k]), morning):
                 results[day_i] = (True, float(scan_jds[k]))
                 found.add(day_i)
 
@@ -3515,7 +3804,7 @@ def _parse_object_name(
             ``heliacal_ut`` and ``vis_limit_mag`` keep the default rejection.
 
     Returns:
-        Body ID (SE_* constant) for planets
+        Body ID (body constant) for planets
 
     Raises:
         Error: If object name is not recognized or not valid for heliacal
@@ -3809,7 +4098,8 @@ def _heliacal_pheno_ut_pythonic(
         - 6 ``TAVact``: topocentric vertical separation from the Sun (deg).
         - 7 ``ARCVact``: geocentric vertical separation from the Sun (deg).
         - 8 ``DAZact``: signed object-minus-Sun azimuth separation (deg).
-        - 9 ``ARCLact``: signed object-minus-Sun longitude separation (deg).
+        - 9 ``ARCLact``: arc of light between the object and the Sun (deg),
+          from the right-spherical-triangle relation cos ARCL = cos ARCV * cos DAZ.
         - 10 ``kact``: atmospheric extinction coefficient.
         - 11 ``minTAV``: limiting topocentric vertical separation (deg).
         - 12-14 ``TfirstVR``, ``TbVR``, ``TlastVR``: beginning, optimum, and
@@ -3843,10 +4133,13 @@ def _heliacal_pheno_ut_pythonic(
 
     References:
         - Schaefer (1990), PASP 102, 212-229, DOI 10.1086/132629,
-          limiting-magnitude/observer model.
+          limiting-magnitude/observer model; Schaefer (1998), Sky & Telescope
+          95(5), 57-60 (VISLIMIT V-band model and its relative airmasses).
+        - Krisciunas & Schaefer (1991), PASP 103, 1033-1039,
+          DOI 10.1086/132921 (scattered-moonlight sky brightness).
         - Yallop (1997), NAO Technical Note 69, only for the lunar-crescent
-          q statistic and class boundaries placed in result slots 17-18.
-        - Kasten & Young (1989), DOI 10.1364/AO.28.004735, optical airmass.
+          q statistic and class boundaries placed in result slots 17-18;
+          Bruin (1977), Vistas in Astronomy 21, 331-358 (crescent width).
     """
     # --- LEB fast path ---
     from .state import get_leb_reader as _get_leb_reader
@@ -3987,65 +4280,91 @@ def _heliacal_pheno_ut_pythonic(
     t = ts.ut1_jd(jd)
     observer_at = earth + observer
 
-    # Calculate Sun position
-    sun_app = observer_at.at(t).observe(sun).apparent()
-    sun_alt_topo, sun_az, _ = sun_app.altaz()
-    sun_alt_deg = sun_alt_topo.degrees
-    sun_az_deg = sun_az.degrees
+    # --- Geometric (TRUEPOS-like) places for the geometric output slots -------
+    # The reference reports AltO, GeoAltO, AziO, AltS, AziS and the derived arcs
+    # from the astrometric (aberration- and light-time-free) direction, whereas
+    # the apparent place carries the ~20" annual aberration (plus, for the fast
+    # planets, the light-time bending of the direction). Using the geometric
+    # place was verified against the reference to cut the residual from ~20-42"
+    # to the frame-model floor. Only the geometric output slots change: the
+    # refracted AppAltO slot keeps the apparent altitude and the arbitrated
+    # refraction model, and the visibility detector is untouched.
+    gast = t.gast
 
-    # Calculate body position (handle both planets and stars)
+    # Sun: geometric topocentric altitude/azimuth (AltS, AziS).
+    _sun_geom = (sun - observer_at).at(t)
+    _sun_alt, _sun_az, _ = _sun_geom.altaz()
+    sun_alt_deg = _sun_alt.degrees
+    sun_az_deg = _sun_az.degrees
+
+    # Object apparent topocentric altitude, retained ONLY as the base of the
+    # refracted AppAltO slot (see below); the refraction model is unchanged.
     if is_star and star_object is not None:
         body_app = observer_at.at(t).observe(star_object).apparent()
     else:
         body_app = observer_at.at(t).observe(target).apparent()
-    body_alt_topo, body_az, body_dist = body_app.altaz()
-    body_alt_deg = body_alt_topo.degrees
-    body_az_deg = body_az.degrees
+    body_app_alt_deg = body_app.altaz()[0].degrees
 
-    # Get geocentric altitude (without refraction or topocentric correction)
+    # Object geometric topocentric altitude/azimuth (AltO, AziO) and the of-date
+    # geocentric RA/Dec for GeoAltO. A Star cannot form a geometric difference
+    # vector and altaz() rejects an astrometric position, so its of-date
+    # astrometric place is reduced by hand; a fixed star's diurnal parallax is
+    # nil, so its topocentric and geocentric altitudes coincide.
     if is_star and star_object is not None:
-        body_geo = earth.at(t).observe(star_object).apparent()
+        _ra_t, _dec_t, _ = observer_at.at(t).observe(star_object).radec(epoch=t)
+        body_alt_deg, body_az_deg = _altaz_from_radec(
+            _ra_t.hours, _dec_t.degrees, lon, lat, gast
+        )
+        _ra_g, _dec_g, _ = earth.at(t).observe(star_object).radec(epoch=t)
+        geo_ra_hours = _ra_g.hours
+        geo_dec_deg = _dec_g.degrees
     else:
-        body_geo = earth.at(t).observe(target).apparent()
-    body_geo_ra, body_geo_dec, body_geo_dist = body_geo.radec(epoch=t)
+        _body_geom = (target - observer_at).at(t)
+        _b_alt, _b_az, _ = _body_geom.altaz()
+        body_alt_deg = _b_alt.degrees
+        body_az_deg = _b_az.degrees
+        _ra_g, _dec_g, _ = (target - earth).at(t).radec(epoch=t)
+        geo_ra_hours = _ra_g.hours
+        geo_dec_deg = _dec_g.degrees
 
-    # Calculate geocentric altitude using hour angle
-    # First get the local sidereal time. GAST is referenced to the true equinox
-    # of date, so the RA must be of date too: radec(epoch=t) reduces to the
-    # equator of date (apparent). Using the default J2000 radec() here mixed a
-    # J2000 RA with an of-date LST, injecting the full J2000→date
-    # precession+nutation in RA into the hour angle (GeoAltO/ARCVact/ARCLact off
-    # by ~0.2-0.3 deg in 2024, growing with distance from J2000).
-    gast = t.gast
+    # Geocentric altitude via hour angle. GAST is referenced to the true equinox
+    # of date, so the RA/Dec must be of date too (radec(epoch=t)); mixing a
+    # J2000 RA with an of-date LST would inject the J2000->date precession+
+    # nutation into the hour angle.
     lst = gast + lon / 15.0  # Local sidereal time in hours
-    ra_hours = body_geo_ra.hours
-    ha = (lst - ra_hours) * 15.0  # Hour angle in degrees
-
-    # Geocentric altitude calculation
-    dec_rad = math.radians(body_geo_dec.degrees)
+    ha = (lst - geo_ra_hours) * 15.0  # Hour angle in degrees
+    dec_rad = math.radians(geo_dec_deg)
     lat_rad = math.radians(lat)
     ha_rad = math.radians(ha)
-
     sin_alt = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
         dec_rad
     ) * math.cos(ha_rad)
     sin_alt = max(-1.0, min(1.0, sin_alt))
     geo_alt_deg = math.degrees(math.asin(sin_alt))
 
-    # Atmospheric refraction from true altitude, in arcminutes:
+    # Apparent geocentric place kept for the fixed-star / fallback elongation
+    # separation below (angular separation is aberration-insensitive).
+    if is_star and star_object is not None:
+        body_geo = earth.at(t).observe(star_object).apparent()
+    else:
+        body_geo = earth.at(t).observe(target).apparent()
+
+    # Atmospheric refraction from the APPARENT true altitude, in arcminutes:
     # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
     # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
-    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
-    if body_alt_deg > -1:
+    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4. The
+    # refracted AppAltO slot deliberately stays on the apparent base and the
+    # arbitrated refraction model (unchanged behaviour).
+    if body_app_alt_deg > -1:
         refraction = 1.02 / math.tan(
-            math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
+            math.radians(body_app_alt_deg + 10.3 / (body_app_alt_deg + 5.11))
         )
         refraction /= 60.0  # Convert arcminutes to degrees
     else:
         refraction = 0.5  # Near-horizon fallback (below the formula's range)
 
     # Apparent altitude (with refraction)
-    app_alt_deg = body_alt_deg + refraction
+    app_alt_deg = body_app_alt_deg + refraction
 
     # Calculate arcus visionis (altitude difference between body and Sun)
     # Topocentric arcus visionis
@@ -4083,9 +4402,10 @@ def _heliacal_pheno_ut_pythonic(
             magnitude = 0.0
             phase_angle = 0.0
 
-    # ARCLact: actual arc length between body and Sun in horizontal coords
-    # Computed as great-circle distance: sqrt(ARCV² + DAZ²)
-    arcl_act = math.sqrt(arcv_act**2 + daz_act**2)
+    # ARCLact: arc of light between the body and the Sun via the exact
+    # right-spherical-triangle relation cos ARCL = cos ARCV * cos DAZ (ARCV
+    # vertical, DAZ horizontal), not the sqrt(ARCV^2 + DAZ^2) planar form.
+    arcl_act = _arc_of_light(arcv_act, daz_act)
 
     # Use Schaefer model for extinction and arcus visionis (observer tuple
     # already parsed above, before the name was rebound).
@@ -4170,7 +4490,9 @@ def _heliacal_pheno_ut_pythonic(
             moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
             illumination = moon_pheno[1] * 100.0  # [1] = illuminated fraction 0-1
 
-            # Crescent width (Yallop/Bruin): W = SD * (1 - cos ARCL), where
+            # Crescent width W = SD * (1 - cos ARCL) from Bruin, F. (1977),
+            # "The first visibility of the lunar crescent", Vistas in Astronomy
+            # 21, 331-358 (adopted by Yallop's q-test below), where
             # ARCL is the arc of light (Sun-Moon elongation, moon_pheno[2]) and
             # SD is the Moon's apparent semidiameter in arcmin (moon_pheno[3]
             # is the apparent diameter in degrees). Near new moon ARCL -> 0 so
@@ -4190,9 +4512,9 @@ def _heliacal_pheno_ut_pythonic(
         except (ValueError, TypeError, ArithmeticError):
             pass
 
-    # Yallop q-test (for lunar crescent visibility)
+    # Yallop q-test for lunar crescent visibility, Yallop, B.D. (1997), NAO
+    # Technical Note No. 69:
     # q = (ARCV - (11.8371 - 6.3226*W + 0.7319*W^2 - 0.1018*W^3)) / 10
-    # Simplified version
     if body == MOON:
         w = w_moon * 60.0  # Convert to arcminutes for formula
         q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
@@ -4555,6 +4877,13 @@ def vis_limit_mag(
     if exclude_moon:
         moon_alt = -90.0  # Assume Moon at nadir
 
+    if body_id == MOON:
+        # Measured reference behavior: when the observed object IS the Moon,
+        # its own light is not sky glow hindering the observation, so the
+        # moonlight term is removed exactly as with VISLIM_NOMOON (the sky
+        # stays dark and the limiting magnitude reflects the object alone).
+        moon_alt = -90.0
+
     # Create Schaefer model for visibility calculations
     schaefer = create_schaefer_model(
         pressure=pressure,
@@ -4570,6 +4899,7 @@ def vis_limit_mag(
         transmission=obs_transmission,
         latitude=lat,
         jd=tjdut,
+        pressure_scales_extinction=True,
     )
 
     # Calculate Moon phase for sky brightness

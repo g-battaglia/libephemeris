@@ -69,12 +69,19 @@ The compact ``refrac()`` implementation uses the independently published
 Saemundsson true-to-apparent and Bennett apparent-to-true approximations, with
 the conventional pressure and temperature scaling. These formulas remain
 separate from the ray tracer because callers may depend on their historical
-closed-form behavior.
+closed-form behavior. The true-to-apparent branch is Saemundsson's formula
+(Meeus 1998, ch. 16, eq. 16.4, p. 106) below 15 deg with the high-altitude
+tangent series above it; the apparent-to-true branch is Bennett's formula
+(Meeus 1998, ch. 16, eq. 16.3, p. 106). The two directions are independent
+published fits and are therefore not exact numerical inverses of each other.
 
 References
 ----------
 - Bennett, G.G. (1982), *Journal of Navigation*, 35, 255-259
+- Saemundsson, Th. (1986), *Sky & Telescope*, 72, 70
 - Meeus, J. (1998), *Astronomical Algorithms*, 2nd ed., chapter 16
+  (Atmospheric Refraction), pp. 105-108; formulas 16.3 (Bennett,
+  apparent->true) and 16.4 (Saemundsson, true->apparent)
 
 Provenance:
     Standard-atmosphere layers, gas laws, refractivity, and closed-form public

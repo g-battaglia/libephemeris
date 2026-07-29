@@ -371,7 +371,7 @@ class LEBReader:
         """Evaluate a body's position and velocity at a given Julian Day.
 
         Args:
-            body_id: SE_* body constant (e.g., SUN=0, MOON=1).
+            body_id: libephemeris body constant (e.g., SUN=0, MOON=1).
             jd: Julian Day in TT (Terrestrial Time).
 
         Returns:

@@ -2,7 +2,7 @@
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """LibEphemeris -- high-precision astronomical ephemeris library.
 
-Pure Python, API-compatible with the reference ephemeris, using NASA JPL
+Pure Python, API-compatible with the reference API, using NASA JPL
 DE440/DE441 ephemerides via Skyfield and IAU 2006/2000A standards via pyerfa.
 
 Calculation backend:
@@ -1222,6 +1222,7 @@ __all__ = [
     "BIT_DISC_CENTER",
     "BIT_FIXED_DISC_SIZE",
     "BIT_FORCE_SLOW_METHOD",
+    "BIT_GEOCTR_NO_ECL_LAT",
     "BIT_HINDU_RISING",
     "BIT_NAUTIC_TWILIGHT",
     "BIT_NO_REFRACTION",

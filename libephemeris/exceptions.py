@@ -856,7 +856,7 @@ def validate_longitude(lon: float, func_name: str = "") -> None:
     """Validate that longitude is within valid range [-180, 360].
 
     Accepts both the signed convention ([-180, 180], west negative) and the
-    east-positive convention ([0, 360)), since the reference ephemeris
+    east-positive convention ([0, 360)), since the reference API
     interprets geographic longitude modulo 360 degrees. The value is used
     as-is: the underlying sidereal-time and observer geometry are periodic in
     360 degrees, so 200 and -160 yield identical results.

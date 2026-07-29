@@ -50,7 +50,7 @@ logger = logging.getLogger("libephemeris")
 
 API_URL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
-# Map SE_* body IDs to Horizons COMMAND strings
+# Map libephemeris body IDs to Horizons COMMAND strings
 _HORIZONS_COMMAND: Dict[int, str] = {
     0: "10",  # Sun
     1: "301",  # Moon
@@ -433,7 +433,7 @@ def horizons_calc_ut(
     Args:
         client: HorizonsClient instance.
         jd_ut: Julian Day UT.
-        body_id: SE_* body constant.
+        body_id: libephemeris body constant.
         iflag: Public calculation flags.
         sid_mode: Sidereal mode override; reads the global state when None.
             An explicit value lets EphemerisContext dispatch through
@@ -1046,7 +1046,9 @@ def _calc_analytical(
 
     from .time_utils import deltat
     from .constants import (
+        FLG_BARYCTR,
         FLG_SIDEREAL,
+        FLG_HELCTR,
         FLG_NONUT,
         FLG_J2000,
         FLG_EQUATORIAL,
@@ -1054,6 +1056,13 @@ def _calc_analytical(
         FLG_SPEED3,
         FLG_TOPOCTR,
     )
+
+    # Public convention for Moon-derived abstract points under HELCTR/BARYCTR
+    # (same rule as planets._calc_body): nodes/apses have no heliocentric or
+    # barycentric place, so return the all-zero position while echoing the
+    # normal retflag.
+    if iflag & (FLG_HELCTR | FLG_BARYCTR):
+        return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag)
     from .planets import (
         _apply_output_flags,
         _apply_sidereal_correction,

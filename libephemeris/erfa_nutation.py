@@ -19,8 +19,12 @@ Precision comparison:
 
 References:
     - IERS Conventions 2010, Chapter 5
-    - Capitaine, N. & Wallace, P.T., 2006, Astron.Astrophys. 450, 855
-    - Mathews, P.M., Herring, T.A., Buffet, B.A. 2002, J.Geophys.Res.
+    - Wallace, P.T. & Capitaine, N., 2006, Astron. Astrophys. 459, 981
+      (precession-nutation procedures consistent with IAU 2006 resolutions;
+      erratum A&A 464, 793) -- the basis of erfa.nut06a used here
+    - Capitaine, N. & Wallace, P.T., 2006, Astron. Astrophys. 450, 855
+    - Mathews, P.M., Herring, T.A. & Buffett, B.A., 2002, J. Geophys. Res.
+      107(B4), 2068, doi:10.1029/2001JB000390 (MHB2000 nutation)
 
 Provenance:
     The numerical series are not copied into this project. Calls delegate to
@@ -196,8 +200,9 @@ def get_erfa_obliquity_iau2006(jd_tt: float) -> Optional[float]:
         Mean obliquity in radians if pyerfa available, None otherwise
 
     Notes:
-        This is slightly different from the Laskar 1986 formula used
-        as fallback. The difference is typically < 0.001 arcseconds
+        This is slightly different from the Laskar 1986 formula
+        (Laskar, J., 1986, Astron. Astrophys. 157, 59) used as
+        fallback. The difference is typically < 0.001 arcseconds
         for dates within a few centuries of J2000.
     """
     if not _HAS_ERFA:

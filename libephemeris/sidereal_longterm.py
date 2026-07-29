@@ -118,17 +118,21 @@ _LTERM_T1 = 2469807.5  # 1 Jan 2050
 
 # --------------------------------------------------------------------------
 # Vondrák 2011 (A&A 534, A22; corrigendum A&A 541, C1) coefficient series.
-# Units: arcseconds (polynomials) / arcseconds and years (periodic terms).
+# Units: amplitudes/polynomial coefficients in arcseconds; the periods of the
+# periodic terms are in Julian centuries (the argument is 2*pi*T/P with T =
+# (jd_tt - J2000)/36525 in Julian centuries), not years.
 # --------------------------------------------------------------------------
 
-# General precession in longitude / obliquity — polynomial part.
+# General precession in longitude / obliquity — polynomial part
+# (Vondrák, Capitaine & Wallace 2011, A&A 534, A22, Table 3: p_A, epsilon_A).
 _PEPOL = (
     (8134.017132, 84028.206305),
     (5043.0520035, 0.3624445),
     (-0.00710733, -0.00004039),
     (0.000000271, -0.000000110),
 )
-# General precession / obliquity — periodic part: [period, p_cos, q_cos, p_sin, q_sin].
+# General precession / obliquity — periodic part: [period, p_cos, q_cos, p_sin, q_sin]
+# (Vondrák, Capitaine & Wallace 2011, A&A 534, A22, Table 3).
 _PEPER = (
     (409.90, 396.15, 537.22, 402.90, 417.15, 288.92, 4043.00, 306.00, 277.00, 203.00),
     (
@@ -525,10 +529,14 @@ def _gmst_iau2006_deg(jd_ut1: float, jd_tt: float) -> float:
     """Greenwich Mean Sidereal Time (deg) via the IAU 2006 expression.
 
     GMST = ERA(UT1) + p(T), with the precession-in-RA polynomial p(T) of
-    Capitaine, Wallace & Chapront (2003), A&A 412, 567. Used in the modern
-    window where it is most precise.
+    Capitaine, Wallace & Chapront (2003), A&A 412, 567. The Earth Rotation
+    Angle ERA(UT1) uses the constants of Capitaine, Guinot & McCarthy (2000),
+    A&A 355, 398 (IERS Conventions 2010, eq. 5.15). Used in the modern window
+    where it is most precise.
     """
     du = jd_ut1 - _J2000
+    # ERA(UT1): Capitaine, Guinot & McCarthy (2000), A&A 355, 398;
+    # IERS Conventions 2010, eq. 5.15.
     era = _D2PI * (0.7790572732640 + 1.00273781191135448 * du)
     t = (jd_tt - _J2000) / 36525.0
     p = 0.014506 + t * (

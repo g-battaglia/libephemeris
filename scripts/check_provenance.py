@@ -73,6 +73,7 @@ INHERITED_HISTORY_BASELINE_COMMITS = (
     "fdd0fe60a7717a45f08f4f0e1823fabba23b8808",  # target main
     "8184e1c2072b615bef77fd0a4a530a4750a49bd1",  # published v3.0.0a5
     "82b44b18dc11dd230b1759e019d63237436afd98",  # published v3.0.0a6
+    "4ecb7bf1e28f9ad9bb27c4d4ac83cda69d05a09f",  # published main (rc14/data-v3)
 )
 INHERITED_HISTORY_ALLOWLIST = frozenset(
     {
@@ -81,6 +82,12 @@ INHERITED_HISTORY_ALLOWLIST = frozenset(
         ("plans/pyswisseph-api-compat-phase2.md", "foreign-source-file"),
         ("plans/pyswisseph-compat-verification.md", "foreign-source-file"),
         ("tests/test_parse_seorbel.py", "foreign-data-file"),
+        # Renamed to references/reference-api-compat.md in-tree; the original
+        # name remains reachable only through the published main ancestry.
+        (
+            ".claude/skills/libephemeris/references/pyswisseph-compat.md",
+            "foreign-source-file",
+        ),
     }
 )
 

@@ -89,6 +89,12 @@ LEB Chebyshev approximation error vs Skyfield reference, per body group and tier
 | **IntpApog/IntpPerig** | Covered by the ecliptic tolerance | Covered by the ecliptic tolerance | Covered by the 0.1" extreme-date tolerance |
 | **Uranians** | ~0.000000" | ~0.000000" | ~0.000000" |
 
+The table compares like-for-like states (system barycenters for the outer
+planets). In non-sealed `skyfield` mode the runtime additionally applies the
+`planet_centers` offset for Saturn and Pluto (planet center vs barycenter,
+up to ~0.05"/0.08" of geocentric longitude), so LEB-vs-Skyfield apparent
+places differ by that physical offset for those two bodies.
+
 **Precession at extreme dates**: the apparent-place reduction uses the
 **Vondrák 2011** long-term precession through ERFA; see
 `libephemeris/precession_vondrak.py`. Near J2000 it converges with the IAU 2006
