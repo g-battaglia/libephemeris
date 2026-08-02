@@ -687,9 +687,7 @@ def convert_leb1_to_leb2(
     nutation_data = (
         src.get_section_data(SECTION_NUTATION) if include_auxiliary else None
     )
-    delta_t_data = (
-        src.get_section_data(SECTION_DELTA_T) if include_auxiliary else None
-    )
+    delta_t_data = src.get_section_data(SECTION_DELTA_T) if include_auxiliary else None
     star_data = src.get_section_data(SECTION_STARS) if include_auxiliary else None
 
     # Write LEB2 v2 (chunked)

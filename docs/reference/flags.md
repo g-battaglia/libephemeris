@@ -66,7 +66,7 @@ By default positions are apparent (light-time + aberration corrected).
 | `FLG_SWIEPH` | Accepted for API compatibility and routed through the configured JPL/LEB backend for ordinary bodies. |
 | `FLG_MOSEPH` | Accepted for API compatibility; it does not activate a Moshier implementation or replace analytical body models. |
 | `FLG_DEFAULTEPH` | Default ephemeris selector (value `2`), equivalent to `FLG_SWIEPH`. |
-| `FLG_SPEED3` | Requests the three-position speed selector and is echoed distinctly from `FLG_SPEED`. Standards-derived mean lunar points and the interpolated compatibility curves expose deterministic derivatives; both selectors preserve the same body model. |
+| `FLG_SPEED3` | Requests the three-position speed selector and is echoed distinctly from `FLG_SPEED` when requested alone. When both speed flags are passed, `FLG_SPEED` takes precedence and the `SPEED3` bit is dropped from the retflag. Standards-derived mean lunar points and the interpolated compatibility curves expose deterministic derivatives; both selectors preserve the same body model. |
 
 ## Advanced / specialized
 

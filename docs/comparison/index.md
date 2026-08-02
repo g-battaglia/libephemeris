@@ -16,7 +16,7 @@ comparison target for the public call surface.
 | Delta T | IERS observations plus the published Stephenson–Morrison–Hohenkerk model |
 | Atmosphere | Published Sæmundsson/Bennett relations and ICAO atmosphere ray tracing |
 | Photometry | Published almanac and peer-reviewed planetary magnitude models |
-| Historical hypothetical bodies | IDs 40–47, 50–53, and 56 from cited publications; six unsupported IDs fail closed |
+| Historical hypothetical bodies | IDs 40–48 and 50–58 from cited publications; only Nibiru (49) fails closed |
 
 Numerical differences between the two stacks are interpreted in light of
 LibEphemeris's own documented model choices, listed above and detailed in the

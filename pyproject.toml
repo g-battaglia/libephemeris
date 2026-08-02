@@ -231,7 +231,10 @@ include = '\.pyi?$'
 [tool.ruff]
 # Vendored third-party sources retain their upstream formatting and license
 # headers. Project-owned Python remains subject to both lint and format gates.
-extend-exclude = ["libephemeris/vendor"]
+# lunar_apse_model.py is an immutable SHA-256-pinned generator output (see its
+# header and test_lunar_apse_generation.py): reformatting it would break the
+# pin without changing any value, so it is excluded like vendored code.
+extend-exclude = ["libephemeris/vendor", "libephemeris/lunar_apse_model.py"]
 
 [tool.ruff.lint]
 # No global ignores: the former blanket F401/F403/F405/E402/F841 list hid

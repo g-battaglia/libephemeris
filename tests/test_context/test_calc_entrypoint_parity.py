@@ -117,8 +117,11 @@ def test_context_ecl_nut_retflag_matches_entrypoint_contract(method, flags, want
     request returns retflag 0, J2000 returns J2000|NONUT, ...), while the UT
     entry point (``calc_ut``) injects the default SWIEPH bit (0 -> SWIEPH,
     J2000 -> SWIEPH|J2000|NONUT, ...). This is the same contract regular
-    bodies use; the pseudo-body is not a special case. Every explicitly
-    requested flag is preserved either way.
+    bodies use; the pseudo-body is not a special case. Requested flags are
+    echoed with one measured exception shared with regular bodies: when
+    FLG_SPEED and FLG_SPEED3 are both requested, FLG_SPEED wins and the
+    SPEED3 bit is dropped from the retflag (measured 384 -> 256 via calc,
+    384 -> 258 via calc_ut; SPEED3 alone is echoed, 128 -> 128/130).
     """
     _, retflag = getattr(le.EphemerisContext(), method)(JD, le.ECL_NUT, flags)
 

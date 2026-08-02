@@ -145,7 +145,9 @@ class TestOrbitalElementsBasic:
             (47, 83.66907, 0.0),  # Poseidon
         ],
     )
-    def test_uranian_elements_from_published_neely_rows(self, ipl, a_expected, e_expected):
+    def test_uranian_elements_from_published_neely_rows(
+        self, ipl, a_expected, e_expected
+    ):
         """The Uranians (40-47) are propagated from Neely's published element
         rows (Hamburg school); the pinned values are this library's own
         regression output for those published elements."""

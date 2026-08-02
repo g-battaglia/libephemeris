@@ -66,7 +66,9 @@ def test_extended_nbody_coverage_uses_guarded_common_sources(
     requested_start = generate_leb._year_to_jd(-13200)
     requested_end = generate_leb._year_to_jd(17191)
     config = SimpleNamespace(planets_file="planets.441", asteroids_file="sb441.bsp")
-    monkeypatch.setattr(generate_leb, "_resolve_assist_config_for_range", lambda *_: config)
+    monkeypatch.setattr(
+        generate_leb, "_resolve_assist_config_for_range", lambda *_: config
+    )
     monkeypatch.setattr(
         generate_leb,
         "_ephemeris_file_coverage",
@@ -87,7 +89,9 @@ def test_extended_nbody_coverage_uses_guarded_common_sources(
 
 def test_nbody_coverage_rejects_non_overlapping_range(monkeypatch) -> None:
     config = SimpleNamespace(planets_file="planets.441", asteroids_file="sb441.bsp")
-    monkeypatch.setattr(generate_leb, "_resolve_assist_config_for_range", lambda *_: config)
+    monkeypatch.setattr(
+        generate_leb, "_resolve_assist_config_for_range", lambda *_: config
+    )
     monkeypatch.setattr(
         generate_leb,
         "_ephemeris_file_coverage",

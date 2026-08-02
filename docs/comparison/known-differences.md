@@ -187,9 +187,13 @@ independent barycentric state, may return a documented fallback or unsupported
 result. The implementation does not manufacture missing values from external
 output.
 
-All methods (mean and osculating) reduce the body's own JPL osculating state;
-there is no separate mean-element planetary theory, so the two methods return
-the same planetary nodes and apsides. Measured longitude residuals against an
+`NODBIT_MEAN` uses the long-term mean-element polynomials of Simon et
+al. (1994) for Mercury through Neptune; Pluto has no entry in that
+mean-element set, so its mean request falls through to the osculating-state
+path and the two methods coincide only for Pluto (see
+[the planetary nodes/apsides methodology](../methodology/planetary-nodes-apsides.md)).
+`NODBIT_OSCU` reduces the body's own JPL osculating state. Measured longitude
+residuals against an
 external osculating implementation (both reducing their own JPL state;
 geocentric ecliptic of date, 1900–2024 sample) stay well inside the node
 tolerance but are non-zero because osculating node and apse *longitudes* are

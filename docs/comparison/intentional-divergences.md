@@ -63,7 +63,8 @@ both conventions, and occultation slots stay at 1.0. Consumers who want the
 physically bounded covered-area fraction in [0, 1] (the NASA/USNO glossary
 definition) use the LibEphemeris-only helpers
 (`sol_eclipse_obscuration_at_loc()`, `sol_eclipse_how_details()`), which
-keep that contract.
+implement that separate bounded-fraction contract alongside the
+compatibility slot.
 
 ## Sripati `house_pos` preserves the fraction in the house-12 wrap
 

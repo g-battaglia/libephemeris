@@ -83,6 +83,15 @@ This record covers every payload in the file, not only the body channels:
 - Coverage: JD 2396758.5–2506331.5 (1850–2150)
 - Format: LEB2 v2; populated section types 0 and 6
 
+Exact generation-input pin:
+
+- `libephemeris/hypothetical.py` SHA-256 (as built, tree of commit
+  `ea052c5`):
+  `b9c64cca9fb3c8263103992200bc5937f5e3c80f85fe64b39f35a500e917cdf8`.
+  Later commits revise this module's documentation and citations; the pin
+  identifies the bytes whose Neely (1980) propagation produced the stored
+  channels.
+
 The standalone `ephemeris_base_uranians.leb` partial is generated from the
 Neely (1980) propagation in
 `libephemeris.hypothetical`, verified over 500 samples per body, converted with

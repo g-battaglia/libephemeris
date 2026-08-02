@@ -121,14 +121,10 @@ def test_helio_cross_slow_bodies_converge(body):
     for target in (0.0, 60.0, 150.0, 210.0, 240.0, 330.0):
         fwd = L.helio_cross_ut(body, target, start, FLG_SWIEPH)
         assert fwd >= start - 1e-6
-        assert (
-            _wrap(L.calc_ut(fwd, body, FLG_SWIEPH | FLG_HELCTR)[0][0], target) < 1e-3
-        )
+        assert _wrap(L.calc_ut(fwd, body, FLG_SWIEPH | FLG_HELCTR)[0][0], target) < 1e-3
         bwd = L.helio_cross_ut(body, target, start, FLG_SWIEPH, True)
         assert bwd <= start + 1e-6
-        assert (
-            _wrap(L.calc_ut(bwd, body, FLG_SWIEPH | FLG_HELCTR)[0][0], target) < 1e-3
-        )
+        assert _wrap(L.calc_ut(bwd, body, FLG_SWIEPH | FLG_HELCTR)[0][0], target) < 1e-3
     # TT entry point shares the fix.
     tt = L.helio_cross(body, 90.0, start, FLG_SWIEPH)
     assert tt >= start - 1e-6

@@ -671,6 +671,14 @@ def _observer_scope(lon: float, lat: float, alt: float) -> "Iterator[None]":
     leaking the observer to the caller. ``set_topo`` clears the observer-at
     cache on entry; the cache is cleared again on exit so a following calc keys
     off the caller's own location.
+
+    Thread-safety: intentionally NOT locked. The module-level API is
+    stateful-global by design (matching the reference API, which shares
+    the same process-wide observer model): concurrent module-level calls
+    already race on sid mode, ephemeris path and the observer itself, so
+    a lock here alone would only feign safety. Callers needing concurrent
+    isolation use ``EphemerisContext``, which serializes access to the
+    shared global state around each call.
     """
     from . import state as _state
     from .cache import clear_observer_cache
@@ -2158,14 +2166,28 @@ def _calculate_eclipse_phases_besselian(
     # fundamental-plane test) and the Earth's oblateness (via the polar-
     # axis stretch shared with _eclipse_where_core). See that helper for
     # the geometry and the published references.
+    # The pen/umb/cen residuals share one _eclipse_where_core() evaluation
+    # per instant, and the six contact solvers below revisit the same
+    # instants (jd_max itself, plus the identical bracket-expansion
+    # ladder). Memoise per call — never at module level, where a cached
+    # triple could survive an ephemeris-state change (mode, files, topo).
+    residual_memo: dict[float, Tuple[float, float, float]] = {}
+
+    def _residual_triple(jd: float) -> Tuple[float, float, float]:
+        triple = residual_memo.get(jd)
+        if triple is None:
+            triple = _besselian_contact_residuals(jd)
+            residual_memo[jd] = triple
+        return triple
+
     def _pen_residual(jd: float) -> float:
-        return _besselian_contact_residuals(jd)[0]
+        return _residual_triple(jd)[0]
 
     def _umb_residual(jd: float) -> float:
-        return _besselian_contact_residuals(jd)[1]
+        return _residual_triple(jd)[1]
 
     def _cen_residual(jd: float) -> float:
-        return _besselian_contact_residuals(jd)[2]
+        return _residual_triple(jd)[2]
 
     # P1/P4: first/last external tangency of the penumbral cone (eclipse
     # begins/ends anywhere on Earth).
@@ -6278,6 +6300,21 @@ def _kernel_jd_bounds(eph) -> Tuple[float, float]:
     return min(starts), max(ends)
 
 
+def _reject_moon_self_occultation(body: "int | str") -> None:
+    """Reject the degenerate Moon-occults-Moon request with the typed error.
+
+    The Moon cannot occult itself; without this guard the shadow geometry
+    would divide by the zero Moon-to-body distance. Measured reference
+    behavior never returns for this request either (it fails to
+    terminate), so the shared typed contract error is raised instead by
+    every lun_occult_* entry point.
+    """
+    if isinstance(body, int) and body == MOON:
+        from .exceptions import Error as _Error
+
+        raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
+
+
 def lun_occult_when_glob(
     tjdut: float,
     body: "int | str",
@@ -6307,14 +6344,7 @@ def lun_occult_when_glob(
         examined; a miss returns retflag zero and a continuation date in the
         first time slot.
     """
-    if isinstance(body, int) and body == MOON:
-        # Degenerate self-request: the Moon cannot occult itself. Raise the
-        # typed contract error instead of letting the shadow geometry divide
-        # by the zero Moon-to-body distance (measured reference behavior
-        # never returns here either: it fails to terminate).
-        from .exceptions import Error as _Error
-
-        raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
+    _reject_moon_self_occultation(body)
     from .exceptions import Error
     from .constants import ECL_ONE_TRY
 
@@ -6803,14 +6833,7 @@ def lun_occult_when_loc(
         Local attributes include covered diameter/disc fractions, target
         azimuth and altitude, elongation, and the event contact times.
     """
-    if isinstance(body, int) and body == MOON:
-        # Degenerate self-request: the Moon cannot occult itself. Raise the
-        # typed contract error instead of letting the shadow geometry divide
-        # by the zero Moon-to-body distance (measured reference behavior
-        # never returns here either: it fails to terminate).
-        from .exceptions import Error as _Error
-
-        raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
+    _reject_moon_self_occultation(body)
 
     # Validate geopos
     if len(geopos) < 3:
@@ -6935,14 +6958,7 @@ def lun_occult_where(
     Returns:
         Tuple of (retflag, geopos, attr) matching the reference API.
     """
-    if isinstance(body, int) and body == MOON:
-        # Degenerate self-request: the Moon cannot occult itself. Raise the
-        # typed contract error instead of letting the shadow geometry divide
-        # by the zero Moon-to-body distance (measured reference behavior
-        # never returns here either: it fails to terminate).
-        from .exceptions import Error as _Error
-
-        raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
+    _reject_moon_self_occultation(body)
     if isinstance(body, int):
         from .fixed_stars import FIXED_STARS as _FS
         from .fixed_stars import get_canonical_star_name as _star_name_by_id
@@ -9712,10 +9728,10 @@ def calc_eclipse_first_contact_c1(
     touches the Sun's disk, marking the beginning of a solar eclipse. At this
     instant, the penumbral shadow cone first touches Earth's surface.
 
-    This function uses Besselian elements to precisely calculate C1. The
-    condition for C1 is when gamma (the distance of the shadow axis from
-    Earth's center) equals 1 + l1 (Earth radius plus penumbral cone radius),
-    occurring before eclipse maximum.
+    This function uses Besselian-element geometry to precisely calculate
+    C1: the instant, before eclipse maximum, at which the penumbral shadow
+    cone is externally tangent to the Earth ellipsoid (the penumbral
+    contact residual of ``_besselian_contact_residuals`` crosses zero).
 
     Args:
         jd_max: Julian Day (UT) of eclipse maximum. This should be the time
@@ -9731,15 +9747,17 @@ def calc_eclipse_first_contact_c1(
         solar eclipse).
 
     Algorithm:
-        1. Calculate l1 (penumbral radius) at eclipse maximum
-        2. Compute target gamma = 1 + l1 (condition for penumbra touching Earth)
-        3. Use binary search to find when gamma equals this target before maximum
-        4. The search proceeds from (jd_max - search_range) to jd_max
+        1. Evaluate the signed penumbral contact residual of
+           ``_besselian_contact_residuals`` (tangency of the penumbral cone
+           with the Earth *ellipsoid*, in km; negative while in contact)
+        2. Expand a bracket backwards from jd_max until the residual turns
+           positive (penumbra clear of Earth)
+        3. Bisect the sign change to the first external tangency (P1)
 
     Precision:
-        The calculation achieves timing precision better than 1 second by
-        iterating until the gamma value converges to within 1e-8 Earth radii,
-        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+        The ellipsoidal residual is bisected to sub-second timing; the
+        residual carries the cone-depth term and the Earth's oblateness,
+        so the standalone helper matches sol_eclipse_when_glob's tret[2].
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -9793,10 +9811,10 @@ def calc_eclipse_second_contact_c2(
     the Sun's disk. At this instant, the umbral (total) or antumbral (annular)
     shadow first touches Earth's surface.
 
-    This function uses Besselian elements to precisely calculate C2. The
-    condition for C2 is when gamma (the distance of the shadow axis from
-    Earth's center) equals ``1 - abs(l2)`` (Earth radius minus umbral/antumbral cone
-    radius), occurring before eclipse maximum.
+    This function uses Besselian-element geometry to precisely calculate
+    C2: the instant, before eclipse maximum, at which the umbral/antumbral
+    shadow cone is externally tangent to the Earth ellipsoid (the core
+    contact residual of ``_besselian_contact_residuals`` crosses zero).
 
     Note: C2 only exists for central eclipses (total or annular). For partial
     eclipses, this function returns 0.0.
@@ -9812,20 +9830,23 @@ def calc_eclipse_second_contact_c2(
     Returns:
         Julian Day (UT) of second contact C2. Returns 0.0 if:
         - The eclipse is not a central eclipse (total or annular)
-        - C2 cannot be determined (gamma at maximum exceeds umbral limit)
+        - C2 cannot be determined (the core shadow never reaches the surface)
         - The input time is not near a valid solar eclipse
 
     Algorithm:
-        1. Calculate l2 (umbral/antumbral radius) at eclipse maximum
-        2. Compute target gamma = ``1 - abs(l2)`` (umbra touching Earth)
-        3. Check if gamma at maximum is less than umbral limit (central phase possible)
-        4. Use binary search to find when gamma equals this target before maximum
-        5. The search proceeds from (jd_max - search_range) to jd_max
+        1. Evaluate the signed umbral/antumbral contact residual of
+           ``_besselian_contact_residuals`` (tangency of the core shadow
+           cone with the Earth *ellipsoid*, in km; negative while in
+           contact). A residual that is already positive at jd_max means
+           the core shadow never reaches the surface: no U1, return 0.0
+        2. Expand a bracket backwards from jd_max until the residual turns
+           positive (core shadow clear of Earth)
+        3. Bisect the sign change to the first external tangency (U1)
 
     Precision:
-        The calculation achieves timing precision better than 1 second by
-        iterating until the gamma value converges to within 1e-8 Earth radii,
-        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+        The ellipsoidal residual is bisected to sub-second timing; the
+        residual carries the cone-depth term and the Earth's oblateness,
+        so the standalone helper matches sol_eclipse_when_glob's tret[4].
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -9884,10 +9905,10 @@ def calc_eclipse_third_contact_c3(
     Earth's surface. At this instant, the central phase of the eclipse ends
     and the partial phase resumes.
 
-    This function uses Besselian elements to precisely calculate C3. The
-    condition for C3 is when gamma (the distance of the shadow axis from
-    Earth's center) equals ``1 - abs(l2)`` (Earth radius minus umbral/antumbral cone
-    radius), occurring after eclipse maximum.
+    This function uses Besselian-element geometry to precisely calculate
+    C3: the instant, after eclipse maximum, at which the umbral/antumbral
+    shadow cone is externally tangent to the Earth ellipsoid (the core
+    contact residual of ``_besselian_contact_residuals`` crosses zero).
 
     Note: C3 only exists for central eclipses (total or annular). For partial
     eclipses, this function returns 0.0.
@@ -9903,20 +9924,23 @@ def calc_eclipse_third_contact_c3(
     Returns:
         Julian Day (UT) of third contact C3. Returns 0.0 if:
         - The eclipse is not a central eclipse (total or annular)
-        - C3 cannot be determined (gamma at maximum exceeds umbral limit)
+        - C3 cannot be determined (the core shadow never reaches the surface)
         - The input time is not near a valid solar eclipse
 
     Algorithm:
-        1. Calculate l2 (umbral/antumbral radius) at eclipse maximum
-        2. Compute target gamma = ``1 - abs(l2)`` (umbra leaving Earth)
-        3. Check if gamma at maximum is less than umbral limit (central phase possible)
-        4. Use binary search to find when gamma equals this target after maximum
-        5. The search proceeds from jd_max to (jd_max + search_range)
+        1. Evaluate the signed umbral/antumbral contact residual of
+           ``_besselian_contact_residuals`` (tangency of the core shadow
+           cone with the Earth *ellipsoid*, in km; negative while in
+           contact). A residual that is already positive at jd_max means
+           the core shadow never reaches the surface: no U4, return 0.0
+        2. Expand a bracket forwards from jd_max until the residual turns
+           positive (core shadow clear of Earth)
+        3. Bisect the sign change to the last external tangency (U4)
 
     Precision:
-        The calculation achieves timing precision better than 1 second by
-        iterating until the gamma value converges to within 1e-8 Earth radii,
-        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+        The ellipsoidal residual is bisected to sub-second timing; the
+        residual carries the cone-depth term and the Earth's oblateness,
+        so the standalone helper matches sol_eclipse_when_glob's tret[5].
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -9973,10 +9997,10 @@ def calc_eclipse_fourth_contact_c4(
     from the Sun's disk externally, marking the end of a solar eclipse. At this
     instant, the penumbral shadow cone last touches Earth's surface.
 
-    This function uses Besselian elements to precisely calculate C4. The
-    condition for C4 is when gamma (the distance of the shadow axis from
-    Earth's center) equals 1 + l1 (Earth radius plus penumbral cone radius),
-    occurring after eclipse maximum.
+    This function uses Besselian-element geometry to precisely calculate
+    C4: the instant, after eclipse maximum, at which the penumbral shadow
+    cone is externally tangent to the Earth ellipsoid (the penumbral
+    contact residual of ``_besselian_contact_residuals`` crosses zero).
 
     Args:
         jd_max: Julian Day (UT) of eclipse maximum. This should be the time
@@ -9992,15 +10016,17 @@ def calc_eclipse_fourth_contact_c4(
         solar eclipse).
 
     Algorithm:
-        1. Calculate l1 (penumbral radius) at eclipse maximum
-        2. Compute target gamma = 1 + l1 (condition for penumbra leaving Earth)
-        3. Use binary search to find when gamma equals this target after maximum
-        4. The search proceeds from jd_max to (jd_max + search_range)
+        1. Evaluate the signed penumbral contact residual of
+           ``_besselian_contact_residuals`` (tangency of the penumbral cone
+           with the Earth *ellipsoid*, in km; negative while in contact)
+        2. Expand a bracket forwards from jd_max until the residual turns
+           positive (penumbra clear of Earth)
+        3. Bisect the sign change to the last external tangency (P4)
 
     Precision:
-        The calculation achieves timing precision better than 1 second by
-        iterating until the gamma value converges to within 1e-8 Earth radii,
-        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+        The ellipsoidal residual is bisected to sub-second timing; the
+        residual carries the cone-depth term and the Earth's oblateness,
+        so the standalone helper matches sol_eclipse_when_glob's tret[3].
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
