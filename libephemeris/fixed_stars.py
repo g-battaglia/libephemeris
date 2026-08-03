@@ -3118,14 +3118,19 @@ def _apply_fixstar_flags(
 
             from .planets import get_ayanamsa_ex_ut
 
-            # Honour FLG_TRUEPOS/FLG_NOABERR on the subtracted ayanamsha:
-            # for the star/galactic-center anchored modes the anchor's
-            # annual aberration is removed (measured reference behavior;
-            # same toggle as the calc sidereal path). FLG_NONUT keeps the
-            # MEAN value this path has always subtracted (see step 3 note
-            # above): with neither aberration bit set this is exactly the
-            # former get_ayanamsa_ut mean value.
-            _ab_bits = iflag & (FLG_TRUEPOS | FLG_NOABERR)
+            # Honour FLG_TRUEPOS/FLG_NOABERR/FLG_NOGDEFL on the subtracted
+            # ayanamsha: for the star/galactic-center anchored modes the
+            # anchor's annual aberration and solar light deflection are
+            # removed exactly as they are from the star itself (measured
+            # reference behavior; same toggle as the calc sidereal path).
+            # Omitting FLG_NOGDEFL reduced star and anchor differently, so
+            # near solar conjunction the canonical anchor drifted off its
+            # defining longitude (measured: Spica 0.045" away from 180
+            # degrees in True Citra, where the reference stays exact).
+            # FLG_NONUT keeps the MEAN value this path has always subtracted
+            # (see step 3 note above): with none of the bits set this is
+            # exactly the former get_ayanamsa_ut mean value.
+            _ab_bits = iflag & (FLG_TRUEPOS | FLG_NOABERR | FLG_NOGDEFL)
             plon = (plon - get_ayanamsa_ex_ut(tjd_ut, FLG_NONUT | _ab_bits)[1]) % 360.0
 
         return plon, plat, pdist

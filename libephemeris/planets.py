@@ -4427,28 +4427,42 @@ def _calc_body(
             # barycentric vector. Without this branch the request fell through
             # to the geocentric path and returned geocentric coordinates while
             # advertising BARYCTR.
-            _lt_b = _transpluto_light_time(jd_tt)
-            _bx, _by, _bz = _transpluto_helio_xyz(jd_tt - _lt_b)
-            _sxyz = (
-                planets["sun"]
-                .at(get_timescale().tt_jd(jd_tt))
-                .frame_xyz(ecliptic_J2000_frame)
-                .au
-            )
-            _bx += float(_sxyz[0])
-            _by += float(_sxyz[1])
-            _bz += float(_sxyz[2])
-            _rb = math.sqrt(_bx * _bx + _by * _by + _bz * _bz)
-            lon = math.degrees(math.atan2(_by, _bx)) % 360.0
-            lat = math.degrees(
-                math.asin(max(-1.0, min(1.0, _bz / _rb)) if _rb > 0 else 0.0)
-            )
-            dist = _rb
-            dlon = dlat = ddist = 0.0
-            if not is_j2000:
-                from .astrometry import _precess_ecliptic as _pe
+            from .astrometry import _precess_ecliptic as _pe
 
-                lon, lat = _pe(lon, lat, 2451545.0, jd_tt)
+            def _transpluto_bary_place(jd: float) -> Tuple[float, float, float]:
+                """Barycentric (lon, lat, dist) in the requested output frame."""
+                _x, _y, _z = _transpluto_helio_xyz(jd - _transpluto_light_time(jd))
+                _sv = (
+                    planets["sun"]
+                    .at(get_timescale().tt_jd(jd))
+                    .frame_xyz(ecliptic_J2000_frame)
+                    .au
+                )
+                _x += float(_sv[0])
+                _y += float(_sv[1])
+                _z += float(_sv[2])
+                _r = math.sqrt(_x * _x + _y * _y + _z * _z)
+                _lo = math.degrees(math.atan2(_y, _x)) % 360.0
+                _la = math.degrees(
+                    math.asin(max(-1.0, min(1.0, _z / _r)) if _r > 0 else 0.0)
+                )
+                if not is_j2000:
+                    _lo, _la = _pe(_lo, _la, 2451545.0, jd)
+                return _lo, _la, _r
+
+            lon, lat, dist = _transpluto_bary_place(jd_tt)
+            dlon = dlat = ddist = 0.0
+            if iflag & (FLG_SPEED | FLG_SPEED3):
+                # Central difference of the SAME reported quantity, so the
+                # speed slots integrate back to the position slots. Leaving
+                # them hard-zeroed advertised speeds the request never
+                # received while the position plainly moves with time.
+                _h = 0.01
+                _p0 = _transpluto_bary_place(jd_tt - _h)
+                _p1 = _transpluto_bary_place(jd_tt + _h)
+                dlon = ((_p1[0] - _p0[0] + 180.0) % 360.0 - 180.0) / (2.0 * _h)
+                dlat = (_p1[1] - _p0[1]) / (2.0 * _h)
+                ddist = (_p1[2] - _p0[2]) / (2.0 * _h)
             lon, dlon = _add_of_date_nutation(lon, dlon, jd_tt, iflag)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)

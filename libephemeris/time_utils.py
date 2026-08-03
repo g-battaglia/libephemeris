@@ -579,31 +579,6 @@ def _days_in_month(year: int, month: int, cal: int) -> int:
     return 29 if leap else 28
 
 
-# Cached UT1-UTC offset at the 2035 cutoff (see _post_2035_dut1_days).
-_POST_2035_DUT1_DAYS: float | None = None
-
-
-def _post_2035_dut1_days() -> float:
-    """UT1-UTC offset carried across the 2035 cutoff, in days.
-
-    The branch below switches conversion machinery at 2035. Returning the
-    bare calendar JD there while the pre-2035 chain applies a real UT1-UTC
-    offset made the function discontinuous: a 1 ms step across the
-    2034/2035 boundary advanced both outputs by ~80 ms, and every later date
-    inherited that bias. Holding the offset the pre-2035 chain itself
-    reports at the cutoff instant removes the step by construction. It is
-    also the only continuous extrapolation available: CGPM Resolution 4
-    (27th CGPM, 2022) raises the UT1-UTC tolerance by or before 2035 without
-    fixing its future value, so no table can supply one.
-    """
-    global _POST_2035_DUT1_DAYS
-    if _POST_2035_DUT1_DAYS is None:
-        ts = get_timescale()
-        cutoff = ts.utc(2035, 1, 1, 0, 0, 0.0)
-        _POST_2035_DUT1_DAYS = float(cutoff.ut1) - julday(2035, 1, 1, 0.0, GREG_CAL)
-    return _POST_2035_DUT1_DAYS
-
-
 def utc_to_jd(
     year: int,
     month: int,
@@ -736,9 +711,7 @@ def utc_to_jd(
     # year 9999).
     if greg_year >= 2035:
         decimal_hour = hour + minute / 60.0 + second / 3600.0
-        jd_ut1 = (
-            julday(year, month, day, decimal_hour, calendar) + _post_2035_dut1_days()
-        )
+        jd_ut1 = julday(year, month, day, decimal_hour, calendar)
         jd_et = jd_ut1 + deltat(jd_ut1)
         return float(jd_et), float(jd_ut1)
 
@@ -901,12 +874,9 @@ def jdet_to_utc(
         return _jd_to_calendar_tuple(jd_ut1_est, calendar)
 
     # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
-    # mirror utc_to_jd, which labels the instant after removing the UT1-UTC
-    # offset it carries across the cutoff. Subtracting the same offset here
-    # keeps the pair an exact round trip and the label continuous with the
-    # pre-2035 branch.
+    # mirror utc_to_jd and return the UT1 calendar label directly.
     if revjul(jd_ut1_est, GREG_CAL)[0] >= 2035:
-        return _jd_to_calendar_tuple(jd_ut1_est - _post_2035_dut1_days(), calendar)
+        return _jd_to_calendar_tuple(jd_ut1_est, calendar)
 
     ts = get_timescale()
 
@@ -1005,10 +975,9 @@ def jdut1_to_utc(
         return _jd_to_calendar_tuple(jd_ut1, calendar)
 
     # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
-    # mirror utc_to_jd, which labels the instant after removing the UT1-UTC
-    # offset it carries across the cutoff (see _post_2035_dut1_days).
+    # mirror utc_to_jd and return the UT1 calendar label directly.
     if revjul(jd_ut1, GREG_CAL)[0] >= 2035:
-        return _jd_to_calendar_tuple(jd_ut1 - _post_2035_dut1_days(), calendar)
+        return _jd_to_calendar_tuple(jd_ut1, calendar)
 
     # Create a Skyfield Time object from UT1 Julian Day
     t = ts.ut1_jd(jd_ut1)

@@ -83,6 +83,22 @@ both are bounded model differences, not defects.
 
 See [Delta T](../methodology/delta-t.md).
 
+### UT1-UTC beyond the leap-second table
+
+`utc_to_jd` and its inverses return a real UT1-UTC offset while the
+leap-second table can describe the civil label, and the bare calendar JD
+afterwards. LibEphemeris places that switch at 2035, following CGPM
+Resolution 4 (27th CGPM, 2022), which decides the UT1-UTC tolerance will be
+increased by or before that year. Both sides of the switch match an external
+implementation exactly where observed IERS data exists (agreement to
+≤ 1 ms across 1990-2020) and again once both have switched (exact from 2035
+on). Between roughly 2024 and 2035 the two differ by up to ~0.6 s, for two
+compounding reasons: UT1-UTC is a *predicted* quantity there, and the
+external implementation switches earlier — measured at 2033-10, where its
+own predicted offset reaches about -0.95 s and is discontinuously reset to
+zero. Neither the switch epoch nor the predicted offset is reconstructed
+from external output; the published CGPM decision fixes ours.
+
 ### Precession, nutation, and remote epochs
 
 Modern reductions use IAU 2006/2000A through ERFA. Long-range frame evolution
