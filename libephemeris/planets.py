@@ -919,6 +919,14 @@ def consume_non_echoed_flags(flags: int, planet: int) -> int:
       JPL-Horizons dpsi/deps Earth-orientation reduction (the flags are
       accepted for API compatibility only, see docs/reference/flags.md), so
       echoing them would advertise a correction that was never applied.
+      An external implementation consumes them the same way for
+      SWIEPH/default requests but, on an explicit ``FLG_JPLEPH`` request,
+      applies its approximate reduction (measured: -0.048" on Mars,
+      -0.050" on the Moon at J2000) and echoes ``FLG_JPLHOR_APPROX`` to
+      say so. Reproducing that echo without the reduction would make the
+      retflag lie about what was computed, and the reduction itself is not
+      reconstructible from published models — see
+      docs/comparison/intentional-divergences.md.
     """
     from .constants import FLG_JPLHOR, FLG_JPLHOR_APPROX
 

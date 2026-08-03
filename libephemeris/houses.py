@@ -122,10 +122,25 @@ def _fold_hsys_case(hsys_char: str) -> str:
     and lowercase ``'g'`` is NOT an alias of Gauquelin ``'G'`` — it stays an
     unrecognized selector served by the default 12-cusp fallback (folding it
     would change the return shape from 12 to 36 cusps).
+
+    Only ASCII ``a``-``z`` fold. ``str.upper()`` is Unicode-aware and can
+    both change length and cross into the ASCII selector space: byte 0xDF is
+    U+00DF, whose uppercase is the two-character ``"SS"``, so an unknown
+    one-byte selector was silently resolving to Sripati (``'S'``) through
+    the later first-character lookup instead of reaching the
+    unknown-selector fallback.
+
+    The selector is one byte, so the ``bytes`` entry points decode it as
+    latin-1 (byte value = code point), matching ``_hsys_code``'s
+    ``ord(hsys[0])``. Decoding as UTF-8 instead made every high byte raise
+    ``UnicodeDecodeError`` on calls the reference answers with the ordinary
+    unknown-selector fallback.
     """
     if hsys_char in ("i", "g"):
         return hsys_char
-    return hsys_char.upper()
+    if "a" <= hsys_char <= "z":
+        return chr(ord(hsys_char) - 32)
+    return hsys_char
 
 
 def _hsys_code(hsys: int | bytes | str) -> int:
@@ -744,7 +759,7 @@ def houses(
     if isinstance(hsys, int):
         hsys_char = chr(hsys)
     elif isinstance(hsys, bytes):
-        hsys_char = hsys.decode("utf-8")
+        hsys_char = hsys.decode("latin-1")
     else:
         hsys_char = str(hsys)
     hsys_char = _fold_hsys_case(hsys_char)
@@ -1286,53 +1301,6 @@ def houses_armc_with_fallback(
         return cusps, ascmc, True, warning
 
 
-def _sunshine_makransky_armc_colure_fixup(
-    cusps: list[float], armc_deg: float, lat: float, sun_dec: float
-) -> None:
-    """Match the reference armc-path 'i' cusps at exact colure hits.
-
-    In the armc entry points the Sun's declination defaults to 0, so the
-    eight Sunshine division points sit at exact multiples of 30 degrees
-    from the meridians and their right ascension W can land exactly on the
-    equinoctial (0/180) or solstitial (90/270) colures.  Behavioral
-    comparison with the reference API (armc grid 0-355, lat -89..89,
-    eps 22-24.5) shows isolated-point outputs at those exact hits, while
-    off the boundary both implementations agree and are continuous:
-
-    * W == 180 with lat >= 0, or W == 0 with lat < 0 (i.e. W == 180 in
-      the hemisphere working frame): the antipode of the continuous limit;
-    * W == 90 or 270 with lat < 0: the mirror 360 - x of the continuous
-      limit;
-    * every other exact hit equals the continuous limit.
-    """
-    tan_product = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
-    if abs(tan_product) >= 1.0:
-        return
-    ascensional_difference = math.degrees(math.asin(tan_product))
-    night_third = (90.0 - ascensional_difference) / 3.0
-    day_third = (90.0 + ascensional_difference) / 3.0
-    offsets = (
-        (2, True, -2.0 * night_third),
-        (3, True, -night_third),
-        (5, True, night_third),
-        (6, True, 2.0 * night_third),
-        (8, False, -2.0 * day_third),
-        (9, False, -day_third),
-        (11, False, day_third),
-        (12, False, 2.0 * day_third),
-    )
-    southern = lat < 0.0
-    for cusp, nocturnal, offset in offsets:
-        w = (armc_deg + (180.0 if nocturnal else 0.0) + offset) % 360.0
-        if w % 90.0 != 0.0:
-            continue
-        if w % 180.0 == 0.0:
-            if (w == 0.0) == southern:
-                cusps[cusp] = (cusps[cusp] + 180.0) % 360.0
-        elif southern:
-            cusps[cusp] = (360.0 - cusps[cusp]) % 360.0
-
-
 def houses_armc(
     armc: float, lat: float, eps: float, hsys: int = ord("P"), ascmc9: float = 0.0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
@@ -1383,7 +1351,7 @@ def houses_armc(
     if isinstance(hsys, int):
         hsys_char = chr(hsys)
     elif isinstance(hsys, bytes):
-        hsys_char = hsys.decode("utf-8")
+        hsys_char = hsys.decode("latin-1")
     else:
         hsys_char = str(hsys)
     hsys_char = _fold_hsys_case(hsys_char)
@@ -1630,7 +1598,6 @@ def houses_armc(
     elif hsys_char == "i":  # Sunshine (Makransky)
         cusps = _houses_sunshine_makransky(armc_active, lat, eps, asc, mc, ascmc9)
         ascmc[1] = cusps[10]
-        _sunshine_makransky_armc_colure_fixup(cusps, armc_deg, lat, ascmc9)
     elif hsys_char == "J":  # Savard-A
         cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
     else:
@@ -1652,7 +1619,7 @@ def _hsys_to_char(hsys: int | bytes | str) -> str:
     if isinstance(hsys, int):
         return _fold_hsys_case(chr(hsys))
     if isinstance(hsys, bytes):
-        return _fold_hsys_case(hsys.decode("utf-8"))
+        return _fold_hsys_case(hsys.decode("latin-1"))
     return _fold_hsys_case(str(hsys))
 
 
@@ -2077,7 +2044,7 @@ def houses_ex(
     if isinstance(hsys, int):
         hsys_char = chr(hsys)
     elif isinstance(hsys, bytes):
-        hsys_char = hsys.decode("utf-8")
+        hsys_char = hsys.decode("latin-1")
     else:
         hsys_char = str(hsys)
     hsys_char = _fold_hsys_case(hsys_char)
@@ -2112,7 +2079,7 @@ def houses_ex(
             if isinstance(hsys, int):
                 _hch = chr(hsys)
             elif isinstance(hsys, bytes):
-                _hch = hsys.decode("utf-8")
+                _hch = hsys.decode("latin-1")
             else:
                 _hch = str(hsys)
             _hch = _fold_hsys_case(_hch)
@@ -2428,7 +2395,7 @@ def house_name(hsys: int) -> str:
     if isinstance(hsys, int):
         hsys_char = chr(hsys)
     elif isinstance(hsys, bytes):
-        hsys_char = hsys.decode("utf-8")
+        hsys_char = hsys.decode("latin-1")
     else:
         hsys_char = str(hsys)
     hsys_char = _fold_hsys_case(hsys_char)

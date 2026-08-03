@@ -135,6 +135,52 @@ reproduced from external implementations:
   finite-difference derivative of its reported cusps here as well; the
   external analytic rule is not reproduced.
 
+## The JPL-Horizons flags are consumed, not echoed
+
+`FLG_JPLHOR` and `FLG_JPLHOR_APPROX` select a JPL-Horizons-consistent
+Earth-orientation reduction (observed celestial-pole offsets dψ/dε on top of
+the precession-nutation model). LibEphemeris does not implement it: the two
+flags are accepted for API compatibility and consumed, so the retflag echoes
+neither.
+
+An external implementation consumes them identically for `FLG_SWIEPH` and
+default requests. On an explicit `FLG_JPLEPH` request it instead applies its
+approximate variant — measured as −0.048″ on Mars and −0.050″ on the Moon at
+J2000 — and echoes `FLG_JPLHOR_APPROX` (normalising `FLG_JPLHOR` to it,
+because the full mode needs an Earth-orientation data file). LibEphemeris
+does not reproduce the echo: a retflag carrying the bit would assert a
+reduction that was never applied, and the approximate offsets it stands for
+are neither published as a closed form nor derivable without fitting that
+implementation's output. Positions requested with either flag are the
+ordinary IAU 2006/2000A reduction, and the retflag says so.
+
+## Sunshine-Makransky stays continuous through the colures
+
+On the `houses_armc*` entry points the Sun's declination defaults to zero,
+so the eight Sunshine-Makransky (`i`) division points sit at exact multiples
+of 30° from the meridians and their right ascension can land exactly on the
+equinoctial or solstitial colure. Makransky's published construction is
+continuous through those points, and LibEphemeris returns it there.
+
+An external implementation returns isolated different values at exactly
+those hits — for ARMC 30°, latitude 41.9°, cusp 3 it reports 360.0 while
+its own value one microdegree to either side is 180.0, so the reported
+point is neither its own two-sided limit nor inside the normalised
+[0°, 360°) range. Reproducing that pattern would require inferring the
+per-point transformation from a grid of external outputs, which this
+project does not do; an earlier revision that had done so was removed. The
+divergence affects only exact colure hits on the ARMC entry points (a
+measure-zero set: any offset of a microdegree agrees to a microdegree) and
+never the Julian-Day entry points, where a real solar declination moves the
+division points off the colures.
+
+`house_pos` with the Horizontal system (`H`) shows the same shape at its own
+degenerate geometry. For a body exactly at the vernal point the external
+value is again not its own limit — at ARMC 250°, latitude 0°, it reports
+7.0 while one microdegree to either side it reports 1.000000023 and
+12.999999995, the two sides of the same house boundary. LibEphemeris returns
+that boundary value, 1.0, at the exact point as well.
+
 ## Phase-angle geometry in `pheno`
 
 `pheno` / `pheno_ut` compute the phase angle from the **apparent geocentric

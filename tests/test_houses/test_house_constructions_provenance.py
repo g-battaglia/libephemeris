@@ -7,7 +7,6 @@ import math
 import pytest
 
 from libephemeris.houses import (
-    _sunshine_makransky_armc_colure_fixup,
     houses_armc,
 )
 from libephemeris.house_constructions import (
@@ -230,13 +229,9 @@ def test_makransky_equator_is_declination_independent_and_cyclic(
     angular cusps.  This is a source-derived limit test and stores no external
     implementation output.
 
-    The armc entry point replaces the continuous construction limit with the
-    reference armc-path outputs when a division point lands exactly on a
-    colure (see ``_sunshine_makransky_armc_colure_fixup``).  The winding
-    invariant belongs to the continuous construction, so the involutive
-    transform is undone before checking it; declination independence holds
-    on the public output directly because the transform does not depend on
-    the declination at latitude zero.
+    The armc entry point returns the continuous construction at every armc,
+    including the exact colure hits, so the winding invariant applies to the
+    public output directly.
     """
     cusps, _ = houses_armc(
         armc,
@@ -256,12 +251,8 @@ def test_makransky_equator_is_declination_independent_and_cyclic(
     for actual, expected in zip(cusps, equinoctial_cusps, strict=True):
         assert _angular_distance_deg(actual, expected) < 2e-12
 
-    continuous = [0.0, *cusps]
-    _sunshine_makransky_armc_colure_fixup(continuous, armc, 0.0, sun_declination)
-    continuous = continuous[1:]
-
-    unwrapped = [continuous[0]]
-    for longitude in continuous[1:]:
+    unwrapped = [cusps[0]]
+    for longitude in cusps[1:]:
         candidate = longitude
         while candidate <= unwrapped[-1]:
             candidate += 360.0
@@ -277,19 +268,20 @@ def test_makransky_equator_is_declination_independent_and_cyclic(
 
 @pytest.mark.parametrize("armc", [30.0, 60.0, 120.0, 150.0, 210.0, 240.0, 300.0, 330.0])
 @pytest.mark.parametrize("latitude", [-60.0, -33.9, 0.0, 41.9, 60.0])
-def test_sunshine_armc_colure_hits_transform_the_construction(
+def test_sunshine_armc_colure_hits_stay_on_the_construction(
     armc: float, latitude: float
 ) -> None:
-    """Exact colure hits return the documented transform of the construction.
+    """Exact colure hits return the construction itself, not a special case.
 
     With zero declination the division points sit at exact multiples of 30
     degrees from the meridians, so these armc values place one point on the
-    equinoctial colure and two on the solstitial colure.  The armc path must
-    then return the continuous construction with the measured armc-path
-    rules applied: the point at W == 180 in the hemisphere working frame is
-    flipped to its antipode, and for southern latitudes the solstitial
-    points are mirrored to ``360 - x``.  Both rules are involutions, and the
-    comparison is between this project's own two code paths only.
+    equinoctial colure and two on the solstitial colure.  Makransky's
+    published construction is continuous through those points, so the armc
+    entry point must return it unchanged there — and the value must equal
+    the two-sided limit of the same construction.  An earlier revision
+    replaced these isolated points with antipode/mirror transforms inferred
+    from a grid of external outputs; that reconstruction was removed (see
+    docs/comparison/intentional-divergences.md).
     """
     public_cusps, _ = houses_armc(armc, latitude, 23.4392911, ord("i"))
     construction = houses_sunshine_makransky(
@@ -301,15 +293,17 @@ def test_sunshine_armc_colure_hits_transform_the_construction(
         0.0,
     )
 
-    expected = list(construction)
-    _sunshine_makransky_armc_colure_fixup(expected, armc, latitude, 0.0)
     for index in (2, 3, 5, 6, 8, 9, 11, 12):
-        assert _angular_distance_deg(public_cusps[index - 1], expected[index]) < 1e-12
+        assert (
+            _angular_distance_deg(public_cusps[index - 1], construction[index]) < 1e-12
+        )
 
-    transformed = {
-        index
-        for index in (2, 3, 5, 6, 8, 9, 11, 12)
-        if _angular_distance_deg(expected[index], construction[index]) > 1e-9
-    }
-    southern = latitude < 0.0
-    assert len(transformed) == (3 if southern else 1)
+    # The exact-hit value is the two-sided limit: stepping a microdegree to
+    # either side moves every division point by less than an arcsecond.
+    for offset in (-1e-6, 1e-6):
+        nearby, _ = houses_armc(armc + offset, latitude, 23.4392911, ord("i"))
+        for index in (2, 3, 5, 6, 8, 9, 11, 12):
+            assert (
+                _angular_distance_deg(public_cusps[index - 1], nearby[index - 1])
+                < 1.0 / 3600.0
+            )
