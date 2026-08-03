@@ -1326,26 +1326,29 @@ def deg_midp(x1: float, x2: float) -> float:
         >>> deg_midp(-10, 10)
         0.0
     """
-    # Normalize both angles to [0, 360) with a plain modulo, NOT through
-    # degnorm: snapping an endpoint into the near-zero band before the arc is
-    # chosen turns a slightly-shorter negative arc into an exact -180 tie and
-    # flips the result by half a turn (deg_midp(180, 5e-14) must be ~90, not
-    # 270). The near-zero snap belongs to the final midpoint only.
-    x1 = x1 % 360.0
-    x2 = x2 % 360.0
-
-    # Calculate the difference
+    # Choose the arc from the RAW arguments. Normalizing first can move the
+    # difference a few ULP off exactly -180, so the equal-arcs tie handler
+    # below never fires and the result flips by half a turn
+    # (deg_midp(-1e-12, 179.999999999999) must be ~90, not ~270). Snapping
+    # first is wrong for the mirror reason — it turns a slightly shorter
+    # negative arc INTO an exact tie — so neither normalization belongs
+    # before this point; only the final midpoint is normalized.
     diff = x2 - x1
+    x1 = x1 % 360.0
 
-    # When both arcs are equally long (diff exactly ±180) we follow the
-    # the reference convention: always take the positive (clockwise) half,
-    # i.e. treat -180 the same as +180.
+    # Reduce the RAW difference into (-180, 180] with a modulo, not with a
+    # single conditional shift: an argument more than one turn from the other
+    # (deg_midp(720, 0)) needs more than one wrap. Reducing the difference
+    # rather than the arguments keeps the exact-opposition tie detectable —
+    # normalizing the arguments first can move it a few ULP off 180 and flip
+    # the result by half a turn.
+    #
+    # A raw difference of exactly -180 maps to +180 here, which is also the
+    # convention for the equal-arcs tie: with both arcs the same length, take
+    # the positive (clockwise) half.
+    diff = diff % 360.0
     if diff > 180.0:
         diff -= 360.0
-    elif diff < -180.0:
-        diff += 360.0
-    elif diff == -180.0:
-        diff = 180.0
 
     # Calculate midpoint along the chosen arc
     midp = x1 + diff / 2.0
@@ -1382,22 +1385,14 @@ def rad_midp(x: float, y: float) -> float:
         4.71238898038469
     """
     # Normalize both angles to [0, 2*pi)
-    # Plain modulo on the inputs; the near-zero snap belongs to the final
-    # midpoint only (see deg_midp).
+    # Arc chosen from the raw arguments, as in deg_midp (see there).
+    _raw_diff = y - x
     x = x % TWO_PI
-    y = y % TWO_PI
 
-    # Calculate the difference
-    diff = y - x
-
-    # When both arcs are equally long (diff exactly ±π) we follow the
-    # the reference convention: always take the positive (clockwise) half.
+    # Same reduction of the raw difference as deg_midp (see there).
+    diff = _raw_diff % TWO_PI
     if diff > math.pi:
         diff -= TWO_PI
-    elif diff < -math.pi:
-        diff += TWO_PI
-    elif diff == -math.pi:
-        diff = math.pi
 
     # Calculate midpoint along the chosen arc
     midp = x + diff / 2.0

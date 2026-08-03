@@ -155,6 +155,19 @@ Neither has an apparent direction or a phase triangle.
   one: a zero-length vector had produced an absurd apparent diameter on the
   phenomena path before these guards.
 
+## South lunar nodes are addressable as negated body ids
+
+`calc`/`calc_ut` accept `-MEAN_NODE` (−10) and `-TRUE_NODE` (−11) and return
+the south node: the north node's antipode, with the latitude negated and the
+representation flags (`FLG_XYZ`, `FLG_RADIANS`) honoured. This is a
+LibEphemeris-only extension — an external implementation rejects every
+negative id except `ECL_NUT` (−1) with an illegal-body error.
+
+The extension is convenient but has one sharp edge worth stating: a caller
+who negates a body id by accident receives a valid position for a different
+point instead of an error. Only these two ids behave this way; every other
+negative id raises `UnknownBodyError` as the reference does.
+
 ## The JPL-Horizons flags are consumed, not echoed
 
 `FLG_JPLHOR` and `FLG_JPLHOR_APPROX` select a JPL-Horizons-consistent

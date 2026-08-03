@@ -2940,7 +2940,6 @@ def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
     not auto-add an ephemeris selector or implied correction bits. They leave
     ``implied=False``.
     """
-    from .constants import FLG_JPLEPH
 
     ret = flags_in
     if implied:
@@ -2950,8 +2949,15 @@ def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
         from .planets import _implied_retflag_bits, _resolve_center_flags
 
         ret = _resolve_center_flags(ret)
-        if not (ret & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
-            ret |= FLG_SWIEPH
+        # The ephemeris selectors are mutually exclusive on this surface:
+        # the measured UT star entry points always echo exactly one of
+        # JPLEPH / SWIEPH / MOSEPH, in that priority. Merely OR-ing the
+        # default in when none was set echoed composites (3, 5, 6, 7) the
+        # reference never returns, and disagreed with calc_ut, which
+        # normalises correctly.
+        from .planets import _exclusive_ephemeris_bit
+
+        ret = _exclusive_ephemeris_bit(ret)
         ret |= _implied_retflag_bits(ret)
     return ret
 

@@ -44,6 +44,8 @@ Provenance:
 
 from __future__ import annotations
 
+import math
+
 
 class Error(Exception):
     """Ephemeris calculation error.
@@ -837,7 +839,11 @@ def validate_latitude(lat: float, func_name: str = "") -> None:
         >>> validate_latitude(45.0)  # OK
         >>> validate_latitude(91.0)  # Raises CoordinateError
     """
-    if lat < -90.0 or lat > 90.0:
+    # NaN fails BOTH comparisons, so a bare range test lets it through and
+    # the caller gets NaN-laced coordinates that look like a result. The
+    # published contract for these surfaces promises a typed CoordinateError
+    # for NaN and infinite input, so test finiteness explicitly.
+    if not math.isfinite(lat) or lat < -90.0 or lat > 90.0:
         prefix = f"{func_name}: " if func_name else ""
         message = (
             f"{prefix}latitude {lat} is out of valid range. "
@@ -873,7 +879,8 @@ def validate_longitude(lon: float, func_name: str = "") -> None:
         >>> validate_longitude(200.0)  # OK (east-positive, = -160 deg)
         >>> validate_longitude(400.0)  # Raises CoordinateError
     """
-    if lon < -180.0 or lon > 360.0:
+    # Finiteness first, for the same reason as validate_latitude.
+    if not math.isfinite(lon) or lon < -180.0 or lon > 360.0:
         prefix = f"{func_name}: " if func_name else ""
         message = (
             f"{prefix}longitude {lon} is out of valid range. "

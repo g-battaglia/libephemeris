@@ -4021,8 +4021,28 @@ def _sol_eclipse_when_loc_impl(
         # in-progress eclipse from being skipped to the next lunation.
         first_contact = jd_first if jd_first != 0.0 else jd_local_max
         last_contact = jd_fourth if jd_fourth != 0.0 else jd_local_max
-        if (not backwards and last_contact <= tjdut + _ECLIPSE_WHEN_EPOCH_MARGIN) or (
-            backwards and first_contact >= tjdut - _ECLIPSE_WHEN_EPOCH_MARGIN
+        # Two independent reasons to skip this lunation:
+        #  * its local phases are wholly past (forward) or wholly future
+        #    (backward) — the contact-anchored test, which is what keeps an
+        #    in-progress eclipse from being dropped; and
+        #  * the caller started AT or past the instant this function would
+        #    return, i.e. the re-entrant `jd = tret[0]; when_loc(jd)` idiom.
+        #    Without the second test the search re-found the same eclipse
+        #    forever (the last contact is still hours ahead of the maximum),
+        #    so enumerating local eclipses hung instead of advancing by the
+        #    ~856-day solar / ~355-day lunar step.
+        if (
+            not backwards
+            and (
+                last_contact <= tjdut + _ECLIPSE_WHEN_EPOCH_MARGIN
+                or jd_local_max <= tjdut + _ECLIPSE_WHEN_EPOCH_MARGIN
+            )
+        ) or (
+            backwards
+            and (
+                first_contact >= tjdut - _ECLIPSE_WHEN_EPOCH_MARGIN
+                or jd_local_max >= tjdut - _ECLIPSE_WHEN_EPOCH_MARGIN
+            )
         ):
             if backwards:
                 jd = jd_max_global - 1
@@ -5914,8 +5934,21 @@ def _lun_eclipse_when_loc_pythonic(
         # already-finished eclipse. tret[0] is still the geocentric maximum
         # here, so the search advance matches the other skips.
         if (
-            not backwards and last_visible <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
-        ) or (backwards and first_visible >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN):
+            not backwards
+            and (
+                last_visible <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
+                # Re-entrancy: the caller started at or past the instant this
+                # function would return, so advance instead of re-finding the
+                # same eclipse (see the solar twin).
+                or tret[0] <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
+            )
+        ) or (
+            backwards
+            and (
+                first_visible >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN
+                or tret[0] >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN
+            )
+        ):
             search_jd = tret[0] + (-25.0 if backwards else 25.0)
             continue
 
@@ -7488,10 +7521,26 @@ def _rise_trans_true_hor_impl(
     )
     from .planets import _PLANET_MAP
 
-    # Unpack geopos: [longitude, latitude, altitude]
-    lon = float(geopos[0])
-    lat = float(geopos[1])
-    altitude = float(geopos[2]) if len(geopos) > 2 else 0.0
+    # Unpack geopos: [longitude, latitude, altitude]. The length is enforced
+    # here as it is on every sibling entry point: accepting a 2-element
+    # sequence silently defaulted the altitude to 0, and a shorter or
+    # non-numeric one escaped as IndexError/ValueError, neither of which
+    # derives from this library's Error — so `except Error:` (the drop-in
+    # for the reference's own exception) missed them.
+    try:
+        _n_geo = len(geopos)
+    except TypeError:
+        _n_geo = 0
+    if _n_geo < 3:
+        raise ValueError("geopos must be a sequence of [longitude, latitude, altitude]")
+    try:
+        lon = float(geopos[0])
+        lat = float(geopos[1])
+        altitude = float(geopos[2])
+    except (TypeError, ValueError) as _geo_exc:
+        raise ValueError(
+            "geopos must be a sequence of [longitude, latitude, altitude]"
+        ) from _geo_exc
 
     # Map parameter names for internal use
     jd_start = tjdut
