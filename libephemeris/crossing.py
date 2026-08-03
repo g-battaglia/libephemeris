@@ -448,55 +448,87 @@ def _helio_cross_bracketed(
 ) -> float:
     """Bracket-and-refine heliocentric crossing for out-of-table slow bodies.
 
-    Scans up to three revolutions on the requested side of ``tjd`` (the
-    instantaneous rate used to size the revolution can differ from the mean
-    rate by the orbit's eccentric variation, so the window keeps generous
-    headroom), brackets the first sign change adjacent to ``tjd`` and
-    refines it with Brent's method. The heliocentric longitude is strictly
-    monotonic in time, so the first bracketed crossing is the correct one.
+    Scans the requested side of ``tjd``, brackets the first sign change
+    adjacent to ``tjd`` and refines it with Brent's method. The heliocentric
+    longitude is strictly monotonic in time, so the first bracketed crossing
+    is the correct one.
+
+    ``mean_rate_deg_day`` is the caller's rate estimate, which for an
+    out-of-table body is the *instantaneous* heliocentric rate. On an
+    eccentric orbit that overestimates the mean motion near perihelion — by
+    (1+e)^2/(1-e^2)^(3/2), which passes 3 at about e = 0.46 — so a fixed
+    three-revolution window can be shorter than one actual revolution and a
+    perfectly valid distant target would raise "No crossing found". The
+    window is therefore expanded geometrically until a bracket appears, so
+    the search never depends on the rate estimate being the mean one.
 
     Raises:
-        Error: If no crossing exists inside the scanned window.
+        Error: If no crossing exists inside the fully expanded window.
     """
     period_days = 360.0 / mean_rate_deg_day if mean_rate_deg_day > 1e-9 else 720.0
-    window = 3.0 * period_days
-    num_samples = max(120, min(4000, int(window / 15.0)))
+    base_window = 3.0 * period_days
+    # 2^6 = 64x the initial span covers even an e ~ 0.95 orbit sampled at
+    # perihelion; beyond that the target genuinely is not crossed.
+    max_expansions = 6
 
-    if not backwards:
+    # Residual at the start epoch decides how each side treats that instant.
+    lon_start, _ = get_position_func(tjd)
+    start_residual = (lon_start - x2cross + 180.0) % 360.0 - 180.0
+    start_is_root = abs(start_residual) <= NR_TOLERANCE
+
+    if not backwards and start_is_root:
         # Forward semantics include a root AT the start instant — the same
         # "no forward dead-band" contract the in-table path documents, and the
         # measured reference behavior (a body exactly on the target crosses
         # now, not one revolution later). A bracket opened at tjd + 1e-6 has
         # no sign change across that root, so the scan silently returned the
         # next revolution for every out-of-table body (Chiron: ~18,400 days
-        # late). Backward semantics are exclusive of the start, so this test
-        # is forward-only.
-        lon_start, _ = get_position_func(tjd)
-        start_residual = (lon_start - x2cross + 180.0) % 360.0 - 180.0
-        if abs(start_residual) <= NR_TOLERANCE:
-            return tjd
+        # late).
+        return tjd
 
-    if backwards:
-        jd_a, jd_b = _find_bracket_for_crossing(
-            get_position_func,
-            x2cross,
-            tjd - window,
-            tjd - _backward_start_exclusion(mean_rate_deg_day, NR_TOLERANCE),
-            num_samples=num_samples,
-            from_end=True,
+    # Backward semantics are strictly-past, so an endpoint root has to be
+    # stepped over — but ONLY when one is actually there. Excluding that
+    # neighbourhood unconditionally swallowed genuine roots lying just inside
+    # it (a target 0.005" behind Chiron resolves ~3 s ago, well under the
+    # exclusion, and the search jumped a whole revolution back).
+    jd_near = tjd
+    if backwards and start_is_root:
+        jd_near -= _backward_start_exclusion(mean_rate_deg_day, NR_TOLERANCE)
+    elif not backwards:
+        jd_near += 1e-6
+
+    # Only the FAR end grows: the near end stays anchored at tjd, so an
+    # expanded scan still returns the crossing adjacent to the start epoch.
+    last_error: "Error | None" = None
+    for expansion in range(max_expansions + 1):
+        window = base_window * (2.0**expansion)
+        num_samples = max(120, min(4000, int(window / 15.0)))
+        try:
+            if backwards:
+                jd_a, jd_b = _find_bracket_for_crossing(
+                    get_position_func,
+                    x2cross,
+                    tjd - window,
+                    jd_near,
+                    num_samples=num_samples,
+                    from_end=True,
+                )
+            else:
+                jd_a, jd_b = _find_bracket_for_crossing(
+                    get_position_func,
+                    x2cross,
+                    jd_near,
+                    tjd + window,
+                    num_samples=num_samples,
+                    from_end=False,
+                )
+        except Error as exc:
+            last_error = exc
+            continue
+        return _brent_find_crossing(
+            get_position_func, x2cross, jd_a, jd_b, NR_TOLERANCE, 200
         )
-    else:
-        jd_a, jd_b = _find_bracket_for_crossing(
-            get_position_func,
-            x2cross,
-            tjd + 1e-6,
-            tjd + window,
-            num_samples=num_samples,
-            from_end=False,
-        )
-    return _brent_find_crossing(
-        get_position_func, x2cross, jd_a, jd_b, NR_TOLERANCE, 200
-    )
+    raise last_error if last_error is not None else Error("No crossing found")
 
 
 def _first_forward_helio_crossing(
@@ -1959,10 +1991,15 @@ def helio_cross_ut(
                 # exactly at the start epoch, which the refinement would
                 # otherwise converge straight back onto (measured: a target
                 # equal to the body's current heliocentric longitude must
-                # return the crossing one revolution earlier).
-                jd_bracket_end = tjdut - _backward_start_exclusion(
-                    speed_default, NR_TOLERANCE
-                )
+                # return the crossing one revolution earlier). Step over it
+                # ONLY when it is there — an unconditional exclusion swallows
+                # genuine roots that fall just inside that neighbourhood.
+                jd_bracket_end = tjdut
+                start_residual = (lon_start - x2cross + 180.0) % 360.0 - 180.0
+                if abs(start_residual) <= NR_TOLERANCE:
+                    jd_bracket_end -= _backward_start_exclusion(
+                        speed_default, NR_TOLERANCE
+                    )
             else:
                 jd_bracket_start = tjdut
                 jd_bracket_end = tjdut + search_window

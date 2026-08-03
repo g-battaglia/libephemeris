@@ -902,6 +902,33 @@ def _degrade_jpl_echo_on_fallback(flags: int) -> int:
     return flags
 
 
+def consume_non_echoed_flags(flags: int, planet: int) -> int:
+    """Drop request bits this library consumes rather than echoes back.
+
+    Shared by every calc entry point — module-level ``calc_ut``/``calc`` and
+    the ``EphemerisContext`` equivalents — because the strip has to happen
+    BEFORE the raw request is captured for the retflag echo. Living only in
+    the module functions, it made the two entry points disagree: a context
+    call echoed bits the module call consumed.
+
+    * ``FLG_CENTER_BODY`` for Sun..Mars: ipl 0-4 have no satellite-system
+      barycenter to resolve (positions are body centers already) and the
+      measured reference retflag does not echo the bit for these five
+      bodies, while nodes, apogees and asteroids echo it back unchanged.
+    * ``FLG_JPLHOR`` / ``FLG_JPLHOR_APPROX``: this library performs no
+      JPL-Horizons dpsi/deps Earth-orientation reduction (the flags are
+      accepted for API compatibility only, see docs/reference/flags.md), so
+      echoing them would advertise a correction that was never applied.
+    """
+    from .constants import FLG_JPLHOR, FLG_JPLHOR_APPROX
+
+    if (flags & FLG_CENTER_BODY) and 0 <= planet <= MARS:
+        flags &= ~FLG_CENTER_BODY
+    if flags & (FLG_JPLHOR | FLG_JPLHOR_APPROX):
+        flags &= ~(FLG_JPLHOR | FLG_JPLHOR_APPROX)
+    return flags
+
+
 def _normalize_calc_flags(flags: int) -> int:
     """Normalize calculation flags according to the public API contract.
 
@@ -1918,25 +1945,7 @@ def calc_ut(
         _record(requested_planet, "ERFA")
         return result
 
-    # FLG_CENTER_BODY consumed for Sun..Mars: for ipl 0-4 there is no
-    # satellite-system barycenter to resolve (positions are body centers
-    # already), and the measured reference retflag does NOT echo the bit for
-    # these five bodies, while nodes, apogees and asteroids echo it back
-    # unchanged. Strip it from the request so every downstream echo path
-    # stays clean; the bit carries no positional meaning in this library
-    # (see docs/reference/flags.md).
-    if (flags & FLG_CENTER_BODY) and 0 <= planet <= MARS:
-        flags &= ~FLG_CENTER_BODY
-
-    # FLG_JPLHOR / FLG_JPLHOR_APPROX consumed: this library performs no
-    # JPL-Horizons dpsi/deps Earth-orientation reduction (the flags are
-    # accepted for API compatibility only, see docs/reference/flags.md), so
-    # echoing them would advertise a correction that was never applied. The
-    # measured reference retflag does not carry them back either.
-    from .constants import FLG_JPLHOR, FLG_JPLHOR_APPROX
-
-    if flags & (FLG_JPLHOR | FLG_JPLHOR_APPROX):
-        flags &= ~(FLG_JPLHOR | FLG_JPLHOR_APPROX)
+    flags = consume_non_echoed_flags(flags, planet)
 
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
@@ -2235,18 +2244,7 @@ def calc(
         _record(requested_planet, "ERFA")
         return result
 
-    # FLG_CENTER_BODY consumed for Sun..Mars (see calc_ut: the measured
-    # reference retflag does not echo the bit for ipl 0-4 on either time
-    # argument; other bodies echo it unchanged).
-    if (flags & FLG_CENTER_BODY) and 0 <= planet <= MARS:
-        flags &= ~FLG_CENTER_BODY
-
-    # FLG_JPLHOR / FLG_JPLHOR_APPROX consumed (see calc_ut: no dpsi/deps
-    # reduction is performed, so the bits are never echoed back).
-    from .constants import FLG_JPLHOR, FLG_JPLHOR_APPROX
-
-    if flags & (FLG_JPLHOR | FLG_JPLHOR_APPROX):
-        flags &= ~(FLG_JPLHOR | FLG_JPLHOR_APPROX)
+    flags = consume_non_echoed_flags(flags, planet)
 
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
@@ -4412,6 +4410,52 @@ def _calc_body(
                 lt = float(hypothetical.calc_transpluto(jd - lt)[2]) / _C_AU_DAY
             return lt
 
+        def _transpluto_helio_xyz(jd: float) -> Tuple[float, float, float]:
+            """Heliocentric J2000-ecliptic cartesian position (AU)."""
+            h = hypothetical.calc_transpluto(jd)
+            lon_r = math.radians(h[0])
+            lat_r = math.radians(h[1])
+            cl = math.cos(lat_r)
+            return (
+                h[2] * cl * math.cos(lon_r),
+                h[2] * cl * math.sin(lon_r),
+                h[2] * math.sin(lat_r),
+            )
+
+        if (iflag & FLG_BARYCTR) and not is_helio:
+            # Barycentric place: the model is heliocentric, so add the Sun's
+            # barycentric vector. Without this branch the request fell through
+            # to the geocentric path and returned geocentric coordinates while
+            # advertising BARYCTR.
+            _lt_b = _transpluto_light_time(jd_tt)
+            _bx, _by, _bz = _transpluto_helio_xyz(jd_tt - _lt_b)
+            _sxyz = (
+                planets["sun"]
+                .at(get_timescale().tt_jd(jd_tt))
+                .frame_xyz(ecliptic_J2000_frame)
+                .au
+            )
+            _bx += float(_sxyz[0])
+            _by += float(_sxyz[1])
+            _bz += float(_sxyz[2])
+            _rb = math.sqrt(_bx * _bx + _by * _by + _bz * _bz)
+            lon = math.degrees(math.atan2(_by, _bx)) % 360.0
+            lat = math.degrees(
+                math.asin(max(-1.0, min(1.0, _bz / _rb)) if _rb > 0 else 0.0)
+            )
+            dist = _rb
+            dlon = dlat = ddist = 0.0
+            if not is_j2000:
+                from .astrometry import _precess_ecliptic as _pe
+
+                lon, lat = _pe(lon, lat, 2451545.0, jd_tt)
+            lon, dlon = _add_of_date_nutation(lon, dlon, jd_tt, iflag)
+            if is_sidereal and not (iflag & FLG_EQUATORIAL):
+                lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
+            result = (lon, lat, dist, dlon, dlat, ddist)
+            result = _maybe_equatorial_convert(result, jd_tt, iflag, already_j2000=True)
+            return _to_native_floats(result), iflag
+
         if is_helio:
             pos = hypothetical.calc_transpluto(jd_tt - _transpluto_light_time(jd_tt))
             lon, lat, dist = pos[0], pos[1], pos[2]
@@ -4446,18 +4490,6 @@ def _calc_body(
             return _to_native_floats(result), iflag
 
         # Geocentric conversion
-        def _transpluto_helio_xyz(jd: float) -> Tuple[float, float, float]:
-            """Heliocentric J2000-ecliptic cartesian position (AU)."""
-            h = hypothetical.calc_transpluto(jd)
-            lon_r = math.radians(h[0])
-            lat_r = math.radians(h[1])
-            cl = math.cos(lat_r)
-            return (
-                h[2] * cl * math.cos(lon_r),
-                h[2] * cl * math.sin(lon_r),
-                h[2] * math.sin(lat_r),
-            )
-
         def _get_transpluto_geo_j2000(jd):
             """Geocentric J2000-ecliptic apparent position for Transpluto.
 
@@ -4712,7 +4744,64 @@ def _calc_body(
                 lon_g, lat_g = _precess_ecliptic(lon_g, lat_g, 2451545.0, jd)
                 return lon_g, lat_g, rg
 
-            if iflag & FLG_HELCTR:
+            if (iflag & FLG_BARYCTR) and not (iflag & FLG_HELCTR):
+                # Barycentric place: the model is heliocentric, so add the
+                # Sun's barycentric vector (the same construction the Uranian
+                # branch uses for its own analytic bodies). Without it the
+                # request fell through to the geocentric Earth-subtraction
+                # path and returned geocentric coordinates while advertising
+                # BARYCTR.
+                _lt_b = _helio_light_time_days(jd_tt)
+                bx, by, bz = _helio_xyz_j2000(jd_tt - _lt_b)
+                _sun_b = planets["sun"].at(get_timescale().tt_jd(jd_tt))
+                _sxyz = _sun_b.frame_xyz(ecliptic_J2000_frame).au
+                bx += float(_sxyz[0])
+                by += float(_sxyz[1])
+                bz += float(_sxyz[2])
+                _rb = math.sqrt(bx * bx + by * by + bz * bz)
+                _lon_b = math.degrees(math.atan2(by, bx)) % 360.0
+                _lat_b = math.degrees(
+                    math.asin(max(-1.0, min(1.0, bz / _rb)) if _rb > 0 else 0.0)
+                )
+                # The vectors above are J2000-ecliptic; rotate to the mean
+                # ecliptic of date for the shared treatment below.
+                _lon_b, _lat_b = _precess_ecliptic(_lon_b, _lat_b, 2451545.0, jd_tt)
+                pos = (_lon_b, _lat_b, _rb, 0.0, 0.0, 0.0)
+                if iflag & FLG_SPEED:
+                    _h = 0.01
+                    _prev_lt = _helio_light_time_days(jd_tt - _h)
+                    _next_lt = _helio_light_time_days(jd_tt + _h)
+
+                    def _bary_lon_lat_dist(_jd, _lt):
+                        _x, _y, _z = _helio_xyz_j2000(_jd - _lt)
+                        _sv = (
+                            planets["sun"]
+                            .at(get_timescale().tt_jd(_jd))
+                            .frame_xyz(ecliptic_J2000_frame)
+                            .au
+                        )
+                        _x += float(_sv[0])
+                        _y += float(_sv[1])
+                        _z += float(_sv[2])
+                        _r = math.sqrt(_x * _x + _y * _y + _z * _z)
+                        _lo = math.degrees(math.atan2(_y, _x)) % 360.0
+                        _la = math.degrees(
+                            math.asin(max(-1.0, min(1.0, _z / _r)) if _r > 0 else 0.0)
+                        )
+                        return _precess_ecliptic(_lo, _la, 2451545.0, _jd) + (_r,)
+
+                    _p0 = _bary_lon_lat_dist(jd_tt - _h, _prev_lt)
+                    _p1 = _bary_lon_lat_dist(jd_tt + _h, _next_lt)
+                    _dlon = (_p1[0] - _p0[0] + 180.0) % 360.0 - 180.0
+                    pos = (
+                        _lon_b,
+                        _lat_b,
+                        _rb,
+                        _dlon / (2.0 * _h),
+                        (_p1[1] - _p0[1]) / (2.0 * _h),
+                        (_p1[2] - _p0[2]) / (2.0 * _h),
+                    )
+            elif iflag & FLG_HELCTR:
                 # Apparent heliocentric place: the body as seen from the Sun,
                 # i.e. evaluated at jd - (Sun-to-body light time). TRUEPOS
                 # zeroes that light time and yields the geometric place.

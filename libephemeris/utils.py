@@ -1545,15 +1545,17 @@ def _split_deg_nakshatra(
         roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
     )
 
-    # Reduce into the current nakshatra in the exact arc-second domain. The
-    # index is chosen from a copy snapped onto the integer-arcsec grid so a
-    # value a hair below a segment boundary still lands in the right segment;
-    # the position itself is left unsnapped to preserve its true sub-arcsecond
-    # fraction (matching the reference, which keeps the full fraction).
+    # Reduce into the current nakshatra in the exact arc-second domain. Both
+    # the segment index and the position within it come from the SAME
+    # unsnapped value: choosing the index from a copy snapped onto the
+    # integer-arcsec grid pushed a value a hair below a boundary into the
+    # next segment while leaving the position negative, which the
+    # decomposition below then clamped to zero — so 13d20' minus half a
+    # microarcsecond reported the start of the next nakshatra instead of the
+    # previous segment's final fractional second. Measured reference
+    # behavior resolves the boundary from the raw value at full precision.
     total_arcsec = ddeg * 3600.0
-    near = round(total_arcsec)
-    idx_source = near if abs(total_arcsec - near) < 1e-6 else total_arcsec
-    nak_idx = int(idx_source / _NAK_SPAN_ARCSEC)
+    nak_idx = int(total_arcsec / _NAK_SPAN_ARCSEC)
     pos_arcsec = total_arcsec - nak_idx * _NAK_SPAN_ARCSEC
 
     # Rounding offset in arc-seconds, suppressed by KEEP_DEG (would advance the

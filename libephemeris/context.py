@@ -694,7 +694,13 @@ class EphemerisContext:
         # Same normalization preamble as the module-level calc_ut()/calc(),
         # so the context entry points stay 1:1 with the reference API
         # (FLG_MOSEPH strip, ephemeris-bit echo, FLG_SPEED3 mapping) on
-        # every path, including the LEB fast path.
+        # every path, including the LEB fast path. The consumed bits are
+        # dropped BEFORE the raw request is captured, exactly as the module
+        # entry points do: capturing them first made a context call echo
+        # FLG_CENTER_BODY / FLG_JPLHOR(_APPROX) that a module call consumed.
+        from .planets import consume_non_echoed_flags
+
+        iflag = consume_non_echoed_flags(iflag, ipl)
         raw_iflag = iflag
         iflag = _normalize_calc_flags(iflag)
         from .planets import _calc_tt_epheflag_echo, _echo_request_bits
@@ -754,6 +760,35 @@ class EphemerisContext:
                         context=True,
                     )
                 return result
+
+            # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections, intercepted
+            # here for the same reason as in the module-level entry points:
+            # the projection wraps a rewritten J2000|NONUT sub-request, so it
+            # has to run BEFORE backend dispatch. Applying it only inside the
+            # LEB fast path left a context in Skyfield mode (or without a
+            # reader) returning the ordinary unprojected sidereal position.
+            from .constants import FLG_EQUATORIAL, SIDBIT_ECL_T0, SIDBIT_SSY_PLANE
+            from .planets import (
+                _SIDBIT_PROJECTION_SUPPRESS_MODES,
+                _sidbit_projection_calc,
+            )
+
+            _bits = self.sidereal_bits
+            if (
+                (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE))
+                and (not (iflag & FLG_EQUATORIAL) or (_bits & SIDBIT_ECL_T0))
+                and self.sidereal_mode not in _SIDBIT_PROJECTION_SUPPRESS_MODES
+            ):
+                return _sidbit_projection_calc(
+                    tjd,
+                    ipl,
+                    iflag,
+                    raw_iflag,
+                    self.sidereal_mode,
+                    _bits,
+                    (self.calc_ut if ut else self.calc),
+                    tt_echo=not ut,
+                )
 
         # Built-in asteroids by AST_OFFSET number (see module calc_ut)
         ipl = _remap_ast_offset(ipl)

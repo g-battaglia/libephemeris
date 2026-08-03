@@ -32,6 +32,7 @@ import weakref
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, overload
 from skyfield.api import Topos
 from skyfield.timelib import Timescale
@@ -1511,12 +1512,14 @@ def jpl_fallback_active() -> bool:
     """
     if get_calc_mode() == "leb":
         return False
-    # After the kernel is opened once, get_planets() has already overwritten
-    # _EPHEMERIS_FILE with the resolved fallback name, so the sticky record set
-    # by the resolver is authoritative; before the first load the eager filename
-    # check catches the fallback so the very first retflag is correct too.
-    if _JPL_FALLBACK_ACTIVE:
-        return True
+    # Evaluated from the REQUESTED filename every time. The sticky record set
+    # by the resolver used to short-circuit this, because get_planets() then
+    # overwrote _EPHEMERIS_FILE with the fallback name and the filename check
+    # could no longer see the original request. Now that the requested name is
+    # preserved, the check is authoritative on its own — and the record was
+    # actively wrong after a set_ephe_path() that makes the requested file
+    # available again, echoing SWIEPH for one more call before the reload
+    # cleared it.
     effective_file = _get_effective_ephemeris_file()
     return not (
         _is_recognized_de_kernel(effective_file)
@@ -2598,20 +2601,74 @@ _DE440_JD_START = 2287184.5
 _DE440_JD_END = 2688976.5
 
 
-def _leb_source_de_number(jd_start: float, jd_end: float) -> int:
+def _leb_source_de_number(
+    jd_start: float, jd_end: float, tier: Optional[str] = None
+) -> int:
     """Generating JPL Development Ephemeris number for an LEB artifact.
 
-    The LEB format stores no source-kernel identifier, so this is inferred
-    from the artifact's own stored coverage: any span reaching outside the
-    published DE440 interval can only have been sampled from DE441. Deriving
-    it from the filename instead (looking for the word "extended") was wrong
-    in both directions, since ``set_leb_file()`` accepts arbitrary paths: a
-    renamed DE441 artifact reported 440, and a DE440 artifact whose path
-    happened to contain "extended" reported 441.
+    The LEB format stores no source-kernel identifier, so this reports a
+    number only when one can be substantiated:
+
+    * ``tier`` — set when the artifact was resolved through the tier
+      machinery — is authoritative: each tier declares the DE kernel it is
+      generated from (``TIERS[...].ephemeris_file``).
+    * otherwise, for an artifact named directly with ``set_leb_file()``,
+      coverage reaching outside the published DE440 interval can only come
+      from DE441. Coverage *inside* that interval proves nothing (a DE441
+      artifact cropped to a narrow span looks identical), so the result is
+      0 — the same "no data" value the compatibility API already uses.
+
+    Deriving this from the filename, as an earlier revision did by looking
+    for the word "extended", was wrong in both directions: a renamed DE441
+    artifact reported 440 and a DE440 artifact stored under a path
+    containing "extended" reported 441.
     """
+    if tier is not None:
+        kernel = TIERS[tier].ephemeris_file if tier in TIERS else ""
+        if "441" in kernel:
+            return 441
+        if "440" in kernel:
+            return 440
     if jd_start < _DE440_JD_START or jd_end > _DE440_JD_END:
         return 441
-    return 440
+    return 0
+
+
+def _leb_core_file_metadata(
+    reader, body: int
+) -> "Optional[tuple[str, float, float, int]]":
+    """``(path, jd_start, jd_end, denum)`` for ONE concrete LEB core file.
+
+    A tiered reader holds several per-tier composites with different spans.
+    Reporting the union range next to a single path claimed that file could
+    serve dates outside its own coverage (measured: the base core paired
+    with the medium union). Pick the widest-covering concrete file for
+    ``body`` and report ITS range, so the triple is internally consistent
+    and the tier that produced it identifies the source kernel.
+    """
+    tier_readers = getattr(reader, "_tier_readers", None)
+    candidates: list[tuple[str, tuple[float, float], Optional[str]]] = []
+
+    def _collect(item, tier: Optional[str]) -> None:
+        for child in getattr(item, "_readers", (item,)):
+            if not getattr(child, "has_body", lambda _b: False)(body):
+                continue
+            bounds = getattr(child, "body_coverage", lambda _b: None)(body)
+            if bounds is None:
+                continue
+            path = str(getattr(child, "path", ""))
+            candidates.append((path, (float(bounds[0]), float(bounds[1])), tier))
+
+    if isinstance(tier_readers, Mapping):
+        for tier_name, tier_reader in tier_readers.items():
+            _collect(tier_reader, tier_name)
+    else:
+        _collect(reader, None)
+
+    if not candidates:
+        return None
+    path, (start, end), tier = max(candidates, key=lambda c: c[1][1] - c[1][0])
+    return (path, start, end, _leb_source_de_number(start, end, tier))
 
 
 def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
@@ -2660,10 +2717,10 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
 
     # LEB service (sealed mode, or auto mode before any JPL kernel is
     # opened): report the active LEB artifact serving the planet/Moon
-    # channels instead of an empty tuple, with the stored union coverage and
-    # the generating JPL Development Ephemeris number (DE440 for the
-    # base/medium tiers, DE441 for extended). ifno 0 and 1 both map to the
-    # merged core file, like a JPL kernel.
+    # channels instead of an empty tuple. ifno 0 and 1 both map to the
+    # merged core file, like a JPL kernel. The triple describes ONE concrete
+    # file: pairing a single path with a multi-tier union range claimed that
+    # file could serve dates it does not cover.
     if get_calc_mode() == "leb" or _PLANETS is None:
         try:
             _reader = get_leb_reader()
@@ -2671,16 +2728,9 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
             _reader = None
         if _reader is not None:
             _body = 0 if ifno == 0 else 1  # SUN / MOON channel
-            _bounds = getattr(_reader, "body_coverage", lambda _b: None)(_body)
-            if _bounds is not None:
-                _files = [
-                    getattr(item, "path", "")
-                    for item in getattr(_reader, "_readers", (_reader,))
-                    if getattr(item, "has_body", lambda _b: False)(_body)
-                ]
-                _path = str(_files[0]) if _files else str(getattr(_reader, "path", ""))
-                _denum = _leb_source_de_number(float(_bounds[0]), float(_bounds[1]))
-                return (_path, float(_bounds[0]), float(_bounds[1]), _denum)
+            _resolved = _leb_core_file_metadata(_reader, _body)
+            if _resolved is not None:
+                return _resolved
         if _PLANETS is None:
             return ("", 0.0, 0.0, 0)
 

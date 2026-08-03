@@ -579,6 +579,31 @@ def _days_in_month(year: int, month: int, cal: int) -> int:
     return 29 if leap else 28
 
 
+# Cached UT1-UTC offset at the 2035 cutoff (see _post_2035_dut1_days).
+_POST_2035_DUT1_DAYS: float | None = None
+
+
+def _post_2035_dut1_days() -> float:
+    """UT1-UTC offset carried across the 2035 cutoff, in days.
+
+    The branch below switches conversion machinery at 2035. Returning the
+    bare calendar JD there while the pre-2035 chain applies a real UT1-UTC
+    offset made the function discontinuous: a 1 ms step across the
+    2034/2035 boundary advanced both outputs by ~80 ms, and every later date
+    inherited that bias. Holding the offset the pre-2035 chain itself
+    reports at the cutoff instant removes the step by construction. It is
+    also the only continuous extrapolation available: CGPM Resolution 4
+    (27th CGPM, 2022) raises the UT1-UTC tolerance by or before 2035 without
+    fixing its future value, so no table can supply one.
+    """
+    global _POST_2035_DUT1_DAYS
+    if _POST_2035_DUT1_DAYS is None:
+        ts = get_timescale()
+        cutoff = ts.utc(2035, 1, 1, 0, 0, 0.0)
+        _POST_2035_DUT1_DAYS = float(cutoff.ut1) - julday(2035, 1, 1, 0.0, GREG_CAL)
+    return _POST_2035_DUT1_DAYS
+
+
 def utc_to_jd(
     year: int,
     month: int,
@@ -711,7 +736,9 @@ def utc_to_jd(
     # year 9999).
     if greg_year >= 2035:
         decimal_hour = hour + minute / 60.0 + second / 3600.0
-        jd_ut1 = julday(year, month, day, decimal_hour, calendar)
+        jd_ut1 = (
+            julday(year, month, day, decimal_hour, calendar) + _post_2035_dut1_days()
+        )
         jd_et = jd_ut1 + deltat(jd_ut1)
         return float(jd_et), float(jd_ut1)
 
@@ -733,22 +760,41 @@ def utc_to_jd(
     return float(t.tt), float(t.ut1)
 
 
+def _reconstruction_snap_tolerance(jd: float) -> float:
+    """Seconds of round-off a calendar reconstruction from ``jd`` can carry.
+
+    Derived from the representation itself rather than fixed: one ulp of a
+    modern Julian Day is ~40 microseconds, and the reconstruction performs a
+    handful of arithmetic steps on it, so two ulps bound the error. A fixed
+    200 microsecond threshold was several times larger than that bound and
+    therefore destroyed valid sub-millisecond inputs — a request for
+    ``second=0.0001`` came back as 0.0 even though the JD still resolves it.
+    """
+    return 2.0 * math.ulp(abs(jd)) * 86400.0
+
+
 def _snap_reconstructed_second(
-    year: int, month: int, day: int, hour: int, minute: int, second: float
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    second: float,
+    tolerance: float,
 ) -> tuple[int, int, int, int, int, float]:
     """Snap a reconstructed Gregorian clock reading to its round instant.
 
-    A modern Julian Day has a ~40 microsecond ulp, so any calendar
-    reconstruction from a float JD carries a ~+-20 microsecond floor;
-    measured reference behavior recovers round instants exactly. A reading
-    within 200 microseconds of a whole second is therefore snapped, with
-    the carry cascading through the calendar. A genuine leap-second minute
-    keeps its second-60 reading (probed through utc_to_jd); the end of a
-    leap second (60.99998 -> 61) rolls into the next day like an ordinary
-    midnight carry.
+    A calendar reconstruction from a float JD carries a round-off floor of a
+    couple of ulps (see :func:`_reconstruction_snap_tolerance`); measured
+    reference behavior recovers round instants exactly. A reading within
+    that floor of a whole second is therefore snapped, with the carry
+    cascading through the calendar. A genuine leap-second minute keeps its
+    second-60 reading (probed through utc_to_jd); the end of a leap second
+    (60.99998 -> 61) rolls into the next day like an ordinary midnight
+    carry.
     """
     sec_round = round(second)
-    if second == sec_round or abs(second - sec_round) >= 2e-4:
+    if second == sec_round or abs(second - sec_round) >= tolerance:
         return year, month, day, hour, minute, second
     if sec_round < 60:
         return year, month, day, hour, minute, float(sec_round)
@@ -787,9 +833,11 @@ def _jd_to_calendar_tuple(
     mm = int(minute_frac)
     ss = (minute_frac - mm) * 60.0
     # Snap the float-JD reconstruction floor (see _snap_reconstructed_second);
-    # no leap seconds exist on these paths, so the plain carry applies.
+    # no leap seconds exist on these paths, so the plain carry applies. The
+    # tolerance comes from this JD's own ulp, so a valid sub-millisecond
+    # reading is never flattened to a round second.
     sec_round = round(ss)
-    if ss != sec_round and abs(ss - sec_round) < 2e-4:
+    if ss != sec_round and abs(ss - sec_round) < _reconstruction_snap_tolerance(jd):
         total = hh * 3600 + mm * 60 + int(sec_round)
         if total < 86400:
             return y, m, d, total // 3600, (total % 3600) // 60, float(total % 60)
@@ -853,9 +901,12 @@ def jdet_to_utc(
         return _jd_to_calendar_tuple(jd_ut1_est, calendar)
 
     # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
-    # mirror utc_to_jd and return the UT1 calendar label directly.
+    # mirror utc_to_jd, which labels the instant after removing the UT1-UTC
+    # offset it carries across the cutoff. Subtracting the same offset here
+    # keeps the pair an exact round trip and the label continuous with the
+    # pre-2035 branch.
     if revjul(jd_ut1_est, GREG_CAL)[0] >= 2035:
-        return _jd_to_calendar_tuple(jd_ut1_est, calendar)
+        return _jd_to_calendar_tuple(jd_ut1_est - _post_2035_dut1_days(), calendar)
 
     ts = get_timescale()
 
@@ -880,7 +931,13 @@ def jdet_to_utc(
     g_minute = int(utc_data[4])
     g_second = float(utc_data[5])
     g_year, g_month, g_day, g_hour, g_minute, g_second = _snap_reconstructed_second(
-        g_year, g_month, g_day, g_hour, g_minute, g_second
+        g_year,
+        g_month,
+        g_day,
+        g_hour,
+        g_minute,
+        g_second,
+        _reconstruction_snap_tolerance(jd_ut1_est),
     )
 
     if calendar == JUL_CAL:
@@ -948,9 +1005,10 @@ def jdut1_to_utc(
         return _jd_to_calendar_tuple(jd_ut1, calendar)
 
     # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
-    # mirror utc_to_jd and return the UT1 calendar label directly.
+    # mirror utc_to_jd, which labels the instant after removing the UT1-UTC
+    # offset it carries across the cutoff (see _post_2035_dut1_days).
     if revjul(jd_ut1, GREG_CAL)[0] >= 2035:
-        return _jd_to_calendar_tuple(jd_ut1, calendar)
+        return _jd_to_calendar_tuple(jd_ut1 - _post_2035_dut1_days(), calendar)
 
     # Create a Skyfield Time object from UT1 Julian Day
     t = ts.ut1_jd(jd_ut1)
@@ -970,7 +1028,13 @@ def jdut1_to_utc(
     g_minute = int(utc_data[4])
     g_second = float(utc_data[5])
     g_year, g_month, g_day, g_hour, g_minute, g_second = _snap_reconstructed_second(
-        g_year, g_month, g_day, g_hour, g_minute, g_second
+        g_year,
+        g_month,
+        g_day,
+        g_hour,
+        g_minute,
+        g_second,
+        _reconstruction_snap_tolerance(jd_ut1),
     )
 
     if calendar == JUL_CAL:
