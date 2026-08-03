@@ -3598,10 +3598,30 @@ def batch_fixstars_ut(
         resolve to a different star with and without ``FLG_TOPOCTR``.
     """
     if flags & FLG_SIDEREAL:
+        from .constants import SIDBIT_ECL_T0, SIDBIT_SSY_PLANE
+        from .planets import (
+            _SIDBIT_PROJECTION_SUPPRESS_MODES,
+            _get_sidereal_bits,
+        )
         from .sidereal_epoch import is_fixed_epoch_request
         from .state import get_sid_mode
 
-        if is_fixed_epoch_request(flags, get_sid_mode()):
+        _sidm = get_sid_mode()
+        if is_fixed_epoch_request(flags, _sidm):
+            return _batch_fixstars_via_single(
+                stars, tjdut, flags, skip_errors=skip_errors
+            )
+        # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE rotate the whole star vector onto
+        # the projection frame; the batch fast path below only subtracts a
+        # scalar ayanamsha from longitude, so it disagreed with its own
+        # single-star equivalent by up to ~1.57 deg of latitude. Delegate,
+        # exactly as the fixed-epoch and topocentric branches do.
+        _bits = _get_sidereal_bits()
+        if (
+            (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE))
+            and (not (flags & FLG_EQUATORIAL) or (_bits & SIDBIT_ECL_T0))
+            and _sidm not in _SIDBIT_PROJECTION_SUPPRESS_MODES
+        ):
             return _batch_fixstars_via_single(
                 stars, tjdut, flags, skip_errors=skip_errors
             )

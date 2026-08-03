@@ -2535,6 +2535,52 @@ def calc_pctr(
     if flags & (FLG_HELCTR | FLG_BARYCTR):
         flags = (flags | FLG_NOABERR | FLG_NOGDEFL) & ~(FLG_HELCTR | FLG_BARYCTR)
 
+    # Sidereal FRAME requests are whole-vector rotations, not scalar ayanamsha
+    # subtractions, so they must be intercepted here exactly as calc()/calc_ut()
+    # do. Without this the planet-centric surface silently returned the base
+    # sidereal position: measured against the reference, Mars seen from Jupiter
+    # at J2000 kept latitude 0.978545 deg where SIDBIT_SSY_PLANE gives -0.375689
+    # and SIDM_J1900 gives 0.989033.
+    if flags & FLG_SIDEREAL:
+        from .sidereal_epoch import (
+            fixed_epoch_request_flags,
+            fixed_epoch_retflag,
+            is_fixed_epoch_request,
+            transform_fixed_epoch_result,
+        )
+
+        _pctr_raw_flags = flags
+        _sidm_p = get_sid_mode()
+
+        def _pctr_calc_fn(_tjd: float, _ipl: int, _flags: int):
+            return calc_pctr(_tjd, _ipl, center, _flags)
+
+        if is_fixed_epoch_request(flags, _sidm_p):
+            sub_xx, sub_rf = _pctr_calc_fn(
+                tjdet, planet, fixed_epoch_request_flags(flags)
+            )
+            xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm_p)
+            return (
+                _to_native_floats(xx_t0),
+                _echo_request_bits(fixed_epoch_retflag(sub_rf, flags), _pctr_raw_flags),
+            )
+
+        _bits_p = _get_sidereal_bits()
+        if (
+            (_bits_p & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE))
+            and (not (flags & FLG_EQUATORIAL) or (_bits_p & SIDBIT_ECL_T0))
+            and _sidm_p not in _SIDBIT_PROJECTION_SUPPRESS_MODES
+        ):
+            return _sidbit_projection_calc(
+                tjdet,
+                planet,
+                flags,
+                _pctr_raw_flags,
+                _sidm_p,
+                _bits_p,
+                _pctr_calc_fn,
+            )
+
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(planet) or _body_uses_jpl_ephemeris(center):
         validate_jd_range(tjdet, planet, "calc_pctr")
@@ -7472,6 +7518,67 @@ def _format_nodaps_output(
     return (formatted[0], formatted[1], formatted[2], formatted[3])
 
 
+def _nodaps_sidereal_frame_projection(
+    entry_fn, tjd: float, planet: int, method: int, flags: int
+):
+    """Frame-projected nod_aps result, or None when no projection applies.
+
+    Sidereal FRAME requests (the fixed-epoch modes and the SIDBIT_ECL_T0 /
+    SIDBIT_SSY_PLANE projections) rotate the whole node/apse vector; the
+    ordinary path only subtracts a scalar ayanamsha from longitude, which
+    cannot move a latitude at all. Measured against the reference, Mars's
+    ascending-node latitude stayed at 0.000196 deg under SIDBIT_SSY_PLANE
+    where the reference returns 1.555359 deg, and the fixed-epoch modes had
+    the same latitude-only gap.
+
+    The four points are re-requested in the J2000|NONUT frame the projection
+    is defined on and each is rotated with the same transform the calc
+    surfaces use, so all four stay in one frame.
+    """
+    if not (flags & FLG_SIDEREAL):
+        return None
+    from .sidereal_epoch import (
+        fixed_epoch_request_flags,
+        is_fixed_epoch_request,
+        sidbit_ecliptic_matrix,
+        ssy_plane_zero_point_deg,
+        transform_fixed_epoch_result,
+        transform_sidbit_result,
+    )
+
+    sid_mode = get_sid_mode()
+    sub_flags = fixed_epoch_request_flags(flags)
+
+    if is_fixed_epoch_request(flags, sid_mode):
+        sub = entry_fn(tjd, planet, method, sub_flags)
+        return tuple(
+            _to_native_floats(transform_fixed_epoch_result(pt, flags, sid_mode))
+            for pt in sub
+        )
+
+    bits = _get_sidereal_bits()
+    if not (bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE)):
+        return None
+    if flags & FLG_EQUATORIAL and not (bits & SIDBIT_ECL_T0):
+        return None
+    if sid_mode in _SIDBIT_PROJECTION_SUPPRESS_MODES:
+        return None
+
+    if bits & SIDBIT_ECL_T0:
+        t0_jd = _ecl_t0_epoch_jd(sid_mode)
+        zero_point = _calc_ayanamsa(t0_jd, sid_mode)
+    else:
+        t0_jd = _J2000_JD
+        zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000_JD, sid_mode))
+    m_ecl = sidbit_ecliptic_matrix(bits, t0_jd, zero_point)
+    if m_ecl is None:
+        return None
+    sub = entry_fn(tjd, planet, method, sub_flags)
+    return tuple(
+        _to_native_floats(transform_sidbit_result(pt, flags, m_ecl)) for pt in sub
+    )
+
+
 def nod_aps_ut(
     tjdut: float,
     planet: int,
@@ -7516,6 +7623,12 @@ def nod_aps_ut(
         For planets, the mean elements provide smooth, predictable values.
         Osculating elements can show rapid variations due to perturbations.
     """
+    projected = _nodaps_sidereal_frame_projection(
+        nod_aps_ut, tjdut, planet, method, flags
+    )
+    if projected is not None:
+        return projected
+
     ts = get_timescale()
     t = ts.ut1_jd(tjdut)
     return _format_nodaps_output(
@@ -7548,6 +7661,10 @@ def nod_aps(
         >>> from libephemeris import nod_aps, JUPITER, NODBIT_OSCU
         >>> nasc, ndsc, peri, aphe = nod_aps(2451545.0, JUPITER, NODBIT_OSCU)
     """
+    projected = _nodaps_sidereal_frame_projection(nod_aps, tjdet, planet, method, flags)
+    if projected is not None:
+        return projected
+
     ts = get_timescale()
     t = ts.tt_jd(tjdet)
     return _format_nodaps_output(

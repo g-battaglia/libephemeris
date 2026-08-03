@@ -99,6 +99,20 @@ own predicted offset reaches about -0.95 s and is discontinuously reset to
 zero. Neither the switch epoch nor the predicted offset is reconstructed
 from external output; the published CGPM decision fixes ours.
 
+### `SIDBIT_SSY_PLANE` zero point
+
+The invariable-plane projection takes its plane from Souami & Souchay
+(2012). The plane *orientation* agrees with an external implementation to
+better than 0.02″ — projected latitudes match on the calc, planet-centric,
+node/apse and fixed-star surfaces alike — but the in-plane zero point
+differs by a per-mode constant of about 27–32″ for the modes whose
+ayanamsha is ~24° at J2000, shrinking toward zero for modes anchored at or
+near a zero J2000 ayanamsha. The offset is stable in time (it varies by
+under 0.5″ across 1850–2100), so it is a difference in the published pole
+realization rather than a drift. The zero point is constructed
+geometrically — the J2000 zero-point direction projected onto the plane —
+and no per-mode correction is fitted to external output.
+
 ### Precession, nutation, and remote epochs
 
 Modern reductions use IAU 2006/2000A through ERFA. Long-range frame evolution
