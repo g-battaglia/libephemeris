@@ -99,6 +99,20 @@ own predicted offset reaches about -0.95 s and is discontinuously reset to
 zero. Neither the switch epoch nor the predicted offset is reconstructed
 from external output; the published CGPM decision fixes ours.
 
+### `SIDBIT_ECL_T0` zero point for the Aldebaran mode
+
+`SIDM_ALDEBARAN_15TAU` is a live star-anchored mode, so its ECL_T0
+*projection plane* and its *value* come from different places. The plane is
+the year −100 mean ecliptic of the Babylonian normal-star zodiac the mode
+belongs to (Huber, Centaurus 5, 1958; Fagan, Zodiacs Old and New, 1950) —
+the same plane already cited for the Kugler family. With that plane the
+equatorial channel matches an external implementation exactly and the
+projected ecliptic latitude to 0.24″. The in-plane zero point still differs
+by about 0.79°: the anchor is evaluated from the catalog direction carried
+to the plane epoch, since the ordinary anchor reduction needs a JPL kernel
+that does not reach year −100, and the external convention for that
+evaluation is not published. No zero-point correction is fitted.
+
 ### `SIDBIT_SSY_PLANE` zero point
 
 The invariable-plane projection takes its plane from Souami & Souchay

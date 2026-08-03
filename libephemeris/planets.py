@@ -1850,7 +1850,7 @@ def _sidbit_projection_calc(
     # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE.
     if sid_bits & SIDBIT_ECL_T0:
         t0_jd = _ecl_t0_epoch_jd(sid_mode)
-        zero_point = _calc_ayanamsa(t0_jd, sid_mode)
+        zero_point = _ecl_t0_zero_point_deg(sid_mode, t0_jd)
     else:  # SIDBIT_SSY_PLANE
         t0_jd = _J2000_JD
         zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000_JD, sid_mode))
@@ -6479,6 +6479,55 @@ def _ecl_date_ayanamsha_delta(
     return (lon_date - method_b + 180.0) % 360.0 - 180.0
 
 
+def _catalog_anchor_longitude_deg(star: "StarData", t0_jd: float) -> float:
+    """Mean-ecliptic-of-t0 longitude of a catalog star, without an ephemeris.
+
+    The zero point of an ECL_T0 projection *plane* is a geometric direction:
+    the star's catalog position carried by proper motion to t0 and rotated
+    into the mean ecliptic of t0. The ordinary anchor path goes through
+    ``earth.at(t).observe(star)``, which needs the JPL kernel and therefore
+    fails outright for the classical ancient epochs (the Babylonian norm at
+    year -100 lies far outside the medium tier). Annual aberration and
+    diurnal parallax, which that path would add, are Earth-observer effects
+    with no meaning in a plane definition, so omitting them is the correct
+    reduction rather than an approximation of convenience.
+    """
+    import numpy as np
+
+    from .sidereal_epoch import _ecliptic_of_t0_matrix
+
+    years = (t0_jd - _J2000_JD) / 365.25
+    # Proper motion in arcsec/yr; pm_ra already carries the cos(dec) factor.
+    dec = math.radians(star.dec_j2000 + star.pm_dec * years / 3600.0)
+    cos_dec0 = math.cos(math.radians(star.dec_j2000))
+    ra = math.radians(star.ra_j2000 + (star.pm_ra * years / 3600.0) / (cos_dec0 or 1.0))
+    v_icrs = np.array(
+        [math.cos(dec) * math.cos(ra), math.cos(dec) * math.sin(ra), math.sin(dec)]
+    )
+    v = np.asarray(_ecliptic_of_t0_matrix(t0_jd)) @ v_icrs
+    return math.degrees(math.atan2(float(v[1]), float(v[0]))) % 360.0
+
+
+def _ecl_t0_zero_point_deg(sid_mode: int, t0_jd: float) -> float:
+    """Sidereal zero point on the mean ecliptic of ``t0_jd``.
+
+    Defining-pair modes read their value from the shared table. A live
+    star-anchored mode is evaluated from its catalog anchor when the epoch
+    lies outside the loaded ephemeris, which is the normal case for the
+    classical ancient planes.
+    """
+    try:
+        return _calc_ayanamsa(t0_jd, sid_mode)
+    except EphemerisRangeError:
+        anchor = _ECL_T0_CATALOG_ANCHORS.get(sid_mode)
+        if anchor is None:
+            raise
+        star_key, target_lon = anchor
+        return (
+            _catalog_anchor_longitude_deg(STARS[star_key], t0_jd) - target_lon
+        ) % 360.0
+
+
 def _ecl_t0_epoch_jd(sid_mode: int) -> float:
     """Defining epoch (JD TT) of a sidereal mode for the ECL_T0 projection.
 
@@ -6533,6 +6582,12 @@ def _ecl_t0_epoch_jd(sid_mode: int) -> float:
 # mean ayanamsha 23°15' at the vernal equinox of 1956 (Report of the
 # Calendar Reform Committee, CSIR, New Delhi, 1955; restated in the Indian
 # Astronomical Ephemeris introduction). JD 2435553.5 = 1956 March 21.0.
+# Live star anchors usable without an ephemeris, for the classical ECL_T0
+# planes whose epoch lies outside the loaded JPL kernel.
+_ECL_T0_CATALOG_ANCHORS: dict[int, tuple[str, float]] = {
+    SIDM_ALDEBARAN_15TAU: ("ALDEBARAN", ALDEBARAN_TARGET_LON),
+}
+
 _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
     SIDM_LAHIRI: 2435553.5,
     # BABYL_KUGLER1/2/3: the three Kugler solutions (Sternkunde und
@@ -6546,6 +6601,15 @@ _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
     SIDM_BABYL_KUGLER1: 1684532.5,
     SIDM_BABYL_KUGLER2: 1684532.5,
     SIDM_BABYL_KUGLER3: 1684532.5,
+    # ALDEBARAN_15TAU: "Aldebaran at 15 Taurus" is one of the defining
+    # normal-star positions of that same Babylonian sidereal zodiac (Huber,
+    # Centaurus 5, 1958, derives the zodiac's zero point from the normal
+    # stars, Aldebaran among them; Fagan, Zodiacs Old and New, 1950, states
+    # the norm in this form). Its VALUE is realized dynamically from the live
+    # star, but its classical projection plane is the same year -100 mean
+    # ecliptic as the rest of the family. Without this entry the projection
+    # fell through to J2000 and landed in the wrong frame by tens of degrees.
+    SIDM_ALDEBARAN_15TAU: 1684532.5,
     # HIPPARCHOS: the Hipparchan sidereal norm (R. Mercier, "Studies in the
     # Medieval Conception of Precession") is anchored to Hipparchus's own
     # observational era, ~-128 (the epoch of his catalog and equinox
@@ -6942,8 +7006,16 @@ def _get_ayanamsa_for_flags(
     # ayanamsha modes without annual aberration, and FLG_TRUEPOS / FLG_NOGDEFL
     # without solar light deflection, so the ayanamsha subtracted matches the
     # planet place the same request produces (measured reference behavior).
-    noaberr = bool(iflag & (FLG_TRUEPOS | FLG_NOABERR))
-    nogdefl = bool(iflag & (FLG_TRUEPOS | FLG_NOGDEFL))
+    # A heliocentric or barycentric request has no Earth to be aberrated by,
+    # so the live anchor must be evaluated without annual aberration there
+    # too: keeping the geocentric anchor left the subtracted zero point
+    # 13.7"-21.3" away from the observer's own frame for the nine
+    # _ABERRANT_ANCHOR_MODES (measured 21.09" on Mars, mode 36, FLG_HELCTR).
+    # The same reasoning removes the solar deflection, which is likewise an
+    # Earth-observer path effect.
+    _centered = bool(iflag & (FLG_HELCTR | FLG_BARYCTR))
+    noaberr = bool(iflag & (FLG_TRUEPOS | FLG_NOABERR)) or _centered
+    nogdefl = bool(iflag & (FLG_TRUEPOS | FLG_NOGDEFL)) or _centered
     if (iflag & FLG_NONUT) or (iflag & FLG_J2000):
         if sid_mode is None:
             sid_mode = get_sid_mode()
@@ -7519,64 +7591,118 @@ def _format_nodaps_output(
 
 
 def _nodaps_sidereal_frame_projection(
-    entry_fn, tjd: float, planet: int, method: int, flags: int
+    entry_fn, tjd: float, planet: int, method: int, flags: int, jd_tt: float
 ):
     """Frame-projected nod_aps result, or None when no projection applies.
 
     Sidereal FRAME requests (the fixed-epoch modes and the SIDBIT_ECL_T0 /
-    SIDBIT_SSY_PLANE projections) rotate the whole node/apse vector; the
-    ordinary path only subtracts a scalar ayanamsha from longitude, which
-    cannot move a latitude at all. Measured against the reference, Mars's
-    ascending-node latitude stayed at 0.000196 deg under SIDBIT_SSY_PLANE
-    where the reference returns 1.555359 deg, and the fixed-epoch modes had
-    the same latitude-only gap.
+    SIDBIT_SSY_PLANE projections) rotate the whole node/apse vector; a scalar
+    ayanamsha subtracted from longitude cannot move a latitude at all, which
+    left every projected latitude at its unprojected value.
 
-    The four points are re-requested in the J2000|NONUT frame the projection
-    is defined on and each is rotated with the same transform the calc
-    surfaces use, so all four stay in one frame.
+    Measured reference behavior: the ecliptic result is the OF-DATE node/apse
+    set rotated rigidly into the target frame. That is what keeps the node
+    pair exactly antipodal — the of-date nodes lie on the ecliptic of date
+    (latitude ~1e-5 deg) and a rigid rotation preserves antipodality.
+    Re-requesting the points in the J2000 frame instead returned that frame's
+    own geocentric node solution, whose latitudes are neither antipodal nor a
+    rotation of the of-date ones (measured 55.9" / 38.1" off on Jupiter at
+    JD 2415020.5).
+
+    Equatorial output follows the calc surfaces: SIDBIT_SSY_PLANE alone
+    leaves the equator untouched, and SIDBIT_ECL_T0 reduces the J2000|NONUT
+    request to the mean equator of t0 (applying the *ecliptic* matrix to an
+    equatorial vector had put Jupiter's node 23.99 deg off in RA).
     """
     if not (flags & FLG_SIDEREAL):
         return None
+    import numpy as np
+
     from .sidereal_epoch import (
-        fixed_epoch_request_flags,
+        _ecliptic_of_t0_matrix,
+        _epoch_matrices,
+        _rotate_spherical,
+        equatorial_epoch_matrix,
         is_fixed_epoch_request,
         sidbit_ecliptic_matrix,
         ssy_plane_zero_point_deg,
-        transform_fixed_epoch_result,
-        transform_sidbit_result,
     )
+    from .sidereal_epoch import FIXED_EPOCH_T0
 
     sid_mode = get_sid_mode()
-    sub_flags = fixed_epoch_request_flags(flags)
+    fixed = is_fixed_epoch_request(flags, sid_mode)
+    bits = _get_sidereal_bits()
+    sidbit = bool(bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE)) and (
+        sid_mode not in _SIDBIT_PROJECTION_SUPPRESS_MODES
+    )
+    if not fixed and not sidbit:
+        return None
 
-    if is_fixed_epoch_request(flags, sid_mode):
-        sub = entry_fn(tjd, planet, method, sub_flags)
-        return tuple(
-            _to_native_floats(transform_fixed_epoch_result(pt, flags, sid_mode))
-            for pt in sub
+    if flags & FLG_EQUATORIAL:
+        if sidbit and not fixed and not (bits & SIDBIT_ECL_T0):
+            return None
+        # Same rigid-rotation construction as the ecliptic branch, on the
+        # equatorial side: the of-date mean-equator result rotated into the
+        # mean equator of t0.
+        t0_eq = FIXED_EPOCH_T0[sid_mode] if fixed else _ecl_t0_epoch_jd(sid_mode)
+        m_eq = (
+            equatorial_epoch_matrix(t0_eq)
+            @ np.asarray(equatorial_epoch_matrix(jd_tt)).T
+        )
+        sub = entry_fn(
+            tjd,
+            planet,
+            method,
+            (flags & ~(FLG_SIDEREAL | FLG_J2000 | FLG_RADIANS)) | FLG_NONUT,
         )
 
-    bits = _get_sidereal_bits()
-    if not (bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE)):
-        return None
-    if flags & FLG_EQUATORIAL and not (bits & SIDBIT_ECL_T0):
-        return None
-    if sid_mode in _SIDBIT_PROJECTION_SUPPRESS_MODES:
-        return None
+        def _project_eq(pt):
+            out = _rotate_spherical(tuple(pt), m_eq)
+            if flags & FLG_RADIANS:
+                out = (
+                    math.radians(out[0]),
+                    math.radians(out[1]),
+                    out[2],
+                    math.radians(out[3]),
+                    math.radians(out[4]),
+                    out[5],
+                )
+            return _to_native_floats(out)
 
-    if bits & SIDBIT_ECL_T0:
-        t0_jd = _ecl_t0_epoch_jd(sid_mode)
-        zero_point = _calc_ayanamsa(t0_jd, sid_mode)
+        return tuple(_project_eq(pt) for pt in sub)
+
+    if fixed:
+        _, m_target = _epoch_matrices(sid_mode)
     else:
-        t0_jd = _J2000_JD
-        zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000_JD, sid_mode))
-    m_ecl = sidbit_ecliptic_matrix(bits, t0_jd, zero_point)
-    if m_ecl is None:
-        return None
-    sub = entry_fn(tjd, planet, method, sub_flags)
-    return tuple(
-        _to_native_floats(transform_sidbit_result(pt, flags, m_ecl)) for pt in sub
-    )
+        if bits & SIDBIT_ECL_T0:
+            t0_jd = _ecl_t0_epoch_jd(sid_mode)
+            zero_point = _ecl_t0_zero_point_deg(sid_mode, t0_jd)
+        else:
+            t0_jd = _J2000_JD
+            zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000_JD, sid_mode))
+        m_sidbit = sidbit_ecliptic_matrix(bits, t0_jd, zero_point)
+        if m_sidbit is None:
+            return None
+        m_target = m_sidbit
+
+    base_flags = (flags & ~(FLG_SIDEREAL | FLG_J2000 | FLG_RADIANS)) | FLG_NONUT
+    sub = entry_fn(tjd, planet, method, base_flags)
+    m = m_target @ np.asarray(_ecliptic_of_t0_matrix(jd_tt)).T
+
+    def _project(pt):
+        out = _rotate_spherical(tuple(pt), m)
+        if flags & FLG_RADIANS:
+            out = (
+                math.radians(out[0]),
+                math.radians(out[1]),
+                out[2],
+                math.radians(out[3]),
+                math.radians(out[4]),
+                out[5],
+            )
+        return _to_native_floats(out)
+
+    return tuple(_project(pt) for pt in sub)
 
 
 def nod_aps_ut(
@@ -7623,14 +7749,13 @@ def nod_aps_ut(
         For planets, the mean elements provide smooth, predictable values.
         Osculating elements can show rapid variations due to perturbations.
     """
+    ts = get_timescale()
+    t = ts.ut1_jd(tjdut)
     projected = _nodaps_sidereal_frame_projection(
-        nod_aps_ut, tjdut, planet, method, flags
+        nod_aps_ut, tjdut, planet, method, flags, float(t.tt)
     )
     if projected is not None:
         return projected
-
-    ts = get_timescale()
-    t = ts.ut1_jd(tjdut)
     return _format_nodaps_output(
         _calc_nod_aps(t, planet, flags, method), flags, float(t.tt)
     )
@@ -7661,12 +7786,13 @@ def nod_aps(
         >>> from libephemeris import nod_aps, JUPITER, NODBIT_OSCU
         >>> nasc, ndsc, peri, aphe = nod_aps(2451545.0, JUPITER, NODBIT_OSCU)
     """
-    projected = _nodaps_sidereal_frame_projection(nod_aps, tjdet, planet, method, flags)
-    if projected is not None:
-        return projected
-
     ts = get_timescale()
     t = ts.tt_jd(tjdet)
+    projected = _nodaps_sidereal_frame_projection(
+        nod_aps, tjdet, planet, method, flags, float(t.tt)
+    )
+    if projected is not None:
+        return projected
     return _format_nodaps_output(
         _calc_nod_aps(t, planet, flags, method), flags, float(t.tt)
     )
