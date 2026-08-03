@@ -1713,7 +1713,9 @@ def houses_armc_ex2(
             diff += 360
         return diff
 
-    def fd_speed(after: float, before: float) -> float:
+    def fd_speed(
+        after: float, before: float, *, sign_pinned_cusp: bool = False
+    ) -> float:
         """Centered-difference rate in deg/day; 0.0 across a discontinuity.
 
         A change larger than 90 degrees across the stencil is treated as a
@@ -1724,8 +1726,13 @@ def houses_armc_ex2(
             return 0.0
         # Sign-pinned wheels step by exactly 30 degrees when the Ascendant
         # changes sign; that is a discontinuity, not a rate (see houses_ex2).
+        # CUSPS ONLY: near the polar circle the Ascendant itself genuinely
+        # sweeps ~30 degrees across the stencil, so applying this test to the
+        # angles zeroed a real rate — and made the same angle read 0.0 for
+        # 'W'/'N' and 1296000 deg/day for every other system.
         if (
-            _fold_hsys_case(chr(_hsys_code(hsys))) in _SIGN_PINNED_HSYS
+            sign_pinned_cusp
+            and _fold_hsys_case(chr(_hsys_code(hsys))) in _SIGN_PINNED_HSYS
             and abs(abs(diff) - 30.0) < 1e-6
         ):
             return 0.0
@@ -1737,7 +1744,8 @@ def houses_armc_ex2(
     # dividing by (2*dt).  Using d_armc directly avoids a separate dt
     # variable: speed = Δcusp / (2*d_armc) * _SIDEREAL_RATE.
     cusps_speed = tuple(
-        fd_speed(cusps_after[i], cusps_before[i]) for i in range(len(cusps))
+        fd_speed(cusps_after[i], cusps_before[i], sign_pinned_cusp=True)
+        for i in range(len(cusps))
     )
 
     ascmc_speed = tuple(

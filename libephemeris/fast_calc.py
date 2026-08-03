@@ -2930,8 +2930,12 @@ def _fast_calc_core(
                 sid_t0=sid_t0,
                 sid_ayan_t0=sid_ayan_t0,
                 sid_bits=sid_bits,
-                noaberr=bool(iflag & (FLG_TRUEPOS | FLG_NOABERR)),
-                nogdefl=bool(iflag & (FLG_TRUEPOS | FLG_NOGDEFL)),
+                noaberr=bool(
+                    iflag & (FLG_TRUEPOS | FLG_NOABERR | FLG_HELCTR | FLG_BARYCTR)
+                ),
+                nogdefl=bool(
+                    iflag & (FLG_TRUEPOS | FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR)
+                ),
             )
             # J2000 ecliptic has no nutation component → mean ayanamsha.
             # Ecliptic of date includes nutation → true ayanamsha (mean + Δψ).
@@ -3000,8 +3004,14 @@ def _fast_calc_core(
                             sid_t0=sid_t0,
                             sid_ayan_t0=sid_ayan_t0,
                             sid_bits=sid_bits,
-                            noaberr=bool(iflag & (FLG_TRUEPOS | FLG_NOABERR)),
-                            nogdefl=bool(iflag & (FLG_TRUEPOS | FLG_NOGDEFL)),
+                            noaberr=bool(
+                                iflag
+                                & (FLG_TRUEPOS | FLG_NOABERR | FLG_HELCTR | FLG_BARYCTR)
+                            ),
+                            nogdefl=bool(
+                                iflag
+                                & (FLG_TRUEPOS | FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR)
+                            ),
                         )
                         if _eff_mean_aya:
                             return _m

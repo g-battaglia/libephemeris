@@ -1326,9 +1326,13 @@ def deg_midp(x1: float, x2: float) -> float:
         >>> deg_midp(-10, 10)
         0.0
     """
-    # Normalize both angles to [0, 360)
-    x1 = x1 % 360.0
-    x2 = x2 % 360.0
+    # Normalize both angles to [0, 360) through degnorm, so a raw argument
+    # within the near-zero band snaps to 0.0 BEFORE the modulo turns it into
+    # ~359.9999999999999. Normalizing with a bare modulo first destroyed the
+    # information the snap needs, and the midpoint then came back a full turn
+    # away from the reference for a tiny-negative input.
+    x1 = degnorm(x1)
+    x2 = degnorm(x2)
 
     # Calculate the difference
     diff = x2 - x1
@@ -1378,8 +1382,9 @@ def rad_midp(x: float, y: float) -> float:
         4.71238898038469
     """
     # Normalize both angles to [0, 2*pi)
-    x = x % TWO_PI
-    y = y % TWO_PI
+    # Same near-zero snap on the raw inputs as deg_midp (see there).
+    x = radnorm(x)
+    y = radnorm(y)
 
     # Calculate the difference
     diff = y - x
@@ -1396,8 +1401,10 @@ def rad_midp(x: float, y: float) -> float:
     # Calculate midpoint along the chosen arc
     midp = x + diff / 2.0
 
-    # Normalize result to [0, 2*pi)
-    return midp % TWO_PI
+    # Normalize through radnorm so the midpoint inherits the near-zero snap
+    # and the half-open range (a bare modulo returned exactly 2*pi, outside
+    # this function's own documented [0, 2*pi)).
+    return radnorm(midp)
 
 
 def d2l(d: float) -> int:

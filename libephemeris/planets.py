@@ -6545,53 +6545,17 @@ def _ecl_date_ayanamsha_delta(
     return (lon_date - method_b + 180.0) % 360.0 - 180.0
 
 
-def _catalog_anchor_longitude_deg(star: "StarData", t0_jd: float) -> float:
-    """Mean-ecliptic-of-t0 longitude of a catalog star, without an ephemeris.
-
-    The zero point of an ECL_T0 projection *plane* is a geometric direction:
-    the star's catalog position carried by proper motion to t0 and rotated
-    into the mean ecliptic of t0. The ordinary anchor path goes through
-    ``earth.at(t).observe(star)``, which needs the JPL kernel and therefore
-    fails outright for the classical ancient epochs (the Babylonian norm at
-    year -100 lies far outside the medium tier). Annual aberration and
-    diurnal parallax, which that path would add, are Earth-observer effects
-    with no meaning in a plane definition, so omitting them is the correct
-    reduction rather than an approximation of convenience.
-    """
-    import numpy as np
-
-    from .sidereal_epoch import _ecliptic_of_t0_matrix
-
-    years = (t0_jd - _J2000_JD) / 365.25
-    # Proper motion in arcsec/yr; pm_ra already carries the cos(dec) factor.
-    dec = math.radians(star.dec_j2000 + star.pm_dec * years / 3600.0)
-    cos_dec0 = math.cos(math.radians(star.dec_j2000))
-    ra = math.radians(star.ra_j2000 + (star.pm_ra * years / 3600.0) / (cos_dec0 or 1.0))
-    v_icrs = np.array(
-        [math.cos(dec) * math.cos(ra), math.cos(dec) * math.sin(ra), math.sin(dec)]
-    )
-    v = np.asarray(_ecliptic_of_t0_matrix(t0_jd)) @ v_icrs
-    return math.degrees(math.atan2(float(v[1]), float(v[0]))) % 360.0
-
-
 def _ecl_t0_zero_point_deg(sid_mode: int, t0_jd: float) -> float:
     """Sidereal zero point on the mean ecliptic of ``t0_jd``.
 
-    Defining-pair modes read their value from the shared table. A live
-    star-anchored mode is evaluated from its catalog anchor when the epoch
-    lies outside the loaded ephemeris, which is the normal case for the
-    classical ancient planes.
+    A single evaluation for every mode, so the result never depends on which
+    precision tier happens to be installed. An earlier revision fell back to
+    a catalog-only anchor when the plane epoch lay outside the loaded kernel;
+    that made the same public call return two different longitudes 0.79 deg
+    apart on the medium and extended tiers, which is a worse defect than the
+    divergence it was meant to close.
     """
-    try:
-        return _calc_ayanamsa(t0_jd, sid_mode)
-    except EphemerisRangeError:
-        anchor = _ECL_T0_CATALOG_ANCHORS.get(sid_mode)
-        if anchor is None:
-            raise
-        star_key, target_lon = anchor
-        return (
-            _catalog_anchor_longitude_deg(STARS[star_key], t0_jd) - target_lon
-        ) % 360.0
+    return _calc_ayanamsa(t0_jd, sid_mode)
 
 
 def _ecl_t0_epoch_jd(sid_mode: int) -> float:
@@ -6648,12 +6612,6 @@ def _ecl_t0_epoch_jd(sid_mode: int) -> float:
 # mean ayanamsha 23°15' at the vernal equinox of 1956 (Report of the
 # Calendar Reform Committee, CSIR, New Delhi, 1955; restated in the Indian
 # Astronomical Ephemeris introduction). JD 2435553.5 = 1956 March 21.0.
-# Live star anchors usable without an ephemeris, for the classical ECL_T0
-# planes whose epoch lies outside the loaded JPL kernel.
-_ECL_T0_CATALOG_ANCHORS: dict[int, tuple[str, float]] = {
-    SIDM_ALDEBARAN_15TAU: ("ALDEBARAN", ALDEBARAN_TARGET_LON),
-}
-
 _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
     SIDM_LAHIRI: 2435553.5,
     # BABYL_KUGLER1/2/3: the three Kugler solutions (Sternkunde und
@@ -6667,15 +6625,6 @@ _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
     SIDM_BABYL_KUGLER1: 1684532.5,
     SIDM_BABYL_KUGLER2: 1684532.5,
     SIDM_BABYL_KUGLER3: 1684532.5,
-    # ALDEBARAN_15TAU: "Aldebaran at 15 Taurus" is one of the defining
-    # normal-star positions of that same Babylonian sidereal zodiac (Huber,
-    # Centaurus 5, 1958, derives the zodiac's zero point from the normal
-    # stars, Aldebaran among them; Fagan, Zodiacs Old and New, 1950, states
-    # the norm in this form). Its VALUE is realized dynamically from the live
-    # star, but its classical projection plane is the same year -100 mean
-    # ecliptic as the rest of the family. Without this entry the projection
-    # fell through to J2000 and landed in the wrong frame by tens of degrees.
-    SIDM_ALDEBARAN_15TAU: 1684532.5,
     # HIPPARCHOS: the Hipparchan sidereal norm (R. Mercier, "Studies in the
     # Medieval Conception of Precession") is anchored to Hipparchus's own
     # observational era, ~-128 (the epoch of his catalog and equinox
@@ -7719,11 +7668,25 @@ def _nodaps_sidereal_frame_projection(
             tjd,
             planet,
             method,
-            (flags & ~(FLG_SIDEREAL | FLG_J2000 | FLG_RADIANS)) | FLG_NONUT,
+            (flags & ~(FLG_SIDEREAL | FLG_J2000 | FLG_RADIANS | FLG_XYZ)) | FLG_NONUT,
         )
 
         def _project_eq(pt):
             out = _rotate_spherical(tuple(pt), m_eq)
+            if flags & FLG_XYZ:
+                _lr = math.radians(out[0])
+                _br = math.radians(out[1])
+                _cb = math.cos(_br)
+                return _to_native_floats(
+                    (
+                        out[2] * _cb * math.cos(_lr),
+                        out[2] * _cb * math.sin(_lr),
+                        out[2] * math.sin(_br),
+                        0.0,
+                        0.0,
+                        0.0,
+                    )
+                )
             if flags & FLG_RADIANS:
                 out = (
                     math.radians(out[0]),
@@ -7751,12 +7714,47 @@ def _nodaps_sidereal_frame_projection(
             return None
         m_target = m_sidbit
 
-    base_flags = (flags & ~(FLG_SIDEREAL | FLG_J2000 | FLG_RADIANS)) | FLG_NONUT
-    sub = entry_fn(tjd, planet, method, base_flags)
-    m = m_target @ np.asarray(_ecliptic_of_t0_matrix(jd_tt)).T
+    # The sub-request is always SPHERICAL and of-date: the rigid rotation is
+    # defined on that frame. FLG_XYZ and FLG_RADIANS are representations of
+    # the ROTATED result, applied below — leaving FLG_XYZ in the sub-request
+    # returned Cartesian components that _rotate_spherical then read as
+    # (lon, lat, r). FLG_J2000 is likewise a property of the output frame:
+    # the caller's J2000 reduction is composed into the rotation instead of
+    # being taken from the sub-request, whose own J2000 solution is not a
+    # rotation of the of-date one.
+    # Two constructions, selected by the caller's FLG_J2000:
+    #  * without it, the sub-request is the MEAN-OF-DATE set and the rotation
+    #    carries it into the target frame — this is what keeps the node pair
+    #    antipodal;
+    #  * with it, the caller has asked for the J2000 reduction first (the
+    #    reference honours its distance-dependent parallax term there), so
+    #    the sub-request is taken in the J2000 frame and rotated J2000 -> t0.
+    #    Reusing the of-date construction here dropped that reduction and
+    #    left the latitude 74" off at 1900, 274" at 1600.
+    base_flags = (flags & ~(FLG_SIDEREAL | FLG_RADIANS | FLG_XYZ)) | FLG_NONUT
+    if flags & FLG_J2000:
+        sub = entry_fn(tjd, planet, method, base_flags)
+        m = m_target
+    else:
+        sub = entry_fn(tjd, planet, method, base_flags & ~FLG_J2000)
+        m = m_target @ np.asarray(_ecliptic_of_t0_matrix(jd_tt)).T
 
     def _project(pt):
         out = _rotate_spherical(tuple(pt), m)
+        if flags & FLG_XYZ:
+            lon_r = math.radians(out[0])
+            lat_r = math.radians(out[1])
+            cl = math.cos(lat_r)
+            return _to_native_floats(
+                (
+                    out[2] * cl * math.cos(lon_r),
+                    out[2] * cl * math.sin(lon_r),
+                    out[2] * math.sin(lat_r),
+                    0.0,
+                    0.0,
+                    0.0,
+                )
+            )
         if flags & FLG_RADIANS:
             out = (
                 math.radians(out[0]),

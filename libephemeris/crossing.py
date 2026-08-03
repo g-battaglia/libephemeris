@@ -2230,7 +2230,18 @@ def helio_cross(
             )
             if backwards:
                 jd_bracket_start = tjdet - search_window
+                # Strictly-past semantics, as on the UT entry point: step the
+                # endpoint over a root sitting exactly at the start epoch,
+                # and only then. Without this the TT twin returned the start
+                # instant itself for the slowest bodies (Neptune, Pluto: the
+                # reference gives -59805 d and -90007 d), so the two entry
+                # points also disagreed with each other.
                 jd_bracket_end = tjdet
+                _start_res = (lon_start - x2cross + 180.0) % 360.0 - 180.0
+                if abs(_start_res) <= NR_TOLERANCE:
+                    jd_bracket_end -= _backward_start_exclusion(
+                        speed_default, NR_TOLERANCE
+                    )
             else:
                 jd_bracket_start = tjdet
                 jd_bracket_end = tjdet + search_window

@@ -1154,6 +1154,22 @@ class EphemerisContext:
         if _body_uses_jpl_ephemeris(ipl) or _body_uses_jpl_ephemeris(iplctr):
             validate_jd_range(tjd_ut, ipl, "calc_pctr")
 
+        # Sidereal FRAME requests are whole-vector rotations. The module-level
+        # calc_pctr() intercepts them; without the same interception here a
+        # context returned the base sidereal position with identical retflags,
+        # so a caller could not even detect it (measured 1.354 deg of latitude
+        # under SIDBIT_SSY_PLANE). Run the module path under this context's
+        # state so one implementation serves both.
+        from .constants import FLG_SIDEREAL as _FLG_SID
+
+        if iflag & _FLG_SID:
+            from .planets import _swapped_context_state, calc_pctr as _mod_pctr
+            from .time_utils import deltat as _deltat
+
+            _tt = tjd_ut + _deltat(tjd_ut)
+            with _swapped_context_state(self):
+                return _mod_pctr(_tt, ipl, iplctr, iflag)
+
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd_ut)
         # Same flag-normalization/output pipeline as the module-level

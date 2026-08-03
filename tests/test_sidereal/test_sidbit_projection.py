@@ -533,27 +533,29 @@ class TestClassicalEclT0Epochs:
         assert _ecl_t0_epoch_jd(SIDM_BABYL_BRITTON) == pytest.approx(1721057.5)
 
     @pytest.mark.unit
-    def test_aldebaran_15tau_uses_the_babylonian_norm_plane(self):
-        """ALDEBARAN_15TAU (14) projects onto the Babylonian norm epoch -100.
+    def test_aldebaran_15tau_keeps_the_tier_independent_j2000_plane(self):
+        """ALDEBARAN_15TAU (14) stays on the J2000 fallback plane.
 
         Its classical defining plane is the year -100 mean ecliptic (JD
         1684532.5) of the Babylonian normal-star zodiac the mode belongs to
         (C. Fagan, "Zodiacs Old and New", Llewellyn, 1950; P. Huber,
-        Centaurus 5, 1958), the same plane the Kugler family already uses.
-
-        This is a live/dynamic star mode, so the ECL_T0 zero point is
-        evaluated at the plane epoch — which lies outside the base/medium
-        DE440 coverage. That range limit is why an earlier round left the
-        epoch at the J2000 fallback; it is resolved by evaluating the anchor
-        from its catalog direction (``_ecl_t0_zero_point_deg``), so the
-        projection now works in the default tier and the equatorial channel
-        matches the measured reference exactly.
+        Centaurus 5, 1958), the same plane the Kugler family uses. Applying
+        it is blocked by a data-provisioning problem, not a sourcing one:
+        this is a live star-anchored mode, so its ECL_T0 zero point is
+        evaluated AT the plane epoch, and year -100 lies outside the
+        base/medium DE440 coverage. A revision that fell back to a
+        catalog-only anchor there made the same public call return two
+        longitudes 0.79 deg apart on the medium and extended tiers — a
+        worse defect than the divergence it closed. The epoch therefore
+        stays at the J2000 fallback until the zero point can be evaluated
+        tier-independently; the divergence is documented in
+        docs/comparison/known-differences.md.
         """
         from libephemeris.constants import SIDM_ALDEBARAN_15TAU
         from libephemeris.planets import _ECL_T0_CLASSICAL_EPOCHS, _ecl_t0_epoch_jd
 
-        assert SIDM_ALDEBARAN_15TAU in _ECL_T0_CLASSICAL_EPOCHS
-        assert _ecl_t0_epoch_jd(SIDM_ALDEBARAN_15TAU) == pytest.approx(1684532.5)
+        assert SIDM_ALDEBARAN_15TAU not in _ECL_T0_CLASSICAL_EPOCHS
+        assert _ecl_t0_epoch_jd(SIDM_ALDEBARAN_15TAU) == pytest.approx(2451545.0)
 
 
 class TestFixedEpochJ2000Echo:

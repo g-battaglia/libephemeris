@@ -99,19 +99,25 @@ own predicted offset reaches about -0.95 s and is discontinuously reset to
 zero. Neither the switch epoch nor the predicted offset is reconstructed
 from external output; the published CGPM decision fixes ours.
 
-### `SIDBIT_ECL_T0` zero point for the Aldebaran mode
+### `SIDBIT_ECL_T0` plane for the Aldebaran mode
 
 `SIDM_ALDEBARAN_15TAU` is a live star-anchored mode, so its ECL_T0
 *projection plane* and its *value* come from different places. The plane is
 the year −100 mean ecliptic of the Babylonian normal-star zodiac the mode
 belongs to (Huber, Centaurus 5, 1958; Fagan, Zodiacs Old and New, 1950) —
-the same plane already cited for the Kugler family. With that plane the
-equatorial channel matches an external implementation exactly and the
-projected ecliptic latitude to 0.24″. The in-plane zero point still differs
-by about 0.79°: the anchor is evaluated from the catalog direction carried
-to the plane epoch, since the ordinary anchor reduction needs a JPL kernel
-that does not reach year −100, and the external convention for that
-evaluation is not published. No zero-point correction is fitted.
+the same plane already cited for the Kugler family — and with that plane the
+equatorial channel matches an external implementation exactly.
+
+Applying it is nevertheless blocked by data provisioning rather than by
+sourcing. Because the mode's zero point is a live anchor evaluated *at* the
+plane epoch, year −100 must be inside the loaded kernel; it is outside the
+base and medium DE440 tiers. A catalog-only fallback was tried and removed:
+it made the same public call return two longitudes 0.79° apart depending on
+which tier happened to be installed, which is a worse defect than the
+divergence it closed. The mode therefore keeps the J2000 fallback plane on
+every tier, and the resulting difference from an external implementation
+(~2′ in longitude) is bounded and stable. No zero-point correction is
+fitted.
 
 ### `SIDBIT_SSY_PLANE` zero point
 
