@@ -1867,8 +1867,14 @@ def _sidbit_projection_calc(
     # sidereal path echoes via _implied_retflag_bits / fixed_epoch_retflag.
     # sub_rf always carries FLG_NONUT because fixed_epoch_request_flags forces
     # it into the rewritten sub-request.
+    # Drop the J2000 bit the internal rewrite forced on, then restore the
+    # caller's own representation bits — including FLG_J2000 when it was
+    # explicitly requested. Omitting it from this mask made an explicit
+    # SIDEREAL|J2000 projection request echo a retflag 32 lower than the
+    # measured one, on both calc_ut() and calc().
     retflag = _echo_request_bits(
-        (sub_rf & ~FLG_J2000) | (flags & (FLG_SIDEREAL | FLG_RADIANS | FLG_XYZ)),
+        (sub_rf & ~FLG_J2000)
+        | (flags & (FLG_SIDEREAL | FLG_RADIANS | FLG_XYZ | FLG_J2000)),
         raw_flags,
     )
     if tt_echo:

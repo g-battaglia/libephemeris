@@ -164,7 +164,17 @@ def _rotate_spherical(
 
     The rotation is time-independent, so the Cartesian velocity rotates with
     the same matrix as the position.
+
+    An all-zero tuple is the degenerate-origin sentinel (geocentric Earth,
+    heliocentric Sun), not a direction: every rotation of the zero vector is
+    the zero vector, so it passes through untouched. The unit-radius
+    substitution below keeps a *direction* meaningful when only the distance
+    is zero; applied to the sentinel it manufactured a longitude and
+    latitude out of nothing (measured: geocentric Earth under SIDBIT_ECL_T0
+    came back at 336.14 degrees instead of six zeroes).
     """
+    if not any(xx):
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     lon, lat, r, dlon, dlat, dr = xx
     lon_r, lat_r = math.radians(lon), math.radians(lat)
     dlon_r, dlat_r = math.radians(dlon), math.radians(dlat)
