@@ -1221,7 +1221,16 @@ def _calc_ayanamsa_from_leb(
 
         jd_ut = jd_tt - deltat(jd_tt)
         return _calc_ayanamsa(
-            jd_ut, mode, noaberr=noaberr, nogdefl=nogdefl, sid_bits=bits
+            jd_ut,
+            mode,
+            noaberr=noaberr,
+            nogdefl=nogdefl,
+            sid_bits=bits,
+            # Carry the caller's own SIDM_USER anchors: the delegated reducer
+            # otherwise reads the module-level ones, so an unrelated
+            # set_sid_mode() moved a sealed-LEB context by 19.03 degrees.
+            sid_t0=sid_t0,
+            sid_ayan_t0=sid_ayan_t0,
         )
 
     if mode == 255:

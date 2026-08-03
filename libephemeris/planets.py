@@ -6567,6 +6567,8 @@ def _calc_ayanamsa(
     noaberr: bool = False,
     nogdefl: bool = False,
     sid_bits: Optional[int] = None,
+    sid_t0: Optional[float] = None,
+    sid_ayan_t0: Optional[float] = None,
 ) -> float:
     """Calculate the selected predefined mean ayanamsha.
 
@@ -6593,6 +6595,13 @@ def _calc_ayanamsa(
             configuration (the LEB reducer, a delegated context call) pass
             their own so the projection cannot be taken from unrelated global
             state.
+        sid_t0: SIDM_USER reference epoch (JD). ``None`` reads the active
+            one. Same reasoning as ``sid_bits``: a caller with an explicit
+            sidereal configuration must supply its own anchor, otherwise an
+            unrelated module-level ``set_sid_mode()`` moves its result (a
+            sealed-LEB context measured 19.03 degrees of drift).
+        sid_ayan_t0: SIDM_USER ayanamsha value at ``sid_t0`` (degrees), with
+            the same ``None`` semantics.
 
     Returns:
         Mean ayanamsha in degrees, normalized to [0, 360).
@@ -6612,7 +6621,10 @@ def _calc_ayanamsa(
     tjd_tt = float(get_timescale().ut1_jd(tjd_ut).tt)
 
     if sid_mode == SIDM_USER:
-        _, t0, ayan_t0 = get_sid_mode(full=True)
+        if sid_t0 is None or sid_ayan_t0 is None:
+            _, t0, ayan_t0 = get_sid_mode(full=True)
+        else:
+            t0, ayan_t0 = sid_t0, sid_ayan_t0
         if bits & SIDBIT_USER_UT:
             # SIDBIT_USER_UT: the user supplied t0 as a UT date. Convert it to
             # TT (t0 is used below as a TT epoch for the accumulated-precession
@@ -8949,7 +8961,9 @@ def _osculating_from_calc_state(
     )
 
 
-def _calc_orbital_elements_fictitious(t, ipl: int) -> Tuple[float, ...]:
+def _calc_orbital_elements_fictitious(
+    t, ipl: int, orbel_aa: bool = False
+) -> Tuple[float, ...]:
     """Osculating elements for a fictitious/hypothetical body (40-58).
 
     The elements are reduced from the library's *own* runtime model for the
@@ -8961,6 +8975,14 @@ def _calc_orbital_elements_fictitious(t, ipl: int) -> Tuple[float, ...]:
     from the geometric *geocentric* J2000-ecliptic state with GM_earth. Bodies
     the library does not model (e.g. Nibiru 49) raise UnknownBodyError from the
     position pipeline, which propagates.
+
+    ``orbel_aa`` carries FLG_ORBEL_AA through to the shared reducer, exactly
+    as the minor-body path does. Dropping it here made the flag a no-op for
+    every fictitious id, while the heliocentric constructions sit beyond
+    several planetary orbits and therefore have a genuinely different
+    interior-mass sum. The geocentric symbolic points keep GM_earth: the
+    Astronomical Almanac interior-mass convention is defined for
+    heliocentric orbits, and no planet lies interior to an Earth satellite.
     """
     if ipl in _FICT_GEOCENTRIC_IDS:
         GM_earth = _GM_SUN / _SUN_EARTH_MASS_RATIO
@@ -8977,9 +8999,9 @@ def _calc_orbital_elements_fictitious(t, ipl: int) -> Tuple[float, ...]:
         # with a = q = Q. The angular elements are degenerate for e = i = 0, so
         # the of-date reference changes no reported quantity.
         flags = FLG_HELCTR | FLG_NONUT | FLG_TRUEPOS | FLG_SPEED
-        return _osculating_from_calc_state(t, ipl, flags, _GM_SUN)
+        return _osculating_from_calc_state(t, ipl, flags, _GM_SUN, orbel_aa=orbel_aa)
     flags = FLG_HELCTR | FLG_J2000 | FLG_TRUEPOS | FLG_SPEED
-    return _osculating_from_calc_state(t, ipl, flags, _GM_SUN)
+    return _osculating_from_calc_state(t, ipl, flags, _GM_SUN, orbel_aa=orbel_aa)
 
 
 def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
@@ -9020,7 +9042,9 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # White Moon and Waldemath), never a silent zero-element tuple. Unmodeled
     # ids (e.g. Nibiru 49) let the pipeline's typed error propagate.
     if CUPIDO <= ipl <= WALDEMATH:
-        return _calc_orbital_elements_fictitious(t, ipl)
+        return _calc_orbital_elements_fictitious(
+            t, ipl, orbel_aa=bool(iflag & FLG_ORBEL_AA)
+        )
 
     # Get target and center bodies. Every public caller has already passed
     # _validate_orbital_object, so an id missing from the planet map here is
@@ -10453,6 +10477,36 @@ def _calc_pheno_asteroid(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     return (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
 
 
+# Pseudo- and degenerate-body phenomena tuples. Neither id has a physical
+# disc seen from the Earth's centre, so no phase triangle exists for them:
+# EARTH *is* the observer (its geocentric vector is the zero origin), and
+# ECL_NUT is not a body at all — calc() returns nutation and obliquity in its
+# first slots. Feeding either tuple to the geometric pipeline produced
+# invented values (a zero-length vector blew the apparent diameter up to
+# ~1.9e13 degrees under FLG_TRUEPOS, and the nutation angles were read as a
+# longitude/latitude/distance triple).
+#
+# Measured reference behavior, invariant under every flag and date tested:
+# EARTH returns an all-zero tuple with attr[3] = 180.0, and ECL_NUT returns
+# NaN for the phase triplet. The reference's own attr[3] for ECL_NUT
+# alternates between 180.0 and ~1e-10 with no dependence on the nutation
+# values it was computed from, so it is not a documented quantity and is
+# reported as 0.0 here (see docs/comparison/intentional-divergences.md).
+_PHENO_EARTH = (0.0, 0.0, 0.0, 180.0) + (0.0,) * 16
+_PHENO_ECL_NUT = (float("nan"),) * 3 + (0.0,) * 17
+
+
+def _degenerate_pheno(planet: int) -> "Tuple[float, ...] | None":
+    """Fixed phenomena tuple for a body with no phase geometry, else None."""
+    from .constants import ECL_NUT
+
+    if planet == EARTH:
+        return _PHENO_EARTH
+    if planet == ECL_NUT:
+        return _PHENO_ECL_NUT
+    return None
+
+
 def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Universal Time.
@@ -10488,6 +10542,10 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
         >>> print(f"Diameter: {attr[3]:.4f} deg")
         >>> print(f"Magnitude: {attr[4]:.2f}")
     """
+    _degenerate = _degenerate_pheno(planet)
+    if _degenerate is not None:
+        return _degenerate
+
     # --- LEB fast path ---
     from .state import get_leb_reader
 
@@ -10528,6 +10586,10 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
     See Also:
         pheno_ut: Same function for Universal Time input
     """
+    _degenerate = _degenerate_pheno(planet)
+    if _degenerate is not None:
+        return _degenerate
+
     # --- LEB fast path ---
     from .state import get_leb_reader
 

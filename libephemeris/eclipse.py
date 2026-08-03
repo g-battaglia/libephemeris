@@ -7573,6 +7573,28 @@ def _rise_trans_true_hor_impl(
         planet = -1
     else:
         planet = cast(int, body)
+        from .constants import ECL_NUT as _ECL_NUT
+
+        if planet in (EARTH, _ECL_NUT):
+            # Neither id denotes a direction in the sky, so no horizon event
+            # exists: EARTH *is* the observer (calc_ut returns the zero
+            # coordinate origin) and ECL_NUT is not a body at all (its first
+            # slots carry nutation and obliquity). Feeding either tuple to
+            # azalt would manufacture a location-dependent rise/set from
+            # data that is not a direction.
+            #
+            # The measured external value is not reproducible: it returns
+            # tjd_start + 0.083333254 days for both ids at every latitude
+            # tested, rise and set identical — an internal sentinel, not an
+            # astronomical result, and encoding that constant would be
+            # reconstructing output. Fail explicitly instead, as this library
+            # does for every other degenerate self-request.
+            from .exceptions import Error as _Error
+
+            raise _Error(
+                "rise/set/transit is undefined for body %d: it has no "
+                "apparent direction in the sky." % planet
+            )
         if planet not in _PLANET_MAP and not use_calc_body:
             # Defensive only: an out-of-map body is validated up front (it sets
             # use_calc_body, and an unplaceable id already raised the unified

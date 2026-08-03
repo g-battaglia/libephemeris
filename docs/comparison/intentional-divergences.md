@@ -135,6 +135,26 @@ reproduced from external implementations:
   finite-difference derivative of its reported cusps here as well; the
   external analytic rule is not reproduced.
 
+## Pseudo- and degenerate-body requests fail or report undefined
+
+`EARTH` is the observer, not a target seen from Earth, and `ECL_NUT` is not a
+body at all — `calc()` returns nutation and obliquity in its first slots.
+Neither has an apparent direction or a phase triangle.
+
+- `pheno`/`pheno_ut` return the measured fixed tuples: all zeros with
+  `attr[3] = 180.0` for `EARTH`, and NaN for the phase triplet of `ECL_NUT`.
+  The external `attr[3]` for `ECL_NUT` alternates between 180.0 and ~1e-10
+  across dates with no dependence on the nutation values it was computed
+  from, so it is not a documented quantity and is reported as 0.0.
+- `rise_trans` raises the typed error instead of returning a time. The
+  external implementation returns `tjd_start + 0.083333254` days for both
+  ids — identical at every latitude tested including the equator, with rise
+  equal to set — which is an internal sentinel rather than an astronomical
+  result. Encoding that constant would be reconstructing output, and
+  computing a horizon event from data that is not a direction would invent
+  one: a zero-length vector had produced an apparent diameter of ~1.9e13
+  degrees on the phenomena path before these guards.
+
 ## The JPL-Horizons flags are consumed, not echoed
 
 `FLG_JPLHOR` and `FLG_JPLHOR_APPROX` select a JPL-Horizons-consistent

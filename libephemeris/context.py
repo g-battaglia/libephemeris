@@ -779,16 +779,27 @@ class EphemerisContext:
                 and (not (iflag & FLG_EQUATORIAL) or (_bits & SIDBIT_ECL_T0))
                 and self.sidereal_mode not in _SIDBIT_PROJECTION_SUPPRESS_MODES
             ):
-                return _sidbit_projection_calc(
-                    tjd,
-                    ipl,
-                    iflag,
-                    raw_iflag,
-                    self.sidereal_mode,
-                    _bits,
-                    (self.calc_ut if ut else self.calc),
-                    tt_echo=not ut,
-                )
+                # Run under the context state swap: the projection resolves
+                # the SIDM_USER epoch and the mode's zero point through the
+                # module-level sidereal globals, so passing only the mode and
+                # the bits let an unrelated module-level set_sid_mode() move
+                # this context's result by tens of degrees (measured 19.03
+                # deg for SIDM_USER | SIDBIT_ECL_T0). The lock is reentrant,
+                # so the nested self.calc_ut()/self.calc() sub-request swaps
+                # the same values again harmlessly.
+                from .planets import _swapped_context_state
+
+                with _swapped_context_state(self):
+                    return _sidbit_projection_calc(
+                        tjd,
+                        ipl,
+                        iflag,
+                        raw_iflag,
+                        self.sidereal_mode,
+                        _bits,
+                        (self.calc_ut if ut else self.calc),
+                        tt_echo=not ut,
+                    )
 
         # Built-in asteroids by AST_OFFSET number (see module calc_ut)
         ipl = _remap_ast_offset(ipl)
