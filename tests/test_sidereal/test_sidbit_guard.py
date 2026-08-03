@@ -1,14 +1,14 @@
 """
 Tests for the SIDBIT projection-flag handling.
 
-The implemented projection flags SIDBIT_ECL_T0, SIDBIT_SSY_PLANE and
-SIDBIT_USER_UT are applied by the module-level setter (they are retained and
-consumed by the sidereal path). The remaining defined projection flags
-(SIDBIT_ECL_DATE, SIDBIT_NO_PREC_OFFSET, SIDBIT_PREC_ORIG) are accepted
-silently for compatibility -- no warning, matching the reference -- but
-currently reduce to the base ayanamsha value. Only a genuinely unknown high bit
-still strips-and-warns. EphemerisContext strips every projection flag (it does
-not carry them).
+The implemented projection flags SIDBIT_ECL_T0, SIDBIT_SSY_PLANE,
+SIDBIT_USER_UT and SIDBIT_ECL_DATE are applied by the setters (they are
+retained and consumed by the sidereal path). The remaining defined projection
+flags (SIDBIT_NO_PREC_OFFSET, SIDBIT_PREC_ORIG) are accepted silently for
+compatibility -- no warning, matching the reference -- but currently reduce to
+the base ayanamsha value. Only a genuinely unknown high bit still
+strips-and-warns. EphemerisContext splits a composite the same way, keeping the
+implemented flags per-instance so they neither leak from nor into module state.
 """
 
 from __future__ import annotations
@@ -201,15 +201,16 @@ def test_user_mode_preserved():
 # EphemerisContext parity with the module setter
 # =============================================================================
 #
-# EphemerisContext.set_sid_mode() must apply the identical SIDBIT strip-and-warn
-# guard as state.set_sid_mode(); otherwise ctx.get_sid_mode() would report the
-# raw composite (e.g. 257 instead of 1) even though the two stores must stay in
-# lockstep (known-differences 10.3).
+# EphemerisContext.set_sid_mode() must split a composite exactly like the
+# module-level setter: the implemented projection flags are kept per-context in
+# ctx.sidereal_bits, the base mode is stored on its own so ctx.get_sid_mode()
+# stays in lockstep with state.get_sid_mode() (never the raw composite, e.g.
+# 257 instead of 1), and only genuinely unsupported high bits warn.
 
 
 @pytest.mark.unit
-def test_context_strips_sidbit_and_warns():
-    """Context set_sid_mode strips SIDBIT flags, warns, and stores the base mode."""
+def test_context_applies_implemented_sidbit_without_warning():
+    """An implemented SIDBIT is stored per-context, not dropped."""
     from libephemeris.context import EphemerisContext
 
     ctx = EphemerisContext()
@@ -217,7 +218,38 @@ def test_context_strips_sidbit_and_warns():
         warnings.simplefilter("always")
         ctx.set_sid_mode(ephem.SIDM_FAGAN_BRADLEY | ephem.SIDBIT_ECL_T0)
     assert ctx.get_sid_mode() == ephem.SIDM_FAGAN_BRADLEY
-    assert any(issubclass(w.category, UserWarning) for w in caught)
+    assert ctx.sidereal_bits == ephem.SIDBIT_ECL_T0
+    assert not caught
+
+
+@pytest.mark.unit
+def test_context_sidereal_bits_isolated_from_module_state():
+    """A module-level projection flag must not reach a context calculation."""
+    from libephemeris.context import EphemerisContext
+
+    jd = 2460000.5
+    ctx = EphemerisContext()
+    ctx.set_sid_mode(ephem.SIDM_LAHIRI)
+    try:
+        clean = ctx.calc_ut(jd, ephem.MARS, ephem.FLG_SIDEREAL)[0][0]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            ephem.set_sid_mode(ephem.SIDM_LAHIRI | ephem.SIDBIT_ECL_DATE)
+        polluted = ctx.calc_ut(jd, ephem.MARS, ephem.FLG_SIDEREAL)[0][0]
+        assert clean == polluted
+    finally:
+        ephem.reset_session()
+
+
+@pytest.mark.unit
+def test_reset_session_clears_the_projection_flags():
+    """reset_session() must clear the SIDBITs with the mode they qualify."""
+    from libephemeris import state
+
+    ephem.set_sid_mode(ephem.SIDM_FAGAN_BRADLEY | ephem.SIDBIT_ECL_T0)
+    assert state._SIDEREAL_BITS == ephem.SIDBIT_ECL_T0
+    ephem.reset_session()
+    assert state._SIDEREAL_BITS == 0
 
 
 @pytest.mark.unit

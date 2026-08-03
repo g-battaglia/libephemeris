@@ -127,6 +127,10 @@ class EphemerisContext:
         self.sidereal_mode: int = 0  # Default: Fagan/Bradley (SIDM_FAGAN_BRADLEY)
         self.sidereal_t0: float = 2451545.0  # J2000.0
         self.sidereal_ayan_t0: float = 0.0
+        # SIDBIT projection flags qualifying sidereal_mode, per-context like
+        # the mode itself and installed globally only for the duration of a
+        # context call (planets._swapped_context_state).
+        self.sidereal_bits: int = 0
         self._angles_cache: dict[str, float] = {}
         self._spk_body_map: dict[
             int, tuple[str, int]
@@ -346,16 +350,29 @@ class EphemerisContext:
             Affects all position calculations when FLG_SIDEREAL is set.
             The default public ID is Fagan/Bradley (SIDM_FAGAN_BRADLEY = 0).
             Every predefined base mode 0--46 has a runtime definition.
+            The implemented SIDBIT projection flags are stored per-context and
+            applied exactly as by the module-level setter; genuinely
+            unsupported high bits still warn and reduce to the base mode.
         """
-        # Apply the same SIDBIT guard as the global setter (state.set_sid_mode):
-        # strip the SIDBIT_* projection flags (>= 256: ECL_T0, SSY_PLANE,
-        # USER_UT, ECL_DATE, NO_PREC_OFFSET, PREC_ORIG), which select
-        # alternative ecliptic/equinox projections not implemented here.
-        # Keeping only the base ayanamsha mode avoids the silent wrong
-        # fallback the composite value would otherwise trigger downstream
-        # (and the LEB fast-path miss it causes). Warn so the caller knows
-        # the projection was dropped rather than applied.
-        sidbits = mode & ~0xFF
+        # Same split as the module-level setter (planets.set_sid_mode): the
+        # implemented SIDBIT projection flags are kept per-context in
+        # sidereal_bits and installed globally only for the duration of a
+        # context call, while the base ayanamsha mode is stored on its own so
+        # get_sid_mode() reports it in lockstep with state.get_sid_mode().
+        # Stripping every high bit here instead made the context strictly less
+        # capable than the module API for flags this version does implement.
+        from .planets import _IMPLEMENTED_SIDBITS
+
+        if mode >= 0:
+            self.sidereal_bits = mode & _IMPLEMENTED_SIDBITS
+            mode = mode & ~_IMPLEMENTED_SIDBITS
+        else:
+            # A negative mode is an invalid ID, not a SIDBIT composite: its
+            # all-ones two's-complement pattern would otherwise enable every
+            # projection bit. Leave it verbatim for the invalid-mode fallback.
+            self.sidereal_bits = 0
+
+        sidbits = (mode & ~0xFF) if mode >= 0 else 0
         if sidbits:
             warnings.warn(
                 f"SIDBIT projection flags 0x{sidbits:04X} are not supported in "
@@ -826,6 +843,11 @@ class EphemerisContext:
                     sid_mode=self.sidereal_mode,
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
+                    # The projection flags must travel with the mode they
+                    # qualify: left to the process-global value, this
+                    # explicitly-configured call still read whatever the last
+                    # module-level set_sid_mode() left behind.
+                    sid_bits=self.sidereal_bits,
                     topo=_ctx_topo,
                 )
                 from .logging_config import get_logger

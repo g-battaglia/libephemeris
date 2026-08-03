@@ -65,7 +65,7 @@ from collections.abc import Iterator
 
 import math
 import warnings
-from typing import Tuple, TYPE_CHECKING
+from typing import Optional, Tuple, TYPE_CHECKING
 
 from .tracing import (
     _is_active,
@@ -1757,6 +1757,7 @@ def _sidbit_projection_calc(
     sid_mode: int,
     sid_bits: int,
     calc_fn,
+    tt_echo: bool = False,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Compute a SIDBIT-projected *ecliptic* sidereal position.
 
@@ -1778,6 +1779,12 @@ def _sidbit_projection_calc(
     retflag echo. Equatorial output under SIDBIT_SSY_PLANE alone keeps the
     base behavior (the invariable-plane projection leaves the equator
     unchanged); the callers' guard routes only ECL_T0 equatorial here.
+
+    ``tt_echo`` applies the calc()-vs-calc_ut() ephemeris-bit echo rule to
+    the returned retflag. The internal sub-request always carries the
+    defaulted FLG_SWIEPH, so without it a TT projection echoed that bit even
+    when the caller passed none (65602 instead of 65600), breaking the echo
+    contract every other calc() path follows.
     """
     from .sidereal_epoch import (
         fixed_epoch_request_flags,
@@ -1799,10 +1806,10 @@ def _sidbit_projection_calc(
         xx_eq = transform_equatorial_epoch_result(
             sub_xx, flags, _ecl_t0_epoch_jd(sid_mode)
         )
-        return (
-            _to_native_floats(xx_eq),
-            _echo_request_bits(fixed_epoch_retflag(sub_rf, flags), raw_flags),
-        )
+        eq_retflag = _echo_request_bits(fixed_epoch_retflag(sub_rf, flags), raw_flags)
+        if tt_echo:
+            eq_retflag = _calc_tt_epheflag_echo(eq_retflag, raw_flags)
+        return (_to_native_floats(xx_eq), eq_retflag)
 
     # Measured reference behavior: with BOTH projection bits set,
     # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE.
@@ -1829,6 +1836,8 @@ def _sidbit_projection_calc(
         (sub_rf & ~FLG_J2000) | (flags & (FLG_SIDEREAL | FLG_RADIANS | FLG_XYZ)),
         raw_flags,
     )
+    if tt_echo:
+        retflag = _calc_tt_epheflag_echo(retflag, raw_flags)
     return (_to_native_floats(xx), retflag)
 
 
@@ -2297,7 +2306,7 @@ def calc(
             and _sidm not in _SIDBIT_PROJECTION_SUPPRESS_MODES
         ):
             return _sidbit_projection_calc(
-                tjdet, planet, flags, raw_flags, _sidm, _bits, calc
+                tjdet, planet, flags, raw_flags, _sidm, _bits, calc, tt_echo=True
             )
 
     # Built-in asteroids by AST_OFFSET number (see calc_ut)
@@ -4384,8 +4393,27 @@ def _calc_body(
         is_j2000 = bool(iflag & FLG_J2000)
         is_sidereal = bool(iflag & FLG_SIDEREAL)
 
+        # Same apparent-place contract as the other predicted planets: the
+        # body is taken at the retarded epoch and, geocentrically, the
+        # direction is corrected for the observer's barycentric velocity.
+        # FLG_TRUEPOS asks for the geometric place and drops both terms;
+        # FLG_NOABERR drops the aberration alone. Speed of light in AU/day,
+        # the shared NOVAS/Skyfield C_AUDAY realization.
+        _C_AU_DAY = 173.1446326846693
+        _tp_truepos = bool(iflag & FLG_TRUEPOS)
+        _tp_noaberr = bool(iflag & (FLG_TRUEPOS | FLG_NOABERR))
+
+        def _transpluto_light_time(jd: float) -> float:
+            """Sun-to-body light time in days (0 for a geometric request)."""
+            if _tp_truepos:
+                return 0.0
+            lt = 0.0
+            for _ in range(3):
+                lt = float(hypothetical.calc_transpluto(jd - lt)[2]) / _C_AU_DAY
+            return lt
+
         if is_helio:
-            pos = hypothetical.calc_transpluto(jd_tt)
+            pos = hypothetical.calc_transpluto(jd_tt - _transpluto_light_time(jd_tt))
             lon, lat, dist = pos[0], pos[1], pos[2]
             dlon, dlat, ddist = pos[3], pos[4], pos[5]
             # Zero the speed slots when FLG_SPEED is absent (reference API
@@ -4418,25 +4446,54 @@ def _calc_body(
             return _to_native_floats(result), iflag
 
         # Geocentric conversion
-        def _get_transpluto_geo_j2000(jd):
-            """Geocentric J2000 ecliptic position for Transpluto."""
+        def _transpluto_helio_xyz(jd: float) -> Tuple[float, float, float]:
+            """Heliocentric J2000-ecliptic cartesian position (AU)."""
             h = hypothetical.calc_transpluto(jd)
             lon_r = math.radians(h[0])
             lat_r = math.radians(h[1])
             cl = math.cos(lat_r)
-            xh = h[2] * cl * math.cos(lon_r)
-            yh = h[2] * cl * math.sin(lon_r)
-            zh = h[2] * math.sin(lat_r)
+            return (
+                h[2] * cl * math.cos(lon_r),
+                h[2] * cl * math.sin(lon_r),
+                h[2] * math.sin(lat_r),
+            )
 
+        def _get_transpluto_geo_j2000(jd):
+            """Geocentric J2000-ecliptic apparent position for Transpluto.
+
+            Standard apparent-place reduction (Explanatory Supplement to the
+            Astronomical Almanac, 3rd ed. 2013, ch. 7): retarded target plus
+            annual aberration, both suppressed for a geometric request. The
+            purely geometric reduction used before left the place short by
+            the ~20" aberration and made FLG_TRUEPOS a no-op here.
+            """
             ts_i = get_timescale()
             t_i = ts_i.tt_jd(jd)
             earth_h = planets["sun"].at(t_i).observe(planets["earth"])
             exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
+            ex, ey, ez = float(exyz[0]), float(exyz[1]), float(exyz[2])
 
-            xg = xh - float(exyz[0])
-            yg = yh - float(exyz[1])
-            zg = zh - float(exyz[2])
+            lt = 0.0
+            xg = yg = zg = 0.0
+            for _ in range(3):
+                xh, yh, zh = _transpluto_helio_xyz(jd - lt)
+                xg, yg, zg = xh - ex, yh - ey, zh - ez
+                if _tp_truepos:
+                    break
+                lt = math.sqrt(xg * xg + yg * yg + zg * zg) / _C_AU_DAY
+
             rg = math.sqrt(xg * xg + yg * yg + zg * zg)
+            if not _tp_noaberr and rg > 0.0:
+                evel = (
+                    planets["earth"]
+                    .at(t_i)
+                    .frame_xyz_and_velocity(ecliptic_J2000_frame)[1]
+                    .au_per_d
+                )
+                xg += float(evel[0]) * rg / _C_AU_DAY
+                yg += float(evel[1]) * rg / _C_AU_DAY
+                zg += float(evel[2]) * rg / _C_AU_DAY
+                rg = math.sqrt(xg * xg + yg * yg + zg * zg)
             lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
             sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
             lat_g = math.degrees(math.asin(sin_lat))
@@ -4546,6 +4603,34 @@ def _calc_body(
                 def _calc_helio(jd, _ipl=ipl):
                     return hypothetical.calc_fictitious_position(_ipl, jd)
 
+            # FLG_TRUEPOS asks for the TRUE (geometric) position: the body
+            # where it actually is at the request epoch, not where it is seen
+            # from. For these analytically propagated bodies the only
+            # light-path term the model carries is the light-time
+            # retardation, so TRUEPOS simply evaluates the orbit at jd
+            # instead of at jd - light-time. Measured against the reference,
+            # FLG_NOABERR and FLG_NOGDEFL leave this path unchanged (no
+            # separate observer-motion or deflection term exists here), and
+            # TRUEPOS changes the geocentric longitude by several arcseconds
+            # (e.g. ~18" for the outer predicted planets, whose light-time is
+            # about half a day) and the heliocentric one by the Sun-to-body
+            # light-time.
+            _truepos = bool(iflag & FLG_TRUEPOS)
+
+            def _helio_light_time_days(jd: float) -> float:
+                """Sun-to-body light time in days at ``jd`` (0 under TRUEPOS).
+
+                Iterated like the geocentric case: the heliocentric distance
+                is itself evaluated at the retarded epoch. Two passes are
+                ample — these orbits move well under a degree per day.
+                """
+                if _truepos:
+                    return 0.0
+                lt = 0.0
+                for _ in range(3):
+                    lt = float(_calc_helio(jd - lt)[2]) / _C_AU_DAY
+                return lt
+
             def _helio_xyz_j2000(jd: float) -> Tuple[float, float, float]:
                 """Heliocentric J2000-ecliptic cartesian position (AU)."""
                 h = _calc_helio(jd)
@@ -4567,23 +4652,59 @@ def _calc_body(
                     h[2] * math.sin(lat_r),
                 )
 
+            # Annual aberration is suppressed by FLG_TRUEPOS (geometric
+            # place) and by FLG_NOABERR (its documented purpose). The
+            # library applies the same rule to every other body, so these
+            # analytic models follow the shared contract rather than
+            # carrying a second one.
+            _noaberr = bool(iflag & (FLG_TRUEPOS | FLG_NOABERR))
+
             def _geo_of_date(jd: float) -> Tuple[float, float, float]:
-                """Geocentric mean-ecliptic-of-date spherical position."""
+                """Geocentric mean-ecliptic-of-date apparent position.
+
+                Standard apparent-place reduction (Explanatory Supplement to
+                the Astronomical Almanac, 3rd ed. 2013, ch. 7): the body is
+                taken at the retarded epoch (light time) and the direction is
+                corrected for the observer's barycentric velocity (annual
+                aberration, up to ~20.5"). Both terms are suppressed for a
+                geometric request; without the aberration term the geocentric
+                place was short by that ~20" and FLG_TRUEPOS had almost
+                nothing to remove.
+                """
                 ts_i = get_timescale()
                 t_i = ts_i.tt_jd(jd)
                 earth_h = planets["sun"].at(t_i).observe(planets["earth"])
                 exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
                 ex, ey, ez = float(exyz[0]), float(exyz[1]), float(exyz[2])
 
-                # Light-time iteration: target retarded, observer fixed
+                # Light-time iteration: target retarded, observer fixed.
+                # Under FLG_TRUEPOS the retardation is suppressed and the
+                # body is taken at the request epoch (geometric position).
                 lt = 0.0
                 xg = yg = zg = 0.0
                 for _ in range(3):
                     bx, by, bz = _helio_xyz_j2000(jd - lt)
                     xg, yg, zg = bx - ex, by - ey, bz - ez
+                    if _truepos:
+                        break
                     lt = math.sqrt(xg * xg + yg * yg + zg * zg) / _C_AU_DAY
 
                 rg = math.sqrt(xg * xg + yg * yg + zg * zg)
+                if not _noaberr and rg > 0.0:
+                    # First-order annual aberration: shift the geometric
+                    # direction by the observer's barycentric velocity over c
+                    # (v/c ~ 1e-4, so higher-order terms stay below a
+                    # milliarcsecond and well under this path's model error).
+                    evel = (
+                        planets["earth"]
+                        .at(t_i)
+                        .frame_xyz_and_velocity(ecliptic_J2000_frame)[1]
+                        .au_per_d
+                    )
+                    xg += float(evel[0]) * rg / _C_AU_DAY
+                    yg += float(evel[1]) * rg / _C_AU_DAY
+                    zg += float(evel[2]) * rg / _C_AU_DAY
+                    rg = math.sqrt(xg * xg + yg * yg + zg * zg)
                 lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
                 sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
                 lat_g = math.degrees(math.asin(sin_lat))
@@ -4592,7 +4713,10 @@ def _calc_body(
                 return lon_g, lat_g, rg
 
             if iflag & FLG_HELCTR:
-                pos = _calc_helio(jd_tt)
+                # Apparent heliocentric place: the body as seen from the Sun,
+                # i.e. evaluated at jd - (Sun-to-body light time). TRUEPOS
+                # zeroes that light time and yields the geometric place.
+                pos = _calc_helio(jd_tt - _helio_light_time_days(jd_tt))
                 if ipl in _FICT_HELIO_IDS:
                     # calc_fictitious_position returns J2000 ecliptic for the
                     # predicted planets; precess to the mean ecliptic of date so
@@ -5383,12 +5507,18 @@ def _swapped_context_state(ctx):
             state._SIDEREAL_MODE,
             state._SIDEREAL_T0,
             state._SIDEREAL_AYAN_T0,
+            state._SIDEREAL_BITS,
             state._ANGLES_CACHE,
         )
         state._TOPO = ctx.topo
         state._SIDEREAL_MODE = ctx.sidereal_mode
         state._SIDEREAL_T0 = ctx.sidereal_t0
         state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
+        # The SIDBIT projection flags qualify the mode above, so they must
+        # travel with it: left on the module value, a module-level
+        # set_sid_mode(mode | SIDBIT_ECL_DATE) changed this context's result
+        # despite the context carrying its own sidereal configuration.
+        state._SIDEREAL_BITS = ctx.sidereal_bits
         state._ANGLES_CACHE = ctx._angles_cache
         try:
             yield
@@ -5398,6 +5528,7 @@ def _swapped_context_state(ctx):
                 state._SIDEREAL_MODE,
                 state._SIDEREAL_T0,
                 state._SIDEREAL_AYAN_T0,
+                state._SIDEREAL_BITS,
                 state._ANGLES_CACHE,
             ) = saved
 
@@ -6324,6 +6455,7 @@ def _calc_ayanamsa(
     sid_mode: int,
     noaberr: bool = False,
     nogdefl: bool = False,
+    sid_bits: Optional[int] = None,
 ) -> float:
     """Calculate the selected predefined mean ayanamsha.
 
@@ -6344,10 +6476,17 @@ def _calc_ayanamsa(
             point for the modes in ``_ABERRANT_ANCHOR_MODES``. Inert for every
             other mode. FLG_TRUEPOS sets both toggles, yielding the geometric
             anchor.
+        sid_bits: SIDBIT projection flags to apply. ``None`` reads the active
+            ones (``_get_sidereal_bits()``), which is what the module-level
+            entry points want; callers holding an explicit sidereal
+            configuration (the LEB reducer, a delegated context call) pass
+            their own so the projection cannot be taken from unrelated global
+            state.
 
     Returns:
         Mean ayanamsha in degrees, normalized to [0, 360).
     """
+    bits = _get_sidereal_bits() if sid_bits is None else sid_bits
     # Strip positive SIDBIT projection flags (>= 256) to recover the base mode,
     # but never mask a negative mode: -1 & 0xFF == 255 (SIDM_USER) would turn
     # an invalid ID into a valid one. Negatives fall through to the invalid-mode
@@ -6363,7 +6502,7 @@ def _calc_ayanamsa(
 
     if sid_mode == SIDM_USER:
         _, t0, ayan_t0 = get_sid_mode(full=True)
-        if _get_sidereal_bits() & SIDBIT_USER_UT:
+        if bits & SIDBIT_USER_UT:
             # SIDBIT_USER_UT: the user supplied t0 as a UT date. Convert it to
             # TT (t0 is used below as a TT epoch for the accumulated-precession
             # baseline), so the ayanamsha is anchored on a single timescale.
@@ -6372,7 +6511,7 @@ def _calc_ayanamsa(
 
             t0 = t0 + deltat(t0)
         value = ayan_t0 + method_b_accumulated_precession(tjd_tt, t0)
-        if _get_sidereal_bits() & SIDBIT_ECL_DATE:
+        if bits & SIDBIT_ECL_DATE:
             # Refer the fixed zero point to the mean ecliptic of date instead
             # of the mean ecliptic of t0 (see _ecl_date_ayanamsha_delta).
             value += _ecl_date_ayanamsha_delta(ayan_t0, t0, tjd_tt)
@@ -6516,7 +6655,7 @@ def _calc_ayanamsa(
             value = VALENS_MOON_AYAN_T0_DEG + method_b_accumulated_precession(
                 tjd_tt, defining_epoch_tt
             )
-            if _get_sidereal_bits() & SIDBIT_ECL_DATE:
+            if bits & SIDBIT_ECL_DATE:
                 # Valens is an epoch-pair mode (it lives on this branch only
                 # for its UT-anchored epoch), so the ecliptic-of-date
                 # projection applies to it like to every defining pair.
@@ -6546,7 +6685,7 @@ def _calc_ayanamsa(
     # from secondary attributions and explicit project conventions.
     defining_value, defining_epoch = AYANAMSHA_DEFINING[sid_mode]
     value = defining_value + method_b_accumulated_precession(tjd_tt, defining_epoch)
-    if _get_sidereal_bits() & SIDBIT_ECL_DATE:
+    if bits & SIDBIT_ECL_DATE:
         # SIDBIT_ECL_DATE: refer the mode's fixed zero point to the mean
         # ecliptic of date instead of its defining mean ecliptic (Vondrák
         # 2011 pole geometry; see _ecl_date_ayanamsha_delta). Live star and
@@ -6669,15 +6808,17 @@ _ACCEPTED_SIDBITS = SIDBIT_NO_PREC_OFFSET | SIDBIT_PREC_ORIG
 # state.set_sid_mode(), which strips-and-warns genuinely unknown high bits.
 _IMPLEMENTED_SIDBITS = _APPLIED_SIDBITS | _ACCEPTED_SIDBITS
 
-# The SIDBIT projection flags carried by the last public set_sid_mode() call.
-# Module-global (matching the module-global sidereal mode in state.py); the
-# EphemerisContext/Horizons thread-safe callers do not exercise SIDBITs.
-_SIDEREAL_BITS = 0
-
 
 def _get_sidereal_bits() -> int:
-    """Return the implemented SIDBIT projection flags currently in effect."""
-    return _SIDEREAL_BITS
+    """Return the implemented SIDBIT projection flags currently in effect.
+
+    The value lives in ``state._SIDEREAL_BITS``, beside the sidereal mode and
+    epoch it qualifies, so that ``reset_session()``/``close()`` clear it with
+    them and ``_swapped_context_state()`` swaps it for an EphemerisContext.
+    """
+    from . import state
+
+    return state._SIDEREAL_BITS
 
 
 def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
@@ -6711,11 +6852,11 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
         >>> # Custom ayanamsa: 24° at J2000.0, precessing at standard rate
         >>> set_sid_mode(SIDM_USER, t0=2451545.0, ayan_t0=24.0)
     """
+    from . import state
     from .state import set_sid_mode
 
-    global _SIDEREAL_BITS
     if mode >= 0:
-        _SIDEREAL_BITS = mode & _IMPLEMENTED_SIDBITS
+        state._SIDEREAL_BITS = mode & _IMPLEMENTED_SIDBITS
         # Forward the base mode plus any still-unsupported projection bits to
         # the state setter, which strips-and-warns for those remaining bits.
         base_mode = mode & ~_IMPLEMENTED_SIDBITS
@@ -6725,7 +6866,7 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
         # two's-complement pattern) would spuriously enable ECL_T0/SSY_PLANE/
         # USER_UT and the `& ~bits` would map it onto a positive base. Pass it
         # through verbatim so the reducer applies the invalid-mode fallback.
-        _SIDEREAL_BITS = 0
+        state._SIDEREAL_BITS = 0
         base_mode = mode
     set_sid_mode(base_mode, t0, ayan_t0)
 

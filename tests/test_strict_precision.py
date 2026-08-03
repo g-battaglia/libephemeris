@@ -112,19 +112,29 @@ class TestSPKRequiredError:
     """Test SPKRequiredError exception.
 
     Strict mode refuses the Keplerian fallback only when NO better source
-    exists. ASSIST (local N-body data) is such a source, so these tests
-    disable it to exercise the genuine "no source at all" raise path
-    deterministically -- independent of whether ASSIST data happens to be
-    installed on the machine running the suite.
+    exists. ASSIST (local N-body data) and the LEB asteroid channels are
+    both such sources, so these tests disable each of them to exercise the
+    genuine "no source at all" raise path deterministically -- independent
+    of whether ASSIST data or an LEB artifact happens to be installed on the
+    machine running the suite.
     """
 
     @pytest.fixture(autouse=True)
     def _no_assist(self):
-        with patch(
-            "libephemeris.rebound_integration.check_assist_data_available",
-            return_value=False,
-        ):
-            yield
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        saved_mode = get_calc_mode()
+        # "skyfield" makes get_leb_reader() return None, so the LEB asteroid
+        # channels cannot serve the request and satisfy strict mode.
+        set_calc_mode("skyfield")
+        try:
+            with patch(
+                "libephemeris.rebound_integration.check_assist_data_available",
+                return_value=False,
+            ):
+                yield
+        finally:
+            set_calc_mode(saved_mode)
 
     def test_error_raised_for_chiron_without_spk(self):
         """Chiron without SPK should raise SPKRequiredError in strict mode."""

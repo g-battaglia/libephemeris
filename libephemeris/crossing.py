@@ -416,6 +416,29 @@ def _nearest_past_helio_crossing(
     return jd_newton
 
 
+def _backward_start_exclusion(rate_deg_day: float, tolerance: float) -> float:
+    """Days to exclude before the start epoch in a backward crossing search.
+
+    Backward semantics are strictly-past: a root AT the start epoch is not a
+    valid answer (measured reference behavior returns the crossing a full
+    revolution earlier). Since the search brackets end exactly at the start,
+    a target equal to the body's current longitude leaves a root on that
+    endpoint, and the refinement converges straight back onto it.
+
+    The exclusion is sized from the body's own rate so it removes the endpoint
+    root without hiding a genuine distinct crossing: heliocentric longitude is
+    monotonic, so the nearest true past crossing is a whole revolution away,
+    while a few multiples of the convergence tolerance are all that is needed
+    to leave the endpoint's basin. A fixed 1e-6 day offset is too small for a
+    slow body (Pluto moves ~4e-9 deg in that time, far below the 0.001"
+    tolerance) and let the search return the start epoch itself.
+    """
+    rate = abs(rate_deg_day)
+    if rate <= 1e-9:
+        return 1.0
+    return max(1e-6, 10.0 * tolerance / rate)
+
+
 def _helio_cross_bracketed(
     get_position_func: Callable[[float], Tuple[float, float]],
     x2cross: float,
@@ -438,12 +461,27 @@ def _helio_cross_bracketed(
     period_days = 360.0 / mean_rate_deg_day if mean_rate_deg_day > 1e-9 else 720.0
     window = 3.0 * period_days
     num_samples = max(120, min(4000, int(window / 15.0)))
+
+    if not backwards:
+        # Forward semantics include a root AT the start instant — the same
+        # "no forward dead-band" contract the in-table path documents, and the
+        # measured reference behavior (a body exactly on the target crosses
+        # now, not one revolution later). A bracket opened at tjd + 1e-6 has
+        # no sign change across that root, so the scan silently returned the
+        # next revolution for every out-of-table body (Chiron: ~18,400 days
+        # late). Backward semantics are exclusive of the start, so this test
+        # is forward-only.
+        lon_start, _ = get_position_func(tjd)
+        start_residual = (lon_start - x2cross + 180.0) % 360.0 - 180.0
+        if abs(start_residual) <= NR_TOLERANCE:
+            return tjd
+
     if backwards:
         jd_a, jd_b = _find_bracket_for_crossing(
             get_position_func,
             x2cross,
             tjd - window,
-            tjd - 1e-6,
+            tjd - _backward_start_exclusion(mean_rate_deg_day, NR_TOLERANCE),
             num_samples=num_samples,
             from_end=True,
         )
@@ -1917,7 +1955,14 @@ def helio_cross_ut(
             )
             if backwards:
                 jd_bracket_start = tjdut - search_window
-                jd_bracket_end = tjdut
+                # Strictly-past semantics: keep the endpoint off a root sitting
+                # exactly at the start epoch, which the refinement would
+                # otherwise converge straight back onto (measured: a target
+                # equal to the body's current heliocentric longitude must
+                # return the crossing one revolution earlier).
+                jd_bracket_end = tjdut - _backward_start_exclusion(
+                    speed_default, NR_TOLERANCE
+                )
             else:
                 jd_bracket_start = tjdut
                 jd_bracket_end = tjdut + search_window

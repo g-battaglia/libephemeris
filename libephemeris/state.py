@@ -150,14 +150,19 @@ _INIT_LOCK = threading.RLock()
 _STATE_LOCK = _CONTEXT_SWAP_LOCK
 
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
-_EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
+_EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file REQUESTED (default: DE440)
 _EPHEMERIS_FILE_EXPLICIT: bool = False  # True if set_ephemeris_file() was called
+# Filename actually opened by the last load. It differs from the requested one
+# only when _resolve_missing_ephemeris_fallback() substituted the tier default
+# for an unrecognized, absent name. Keeping the two apart matters: overwriting
+# the requested name with the fallback discarded the caller's choice for good,
+# so pointing set_ephe_path() at a directory that does contain the requested
+# file still loaded the fallback.
+_EPHEMERIS_FILE_EFFECTIVE: Optional[str] = None
 # Sticky record of whether the most recent ephemeris load silently replaced an
 # unavailable configured JPL file with the tier default (see
-# _resolve_missing_ephemeris_fallback / jpl_fallback_active). get_planets()
-# overwrites _EPHEMERIS_FILE with the resolved fallback name, which would hide
-# the fallback from a filename-only check after the first load, so the resolver
-# records it here.
+# _resolve_missing_ephemeris_fallback / jpl_fallback_active), so a caller need
+# not compare filenames to detect the substitution.
 _JPL_FALLBACK_ACTIVE: bool = False
 _EPHEMERIS_ENV_VAR = "LIBEPHEMERIS_EPHEMERIS"  # Env var for ephemeris file selection
 _PRECISION_TIER: Optional[str] = None  # Programmatic tier override
@@ -176,6 +181,13 @@ _TOPO: Optional[Topos] = None  # Observer location
 _SIDEREAL_MODE: Optional[int] = None  # Active sidereal mode ID
 _SIDEREAL_AYAN_T0: float = 0.0  # Ayanamsha value at reference epoch
 _SIDEREAL_T0: float = 0.0  # Reference epoch (JD) for ayanamsha
+# SIDBIT projection flags carried by the last set_sid_mode() call, read through
+# planets._get_sidereal_bits(). Co-located with the other sidereal fields so
+# that reset_session()/close() clear it with them and _swapped_context_state()
+# swaps it for an EphemerisContext: kept as a separate planets-module global it
+# survived both, leaking a projection into later default sidereal calculations
+# and across the context boundary.
+_SIDEREAL_BITS: int = 0
 _ANGLES_CACHE: dict[str, float] = {}  # Pre-calculated angles {name: longitude}
 _TIDAL_ACCELERATION: Optional[float] = None  # Explicit Delta-T tidal acceleration
 _DELTA_T_USERDEF: Optional[float] = None  # User-defined Delta T value
@@ -1538,7 +1550,7 @@ def get_planets() -> SpiceKernel:
             "use the active LEB reader or a declared analytical model"
         )
 
-    global _PLANETS, _EPHEMERIS_FILE
+    global _PLANETS, _EPHEMERIS_FILE_EFFECTIVE
     logger = get_logger()
     if _PLANETS is None:
         with _INIT_LOCK:
@@ -1548,11 +1560,14 @@ def get_planets() -> SpiceKernel:
                 effective_file = _resolve_missing_ephemeris_fallback(
                     effective_file, logger
                 )
-                _EPHEMERIS_FILE = effective_file
+                # Record what is actually opened WITHOUT destroying the
+                # requested name: a later set_ephe_path() must be able to
+                # re-resolve the caller's original choice.
+                _EPHEMERIS_FILE_EFFECTIVE = effective_file
 
                 # Try custom ephemeris path first if set
                 if _EPHEMERIS_PATH:
-                    bsp_path = os.path.join(_EPHEMERIS_PATH, _EPHEMERIS_FILE)
+                    bsp_path = os.path.join(_EPHEMERIS_PATH, effective_file)
                     if os.path.exists(bsp_path):
                         logger.debug("Using cached ephemeris: %s", bsp_path)
                         _PLANETS = load(bsp_path)
@@ -1561,7 +1576,7 @@ def get_planets() -> SpiceKernel:
 
                 # Load from data dir (downloads automatically if missing)
                 data_dir = _get_data_dir()
-                bsp_path = os.path.join(data_dir, _EPHEMERIS_FILE)
+                bsp_path = os.path.join(data_dir, effective_file)
                 if os.path.exists(bsp_path):
                     logger.debug("Using cached ephemeris: %s", bsp_path)
                     _PLANETS = load(bsp_path)
@@ -1569,9 +1584,9 @@ def get_planets() -> SpiceKernel:
                 else:
                     from .net import require_network
 
-                    require_network(f"Skyfield {_EPHEMERIS_FILE} ephemeris download")
-                    logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
-                    _PLANETS = load(_EPHEMERIS_FILE)
+                    require_network(f"Skyfield {effective_file} ephemeris download")
+                    logger.info("Downloading JPL ephemeris %s...", effective_file)
+                    _PLANETS = load(effective_file)
                     logger.info("Ephemeris downloaded to: %s", data_dir)
     return _PLANETS
 
@@ -1977,12 +1992,14 @@ def reset_session() -> None:
     switching ephemeris files, test cleanup, or application shutdown).
     """
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
+    global _SIDEREAL_BITS
     global _ANGLES_CACHE
     with _STATE_LOCK:
         _TOPO = None
         _SIDEREAL_MODE = None
         _SIDEREAL_AYAN_T0 = 0.0
         _SIDEREAL_T0 = 0.0
+        _SIDEREAL_BITS = 0
         _ANGLES_CACHE = {}
     from .cache import clear_observer_cache
 
@@ -2012,7 +2029,7 @@ def set_ephe_path(path: Optional[str] = None) -> None:
 
         Idempotent: if the path hasn't changed, no resources are released.
     """
-    global _EPHEMERIS_PATH, _PLANETS
+    global _EPHEMERIS_PATH, _PLANETS, _EPHEMERIS_FILE_EFFECTIVE
     if path == _EPHEMERIS_PATH:
         return  # No-op: path unchanged, keep loaded kernels and caches
     _EPHEMERIS_PATH = path
@@ -2023,6 +2040,10 @@ def set_ephe_path(path: Optional[str] = None) -> None:
         except (AttributeError, OSError, ValueError):
             pass
     _PLANETS = None
+    # Drop the resolved filename too: the new directory may well contain the
+    # file the caller originally requested, so the next load must re-resolve
+    # from the requested name instead of reusing an earlier fallback.
+    _EPHEMERIS_FILE_EFFECTIVE = None
     from .cache import clear_caches
 
     clear_caches()
@@ -2402,6 +2423,7 @@ def close() -> None:
     global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
     global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
+    global _SIDEREAL_BITS
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
     global _SPK_KERNELS, _SPK_BODY_MAP, _SPK_TYPE21_KERNELS, _AUTO_SPK_DOWNLOAD
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
@@ -2416,9 +2438,11 @@ def close() -> None:
 def _close_inner() -> None:
     """Inner close implementation (must be called with _STATE_LOCK held)."""
     global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
+    global _EPHEMERIS_FILE_EFFECTIVE
     global _JPL_FALLBACK_ACTIVE
     global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
+    global _SIDEREAL_BITS
     global _ANGLES_CACHE, _TIDAL_ACCELERATION, _LAPSE_RATE
     global _SPK_KERNELS, _SPK_BODY_MAP, _SPK_TYPE21_KERNELS, _AUTO_SPK_DOWNLOAD
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
@@ -2493,6 +2517,7 @@ def _close_inner() -> None:
     # Reset all global state to initial values
     _EPHEMERIS_PATH = None
     _EPHEMERIS_FILE = "de440.bsp"
+    _EPHEMERIS_FILE_EFFECTIVE = None
     _EPHEMERIS_FILE_EXPLICIT = False
     _JPL_FALLBACK_ACTIVE = False
     _LOADER = None
@@ -2506,6 +2531,7 @@ def _close_inner() -> None:
     _SIDEREAL_MODE = None
     _SIDEREAL_AYAN_T0 = 0.0
     _SIDEREAL_T0 = 0.0
+    _SIDEREAL_BITS = 0
     _ANGLES_CACHE = {}
     _TIDAL_ACCELERATION = None
     # _DELTA_T_USERDEF is deliberately NOT reset here: measured reference
@@ -2563,6 +2589,29 @@ def _close_inner() -> None:
         reset_assist_data_cache()
     except ImportError:
         pass
+
+
+# Published span of the DE440 long ephemeris (Park et al. 2021, AJ 161:105):
+# JD 2287184.5 to 2688976.5, i.e. 1549-12-31 to 2650-01-25. DE441 is the only
+# JPL kernel in this project's inventory that reaches beyond it.
+_DE440_JD_START = 2287184.5
+_DE440_JD_END = 2688976.5
+
+
+def _leb_source_de_number(jd_start: float, jd_end: float) -> int:
+    """Generating JPL Development Ephemeris number for an LEB artifact.
+
+    The LEB format stores no source-kernel identifier, so this is inferred
+    from the artifact's own stored coverage: any span reaching outside the
+    published DE440 interval can only have been sampled from DE441. Deriving
+    it from the filename instead (looking for the word "extended") was wrong
+    in both directions, since ``set_leb_file()`` accepts arbitrary paths: a
+    renamed DE441 artifact reported 440, and a DE440 artifact whose path
+    happened to contain "extended" reported 441.
+    """
+    if jd_start < _DE440_JD_START or jd_end > _DE440_JD_END:
+        return 441
+    return 440
 
 
 def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
@@ -2630,9 +2679,7 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
                     if getattr(item, "has_body", lambda _b: False)(_body)
                 ]
                 _path = str(_files[0]) if _files else str(getattr(_reader, "path", ""))
-                _denum = (
-                    441 if any("extended" in str(f).lower() for f in _files) else 440
-                )
+                _denum = _leb_source_de_number(float(_bounds[0]), float(_bounds[1]))
                 return (_path, float(_bounds[0]), float(_bounds[1]), _denum)
         if _PLANETS is None:
             return ("", 0.0, 0.0, 0)
@@ -2674,9 +2721,11 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
                 if end_jd == float("-inf"):
                     end_jd = 0.0
 
-        # Extract DE number from filename (e.g., "de421.bsp" -> 421)
+        # Extract DE number from filename (e.g., "de421.bsp" -> 421). Report
+        # the kernel actually opened, which differs from the requested name
+        # whenever the missing-file fallback substituted the tier default.
         denum = 0
-        filename = _EPHEMERIS_FILE.lower()
+        filename = (_EPHEMERIS_FILE_EFFECTIVE or _EPHEMERIS_FILE).lower()
         if filename.startswith("de") and ".bsp" in filename:
             try:
                 # Extract digits between "de" and ".bsp"

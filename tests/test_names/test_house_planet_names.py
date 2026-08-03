@@ -81,12 +81,17 @@ class TestHouseName:
         assert result != "Unknown"
 
     @pytest.mark.unit
-    def test_unknown_system_returns_unknown(self):
-        """Unknown system char should return 'Unknown' or similar."""
-        result = swe.house_name(ord("Z"))
-        assert isinstance(result, str)
-        # Should indicate unknown
-        assert "unknown" in result.lower() or len(result) > 0
+    def test_unknown_system_returns_empty_string(self):
+        """An unknown system selector returns the empty string.
+
+        Measured contract (matched exactly): every unrecognized selector —
+        letters outside the table and non-letters alike — maps to '', not to
+        a placeholder such as "Unknown".
+        """
+        for selector in (ord("Z"), ord("z"), ord("5")):
+            result = swe.house_name(selector)
+            assert isinstance(result, str)
+            assert result == ""
 
     @pytest.mark.unit
     def test_alias_works(self):

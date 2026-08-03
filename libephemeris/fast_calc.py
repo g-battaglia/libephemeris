@@ -45,6 +45,7 @@ from .constants import (
     PLUTO,
     SATURN,
     SIDBIT_ECL_DATE,
+    SIDBIT_USER_UT,
     SUN,
     TRUE_NODE,
     URANUS,
@@ -1150,6 +1151,7 @@ def _calc_ayanamsa_from_leb(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
+    sid_bits: Optional[int] = None,
     noaberr: bool = False,
     nogdefl: bool = False,
 ) -> float:
@@ -1165,6 +1167,12 @@ def _calc_ayanamsa_from_leb(
         sid_mode: Sidereal mode ID (if None, reads from global state).
         sid_t0: Reference epoch JD for custom ayanamsha.
         sid_ayan_t0: Ayanamsha value at reference epoch (degrees).
+        sid_bits: SIDBIT projection flags qualifying ``sid_mode``. ``None``
+            reads the active ones. A caller that supplies an explicit sidereal
+            configuration (an EphemerisContext) must pass its own bits here:
+            reading the process-global value instead let an unrelated
+            ``set_sid_mode(... | SIDBIT_ECL_DATE)`` change that caller's result,
+            and made SIDBIT_USER_UT inert on this path.
         noaberr: Forwarded to ``planets._calc_ayanamsa`` for the delegated
             (dynamic) modes, so a FLG_TRUEPOS / FLG_NOABERR request evaluates the
             aberrant star/galactic anchor without annual aberration — keeping the
@@ -1191,10 +1199,20 @@ def _calc_ayanamsa_from_leb(
 
     from .planets import _get_sidereal_bits
 
-    if mode in _DELEGATED_AYANAMSHA_MODES or (_get_sidereal_bits() & SIDBIT_ECL_DATE):
-        # SIDBIT_ECL_DATE refers the zero point to the mean ecliptic of date;
-        # the geometric delta lives in planets._calc_ayanamsa, so delegate the
-        # whole evaluation there to keep both backends numerically identical.
+    bits = _get_sidereal_bits() if sid_bits is None else sid_bits
+
+    # SIDBIT_ECL_DATE refers the zero point to the mean ecliptic of date and
+    # SIDBIT_USER_UT reads the SIDM_USER t0 as a UT date; both geometric
+    # reductions live in planets._calc_ayanamsa, so delegate the whole
+    # evaluation there to keep both backends numerically identical. Taking the
+    # local SIDM_USER branch below while USER_UT was set silently ignored the
+    # bit on this path (the module reducer honours it).
+    _delegate_user_ut = mode == 255 and bool(bits & SIDBIT_USER_UT)
+    if (
+        mode in _DELEGATED_AYANAMSHA_MODES
+        or (bits & SIDBIT_ECL_DATE)
+        or _delegate_user_ut
+    ):
         # Late imports avoid a cycle. _calc_ayanamsa accepts UT, so invert
         # TT approximately with the same Delta T model used in the forward
         # conversion.
@@ -1202,7 +1220,9 @@ def _calc_ayanamsa_from_leb(
         from .time_utils import deltat
 
         jd_ut = jd_tt - deltat(jd_tt)
-        return _calc_ayanamsa(jd_ut, mode, noaberr=noaberr, nogdefl=nogdefl)
+        return _calc_ayanamsa(
+            jd_ut, mode, noaberr=noaberr, nogdefl=nogdefl, sid_bits=bits
+        )
 
     if mode == 255:
         # SIDM_USER: sidereal zero point fixed on the mean ecliptic of t0.
@@ -1485,8 +1505,12 @@ def _frame_transform(
         # Mean equator/equinox of J2000: ICRS rotated by IAU 2006 frame bias.
         v = _rotate_icrs_to_j2000_mean_equator(geo[0], geo[1], geo[2])
     elif (iflag & FLG_EQUATORIAL) and (iflag & FLG_SIDEREAL):
-        # SID+EQ: mean equator of date (P matrix, no nutation).
-        v = _mat3_vec3(_prec_matrix(jd_tt), geo)
+        # SID+EQ: mean equator of date (P matrix, no nutation). FLG_ICRS drops
+        # the frame bias here like in every other branch; taking the biased
+        # matrix unconditionally made LEB output identical with and without
+        # FLG_ICRS, losing the ~0.009" shift the Skyfield path applies.
+        _sid_eq_mat = _prec_matrix_nobias(jd_tt) if _icrs else _prec_matrix(jd_tt)
+        v = _mat3_vec3(_sid_eq_mat, geo)
     elif iflag & FLG_EQUATORIAL:
         # NONUT: mean equator (P matrix); else true equator (PNM). FLG_ICRS
         # drops the ICRS frame bias from either matrix.
@@ -2382,6 +2406,7 @@ def fast_calc_ut(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
+    sid_bits: Optional[int] = None,
     topo: Optional[Tuple[float, float, float]] = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Fast equivalent of calc_ut() using precomputed .leb data.
@@ -2394,6 +2419,8 @@ def fast_calc_ut(
         sid_mode: Sidereal mode override (for thread-safe context calls).
         sid_t0: Sidereal reference epoch override.
         sid_ayan_t0: Sidereal ayanamsha-at-epoch override.
+        sid_bits: SIDBIT projection-flag override (for thread-safe context
+            calls); ``None`` reads the active ones.
 
     Returns:
         Same as calc_ut(): ((lon, lat, dist, dlon, dlat, ddist), iflag)
@@ -2486,6 +2513,7 @@ def fast_calc_ut(
             sid_mode=sid_mode,
             sid_t0=sid_t0,
             sid_ayan_t0=sid_ayan_t0,
+            sid_bits=sid_bits,
             topo_offset=topo_offset,
             topo_offset_fn=topo_offset_fn,
         )
@@ -2512,6 +2540,7 @@ def fast_calc_tt(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
+    sid_bits: Optional[int] = None,
     topo: Optional[Tuple[float, float, float]] = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Fast equivalent of calc() using precomputed .leb data.
@@ -2524,6 +2553,8 @@ def fast_calc_tt(
         sid_mode: Sidereal mode override (for thread-safe context calls).
         sid_t0: Sidereal reference epoch override.
         sid_ayan_t0: Sidereal ayanamsha-at-epoch override.
+        sid_bits: SIDBIT projection-flag override (for thread-safe context
+            calls); ``None`` reads the active ones.
 
     Returns:
         Same as calc(): ((lon, lat, dist, dlon, dlat, ddist), iflag)
@@ -2620,6 +2651,7 @@ def fast_calc_tt(
             sid_mode=sid_mode,
             sid_t0=sid_t0,
             sid_ayan_t0=sid_ayan_t0,
+            sid_bits=sid_bits,
             topo_offset=topo_offset,
             topo_offset_fn=topo_offset_fn,
         )
@@ -2640,6 +2672,7 @@ def _fast_calc_core(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
+    sid_bits: Optional[int] = None,
     topo_offset: Optional[
         Tuple[Tuple[float, float, float], Tuple[float, float, float]]
     ] = None,
@@ -2854,6 +2887,7 @@ def _fast_calc_core(
                 sid_mode=sid_mode,
                 sid_t0=sid_t0,
                 sid_ayan_t0=sid_ayan_t0,
+                sid_bits=sid_bits,
                 noaberr=bool(iflag & (FLG_TRUEPOS | FLG_NOABERR)),
                 nogdefl=bool(iflag & (FLG_TRUEPOS | FLG_NOGDEFL)),
             )
@@ -2923,6 +2957,7 @@ def _fast_calc_core(
                             sid_mode=sid_mode,
                             sid_t0=sid_t0,
                             sid_ayan_t0=sid_ayan_t0,
+                            sid_bits=sid_bits,
                             noaberr=bool(iflag & (FLG_TRUEPOS | FLG_NOABERR)),
                             nogdefl=bool(iflag & (FLG_TRUEPOS | FLG_NOGDEFL)),
                         )
@@ -3003,6 +3038,7 @@ def _fast_calc_core(
             sid_mode=sid_mode,
             sid_t0=sid_t0,
             sid_ayan_t0=sid_ayan_t0,
+            sid_bits=sid_bits,
             topo_offset=topo_offset,
             topo_offset_fn=topo_offset_fn,
         )
@@ -3015,6 +3051,7 @@ def _fast_calc_core(
             sid_mode=sid_mode,
             sid_t0=sid_t0,
             sid_ayan_t0=sid_ayan_t0,
+            sid_bits=sid_bits,
             topo_offset=topo_offset,
             topo_offset_fn=topo_offset_fn,
         )

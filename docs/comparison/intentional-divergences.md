@@ -437,3 +437,16 @@ eclipses, and lunar points use the independent models listed in
 [Known differences](known-differences.md). When a reference API uses a
 different valid convention, LibEphemeris documents the bounded model
 difference rather than fitting its output.
+
+## `FLG_NOABERR` reaches the hypothetical bodies
+
+Geocentric places of the historical predicted planets (Transpluto/Isis,
+Harrington, Le Verrier, Adams, Lowell, Pickering, Vulcan, Proserpina) are
+built by the standard apparent-place reduction — retarded target plus
+annual aberration (Explanatory Supplement to the Astronomical Almanac,
+3rd ed. 2013, ch. 7). `FLG_TRUEPOS` drops both terms and `FLG_NOABERR`
+drops the aberration alone, exactly as on every other body. At least one
+external implementation applies the same reduction but leaves `NOABERR`
+inert for these ids, so a `NOABERR` request there returns the aberrated
+place; the two agree without the flag and differ by up to about 20.5″
+with it. LibEphemeris keeps the flag meaningful on every surface.
