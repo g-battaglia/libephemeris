@@ -4764,6 +4764,7 @@ def _calc_body(
             # analytic models follow the shared contract rather than
             # carrying a second one.
             _noaberr = bool(iflag & (FLG_TRUEPOS | FLG_NOABERR))
+            _nogdefl = bool(iflag & (FLG_TRUEPOS | FLG_NOGDEFL))
 
             def _geo_of_date(jd: float) -> Tuple[float, float, float]:
                 """Geocentric mean-ecliptic-of-date apparent position.
@@ -4796,6 +4797,23 @@ def _calc_body(
                     lt = math.sqrt(xg * xg + yg * yg + zg * zg) / _C_AU_DAY
 
                 rg = math.sqrt(xg * xg + yg * yg + zg * zg)
+                if not _nogdefl and rg > 0.0:
+                    # Solar gravitational light deflection, from the shared
+                    # PPN routine the planetary paths use. Omitting it left
+                    # FLG_NOGDEFL with nothing to switch off on this whole
+                    # family, while the reference moves by up to 0.16" for a
+                    # body near the Sun's line of sight.
+                    from .fast_calc import _apply_gravitational_deflection
+
+                    _src = _SkyfieldDeflectorSource(planets)
+                    xg, yg, zg = _apply_gravitational_deflection(
+                        (xg, yg, zg),
+                        (ex, ey, ez),
+                        jd,
+                        rg / _C_AU_DAY,
+                        _src,
+                    )
+                    rg = math.sqrt(xg * xg + yg * yg + zg * zg)
                 if not _noaberr and rg > 0.0:
                     # First-order annual aberration: shift the geometric
                     # direction by the observer's barycentric velocity over c
@@ -4944,7 +4962,63 @@ def _calc_body(
                 g_ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
                 pos = (g_lon, g_lat, g_dist, g_dlon, g_dlat, g_ddist)
         else:
+            # Selena (56) and Waldemath (58) are GEOCENTRIC symbolic models.
+            # Their centre and light-path flags were inert while the retflag
+            # echoed them, so a heliocentric request came back geocentric
+            # (measured 140 deg off on 56, 72 deg on 58). Re-centre the
+            # geocentric vector on the requested origin and honour the
+            # aberration toggle, exactly as the Uranian lunar points do.
             pos = hypothetical.calc_hypothetical_position(ipl, jd_tt)
+            if iflag & (FLG_HELCTR | FLG_BARYCTR) or not (
+                iflag & (FLG_TRUEPOS | FLG_NOABERR)
+            ):
+                from skyfield.framelib import ecliptic_J2000_frame as _eclJ2
+
+                _ts_h = get_timescale()
+                _t_h = _ts_h.tt_jd(jd_tt)
+                _lo = math.radians(pos[0])
+                _la = math.radians(pos[1])
+                _cb = math.cos(_la)
+                _gx = pos[2] * _cb * math.cos(_lo)
+                _gy = pos[2] * _cb * math.sin(_lo)
+                _gz = pos[2] * math.sin(_la)
+                if iflag & (FLG_HELCTR | FLG_BARYCTR):
+                    # FLG_HELCTR adds Earth's heliocentric vector, FLG_BARYCTR
+                    # its barycentric one; with both set the heliocentric view
+                    # wins, mirroring the other analytic branches.
+                    if iflag & FLG_HELCTR:
+                        _ev = (
+                            planets["sun"]
+                            .at(_t_h)
+                            .observe(planets["earth"])
+                            .frame_xyz(_eclJ2)
+                            .au
+                        )
+                    else:
+                        _ev = planets["earth"].at(_t_h).frame_xyz(_eclJ2).au
+                    _gx += float(_ev[0])
+                    _gy += float(_ev[1])
+                    _gz += float(_ev[2])
+                elif not (iflag & (FLG_TRUEPOS | FLG_NOABERR)):
+                    # Annual aberration on the geocentric direction (the
+                    # observer's barycentric velocity over c).
+                    _rg0 = math.sqrt(_gx * _gx + _gy * _gy + _gz * _gz)
+                    _vel = (
+                        planets["earth"]
+                        .at(_t_h)
+                        .frame_xyz_and_velocity(_eclJ2)[1]
+                        .au_per_d
+                    )
+                    _c = 173.1446326846693
+                    _gx += float(_vel[0]) * _rg0 / _c
+                    _gy += float(_vel[1]) * _rg0 / _c
+                    _gz += float(_vel[2]) * _rg0 / _c
+                _rg = math.sqrt(_gx * _gx + _gy * _gy + _gz * _gz)
+                _new_lon = math.degrees(math.atan2(_gy, _gx)) % 360.0
+                _new_lat = math.degrees(
+                    math.asin(max(-1.0, min(1.0, _gz / _rg)) if _rg > 0 else 0.0)
+                )
+                pos = (_new_lon, _new_lat, _rg, pos[3], pos[4], pos[5])
 
         lon, lat, dist = pos[0], pos[1], pos[2]
         # Zero the speed slots when FLG_SPEED is absent (the reference
