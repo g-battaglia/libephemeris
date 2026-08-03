@@ -3616,11 +3616,14 @@ def batch_fixstars_ut(
         # scalar ayanamsha from longitude, so it disagreed with its own
         # single-star equivalent by up to ~1.57 deg of latitude. Delegate,
         # exactly as the fixed-epoch and topocentric branches do.
+        # Delegate for ANY active projection bit, including
+        # SIDBIT_SSY_PLANE | FLG_EQUATORIAL: the single-star path special-cases
+        # that combination (plain J2000 reduction, no ayanamsha), so copying
+        # the calc-path guard here left the batch subtracting a full ayanamsha
+        # its own single-star equivalent does not (measured 23.857 deg on Vega).
         _bits = _get_sidereal_bits()
-        if (
-            (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE))
-            and (not (flags & FLG_EQUATORIAL) or (_bits & SIDBIT_ECL_T0))
-            and _sidm not in _SIDBIT_PROJECTION_SUPPRESS_MODES
+        if (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE)) and (
+            _sidm not in _SIDBIT_PROJECTION_SUPPRESS_MODES
         ):
             return _batch_fixstars_via_single(
                 stars, tjdut, flags, skip_errors=skip_errors

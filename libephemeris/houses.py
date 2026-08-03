@@ -112,6 +112,14 @@ from . import sidereal_longterm as _sidlt
 from .time_utils import deltat as _deltat
 
 
+# Systems whose cusps are pinned to exact 30-degree sign boundaries, so the
+# cusp function is piecewise constant in time: Whole Sign ('W') and Aries
+# ('N'). Their true cusp derivative is zero, and the only variation across a
+# finite-difference stencil is the 30-degree step taken when the Ascendant
+# changes sign.
+_SIGN_PINNED_HSYS = frozenset({"W", "N"})
+
+
 def _fold_hsys_case(hsys_char: str) -> str:
     """Fold a house-system selector to its canonical case.
 
@@ -1714,6 +1722,13 @@ def houses_armc_ex2(
         diff = angular_diff_local(after, before)
         if abs(diff) > 90.0:
             return 0.0
+        # Sign-pinned wheels step by exactly 30 degrees when the Ascendant
+        # changes sign; that is a discontinuity, not a rate (see houses_ex2).
+        if (
+            _fold_hsys_case(chr(_hsys_code(hsys))) in _SIGN_PINNED_HSYS
+            and abs(abs(diff) - 30.0) < 1e-6
+        ):
+            return 0.0
         return diff / (2 * d_armc) * _SIDEREAL_RATE
 
     # Velocities in deg/day = d(cusp)/d(ARMC) * (ARMC deg/day)
@@ -2282,6 +2297,8 @@ def houses_ex2(
     _, ascmc_hminus = houses_ex(tjdut - _DT_HALF, lat, lon, hsys, _flags_deg)
     _, ascmc_hplus = houses_ex(tjdut + _DT_HALF, lat, lon, hsys, _flags_deg)
 
+    _is_sign_pinned = _fold_hsys_case(chr(_hsys_code(hsys))) in _SIGN_PINNED_HSYS
+
     def _rate(after: float, before: float) -> float:
         d = after - before
         if d > 180.0:
@@ -2291,6 +2308,15 @@ def houses_ex2(
         # A change larger than 90 degrees across the stencil is a branch
         # discontinuity, where no finite derivative exists.
         if abs(d) > 90.0:
+            return 0.0
+        # Sign-pinned systems (Whole Sign, Aries) hold their cusps on exact
+        # 30-degree boundaries, so the cusp function is piecewise constant and
+        # its derivative is zero — except across the instant the Ascendant
+        # changes sign, where the whole wheel steps by exactly 30 degrees.
+        # That step is far below the 90-degree guard above, so the stencil
+        # reported it as a rate: 30 / (2 * 1/4096) = 61440 deg/day on all
+        # twelve cusps, hit by ~0.5% of random (jd, lat, lon) triples.
+        if _is_sign_pinned and abs(abs(d) - 30.0) < 1e-6:
             return 0.0
         return d / (2.0 * _DT_DAYS)
 
