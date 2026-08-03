@@ -328,11 +328,19 @@ _OCCULT_MAX_CONJUNCTIONS = int(_ECLIPSE_SEARCH_HORIZON_YEARS * 13.5)
 # "when" finder. A candidate maximum within this margin of the search epoch
 # counts as "already reached", so the idiom `jd = tret[0]; when(jd)` advances
 # to the neighbouring event instead of re-returning the one it started on.
-# Measured reference behavior: the current<->next (forward) and
-# current<->previous (backward) transition sits exactly at max -/+ 1e-4 day
-# (8.64 s), symmetric in both directions, uniformly across the global and
-# local solar, lunar and occultation searches.
-_ECLIPSE_WHEN_EPOCH_MARGIN = 1e-4  # days (8.64 s)
+#
+# Derived from this library's own solver, not from any external transition:
+# the maximum is refined by golden section to ~1e-7 day (see _golden_min),
+# and a search restarted from a returned maximum re-brackets from a
+# different interval, so the recomputed instant can differ from the returned
+# one by a few times that resolution. A margin of 100x the resolution
+# absorbs that jitter with a wide safety factor while staying five orders of
+# magnitude below the smallest possible separation between two distinct
+# events (half a synodic month, ~14.8 days), so it can never merge two real
+# eclipses. Callers starting between this margin and ~8.6 s before a maximum
+# may see a different event than an external implementation chooses; that
+# boundary window is documented in docs/comparison/known-differences.md.
+_ECLIPSE_WHEN_EPOCH_MARGIN = 100.0 * 1e-7  # days (0.86 s)
 
 SYNODIC_MONTH = 29.530588853  # Mean synodic month in days
 LUNAR_NODE_PERIOD = 6798.38  # Lunar node regression period in days

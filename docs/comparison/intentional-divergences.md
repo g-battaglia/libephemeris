@@ -147,13 +147,13 @@ Neither has an apparent direction or a phase triangle.
   across dates with no dependence on the nutation values it was computed
   from, so it is not a documented quantity and is reported as 0.0.
 - `rise_trans` raises the typed error instead of returning a time. The
-  external implementation returns `tjd_start + 0.083333254` days for both
-  ids — identical at every latitude tested including the equator, with rise
-  equal to set — which is an internal sentinel rather than an astronomical
-  result. Encoding that constant would be reconstructing output, and
+  external implementation returns a fixed offset from the start epoch for
+  both ids — the same value at every latitude tested including the equator,
+  with rise equal to set — which is an internal sentinel rather than an
+  astronomical result. Encoding it would be reconstructing output, and
   computing a horizon event from data that is not a direction would invent
-  one: a zero-length vector had produced an apparent diameter of ~1.9e13
-  degrees on the phenomena path before these guards.
+  one: a zero-length vector had produced an absurd apparent diameter on the
+  phenomena path before these guards.
 
 ## The JPL-Horizons flags are consumed, not echoed
 
@@ -183,10 +183,9 @@ equinoctial or solstitial colure. Makransky's published construction is
 continuous through those points, and LibEphemeris returns it there.
 
 An external implementation returns isolated different values at exactly
-those hits — for ARMC 30°, latitude 41.9°, cusp 3 it reports 360.0 while
-its own value one microdegree to either side is 180.0, so the reported
-point is neither its own two-sided limit nor inside the normalised
-[0°, 360°) range. Reproducing that pattern would require inferring the
+those hits: at a sampled ARMC and latitude one cusp comes back neither at
+its own two-sided limit — the values a microdegree to either side agree
+with each other — nor inside the normalised [0°, 360°) range. Reproducing that pattern would require inferring the
 per-point transformation from a grid of external outputs, which this
 project does not do; an earlier revision that had done so was removed. The
 divergence affects only exact colure hits on the ARMC entry points (a
@@ -196,10 +195,10 @@ division points off the colures.
 
 `house_pos` with the Horizontal system (`H`) shows the same shape at its own
 degenerate geometry. For a body exactly at the vernal point the external
-value is again not its own limit — at ARMC 250°, latitude 0°, it reports
-7.0 while one microdegree to either side it reports 1.000000023 and
-12.999999995, the two sides of the same house boundary. LibEphemeris returns
-that boundary value, 1.0, at the exact point as well.
+value is again not its own limit: a microdegree to either side its own
+results converge on one house boundary, while at the exact point it reports
+a different house entirely. LibEphemeris returns the boundary value at the
+exact point as well.
 
 ## Phase-angle geometry in `pheno`
 

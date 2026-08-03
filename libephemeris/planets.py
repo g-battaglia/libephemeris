@@ -7605,6 +7605,30 @@ def _format_nodaps_output(
     return (formatted[0], formatted[1], formatted[2], formatted[3])
 
 
+def _spherical_state_to_xyz(
+    lon_deg: float, lat_deg: float, r: float, dlon: float, dlat: float, dr: float
+) -> Tuple[float, float, float, float, float, float]:
+    """Cartesian position AND velocity from a spherical state (deg, AU, /day).
+
+    The six-slot contract keeps the velocity slots meaningful under FLG_XYZ,
+    so the rates are transformed with the position instead of being zeroed.
+    """
+    lo = math.radians(lon_deg)
+    la = math.radians(lat_deg)
+    dlo = math.radians(dlon)
+    dla = math.radians(dlat)
+    cl, sl = math.cos(lo), math.sin(lo)
+    cb, sb = math.cos(la), math.sin(la)
+    return (
+        r * cb * cl,
+        r * cb * sl,
+        r * sb,
+        dr * cb * cl - r * sb * cl * dla - r * cb * sl * dlo,
+        dr * cb * sl - r * sb * sl * dla + r * cb * cl * dlo,
+        dr * sb + r * cb * dla,
+    )
+
+
 def _nodaps_sidereal_frame_projection(
     entry_fn, tjd: float, planet: int, method: int, flags: int, jd_tt: float
 ):
@@ -7674,19 +7698,7 @@ def _nodaps_sidereal_frame_projection(
         def _project_eq(pt):
             out = _rotate_spherical(tuple(pt), m_eq)
             if flags & FLG_XYZ:
-                _lr = math.radians(out[0])
-                _br = math.radians(out[1])
-                _cb = math.cos(_br)
-                return _to_native_floats(
-                    (
-                        out[2] * _cb * math.cos(_lr),
-                        out[2] * _cb * math.sin(_lr),
-                        out[2] * math.sin(_br),
-                        0.0,
-                        0.0,
-                        0.0,
-                    )
-                )
+                return _to_native_floats(_spherical_state_to_xyz(*out))
             if flags & FLG_RADIANS:
                 out = (
                     math.radians(out[0]),
@@ -7742,19 +7754,7 @@ def _nodaps_sidereal_frame_projection(
     def _project(pt):
         out = _rotate_spherical(tuple(pt), m)
         if flags & FLG_XYZ:
-            lon_r = math.radians(out[0])
-            lat_r = math.radians(out[1])
-            cl = math.cos(lat_r)
-            return _to_native_floats(
-                (
-                    out[2] * cl * math.cos(lon_r),
-                    out[2] * cl * math.sin(lon_r),
-                    out[2] * math.sin(lat_r),
-                    0.0,
-                    0.0,
-                    0.0,
-                )
-            )
+            return _to_native_floats(_spherical_state_to_xyz(*out))
         if flags & FLG_RADIANS:
             out = (
                 math.radians(out[0]),
