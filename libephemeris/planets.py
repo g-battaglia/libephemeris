@@ -4880,6 +4880,29 @@ def _calc_body(
                 # i.e. evaluated at jd - (Sun-to-body light time). TRUEPOS
                 # zeroes that light time and yields the geometric place.
                 pos = _calc_helio(jd_tt - _helio_light_time_days(jd_tt))
+                if iflag & (FLG_SPEED | FLG_SPEED3):
+                    # The model's own rate is dλ/dt at the RETARDED epoch; the
+                    # reported quantity is λ(jd − lt(jd)), whose derivative
+                    # carries the extra (1 − dlt/dt) factor. Keeping the raw
+                    # model rate left the speed off the derivative of the
+                    # reported position by 0.25"/day on the fastest body
+                    # (Vulcan). Central-difference the reported quantity.
+                    _hh = 0.01
+                    _q0 = _calc_helio(
+                        (jd_tt - _hh) - _helio_light_time_days(jd_tt - _hh)
+                    )
+                    _q1 = _calc_helio(
+                        (jd_tt + _hh) - _helio_light_time_days(jd_tt + _hh)
+                    )
+                    _dl = ((_q1[0] - _q0[0] + 180.0) % 360.0 - 180.0) / (2.0 * _hh)
+                    pos = (
+                        pos[0],
+                        pos[1],
+                        pos[2],
+                        _dl,
+                        (_q1[1] - _q0[1]) / (2.0 * _hh),
+                        (_q1[2] - _q0[2]) / (2.0 * _hh),
+                    )
                 if ipl in _FICT_HELIO_IDS:
                     # calc_fictitious_position returns J2000 ecliptic for the
                     # predicted planets; precess to the mean ecliptic of date so
@@ -5390,7 +5413,29 @@ def _calc_body(
                 # deflection while still applying stellar aberration.
                 pos = obs_at_t.observe(target).apparent(deflectors=())
             else:
-                pos = obs_at_t.observe(target).apparent()  # Apparent
+                # Apparent = deflection + aberration. The deflection is taken
+                # from the SHARED clamped routine rather than Skyfield's, so
+                # both backends use one implementation: Skyfield's
+                # add_deflection has no ERFA dlim limiter, so for a planet
+                # geometrically inside the solar disc its term blew up and the
+                # two backends split by 14.3" in latitude (measured on Mars at
+                # JD 2422088.26225, 0.017 deg from the Sun's centre, where the
+                # LEB side sits 0.62" from the reference and the Skyfield side
+                # 14.9"). Same deflectors (Sun, Jupiter, Saturn).
+                import numpy as _np
+                from skyfield.constants import C_AUDAY as _C_AUDAY
+                from skyfield.functions import length_of as _length_of
+                from skyfield.positionlib import Apparent as _Apparent
+                from skyfield.relativity import add_aberration as _add_aberration
+
+                _astro = obs_at_t.observe(target)
+                _defl = _apply_deflection_only(_astro, t, icrf_center, planets)
+                _p = _np.array(_defl.position.au, dtype=float)
+                _v_obs = _np.array(
+                    _astro.center_barycentric.velocity.au_per_d, dtype=float
+                )
+                _add_aberration(_p, _v_obs, _length_of(_p) / _C_AUDAY)
+                pos = _Apparent(_p, _defl.velocity.au_per_d, t=t, center=icrf_center)
 
     # 4. Coordinate System & Speeds
     is_equatorial = bool(iflag & FLG_EQUATORIAL)
@@ -5415,13 +5460,19 @@ def _calc_body(
 
         if iflag & FLG_J2000:
             # Mean equator/equinox of J2000: ICRS rotated by IAU 2006 frame
-            # bias.
+            # bias. FLG_ICRS combines with FLG_J2000 instead of being
+            # overridden by it (measured: the bias is still dropped, 0.0065"
+            # to 0.0102" on the bodies sampled), so under ICRS the vector is
+            # already in the requested frame.
             from .fast_calc import _rotate_icrs_to_j2000_mean_equator
 
             _xi, _yi, _zi = pos.position.au
-            xe, ye, ze = _rotate_icrs_to_j2000_mean_equator(
-                float(_xi), float(_yi), float(_zi)
-            )
+            if is_icrs:
+                xe, ye, ze = float(_xi), float(_yi), float(_zi)
+            else:
+                xe, ye, ze = _rotate_icrs_to_j2000_mean_equator(
+                    float(_xi), float(_yi), float(_zi)
+                )
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
             p2 = (
@@ -5496,11 +5547,26 @@ def _calc_body(
         # Ecliptic (Long/Lat)
         if iflag & FLG_J2000:
             # IAU 2006 mean-ecliptic J2000 coordinates (frame bias plus mean
-            # obliquity).
-            from .fast_calc import _rotate_icrs_to_ecliptic_j2000
+            # obliquity). FLG_ICRS drops the bias here too, leaving the
+            # pole/equinox on the ICRS realization and applying the J2000
+            # mean obliquity alone.
+            from .fast_calc import (
+                _rotate_equatorial_to_ecliptic,
+                _rotate_icrs_to_ecliptic_j2000,
+            )
 
             x, y, z = pos.position.au
-            xe, ye, ze = _rotate_icrs_to_ecliptic_j2000(float(x), float(y), float(z))
+            if is_icrs:
+                xe, ye, ze = _rotate_equatorial_to_ecliptic(
+                    float(x),
+                    float(y),
+                    float(z),
+                    vondrak_mean_obliquity_rad(_J2000_JD),
+                )
+            else:
+                xe, ye, ze = _rotate_icrs_to_ecliptic_j2000(
+                    float(x), float(y), float(z)
+                )
 
             # Convert to spherical
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)

@@ -959,10 +959,16 @@ def _sol_how_core(
     # fraction at 1.0. Measured reference behavior.
     _is_solar = (not isinstance(body, str)) and body == SUN
     if retc == 0:
-        # No eclipse at this place and time: nothing of the Sun is obscured.
-        # (sol_eclipse_how() zeroes attr on retflag==0, but sol_eclipse_where()
-        # and lun_occult_where() return this attr directly, so set 0.0 here.)
-        attr[2] = 0.0
+        # No eclipse at this place and time. The measured value of this slot is
+        # 1.0, not 0.0 — verified on six no-event instants spanning 1980-2050,
+        # where attr[1] itself ranges 0.93-1.02, so the 1.0 is a fixed
+        # no-event value rather than the area ratio. It reads oddly for a
+        # channel documented as "fraction of the Sun's disc covered", but it
+        # is the compatibility contract for this entry point and consumers
+        # branch on it; sol_eclipse_how() zeroes its whole attr array on
+        # retflag==0 and is unaffected. The earlier 0.0 here rested on a
+        # comment that asserted the opposite measurement.
+        attr[2] = 1.0
     elif rsun <= 0.0:
         attr[2] = 1.0
     elif retc in (ECL_TOTAL, ECL_ANNULAR):

@@ -1505,14 +1505,19 @@ def _frame_transform(
     *want_xyz*, in which case the Cartesian components of the rotated vector
     are returned.
     """
-    # FLG_ICRS selects the of-date reduction expressed relative to the ICRS
-    # pole/equinox: the same precession-nutation WITHOUT the ICRS frame bias.
-    # FLG_J2000 (a fixed frame) takes precedence over it, matching the reference
-    # and the Skyfield-path reducer in ``planets._calc_body``.
-    _icrs = bool(iflag & FLG_ICRS) and not (iflag & FLG_J2000)
+    # FLG_ICRS drops the ICRS frame bias from the output rotation. It combines
+    # with FLG_J2000 rather than being overridden by it: measured against the
+    # reference, FLG_J2000 | FLG_ICRS still removes the bias (0.0065"-0.0102"
+    # on the bodies sampled), where an earlier revision returned the plain
+    # J2000 mean-equinox value and a comment claimed that matched.
+    _icrs = bool(iflag & FLG_ICRS)
     if (iflag & FLG_EQUATORIAL) and (iflag & FLG_J2000):
         # Mean equator/equinox of J2000: ICRS rotated by IAU 2006 frame bias.
-        v = _rotate_icrs_to_j2000_mean_equator(geo[0], geo[1], geo[2])
+        # Under FLG_ICRS the bias is dropped, so the vector IS the output.
+        if _icrs:
+            v = (geo[0], geo[1], geo[2])
+        else:
+            v = _rotate_icrs_to_j2000_mean_equator(geo[0], geo[1], geo[2])
     elif (iflag & FLG_EQUATORIAL) and (iflag & FLG_SIDEREAL):
         # SID+EQ: mean equator of date (P matrix, no nutation). FLG_ICRS drops
         # the frame bias here like in every other branch; taking the biased
@@ -1531,7 +1536,13 @@ def _frame_transform(
             _eq_mat, _, _, _ = _frame_data(jd_tt)
         v = _mat3_vec3(_eq_mat, geo)
     elif iflag & FLG_J2000:
-        v = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
+        if _icrs:
+            # Bias-free: rotate the ICRS vector by the J2000 mean obliquity
+            # only, leaving the pole/equinox on the ICRS realization.
+            eps_j2000 = math.radians(vondrak_mean_obliquity_deg(_J2000))
+            v = _rotate_equatorial_to_ecliptic(geo[0], geo[1], geo[2], eps_j2000)
+        else:
+            v = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
     else:
         # TRUE ECLIPTIC OF DATE (default). FLG_NONUT: mean ecliptic (no nutation).
         # FLG_ICRS drops the frame bias; the true obliquity is bias-independent.
@@ -2378,9 +2389,31 @@ def _escalate_sealed_range_miss(
         return None
     body_cov = coverage_fn(ipl)
     if body_cov is None:
-        # Body absent from the reader entirely: not a date-range miss for this
-        # body. Leave the original error for the caller's missing-body policy.
-        return None
+        # The requested id has no channel of its own. For an analytically
+        # modelled body that reads its Sun/Earth support states from the LEB
+        # (Transpluto 48, the predicted planets 50-54, Vulcan 55, Proserpina
+        # 57) the miss IS a date-range miss, so describe it with the id the
+        # caller asked for instead of leaving an error that names Body 0.
+        sun_cov_only = coverage_fn(SUN)
+        if sun_cov_only is None:
+            return None
+        s_start, s_end = float(sun_cov_only[0]), float(sun_cov_only[1])
+        if s_start <= jd_tt <= s_end:
+            # Support states are in range: not a range miss.
+            return None
+        from .exceptions import EphemerisRangeError as _RangeErr
+
+        return _RangeErr(
+            message=(
+                f"Body {ipl} at JD {jd_tt:.6f} is outside active LEB coverage "
+                f"range [{s_start:.6f}, {s_end:.6f}] for the support states its "
+                "declared local model needs."
+            ),
+            requested_jd=jd_tt,
+            start_jd=s_start,
+            end_jd=s_end,
+            body_id=ipl,
+        )
     b_start, b_end = float(body_cov[0]), float(body_cov[1])
     if b_start <= jd_tt <= b_end:
         # The requested body IS covered here; the failure was something else

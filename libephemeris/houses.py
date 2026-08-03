@@ -1987,12 +1987,16 @@ def _houses_sidbit_projection(
     ang_n = math.degrees(math.atan2(float(n_eq[1]), float(n_eq[0]))) % 360.0
     armc_p = (trop_ascmc[2] - ang_n) % 360.0
 
-    # Sunshine ('I'/'i') Sun declination on the equator of date. In an ayanamsha
-    # (non-fixed-epoch) sidereal zodiac the reference computes 'i' like 'I'
-    # (see houses_ex), so collapse the engine selector here as well.
-    engine_hsys = "I" if hsys_char == "i" else hsys_char
+    # Sunshine ('I'/'i') Sun declination on the equator of date. The plain
+    # ayanamsha zodiac collapses 'i' onto 'I' (see houses_ex), but a SIDBIT
+    # projection does NOT: measured against the reference, 'i' keeps the
+    # Makransky construction here, which differs from 'I' above about 59
+    # degrees of latitude (78.0 deg on cusp 2 at lat 60, 100.7 deg at lat
+    # 65) and is identical below it. This function only runs with a
+    # projection bit active, so the selector passes through unchanged.
+    engine_hsys = hsys_char
     ascmc9 = 0.0
-    if engine_hsys == "I":
+    if engine_hsys in ("I", "i"):
         try:
             eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
             sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)

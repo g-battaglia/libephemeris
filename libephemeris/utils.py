@@ -739,6 +739,13 @@ def degnorm(x: float) -> float:
         >>> degnorm(720)
         0.0
     """
+    # Measured reference behavior: an input within 1e-13 of zero normalizes to
+    # exactly 0.0 rather than wrapping to ~360. Without this, degnorm(-5e-14)
+    # returned 359.99999999999994 — the same angle, but a full turn away in
+    # the reported value, which propagates into any consumer that compares or
+    # bins the result. The snap runs before the wrap, as in the reference.
+    if abs(x) < 1e-13:
+        return 0.0
     result = x % 360.0
     # Python's modulo can return exactly 360.0 for tiny negative inputs
     # (e.g. (-1e-17) % 360.0 == 360.0); snap that artifact to 0.0 to keep
@@ -779,6 +786,11 @@ def radnorm(x: float) -> float:
         >>> radnorm(4 * math.pi)  # 720 degrees -> 0
         0.0
     """
+    # Same near-zero snap as degnorm (measured reference behavior): an input
+    # within 1e-13 rad of zero normalizes to exactly 0.0 instead of wrapping
+    # to ~2*pi.
+    if abs(x) < 1e-13:
+        return 0.0
     result = x % TWO_PI
     # Same snap as degnorm: keep the [0, 2*pi) contract for tiny negative
     # inputs whose modulo lands exactly on the upper bound.
@@ -1334,14 +1346,11 @@ def deg_midp(x1: float, x2: float) -> float:
     # Calculate midpoint along the chosen arc
     midp = x1 + diff / 2.0
 
-    # Normalize result to [0, 360). A tiny-negative midpoint makes the float
-    # modulo round to exactly 360.0 ((-2.3e-14) % 360.0 == 360.0), which
-    # would violate the documented half-open range: snap it to 0.0, the same
-    # guard degnorm applies.
-    result = midp % 360.0
-    if result >= 360.0:
-        return 0.0
-    return result
+    # Normalize through degnorm so the midpoint inherits the same near-zero
+    # snap and half-open-range guard as every other public angle (a midpoint
+    # a hair below zero, e.g. deg_midp(0.0, -1e-13), otherwise reported
+    # ~359.99999999999994 instead of 0.0).
+    return degnorm(midp)
 
 
 def rad_midp(x: float, y: float) -> float:
