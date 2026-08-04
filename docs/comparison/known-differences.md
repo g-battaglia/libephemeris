@@ -197,8 +197,18 @@ covered by provenance tests rather than by preserving the reference anomaly.
 Fixed-star astrometry uses the permissively sourced LibEphemeris catalogue,
 proper motions, and the same ERFA/Skyfield frame pipeline as planetary output.
 Catalogue coverage, aliases, and ambiguous prefix resolution can differ from an
-external catalogue. Numeric strings are interpreted as Hipparcos identifiers;
-names and aliases follow LibEphemeris's documented resolver.
+external catalogue.
+
+The reference-named `fixstar*` family resolves names with the reference's
+exact search semantics: a leading-digit string is a **1-based sequential
+number in the sorted catalogue** (so `"12"` is the twelfth catalogue entry,
+not HIP 12), a leading comma keys an exact Bayer/Flamsteed nomenclature
+match, and plain names match traditional names exactly first, then as a
+prefix in catalogue order. No fuzzy matching, Bayer-word parsing
+(`"Alpha Leonis"`), Flamsteed-word parsing (`"32 Leonis"`), or
+alternate-spelling recovery happens on this family. Those richer lookups
+remain available in LibEphemeris's own helper `resolve_star_name()`, which
+is the migration path for callers that relied on them.
 
 Sidereal star speeds are derived from the actual selected sidereal model. No
 mode-dependent correction is recovered from external observations.

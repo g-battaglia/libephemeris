@@ -9096,11 +9096,12 @@ def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, 
     offset raise ``object N not valid`` (the reference rejects the same ids
     through its element-file lookup). The fictitious/hypothetical bodies (40-58) are
     reduced from the library's *own* runtime models rather than a foreign
-    element set, so where the two models disagree by arbitration the elements
-    differ (e.g. Isis/Transpluto a=77.755 here vs 77.775; the White Moon (56)
-    and Waldemath (58) are geocentric circular constructions here, so their
-    elements are Earth-relative). Nibiru (49) is intentionally not modeled and
-    the position pipeline's typed error propagates.
+    element set, so implementations built on a different element source can
+    report different elements (e.g. Isis/Transpluto uses a=77.755 from the
+    published Landscheidt convention; the White Moon (56) and Waldemath (58)
+    are geocentric circular constructions here, so their elements are
+    Earth-relative). Nibiru (49) is intentionally not modeled and the
+    position pipeline's typed error propagates.
     """
     _validate_orbital_object("get_orbital_elements", planet, sun_valid=False)
     ts = get_timescale()
