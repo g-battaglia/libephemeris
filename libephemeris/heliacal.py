@@ -2449,7 +2449,7 @@ def _vis_limit_mag_leb(
         moon_alt = -90.0
 
     if body_id == MOON:
-        # Measured reference behavior: when the observed object IS the Moon,
+        # Compatibility contract: when the observed object IS the Moon,
         # its own light is not sky glow hindering the observation, so the
         # moonlight term is removed exactly as with VISLIM_NOMOON (the sky
         # stays dark and the limiting magnitude reflects the object alone).
@@ -4279,14 +4279,15 @@ def _heliacal_pheno_ut_pythonic(
     observer_at = earth + observer
 
     # --- Geometric (TRUEPOS-like) places for the geometric output slots -------
-    # The reference reports AltO, GeoAltO, AziO, AltS, AziS and the derived arcs
-    # from the astrometric (aberration- and light-time-free) direction, whereas
-    # the apparent place carries the ~20" annual aberration (plus, for the fast
-    # planets, the light-time bending of the direction). Using the geometric
-    # place was verified against the reference to cut the residual from ~20-42"
-    # to the frame-model floor. Only the geometric output slots change: the
-    # refracted AppAltO slot keeps the apparent altitude and the arbitrated
-    # refraction model, and the visibility detector is untouched.
+    # Compatibility contract: AltO, GeoAltO, AziO, AltS, AziS and the derived
+    # arcs come from the astrometric (aberration- and light-time-free)
+    # direction, whereas the apparent place carries the ~20" annual aberration
+    # (plus, for the fast planets, the light-time bending of the direction).
+    # Using the geometric place cuts the residual (behavioral comparison with
+    # one external implementation) from ~20-42" to the frame-model floor. Only
+    # the geometric output slots change: the refracted AppAltO slot keeps the
+    # apparent altitude and the arbitrated refraction model, and the
+    # visibility detector is untouched.
     gast = t.gast
 
     # Sun: geometric topocentric altitude/azimuth (AltS, AziS).
@@ -4876,7 +4877,7 @@ def vis_limit_mag(
         moon_alt = -90.0  # Assume Moon at nadir
 
     if body_id == MOON:
-        # Measured reference behavior: when the observed object IS the Moon,
+        # Compatibility contract: when the observed object IS the Moon,
         # its own light is not sky glow hindering the observation, so the
         # moonlight term is removed exactly as with VISLIM_NOMOON (the sky
         # stays dark and the limiting magnitude reflects the object alone).

@@ -98,7 +98,7 @@ class _IllegalRiseBodyError(UnknownBodyError, ValueError):
     Raised for an unknown or unsupported body id passed to ``rise_trans`` /
     ``rise_trans_true_hor`` (e.g. a planetary moon with no registered SPK).
     It multiply inherits the typed ``UnknownBodyError`` (an ``Error``
-    subclass, the class the reference raises for an illegal body) AND the
+    subclass, the compatibility-contract class for an illegal body) AND the
     built-in ``ValueError`` so the single "illegal planet number" contract is
     identical on every backend and satisfies callers catching either type.
     """
@@ -918,14 +918,14 @@ def _sol_how_core(
 
     attr: [0] magnitude as diameter fraction (negative when the limbs do
     not yet overlap), [1] lunar/solar diameter ratio, [2] obscuration.
-    For a solar eclipse the obscuration follows the measured reference
-    convention: the disc-area ratio (r_moon/r_sun)**2 while one disc lies
+    For a solar eclipse the obscuration follows the compatibility
+    contract: the disc-area ratio (r_moon/r_sun)**2 while one disc lies
     inside the other, so it exceeds 1 during totality (Moon larger) and is
     (r_moon/r_sun)**2 < 1 during annularity; the partial phase reports the
     two-disc lens-overlap fraction. For an occultation the obscuration is
     the covered fraction of the body, bounded at 1.0 on the how/when_loc
     path — but the WHERE path reports the uncapped disc-area ratio for
-    planet targets (measured reference behavior; ``where_convention``),
+    planet targets (compatibility contract; ``where_convention``),
     while star targets stay at 1.0 on every path.
     [3] 0 (callers fill the core-shadow width), [4] azimuth of the Sun,
     [5] true altitude, [6] apparent altitude, [7] Moon-Sun center
@@ -961,10 +961,10 @@ def _sol_how_core(
     attr = [0.0] * 20
     attr[1] = rmoon / rsun if rsun > 0.0 else 0.0
     attr[0] = (rsun + rmoon - dctr) / (2.0 * rsun) if rsun > 0.0 else 1.0
-    # A solar eclipse (Sun as the "occulted" body) reports the disc-area
-    # ratio while one disc lies inside the other, so obscuration exceeds 1
-    # during totality; an occultation of a finite body caps the covered
-    # fraction at 1.0. Measured reference behavior.
+    # Compatibility contract: a solar eclipse (Sun as the "occulted" body)
+    # reports the disc-area ratio while one disc lies inside the other, so
+    # obscuration exceeds 1 during totality; an occultation of a finite
+    # body caps the covered fraction at 1.0.
     _is_solar = (not isinstance(body, str)) and body == SUN
     if retc == 0:
         # No eclipse at this place and time. Compatibility contract: this
@@ -2166,7 +2166,8 @@ def _calculate_eclipse_phases_besselian(
     # A hybrid (annular-total) eclipse sets ECL_ANNULAR_TOTAL only — it shares
     # no bits with ECL_TOTAL/ECL_ANNULAR — so it too has an umbral axis that
     # touches Earth and a center line. Without this it would lose U1/U4 and
-    # the center-line instants (tret[4..7]), which the reference returns.
+    # the center-line instants (tret[4..7]), which belong in the tret
+    # contract for these types.
     is_hybrid = bool(eclipse_type & ECL_ANNULAR_TOTAL)
     has_umbral_contact = is_total or is_annular or is_hybrid
 
@@ -2231,8 +2232,8 @@ def _calculate_eclipse_phases_besselian(
     # is bracketed by the first/last penumbral contacts rather than by a fixed
     # window around the maximum. When those contacts do not resolve — an
     # ultra-shallow graze whose penumbra never fully lands, so tret[2]/[3] are
-    # left 0 — there is no such window and tret[1] stays 0. Measured reference
-    # behavior: that degenerate partial returns tret[1] = 0. The earlier
+    # left 0 — there is no such window and tret[1] stays 0. Compatibility
+    # contract: that degenerate partial returns tret[1] = 0. The earlier
     # fabricated jd_max +- 0.15 d bracket produced a spurious noon instant
     # tens of minutes from the maximum for exactly those events.
     t_noon = 0.0
@@ -2466,9 +2467,9 @@ def _calculate_eclipse_type_and_magnitude(
         return 0, 0.0, gamma, moon_sun_ratio
 
     # Edge case: near-miss eclipse (gamma very close to limit).
-    # The reference returns PARTIAL|NONCENTRAL (retflag 18) for shallow
-    # partials; the non-reference ECL_GRAZING bit is no longer leaked
-    # into any public retflag.
+    # Compatibility contract: PARTIAL|NONCENTRAL (retflag 18) is returned
+    # for shallow partials; the non-reference ECL_GRAZING bit is no longer
+    # leaked into any public retflag.
     if _is_near_miss_eclipse(gamma, gamma_limit_partial):
         # Graze-boundary gate: the approximate spherical fundamental-plane
         # test (gamma <= 1 + l1) admits penumbral grazes that neither the
@@ -3009,7 +3010,7 @@ def _sol_eclipse_when_glob_pythonic(
                 # drag the maximum across the start time). The epoch margin
                 # makes a maximum within _ECLIPSE_WHEN_EPOCH_MARGIN of jd_start count as
                 # "reached", so an on-maximum start advances to the previous
-                # eclipse (measured reference behavior).
+                # eclipse (compatibility contract).
                 if result[1][0] < jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN:
                     return result
             # Go further back
@@ -3064,7 +3065,7 @@ def _sol_eclipse_when_glob_pythonic(
             # a past eclipse (or looping forever in tret[0]+eps scans). The
             # epoch margin makes a maximum within _ECLIPSE_WHEN_EPOCH_MARGIN of jd_start count
             # as "reached", so `jd = tret[0]; when(jd)` advances to the next
-            # eclipse (measured reference behavior).
+            # eclipse (compatibility contract).
             result = None
         if result is not None:
             # For bidirectional mode, we have a forward result
@@ -3096,8 +3097,8 @@ def _strip_one_try_bit(flags: int) -> int:
     The bit value is shared between ``ECL_ONE_TRY`` and ``FLG_TOPOCTR``.
     In the eclipse functions' ``flags`` argument it can only mean the
     one-try optimization hint (the topocentric place is defined by the
-    explicit ``geopos``, never by this flag), and measured reference
-    behavior returns identical results with or without it. Passing it
+    explicit ``geopos``, never by this flag), and results are identical
+    with or without it (compatibility contract). Passing it
     through to the position pipeline would instead trip the topocentric
     configuration guard. The functional one-try request rides on the
     ``backwards`` parameter, as in the occultation searches.
@@ -3753,7 +3754,7 @@ def _sol_eclipse_when_loc_impl(
     """
     Find the next solar eclipse visible from a specific geographic location.
 
-    This function matches the reference API signature exactly. It searches forward
+    This function follows the reference API signature exactly. It searches forward
     (or backward if specified) in time from tjdut to find the next solar
     eclipse visible from the observer's location specified by geopos.
 
@@ -4362,8 +4363,8 @@ def _sol_eclipse_how_impl(
 
     Note:
         The visibility gate uses the Sun's apparent altitude: at or below
-        0 the function returns retflag 0 even mid-eclipse, matching the
-        reference behavior.
+        0 the function returns retflag 0 even mid-eclipse (compatibility
+        contract).
 
     References:
         - Reference API: sol_eclipse_how()
@@ -5299,7 +5300,8 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     # Edge case: shallow penumbral eclipse
     if penumbral_mag > 0 and penumbral_mag < SHALLOW_ECLIPSE_MAG_THRESHOLD:
         # Very shallow penumbral eclipse - mark as grazing
-        # Shallow grazing penumbral: the reference reports plain PENUMBRAL
+        # Shallow grazing penumbral reports plain PENUMBRAL (compatibility
+        # contract)
         eclipse_type = ECL_PENUMBRAL
         penumbral_mag = max(0.0, penumbral_mag)
         return eclipse_type, 0.0, penumbral_mag, gamma, penumbra_radius, umbra_radius
@@ -5313,7 +5315,8 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     # Edge case: shallow umbral (partial) eclipse
     if umbral_mag > 0 and umbral_mag < SHALLOW_ECLIPSE_MAG_THRESHOLD:
         # Very shallow partial umbral eclipse - mark as grazing
-        # Shallow grazing partial: the reference reports plain PARTIAL
+        # Shallow grazing partial reports plain PARTIAL (compatibility
+        # contract)
         eclipse_type = ECL_PARTIAL
         umbral_mag = max(0.0, min(1.0, umbral_mag))
         penumbral_mag = max(0.0, penumbral_mag)
@@ -5672,7 +5675,7 @@ def _lun_eclipse_when_pythonic(
     # _find_next_full_moon() skip to the NEXT lunation and drop the
     # in-progress eclipse. Probe the previous Full Moon first and return its
     # eclipse when its maximum is still more than the epoch margin ahead of
-    # jd_start (measured reference behavior: the current eclipse is returned
+    # jd_start (compatibility contract: the current eclipse is returned
     # right up to maximum - _ECLIPSE_WHEN_EPOCH_MARGIN).
     if not backwards:
         try:
@@ -5711,7 +5714,7 @@ def _lun_eclipse_when_pythonic(
             # can drag the maximum across the start time). The epoch margin
             # makes a maximum within _ECLIPSE_WHEN_EPOCH_MARGIN of jd_start count as "reached",
             # so `jd = tret[0]; when(jd)` advances to the neighbouring
-            # eclipse (measured reference behavior).
+            # eclipse (compatibility contract).
             skip = (
                 not backwards and jd_max <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
             ) or (backwards and jd_max >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN)
@@ -6349,10 +6352,10 @@ def _reject_moon_self_occultation(body: "int | str") -> None:
     """Reject the degenerate Moon-occults-Moon request with the typed error.
 
     The Moon cannot occult itself; without this guard the shadow geometry
-    would divide by the zero Moon-to-body distance. Measured reference
-    behavior never returns for this request either (it fails to
-    terminate), so the shared typed contract error is raised instead by
-    every lun_occult_* entry point.
+    would divide by the zero Moon-to-body distance. Behavioral comparison
+    with one external implementation showed no defined result for this
+    request either (the call fails to terminate), so the shared typed
+    contract error is raised instead by every lun_occult_* entry point.
     """
     if isinstance(body, int) and body == MOON:
         from .exceptions import Error as _Error
@@ -7480,8 +7483,8 @@ def _rise_trans_true_hor_impl(
         rotates that direction to the observer's horizon. This drops both the
         topocentric parallax and the ecliptic latitude, so a body far from the
         ecliptic rises/sets at a very different time (e.g. the Moon shifts by
-        tens of minutes toward its ecliptic-longitude crossing). Measured
-        reference behavior: the bit affects rise/set and twilight but is
+        tens of minutes toward its ecliptic-longitude crossing). Compatibility
+        contract: the bit affects rise/set and twilight but is
         ignored for meridian transits. It is the latitude-zeroing component of
         BIT_HINDU_RISING (896 = 128 | 256 | 512).
 
@@ -7578,14 +7581,15 @@ def _rise_trans_true_hor_impl(
     # backend (the LEB reader when sealed, JPL/Skyfield otherwise) and already
     # enforces the typed error contract, so a genuinely unknown id or an
     # out-of-range date raises there. These are point sources: zero disc radius
-    # and negligible (geocentric) parallax, matching the measured reference
+    # and negligible (geocentric) parallax — the compatibility-contract
     # rise/set geometry.
     use_calc_body = (not is_fixed_star) and (cast(int, body) not in _PLANET_MAP)
     if use_calc_body:
         # Validate positionability up front so an unplaceable body raises the
-        # typed error at the call (the reference rejects it there too), not
-        # mid-search; the fast_calc probe below uses the wrong id space for
-        # AST_OFFSET-aliased ids, so it is skipped for these bodies.
+        # typed error at the call (compatibility contract: rejection happens
+        # at the call), not mid-search; the fast_calc probe below uses the
+        # wrong id space for AST_OFFSET-aliased ids, so it is skipped for
+        # these bodies.
         try:
             calc_ut(jd_start, cast(int, body), FLG_SPEED)
         except (KeyError, ValueError, Error) as _probe_exc:
@@ -7692,8 +7696,8 @@ def _rise_trans_true_hor_impl(
         )
 
     # Twilight events: geometric center crossings of -6/-12/-18 degrees
-    # (the horizon height is ignored for twilight). Measured reference
-    # behavior honors the twilight bits for the Sun AND for fixed stars
+    # (the horizon height is ignored for twilight). Compatibility contract:
+    # the twilight bits are honored for the Sun AND for fixed stars
     # (heliacal-style star visibility at a chosen solar-depression class),
     # while planets and the Moon keep their ordinary horizon crossing.
     rsmi_eff = rsmi
@@ -7772,8 +7776,8 @@ def _rise_trans_true_hor_impl(
 
     # Hindu-rising convention (BIT_GEOCTR_NO_ECL_LAT): the event uses the
     # body's GEOCENTRIC apparent place projected onto the ecliptic (ecliptic
-    # latitude zeroed), not the ordinary topocentric place. Measured reference
-    # behavior: this shifts rise/set AND twilight (e.g. the Moon's rise moves by
+    # latitude zeroed), not the ordinary topocentric place. Compatibility
+    # contract: this shifts rise/set AND twilight (e.g. the Moon's rise moves by
     # ~25 min toward its ecliptic-longitude crossing) but leaves meridian
     # transits untouched - the transit path below returns before the altitude
     # engine, so the bit is naturally ignored there. Built on calc_ut/azalt so
@@ -7820,8 +7824,8 @@ def _rise_trans_true_hor_impl(
         higher declination while the solve — already working on the lower
         projected declination — would have found the event: the two disagree
         and rise/set is spuriously reported circumpolar (res=-2) at high
-        geographic latitude. Measured reference behavior: the event exists and
-        is returned there.
+        geographic latitude. Compatibility contract: the event exists and
+        must be returned.
 
         The projection uses the same of-date true obliquity azalt applies in
         _get_body_altaz_geoctr_nolat, so this declination is exactly the one the
@@ -11087,8 +11091,9 @@ def calc_solar_eclipse_duration(
         3. Return (C3 - C2) converted from days to minutes
 
     Precision:
-        The central-line duration matches the reference local maximum-eclipse
-        duration to within about ±0.05 minutes (±3 seconds).
+        The central-line duration agrees with one external implementation's
+        local maximum-eclipse duration to within about ±0.05 minutes
+        (±3 seconds).
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -11103,8 +11108,8 @@ def calc_solar_eclipse_duration(
 
     Note:
         - This is the central-line maximum duration (as seen from the point of
-          greatest eclipse), the same quantity the reference reports as the
-          local maximum-eclipse duration
+          greatest eclipse), the quantity the compatibility contract labels
+          the local maximum-eclipse duration
         - Duration at other observer locations on the path is typically shorter;
           for a specific location use _sol_eclipse_when_loc_pythonic()
         - Total solar eclipses can have central durations up to ~7.5 minutes
@@ -12723,7 +12728,7 @@ def sol_eclipse_magnitude_at_loc(
     """
     Calculate the eclipse magnitude at a specific geographic location and time.
 
-    This function matches the reference API naming convention. It is a convenience
+    This function follows the reference API naming convention. It is a convenience
     wrapper that returns just the eclipse magnitude (fraction of solar diameter
     covered by the Moon) without the full attribute array.
 
@@ -12997,7 +13002,7 @@ def sol_eclipse_obscuration_at_loc(
     """
     Calculate the eclipse obscuration at a specific geographic location and time.
 
-    This function matches the reference API naming convention. It is a convenience
+    This function follows the reference API naming convention. It is a convenience
     wrapper that returns just the eclipse obscuration (fraction of solar disc
     area covered by the Moon) without the full attribute array.
 
@@ -13139,7 +13144,7 @@ def lun_eclipse_umbral_magnitude(
     """
     Calculate the umbral magnitude for a lunar eclipse at a specific time.
 
-    This function matches the reference API naming convention. It is a convenience
+    This function follows the reference API naming convention. It is a convenience
     function that returns just the umbral magnitude (fraction of Moon's diameter
     within Earth's umbral shadow).
 
@@ -13255,7 +13260,7 @@ def lun_eclipse_penumbral_magnitude(
     """
     Calculate the penumbral magnitude for a lunar eclipse at a specific time.
 
-    This function matches the reference API naming convention. It is a convenience
+    This function follows the reference API naming convention. It is a convenience
     function that returns just the penumbral magnitude (fraction of Moon's diameter
     within Earth's penumbral shadow).
 
@@ -13380,7 +13385,7 @@ def lun_eclipse_gamma(
 ) -> float:
     """Calculate lunar-eclipse gamma at a specific time.
 
-    This function matches the reference API naming convention. Gamma represents
+    This function follows the reference API naming convention. Gamma represents
     the distance of the Moon's center from Earth's shadow axis, measured in
     Earth radii.
 

@@ -2408,7 +2408,7 @@ def close() -> None:
           (they are re-resolved from env/TOML only if never set
           explicitly). Per-session state (topo, sidereal mode, open files,
           caches) is cleared.
-        - Measured reference behavior: a user-defined Delta-T set via
+        - Compatibility contract: a user-defined Delta-T set via
           set_delta_t_userdef() is preserved across close() (it is treated
           as configuration, not per-session state). Clear it explicitly with
           set_delta_t_userdef(None).
@@ -2529,8 +2529,8 @@ def _close_inner() -> None:
     _SIDEREAL_BITS = 0
     _ANGLES_CACHE = {}
     _TIDAL_ACCELERATION = None
-    # _DELTA_T_USERDEF is deliberately NOT reset here: measured reference
-    # behavior preserves a user-defined Delta-T across close(). Callers clear
+    # _DELTA_T_USERDEF is deliberately NOT reset here (compatibility
+    # contract): a user-defined Delta-T survives close(). Callers clear
     # it explicitly via set_delta_t_userdef(None).
     _LAPSE_RATE = None
     _AUTO_SPK_DOWNLOAD = None

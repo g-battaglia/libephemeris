@@ -859,10 +859,11 @@ class EphemerisContext:
             # Fall back to global reader if context has no .leb
             reader = state.get_leb_reader()
 
-        # The reference treats Earth as the exact coordinate origin even for
-        # a topocentric request. The LEB topocentric reducer would otherwise
-        # expose the geocentre-from-observer offset, so use the shared vector
-        # path for this degenerate case (LEB-backed in sealed LEB mode).
+        # Compatibility contract: Earth is the exact coordinate origin even
+        # for a topocentric request. The LEB topocentric reducer would
+        # otherwise expose the geocentre-from-observer offset, so use the
+        # shared vector path for this degenerate case (LEB-backed in sealed
+        # LEB mode).
         from .constants import EARTH, FLG_TOPOCTR
 
         if ipl == EARTH and (iflag & FLG_TOPOCTR):

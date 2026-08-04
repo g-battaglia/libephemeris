@@ -123,7 +123,7 @@ _SIGN_PINNED_HSYS = frozenset({"W", "N"})
 def _fold_hsys_case(hsys_char: str) -> str:
     """Fold a house-system selector to its canonical case.
 
-    Measured reference behavior accepts house-system letters
+    Compatibility contract: house-system letters are accepted
     case-insensitively (``'k'`` selects Koch exactly like ``'K'``), with two
     deliberate exceptions: lowercase ``'i'`` is a distinct system of its own
     (Sunshine/Makransky alternative), not an alias of ``'I'`` (Sunshine),
@@ -147,8 +147,8 @@ def _fold_hsys_case(hsys_char: str) -> str:
     # A selector is ONE character. The bytes/str entry points can hand a
     # longer value straight here, and a lexicographic "a" <= s <= "z" test is
     # true for any lowercase multi-character string, so ord() then raised an
-    # internal "expected a character" TypeError. The measured reference also
-    # rejects a multi-character selector (TypeError: argument 4 must be a byte
+    # internal "expected a character" TypeError. Compatibility contract: a
+    # multi-character selector raises (TypeError: argument 4 must be a byte
     # string of length 1), so raising is right — it just has to say so.
     if len(hsys_char) != 1:
         raise TypeError(
@@ -914,8 +914,8 @@ def houses(
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
     # At the exact equator the northern (+90-lat) and southern (-90-lat) pole
-    # heights give antipodal one-sided limits for coasc2 (180 vs 0). Measured
-    # reference behavior resolves this degeneracy per house system: the horizon
+    # heights give antipodal one-sided limits for coasc2 (180 vs 0).
+    # Compatibility contract: the degeneracy is resolved per house system: the horizon
     # system 'H' takes the southern branch (coasc2 -> 0), while every other
     # system takes the northern branch (coasc2 -> 180). Away from lat == 0 the
     # sign of the latitude selects the branch unambiguously and the two
@@ -1009,7 +1009,7 @@ def houses(
     elif hsys_char == "Y":  # APC Houses
         cusps = _houses_apc(armc_active, lat, eps, asc, mc)
         # APC at polar latitudes needs cusps and MC flipped if MC is below horizon
-        # (reference behavior - different from R/C/T which flip armc_active)
+        # (compatibility contract - different from R/C/T which flip armc_active)
         mc_dec_rad = math.atan(
             math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
         )
@@ -1033,11 +1033,12 @@ def houses(
     elif hsys_char == "N":  # Natural Gradient
         cusps = _houses_natural_gradient(armc_active, lat, eps, asc, mc)
     elif hsys_char in ("G", "g"):  # Gauquelin
-        # Lowercase 'g' computes the same 36 Gauquelin sectors: measured
-        # reference behavior folds it for the computation (house_pos and
-        # house_name treat 'g' as Gauquelin) but keys the RETURN SHAPE on
-        # the uppercase byte only, so 'g' yields the first 12 sectors in
-        # the ordinary 12-cusp tuple (see the shape check below).
+        # Lowercase 'g' computes the same 36 Gauquelin sectors.
+        # Compatibility contract: 'g' is folded for the computation
+        # (house_pos and house_name treat 'g' as Gauquelin) but the RETURN
+        # SHAPE is keyed on the uppercase byte only, so 'g' yields the first
+        # 12 sectors in the ordinary 12-cusp tuple (see the shape check
+        # below).
         cusps = _houses_gauquelin(armc_active, lat, eps, asc, mc)
     elif hsys_char == "S":  # Sripati
         cusps = _houses_sripati(asc, mc)
@@ -1496,8 +1497,8 @@ def houses_armc(
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
     # At the exact equator the northern (+90-lat) and southern (-90-lat) pole
-    # heights give antipodal one-sided limits for coasc2 (180 vs 0). Measured
-    # reference behavior resolves this degeneracy per house system: the horizon
+    # heights give antipodal one-sided limits for coasc2 (180 vs 0).
+    # Compatibility contract: the degeneracy is resolved per house system: the horizon
     # system 'H' takes the southern branch (coasc2 -> 0), while every other
     # system takes the northern branch (coasc2 -> 180). Away from lat == 0 the
     # sign of the latitude selects the branch unambiguously and the two
@@ -1572,7 +1573,7 @@ def houses_armc(
     elif hsys_char == "Y":  # APC Houses
         cusps = _houses_apc(armc_active, lat, eps, asc, mc)
         # APC at polar latitudes needs MC flipped in ascmc if MC is below horizon
-        # (reference behavior - different from R/C/T which flip armc_active)
+        # (compatibility contract - different from R/C/T which flip armc_active)
         mc_dec_rad = math.atan(
             math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
         )
@@ -1595,11 +1596,12 @@ def houses_armc(
     elif hsys_char == "N":  # Natural Gradient
         cusps = _houses_natural_gradient(armc_active, lat, eps, asc, mc)
     elif hsys_char in ("G", "g"):  # Gauquelin
-        # Lowercase 'g' computes the same 36 Gauquelin sectors: measured
-        # reference behavior folds it for the computation (house_pos and
-        # house_name treat 'g' as Gauquelin) but keys the RETURN SHAPE on
-        # the uppercase byte only, so 'g' yields the first 12 sectors in
-        # the ordinary 12-cusp tuple (see the shape check below).
+        # Lowercase 'g' computes the same 36 Gauquelin sectors.
+        # Compatibility contract: 'g' is folded for the computation
+        # (house_pos and house_name treat 'g' as Gauquelin) but the RETURN
+        # SHAPE is keyed on the uppercase byte only, so 'g' yields the first
+        # 12 sectors in the ordinary 12-cusp tuple (see the shape check
+        # below).
         cusps = _houses_gauquelin(armc_active, lat, eps, asc, mc)
     elif hsys_char == "S":  # Sripati
         cusps = _houses_sripati(asc, mc)
@@ -1657,7 +1659,7 @@ def houses_armc_ex2(
     houses_ex2(). It calculates house cusps directly from the ARMC value and
     also returns the velocities (derivatives) of house cusps and angles.
 
-    Velocities are always calculated, matching the reference behavior.
+    Velocities are always calculated (compatibility contract).
     The ``ascmc9`` parameter carries the Sun's declination for the Sunshine
     house system ('I'/'i') and is forwarded to the underlying cusp solution
     (matching the reference, whose houses_armc_ex2 also uses it); it is
@@ -1836,10 +1838,10 @@ def _houses_fixed_epoch_sidereal(
     n_eq = m @ n_t0
     ang_n = math.degrees(math.atan2(float(n_eq[1]), float(n_eq[0]))) % 360.0
     armc_p = (trop_ascmc[2] - ang_n) % 360.0
-    # The reference orients the anchor arc by the sign of (t - t0), not by
-    # its true sign: within the interval where nutation puts the node on
-    # the other side of the t0 equinox, the anchor reflects. The ARMC above
-    # is NOT reflected (measured reference behavior).
+    # Compatibility contract: the anchor arc is oriented by the sign of
+    # (t - t0), not by its true sign: within the interval where nutation puts
+    # the node on the other side of the t0 equinox, the anchor reflects. The
+    # ARMC above is NOT reflected.
     d_node = lon_node if lon_node <= 180.0 else lon_node - 360.0
     lon_node = -abs(d_node) if jd_tt >= t0 else abs(d_node)
 
@@ -1897,7 +1899,7 @@ def _houses_sidbit_projection(
         Souchay 2012); the zero point is the J2000 ayanamsha direction projected
         onto that plane.
 
-    Measured reference behavior builds the whole house construction ON that
+    Compatibility contract: the whole house construction is built ON that
     plane rather than shifting the ecliptic-of-date cusps by a scalar ayanamsha:
     the ARMC is re-based to the ascending node of the true equator of date on
     the plane (so the reported ARMC itself moves -- up to ~3.9 deg for the tilted
@@ -1979,7 +1981,7 @@ def _houses_sidbit_projection(
 
     # Projection plane, expressed as J2000-mean-ecliptic -> plane frame, and the
     # sidereal zero point in that frame -- identical to the calc SIDBIT path.
-    # Measured reference behavior: with BOTH projection bits set,
+    # Flag precedence: with BOTH projection bits set,
     # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE.
     if sid_bits & SIDBIT_ECL_T0:
         from .planets import _ecl_t0_epoch_jd
@@ -2007,7 +2009,7 @@ def _houses_sidbit_projection(
 
     # Sunshine ('I'/'i') Sun declination on the equator of date. The plain
     # ayanamsha zodiac collapses 'i' onto 'I' (see houses_ex), but a SIDBIT
-    # projection does NOT: measured against the reference, 'i' keeps the
+    # projection does NOT (compatibility contract): 'i' keeps the
     # Makransky construction here, which differs from 'I' above about 59
     # degrees of latitude (78.0 deg on cusp 2 at lat 60, 100.7 deg at lat
     # 65) and is identical below it. This function only runs with a
@@ -2132,10 +2134,10 @@ def houses_ex(
 
         # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections. The sidereal zodiac
         # is measured on the mean ecliptic of the mode's reference epoch t0, or on
-        # the solar-system invariable plane, instead of the ecliptic of date. The
-        # reference rebuilds the whole house construction on that plane (measured
-        # reference behavior: the reported ARMC itself shifts to the plane's node),
-        # so route to the projected-plane reconstruction. The star/galactic "true"
+        # the solar-system invariable plane, instead of the ecliptic of date.
+        # Compatibility contract: the whole house construction is rebuilt on that
+        # plane (the reported ARMC itself shifts to the plane's node), so route
+        # to the projected-plane reconstruction. The star/galactic "true"
         # modes define their zero point on the ecliptic of date, where the
         # projection is inert (the same suppression the calc path applies): those
         # fall through to the ayanamsha path below, which reproduces the base
@@ -2163,12 +2165,12 @@ def houses_ex(
         # term — houses are geometric ARMC-frame quantities). FLG_TRUEPOS /
         # FLG_NOABERR / FLG_NOGDEFL are honoured: for the star/galactic-center
         # anchored modes the anchor's annual aberration and solar light
-        # deflection are removed from the subtracted value (measured
-        # reference behavior: every cusp and angle shifts by the same amount
-        # as the calc sidereal path under those bits). Dropping FLG_NOGDEFL
-        # here left the cusps completely unchanged by that flag, while the
-        # reference shifts them all by the anchor's deflection delta
-        # (measured: -0.045" for a True Citra solar-conjunction case).
+        # deflection are removed from the subtracted value (compatibility
+        # contract: every cusp and angle shifts by the same amount as the
+        # calc sidereal path under those bits). Dropping FLG_NOGDEFL here
+        # left the cusps completely unchanged by that flag, when they should
+        # all shift by the anchor's deflection delta (-0.045" for a True
+        # Citra solar-conjunction case).
         from .constants import FLG_NOABERR, FLG_NOGDEFL, FLG_TRUEPOS
         from .planets import get_ayanamsa_ex_ut
 
@@ -2475,7 +2477,7 @@ def house_name(hsys: int) -> str:
         "i": "Sunshine/alt.",
         "J": "Savard-A",
     }
-    # Measured reference behavior: an unknown selector yields an empty
+    # Compatibility contract: an unknown selector yields an empty
     # string, and the name lookup folds 'g' to Gauquelin (unlike the
     # houses() tuple shape, which stays 12 for the lowercase byte).
     if hsys_char == "g":
@@ -2581,7 +2583,8 @@ def _houses_placidus(
             # +/-90 deg) and keep iterating — the latitude pre-check
             # has already raised for genuinely polar latitudes.
             # Bailing out here sent these cases to the fallback cusps,
-            # up to 20 deg away from the reference at lat +/-66.55.
+            # up to 20 deg of divergence from one external implementation
+            # at lat +/-66.55.
             prod = math.tan(rad_lat) * tan_dec
             if prod > 1.0:
                 prod = 1.0
@@ -5207,7 +5210,7 @@ def _house_pos_pythonic(
     hsys_int: int
 
     # Detect which calling convention is used.  objcoord may be any
-    # sequence (the reference accepts lists as well as tuples).
+    # sequence (lists are accepted as well as tuples).
     if isinstance(hsys_or_objcoord, (tuple, list)):
         # 5-arg reference API form: (armc, lat, obliquity, objcoord, hsys)
         objcoord = hsys_or_objcoord
@@ -5255,8 +5258,8 @@ def _house_pos_pythonic(
 
     # Case-fold the selector like every other entry point ('k' == 'K',
     # lowercase 'i' stays the distinct Sunshine-alternative system).
-    # house_pos folds 'g' fully: measured reference behavior returns
-    # Gauquelin SECTOR positions (1-36) for the lowercase selector too —
+    # house_pos folds 'g' fully (compatibility contract): Gauquelin
+    # SECTOR positions (1-36) are returned for the lowercase selector too —
     # only the houses() tuple shape is keyed on the uppercase byte.
     hsys_char = _fold_hsys_case(hsys_char)
     if hsys_char == "g":

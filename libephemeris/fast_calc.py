@@ -1252,7 +1252,7 @@ def _calc_ayanamsa_from_leb(
             jd_tt, defining_epoch
         )
     else:
-        # Measured reference behavior: an unrecognized sidereal mode falls back
+        # Compatibility contract: an unrecognized sidereal mode falls back
         # to the default Fagan/Bradley ayanamsha (mode 0). Match the module
         # reducer (planets._calc_ayanamsa) so a sidereal position request on the
         # LEB path never raises on an invalid mode.
@@ -2497,10 +2497,11 @@ def fast_calc_ut(
     topo_offset = None
     topo_geopos = None
     if iflag & FLG_TOPOCTR and ipl in _TOPO_NOOP_POINTS:
-        # Parallax is a no-op for the geocentric-defined lunar points: the
-        # measured reference (and the Skyfield path) compute them under
-        # FLG_TOPOCTR without an observer and echo the bit. Leave
-        # topo_geopos unset so the offset stages below are skipped.
+        # Parallax is a no-op for the geocentric-defined lunar points.
+        # Compatibility contract (same as the Skyfield path): they are
+        # computed under FLG_TOPOCTR without requiring an observer, and
+        # the bit is echoed. Leave topo_geopos unset so the offset stages
+        # below are skipped.
         pass
     elif iflag & FLG_TOPOCTR:
         if topo is not None:
@@ -2619,10 +2620,11 @@ def fast_calc_tt(
     topo_offset = None
     topo_geopos = None
     if iflag & FLG_TOPOCTR and ipl in _TOPO_NOOP_POINTS:
-        # Parallax is a no-op for the geocentric-defined lunar points: the
-        # measured reference (and the Skyfield path) compute them under
-        # FLG_TOPOCTR without an observer and echo the bit. Leave
-        # topo_geopos unset so the offset stages below are skipped.
+        # Parallax is a no-op for the geocentric-defined lunar points.
+        # Compatibility contract (same as the Skyfield path): they are
+        # computed under FLG_TOPOCTR without requiring an observer, and
+        # the bit is echoed. Leave topo_geopos unset so the offset stages
+        # below are skipped.
         pass
     elif iflag & FLG_TOPOCTR:
         if topo is not None:
@@ -2919,11 +2921,11 @@ def _fast_calc_core(
     _skip_sidereal = bool(iflag & FLG_EQUATORIAL)
 
     # Degenerate self-observation (Earth geocentric, Sun heliocentric) yields a
-    # zero-length state whose longitude is physically undefined. Measured
-    # reference behavior: the reference returns the exact zero vector here and
-    # does NOT subtract the ayanamsha from the undefined zero longitude, so skip
-    # the sidereal reduction on a zero-distance state (matches the Skyfield
-    # path's _degenerate_origin_result).
+    # zero-length state whose longitude is physically undefined. Compatibility
+    # contract: return the exact zero vector here and do NOT subtract the
+    # ayanamsha from the undefined zero longitude, so skip the sidereal
+    # reduction on a zero-distance state (matches the Skyfield path's
+    # _degenerate_origin_result).
     if (iflag & FLG_SIDEREAL) and not _skip_sidereal and dist != 0.0:
         try:
             mean_aya = _calc_ayanamsa_from_leb(

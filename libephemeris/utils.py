@@ -170,7 +170,8 @@ def cotrans_sp(
     # exact pole. The analytic longitude rate (x*dy - y*dx)/denom is stable for
     # every denom > 0, so no artificial guard band is used: an earlier
     # ``denom > 1e-10`` guard zeroed the rate within ~0.0006 deg of the pole,
-    # whereas the reference returns the (large, finite) analytic value there.
+    # whereas the compatibility contract keeps the (large, finite) analytic
+    # value there.
     # Only the genuine singularity (denom exactly 0.0) falls back to 0.0.
     denom = x * x + y * y
     if denom > 0.0:
@@ -1548,10 +1549,10 @@ def _split_deg_nakshatra(
     differ, so the check must use the position, unlike the 30° zodiac path.
 
     The index is not reduced modulo 360°: it counts nakshatras from 0 for the
-    raw longitude, so inputs beyond one turn report indices >= 27. Measured
-    reference behavior: a raw index of exactly 27 (one full turn, longitude in
-    [360°, 360° + 13°20')) reports as nakshatra 0; larger indices are reported
-    unreduced.
+    raw longitude, so inputs beyond one turn report indices >= 27.
+    Compatibility contract: a raw index of exactly 27 (one full turn,
+    longitude in [360°, 360° + 13°20')) reports as nakshatra 0; larger
+    indices are reported unreduced.
 
     Because the segment is exact in arc-seconds but not in degrees, the
     arc-second reduction here makes exact degree/minute/segment boundaries
@@ -1571,8 +1572,8 @@ def _split_deg_nakshatra(
     # next segment while leaving the position negative, which the
     # decomposition below then clamped to zero — so 13d20' minus half a
     # microarcsecond reported the start of the next nakshatra instead of the
-    # previous segment's final fractional second. Measured reference
-    # behavior resolves the boundary from the raw value at full precision.
+    # previous segment's final fractional second. The boundary must be
+    # resolved from the raw value at full precision (compatibility contract).
     total_arcsec = ddeg * 3600.0
     nak_idx = int(total_arcsec / _NAK_SPAN_ARCSEC)
     pos_arcsec = total_arcsec - nak_idx * _NAK_SPAN_ARCSEC
@@ -1694,7 +1695,7 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
     # --- Zodiacal sign extraction (after rounding) ---
     # The index is not reduced modulo 360°: int(ddeg / 30) counts 30° signs
     # from 0 for the raw longitude, so inputs beyond one turn report indices
-    # >= 12. Measured reference behavior: a raw index of exactly 12 (one full
+    # >= 12. Compatibility contract: a raw index of exactly 12 (one full
     # turn, ddeg in [360°, 390°)) reports as sign 0; larger indices are
     # reported unreduced.
     if roundflag & SPLIT_DEG_ZODIACAL:

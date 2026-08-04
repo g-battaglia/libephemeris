@@ -3127,12 +3127,12 @@ def _apply_fixstar_flags(
             # Honour FLG_TRUEPOS/FLG_NOABERR/FLG_NOGDEFL on the subtracted
             # ayanamsha: for the star/galactic-center anchored modes the
             # anchor's annual aberration and solar light deflection are
-            # removed exactly as they are from the star itself (measured
-            # reference behavior; same toggle as the calc sidereal path).
+            # removed exactly as they are from the star itself (compatibility
+            # contract; same toggle as the calc sidereal path).
             # Omitting FLG_NOGDEFL reduced star and anchor differently, so
             # near solar conjunction the canonical anchor drifted off its
-            # defining longitude (measured: Spica 0.045" away from 180
-            # degrees in True Citra, where the reference stays exact).
+            # defining longitude (measured: Spica 0.045" away from the
+            # exact 180 degrees that True Citra pins by definition).
             # FLG_NONUT keeps the MEAN value this path has always subtracted
             # (see step 3 note above): with none of the bits set this is
             # exactly the former get_ayanamsa_ut mean value.
@@ -3352,7 +3352,7 @@ def _sidbit_star_call(
     finally:
         _fixed_star_record_suppressed.reset(suppress_token)
 
-    # Measured reference behavior: SIDBIT_ECL_T0 takes precedence over
+    # Flag precedence: SIDBIT_ECL_T0 takes precedence over
     # SIDBIT_SSY_PLANE when both are set (same as the calc path).
     if bits & SIDBIT_ECL_T0:
         t0_jd = _ecl_t0_epoch_jd(sidm)
@@ -3510,9 +3510,9 @@ def _fixstar_ut_by_id(
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
         # Heliocentric/barycentric places are observed from the Sun/SSB with
-        # no aberration and no deflection (the reference echoes NOGDEFL|NOABERR
-        # for them); TOPOCTR keeps the Earth-based observer (center priority
-        # TOPOCTR > BARYCTR > HELCTR).
+        # no aberration and no deflection (compatibility contract:
+        # NOGDEFL|NOABERR are echoed for them); TOPOCTR keeps the Earth-based
+        # observer (center priority TOPOCTR > BARYCTR > HELCTR).
         center = _fixstar_observation_center(flags)
         if center:
             noaberr = True

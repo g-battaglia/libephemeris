@@ -108,11 +108,11 @@ def fixed_epoch_request_flags(iflag: int) -> int:
 def fixed_epoch_retflag(retflag: int, iflag: int) -> int:
     """Echo flags for a fixed-epoch sidereal call.
 
-    The reference echoes the caller's flags plus FLG_NONUT; the internal
-    FLG_J2000 rewrite is not exposed. Bits the backend added on top of the
-    rewritten request (ephemeris echo bits, implied bits) are kept, minus
-    the internal FLG_J2000 — but a J2000 bit the CALLER passed explicitly
-    is still echoed back (measured reference retflag keeps it).
+    Compatibility contract: the caller's flags are echoed plus FLG_NONUT;
+    the internal FLG_J2000 rewrite is not exposed. Bits the backend added
+    on top of the rewritten request (ephemeris echo bits, implied bits)
+    are kept, minus the internal FLG_J2000 — but a J2000 bit the CALLER
+    passed explicitly is still echoed back.
     """
     return (
         (retflag & ~FLG_J2000)
@@ -271,9 +271,9 @@ def sidbit_ecliptic_matrix(
     Returns:
         A 3x3 numpy rotation matrix, or None when no projection bit is set.
     """
-    # Measured reference behavior: with BOTH projection bits set,
-    # SIDBIT_ECL_T0 takes precedence over SIDBIT_SSY_PLANE (must mirror the
-    # callers' precedence, which choose t0_jd/zero_point the same way).
+    # Flag precedence: with BOTH projection bits set, SIDBIT_ECL_T0 takes
+    # precedence over SIDBIT_SSY_PLANE (must mirror the callers' precedence,
+    # which choose t0_jd/zero_point the same way).
     if sid_bits & SIDBIT_ECL_T0:
         base = _ecliptic_of_t0_matrix(t0_jd)
     elif sid_bits & SIDBIT_SSY_PLANE:

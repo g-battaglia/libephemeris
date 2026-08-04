@@ -420,7 +420,7 @@ def _backward_start_exclusion(rate_deg_day: float, tolerance: float) -> float:
     """Days to exclude before the start epoch in a backward crossing search.
 
     Backward semantics are strictly-past: a root AT the start epoch is not a
-    valid answer (measured reference behavior returns the crossing a full
+    valid answer (compatibility contract: the crossing returned is a full
     revolution earlier). Since the search brackets end exactly at the start,
     a target equal to the body's current longitude leaves a root on that
     endpoint, and the refinement converges straight back onto it.
@@ -478,9 +478,9 @@ def _helio_cross_bracketed(
 
     if not backwards and start_is_root:
         # Forward semantics include a root AT the start instant — the same
-        # "no forward dead-band" contract the in-table path documents, and the
-        # measured reference behavior (a body exactly on the target crosses
-        # now, not one revolution later). A bracket opened at tjd + 1e-6 has
+        # "no forward dead-band" contract the in-table path documents (a
+        # body exactly on the target crosses now, not one revolution
+        # later). A bracket opened at tjd + 1e-6 has
         # no sign change across that root, so the scan silently returned the
         # next revolution for every out-of-table body (Chiron: ~18,400 days
         # late).

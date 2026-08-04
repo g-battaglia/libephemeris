@@ -79,7 +79,7 @@ _UTC_EPOCH_BAND = 2.0 / 86400.0  # ~2 s window treated as "at the UTC epoch"
 def _validate_calendar(cal: int, func_name: str) -> None:
     """Reject calendar flags other than GREG_CAL/JUL_CAL.
 
-    The reference binding validates the calendar flag in every calendar
+    Compatibility contract: the calendar flag is validated in every calendar
     conversion function (e.g. ``julday: invalid calendar (99)``);
     all five libephemeris counterparts share this guard.
 
@@ -162,8 +162,9 @@ def revjul(jd: float, cal: int = GREG_CAL) -> tuple[int, int, int, float]:
     z = _floor(jd)
     f = jd - z
 
-    # Always respect cal — the reference uses proleptic Gregorian for ancient dates
-    # when GREG_CAL is requested, not auto-detection by JD threshold.
+    # Always respect cal — compatibility contract: GREG_CAL means the proleptic
+    # Gregorian calendar even for ancient dates, not auto-detection by JD
+    # threshold.
     if cal == GREG_CAL:
         alpha = _floor((z - 1867216.25) / 36524.25)
         a = z + 1 + alpha - _floor(alpha / 4)
@@ -633,8 +634,8 @@ def utc_to_jd(
         >>> print(f"JD(TT): {jd_tt:.6f}, JD(UT1): {jd_ut:.6f}")
         JD(TT): 2451545.000743, JD(UT1): 2451545.000004
     """
-    # Reference-API parity: the binding validates the calendar flag here
-    # too, like julday()/revjul(). Without this guard cal=99 would mean
+    # Compatibility contract: the calendar flag is validated here too,
+    # like julday()/revjul(). Without this guard cal=99 would mean
     # Julian in julday() but Gregorian here (and even flip interpretation
     # across the 1972 boundary, where the pre-UTC branch defers to julday).
     _validate_calendar(calendar, "utc_to_jd")
@@ -705,11 +706,11 @@ def utc_to_jd(
     # From 2035 on, leap-second UTC ends: CGPM Resolution 4 (27th CGPM, 2022)
     # decides that the UT1-UTC tolerance will be increased by or before 2035,
     # so the leap-second table cannot describe later civil labels. Like the
-    # pre-1972 branch (and the measured reference behavior, which converges
-    # to it once Delta T exceeds the frozen TAI-UTC offset), a far-future
+    # pre-1972 branch (a handling one external implementation converges to
+    # once Delta T exceeds the frozen TAI-UTC offset), a far-future
     # civil label is treated as UT1: jd_ut1 is the literal calendar JD and
     # jd_et = jd_ut1 + Delta T. Keeping Skyfield's frozen-offset UTC chain
-    # here instead would diverge without bound (measured -208,000 s in TT by
+    # here instead would diverge without bound (about -208,000 s in TT by
     # year 9999).
     if greg_year >= 2035:
         decimal_hour = hour + minute / 60.0 + second / 3600.0
@@ -760,9 +761,9 @@ def _snap_reconstructed_second(
     """Snap a reconstructed Gregorian clock reading to its round instant.
 
     A calendar reconstruction from a float JD carries a round-off floor of a
-    couple of ulps (see :func:`_reconstruction_snap_tolerance`); measured
-    reference behavior recovers round instants exactly. A reading within
-    that floor of a whole second is therefore snapped, with the carry
+    couple of ulps (see :func:`_reconstruction_snap_tolerance`); round
+    instants must be recovered exactly (compatibility contract). A reading
+    within that floor of a whole second is therefore snapped, with the carry
     cascading through the calendar. A genuine leap-second minute keeps its
     second-60 reading (probed through utc_to_jd); the end of a leap second
     (60.99998 -> 61) rolls into the next day like an ordinary midnight
@@ -1026,7 +1027,7 @@ def day_of_week(jd: float) -> int:
     Calculate the day of the week for a given Julian Day number.
 
     Uses the formula: floor(jd + 0.5) % 7 to get 0=Monday convention.
-    This matches the reference day_of_week function.
+    Compatibility contract: same indexing as the reference API's day_of_week.
 
     Args:
         jd: Julian Day number
@@ -1692,7 +1693,7 @@ def utc_time_zone(
     to obtain the equivalent UTC date/time. Handles all date boundary
     crossings (day, month, year) correctly.
 
-    This matches the reference convention: the offset is **subtracted**
+    Compatibility contract: the offset is **subtracted**
     from the input time.
 
     Args:
