@@ -677,6 +677,19 @@ Each `EphemerisContext` instance has its own isolated state while sharing the ex
 
 Memory overhead per context: ~1 KB. Ephemeris files (DE440: ~119 MB) are loaded once and shared.
 
+**Module-level event searches mutate the global observer.** `rise_trans`,
+`rise_trans_true_hor`, and the location-dependent eclipse searches
+(`sol_eclipse_when_loc`, `lun_eclipse_when_loc`, and related chains) set the
+process-global topocentric observer for the duration of the search, so the
+underlying `calc_ut(FLG_TOPOCTR)` chain sees the requested geographic
+position; the previous observer is restored on exit, including on error. This
+is deliberately not locked — a lock around the observer alone would only
+feign safety while the rest of the module state remains shared. A thread that
+calls `calc_ut` with `FLG_TOPOCTR` while another thread runs one of these
+searches observes the search's observer. Threads that need concurrent
+topocentric isolation should run their calculations through their own
+`EphemerisContext`.
+
 ---
 
 ## 20. Comprehensive Precision Audit
