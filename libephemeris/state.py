@@ -2423,17 +2423,9 @@ def close() -> None:
         >>> close()  # Close files and reset state
         >>> pos, _ = calc_ut(2451545.0, SUN, 0)  # Reloads ephemeris
     """
-    global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
-    global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
-    global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
-    global _SIDEREAL_BITS
-    global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
-    global _SPK_KERNELS, _SPK_BODY_MAP, _SPK_TYPE21_KERNELS, _AUTO_SPK_DOWNLOAD
-    global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
-    global _PRECISION_TIER
-    global _LEB_FILE, _LEB_READER, _CALC_MODE
-    global _HORIZONS_CLIENT, _HORIZONS_WARNED
-
+    # No global declarations: this wrapper only locks and delegates; the
+    # actual state resets (and their deliberate omissions, e.g. the
+    # preserved user Delta-T) live in _close_inner().
     with _STATE_LOCK:
         _close_inner()
 

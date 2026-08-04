@@ -1712,7 +1712,8 @@ def _is_transient_close_race(exc: BaseException) -> bool:
       through a new lookup shape must stay retryable rather than become an
       intermittent concurrency failure. A genuine (non-race) ``KeyError``
       is retried and then propagates unchanged once the retry budget is
-      exhausted.
+      exhausted; each retry is logged at debug level on the
+      ``libephemeris`` logger for diagnosis.
 
     These are races, not genuine coverage/body misses: those are converted to
     typed :class:`EphemerisRangeError` / :class:`UnknownBodyError` upstream
@@ -1751,6 +1752,18 @@ def _calc_body_race_safe(t, planet: int, calc_iflag: int):
                 or attempt == _MAX_CLOSE_RACE_RETRIES
             ):
                 raise
+            # Exceptional path only: the import and the log cost nothing on
+            # the calculation hot path, and a genuine KeyError absorbed by
+            # the broad predicate stays diagnosable at debug level.
+            import logging
+
+            logging.getLogger("libephemeris").debug(
+                "transient close()/reload race on body %s (attempt %d/%d): %r",
+                planet,
+                attempt + 1,
+                _MAX_CLOSE_RACE_RETRIES,
+                _race_err,
+            )
     raise AssertionError("unreachable")  # pragma: no cover
 
 
@@ -11072,9 +11085,9 @@ def _pheno_positional(jd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     elongation = math.degrees(math.acos(max(-1.0, min(1.0, cos_el))))
 
     if ipl in _PHENO_POINT_BODIES:
-        if ipl in (21, 22):
-            # Interpolated apsides: the reference marks the inapplicable
-            # phase slots NaN (same convention as its nod_aps output).
+        if ipl in (INTP_APOG, INTP_PERG):
+            # Interpolated apsides: the inapplicable phase slots are NaN
+            # (same convention as the nod_aps output for these ids).
             return (float("nan"), float("nan"), elongation) + (0.0,) * 17
         return (0.0, 0.0, elongation) + (0.0,) * 17
 
