@@ -744,12 +744,14 @@ def degnorm(x: float) -> float:
     # ~360: without this, degnorm(-5e-14) returned 359.99999999999994 —
     # the same angle, but a full turn away in the reported value, which
     # propagates into any consumer that compares or bins the result. The
-    # 1e-13 deg threshold is a project choice sitting above the roundoff
-    # floor of the modulo near zero (ulp of 360.0 is ~5.7e-14) and far
-    # below any meaningful angular resolution (1e-13 deg = 3.6e-10
-    # arcsec); any value in roughly [1e-13, 1e-9] behaves identically.
-    # The snap runs before the wrap so a tiny negative never reaches the
-    # modulo.
+    # band sits above the roundoff floor of the modulo near zero (ulp of
+    # 360.0 is ~5.7e-14) and far below any meaningful angular resolution
+    # (1e-13 deg = 3.6e-10 arcsec). Its exact boundary — |x| < 1e-13,
+    # exclusive — is the public snap contract of this function
+    # (compatibility contract): inputs at or beyond it wrap normally, so
+    # moving the boundary changes observable output for inputs like
+    # -1e-12. The snap runs before the wrap so a tiny negative never
+    # reaches the modulo.
     if abs(x) < 1e-13:
         return 0.0
     result = x % 360.0
@@ -792,11 +794,12 @@ def radnorm(x: float) -> float:
         >>> radnorm(4 * math.pi)  # 720 degrees -> 0
         0.0
     """
-    # Same near-zero snap as degnorm, with an independently chosen per-unit
-    # threshold (1e-13 rad, not the degree value converted): it sits above
-    # the roundoff floor of the modulo near zero (ulp of 2*pi is ~8.9e-16)
-    # and far below any meaningful angular resolution (1e-13 rad ~ 2e-8
-    # arcsec), so any value in a wide band behaves identically.
+    # Same near-zero snap as degnorm with the same numeric band per unit
+    # (1e-13 rad, not the degree value converted): above the roundoff
+    # floor of the modulo near zero (ulp of 2*pi is ~8.9e-16), far below
+    # any meaningful angular resolution (1e-13 rad ~ 2e-8 arcsec). As in
+    # degnorm, the exact exclusive boundary is this function's public
+    # snap contract (compatibility contract).
     if abs(x) < 1e-13:
         return 0.0
     result = x % TWO_PI

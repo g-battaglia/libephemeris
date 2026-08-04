@@ -1373,13 +1373,16 @@ def mooncross_node(
     # failing the direction check and bouncing forever).
     accept_eps = 1e-6
     if abs(lat) < 10 * NR_TOLERANCE_MOON:
-        # The NR tolerance band is ~17 ms wide in time (0.001" at the
+        # The NR tolerance band is ~17.4 ms wide in time (0.001" at the
         # ~1.38 deg/day nodal latitude rate), so a restart from a previous
-        # result sees latitude noise anywhere inside it. The imminent-root
-        # branch below must only fire ABOVE that band, so the threshold is
-        # set just over it with a 1.3x margin: 2.5e-7 day (~22 ms). Its
-        # exact value is otherwise free — anything above the noise band and
-        # negligible against the half-nodal-month step behaves identically.
+        # result sees latitude noise anywhere inside it. The threshold is
+        # bounded on both sides: it must sit ABOVE that noise band (or a
+        # restart bounces on its own result), and LOW enough that a start
+        # a few tens of ms before the node still takes the imminent-root
+        # branch — the contract stated above; a threshold near the branch
+        # gate (~174 ms) would send such a start onto the half-nodal-month
+        # step instead. 2.5e-7 day (~21.6 ms, ~1.25x the noise band) sits
+        # at the low end of that admissible window.
         lat_speed0 = pos[4]
         t_est = -lat / lat_speed0 if abs(lat_speed0) > 0.1 else 0.0
         if t_est * direction > 2.5e-7:
@@ -2234,9 +2237,10 @@ def helio_cross(
                 # Strictly-past semantics, as on the UT entry point: step the
                 # endpoint over a root sitting exactly at the start epoch,
                 # and only then. Without this the TT twin returned the start
-                # instant itself for the slowest bodies (Neptune, Pluto: the
-                # reference gives -59805 d and -90007 d), so the two entry
-                # points also disagreed with each other.
+                # instant itself for the slowest bodies (Neptune, Pluto),
+                # instead of the previous crossing tens of thousands of days
+                # earlier, so the two entry points also disagreed with each
+                # other.
                 jd_bracket_end = tjdet
                 _start_res = (lon_start - x2cross + 180.0) % 360.0 - 180.0
                 if abs(_start_res) <= NR_TOLERANCE:

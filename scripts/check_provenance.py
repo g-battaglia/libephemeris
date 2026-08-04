@@ -943,7 +943,7 @@ _UNIT = (
 # unit-bearing tolerance in the same sentence. Distance words (off, away
 # from, differs, diverge) are deliberately NOT here: documenting a measured
 # divergence is policy-encouraged and must stay green.
-_AGREE_VERB = r"(?:match|agree|reproduc|replicat|track|identical|equal)"
+_AGREE_VERB = r"(?:match|agree|reproduc|replicat|track|identical|equal|coincide)"
 AGREEMENT_VERB_NEAR_REF_RE = re.compile(
     rf"{_AGREE_VERB}\w*.{{0,25}}?(?:reference|external implementation)|"
     rf"(?:reference|external implementation).{{0,25}}?{_AGREE_VERB}",
@@ -965,8 +965,12 @@ FITTING_WORKFLOW_RE = re.compile(
     r"by trial(?:\s+and\s+error)?",
     re.IGNORECASE,
 )
+# 140 chars reaches a "not" separated from its verb by a long parenthetical
+# ("was not, contrary to ..., tuned to the reference") while staying local
+# enough that an unrelated early negation rarely shadows a genuine fitting
+# claim later in the same sentence.
 NEGATION_GUARD_RE = re.compile(
-    r"\b(?:no|not|never|neither|nor|cannot|without|nothing)\b[^.!?]{0,60}$",
+    r"\b(?:no|not|never|neither|nor|cannot|without|nothing)\b[^.!?]{0,140}$",
     re.IGNORECASE,
 )
 

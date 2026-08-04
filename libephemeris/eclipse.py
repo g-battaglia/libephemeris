@@ -7308,13 +7308,17 @@ def _calculate_rise_set(
     # (the apparent altitude jumps by ~the horizon refraction across the
     # crossing): the documented stop convention there is the refracted branch
     # above the jump, so converging onto |h| = 0 would leave it. Those
-    # crossings keep the historic exit unchanged. The 2"/s gate value follows
-    # from the tolerance mapping above: the fixed 1e-4 deg altitude exit
-    # (0.36") maps to a time error of 0.36"/slope, which crosses the
-    # ~0.2 s scale — several times the 0.03 s target — exactly when the
-    # slope drops below ~2"/s. Below the gate the time-pinned refinement is
-    # required; above it the altitude exit is already time-accurate, so any
-    # nearby gate value behaves identically.
+    # crossings keep the historic exit unchanged. The gate separates two
+    # slope populations rather than deriving from the tolerance target: a
+    # near-tangential grazing approaches zero slope by definition (the
+    # altitude curve flattens at tangency), while an ordinary crossing
+    # runs at ~15"/s and the dip branch far steeper, so any gate in the
+    # wide gap between the grazing population and the ordinary one
+    # classifies the two identically; 2"/s sits in that gap. At the gate
+    # itself the historic altitude exit still carries up to
+    # 0.36"/(2"/s) = 0.18 s of time error (the mapping above), shrinking
+    # as 1/slope for steeper crossings — accepted for the non-grazing
+    # population, whose exit convention is unchanged.
     _TIME_TOL_S = 0.03
     _SLOPE_PROBE_S = 0.05
     _GRAZE_SLOPE_DEG_S = 2.0 / 3600.0  # ~2"/s: near-tangential grazing only

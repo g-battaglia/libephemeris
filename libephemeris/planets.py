@@ -1739,9 +1739,11 @@ _MAX_CLOSE_RACE_RETRIES = 8
 def _calc_body_race_safe(t, planet: int, calc_iflag: int):
     """Call ``_calc_body``, transparently retrying a concurrent close() race.
 
-    See :func:`_is_transient_close_race`. Non-race errors propagate on their
-    first occurrence; a transient close()/reload error is retried after the
-    lazy reload, up to ``_MAX_CLOSE_RACE_RETRIES`` times.
+    See :func:`_is_transient_close_race`. Errors that predicate classifies
+    as non-race propagate on their first occurrence; an error it classifies
+    as a transient close()/reload race (deliberately including every
+    ``KeyError``) is retried after the lazy reload, up to
+    ``_MAX_CLOSE_RACE_RETRIES`` times before propagating.
     """
     for attempt in range(_MAX_CLOSE_RACE_RETRIES + 1):
         try:
@@ -9155,9 +9157,9 @@ def get_orbital_elements_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float,
 # Jupiter and every interior body (the terrestrial planets and the main-belt
 # asteroids Ceres/Pallas/Juno/Vesta) are unchanged. The classifier value is a
 # project choice inside the published gap between the Jupiter and Saturn
-# semi-major axes — 5.2026 AU and 9.5549 AU respectively (IAU/NASA planetary
-# fact sheet; Standish & Williams, Explanatory Supplement 3rd ed., Table
-# 8.10.2) — so any threshold in (5.21, 9.55) classifies identically; 6.0 sits
+# semi-major axes — 5.2026 AU and 9.5549 AU mean elements (Simon et al.,
+# A&A 282, 663, 1994; reproduced in Meeus, Astronomical Algorithms, Table
+# 31.a) — so any threshold in (5.21, 9.53) classifies identically; 6.0 sits
 # clear of Jupiter's osculating excursions.
 _TRANS_JOVIAN_A_AU = 6.0
 
@@ -10920,14 +10922,13 @@ def _calc_pheno_asteroid(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 # longitude/latitude/distance triple).
 #
 # Compatibility contract, flag- and date-invariant: EARTH returns an
-# all-zero tuple with a fixed 180.0 in the elongation slot, and ECL_NUT
-# returns NaN for the phase triplet. Both are protocol sentinels for bodies
-# with no phase geometry — discrete return-shape values in the same class as
-# a retflag echo, not computed quantities (180.0 is the degenerate
-# elongation of the observer's own position). The one undocumented channel
-# (ECL_NUT's elongation slot, which carries no stable value externally) is
-# deliberately reported as 0.0 rather than reproduced — see
-# docs/comparison/intentional-divergences.md.
+# all-zero tuple with a fixed 180.0 in the apparent-diameter slot
+# (attr[3]), and ECL_NUT returns NaN for the phase triplet. Both are
+# protocol sentinels for bodies with no phase geometry — discrete
+# return-shape values in the same class as a retflag echo, not computed
+# quantities. The one undocumented channel (ECL_NUT's attr[3], which
+# carries no stable value externally) is deliberately reported as 0.0
+# rather than reproduced — see docs/comparison/intentional-divergences.md.
 _PHENO_EARTH = (0.0, 0.0, 0.0, 180.0) + (0.0,) * 16
 _PHENO_ECL_NUT = (float("nan"),) * 3 + (0.0,) * 17
 

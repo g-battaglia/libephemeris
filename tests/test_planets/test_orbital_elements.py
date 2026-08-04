@@ -160,10 +160,11 @@ class TestOrbitalElementsBasic:
     def test_white_moon_is_geocentric_model(self):
         """White Moon (56) is a geocentric circular construction here: its
         osculating semi-major axis is Earth-relative (~0.053 AU), an intentional
-        divergence from the reference's ~0.909 AU heliocentric element set."""
+        divergence from implementations that model it as a heliocentric
+        element set (docs/comparison/intentional-divergences.md)."""
         jd = 2451545.0
         el = ephem.get_orbital_elements(jd, 56, 0)
-        assert 0.04 < el[0] < 0.07  # geocentric radius, not the reference's 0.909
+        assert 0.04 < el[0] < 0.07  # Earth-relative radius, not heliocentric
         assert el[1] < 0.01  # near-circular
 
 

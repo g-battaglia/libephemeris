@@ -2793,9 +2793,11 @@ def calc_hypothetical_position(
     Raises:
         ValueError: If ipl is not a valid hypothetical body ID.
         UnknownBodyError: If the recognised ID has no publicly sourced
-            built-in model.  Supported IDs are 40--48 and 50--58; only
-            ID 49 (Nibiru) fails closed (see
-            ``docs/methodology/missing-hypothetical-models.md``).
+            built-in model.  Supported IDs are 40--48 and 50--58; ID 49
+            (Nibiru, see
+            ``docs/methodology/missing-hypothetical-models.md``) and the
+            unnamed tail 59--69 of the recognised fictitious range fail
+            closed.
     """
     if not is_hypothetical_body(ipl):
         raise ValueError(f"Body ID {ipl} is not a hypothetical body")

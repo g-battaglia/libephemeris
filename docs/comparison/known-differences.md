@@ -202,13 +202,23 @@ external catalogue.
 The reference-named `fixstar*` family resolves names with the reference's
 exact search semantics: a leading-digit string is a **1-based sequential
 number in the sorted catalogue** (so `"12"` is the twelfth catalogue entry,
-not HIP 12), a leading comma keys an exact Bayer/Flamsteed nomenclature
-match, and plain names match traditional names exactly first, then as a
-prefix in catalogue order. No fuzzy matching, Bayer-word parsing
-(`"Alpha Leonis"`), Flamsteed-word parsing (`"32 Leonis"`), or
-alternate-spelling recovery happens on this family. Those richer lookups
-remain available in LibEphemeris's own helper `resolve_star_name()`, which
-is the migration path for callers that relied on them.
+not HIP 12, and `"32 Leonis"` is the 32nd entry, not the Flamsteed
+designation), a leading comma keys an exact Bayer/Flamsteed nomenclature
+match, and plain names match traditional names and curated alias-table
+keys exactly first (`"Alpha Leonis"`, `"Betelgeux"` and `"Formalhaut"` are
+literal alias keys and still resolve), then as a prefix in catalogue order
+(`"Reg"` is Regulus). No fuzzy matching, no Hipparcos-number lookup
+(`"HIP 49669"` raises), and no word-designation *parsing* happens on this
+family: a designation absent from the alias table (`"Gamma Virginis"`)
+raises. The richer lookups remain available in LibEphemeris's own helper
+`resolve_star_name()` (`libephemeris.fixed_stars`), the migration path for
+callers that relied on them.
+
+Note that the sequential-number rule makes numeric-string lookups
+inherently catalogue-dependent: two implementations sharing the rule but
+sorting different catalogues will generally return **different stars** for
+the same numeric string. Numeric lookups are only portable within one
+catalogue.
 
 Sidereal star speeds are derived from the actual selected sidereal model. No
 mode-dependent correction is recovered from external observations.

@@ -790,3 +790,42 @@ class TestNarrativeGateWaiverMechanism:
         )
         hits, _ack = check_provenance._reference_narrative_hits(tmp_path)
         assert all(lb != "reference-authored-constant" for _p, _ln, lb, _s in hits)
+
+
+class TestNarrativeGateReviewRegressions:
+    """Regression fixtures from the adversarial review of the gate."""
+
+    def test_coincide_verb_is_an_agreement_verb(self, tmp_path: Path) -> None:
+        _write_pkg_module(
+            tmp_path,
+            "mod_r1.py",
+            "# Hand-adjusted until the outputs coincide with the reference\n"
+            "# within 0.5 arcsec across the tested dates.\n"
+            "_K = 0.7\n",
+        )
+        labels = {lb for _p, lb in _narrative_hits(tmp_path)}
+        assert "reference-derived-evidence" in labels
+
+    def test_long_parenthetical_negation_is_not_a_hit(self, tmp_path: Path) -> None:
+        _write_pkg_module(
+            tmp_path,
+            "mod_r2.py",
+            "# This coefficient was not, contrary to what an earlier revision\n"
+            "# of this comment seemed to suggest to some reviewers, tuned to\n"
+            "# the reference in any way; it comes straight from Meeus (1998).\n"
+            "_C = 0.2\n",
+        )
+        assert _narrative_hits(tmp_path) == []
+
+    def test_single_copied_output_on_module_constant_is_caught(
+        self, tmp_path: Path
+    ) -> None:
+        # Clause A cannot see a bare copied output (no domain, no
+        # tolerance); Clause B is the designed catch for the constant form.
+        _write_pkg_module(
+            tmp_path,
+            "mod_r3.py",
+            "# The reference reports 1.5 for this input, so we return 1.5.\n_V = 1.5\n",
+        )
+        labels = {lb for _p, lb in _narrative_hits(tmp_path)}
+        assert "reference-authored-constant" in labels

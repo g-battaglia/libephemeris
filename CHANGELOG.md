@@ -14,14 +14,21 @@ the cases below. Each change aligns the API with the documented compatibility
 contract; the pre-change behavior was a LibEphemeris extension or artifact.
 
 - **Fixed-star name resolution is narrowed to the reference search
-  semantics.** The `fixstar*` family no longer accepts catalogue-number
-  lookups ("HIP 49669"), Bayer/Flamsteed word designations ("Alpha Leonis",
-  "32 Leonis"), partial prefixes ("Reg") or fuzzy/alternate spellings.
-  Silent-change case: a leading-digit string is now a **1-based sequential
-  number in the sorted catalogue**, so `"12"` returns the twelfth catalogue
-  entry — a call that previously meant HIP 12 returns a *different star
-  without raising*. The richer lookups remain available in the library's own
-  `resolve_star_name()` helper, which is the migration path. See
+  semantics.** The `fixstar*` family no longer accepts Hipparcos-number
+  lookups ("HIP 49669" raises) or fuzzy matching; word designations resolve
+  only when they are literal keys of the curated alias table ("Alpha
+  Leonis", "Betelgeux" and "Formalhaut" still resolve; an unlisted
+  designation such as "Gamma Virginis" raises). Retained: exact
+  traditional-name match, catalogue-order prefix match ("Reg" is Regulus),
+  and the comma nomenclature forms. Silent-change case: **any leading-digit
+  string is now a 1-based sequential number in the sorted catalogue** —
+  `"12"` returns the twelfth entry (a call that previously meant HIP 12
+  returns a different star without raising), and `"32 Leonis"` no longer
+  means the Flamsteed designation but the 32nd entry. Numeric lookups are
+  catalogue-dependent by construction: implementations sorting different
+  catalogues return different stars for the same numeric string. The richer
+  lookups remain available in
+  `libephemeris.fixed_stars.resolve_star_name()`, the migration path. See
   `docs/comparison/known-differences.md`, "Fixed stars".
 - **`get_ayanamsa_name()` returns `""` for ids without a predefined name**
   (previously "User Defined" for `SIDM_USER` and "Unknown" otherwise), and
