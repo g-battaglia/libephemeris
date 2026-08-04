@@ -11,7 +11,13 @@ Fingerprint greps over the shipped package:
 Classes 1-2 guard against Swiss Ephemeris source identifiers; class 3
 against PyMeeus identifiers (``moon_theories/galilean.py`` is an independent
 implementation derived from Lieske 1998 / Meeus ch. 44); class 4 flags any
-copyleft (L/GPL) license declaration that strays into the tree.
+copyleft (L/GPL) license declaration that strays into the tree. Two further
+package-scoped gates run alongside: the high-precision-literal gate (a float
+with >= 10 significant digits needs a citation) and the output-fitting
+narrative gate (an annotation that names the reference AND records a numeric
+sampling domain, an agreement tolerance or a fitting workflow — or a
+module-level float constant whose annotation names the reference without a
+published source — fails; contracts stated as rules pass).
 
 The sweep covers UTF-8 project text across the physical worktree. Name-only
 gates run first: one covers the physical tree (including gitignored and
@@ -872,6 +878,359 @@ def _high_precision_literal_hits(root: Path) -> list[tuple[Path, int, str, str]]
     return hits
 
 
+# ---------------------------------------------------------------------------
+# Output-fitting narrative gate (6th category).
+#
+# The three real fitted-value cases removed from this codebase shared no
+# numeric signature (one was a round number, one a set of conditional
+# branches, one a formula), but they shared a rhetorical one: a CONTRACT
+# statement is a rule and never needs a sampling domain or an agreement
+# tolerance, while a fitted value always states one or the other, because a
+# domain-of-agreement is the only justification available for a number with
+# no published source. This gate detects that asymmetry.
+#
+# Clause A (linguistic, sentence-scoped): a sentence that names the
+# reference AND records a numeric sampling domain, an agreement-to-tolerance
+# claim, or a fitting-workflow verb.
+# Clause B (structural): a module-level float constant whose annotation
+# window names the reference and cites no published source.
+#
+# Stated limitation: this converts honest documentation of a fitted value
+# from something a reviewer might notice into something CI refuses. It does
+# not defend against deliberate concealment (an uncommented constant, or
+# vocabulary avoidance); no textual check can.
+# ---------------------------------------------------------------------------
+
+REF_SUBJECT_RE = re.compile(
+    r"measured reference|"
+    r"reference (?:API|behaviou?r|implementation|ephemeris|output|returns|"
+    r"reports|echoes|raises|rule)|"
+    r"the reference\b|"
+    r"external (?:implementation|output|library|API)|"
+    r"compatibility output",
+    re.IGNORECASE,
+)
+
+# "the Skyfield reference", "the JPL reference": comparisons against open
+# sources are not policy events.
+REF_EXEMPT_RE = re.compile(
+    r"(?:Skyfield|JPL|Horizons|ERFA|SOFA|IAU|IERS|LEB|astropy|NASA|Meeus|"
+    r"DE4\d\d)[ -/]*(?:DE4\d\d\s+)?reference",
+    re.IGNORECASE,
+)
+
+_NUM_RANGE = r"-?\d+(?:\.\d+)?\s*(?:-|\.\.+|–|to\s)\s*-?\d+(?:\.\d+)?"
+
+# An experiment noun near a numeric range, or a domain preposition + input
+# parameter noun near a numeric range. The numeric range is mandatory:
+# "across latitude" as prose is not a sweep record.
+SAMPLING_DOMAIN_RE = re.compile(
+    rf"(?:\bgrid\b|\bsweep\b|\bswept\b|\bsampled\b|\bsampling\b|\bscanned\b|"
+    rf"\bscan\b).{{0,45}}?(?:{_NUM_RANGE})|"
+    rf"(?:\bacross\b|\bover\b|\bspanning\b|\bfor\b)\s+(?:the\s+)?"
+    rf"(?:latitude|longitude|lat|lon|armc|epochs?|dates?|declinations?|"
+    rf"obliquity|flags?|bodies|ids?|systems?|selectors?|azimuths?|"
+    rf"altitudes?|geopos)\b.{{0,25}}?(?:{_NUM_RANGE})",
+    re.IGNORECASE,
+)
+
+_UNIT = (
+    r"(?:deg(?:rees?)?|arcsec(?:onds?)?|arcmin(?:utes?)?|mas|\"|''|"
+    r"days?|s(?:ec(?:onds?)?)?|min(?:utes?)?|km|AU|m|mbar|digits?|%)"
+)
+
+# An agreement verb adjacent to the reference token (either order), plus a
+# unit-bearing tolerance in the same sentence. Distance words (off, away
+# from, differs, diverge) are deliberately NOT here: documenting a measured
+# divergence is policy-encouraged and must stay green.
+_AGREE_VERB = r"(?:match|agree|reproduc|replicat|track|identical|equal)"
+AGREEMENT_VERB_NEAR_REF_RE = re.compile(
+    rf"{_AGREE_VERB}\w*.{{0,25}}?(?:reference|external implementation)|"
+    rf"(?:reference|external implementation).{{0,25}}?{_AGREE_VERB}",
+    re.IGNORECASE,
+)
+TOLERANCE_RE = re.compile(
+    rf"(?:to|within|<=?|under|below)\s*~?\s*\d+(?:\.\d+)?\s*{_UNIT}\b|"
+    rf"to\s+0\.0+\s*(?:{_UNIT})?",
+    re.IGNORECASE,
+)
+
+# Fitting-workflow vocabulary, guarded by negation: the repo's dominant use
+# of these words is the attestation "never fitted to external output".
+FITTING_WORKFLOW_RE = re.compile(
+    r"chosen (?:so that|to (?:match|reproduce|agree))|set from measured|"
+    r"tuned to|calibrated to match|"
+    r"fitted to the (?:reference|external|compatibility|observed)|"
+    r"inferred from (?:the )?(?:grid|sweep|comparison|reference)|"
+    r"by trial(?:\s+and\s+error)?",
+    re.IGNORECASE,
+)
+NEGATION_GUARD_RE = re.compile(
+    r"\b(?:no|not|never|neither|nor|cannot|without|nothing)\b[^.!?]{0,60}$",
+    re.IGNORECASE,
+)
+
+# Published-source tokens for Clause B. Deliberately STRICTER than
+# CITATION_TOKEN_RE: that list accepts "derived", "measured", "convention",
+# "nominal" — exactly the weasel words a fitted constant's comment already
+# used. Only named bodies, authors, standards, catalogues and named methods
+# clear a reference-naming constant.
+PUBLISHED_SOURCE_RE = re.compile(
+    r"IAU|IERS|JPL|DE4\d\d|BIPM|CODATA|Hipparcos|Gaia|ERFA|SOFA|Meeus|"
+    r"Simon|Vondr|Chapront|Folkner|Park et al|Standish|Lieske|van Leeuwen|"
+    r"XHIP|Capitaine|Espenak|Morrison|Stephenson|Bretagnon|Francou|Laskar|"
+    r"Newhall|Seidelmann|Kaplan|Wallace|Bowell|Neely|Huber|Kugler|Britton|"
+    r"Lahiri|Schaefer|Reijs|Rozenberg|Kasten|Explanatory Supplement|"
+    r"Astronomical Almanac|NASA/TP|WGS84|VSOP|ELP\s?2000|golden section|"
+    r"speed of light|Gauss|gravitational constant|synodic month|"
+    r"Sepharial|Landscheidt|Hawkins|planetary fact sheet|"
+    r"docs/(?:methodology|comparison|reference)/[\w-]+\.md",
+    re.IGNORECASE,
+)
+
+# Dual-key waiver registry for contract attestations: (repo-relative path,
+# symbol the hit anchors to, rationale). A waiver applies ONLY when the
+# matching source site ALSO carries an inline "provenance-contract-ok"
+# token in its annotation window, so suppressing a finding always requires
+# a diff to this script (a reviewable policy change), never a single-file
+# edit inside libephemeris/. Keyed on the symbol so the waiver dies on
+# rename or deletion. The rationale must answer, in >= 80 characters, why
+# the value is re-derivable without reading the reference's numeric output.
+CONTRACT_ATTESTATION_ALLOWLIST: frozenset[tuple[str, str, str]] = frozenset()
+
+# Mirrors check_algorithm_provenance.VAGUE_SOURCE_RE; assembled from
+# fragments so that gate's own placeholder scan does not read the phrases
+# as literals in this file.
+_VAGUE_RATIONALE_RE = re.compile(
+    "|".join(
+        (
+            "reference" + r"\s+" + "documentation",
+            "standard" + r"\s+" + "formula",
+            "various" + r"\s+" + "sources",
+            "source" + r"\s+" + "unknown",
+            "unknown" + r"\s+" + "source",
+            "citation" + r"\s+" + "needed",
+            r"\b" + "tb" + "d" + r"\b",
+            r"\b" + "to" + "do" + r"\b",
+        )
+    ),
+    re.IGNORECASE,
+)
+
+CONTRACT_WAIVER_TOKEN = "provenance-contract-ok"
+
+
+def _narrative_scan_paths(root: Path) -> list[Path]:
+    """Non-vendor package modules, the scope of the narrative gate."""
+    package = root / "libephemeris"
+    paths = []
+    for path in sorted(package.rglob("*.py")):
+        rel_parts = path.relative_to(package).parts
+        if "vendor" in rel_parts or "__pycache__" in rel_parts:
+            continue
+        paths.append(path)
+    return paths
+
+
+def _annotation_blocks(text: str) -> list[tuple[int, str]]:
+    """(first_lineno, joined_text) for comment runs and docstrings."""
+    import ast
+
+    lines = text.splitlines()
+    blocks: list[tuple[int, str]] = []
+    run_start = None
+    run: list[str] = []
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            if run_start is None:
+                run_start = i
+            run.append(stripped.lstrip("#").strip())
+        else:
+            if run_start is not None:
+                blocks.append((run_start, " ".join(run)))
+                run_start, run = None, []
+    if run_start is not None:
+        blocks.append((run_start, " ".join(run)))
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return blocks
+    nodes = [tree] + [
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    ]
+    for node in nodes:
+        doc = ast.get_docstring(node, clean=False)
+        if not doc:
+            continue
+        body = node.body[0]
+        blocks.append((body.lineno, " ".join(doc.split())))
+    return blocks
+
+
+def _sentences(block_text: str) -> list[str]:
+    """Split an annotation block into sentence-scoped units."""
+    parts = re.split(r"(?<=[.!?])\s+|\s{2,}|(?<!\d)\*\s", block_text)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _enclosing_symbol(text: str, lineno: int, fallback: str) -> str:
+    """Name of the top-level def/class containing lineno, else fallback."""
+    import ast
+
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return fallback
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if node.lineno <= lineno <= (node.end_lineno or node.lineno):
+                return node.name
+    return fallback
+
+
+def _contract_waiver_applies(
+    rel: str, symbol: str, window_text: str
+) -> tuple[bool, str]:
+    """Check the dual-key waiver; returns (applies, rationale)."""
+    if CONTRACT_WAIVER_TOKEN not in window_text:
+        return False, ""
+    for path_key, symbol_key, rationale in CONTRACT_ATTESTATION_ALLOWLIST:
+        if path_key != rel or symbol_key != symbol:
+            continue
+        if len(rationale) < 80 or _VAGUE_RATIONALE_RE.search(rationale):
+            continue
+        return True, rationale
+    return False, ""
+
+
+def _sentence_is_evidence(sentence: str) -> bool:
+    """Clause A predicate for one sentence."""
+    if not REF_SUBJECT_RE.search(sentence):
+        return False
+    if REF_EXEMPT_RE.search(sentence):
+        return False
+    if SAMPLING_DOMAIN_RE.search(sentence):
+        return True
+    if AGREEMENT_VERB_NEAR_REF_RE.search(sentence) and TOLERANCE_RE.search(sentence):
+        return True
+    fit = FITTING_WORKFLOW_RE.search(sentence)
+    if fit and not NEGATION_GUARD_RE.search(sentence[: fit.start()]):
+        return True
+    return False
+
+
+def _reference_narrative_hits(
+    root: Path,
+) -> tuple[list[tuple[Path, int, str, str]], list[tuple[Path, int, str, str]]]:
+    """Clause A + Clause B scan; returns (hits, acknowledged_waivers)."""
+    import ast
+
+    hits: list[tuple[Path, int, str, str]] = []
+    acknowledged: list[tuple[Path, int, str, str]] = []
+    for path in _narrative_scan_paths(root):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        rel = path.relative_to(root).as_posix()
+        lines = text.splitlines()
+
+        # Clause A: sentence-scoped narrative evidence.
+        for block_start, block_text in _annotation_blocks(text):
+            for sentence in _sentences(block_text):
+                if not _sentence_is_evidence(sentence):
+                    continue
+                symbol = _enclosing_symbol(text, block_start, path.stem)
+                waived, rationale = _contract_waiver_applies(rel, symbol, block_text)
+                row = (
+                    path,
+                    block_start,
+                    "reference-derived-evidence",
+                    sentence[:160],
+                )
+                if waived:
+                    acknowledged.append(
+                        (
+                            path,
+                            block_start,
+                            "acknowledged-contract-attestation",
+                            f"{symbol}: {rationale[:120]}",
+                        )
+                    )
+                else:
+                    hits.append(row)
+                break  # one hit per block is enough
+
+        # Clause B: module-level float constants naming the reference.
+        head = "\n".join(lines[:60])
+        if GENERATED_HEADER_RE.search(head):
+            continue
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+                value = node.value
+            elif isinstance(node, ast.AnnAssign):
+                targets = [node.target]
+                value = node.value
+            else:
+                continue
+            if value is None or not targets:
+                continue
+            name_target = targets[0]
+            if not isinstance(name_target, ast.Name):
+                continue
+            has_float = any(
+                isinstance(sub, ast.Constant) and isinstance(sub.value, float)
+                for sub in ast.walk(value)
+            )
+            if not has_float:
+                continue
+            # Window: the contiguous comment run immediately above plus the
+            # statement's own lines, joined comment-stripped so a phrase
+            # split across wrapped comment lines still matches.
+            start = node.lineno
+            top = start - 1
+            while top >= 1 and lines[top - 1].strip().startswith("#"):
+                top -= 1
+            window = " ".join(
+                line.strip().lstrip("#").strip()
+                for line in lines[top : (node.end_lineno or start)]
+            )
+            if not REF_SUBJECT_RE.search(window):
+                continue
+            if REF_EXEMPT_RE.search(window):
+                continue
+            if PUBLISHED_SOURCE_RE.search(window):
+                continue
+            waived, rationale = _contract_waiver_applies(rel, name_target.id, window)
+            if waived:
+                acknowledged.append(
+                    (
+                        path,
+                        start,
+                        "acknowledged-contract-attestation",
+                        f"{name_target.id}: {rationale[:120]}",
+                    )
+                )
+                continue
+            hits.append(
+                (
+                    path,
+                    start,
+                    "reference-authored-constant",
+                    lines[start - 1].strip()[:160],
+                )
+            )
+    return hits, acknowledged
+
+
 def main() -> int:
     """Run every repository independence and provenance policy check."""
     name_hits: list[tuple[Path, int, str, str]] = []
@@ -970,6 +1329,12 @@ def main() -> int:
     for path, lineno, label, line in literal_hits:
         print(f"{path.relative_to(REPO_ROOT)}:{lineno}: [{label}] {line[:100]}")
 
+    narrative_hits, contract_waivers = _reference_narrative_hits(REPO_ROOT)
+    for path, lineno, label, line in contract_waivers:
+        print(f"{path.relative_to(REPO_ROOT)}:{lineno}: [{label}] {line[:160]}")
+    for path, lineno, label, line in narrative_hits:
+        print(f"{path.relative_to(REPO_ROOT)}:{lineno}: [{label}] {line[:160]}")
+
     for path, lineno, label, line in content_hits:
         print(f"{path.relative_to(REPO_ROOT)}:{lineno}: [{label}] {line[:100]}")
     print(
@@ -978,10 +1343,12 @@ def main() -> int:
         f"{len(inherited_history_hits)} acknowledged inherited-history hit(s), "
         f"{len(history_hits)} new reachable-history hit(s), "
         f"{len(content_hits)} content hit(s) over {scanned} project files, "
-        f"{len(literal_hits)} unannotated high-precision literal(s) "
+        f"{len(literal_hits)} unannotated high-precision literal(s), "
+        f"{len(narrative_hits)} output-fitting narrative hit(s) "
+        f"({len(contract_waivers)} acknowledged contract attestation(s)) "
         "in the physical worktree (gate: 0)"
     )
-    return 1 if history_hits or content_hits or literal_hits else 0
+    return 1 if history_hits or content_hits or literal_hits or narrative_hits else 0
 
 
 if __name__ == "__main__":
