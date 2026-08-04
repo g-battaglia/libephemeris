@@ -71,7 +71,16 @@ def _active_ephemeris_range() -> tuple[str | None, float, float]:
     from .state import get_calc_mode, get_current_file_data, get_leb_reader, get_planets
 
     path, start_jd, end_jd, _ = get_current_file_data(0)
-    if start_jd and end_jd:
+    # Honor the range only when it belongs to a JPL kernel. Since the
+    # provenance fix that made get_current_file_data() report the concrete
+    # LEB artifact serving body 0 (with its own interval), this branch also
+    # sees LEB paths — and a LEB file's interval must not narrow the
+    # analytic validity (the contract above): in auto mode the router falls
+    # back to Skyfield/JPL for dates outside every LEB interval, so
+    # enforcing the LEB window here rejected requests the pipeline could
+    # serve. LEB-derived paths fall through to the mode branch below.
+    _is_leb_source = bool(path) and path.endswith((".leb", ".leb2"))
+    if start_jd and end_jd and not _is_leb_source:
         return path, float(start_jd), float(end_jd)
 
     mode = get_calc_mode()
