@@ -54,10 +54,6 @@ from typing import Tuple, Dict, List, Optional, Union, cast, NoReturn
 from .constants import FICT_OFFSET
 
 
-# Public element-container objects for *unsupported* bodies use NaN fields.
-# This preserves their import names and type identity without silently
-
-
 # =============================================================================
 # HYPOTHETICAL BODY IDENTIFIERS
 # =============================================================================
@@ -1414,10 +1410,11 @@ def get_bundled_fictitious_orbits_path() -> Path:
 
     The dataset contains the 12 independently transcribed primary-source
     orbital models documented in ``docs/methodology/hypothetical-bodies.md``.
-    The other supported bodies (Transpluto, Pickering, Vulcan, Selena and
-    Proserpina) are defined as module-level element sets rather than CSV
-    rows; IDs without a recoverable public model (Nibiru, Waldemath) are
-    inventoried in ``docs/methodology/missing-hypothetical-models.md``.
+    The other supported bodies (Transpluto, Pickering, Vulcan, Selena,
+    Proserpina and Waldemath) are defined as module-level element sets
+    rather than CSV rows; the one ID without a recoverable public model
+    (Nibiru) is inventoried in
+    ``docs/methodology/missing-hypothetical-models.md``.
 
     Returns:
         Path to the bundled CSV dataset file.
@@ -2796,8 +2793,9 @@ def calc_hypothetical_position(
     Raises:
         ValueError: If ipl is not a valid hypothetical body ID.
         UnknownBodyError: If the recognised ID has no publicly sourced
-            built-in model.  Supported IDs are 40--48 and 50--57; IDs 49
-            (Nibiru) and 58 (Waldemath) fail closed.
+            built-in model.  Supported IDs are 40--48 and 50--58; only
+            ID 49 (Nibiru) fails closed (see
+            ``docs/methodology/missing-hypothetical-models.md``).
     """
     if not is_hypothetical_body(ipl):
         raise ValueError(f"Body ID {ipl} is not a hypothetical body")

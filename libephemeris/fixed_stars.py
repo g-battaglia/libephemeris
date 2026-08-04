@@ -3294,8 +3294,7 @@ def _sidbit_star_call(
 ):
     """SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE projections for fixed stars.
 
-    Measured reference behavior on the fixed-star path (distinct from the
-    calc path, whose equatorial convention differs):
+    Compatibility contract on the fixed-star path:
 
       * ecliptic output is projected onto the mean ecliptic of the mode's
         t0 (SIDBIT_ECL_T0) or the solar-system invariable plane
@@ -3304,9 +3303,12 @@ def _sidbit_star_call(
         planets._sidbit_projection_calc);
       * equatorial output is the star on the MEAN EQUATOR AND EQUINOX of
         the projection epoch — the mode's t0 for SIDBIT_ECL_T0, J2000 for
-        SIDBIT_SSY_PLANE — with no ayanamsha subtraction (for
-        SIDBIT_SSY_PLANE it is bit-identical to the FLG_J2000|FLG_NONUT
-        request);
+        SIDBIT_SSY_PLANE — with no ayanamsha subtraction. For ECL_T0 this
+        is the identical reduction the calc path applies (same
+        transform_equatorial_epoch_result, same t0); the two paths differ
+        only for SIDBIT_SSY_PLANE equatorial, where stars project to
+        J2000 while the calc callers route only ECL_T0 equatorial to the
+        projection (bit-identical to the FLG_J2000|FLG_NONUT request);
       * the star/galactic "true" modes suppress the projection (the base
         sidereal position is returned), and SIDBIT_ECL_T0 takes precedence
         when both bits are set — the same suppression set and precedence

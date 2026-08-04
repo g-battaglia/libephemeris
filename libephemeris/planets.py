@@ -1701,12 +1701,18 @@ def _is_transient_close_race(exc: BaseException) -> bool:
     in-flight lookup then fails, before the resources reload lazily, with one
     of a small set of shapes:
 
-    - ``ValueError('seek of closed file')`` — an SPK/mmap handle closed
-      underneath the read;
-    - ``KeyError`` from a transiently emptied Skyfield kernel
-      (``"kernel 'de440.bsp' is missing 'EARTH'"``) or LEB reader
-      (``"Body 14 not in any installed LEB tier"``, ``"not in LEB file"``, or
-      a bare channel-id key such as ``KeyError(0)``).
+    - a ``ValueError`` whose message contains ``"closed file"`` (e.g.
+      ``'seek of closed file'``) — an SPK/mmap handle closed underneath the
+      read;
+    - any ``KeyError``. The known race shapes are a transiently emptied
+      Skyfield kernel (``"kernel 'de440.bsp' is missing 'EARTH'"``) or LEB
+      reader (``"Body 14 not in any installed LEB tier"``, ``"not in LEB
+      file"``, a bare channel-id key such as ``KeyError(0)``), but the
+      predicate deliberately matches every ``KeyError``: a race surfacing
+      through a new lookup shape must stay retryable rather than become an
+      intermittent concurrency failure. A genuine (non-race) ``KeyError``
+      is retried and then propagates unchanged once the retry budget is
+      exhausted.
 
     These are races, not genuine coverage/body misses: those are converted to
     typed :class:`EphemerisRangeError` / :class:`UnknownBodyError` upstream
@@ -1807,13 +1813,15 @@ def _sidbit_projection_calc(
         epoch t0; the zero point is the mode's ayanamsha at t0.
 
     Ecliptic output (spherical or FLG_XYZ) is projected onto the plane.
-    Equatorial output under SIDBIT_ECL_T0 is the J2000|NONUT mean-frame
-    position itself — measured reference behavior: RA/Dec and their speeds
-    are bit-identical to the FLG_J2000|FLG_NONUT request (no ayanamsha
-    subtraction, no further precession to t0), with the plain sidereal
-    retflag echo. Equatorial output under SIDBIT_SSY_PLANE alone keeps the
-    base behavior (the invariable-plane projection leaves the equator
-    unchanged); the callers' guard routes only ECL_T0 equatorial here.
+    Equatorial output under SIDBIT_ECL_T0 is the position reduced to the
+    MEAN EQUATOR AND EQUINOX of the mode's t0 — compatibility contract:
+    the J2000|NONUT sub-request is precessed to t0 with no ayanamsha
+    subtraction, and the retflag keeps the plain sidereal echo (the same
+    convention the fixed-star path applies for ECL_T0 — see
+    fixed_stars._sidbit_star_call). Equatorial output under
+    SIDBIT_SSY_PLANE alone keeps the base behavior (the invariable-plane
+    projection leaves the equator unchanged); the callers' guard routes
+    only ECL_T0 equatorial here.
 
     ``tt_echo`` applies the calc()-vs-calc_ut() ephemeris-bit echo rule to
     the returned retflag. The internal sub-request always carries the
