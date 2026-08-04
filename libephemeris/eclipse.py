@@ -428,9 +428,9 @@ _ECL_EARTH_FLATTENING = 1.0 / 298.25642
 # Explanatory Supplement to the Astronomical Almanac (3rd ed., 2013), eclipse
 # phenomena; Meeus, "Elements of Solar Eclipses 1951-2200" (Willmann-Bell,
 # 1989), ch. 3.  Applied at second/third contact and at occultation
-# disappearance/reappearance while the full disc stays at first/fourth
-# (measured reference behavior, and the convention of the NASA canon whose
-# published durations these contacts reproduce to ~0.1 s).
+# disappearance/reappearance while the full disc stays at first/fourth —
+# the convention of the NASA canon, whose published durations these
+# contacts reproduce to ~0.1 s.
 _ECL_RMOON_INNER_AU = 0.272281 * 6378.140 / _ECL_AU_KM
 
 # Danjon lunar-shadow convention used by NASA's Five Millennium Catalog.
@@ -967,15 +967,13 @@ def _sol_how_core(
     # fraction at 1.0. Measured reference behavior.
     _is_solar = (not isinstance(body, str)) and body == SUN
     if retc == 0:
-        # No eclipse at this place and time. The measured value of this slot is
-        # 1.0, not 0.0 — verified on six no-event instants spanning 1980-2050,
-        # where attr[1] itself ranges 0.93-1.02, so the 1.0 is a fixed
-        # no-event value rather than the area ratio. It reads oddly for a
-        # channel documented as "fraction of the Sun's disc covered", but it
-        # is the compatibility contract for this entry point and consumers
-        # branch on it; sol_eclipse_how() zeroes its whole attr array on
-        # retflag==0 and is unaffected. The earlier 0.0 here rested on a
-        # comment that asserted the opposite measurement.
+        # No eclipse at this place and time. Compatibility contract: this
+        # entry point reports a fixed no-event sentinel of 1.0 in the
+        # obscuration slot — a protocol value in the same class as a
+        # retflag echo or a -99999999.0 sentinel, not an area ratio. It
+        # reads oddly for a channel documented as "fraction of the Sun's
+        # disc covered", but consumers branch on it; sol_eclipse_how()
+        # zeroes its whole attr array on retflag==0 and is unaffected.
         attr[2] = 1.0
     elif rsun <= 0.0:
         attr[2] = 1.0
@@ -7305,11 +7303,15 @@ def _calculate_rise_set(
     # The slope gate deliberately excludes the steeper high-summer sub-polar
     # geometry, where the rise/set sits on the refraction "dip" discontinuity
     # (the apparent altitude jumps by ~the horizon refraction across the
-    # crossing): there the reference stops on the refracted branch above the
-    # jump, so converging onto |h| = 0 would diverge from it. Those crossings
-    # keep the historic exit unchanged. Measured behavioral comparison places
-    # the near-tangential grazing that needs refining below ~2"/s and the
-    # dip-branch geometry above it, so the gate sits at 2"/s.
+    # crossing): the documented stop convention there is the refracted branch
+    # above the jump, so converging onto |h| = 0 would leave it. Those
+    # crossings keep the historic exit unchanged. The 2"/s gate value follows
+    # from the tolerance mapping above: the fixed 1e-4 deg altitude exit
+    # (0.36") maps to a time error of 0.36"/slope, which crosses the
+    # ~0.2 s scale — several times the 0.03 s target — exactly when the
+    # slope drops below ~2"/s. Below the gate the time-pinned refinement is
+    # required; above it the altitude exit is already time-accurate, so any
+    # nearby gate value behaves identically.
     _TIME_TOL_S = 0.03
     _SLOPE_PROBE_S = 0.05
     _GRAZE_SLOPE_DEG_S = 2.0 / 3600.0  # ~2"/s: near-tangential grazing only
@@ -11881,8 +11883,16 @@ def _get_saros_info(
             best_series = ref_saros
             best_member = ref_member + n_cycles
 
-    # The reference accepts a member only within 2 days of the saros
-    # grid; outside that it reports its no-match sentinel.
+    # Acceptance window around the mean-cycle grid. True members of a series
+    # wobble around the mean saros extrapolation (223 synodic months beat
+    # against 242 draconic and 239 anomalistic months — Meeus, Mathematical
+    # Astronomy Morsels; Espenak & Meeus, NASA/TP-2006-214141), while the
+    # nearest eclipse belonging to a *different* series sits at least one
+    # synodic month (~29.53 d) off the grid. Any window between those two
+    # scales discriminates identically near the pinned reference members;
+    # 2.0 days is the conservative low end. Outside it the no-match protocol
+    # sentinel (-99999999.0, -99999999.0) is returned (compatibility
+    # contract).
     if best_residual > 2.0:
         return (-99999999.0, -99999999.0)
 

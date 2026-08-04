@@ -692,10 +692,10 @@ def _apply_gravitational_deflection(
         # Near-superior-conjunction limiter (ERFA eraLdsun / eraLd, IAU SOFA):
         # the PPN denominator 1 + q.e vanishes when the body sits behind the
         # deflector's centre, and the unclamped term blew the deflection up to
-        # ~8.8" for a planet geometrically inside the solar disk. The standard
-        # clamp bounds it at dlim = 1e-6 / max(emag^2, 1), keeping the
-        # deflection finite and matching the measured reference behavior
-        # (parity <= 0.001" outside the disk is unaffected).
+        # ~8.8" for a planet geometrically inside the solar disk. The
+        # published SOFA clamp bounds it at dlim = 1e-6 / max(emag^2, 1),
+        # keeping the deflection finite (parity <= 0.001" outside the disk
+        # is unaffected).
         dlim = 1e-6 / (emag * emag if emag * emag > 1.0 else 1.0)
         fac2 = 1.0 + qdote
         if fac2 < dlim:

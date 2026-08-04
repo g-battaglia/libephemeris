@@ -65,8 +65,10 @@ _IERS_F_RATE_ARCSEC_CY = 1739527262.8478
 _IERS_OMEGA_RATE_ARCSEC_CY = -6962890.5431
 
 # --- UTC epoch boundary (jd*_to_utc classification) ------------------------
-# JD of 1972-01-01 00:00:00, the start of leap-second UTC. Before this instant
-# there is no UTC and the reference API returns the UT1 calendar date directly.
+# JD of 1972-01-01 00:00:00 UTC, the start of leap-second UTC as defined by
+# the IERS TAI-UTC table (BIPM/IERS Bulletin C lineage: TAI-UTC = 10 s exactly
+# from 1972-01-01). Before this instant no leap-second UTC exists, so the
+# conversion returns the UT1 calendar date directly (compatibility contract).
 # Instants within a guard band of this epoch are ambiguous when classified by
 # the UT1 year alone (UT1 leads/lags UTC by up to ~0.9 s), so they are routed
 # through Skyfield's UTC to be classified on the reconstructed UTC year.

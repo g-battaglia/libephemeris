@@ -2309,7 +2309,6 @@ def houses_ex2(
     # use two-step Richardson extrapolation, combining centered differences at
     # h = 1/4096 and h/2 = 1/8192 day (both exact binary fractions, both above
     # the roundoff floor) to cancel the leading f'''·h² term, O(h²) → O(h⁴).
-    # This tracks the measured reference behavior across latitude on every angle.
     # The cusp rates keep the plain centered difference at the coarse step.
     _DT_DAYS = 1.0 / 4096.0
     _DT_HALF = 1.0 / 8192.0

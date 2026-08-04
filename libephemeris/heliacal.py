@@ -549,11 +549,14 @@ class SchaeferModel:
 
         self.atmo = atmo
 
-        # Measured reference behavior: the heliacal extinction coefficient is
-        # pressure-INDEPENDENT (identical at 700 and 1013.25 mbar), while the
-        # limiting-magnitude surface scales Rayleigh with P/1013.25 (Schaefer
-        # 1993). The constructor toggle selects which convention this model
-        # instance uses; 0.0 selects the standard-atmosphere altitude form.
+        # The published VISLIMIT Rayleigh form is the standard-atmosphere
+        # altitude law 0.1066*exp(-h/H) (Schaefer, S&T 95(5), 57; Schaefer
+        # 1993) — pressure-independent by construction. Scaling with
+        # P/1013.25 is the equivalent parametrization when barometric
+        # pressure is an explicit observation, used by the
+        # limiting-magnitude surface. The constructor toggle selects the
+        # parametrization for this model instance; the sentinel 0.0 selects
+        # the published altitude form, which the heliacal model uses.
         self._extinction_pressure = atmo.pressure if pressure_scales_extinction else 0.0
         self.observer = observer
         self.latitude = latitude

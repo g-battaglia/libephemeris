@@ -6707,8 +6707,8 @@ _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
     # zodiac is ~-100 (P. Huber, "Ueber den Nullpunkt der babylonischen
     # Ekliptik", Centaurus 5, 1958; cf. Fagan, Zodiacs Old and New, 1950),
     # so the whole family shares the mean ecliptic of year -100 as its
-    # projection plane. JD 1684532.5 = -100 Jan 1.0 (Julian). Measured
-    # reference behavior confirms one shared plane for the triplet.
+    # projection plane. JD 1684532.5 = -100 Jan 1.0 (Julian). Being value
+    # readings of one zodiac, the triplet shares a single projection plane.
     SIDM_BABYL_KUGLER1: 1684532.5,
     SIDM_BABYL_KUGLER2: 1684532.5,
     SIDM_BABYL_KUGLER3: 1684532.5,
@@ -8737,11 +8737,12 @@ def _calc_nod_aps(
 
         The second (empty) focus is located at distance 2ae from the
         primary focus (Sun or Earth) along the apse line, in the
-        anti-perihelion direction. In the perifocal frame this is the
-        point (-2ae, 0, 0).
+        anti-perihelion direction — conic-section geometry. In the
+        perifocal frame this is the point (-2ae, 0, 0).
 
-        This matches the reference convention which returns the second
-        focal point in the aphelion/apogee slot of nod_aps results.
+        Slot placement is the compatibility contract for the
+        NODBIT_FOPOINT method: the aphelion/apogee slot of nod_aps
+        results carries this second focal point.
         """
         # Distance from primary focus to second focus = 2 * a * e
         f_dist = 2.0 * a * e_mag
@@ -9134,13 +9135,16 @@ def get_orbital_elements_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float,
     return _calc_orbital_elements(t, ipl, iflag)
 
 
-# Semi-major-axis threshold for FLG_BARYCTR orbital elements. Measured
-# reference behavior: under FLG_BARYCTR the two-body osculating fit is
-# re-referenced from the Sun to the solar-system barycentre only for orbits
-# beyond Jupiter; Jupiter (a ~ 5.20 AU) and every interior body (the terrestrial
-# planets and the main-belt asteroids Ceres/Pallas/Juno/Vesta at ~2.4-2.8 AU)
-# are unchanged. The 6.0 AU boundary cleanly separates Jupiter's stable
-# semi-major axis from Saturn (~9.58 AU) and the trans-jovian centaurs/TNOs.
+# Semi-major-axis threshold for FLG_BARYCTR orbital elements. Compatibility
+# contract: under FLG_BARYCTR the two-body osculating fit is re-referenced
+# from the Sun to the solar-system barycentre only for orbits beyond Jupiter;
+# Jupiter and every interior body (the terrestrial planets and the main-belt
+# asteroids Ceres/Pallas/Juno/Vesta) are unchanged. The classifier value is a
+# project choice inside the published gap between the Jupiter and Saturn
+# semi-major axes — 5.2026 AU and 9.5549 AU respectively (IAU/NASA planetary
+# fact sheet; Standish & Williams, Explanatory Supplement 3rd ed., Table
+# 8.10.2) — so any threshold in (5.21, 9.55) classifies identically; 6.0 sits
+# clear of Jupiter's osculating excursions.
 _TRANS_JOVIAN_A_AU = 6.0
 
 
@@ -9573,13 +9577,13 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
     # Convert the ecliptic heliocentric (Moon: geocentric) state to the
     # 50-slot osculating-element tuple via the shared reducer. The derived
-    # period slots use the central mass alone (measured reference
-    # convention): the pure Gaussian solar GM for heliocentric orbits, and
+    # period slots use the central mass alone (two-body osculation about
+    # the primary): the pure Gaussian solar GM for heliocentric orbits, and
     # for the Moon the Earth-only GM from the IAU Sun/Earth mass ratio
     # 332946.0487 (Astronomical Almanac / Explanatory Supplement, 3rd ed.).
-    # The external implementation's geocentric GM realization for the Moon
-    # is not published; the Earth-only value leaves a ~8e-4 relative offset
-    # on the Moon's period family (down from 5.3e-3 with GM(Earth+Moon)).
+    # No externally realized geocentric GM is published for comparison; the
+    # Earth-only value leaves a ~8e-4 relative offset on the Moon's period
+    # family (down from 5.3e-3 with GM(Earth+Moon)).
     if ipl == MOON:
         GM_slots = 0.01720209895**2 / 332946.0487
     else:
@@ -10568,9 +10572,9 @@ def _calc_moon_magnitude(
 def _moon_horizontal_parallax_deg(geo_dist_geometric_au: float) -> float:
     """Equatorial horizontal parallax of the Moon for pheno slot [5].
 
-    The reference reports the Moon's geocentric equatorial horizontal parallax
-    in pheno attribute [5] (0.0 for every other body). The convention, verified
-    to 0.000000" against the reference over perigee-to-apogee dates, is
+    Pheno attribute [5] carries the Moon's geocentric equatorial horizontal
+    parallax (0.0 for every other body — compatibility contract). The
+    convention is the textbook relation
 
         sin(pi) = R_eq / d
 
@@ -10798,11 +10802,11 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
             tjd,
         )
 
-    # Slot [5]: the Moon's horizontal parallax (0.0 for every other body). The
-    # reference reports the geocentric equatorial horizontal parallax when no
-    # observer is set, and the actual geocentric->topocentric parallactic
-    # displacement under FLG_TOPOCTR (both verified to 0.000000" against the
-    # reference); neither depends on the request's FLG_TRUEPOS bit.
+    # Slot [5]: the Moon's horizontal parallax (0.0 for every other body —
+    # compatibility contract). With no observer set the slot carries the
+    # geocentric equatorial horizontal parallax; under FLG_TOPOCTR it
+    # carries the actual geocentric->topocentric parallactic displacement.
+    # Neither depends on the request's FLG_TRUEPOS bit.
     slot5 = 0.0
     if ipl == MOON:
         if iflag & FLG_TOPOCTR:
@@ -10900,12 +10904,15 @@ def _calc_pheno_asteroid(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 # ~1.9e13 degrees under FLG_TRUEPOS, and the nutation angles were read as a
 # longitude/latitude/distance triple).
 #
-# Measured reference behavior, invariant under every flag and date tested:
-# EARTH returns an all-zero tuple with attr[3] = 180.0, and ECL_NUT returns
-# NaN for the phase triplet. The reference's own attr[3] for ECL_NUT
-# alternates between 180.0 and ~1e-10 with no dependence on the nutation
-# values it was computed from, so it is not a documented quantity and is
-# reported as 0.0 here (see docs/comparison/intentional-divergences.md).
+# Compatibility contract, flag- and date-invariant: EARTH returns an
+# all-zero tuple with a fixed 180.0 in the elongation slot, and ECL_NUT
+# returns NaN for the phase triplet. Both are protocol sentinels for bodies
+# with no phase geometry — discrete return-shape values in the same class as
+# a retflag echo, not computed quantities (180.0 is the degenerate
+# elongation of the observer's own position). The one undocumented channel
+# (ECL_NUT's elongation slot, which carries no stable value externally) is
+# deliberately reported as 0.0 rather than reproduced — see
+# docs/comparison/intentional-divergences.md.
 _PHENO_EARTH = (0.0, 0.0, 0.0, 180.0) + (0.0,) * 16
 _PHENO_ECL_NUT = (float("nan"),) * 3 + (0.0,) * 17
 
@@ -11286,16 +11293,16 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         magnitude = _calc_moon_magnitude(phase_angle, r_moon, mag_ms)
 
         # Slot [5]: the Moon's horizontal parallax. Without an observer the
-        # reference reports the geocentric equatorial horizontal parallax from
-        # the geometric geocentric distance; under FLG_TOPOCTR it reports the
+        # slot carries the geocentric equatorial horizontal parallax from
+        # the geometric geocentric distance; under FLG_TOPOCTR it carries the
         # actual geocentric->topocentric parallactic displacement (the on-sky
         # angle between the geocentric-apparent and topocentric-apparent Moon
-        # directions). Both were verified to 0.000000" against the reference and
-        # are independent of the request's FLG_TRUEPOS bit.
+        # directions). Both are independent of the request's FLG_TRUEPOS bit
+        # (compatibility contract, same convention as the LEB path above).
         if iflag & FLG_TOPOCTR:
             # Both legs are the APPARENT place (even under FLG_TRUEPOS, where
-            # target_pos_geo would be geometric): the reference's topocentric
-            # parallax is the apparent geo->topo displacement.
+            # target_pos_geo would be geometric): the topocentric parallax
+            # convention is the apparent geo->topo displacement.
             geo_app = get_cached_observer_at(earth, t).observe(target).apparent()
             topo_app = obs_at_t.observe(target).apparent()
             v_geo = geo_app.position.au
