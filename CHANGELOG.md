@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-04
+
+The stable v3.0.0 release. Consolidates the whole `3.0.0rc*` series — the
+long-term-model re-grounding (Vondrák 2011, multi-era Delta-T), the
+ultra-review parity cycle, source-autonomous sealed LEB mode with the
+pinned `data-v3` artifact set, and the provenance-hardening arc — under
+the AGPL-3.0-only license adopted at rc11. Long-form notes:
+`release-notes/v3.0.0.md`.
+
 ### Breaking
 
 The `3.0.0rc9`-`3.0.0rc15` parity cycle changed observable public behavior in

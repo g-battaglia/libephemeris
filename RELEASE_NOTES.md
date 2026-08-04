@@ -7,18 +7,16 @@ prepared in the source tree.
 
 ---
 
-## 3.0.0rc15 — current source-tree candidate (2026-07-21)
+## 3.0.0 — current source-tree release (2026-08-04)
 
-`3.0.0rc15` is the candidate currently prepared in this source tree. The
-per-release breakdown for the whole `3.0.0rc*` series — including the
-intermediate candidates between rc8 and rc15 — is recorded in
-[`CHANGELOG.md`](CHANGELOG.md), with long-form notes under
-[`release-notes/`](release-notes/). This page only records which candidate the
-tree currently carries; it does not duplicate the changelog.
+`3.0.0` is the stable release prepared in this source tree. The
+per-release breakdown for the whole `3.0.0rc*` series is recorded in
+[`CHANGELOG.md`](CHANGELOG.md), with the consolidated long-form notes in
+[`release-notes/v3.0.0.md`](release-notes/v3.0.0.md). This page only
+records which version the tree currently carries; it does not duplicate
+the changelog.
 
-After publication a candidate is installable with
-`pip install --pre libephemeris==3.0.0rc15`. Until then, install this source
-tree to evaluate it.
+After publication it is installable with `pip install libephemeris==3.0.0`.
 
 For the complete, structured change history across the `3.0.0rc*` series and
 upgrade details, see [`CHANGELOG.md`](CHANGELOG.md), the per-release notes under
