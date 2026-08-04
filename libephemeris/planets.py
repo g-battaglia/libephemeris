@@ -1856,7 +1856,12 @@ def _sidbit_projection_calc(
         zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000_JD, sid_mode))
 
     m_ecl = sidbit_ecliptic_matrix(sid_bits, t0_jd, zero_point)
-    assert m_ecl is not None  # a projection bit is set by the caller's guard
+    if m_ecl is None:
+        # The caller's guard should keep us out of here, but an assert
+        # disappears under python -O and would hand None to the transform.
+        # Fall through to the unprojected sidereal path, as the nod_aps twin
+        # already does.
+        return calc_fn(tjd, planet, flags)
     sub_xx, sub_rf = calc_fn(tjd, planet, fixed_epoch_request_flags(flags))
     xx = transform_sidbit_result(sub_xx, flags, m_ecl)
     # Echo the caller's representation and SIDEREAL bit; drop the internal
@@ -10068,7 +10073,15 @@ def _calc_orbit_max_min_true_distance(
     if (iflag & FLG_BARYCTR) and ipl not in (SUN, MOON):
         try:
             _a_helio = _calc_orbital_elements(t, ipl, FLG_HELCTR)[0]
-        except Exception:
+        except (EphemerisRangeError, UnknownBodyError):
+            # A typed source error is the caller's answer, not a reason to
+            # silently classify the body as interior to Jupiter and downgrade
+            # an explicit FLG_BARYCTR request: the calculation below fails on
+            # the same cause anyway, with the diagnosis lost.
+            raise
+        except (ValueError, ArithmeticError, KeyError):
+            # Genuinely unresolvable geometry: fall back to the heliocentric
+            # convention, the documented default for a non-trans-jovian body.
             _a_helio = 0.0
         if not (_a_helio > _TRANS_JOVIAN_A_AU):
             iflag = (iflag & ~FLG_BARYCTR) | FLG_HELCTR
@@ -11006,7 +11019,9 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
     return _calc_pheno(t, planet, flags)
 
 
-_PHENO_POINT_BODIES = frozenset((10, 11, 12, 13, 21, 22))
+_PHENO_POINT_BODIES = frozenset(
+    (MEAN_NODE, TRUE_NODE, MEAN_APOG, OSCU_APOG, INTP_APOG, INTP_PERG)
+)
 
 
 def _pheno_positional(jd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:

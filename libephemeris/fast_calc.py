@@ -2570,7 +2570,9 @@ def fast_calc_ut(
 # topocentric parallax is a no-op for them, and the measured reference (and
 # the Skyfield path) compute them under FLG_TOPOCTR without requiring an
 # observer. The missing-observer guard must not fire for these ids.
-_TOPO_NOOP_POINTS = frozenset({10, 11, 12, 13, 21, 22})
+_TOPO_NOOP_POINTS = frozenset(
+    {MEAN_NODE, TRUE_NODE, MEAN_APOG, OSCU_APOG, INTP_APOG, INTP_PERG}
+)
 
 
 def fast_calc_tt(

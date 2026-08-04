@@ -3009,7 +3009,7 @@ def _sol_eclipse_when_glob_pythonic(
                 # Direction invariant: a backward search must return an
                 # eclipse whose maximum precedes jd_start (refinement can
                 # drag the maximum across the start time). The epoch margin
-                # makes a maximum within 1e-4 day of jd_start count as
+                # makes a maximum within _ECLIPSE_WHEN_EPOCH_MARGIN of jd_start count as
                 # "reached", so an on-maximum start advances to the previous
                 # eclipse (measured reference behavior).
                 if result[1][0] < jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN:
@@ -3064,7 +3064,7 @@ def _sol_eclipse_when_glob_pythonic(
             # candidate can refine to a maximum a few minutes BEFORE the
             # start time; skip to the next lunation instead of returning
             # a past eclipse (or looping forever in tret[0]+eps scans). The
-            # epoch margin makes a maximum within 1e-4 day of jd_start count
+            # epoch margin makes a maximum within _ECLIPSE_WHEN_EPOCH_MARGIN of jd_start count
             # as "reached", so `jd = tret[0]; when(jd)` advances to the next
             # eclipse (measured reference behavior).
             result = None
@@ -5675,7 +5675,7 @@ def _lun_eclipse_when_pythonic(
     # in-progress eclipse. Probe the previous Full Moon first and return its
     # eclipse when its maximum is still more than the epoch margin ahead of
     # jd_start (measured reference behavior: the current eclipse is returned
-    # right up to maximum - 1e-4 day).
+    # right up to maximum - _ECLIPSE_WHEN_EPOCH_MARGIN).
     if not backwards:
         try:
             jd_prev_fm = _find_previous_full_moon(jd_start)
@@ -5711,7 +5711,7 @@ def _lun_eclipse_when_pythonic(
             # Direction invariant: a forward search must return an eclipse
             # after jd_start, a backward search one before it (refinement
             # can drag the maximum across the start time). The epoch margin
-            # makes a maximum within 1e-4 day of jd_start count as "reached",
+            # makes a maximum within _ECLIPSE_WHEN_EPOCH_MARGIN of jd_start count as "reached",
             # so `jd = tret[0]; when(jd)` advances to the neighbouring
             # eclipse (measured reference behavior).
             skip = (

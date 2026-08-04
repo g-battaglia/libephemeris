@@ -144,6 +144,16 @@ def _fold_hsys_case(hsys_char: str) -> str:
     ``UnicodeDecodeError`` on calls the reference answers with the ordinary
     unknown-selector fallback.
     """
+    # A selector is ONE character. The bytes/str entry points can hand a
+    # longer value straight here, and a lexicographic "a" <= s <= "z" test is
+    # true for any lowercase multi-character string, so ord() then raised an
+    # internal "expected a character" TypeError. The measured reference also
+    # rejects a multi-character selector (TypeError: argument 4 must be a byte
+    # string of length 1), so raising is right — it just has to say so.
+    if len(hsys_char) != 1:
+        raise TypeError(
+            f"house-system identifier must be a single character, not {hsys_char!r}"
+        )
     if hsys_char in ("i", "g"):
         return hsys_char
     if "a" <= hsys_char <= "z":
