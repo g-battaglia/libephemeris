@@ -5,10 +5,11 @@ the highest achievable precision and coverage across every surface, including
 the niche ones. It is a living plan, not a commitment to dates.
 
 Items that shipped code in v3 already point here from the source ("planned for
-a future release; see NEXT.md"): notably `nod_aps` for minor bodies (§Wave 1.3)
-and the composite `SIDBIT` sidereal projections (§Wave 3.1). Those guards
-currently raise or warn rather than return a plausible-looking wrong value; the
-waves below turn them into full features.
+a future release; see NEXT.md"): notably the composite `SIDBIT` sidereal
+projections (§Wave 3.1). Those guards currently raise or warn rather than return
+a plausible-looking wrong value; the waves below turn them into full features.
+(`nod_aps` for minor bodies — §Wave 1.3 — has since shipped: asteroids/centaurs
+now compute osculating nodes/apsides from the shared position pipeline.)
 
 ---
 
@@ -74,11 +75,16 @@ needs a per-body file).*
 - **1.2 Universal ASSIST**: generalise the curated-asteroid ASSIST path to any
   small body via the SBDB element fetch; add an integration cache and an on-disk
   SBDB cache with a TTL.
-- **1.3 `nod_aps` for minor bodies** (resolves the guard in `planets.py`):
-  drop the raise-guard for asteroids/centaurs, source the state from 1.1,
-  μ = GM_Sun, keep the rest of the machinery (aberration, J2000 reduction);
-  MEAN falls back to osculating as Pluto already does. Validate on a grid of
-  five bodies × three epochs × methods.
+- **1.3 `nod_aps` for minor bodies** — DONE. The raise-guard for
+  asteroids/centaurs is gone: the heliocentric geometric state is sourced from
+  the shared position pipeline (`_minor_body_helio_icrs_state`), reduced with
+  μ = GM_Sun through the same machinery as the planets (aberration, deflection,
+  J2000/sidereal reduction), with every method falling back to osculating as
+  Pluto does and NODBIT_OSCU_BAR re-referencing trans-jovian centaurs to the
+  barycentre. Property/invariant tests cover six bodies × three epochs ×
+  methods; the like-for-like reference agreement is pinned in the compare
+  suite. A future refinement is universal ASSIST states (1.1/1.2) to tighten
+  the osculating-realization residual on the apsidal longitudes.
 - **1.4 Universal `pheno`**: H, G from SBDB for bodies outside the curated
   table; diameter from SBDB when available.
 - **1.5 Edge contract**: with universal ASSIST the out-of-SPK-coverage region

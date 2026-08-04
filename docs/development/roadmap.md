@@ -75,9 +75,10 @@ Vectorization completed for all 6 ecliptic bodies. A single Skyfield call `(moon
 | Ecliptics (6 bodies) | ~5-8 min | **~38s** | **~10x** |
 | **Supported groups total (historical measurement)** | **~10-15 min** | **~5 min** | **~2-3x** |
 
-These historical timings predate the clean-room removal of unsupported
-hypothetical and fitted lunar models. Current verification is source-based and
-uses only independently derived data.
+These historical timings were measured with an older group registry (before
+the hypothetical group was dropped from generation), so they are indicative
+only. Verification compares each stored body against its generating source
+model.
 
 ---
 

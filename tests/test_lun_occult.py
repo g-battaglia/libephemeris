@@ -301,3 +301,19 @@ class TestLunOccultReferenceCompatibility:
                 assert tret[2] <= tret[4] <= tret[0]  # begin <= totality_begin <= max
             if tret[5] > 0:
                 assert tret[0] <= tret[5] <= tret[3]  # max <= totality_end <= end
+
+
+class TestMoonSelfOccultation:
+    """The Moon cannot occult itself: typed error on every entry point."""
+
+    def test_moon_self_raises_typed_error(self):
+        import libephemeris as le
+        from libephemeris.exceptions import Error
+
+        jd = le.julday(2000, 1, 1, 12.0)
+        with pytest.raises(Error):
+            le.lun_occult_when_glob(jd, le.MOON, le.FLG_SWIEPH, 0, False)
+        with pytest.raises(Error):
+            le.lun_occult_when_loc(jd, le.MOON, (12.5, 41.9, 0.0), le.FLG_SWIEPH)
+        with pytest.raises(Error):
+            le.lun_occult_where(jd, le.MOON, le.FLG_SWIEPH)

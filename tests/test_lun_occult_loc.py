@@ -393,3 +393,37 @@ class TestIntegerStarIdRoutesToStarPath:
         w_str = le.lun_occult_where(2460883.3934, "Regulus")
         assert w_int[0] == w_str[0]
         assert all(abs(a - b) < 1e-9 for a, b in zip(w_int[1], w_str[1]))
+
+
+class TestLunOccultWhenLocExtendedBodies:
+    """lun_occult_when_loc for occulted bodies outside the classical
+    _PLANET_MAP (Chiron and the main-belt asteroids). Previously a gap in every
+    mode (the internal body rise/set and the topocentric place both refused the
+    id); both are now served through the shared calc_ut pipeline. Reference
+    free, runs under whichever backend the suite selected.
+    """
+
+    from libephemeris import ECL_ONE_TRY as _ONE_TRY
+
+    ROME = (12.5, 41.9028, 0.0)
+    BODIES = [15, 17, 20]  # Chiron, Ceres, Vesta
+
+    def test_when_loc_does_not_raise_for_asteroids(self):
+        """One conjunction try returns the (retflag, tret, attr) structure and
+        never leaks a raw ValueError/KeyError for these bodies."""
+        jd0 = julday(2015, 1, 1, 0)
+        for body in self.BODIES:
+            retflag, tret, attr = lun_occult_when_loc(
+                jd0, body, self.ROME, FLG_SWIEPH, self._ONE_TRY
+            )
+            assert isinstance(retflag, int)
+            assert len(tret) == 10
+            assert len(attr) == 20
+
+    def test_unplaceable_body_raises_error(self):
+        """A body no backend can place still raises the typed error."""
+        from libephemeris.exceptions import Error
+
+        jd0 = julday(2015, 1, 1, 0)
+        with pytest.raises(Error):
+            lun_occult_when_loc(jd0, 999, self.ROME, FLG_SWIEPH, self._ONE_TRY)

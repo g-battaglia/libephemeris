@@ -2,16 +2,14 @@
 
 The `nod_aps()` and `nod_aps_ut()` entry points return four points on an
 orbit: ascending node, descending node, periapsis, and apapsis (or the second
-focus when `NODBIT_FOPOINT` is selected). This page describes LibEphemeris's
-independent calculation and the compatibility semantics of their six output
+focus when `NODBIT_FOPOINT` is selected). This page describes the
+calculation and the compatibility semantics of their six output
 slots.
 
-## Clean-room basis
+## Model basis
 
 The implementation uses NASA JPL states, published mean orbital elements,
-and IAU frame standards. Public compatibility calls are used only as an
-ephemeral behavioral check: no comparison-package source, prose, algorithm,
-data file, recorded output table, or fitted comparison data enters the project.
+and IAU frame standards.
 
 For `NODBIT_MEAN`, Mercury through Neptune use the long-term mean-element
 polynomials derived from Simon et al. (1994). The apparent solar orbit uses
@@ -59,8 +57,8 @@ the near-instantaneous central-difference speed calculation.
 
 ## Apparent-place limitations
 
-Outside the solar photosphere, LibEphemeris applies the independently
-implemented finite-source PPN point-mass reduction. `FLG_NOGDEFL` suppresses
+Outside the solar photosphere, LibEphemeris applies a finite-source PPN
+point-mass deflection reduction. `FLG_NOGDEFL` suppresses
 that term, while `FLG_TRUEPOS` suppresses both gravitational deflection and
 annual aberration.
 
@@ -72,12 +70,11 @@ radius and omits the invalid point-mass term instead of fitting an empirical
 interior model. Results for these rare interior rays therefore remain a known
 compatibility gap; `FLG_NOGDEFL` and `FLG_TRUEPOS` avoid it deterministically.
 
-Annual aberration is computed from the independently implemented first-order
+Annual aberration is computed from the standard first-order
 direction transformation. Its position channels are supported, but the legacy
 six-slot convention has a distinct radial-speed behavior that is not derived
 from an astronomical standard. The `ddist` slot for apparent geocentric MEAN
-points therefore remains a documented compatibility gap. No externally derived
-coefficient or correction table is used to conceal it.
+points therefore remains a documented compatibility gap.
 
 ## References
 

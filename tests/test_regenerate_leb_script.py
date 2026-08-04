@@ -115,8 +115,7 @@ def test_no_merge_can_convert_standalone_uranians() -> None:
 
 def test_extended_generation_uses_the_full_de441_range() -> None:
     result = _run_sourced_script(
-        "printf '%s..%s\\n' \"$(tier_start_jd extended)\" "
-        "\"$(tier_end_jd extended)\""
+        'printf \'%s..%s\\n\' "$(tier_start_jd extended)" "$(tier_end_jd extended)"'
     )
 
     assert result.returncode == 0, result.stderr

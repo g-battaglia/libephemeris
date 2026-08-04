@@ -356,8 +356,8 @@ def test_harrington_j2000_heliocentric_state_rates(skyfield_backend):
         assert abs(delta * 3600.0) < 0.01, component
 
 
-REVIEWED_FICTITIOUS_IDS = (*range(C.CUPIDO, C.POSEIDON + 1), 50, 51, 52, 53, 56)
-UNVERIFIED_FICTITIOUS_IDS = (48, 49, 54, 55, 57, 58)
+REVIEWED_FICTITIOUS_IDS = (*range(C.CUPIDO, C.POSEIDON + 1), 48, *range(50, 59))
+UNVERIFIED_FICTITIOUS_IDS = (49,)
 
 
 @pytest.mark.parametrize("ipl", REVIEWED_FICTITIOUS_IDS)

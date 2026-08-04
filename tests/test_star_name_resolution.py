@@ -439,3 +439,58 @@ class TestReturnTypeStructure:
         assert isinstance(name, str)
         assert name == "Spica,alVir"
         assert isinstance(retflag, int)
+
+
+@pytest.mark.unit
+class TestCorCaroliProperName:
+    """Regression: alpha-2 CVn carries its full IAU WGSN name 'Cor Caroli'.
+
+    The generated catalog previously stored a truncated proper name 'Cor'
+    (star id 1000781), so the bare 'Cor' resolved while the full 'Cor Caroli'
+    errored. Measured reference behavior: the v2 search rejects the bare
+    'Cor' and accepts 'Cor Caroli'; the returned name carries the full form.
+    """
+
+    JD = 2451545.0
+
+    def test_catalog_entry_has_full_name(self):
+        entry = next(e for e in STAR_CATALOG if e.id == 1000781)
+        assert entry.name == "Cor Caroli"
+        assert entry.nomenclature == "al02CVn"
+
+    def test_cor_caroli_resolves_v2(self):
+        from libephemeris.fixed_stars import _resolve_star2
+
+        entry, err = _resolve_star2("Cor Caroli")
+        assert err is None and entry is not None
+        assert entry.id == 1000781
+
+    def test_bare_cor_errors_v2(self):
+        from libephemeris.fixed_stars import _resolve_star2
+
+        entry, err = _resolve_star2("Cor")
+        assert entry is None and err is not None
+
+    def test_fixstar2_ut_returns_full_name(self):
+        import libephemeris as L
+        from libephemeris.fixed_stars import fixstar2_ut
+
+        L.set_calc_mode("skyfield")
+        try:
+            _pos, name, _retflag = fixstar2_ut("Cor Caroli", self.JD, 0)
+        finally:
+            L.set_calc_mode("auto")
+        assert name.startswith("Cor Caroli")
+
+    def test_other_multiword_names_intact(self):
+        """The other 22 multi-word proper names must stay intact."""
+        multiword = {e.name for e in STAR_CATALOG if " " in e.name}
+        assert "Cor Caroli" in multiword
+        for expected in (
+            "Kaus Australis",
+            "Yed Prior",
+            "Rigil Kentaurus",
+            "Polaris Australis",
+            "Asellus Borealis",
+        ):
+            assert expected in multiword

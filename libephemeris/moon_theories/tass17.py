@@ -28,7 +28,9 @@ Note: In the original TASS 1.7, Hyperion was index 7 and Iapetus was index 6.
 We follow the same convention.
 
 Reference:
-- Vienne, A. & Duriez, L. (1995) "TASS1.6", A&A 297, 588-605
+- Vienne, A. & Duriez, L. (1995) "TASS1.6", A&A 297, 588-605. NOTE: the
+  published paper describes the TASS 1.6 solution; TASS 1.7 is the later
+  revision distributed by the IMCCE (the Fortran below), not a separate paper.
 - Original Fortran: ftp://ftp.imcce.fr/pub/ephem/satel/tass17/
 - Stellarium implementation: Johannes Gajdosik (MIT license)
 

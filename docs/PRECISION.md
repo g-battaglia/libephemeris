@@ -7,20 +7,21 @@ head-to-head with Swiss Ephemeris see the
 
 ## Planetary Positions (geocentric ecliptic, 1550–2650 CE)
 
-| Body | Mean Diff | Max Diff | Notes |
-|------|-----------|----------|-------|
-| Sun | 0.04" | 0.20" | DE440 vs DE431 |
-| Moon | 0.70" | 3.32" | Numerical vs analytical lunar theory |
-| Mercury | 0.05" | 0.32" | |
-| Venus | 0.08" | 0.33" | |
-| Mars | 0.06" | 0.58" | |
-| Jupiter | 0.12" | 0.44" | Includes COB correction |
-| Saturn | 0.13" | 0.51" | Includes COB correction |
-| Uranus | 0.23" | 0.50" | |
-| Neptune | 0.24" | 1.17" | |
-| Pluto | 0.26" | 0.75" | Includes COB correction |
+Agreement with an independent reference is graded by the project validation
+suite against JPL DE440/DE441 states, ERFA/SOFA reductions, and JPL Horizons,
+each within a documented per-body envelope. The classes below are what that
+sampled comparison observes; they are not a continuous maximum, and no per-date
+reference output is retained.
 
-All planets sub-arcsecond. Moon ~3" max reflects different lunar models (JPL DE440 numerical integration vs ELP/MPP02 + DE431).
+| Body group | Modern-era agreement class | Dominant cause |
+|------------|----------------------------|----------------|
+| Sun, Mercury–Pluto | sub-arcsecond, hundredths-of-an-arcsecond class | nutation realization, body-center convention |
+| Moon | largest of the major bodies; sub-arcsecond in the modern range | nutation-model and COB-correction pipeline |
+| Toward the JPL kernel endpoints | agreement widens away from J2000 | ΔT model and kernel-edge behavior |
+
+The angular class reflects intentional model choices (JPL DE440 numerical
+integration, nutation realization, body-center convention, ΔT model), not
+solver error.
 
 ## Velocities
 

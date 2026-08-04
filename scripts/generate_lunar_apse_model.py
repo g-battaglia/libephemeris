@@ -25,7 +25,8 @@ reproducibly, as the smooth track through the Moon's actual apsis passages:
 
 Everything derives from the JPL DE440 kernel (Park et al. 2021, AJ 161:105),
 the IAU SOFA/IERS 2003 fundamental arguments exposed by BSD-licensed ERFA,
-the mean Earth-orbit eccentricity published by Simon et al. (1994), and this
+the mean Earth-orbit eccentricity polynomial of Meeus, Astronomical Algorithms
+(2nd ed.), eq. 25.4 (after Simon et al. 1994, A&A 282, 663--683), and this
 script. No value is fitted to any external ephemeris implementation.
 
 Outputs ``libephemeris/lunar_apse_model.py`` (tables + fitted coefficients).
@@ -483,14 +484,9 @@ docs/methodology/interpolated-perigee.md):
 
 Sources: JPL DE440; IERS Conventions (2010), Eq. 5.43; ERFA's BSD-licensed
 implementation of the IAU SOFA fundamental-argument routines; and the mean
-Earth-orbit eccentricity from Simon et al. (1994), A&A 282, 663--683.
+Earth-orbit eccentricity polynomial of Meeus, Astronomical Algorithms
+(2nd ed., 1998), eq. 25.4 (after Simon et al. 1994, A&A 282, 663--683).
 No value derives from any external ephemeris implementation.
-
-Provenance:
-    AUTO-GENERATED solely by ``scripts/generate_lunar_apse_model.py`` from the
-    reviewed DE440 kernel and published IERS/ERFA/Simon inputs named above.
-    The generator emits its method and fit statistics with the values. No
-    reference-product sample or correction table is an input.
 
 Fit quality (vs the DE440 passage track):
   apogee : trig RMS {apo_stats["trig_rms_arcsec"]:.1f}\", table RMS {apo_stats["table_rms_arcsec"]:.2f}\",
@@ -499,6 +495,14 @@ Fit quality (vs the DE440 passage track):
   perigee: trig RMS {per_stats["trig_rms_arcsec"]:.1f}\", table RMS {per_stats["table_rms_arcsec"]:.2f}\",
            table max {per_stats["table_max_arcsec"]:.2f}\",
            latitude RMS {per_stats["lat_rms_arcsec"]:.1f}\", {per_stats["passages"]} passages
+
+Provenance:
+    This generated module is the immutable output boundary, not an editable
+    source of theory. Regenerate only with
+    ``scripts/generate_lunar_apse_model.py`` from the reviewed DE440 kernel.
+    The generator records passage extraction, IERS basis construction,
+    least-squares design matrix, residual interpolation grid, units, coverage,
+    and fit statistics. No reference-product sample is an input.
 """
 
 from __future__ import annotations

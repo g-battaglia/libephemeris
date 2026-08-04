@@ -166,8 +166,15 @@ def cotrans_sp(
         - cos_lat * sin_eps * lat_speed_rad
     )
 
+    # denom = x^2 + y^2 = cos^2(new_lat); it is >= 0 and vanishes only at the
+    # exact pole. The analytic longitude rate (x*dy - y*dx)/denom is stable for
+    # every denom > 0, so no artificial guard band is used: an earlier
+    # ``denom > 1e-10`` guard zeroed the rate within ~0.0006 deg of the pole,
+    # whereas the compatibility contract keeps the (large, finite) analytic
+    # value there.
+    # Only the genuine singularity (denom exactly 0.0) falls back to 0.0.
     denom = x * x + y * y
-    if abs(denom) > 1e-10:
+    if denom > 0.0:
         new_lon_speed_rad = (x * dy_dt - y * dx_dt) / denom
     else:
         new_lon_speed_rad = 0.0
@@ -733,6 +740,20 @@ def degnorm(x: float) -> float:
         >>> degnorm(720)
         0.0
     """
+    # Near-zero inputs normalize to exactly 0.0 rather than wrapping to
+    # ~360: without this, degnorm(-5e-14) returned 359.99999999999994 —
+    # the same angle, but a full turn away in the reported value, which
+    # propagates into any consumer that compares or bins the result. The
+    # band sits above the roundoff floor of the modulo near zero (ulp of
+    # 360.0 is ~5.7e-14) and far below any meaningful angular resolution
+    # (1e-13 deg = 3.6e-10 arcsec). Its exact boundary — |x| < 1e-13,
+    # exclusive — is the public snap contract of this function
+    # (compatibility contract): inputs at or beyond it wrap normally, so
+    # moving the boundary changes observable output for inputs like
+    # -1e-12. The snap runs before the wrap so a tiny negative never
+    # reaches the modulo.
+    if abs(x) < 1e-13:
+        return 0.0
     result = x % 360.0
     # Python's modulo can return exactly 360.0 for tiny negative inputs
     # (e.g. (-1e-17) % 360.0 == 360.0); snap that artifact to 0.0 to keep
@@ -773,6 +794,14 @@ def radnorm(x: float) -> float:
         >>> radnorm(4 * math.pi)  # 720 degrees -> 0
         0.0
     """
+    # Same near-zero snap as degnorm with the same numeric band per unit
+    # (1e-13 rad, not the degree value converted): above the roundoff
+    # floor of the modulo near zero (ulp of 2*pi is ~8.9e-16), far below
+    # any meaningful angular resolution (1e-13 rad ~ 2e-8 arcsec). As in
+    # degnorm, the exact exclusive boundary is this function's public
+    # snap contract (compatibility contract).
+    if abs(x) < 1e-13:
+        return 0.0
     result = x % TWO_PI
     # Same snap as degnorm: keep the [0, 2*pi) contract for tiny negative
     # inputs whose modulo lands exactly on the upper bound.
@@ -1195,7 +1224,7 @@ def cs2lonlatstr(cs: int, plus: "str | bytes", minus: "str | bytes") -> str:
             minutes = 0
             degrees += 1
 
-    # Format matching the reference ephemeris: "{deg}{char}{min:02d}" or
+    # Format matching the reference API: "{deg}{char}{min:02d}" or
     # "{deg}{char}{min:02d}'{sec:02d}"
     if seconds == 0:
         return f"{degrees}{direction}{minutes:02d}"
@@ -1308,28 +1337,38 @@ def deg_midp(x1: float, x2: float) -> float:
         >>> deg_midp(-10, 10)
         0.0
     """
-    # Normalize both angles to [0, 360)
-    x1 = x1 % 360.0
-    x2 = x2 % 360.0
-
-    # Calculate the difference
+    # Choose the arc from the RAW arguments. Normalizing first can move the
+    # difference a few ULP off exactly -180, so the equal-arcs tie handler
+    # below never fires and the result flips by half a turn
+    # (deg_midp(-1e-12, 179.999999999999) must be ~90, not ~270). Snapping
+    # first is wrong for the mirror reason — it turns a slightly shorter
+    # negative arc INTO an exact tie — so neither normalization belongs
+    # before this point; only the final midpoint is normalized.
     diff = x2 - x1
+    x1 = x1 % 360.0
 
-    # When both arcs are equally long (diff exactly ±180) we follow the
-    # the reference convention: always take the positive (clockwise) half,
-    # i.e. treat -180 the same as +180.
+    # Reduce the RAW difference into (-180, 180] with a modulo, not with a
+    # single conditional shift: an argument more than one turn from the other
+    # (deg_midp(720, 0)) needs more than one wrap. Reducing the difference
+    # rather than the arguments keeps the exact-opposition tie detectable —
+    # normalizing the arguments first can move it a few ULP off 180 and flip
+    # the result by half a turn.
+    #
+    # A raw difference of exactly -180 maps to +180 here, which is also the
+    # convention for the equal-arcs tie: with both arcs the same length, take
+    # the positive (clockwise) half.
+    diff = diff % 360.0
     if diff > 180.0:
         diff -= 360.0
-    elif diff < -180.0:
-        diff += 360.0
-    elif diff == -180.0:
-        diff = 180.0
 
     # Calculate midpoint along the chosen arc
     midp = x1 + diff / 2.0
 
-    # Normalize result to [0, 360)
-    return midp % 360.0
+    # Normalize through degnorm so the midpoint inherits the same near-zero
+    # snap and half-open-range guard as every other public angle (a midpoint
+    # a hair below zero, e.g. deg_midp(0.0, -1e-13), otherwise reported
+    # ~359.99999999999994 instead of 0.0).
+    return degnorm(midp)
 
 
 def rad_midp(x: float, y: float) -> float:
@@ -1357,26 +1396,22 @@ def rad_midp(x: float, y: float) -> float:
         4.71238898038469
     """
     # Normalize both angles to [0, 2*pi)
+    # Arc chosen from the raw arguments, as in deg_midp (see there).
+    _raw_diff = y - x
     x = x % TWO_PI
-    y = y % TWO_PI
 
-    # Calculate the difference
-    diff = y - x
-
-    # When both arcs are equally long (diff exactly ±π) we follow the
-    # the reference convention: always take the positive (clockwise) half.
+    # Same reduction of the raw difference as deg_midp (see there).
+    diff = _raw_diff % TWO_PI
     if diff > math.pi:
         diff -= TWO_PI
-    elif diff < -math.pi:
-        diff += TWO_PI
-    elif diff == -math.pi:
-        diff = math.pi
 
     # Calculate midpoint along the chosen arc
     midp = x + diff / 2.0
 
-    # Normalize result to [0, 2*pi)
-    return midp % TWO_PI
+    # Normalize through radnorm so the midpoint inherits the near-zero snap
+    # and the half-open range (a bare modulo returned exactly 2*pi, outside
+    # this function's own documented [0, 2*pi)).
+    return radnorm(midp)
 
 
 def d2l(d: float) -> int:
@@ -1477,38 +1512,94 @@ def _decompose_to_dms(ddeg: float, has_rounding: bool) -> Tuple[int, int, int, f
     return ideg, imin, isec, secfr
 
 
+def _decompose_arcsec_to_dms(
+    pos_arcsec: float, has_rounding: bool
+) -> Tuple[int, int, int, float]:
+    """Break a non-negative arc-second position into deg, min, sec, secfr.
+
+    The nakshatra split reduces in the arc-second domain (where the 13°20'
+    segment is exactly 48000") so that positions on an exact degree, minute
+    or segment boundary decompose without the sub-arcsecond truncation the
+    degree-domain path would show. ``has_rounding`` mirrors
+    :func:`_decompose_to_dms`.
+    """
+    total = max(pos_arcsec, 0.0)
+    ideg = int(total / 3600.0)
+    total = max(total - ideg * 3600.0, 0.0)
+    imin = int(total / 60.0)
+    total = max(total - imin * 60.0, 0.0)
+    isec = int(total)
+    if has_rounding:
+        secfr = float(isec)
+    else:
+        secfr = max(total - isec, 0.0)
+    return ideg, imin, isec, secfr
+
+
+_NAK_SPAN_ARCSEC: float = 48000.0  # 360° * 3600 / 27, exact in the arcsec domain
+
+
 def _split_deg_nakshatra(
     ddeg: float, roundflag: int
 ) -> Tuple[int, int, int, float, int]:
     """Nakshatra-mode split for non-negative degree values.
 
-    The ecliptic is divided into 27 equal segments (nakshatras) of
-    13°20' each.  Returns the position within the current nakshatra.
+    The ecliptic is divided into 27 equal segments (nakshatras) of 13°20'
+    each. The value is reduced into its segment in the arc-second domain, then
+    the rounding offset is applied with ``KEEP_DEG``/``KEEP_SIGN`` tested on the
+    position *within* the nakshatra (the displayed degree) — for a 13°20'
+    segment the whole-degree part of the position and of the raw longitude
+    differ, so the check must use the position, unlike the 30° zodiac path.
+
+    The index is not reduced modulo 360°: it counts nakshatras from 0 for the
+    raw longitude, so inputs beyond one turn report indices >= 27.
+    Compatibility contract: a raw index of exactly 27 (one full turn,
+    longitude in [360°, 360° + 13°20')) reports as nakshatra 0; larger
+    indices are reported unreduced.
+
+    Because the segment is exact in arc-seconds but not in degrees, the
+    arc-second reduction here makes exact degree/minute/segment boundaries
+    display cleanly, unlike the reference's degree-domain arithmetic which can
+    render such boundaries one arc-second low. Away from boundaries the two may
+    still differ by up to one arc-second in the sub-arcsecond field (float
+    representation only); the segment index and rounded fields agree.
     """
-    nakshatra_span = 360.0 / 27.0
-    normalized = ddeg % 360.0
-    pos_in_nak = normalized % nakshatra_span
-
-    # Determine and conditionally suppress rounding offset
-    offset = _rounding_offset(roundflag)
-    if offset > 0.0:
-        if roundflag & SPLIT_DEG_KEEP_DEG:
-            # Suppress when offset would bump the integer-degree part
-            if int(pos_in_nak + offset) - int(pos_in_nak) > 0:
-                offset = 0.0
-        elif roundflag & SPLIT_DEG_KEEP_SIGN:
-            # Suppress when offset would cross into next nakshatra
-            if pos_in_nak + offset >= nakshatra_span:
-                offset = 0.0
-
-    rounded = (normalized + offset) % 360.0
-    nak_idx = min(int(rounded / nakshatra_span), 26)
-    position = rounded - nak_idx * nakshatra_span
-
     has_rounding = bool(
         roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
     )
-    ideg, imin, isec, secfr = _decompose_to_dms(position, has_rounding)
+
+    # Reduce into the current nakshatra in the exact arc-second domain. Both
+    # the segment index and the position within it come from the SAME
+    # unsnapped value: choosing the index from a copy snapped onto the
+    # integer-arcsec grid pushed a value a hair below a boundary into the
+    # next segment while leaving the position negative, which the
+    # decomposition below then clamped to zero — so 13d20' minus half a
+    # microarcsecond reported the start of the next nakshatra instead of the
+    # previous segment's final fractional second. The boundary must be
+    # resolved from the raw value at full precision (compatibility contract).
+    total_arcsec = ddeg * 3600.0
+    nak_idx = int(total_arcsec / _NAK_SPAN_ARCSEC)
+    pos_arcsec = total_arcsec - nak_idx * _NAK_SPAN_ARCSEC
+
+    # Rounding offset in arc-seconds, suppressed by KEEP_DEG (would advance the
+    # displayed whole-degree part of the position) or KEEP_SIGN (would cross
+    # into the next nakshatra).
+    off_arcsec = _rounding_offset(roundflag) * 3600.0
+    if off_arcsec > 0.0:
+        if roundflag & SPLIT_DEG_KEEP_DEG:
+            if int((pos_arcsec + off_arcsec) / 3600.0) > int(pos_arcsec / 3600.0):
+                off_arcsec = 0.0
+        elif roundflag & SPLIT_DEG_KEEP_SIGN:
+            if pos_arcsec + off_arcsec >= _NAK_SPAN_ARCSEC:
+                off_arcsec = 0.0
+    pos_arcsec += off_arcsec
+    if pos_arcsec >= _NAK_SPAN_ARCSEC:
+        pos_arcsec -= _NAK_SPAN_ARCSEC
+        nak_idx += 1
+    if nak_idx == 27:
+        nak_idx = 0
+
+    ideg, imin, isec, secfr = _decompose_arcsec_to_dms(pos_arcsec, has_rounding)
     return (ideg, imin, isec, secfr, nak_idx)
 
 
@@ -1605,10 +1696,16 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
     ddeg += offset
 
     # --- Zodiacal sign extraction (after rounding) ---
+    # The index is not reduced modulo 360°: int(ddeg / 30) counts 30° signs
+    # from 0 for the raw longitude, so inputs beyond one turn report indices
+    # >= 12. Compatibility contract: a raw index of exactly 12 (one full
+    # turn, ddeg in [360°, 390°)) reports as sign 0; larger indices are
+    # reported unreduced.
     if roundflag & SPLIT_DEG_ZODIACAL:
-        ddeg %= 360.0
         sign_out = int(ddeg / 30.0)
-        ddeg %= 30.0
+        ddeg = math.fmod(ddeg, 30.0)
+        if sign_out == 12:
+            sign_out = 0
 
     # --- Decompose into deg / min / sec / secfr ---
     ideg, imin, isec, secfr = _decompose_to_dms(ddeg, has_rounding)

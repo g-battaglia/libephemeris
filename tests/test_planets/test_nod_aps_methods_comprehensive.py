@@ -231,3 +231,112 @@ class TestNodApsEdgeCases:
         result = swe.nod_aps(JD_J2000, MARS, NODBIT_MEAN)
         assert len(result) == 4
         assert len(result[0]) == 6
+
+
+class TestNodApsMethodBitPrecedence:
+    """Method-bit precedence (measured reference behavior).
+
+    NODBIT_MEAN wins whenever it is set, even alongside NODBIT_OSCU /
+    NODBIT_OSCU_BAR, so methods 3/5/7 track method 1 (mean) rather than the
+    osculating methods 2/4/6. Method 0 (no bits) also defaults to mean. The
+    NODBIT_OSCU_BAR barycentric center is an independent choice, applied only
+    on the osculating path, so a body without mean elements still honors it.
+    """
+
+    _MEAN_BODIES = [MOON, MERCURY, VENUS, MARS, JUPITER, SATURN, NEPTUNE]
+
+    @staticmethod
+    def _assert_points_match(got, want, ctx):
+        for slot in range(4):
+            for comp in range(3):
+                assert got[slot][comp] == pytest.approx(want[slot][comp], abs=1e-6), (
+                    f"{ctx}: slot={slot} comp={comp} {got[slot][comp]} != "
+                    f"{want[slot][comp]}"
+                )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", _MEAN_BODIES)
+    def test_mean_bit_overrides_osculating(self, body):
+        """Methods 3/5/7 equal method 1 for bodies with mean elements."""
+        mean = swe.nod_aps_ut(JD_J2000, body, NODBIT_MEAN)
+        for combo in (
+            NODBIT_MEAN | NODBIT_OSCU,  # 3
+            NODBIT_MEAN | NODBIT_OSCU_BAR,  # 5
+            NODBIT_MEAN | NODBIT_OSCU | NODBIT_OSCU_BAR,  # 7
+        ):
+            got = swe.nod_aps_ut(JD_J2000, body, combo)
+            self._assert_points_match(got, mean, f"body={body} method={combo}")
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [MOON, MERCURY, MARS, NEPTUNE])
+    def test_method_zero_defaults_to_mean(self, body):
+        """Method 0 (no bits) equals method 1 (mean)."""
+        mean = swe.nod_aps_ut(JD_J2000, body, NODBIT_MEAN)
+        got = swe.nod_aps_ut(JD_J2000, body, 0)
+        self._assert_points_match(got, mean, f"body={body} method=0")
+
+    @pytest.mark.unit
+    def test_oscu_bar_wins_over_oscu_when_mean_absent(self):
+        """Method 6 (OSCU|OSCU_BAR) equals method 4 for a trans-jovian planet.
+
+        With the mean bit absent, the barycentric center wins over the plain
+        heliocentric osculating one.
+        """
+        m4 = swe.nod_aps_ut(JD_J2000, NEPTUNE, NODBIT_OSCU_BAR)
+        m6 = swe.nod_aps_ut(JD_J2000, NEPTUNE, NODBIT_OSCU | NODBIT_OSCU_BAR)
+        self._assert_points_match(m6, m4, "Neptune method=6")
+
+    @pytest.mark.unit
+    def test_body_without_mean_elements_honors_oscu_bar_under_mean_bit(self):
+        """Pluto (no mean elements) falls through to osculating for every method.
+
+        The OSCU_BAR bit then still selects the barycentric center even when
+        NODBIT_MEAN is set (methods 5/7 == method 4), while methods 0/1/2/3 stay
+        on the heliocentric osculating center.
+        """
+        m4 = swe.nod_aps_ut(JD_J2000, PLUTO, NODBIT_OSCU_BAR)
+        for combo in (
+            NODBIT_MEAN | NODBIT_OSCU_BAR,  # 5
+            NODBIT_MEAN | NODBIT_OSCU | NODBIT_OSCU_BAR,  # 7
+        ):
+            got = swe.nod_aps_ut(JD_J2000, PLUTO, combo)
+            self._assert_points_match(got, m4, f"Pluto method={combo}")
+        # Plain mean (1) == plain heliocentric osculating (2), both distinct
+        # from the barycentric method 4.
+        m1 = swe.nod_aps_ut(JD_J2000, PLUTO, NODBIT_MEAN)
+        m2 = swe.nod_aps_ut(JD_J2000, PLUTO, NODBIT_OSCU)
+        self._assert_points_match(m1, m2, "Pluto method 1 vs 2")
+        assert abs(m1[2][0] - m4[2][0]) > 1e-3  # helio vs bary perihelion differ
+
+
+class TestNodApsSiderealEquatorial:
+    """FLG_SIDEREAL is ignored when FLG_EQUATORIAL is set.
+
+    Measured reference behavior: nod_aps SID+EQU is identical to EQU alone (the
+    equatorial rotation runs after the point is built, so the ayanamsha is not
+    subtracted). Plain SIDEREAL still applies the ayanamsha.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", [MERCURY, MARS, JUPITER, NEPTUNE, MOON])
+    def test_sidereal_equatorial_matches_equatorial(self, body):
+        swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
+        equ = swe.nod_aps_ut(JD_J2000, body, NODBIT_MEAN, swe.FLG_EQUATORIAL)
+        sid_equ = swe.nod_aps_ut(
+            JD_J2000, body, NODBIT_MEAN, swe.FLG_SIDEREAL | swe.FLG_EQUATORIAL
+        )
+        for slot in range(4):
+            for comp in range(3):
+                assert sid_equ[slot][comp] == pytest.approx(
+                    equ[slot][comp], abs=1e-6
+                ), f"body={body} slot={slot} comp={comp}: SID+EQU must equal EQU"
+
+    @pytest.mark.unit
+    def test_sidereal_alone_still_subtracts_ayanamsha(self):
+        swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
+        trop = swe.nod_aps_ut(JD_J2000, MARS, NODBIT_MEAN, 0)
+        sid = swe.nod_aps_ut(JD_J2000, MARS, NODBIT_MEAN, swe.FLG_SIDEREAL)
+        # sidereal = tropical-of-date longitude minus the (mean) ayanamsha,
+        # ~23.9 deg at J2000 for Lahiri.
+        d = (trop[0][0] - sid[0][0]) % 360.0
+        assert 20.0 < d < 30.0

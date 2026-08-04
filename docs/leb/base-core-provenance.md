@@ -1,6 +1,6 @@
 # Bundled base-tier LEB2 provenance
 
-This is the build attestation for the two tracked prebuilt LEB artifacts in the
+This is the build record for the two tracked prebuilt LEB artifacts in the
 repository: the base core and the small Hamburg-body companion.
 
 ## Core artifact
@@ -44,15 +44,14 @@ input and is not relicensed by this project.
 
 - Planetary, Earth, and lunar state data: NASA JPL DE440s.
 - Mean-node and mean-apogee inputs: ERFA's implementation of the IERS 2003
-  Delaunay arguments plus conventional orbital-plane geometry. This build was
-  performed after removal of the superseded compatibility baseline and does
-  not use an earlier LEB body channel as an input or target.
+  Delaunay arguments plus conventional orbital-plane geometry, evaluated
+  directly; no earlier LEB body channel is used as an input or target.
 - Serialization and compression: the project-owned LEB2 generator and format
   implementation in this repository.
 
 ## Auxiliary sections
 
-The attestation covers every payload in the file, not only the body channels:
+This record covers every payload in the file, not only the body channels:
 
 - **Nutation:** `scripts.generate_leb.generate_nutation()` evaluates ERFA
   `nut06a`, the IAU 2006/2000A model, into 6,849 Chebyshev segments with a
@@ -84,22 +83,26 @@ The attestation covers every payload in the file, not only the body channels:
 - Coverage: JD 2396758.5–2506331.5 (1850–2150)
 - Format: LEB2 v2; populated section types 0 and 6
 
+Exact generation-input pin:
+
+- `libephemeris/hypothetical.py` SHA-256 (as built, tree of commit
+  `ea052c5`):
+  `b9c64cca9fb3c8263103992200bc5937f5e3c80f85fe64b39f35a500e917cdf8`.
+  Later commits revise this module's documentation and citations; the pin
+  identifies the bytes whose Neely (1980) propagation produced the stored
+  channels.
+
 The standalone `ephemeris_base_uranians.leb` partial is generated from the
-independently sourced Neely (1980) propagation in
+Neely (1980) propagation in
 `libephemeris.hypothetical`, verified over 500 samples per body, converted with
 the `1e-12` native-component target, and verified over another 200 samples per
 body. Shared nutation, Delta-T, and star-catalog tables are intentionally owned
 by the core and are not duplicated in this or any other named companion.
 
-The recorded build inputs contain no reference-distribution source,
-documentation, algorithm, data file, generated artifact, or comparison output;
-the build regenerated the asset rather than converting a previously published
-LEB file. This attestation is scoped to the named build inputs and artifact. It
-does not make a claim about every historical repository revision.
-The hypothetical group, retired at the time of this build, was neither
-generated into nor converted as part of this `base_core.leb2` artifact. The
-Hamburg bodies (40–47) now ship separately as the independently sourced,
+Both assets were regenerated from the inputs listed above rather than
+converted from a previously published LEB file. The core artifact contains no
+fictitious body IDs: the Hamburg bodies (40–47) ship separately as the
 manifest-pinned `base_uranians.leb2` companion.
 
-This page is an external build record. The command, hashes, input description,
-and clean-room attestation are not embedded as metadata inside the LEB2 format.
+This page is an external build record. The command, hashes, and input
+description are not embedded as metadata inside the LEB2 format.

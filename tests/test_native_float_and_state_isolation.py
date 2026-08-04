@@ -72,6 +72,24 @@ def test_calc_returns_native_floats(body, flags):
             assert not isinstance(v, np.generic)
 
 
+@pytest.mark.parametrize("body", _BODIES)
+def test_pheno_returns_native_floats(body):
+    """Every pheno/pheno_ut slot must be a native float.
+
+    Guards the Moon apparent-diameter (slot 3) numpy ``float64`` leak on the
+    skyfield path, where ``moon_dist.au`` flowed into ``_calc_apparent_diameter``
+    without a ``float()`` cast.
+    """
+    for fn in (L.pheno, L.pheno_ut):
+        try:
+            result = fn(JD, body, FLG_SWIEPH)
+        except Exception:  # body unsupported by pheno — not a contract case
+            continue
+        for i, v in enumerate(result):
+            assert type(v) is float, f"{fn.__name__}({body})[{i}]: {type(v)}"
+            assert not isinstance(v, np.generic)
+
+
 def test_geocentric_unaffected_by_topo():
     L.set_topo(0.0, 0.0, 0.0)
     geo = L.calc_ut(JD, MOON, FLG_SWIEPH)[0][0]

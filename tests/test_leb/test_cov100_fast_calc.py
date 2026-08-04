@@ -28,6 +28,7 @@ from libephemeris.constants import (
     HARRINGTON,
     MEAN_NODE,
     MOON,
+    OSCU_APOG,
     SUN,
     TRUE_NODE,
     FLG_EQUATORIAL,
@@ -38,6 +39,7 @@ from libephemeris.constants import (
     FLG_SPEED,
     FLG_TOPOCTR,
 )
+from libephemeris.leb_format import COORD_HELIO_ECL
 from libephemeris.fast_calc import (
     _apply_aberration,
     _apply_cob_correction,
@@ -486,7 +488,7 @@ def test_pipeline_ecliptic_non_lunar_body_skips_nutation(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_eq_j2000_wrap_positive(reader, monkeypatch):
     """EQ+J2000: d_eq_lon > 180 wrap (line 1483)."""
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])  # eq_now, eq_fwd
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])  # eq_now, eq_fwd
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -502,7 +504,7 @@ def test_pipeline_ecliptic_eq_j2000_wrap_positive(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_eq_j2000_wrap_negative(reader, monkeypatch):
     """EQ+J2000: d_eq_lon < -180 wrap (line 1485)."""
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -518,7 +520,7 @@ def test_pipeline_ecliptic_eq_j2000_wrap_negative(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_eq_wrap_positive(reader, monkeypatch):
     """EQ of date: d_eq_lon > 180 wrap (line 1509)."""
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -531,7 +533,7 @@ def test_pipeline_ecliptic_eq_wrap_positive(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_eq_wrap_negative(reader, monkeypatch):
     """EQ of date: d_eq_lon < -180 wrap (line 1511)."""
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -544,7 +546,7 @@ def test_pipeline_ecliptic_eq_wrap_negative(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_j2000_wrap_positive(reader, monkeypatch):
     """J2000 ecliptic: d_j_lon > 180 wrap (line 1527)."""
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
 
     def fake_precess(lo, la, a, b):
         return next(seq)
@@ -557,7 +559,7 @@ def test_pipeline_ecliptic_j2000_wrap_positive(reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_ecliptic_j2000_wrap_negative(reader, monkeypatch):
     """J2000 ecliptic: d_j_lon < -180 wrap (line 1529)."""
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_precess(lo, la, a, b):
         return next(seq)
@@ -674,7 +676,7 @@ def test_pipeline_helio_eq_of_date_sidereal_meanobl(helio_reader):
 @SKIP_NO_LEB
 def test_pipeline_helio_eq_of_date_wrap_positive(helio_reader, monkeypatch):
     """Helio EQ of date: d_eq_lon > 180 wrap (line 1671)."""
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -689,7 +691,7 @@ def test_pipeline_helio_eq_of_date_wrap_positive(helio_reader, monkeypatch):
 @SKIP_NO_LEB
 def test_pipeline_helio_eq_of_date_wrap_negative(helio_reader, monkeypatch):
     """Helio EQ of date: d_eq_lon < -180 wrap (line 1673)."""
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_cotrans(lon, lat, eps):
         return next(seq)
@@ -707,10 +709,67 @@ def test_pipeline_helio_eq_of_date_wrap_negative(helio_reader, monkeypatch):
 
 
 @SKIP_NO_LEB
-def test_fast_calc_tt_icrs_raises(reader):
-    """fast_calc_tt with FLG_ICRS raises KeyError (line 1809)."""
+def test_fast_calc_tt_icrs_pipeline_a_computed(reader):
+    """FLG_ICRS is reduced in-place for barycentric ICRS (Pipeline-A) bodies.
+
+    The stored channel already IS ICRS, so the direct reducer returns the
+    of-date position with the frame bias omitted instead of deferring to the
+    caller's resolver.
+    """
+    res, iflag = fast_calc_tt(reader, JD, SUN, FLG_ICRS | FLG_SPEED)
+    assert len(res) == 6
+    assert all(math.isfinite(v) for v in res)
+
+
+@SKIP_NO_LEB
+def test_fast_calc_tt_icrs_ecliptic_direct_served(reader):
+    """FLG_ICRS is served in place for ecliptic-direct (Pipeline-B) bodies.
+
+    For the of-date ecliptic lunar points FLG_ICRS is a no-op in the public
+    convention (the Skyfield backend's ``_maybe_equatorial_convert`` never
+    consults it), so the request stays on the LEB channel and returns the same
+    of-date ecliptic place as the plain request rather than re-deriving the
+    hypersensitive osculating longitude from a different Moon-state source.
+    """
+    for body in (MEAN_NODE, OSCU_APOG):
+        icrs, _ = fast_calc_tt(reader, JD, body, FLG_ICRS | FLG_SPEED)
+        plain, _ = fast_calc_tt(reader, JD, body, FLG_SPEED)
+        assert len(icrs) == 6
+        assert all(math.isfinite(v) for v in icrs)
+        # ICRS adds nothing to the of-date ecliptic output for these bodies.
+        assert icrs == pytest.approx(plain, abs=1e-12)
+
+
+@SKIP_NO_LEB
+def test_fast_calc_tt_icrs_heliocentric_raises(reader, monkeypatch):
+    """FLG_ICRS still raises KeyError for heliocentric (Pipeline-C) bodies.
+
+    Only the barycentric ICRS and ecliptic-direct pipelines are served in
+    place; a heliocentric channel has no in-place ICRS reducer and routes to
+    the caller's mode-aware resolver. No public non-fictitious body carries a
+    COORD_HELIO_ECL channel, so a synthetic id exercises the guard directly.
+    """
+    from types import SimpleNamespace
+
+    fake_id = 12345  # not fictitious (40-58), not an external ecliptic model
+    real_has_body = reader.has_body
+    real_bodies = reader._bodies
+
+    def fake_has_body(body_id):
+        return body_id == fake_id or real_has_body(body_id)
+
+    monkeypatch.setattr(reader, "has_body", fake_has_body)
+    # jd_start/jd_end cover JD so the sealed-range escalation sees the body as
+    # in range and lets the original "unsupported flag" KeyError propagate.
+    monkeypatch.setitem(
+        real_bodies,
+        fake_id,
+        SimpleNamespace(
+            coord_type=COORD_HELIO_ECL, jd_start=JD - 1000.0, jd_end=JD + 1000.0
+        ),
+    )
     with pytest.raises(KeyError):
-        fast_calc_tt(reader, JD, SUN, FLG_ICRS)
+        fast_calc_tt(reader, JD, fake_id, FLG_ICRS | FLG_SPEED)
 
 
 @SKIP_NO_LEB
@@ -742,10 +801,15 @@ def test_fast_calc_tt_topo_missing_raises(reader):
     """fast_calc_tt FLG_TOPOCTR without set_topo() raises (lines 1823-1824)."""
     from libephemeris import state
 
+    from libephemeris.exceptions import ConfigurationError
+
     saved = state._TOPO
     state._TOPO = None
     try:
-        with pytest.raises(ValueError, match="set_topo"):
+        # ConfigurationError, NOT ValueError: a ValueError here was caught by
+        # the sealed curated-asteroid coverage fallback, which then silently
+        # served a Keplerian geocentric position (Round AP finding).
+        with pytest.raises(ConfigurationError, match="set_topo"):
             fast_calc_tt(reader, JD, SUN, FLG_TOPOCTR)
     finally:
         state._TOPO = saved
@@ -855,7 +919,7 @@ def test_deferred_sid_j2k_wrap_positive(reader, monkeypatch):
     """Deferred SID+J2000: d_j_lon > 180 wrap (line 2064)."""
     from libephemeris.constants import SIDM_LAHIRI
 
-    seq = iter([(1.0, 0.0), (359.0, 0.0)])
+    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
 
     def fake_precess(lo, la, a, b):
         return next(seq)
@@ -876,7 +940,7 @@ def test_deferred_sid_j2k_wrap_negative(reader, monkeypatch):
     """Deferred SID+J2000: d_j_lon < -180 wrap (line 2066)."""
     from libephemeris.constants import SIDM_LAHIRI
 
-    seq = iter([(359.0, 0.0), (1.0, 0.0)])
+    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
     def fake_precess(lo, la, a, b):
         return next(seq)
@@ -890,3 +954,125 @@ def test_deferred_sid_j2k_wrap_negative(reader, monkeypatch):
         sid_mode=SIDM_LAHIRI,
     )
     assert all(math.isfinite(v) for v in res)
+
+
+class TestEquatorialSpeedSelfConsistency:
+    """Equatorial/J2000 frame speeds are the derivative of the reported
+    positions: the conversion uses a CENTERED stencil (a one-sided step
+    left ~0.45\"/day of declination-rate bias on the fast-swinging
+    osculating apogee)."""
+
+    def test_oscu_apog_equatorial_speed_matches_own_derivative(self):
+        import libephemeris as le
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                jd = le.julday(2004, 2, 11, 0.0)
+                f = le.FLG_SWIEPH | le.FLG_EQUATORIAL | le.FLG_SPEED
+                rep = le.calc_ut(jd, 13, f)[0]
+                h = 300.0 / 86400.0
+                p_m = le.calc_ut(jd - h, 13, f)[0]
+                p_p = le.calc_ut(jd + h, 13, f)[0]
+                num_ddec = (p_p[1] - p_m[1]) / (2 * h)
+                assert abs(rep[4] - num_ddec) * 3600.0 < 0.06
+        finally:
+            le.set_calc_mode(prev)
+
+    def test_oscu_apog_equatorial_j2000_speed_matches_own_derivative(self):
+        """The combined EQUATORIAL|J2000 branch shares the centered stencil:
+        the one-sided step it retained after the of-date fix left a
+        ~0.29\"/day J2000 declination-rate backend split at fast-swinging
+        epochs (measured at 1944/2062)."""
+        import libephemeris as le
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                # Fast-swinging epoch where the one-sided bias reached
+                # 0.23"/day of dDec.
+                jd = 2431097.564506
+                f = le.FLG_SWIEPH | le.FLG_EQUATORIAL | le.FLG_J2000 | le.FLG_SPEED
+                rep = le.calc_ut(jd, 13, f)[0]
+                h = 300.0 / 86400.0
+                p_m = le.calc_ut(jd - h, 13, f)[0]
+                p_p = le.calc_ut(jd + h, 13, f)[0]
+                num_ddec = (p_p[1] - p_m[1]) / (2 * h)
+                assert abs(rep[4] - num_ddec) * 3600.0 < 0.06, mode
+        finally:
+            le.set_calc_mode(prev)
+
+
+class TestTopoWithoutObserverRaisesUniformly:
+    """FLG_TOPOCTR without set_topo raises the typed ConfigurationError on
+    every body class and backend: the guard must NOT be a ValueError, or the
+    sealed curated-asteroid coverage fallback swallows it and silently
+    serves a Keplerian geocentric position (measured reference raises)."""
+
+    def test_curated_asteroids_raise_like_planets(self):
+        import libephemeris as le
+        from libephemeris.exceptions import ConfigurationError
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                le.close()  # drop any observer set by earlier tests
+                for body in (15, 17, 10001, 6, 40):
+                    try:
+                        le.calc_ut(2452000.5, body, 2 | le.FLG_TOPOCTR)
+                        raise AssertionError(f"{mode}/{body}: no raise")
+                    except ConfigurationError:
+                        pass
+        finally:
+            le.set_calc_mode(prev)
+
+
+class TestTopoNoopLunarPoints:
+    """The geocentric-defined lunar points compute under FLG_TOPOCTR without
+    an observer (parallax no-op; measured reference echoes the bit), while
+    parallax-bearing bodies keep the typed ConfigurationError."""
+
+    def test_lunar_points_compute_without_observer(self):
+        import libephemeris as le
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                le.close()
+                for body in (10, 11, 12, 13, 21, 22):
+                    pos, rf = le.calc_ut(2451545.0, body, 2 | le.FLG_TOPOCTR)
+                    assert rf & le.FLG_TOPOCTR, (mode, body)
+                    assert 0.0 <= pos[0] < 360.0
+        finally:
+            le.set_calc_mode(prev)
+
+
+class TestDeflectionConjunctionLimiter:
+    """The PPN deflection denominator is clamped near superior conjunction
+    (ERFA eraLdsun dlim convention): a planet geometrically inside the
+    solar disk stays bounded (~arcsec) instead of blowing up to ~9", and
+    the observable regime (outside the disk) is untouched."""
+
+    def test_mercury_superior_conjunction_bounded(self):
+        import libephemeris as le
+
+        prev = le.get_calc_mode()
+        try:
+            for mode in ("leb", "skyfield"):
+                le.set_calc_mode(mode)
+                with_defl = le.calc(2431039.0, 2, 2 | 256)[0][0]
+                no_defl = le.calc(2431039.0, 2, 2 | 256 | le.FLG_NOGDEFL)[0][0]
+                # Bounded deflection: well under the former ~8.8" blow-up.
+                assert (
+                    abs((with_defl - no_defl + 180.0) % 360.0 - 180.0) * 3600.0 < 2.0
+                ), mode
+                # Outside the disk: deflection remains sub-arcsecond and active.
+                w2 = le.calc(2451545.0, 2, 2 | 256)[0][0]
+                n2 = le.calc(2451545.0, 2, 2 | 256 | le.FLG_NOGDEFL)[0][0]
+                assert abs((w2 - n2 + 180.0) % 360.0 - 180.0) * 3600.0 < 0.1, mode
+        finally:
+            le.set_calc_mode(prev)

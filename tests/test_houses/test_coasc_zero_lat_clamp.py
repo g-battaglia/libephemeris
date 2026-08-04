@@ -19,7 +19,14 @@ class TestCoAscZeroLatClamp:
         _, ascmc_neg = ephem.houses_armc(ARMC, -1e-12, EPS, hsys)
         separation = abs((ascmc_pos[6] - ascmc_neg[6] + 180.0) % 360.0 - 180.0)
         assert separation > 179.0
-        assert ascmc_zero[6] == ascmc_pos[6]
+        # The exact equator resolves to one of the two antipodal one-sided
+        # limits. Measured reference behavior: the horizon system 'H' takes the
+        # southern (negative-latitude) branch, every other system the northern
+        # (positive-latitude) branch.
+        if hsys == ord("H"):
+            assert ascmc_zero[6] == ascmc_neg[6]
+        else:
+            assert ascmc_zero[6] == ascmc_pos[6]
 
     @pytest.mark.unit
     def test_houses_clamp_is_sign_aware(self):

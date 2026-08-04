@@ -189,8 +189,13 @@ class TestHousesEx2SpeedFlag:
         assert cusps_speed1 == cusps_speed2, "Whole Sign: speeds differ"
         assert ascmc_speed1 == ascmc_speed2, "Whole Sign: ascmc speeds differ"
 
-        # Whole-sign cusps are fixed boundaries between sign changes.
-        assert all(speed == 0.0 for speed in cusps_speed1)
+        # Whole-Sign cusps sit at fixed sign boundaries, so the true time
+        # derivative of every reported cusp is zero (the cusp function is a
+        # step function, constant almost everywhere). The speeds are the
+        # finite-difference derivative of the reported positions - never an
+        # analytic rule reconstructed from external output.
+        for i in range(12):
+            assert cusps_speed1[i] == 0.0
         assert any(speed != 0.0 for speed in ascmc_speed1)
 
     """Tests for velocities in houses_armc_ex2."""
@@ -296,11 +301,14 @@ class TestHousesEx2SpeedFlag:
 
     @pytest.mark.unit
     def test_houses_armc_ex2_speed_flag_whole_sign(self):
-        """Whole Sign cusps are fixed at sign boundaries, so velocity is zero.
+        """Whole Sign cusp speeds are the derivative of the reported cusps.
 
-        Whole Sign houses place cusps at exact sign boundaries (0, 30, 60, etc.).
-        Within a short time interval, these don't change, so cusp velocities are zero.
-        However, ASC and MC velocities should still be calculated.
+        Whole Sign houses place cusps at exact sign boundaries, so the true
+        derivative of every cusp is zero. The speeds are always the
+        finite-difference derivative of the positions this function reports;
+        the analytic rule an external implementation exposes instead is a
+        documented intentional divergence. ASC and MC velocities are still
+        calculated.
         """
         armc = 150.0
         lat = 45.0
@@ -310,7 +318,8 @@ class TestHousesEx2SpeedFlag:
             armc, lat, eps, ord("W")
         )
 
-        assert all(speed == 0.0 for speed in cusps_speed)
+        for i in range(12):
+            assert cusps_speed[i] == 0.0
         assert any(speed != 0.0 for speed in ascmc_speed)
 
 

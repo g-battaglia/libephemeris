@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-04
+
+The stable v3.0.0 release. Consolidates the whole `3.0.0rc*` series — the
+long-term-model re-grounding (Vondrák 2011, multi-era Delta-T), the
+ultra-review parity cycle, source-autonomous sealed LEB mode with the
+pinned `data-v3` artifact set, and the provenance-hardening arc — under
+the AGPL-3.0-only license adopted at rc11. Long-form notes:
+`release-notes/v3.0.0.md`.
+
+### Breaking
+
+The `3.0.0rc9`-`3.0.0rc15` parity cycle changed observable public behavior in
+the cases below. Each change aligns the API with the documented compatibility
+contract; the pre-change behavior was a LibEphemeris extension or artifact.
+
+- **Fixed-star name resolution is narrowed to the reference search
+  semantics.** The `fixstar*` family no longer accepts Hipparcos-number
+  lookups ("HIP 49669" raises) or fuzzy matching; word designations resolve
+  only when they are literal keys of the curated alias table ("Alpha
+  Leonis", "Betelgeux" and "Formalhaut" still resolve; an unlisted
+  designation such as "Gamma Virginis" raises). Retained: exact
+  traditional-name match, catalogue-order prefix match ("Reg" is Regulus),
+  and the comma nomenclature forms. Silent-change case: **any leading-digit
+  string is now a 1-based sequential number in the sorted catalogue** —
+  `"12"` returns the twelfth entry (a call that previously meant HIP 12
+  returns a different star without raising), and `"32 Leonis"` no longer
+  means the Flamsteed designation but the 32nd entry. Numeric lookups are
+  catalogue-dependent by construction: implementations sorting different
+  catalogues return different stars for the same numeric string. The richer
+  lookups remain available in
+  `libephemeris.fixed_stars.resolve_star_name()`, the migration path. See
+  `docs/comparison/known-differences.md`, "Fixed stars".
+- **`get_ayanamsa_name()` returns `""` for ids without a predefined name**
+  (previously "User Defined" for `SIDM_USER` and "Unknown" otherwise), and
+  **`house_name()` returns `""` for unknown selectors.**
+- **A multi-character house-system selector raises `TypeError`** (previously
+  it fell through to the default system); high-byte selector characters are
+  decoded latin-1, not UTF-8.
+- **`utc_to_jd()` rejects invalid dates and times** ("invalid date: …" /
+  "invalid time: …") instead of normalizing them; seconds 60.0-60.999 remain
+  accepted for leap-second instants. Dates from 2035 on are treated as UT1
+  (see `docs/comparison/known-differences.md`, "UT1-UTC beyond the
+  leap-second table").
+- **`close()` no longer clears a user-defined Delta-T** set via
+  `set_delta_t_userdef()`: it is treated as configuration, not per-session
+  state.
+- **`get_calc_mode()` can raise `ValueError`** when `LIBEPHEMERIS_MODE` or
+  the TOML `calc_mode` key holds an unrecognized value, instead of silently
+  degrading a sealed deployment to `auto`. The getter is called throughout
+  the library, so the error can surface from any calculation entry point.
+- **`nod_aps*` raises a typed `Error` for body ids without implemented
+  nodes/apsides** instead of returning a fallback, and returns NaN position
+  slots for the interpolated apsides (21/22); `get_orbital_elements` and
+  `orbit_max_min_true_distance` raise typed errors for the Sun, the lunar
+  nodes/apogees, and ids 23-39.
+- **`sol_eclipse_where`/`lun_occult_where` report `attr[2] = 1.0` when no
+  eclipse is in progress** at the computed location (previously 0.0), and the
+  obscuration slot is no longer capped at 1.0 during totality (it carries
+  the disc-area ratio; see `docs/comparison/intentional-divergences.md`).
+- **Eclipse searches restarted from a returned maximum advance past it.**
+  The epoch margin (`~0.86 s`) derived from the golden-section refinement
+  resolution decides which event a search started exactly at `tret[0]`
+  returns.
+- **Legacy `*_KEPLERIAN_ELEMENTS` display containers for the Uranian bodies
+  zero `e`, `i`, `omega`, `Omega` on circular rows** (Hades keeps its
+  published inclined elements); the runtime element set is unaffected.
+- **`degnorm`/`radnorm` snap inputs within 1e-13 of zero to exactly 0.0**
+  instead of wrapping to just under a full turn.
+
+Thread-safety note: the module-level event searches (`rise_trans`,
+`rise_trans_true_hor`, the eclipse `*_loc` chains) set the process-global
+observer for the duration of the search so the topocentric calculation chain
+sees it. Concurrent callers needing isolation should use `EphemerisContext`
+(see `docs/reference/precision.md`, "Thread-safe Context API").
+
+### Performance
+
+- `calc_ut` improves ~20% on the main planetary path.
+- `rise_trans` is ~24-25% slower (the rise/set chain now routes through
+  `calc_ut` for backend-agnostic parity instead of the native Skyfield path);
+  `heliacal_ut`, which calls `rise_trans` in a loop, is the most affected
+  consumer.
+- `houses_ex2` is ~53% slower: the angle speeds now use two-step Richardson
+  extrapolation (five `houses_ex` evaluations instead of three), improving
+  the speed error from O(h²) to O(h⁴).
+
 ## [3.0.0rc15] - 2026-07-21
 
 Moves artifact integrity verification from every reader construction to the one

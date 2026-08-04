@@ -63,6 +63,34 @@ class TestCalcModeBasic:
         mode = get_calc_mode()
         assert mode in ("auto", "leb", "skyfield"), f"mode={mode}"
 
+    @pytest.mark.unit
+    def test_env_typo_raises_not_silent_auto(self, monkeypatch):
+        """A LIBEPHEMERIS_MODE typo must fail loudly, never silently un-seal.
+
+        A typo (e.g. 'lebb') previously resolved to 'auto', which quietly
+        widened a sealed 'leb' deployment (fallback allowed, network unsealed).
+        It now raises ValueError, mirroring LIBEPHEMERIS_NETWORK_POLICY.
+        """
+        set_calc_mode(None)  # let the env var be consulted
+        monkeypatch.setenv("LIBEPHEMERIS_MODE", "lebb")
+        with pytest.raises(ValueError, match="Invalid calculation mode"):
+            get_calc_mode()
+
+    @pytest.mark.unit
+    def test_env_absent_still_auto(self, monkeypatch):
+        """Absence of the env var is not a typo and stays 'auto'/'leb'."""
+        set_calc_mode(None)
+        monkeypatch.delenv("LIBEPHEMERIS_MODE", raising=False)
+        assert get_calc_mode() in ("auto", "leb")
+
+    @pytest.mark.unit
+    def test_env_valid_case_insensitive(self, monkeypatch):
+        """A valid env value (any case/whitespace) resolves normally."""
+        set_calc_mode(None)
+        monkeypatch.setenv("LIBEPHEMERIS_MODE", "  SKYFIELD ")
+        assert get_calc_mode() == "skyfield"
+        set_calc_mode(None)
+
 
 class TestSkyfieldBackend:
     """Test calculations in skyfield mode."""

@@ -35,7 +35,7 @@ RETIRED_PATHS = (
 
 PINNED_PATHS = {
     "libephemeris/lunar_apse_model.py": (
-        "7ce63d2f390efceab53e6e27a8d4192ff23066af44f6af97360d70f82b4615ba"
+        "0132e75b0b39cd5df540f90acd5ebb740a3f39e593e292ab5c003106ccdc08d9"
     ),
 }
 

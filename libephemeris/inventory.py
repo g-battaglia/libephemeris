@@ -173,7 +173,14 @@ def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | N
     """Return active LEB coverage for ``body_id`` and optionally ``jd``.
 
     ``None`` means that the active LEB reader does not contain the body. It
-    does not imply that an analytical or online fallback exists.  With a
+    does not imply that an analytical or online fallback exists.
+
+    The reported interval is the STORED coefficient range. An apparent-place
+    request at the exact lower boundary still needs the body's state up to
+    one light-time earlier (8 minutes for the Sun, ~5.7 hours for Pluto), so
+    the first usable apparent instant sits that far inside ``jd_start``
+    (``FLG_TRUEPOS`` works from the boundary itself). Artifacts generated
+    with the one-day tier margin absorb this entirely.  With a
     date-aware tiered reader, a covered ``jd`` reports the concrete selected
     tier file; a date outside every stored interval reports the union coverage
     without pretending that one file served the request.

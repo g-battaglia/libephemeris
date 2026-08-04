@@ -101,11 +101,20 @@ class TestTime:
 
 
 class TestSplitDeg:
-    def test_nakshatra_index_for_unnormalized_longitude(self) -> None:
-        """Nakshatra indices use the longitude modulo one full circle."""
+    def test_nakshatra_position_repeats_but_index_is_unreduced(self) -> None:
+        """Matching the reference, the position within a nakshatra repeats
+        every 360 deg, but the segment index counts the raw longitude and is
+        not reduced modulo 360 (only a raw index of exactly 27 -- one full
+        turn -- wraps back to 0)."""
         nak = le.SPLIT_DEG_NAKSHATRA
-        for angle in (0.0, 17.25, 359.9, 720.0):
-            assert le.split_deg(angle, nak) == le.split_deg(angle + 360.0, nak)
+        # (angle, index at angle, index at angle + 360)
+        cases = ((0.0, 0, 0), (17.25, 1, 28), (359.9, 26, 53), (720.0, 54, 81))
+        for angle, idx, idx_plus_turn in cases:
+            base = le.split_deg(angle, nak)
+            wrapped = le.split_deg(angle + 360.0, nak)
+            assert base[:3] == wrapped[:3]  # deg/min/sec position repeats
+            assert base[4] == idx
+            assert wrapped[4] == idx_plus_turn
 
 
 class TestReaderResourceSafety:

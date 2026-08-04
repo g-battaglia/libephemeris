@@ -415,3 +415,38 @@ class TestLunOccultWhereAttributes:
 
         if ocl_type != 0:
             assert attr[7] < 0.5
+
+
+class TestLunOccultWhereExtendedBodies:
+    """lun_occult_where for occulted bodies outside the classical
+    _PLANET_MAP (Chiron and the main-belt asteroids). The Skyfield path used
+    to leak a raw KeyError from ``_PLANET_MAP[body]``; both backends now source
+    the occulted body's topocentric place from calc_ut, matching the LEB path.
+    Runs reference free under whichever backend the suite selected.
+    """
+
+    # Chiron, Ceres, Pallas, Juno, Vesta.
+    BODIES = [15, 17, 18, 19, 20]
+
+    def test_where_at_occultation_returns_structure(self):
+        """At a real global occultation instant, lun_occult_where returns the
+        (retflag, geopos, attr) structure for these bodies without raising."""
+        jd0 = julday(2015, 1, 1, 0)
+        for body in self.BODIES:
+            _rfg, tg = lun_occult_when_glob(jd0, body, FLG_SWIEPH, 0, False)
+            tocc = tg[0]
+            retflag, geopos, attr = lun_occult_where(tocc, body, FLG_SWIEPH)
+            assert isinstance(retflag, int)
+            assert len(geopos) == 10
+            assert len(attr) == 20
+            # A ground point in progress: valid geographic coordinates.
+            assert -180.0 <= geopos[0] <= 360.0
+            assert -90.0 <= geopos[1] <= 90.0
+
+    def test_unplaceable_body_raises_error(self):
+        """A body no backend can place still raises the typed error."""
+        from libephemeris.exceptions import Error
+
+        jd = julday(2024, 1, 1, 0)
+        with pytest.raises(Error):
+            lun_occult_where(jd, 999, FLG_SWIEPH)

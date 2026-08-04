@@ -25,6 +25,13 @@ comparison ephemeris supplies targets or coefficients. The table interval is
 limited to DE440 medium coverage. A one-year terminal taper prevents jumps at
 both ends; beyond it, trig-only accuracy is about `0.112°` RMS.
 
+The residual figures above measure the model's fit to the DE440 apsis
+passages, not agreement with any other implementation. Away from the
+passages, interpolated apsides are definition-dependent: other published
+realizations differ from this one by up to a few tenths of a degree in
+longitude (and several arcminutes in latitude) at arbitrary dates, while
+all agree at the physical DE440 passages themselves.
+
 Latitude uses a two-harmonic inclined-plane model fitted to the same DE440
 passages. The distance channel is the mean DE440 perigee-passage distance,
 `0.0024236 AU`. Output starts on the true ecliptic of date, and the common

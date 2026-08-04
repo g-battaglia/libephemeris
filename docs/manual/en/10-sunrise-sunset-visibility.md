@@ -392,11 +392,12 @@ if jd_event > 0:
 Heliacal rising of Sirius in Cairo: 5/8/2024
 ```
 
-> The date comes from Schaefer's VISLIMIT visibility model. The reference
-> ephemeris places this particular event one day later (6 Aug 2024); at
-> the razor-thin first-morning transition a residual of a few tenths of a
+> The date comes from Schaefer's VISLIMIT visibility model. At the
+> razor-thin first-morning transition a residual of a few tenths of a
 > magnitude in the limiting-magnitude model can shift the reported day by
-> ±1 (see the notes on heliacal precision in the compatibility docs).
+> ±1, so implementations built on different atmospheric models can place
+> this event one day apart (see the notes on heliacal precision in the
+> compatibility docs).
 
 The four types of heliacal events are:
 

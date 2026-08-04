@@ -546,3 +546,286 @@ def test_main_scans_blocked_content_in_shell_files(
     monkeypatch.setattr(check_provenance, "REPO_ROOT", tmp_path)
 
     assert check_provenance.main() == 1
+
+
+# ---------------------------------------------------------------------------
+# Output-fitting narrative gate (6th category)
+# ---------------------------------------------------------------------------
+
+
+def _narrative_hits(root: Path) -> list[tuple[str, str]]:
+    hits, _ = check_provenance._reference_narrative_hits(root)
+    return [
+        (path.relative_to(root).as_posix(), label)
+        for path, label, _ in ((p, lb, s) for p, _ln, lb, s in hits)
+    ]
+
+
+def _write_pkg_module(root: Path, name: str, source: str) -> Path:
+    pkg = root / "libephemeris"
+    pkg.mkdir(parents=True, exist_ok=True)
+    path = pkg / name
+    path.write_text(source)
+    return path
+
+
+class TestNarrativeGateCatchesRealArchetypes:
+    """One fixture per real removed-case archetype the gate must catch."""
+
+    def test_sampling_domain_narrative_is_caught(self, tmp_path: Path) -> None:
+        # Colure-fixup archetype: conditional branches justified by a grid
+        # sweep of the reference, no unusual literal anywhere.
+        _write_pkg_module(
+            tmp_path,
+            "mod_a.py",
+            '''\
+def _fixup(armc):
+    """Behavioral comparison with the reference API (armc grid 0-355,
+    lat -89..89) shows isolated-point outputs at those exact hits."""
+    if armc > 180.0:
+        return armc - 0.5
+    return armc
+''',
+        )
+        assert ("libephemeris/mod_a.py", "reference-derived-evidence") in (
+            _narrative_hits(tmp_path)
+        )
+
+    def test_agreement_to_tolerance_is_caught(self, tmp_path: Path) -> None:
+        # Selector-rule archetype: a rule derived by observing which inputs
+        # behaved differently, justified by an agreement claim.
+        _write_pkg_module(
+            tmp_path,
+            "mod_b.py",
+            '''\
+_PINNED = frozenset({"O", "W", "N"})
+
+
+def _rate(h):
+    """The rule below reproduces the reference output to 0 deg/day
+    across latitude 0-78, four epochs."""
+    return 0.0 if h in _PINNED else 1.0
+''',
+        )
+        assert ("libephemeris/mod_b.py", "reference-derived-evidence") in (
+            _narrative_hits(tmp_path)
+        )
+
+    def test_reference_located_constant_is_caught(self, tmp_path: Path) -> None:
+        # Eclipse-margin archetype: a bare comment locating an observed
+        # transition; a ROUND number, so the numeric-literal gate is blind.
+        path = _write_pkg_module(
+            tmp_path,
+            "mod_c.py",
+            "# Measured reference behavior: the transition sits exactly at\n"
+            "# max +- 1e-4 day (8.64 s).\n"
+            "_MARGIN = 1e-4\n",
+        )
+        hits, _ack = check_provenance._reference_narrative_hits(tmp_path)
+        labels = {label for _p, _ln, label, _s in hits}
+        assert "reference-authored-constant" in labels
+        # The explicit regression: the high-precision-literal gate must NOT
+        # see this round number.
+        assert check_provenance._significant_digits("1e-4") < (
+            check_provenance.HIGH_PRECISION_SIG_DIGITS
+        )
+        assert path.exists()
+
+    def test_explicit_fitting_verb_is_caught(self, tmp_path: Path) -> None:
+        _write_pkg_module(
+            tmp_path,
+            "mod_d.py",
+            "# Threshold chosen so that our transition instant matches the\n"
+            "# reference.\n"
+            "_T = 0.5\n",
+        )
+        labels = {lb for _p, lb in _narrative_hits(tmp_path)}
+        assert "reference-derived-evidence" in labels
+
+    def test_round_constant_fires_clause_b_not_the_literal_gate(
+        self, tmp_path: Path
+    ) -> None:
+        _write_pkg_module(
+            tmp_path,
+            "mod_e.py",
+            "# The reference implementation switches branches here.\n_GATE = 0.5\n",
+        )
+        hits, _ack = check_provenance._reference_narrative_hits(tmp_path)
+        assert [(lb) for _p, _ln, lb, _s in hits] == ["reference-authored-constant"]
+        literal_hits = check_provenance._high_precision_literal_hits(tmp_path)
+        assert literal_hits == []
+
+
+class TestNarrativeGateLeavesContractsAlone:
+    """One fixture per legitimate archetype the gate must NOT touch.
+
+    The annotated statement is an INT binding: contract comments and
+    divergence notes are Clause A material, and Clause B deliberately
+    stays strict for module-level FLOAT constants that name the
+    reference (that is the _PHENO_EARTH-style case the dual-key waiver
+    exists for).
+    """
+
+    @pytest.mark.parametrize(
+        "comment",
+        [
+            # Retflag-echo contract.
+            "# Compatibility contract: the retflag echoes FLG_MOSEPH only\n"
+            "# when it is the sole source bit.\n",
+            # Error-type contract.
+            "# The reference raises TypeError for a multi-character\n# selector.\n",
+            # Return-shape contract.
+            "# An unknown selector yields an empty tuple rather than the\n"
+            "# 12-cusp fallback (the reference rule).\n",
+            # Documented divergence magnitude — policy-encouraged.
+            "# This leaves the reported speed ~0.2-0.8 arcsec/day off the\n"
+            "# reference near the poles.\n",
+            # Negated attestation.
+            "# No zero point is fitted to compatibility output; the value\n"
+            "# is never fitted to external output.\n",
+            # Fitting against a PUBLISHED source.
+            "# Delaunay series fitted at the DE440 perigee passages over\n"
+            "# the medium-kernel interval.\n",
+            # Open-source baseline comparison.
+            "# Tracks the Skyfield reference to <0.005 arcsec across the\n"
+            "# full catalogue.\n",
+        ],
+        ids=[
+            "retflag-echo",
+            "error-type",
+            "return-shape",
+            "divergence-magnitude",
+            "negated-attestation",
+            "published-source-fit",
+            "skyfield-baseline",
+        ],
+    )
+    def test_legitimate_comment_is_not_a_hit(
+        self, tmp_path: Path, comment: str
+    ) -> None:
+        _write_pkg_module(tmp_path, "mod_ok.py", comment + "_X = 1\n")
+        assert _narrative_hits(tmp_path) == []
+
+
+class TestNarrativeGateWaiverMechanism:
+    """The dual-key contract-attestation waiver."""
+
+    SOURCE = (
+        "# Compatibility contract sentinel: the reference returns this\n"
+        "# fixed tuple for the degenerate body.  provenance-contract-ok\n"
+        "_SENTINEL = 180.0\n"
+    )
+    RATIONALE = (
+        "degenerate-body sentinel tuple; a shape/echo contract in the same "
+        "class as a retflag echo, re-derivable from the public API surface "
+        "without reading any numeric output"
+    )
+
+    def test_inline_token_alone_does_not_waive(self, tmp_path: Path) -> None:
+        _write_pkg_module(tmp_path, "mod_w.py", self.SOURCE)
+        hits, ack = check_provenance._reference_narrative_hits(tmp_path)
+        assert len(hits) == 1 and ack == []
+
+    def test_registry_alone_does_not_waive(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        source_without_token = self.SOURCE.replace("  provenance-contract-ok", "")
+        _write_pkg_module(tmp_path, "mod_w.py", source_without_token)
+        monkeypatch.setattr(
+            check_provenance,
+            "CONTRACT_ATTESTATION_ALLOWLIST",
+            frozenset({("libephemeris/mod_w.py", "_SENTINEL", self.RATIONALE)}),
+        )
+        hits, ack = check_provenance._reference_narrative_hits(tmp_path)
+        assert len(hits) == 1 and ack == []
+
+    def test_both_keys_waive_and_are_reported(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_pkg_module(tmp_path, "mod_w.py", self.SOURCE)
+        monkeypatch.setattr(
+            check_provenance,
+            "CONTRACT_ATTESTATION_ALLOWLIST",
+            frozenset({("libephemeris/mod_w.py", "_SENTINEL", self.RATIONALE)}),
+        )
+        hits, ack = check_provenance._reference_narrative_hits(tmp_path)
+        assert hits == []
+        assert len(ack) == 1
+        assert ack[0][2] == "acknowledged-contract-attestation"
+        assert "_SENTINEL" in ack[0][3]
+
+    def test_waiver_dies_on_symbol_rename(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        renamed = self.SOURCE.replace("_SENTINEL", "_RENAMED")
+        _write_pkg_module(tmp_path, "mod_w.py", renamed)
+        monkeypatch.setattr(
+            check_provenance,
+            "CONTRACT_ATTESTATION_ALLOWLIST",
+            frozenset({("libephemeris/mod_w.py", "_SENTINEL", self.RATIONALE)}),
+        )
+        hits, ack = check_provenance._reference_narrative_hits(tmp_path)
+        assert len(hits) == 1 and ack == []
+
+    def test_short_or_vague_rationale_does_not_waive(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_pkg_module(tmp_path, "mod_w.py", self.SOURCE)
+        for bad in ("too short", "citation needed " * 10):
+            monkeypatch.setattr(
+                check_provenance,
+                "CONTRACT_ATTESTATION_ALLOWLIST",
+                frozenset({("libephemeris/mod_w.py", "_SENTINEL", bad)}),
+            )
+            hits, ack = check_provenance._reference_narrative_hits(tmp_path)
+            assert len(hits) == 1 and ack == []
+
+    def test_generated_module_header_exempts_clause_b(self, tmp_path: Path) -> None:
+        _write_pkg_module(
+            tmp_path,
+            "mod_gen.py",
+            "# AUTO-GENERATED by scripts/generate_tables.py\n"
+            "# The reference implementation switches branches here.\n"
+            "_GATE = 0.5\n",
+        )
+        hits, _ack = check_provenance._reference_narrative_hits(tmp_path)
+        assert all(lb != "reference-authored-constant" for _p, _ln, lb, _s in hits)
+
+
+class TestNarrativeGateReviewRegressions:
+    """Regression fixtures from the adversarial review of the gate."""
+
+    def test_coincide_verb_is_an_agreement_verb(self, tmp_path: Path) -> None:
+        _write_pkg_module(
+            tmp_path,
+            "mod_r1.py",
+            "# Hand-adjusted until the outputs coincide with the reference\n"
+            "# within 0.5 arcsec across the tested dates.\n"
+            "_K = 0.7\n",
+        )
+        labels = {lb for _p, lb in _narrative_hits(tmp_path)}
+        assert "reference-derived-evidence" in labels
+
+    def test_long_parenthetical_negation_is_not_a_hit(self, tmp_path: Path) -> None:
+        _write_pkg_module(
+            tmp_path,
+            "mod_r2.py",
+            "# This coefficient was not, contrary to what an earlier revision\n"
+            "# of this comment seemed to suggest to some reviewers, tuned to\n"
+            "# the reference in any way; it comes straight from Meeus (1998).\n"
+            "_C = 0.2\n",
+        )
+        assert _narrative_hits(tmp_path) == []
+
+    def test_single_copied_output_on_module_constant_is_caught(
+        self, tmp_path: Path
+    ) -> None:
+        # Clause A cannot see a bare copied output (no domain, no
+        # tolerance); Clause B is the designed catch for the constant form.
+        _write_pkg_module(
+            tmp_path,
+            "mod_r3.py",
+            "# The reference reports 1.5 for this input, so we return 1.5.\n_V = 1.5\n",
+        )
+        labels = {lb for _p, lb in _narrative_hits(tmp_path)}
+        assert "reference-authored-constant" in labels

@@ -66,7 +66,7 @@ By default positions are apparent (light-time + aberration corrected).
 | `FLG_SWIEPH` | Accepted for API compatibility and routed through the configured JPL/LEB backend for ordinary bodies. |
 | `FLG_MOSEPH` | Accepted for API compatibility; it does not activate a Moshier implementation or replace analytical body models. |
 | `FLG_DEFAULTEPH` | Default ephemeris selector (value `2`), equivalent to `FLG_SWIEPH`. |
-| `FLG_SPEED3` | Requests the three-position speed selector and is echoed distinctly from `FLG_SPEED`. Standards-derived mean lunar points and the interpolated compatibility curves expose deterministic derivatives; both selectors preserve the same body model. |
+| `FLG_SPEED3` | Requests the three-position speed selector and is echoed distinctly from `FLG_SPEED` when requested alone. When both speed flags are passed, `FLG_SPEED` takes precedence and the `SPEED3` bit is dropped from the retflag. Standards-derived mean lunar points and the interpolated compatibility curves expose deterministic derivatives; both selectors preserve the same body model. |
 
 ## Advanced / specialized
 
@@ -74,7 +74,7 @@ These exist for pyswisseph API compatibility; most users never need them.
 
 | Flag | Effect |
 |------|--------|
-| `FLG_CENTER_BODY` | Request the planet body center instead of the system barycenter. libephemeris already returns body centers by default (see [Planet Centers](../methodology/planet-centers-spk.md)). |
+| `FLG_CENTER_BODY` | Request the planet body center instead of the system barycenter. libephemeris already returns body centers by default (see [Planet Centers](../methodology/planet-centers-spk.md)). For Sun through Mars (body IDs 0–4) the flag is consumed and not echoed in the return flags — those bodies have no satellite-system barycenter to resolve; for all other bodies the bit is echoed back unchanged. |
 | `FLG_ORBEL_AA` | Use the Astronomical Almanac convention for osculating orbital elements (`get_orbital_elements`). |
 | `FLG_JPLHOR` | JPL Horizons-consistent precession/nutation handling (legacy compatibility). |
 | `FLG_JPLHOR_APPROX` | Approximate JPL Horizons mode (legacy compatibility). |

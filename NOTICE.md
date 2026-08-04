@@ -45,9 +45,12 @@ does not imply code derivation.
 ## Validation
 
 Compatibility with the reference API is verified by calling its public
-interface and comparing outputs. The development process aims to keep these
-comparisons ephemeral. Reference-distribution source, prose, algorithms, and
-data files should not be part of the shipped package.
+interface and comparing outputs. These comparisons are ephemeral: no
+reference output is persisted, fitted, or committed. Reference-distribution
+source, prose, algorithms, and data files are not part of the shipped
+package, and automated provenance gates (`scripts/check_provenance.py`,
+`scripts/check_algorithm_provenance.py`) enforce both boundaries through
+the test suite and release checks.
 
 The registry and focused methodology pages state exactly which numerical data
 and models are reproducible from a primary/public source, which are generated

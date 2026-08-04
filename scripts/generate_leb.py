@@ -762,9 +762,17 @@ def _eval_ecliptic_bodies_batch(
         # |r| for eccentricity vector
         r_mag = np.sqrt(r[0] ** 2 + r[1] ** 2 + r[2] ** 2)
 
-        # Gravitational parameter μ for Earth-Moon system in AU³/day²
-        gm_earth = 398600.435436  # km³/s²
-        earth_moon_mass_ratio = 81.3005691
+        # Gravitational parameter μ for Earth-Moon system in AU³/day².
+        # NOTE: these are the JPL DE430 constants (Folkner et al. 2014, IPN PR
+        # 42-196): GM_Earth = 398600.435436 km³/s², EMRAT = 81.3005691 (DE430
+        # EMRAT 81.30056907...). They are NOT the DE440 values used elsewhere in
+        # the project (DE440: GM_Earth = 398600.435507, EMRAT = 81.3005682...),
+        # a ~2e-10 relative difference. The effect on the derived Moon
+        # eccentricity vector is negligible, but a future .leb regeneration
+        # should decide whether to align these with DE440. Not changed here (a
+        # value change would alter generated artifacts).
+        gm_earth = 398600.435436  # km³/s² (DE430)
+        earth_moon_mass_ratio = 81.3005691  # DE430 EMRAT
         gm_moon = gm_earth / earth_moon_mass_ratio
         gm_earth_moon = gm_earth + gm_moon
         mu = gm_earth_moon / (149597870.7**3) * (86400**2)
@@ -1601,7 +1609,7 @@ def generate_body_icrs_asteroid(
             )
 
         # Compute asteroid heliocentric positions via spktype21 (scalar loop)
-        AU_KM = 149597870.7
+        AU_KM = 149597870.7  # exact IAU 2012 (Resolution B2) astronomical unit
         all_values = np.empty((len(all_jds), 3))
         spk_bar = ProgressBar(
             len(all_jds),
@@ -3181,7 +3189,9 @@ def assemble_leb(
                     yr_e = 2000.0 + (br_end - 2451545.0) / 365.25
                     range_note = f" [~{yr_s:.0f}-{yr_e:.0f}]"
             if coord_type in (COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM):
-                # Convert AU error to arcseconds using min geocentric distance
+                # Convert AU error to arcseconds using min geocentric distance.
+                # 206265.0 is the rounded arcseconds-per-radian factor
+                # (180*3600/pi = 206264.806...).
                 geo_dist = _MIN_GEO_DIST.get(bid, 1.0)
                 if geo_dist > 0.01:
                     arcsec = (error / geo_dist) * 206265.0
@@ -3994,19 +4004,28 @@ def _resolve_tier(args) -> Tuple[float, float, str]:
         exact_tier_start = DE441_START_JD
         exact_tier_end = DE441_END_JD
 
+    # Tier-default year bounds carry a one-day margin on each side so the
+    # advertised calendar range stays fully usable at its boundary instants:
+    # a UT request at the end boundary converts to TT past it, and
+    # light-time retardation samples the source slightly before the start.
+    # Explicit --start/--end/--start-jd/--end-jd keep their exact calendar
+    # semantics. Requests that exceed the actual DE kernel coverage are
+    # narrowed by the source-backed grid resolver, never extrapolated.
+    start_margin = 1.0 if args.start is None else 0.0
+    end_margin = 1.0 if args.end is None else 0.0
     jd_start = (
         float(args.start_jd)
         if args.start_jd is not None
         else exact_tier_start
         if exact_tier_start is not None
-        else _year_to_jd(start_year)
+        else _year_to_jd(start_year) - start_margin
     )
     jd_end = (
         float(args.end_jd)
         if args.end_jd is not None
         else exact_tier_end
         if exact_tier_end is not None
-        else _year_to_jd(end_year)
+        else _year_to_jd(end_year) + end_margin
     )
     if jd_start >= jd_end:
         raise SystemExit("generation start must be before generation end")

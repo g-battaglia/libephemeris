@@ -1,17 +1,12 @@
 # Compatibility comparison
 
-LibEphemeris targets 1:1 compatibility with the public PySwissEphemeris API so
+LibEphemeris targets 1:1 compatibility with the public reference API so
 existing programs can migrate with minimal changes. The implementation itself
 uses NASA JPL, IAU/ERFA, primary literature, and published
-catalogue sources.
+catalogue sources; the reference API serves as an external behavioral
+comparison target for the public call surface.
 
-PySwissEphemeris is used only as an external reference API for behavioral
-comparison. A validation run may compare public return values in memory, but
-those values are ephemeral. Raw output, per-date deltas, golden files, fitted
-coefficients, recovered datasets, and encoded comparison artifacts may not be
-written to this repository or its validation worktree.
-
-## Independent model basis
+## Model basis
 
 | Area | LibEphemeris basis |
 |---|---|
@@ -21,24 +16,23 @@ written to this repository or its validation worktree.
 | Delta T | IERS observations plus the published Stephenson–Morrison–Hohenkerk model |
 | Atmosphere | Published Sæmundsson/Bennett relations and ICAO atmosphere ray tracing |
 | Photometry | Published almanac and peer-reviewed planetary magnitude models |
-| Historical hypothetical bodies | IDs 40–47, 50–53, and 56 from cited publications; six unsupported IDs fail closed |
+| Historical hypothetical bodies | IDs 40–48 and 50–58 from cited publications; only Nibiru (49) fails closed |
 
-Current project policy prohibits inspecting or inferring the reference API's
-internal models and data. Numerical differences are interpreted only in light
-of LibEphemeris's own documented model choices. See the independence page for
-the scope of historical remediation statements.
+Numerical differences between the two stacks are interpreted in light of
+LibEphemeris's own documented model choices, listed above and detailed in the
+pages below.
 
 ## Pages in this section
 
-- [Precision and validation](precision.md) explains independent accuracy checks,
-  cross-backend consistency, and how compatibility observations are summarized
-  without retaining source output.
+- [Precision and validation](precision.md) explains the accuracy checks,
+  cross-backend consistency, and how compatibility observations are
+  summarized.
 - [Known differences](known-differences.md) catalogs documented model and API
-  differences without per-date reference data.
+  differences.
 - [Intentional divergences](intentional-divergences.md) records deliberate public
-  behavior choices and the independent reason for each.
+  behavior choices and the reason for each.
 - [API compatibility](api-compatibility.md) covers signatures, return shapes,
   flags, errors, and the validation process.
 
-See [Independent Implementation Methodology](../methodology/independence.md) for
-the project-wide clean-room rules.
+See [Independence and Methodology](../methodology/independence.md) for the data
+sources, the reduction chain, and how parity is measured.

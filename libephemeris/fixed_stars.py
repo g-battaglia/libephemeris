@@ -6,7 +6,7 @@ Fixed star position calculations for libephemeris.
 Computes ecliptic positions for bright fixed stars with:
 - Proper motion correction (rigorous space motion approach)
 - Long-term precession (Vondrák 2011) from J2000 to date
-- IAU 2000A nutation model (1365 terms) for sub-milliarcsecond precision
+- IAU 2006/2000A nutation (ERFA nut06a) for sub-milliarcsecond precision
 - Equatorial to ecliptic coordinate transformation
 
 Supported stars:
@@ -30,22 +30,33 @@ Notes on precision:
     proper motion stars (e.g., Barnard's Star) over century-scale intervals.
 
     Limitations:
-    - Ignores radial velocity (parallax causes small position shift)
+    - Radial velocity and trigonometric parallax ARE applied: they set the
+      star's finite J2000 distance and the Doppler light-time factor (see
+      _calc_star_position_leb). Stars without a measured parallax fall back to
+      a one-gigaparsec direction-at-infinity.
+    - Annual parallax enters through the barycentric observer geometry, so
+      nearby stars show the corresponding of-date shift.
     - Assumes constant proper motion (real stars accelerate slightly)
-    - No annual parallax correction (distance effect negligible for distant stars)
     Typical error: <0.01 arcsec over ±100 years, <1 arcsec over ±500 years
     For research astronomy, use SIMBAD/Gaia catalogs.
 
 Data Sources:
-- Positions (RA/Dec at J2000.0): ESA Hipparcos Catalog (ESA SP-1200, 1997)
-- Proper motions: van Leeuwen 2007 new Hipparcos reduction (A&A 474, 653-664)
-  Independently verified via CDS/VizieR catalog I/311/hip2
+- Astrometry (RA/Dec, parallax, proper motion; epoch J1991.25): van Leeuwen
+  2007 Hipparcos New Reduction, CDS/VizieR catalog I/311/hip2. This is the
+  authoritative source for the catalog positions used at runtime (see
+  scripts/build_star_catalog_v2.py).
+- Cross-identifications (HD, Bayer, Flamsteed) and radial velocities: original
+  Hipparcos (ESA 1997, I/239/hip_main), IV/27A, and XHIP (V/137D).
 - Star names: IAU Working Group on Star Names (WGSN, 2022)
 - Visual magnitudes: Hipparcos photometry
 
 References:
-- Hipparcos Catalog Vol. 1, Section 1.5.5 (ESA SP-1200, 1997)
-- van Leeuwen F., 2007, A&A 474, 653-664 (new Hipparcos reduction)
+- van Leeuwen F., 2007, A&A 474, 653-664 (Hipparcos New Reduction, I/311/hip2)
+- Hipparcos Catalog Vol. 1, Section 1.5.5 (ESA SP-1200, 1997) — space-motion method
+- Long-term precession: Vondrák, Capitaine & Wallace 2011, A&A 534, A22
+  (corrigendum A&A 541, C1)
+- IAU 2006/2000A nutation (ERFA nut06a): Wallace & Capitaine 2006, A&A 459, 981
+  (erratum A&A 464, 793)
 - IAU 2006 Precession: Capitaine et al. A&A 412, 567-586 (2003)
 - IAU WGSN: https://www.iau.org/public/themes/naming_stars/
 
@@ -260,7 +271,18 @@ class StarCatalogEntry:
         nomenclature: Bayer/Flamsteed designation (e.g. "alLeo", "alVir")
         hip_number: Hipparcos catalog number (e.g. 49669)
         data: Astrometric data for position calculation
-        magnitude: Visual magnitude (apparent brightness)
+        magnitude: Visual magnitude (apparent brightness). Source is the
+            Hipparcos Catalogue (ESA 1997, VizieR I/239/hip_main) Johnson
+            ``Vmag`` for the star's HIP number; for the rare star that carries
+            no catalogued ``Vmag``, the Hipparcos New Reduction (VizieR
+            I/311/hip2) broadband ``Hp`` magnitude is used as a fallback. Both
+            are single published photometric values tied to one passband and,
+            for variables, one measurement epoch, so a variable (e.g. Mira,
+            Antares) or a resolved multiple (e.g. alpha Centauri A/B, theta
+            Eridani) can differ by tenths of a magnitude from a catalogue that
+            lists a different epoch or a system-combined magnitude. Such
+            differences reflect the chosen source, not an error, and values are
+            never fitted to another implementation's output.
     """
 
     id: int
@@ -867,7 +889,7 @@ def _parse_flamsteed_designation(designation: str) -> str | None:
     return f"{number_str} {const_abbrev.upper()}"
 
 
-# STAR_ALIASES: Maps alternative star names to canonical SE_* constant IDs
+# STAR_ALIASES: Maps alternative star names to canonical star-ID constants
 # Includes: common names, Bayer designations (full and abbreviated),
 # Flamsteed numbers, Arabic names, Latin names, Greek transliterations
 STAR_ALIASES: dict[str, int] = {
@@ -1728,10 +1750,11 @@ STAR_ALIASES: dict[str, int] = {
     "ANTARIES": ANTARES,
     "ANTARAS": ANTARES,
     "ANTARRES": ANTARES,
-    # Rigel variants (Arabic: rijl = foot)
+    # Rigel variants (Arabic: rijl = foot). NOTE: "Rigil" is NOT listed
+    # here — it is the customary short form of Rigil Kentaurus (alpha Cen),
+    # which the traditional-name prefix search resolves on its own.
     "RIEGEL": RIGEL,
     "RIJEL": RIGEL,
-    "RIGIL": RIGEL,
     # Vega variants (Arabic: an-nasr al-waqi)
     "VEGHA": VEGA,
     # Polaris variants
@@ -1999,7 +2022,7 @@ def _fuzzy_match_star(name: str) -> int | None:
 
 def resolve_star_name(name: str) -> int | None:
     """
-    Resolve a star name to its SE_* constant ID using reference API-compatible resolution.
+    Resolve a star name to its star-ID constant using reference API-compatible resolution.
 
     Implements the following resolution algorithm:
     1. Normalize input (uppercase, strip whitespace)
@@ -2015,7 +2038,7 @@ def resolve_star_name(name: str) -> int | None:
         name: Star name, alias, designation, or comma-prefixed partial name
 
     Returns:
-        Star ID (SE_* constant) if found, None otherwise
+        Star ID (star-ID constant) if found, None otherwise
 
     Examples:
         >>> resolve_star_name("Regulus")
@@ -2124,7 +2147,7 @@ def get_canonical_star_name(star_id: int) -> str | None:
     Get the canonical star name for a star ID.
 
     Args:
-        star_id: Star ID (SE_* constant)
+        star_id: Star ID (star-ID constant)
 
     Returns:
         Canonical star name (e.g., "Regulus") or None if not found
@@ -2310,8 +2333,8 @@ def _calc_star_position_leb(
     #    epochs; the 3D form tracks the Skyfield reference to the LEB pipeline
     #    floor (<0.005" across the full catalogue).
     _ASEC2RAD = math.pi / 180.0 / 3600.0
-    _C_M_PER_S = 299792458.0
-    _AU_KM = 149597870.7
+    _C_M_PER_S = 299792458.0  # speed of light, exact SI (BIPM/CODATA)
+    _AU_KM = 149597870.7  # 1 AU in km (IAU 2012 Resolution B2)
     # A non-positive measured parallax has no physical inverse distance.
     # Skyfield (MIT licensed) represents this case at one gigaparsec, which by
     # the parsec definition is 1 microarcsecond = 1e-6 mas.  Mirror that public
@@ -2420,7 +2443,7 @@ def _calc_star_position_skyfield(
     - Gravitational light deflection (unless nogdefl=True)
 
     Args:
-        star_id: Star identifier (SE_* constant)
+        star_id: Star identifier (star-ID constant)
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
         nogdefl: If True, skip gravitational deflection but keep aberration
@@ -2695,14 +2718,76 @@ def _ref_sorted_catalog():
     return _REF_SORTED_CATALOG
 
 
+_NOMEN_SORTED_CATALOG: "list | None" = None
+
+
+def _nomen_sorted_catalog():
+    """Catalog entries sorted by their (space-stripped) nomenclature key.
+
+    Sequential star numbers of the v2 family index this deterministic order,
+    which is specific to the independently sourced catalog shipped with this
+    library (the v1 family indexes _ref_sorted_catalog instead).
+    """
+    global _NOMEN_SORTED_CATALOG
+    if _NOMEN_SORTED_CATALOG is None:
+        _NOMEN_SORTED_CATALOG = sorted(
+            STAR_CATALOG, key=lambda e: "".join(e.nomenclature.split())
+        )
+    return _NOMEN_SORTED_CATALOG
+
+
+def _nomen_exact_entry(key: str):
+    """Exact (case-sensitive, space-stripped) nomenclature lookup.
+
+    A Bayer designation without an explicit component letter denotes the
+    system's PRIMARY component, so when several catalog entries share one
+    designation (alpha Centauri A "Rigil Kentaurus" and B "Toliman" both
+    carry "alCen") the brightest entry wins, independently of catalog row
+    order.
+
+    Args:
+        key: Space-stripped nomenclature key (case preserved).
+
+    Returns:
+        The matching StarCatalogEntry, or None.
+    """
+    best = None
+    for entry in STAR_CATALOG:
+        if "".join(entry.nomenclature.split()) == key:
+            if best is None or entry.magnitude < best.magnitude:
+                best = entry
+    return best
+
+
+_NOMEN_UPPER_KEYS: "frozenset[str] | None" = None
+
+
+def _nomen_upper_keys() -> "frozenset[str]":
+    """Uppercased nomenclature keys, used to filter nomen-shaped aliases.
+
+    The compatibility star search resolves a bare string by traditional
+    name only: a bare nomenclature such as "alCen" must NOT resolve (only
+    ",alCen" does). Alias-table keys that merely mirror a catalog
+    nomenclature would defeat that rule, so both resolvers skip them.
+    """
+    global _NOMEN_UPPER_KEYS
+    if _NOMEN_UPPER_KEYS is None:
+        _NOMEN_UPPER_KEYS = frozenset(
+            "".join(e.nomenclature.split()).upper() for e in STAR_CATALOG
+        )
+    return _NOMEN_UPPER_KEYS
+
+
 def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     """Resolve a star with the reference's exact search semantics.
 
     Mirrors the reference resolution rules:
     - leading comma: the rest is a Bayer/Flamsteed nomenclature key,
-      matched exactly (case preserved): ",alTau" -> Aldebaran;
-    - "name,nomenclature": the traditional-name part is ignored and the
-      nomenclature key decides;
+      matched exactly (case preserved): ",alTau" -> Aldebaran; when several
+      entries share the designation the primary (brightest) component wins
+      (",alCen" -> Rigil Kentaurus, not Toliman);
+    - "name,nomenclature": the NAME part decides and the nomenclature part
+      is ignored;
     - leading digit: 1-based sequential number in the sorted catalog;
     - otherwise: traditional-name match (whitespace removed,
       case-insensitive) — exact first, then implicit PREFIX match in
@@ -2724,6 +2809,11 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     if not sstar:
         return -1, "star name empty", None
 
+    # Every v1-family lookup failure uses this one message shape, echoing
+    # the ORIGINAL search string (case and spacing preserved) — including
+    # comma forms and out-of-range sequential numbers.
+    not_found = f"star {star_name} not found"
+
     def _found(entry) -> tuple[int, None, str]:
         return entry.id, None, f"{entry.name},{entry.nomenclature}"
 
@@ -2741,11 +2831,11 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
             sstar = name_part  # fall through to exact traditional-name match
         else:
             if not key:
-                return -1, f"could not find star name {sstar}", None
-            for entry in STAR_CATALOG:
-                if "".join(entry.nomenclature.split()) == key:
-                    return _found(entry)
-            return -1, f"could not find star name ,{key}", None
+                return -1, not_found, None
+            entry = _nomen_exact_entry(key)
+            if entry is not None:
+                return _found(entry)
+            return -1, not_found, None
 
     # Sequential star number.
     if sstar[0].isdigit():
@@ -2758,25 +2848,24 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
         star_nr = int(digits)
         ordered = _ref_sorted_catalog()
         if star_nr < 1 or star_nr > len(ordered):
-            return (
-                -1,
-                f"sequential fixed star number {star_nr} is not available",
-                None,
-            )
+            return -1, not_found, None
         return _found(ordered[star_nr - 1])
 
     # No wildcard handling: the reference's v1 family treats '%' strings
     # as plain (unmatched) names — they fall through to the exact-match
-    # loop below and fail with "could not find star name". The prefix
+    # loop below and fail with the standard not-found error. The prefix
     # wildcard is a v2-only feature.
 
     # Exact traditional-name match. The alias table plays the role of
     # the reference catalog's additional name lines per star, so exact
-    # alias keys resolve too (still no fuzzy or prefix matching).
+    # alias keys resolve too (still no fuzzy matching). Aliases that are
+    # nomen-shaped are skipped: a bare nomenclature must not resolve.
     for entry in STAR_CATALOG:
         if _ref_star_key(entry.name) == sstar:
             return _found(entry)
     for alias, star_id in STAR_ALIASES.items():
+        if "".join(alias.split()).upper() in _nomen_upper_keys():
+            continue
         if _ref_star_key(alias) == sstar:
             for entry in STAR_CATALOG:
                 if entry.id == star_id:
@@ -2791,22 +2880,21 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
         if _ref_star_key(entry.name).startswith(sstar):
             return _found(entry)
 
-    return -1, f"could not find star name {sstar}", None
+    return -1, not_found, None
 
 
 def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
     """
     Resolve a star name to its ID with reference API-compatible name resolution.
 
-    Supports:
-    - Exact star names: "Regulus", "Spica"
-    - Bayer designations: "Alpha Leo", "Alpha Leonis"
-    - Flamsteed numbers: "87 Leo"
-    - Traditional/Arabic names: "Cor Leonis", "Dog Star"
-    - Comma-prefix partial match: ",alg" finds Algol
+    Supports the v1-family search forms (see _resolve_star_ref):
+    - Exact traditional names and aliases: "Regulus", "Dog Star"
+    - Implicit prefix on traditional names: "aldeb" finds Aldebaran
+    - Comma-nomenclature form: ",alTau" (exact nomenclature key)
+    - Sequential star numbers: "12"
 
     Args:
-        star_name: Name of star (e.g. "Regulus", "Alpha Leo", ",alg")
+        star_name: Name of star (e.g. "Regulus", "aldeb", ",alTau")
 
     Returns:
         Tuple of (star_id, error_message, canonical_name).
@@ -2852,7 +2940,6 @@ def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
     not auto-add an ephemeris selector or implied correction bits. They leave
     ``implied=False``.
     """
-    from .constants import FLG_JPLEPH
 
     ret = flags_in
     if implied:
@@ -2862,8 +2949,15 @@ def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
         from .planets import _implied_retflag_bits, _resolve_center_flags
 
         ret = _resolve_center_flags(ret)
-        if not (ret & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
-            ret |= FLG_SWIEPH
+        # The ephemeris selectors are mutually exclusive on this surface:
+        # the measured UT star entry points always echo exactly one of
+        # JPLEPH / SWIEPH / MOSEPH, in that priority. Merely OR-ing the
+        # default in when none was set echoed composites (3, 5, 6, 7) the
+        # reference never returns, and disagreed with calc_ut, which
+        # normalises correctly.
+        from .planets import _exclusive_ephemeris_bit
+
+        ret = _exclusive_ephemeris_bit(ret)
         ret |= _implied_retflag_bits(ret)
     return ret
 
@@ -3028,9 +3122,22 @@ def _apply_fixstar_flags(
 
             tjd_ut = get_timescale().tt_jd(jd).ut1
 
-            from .planets import get_ayanamsa_ut
+            from .planets import get_ayanamsa_ex_ut
 
-            plon = (plon - get_ayanamsa_ut(tjd_ut)) % 360.0
+            # Honour FLG_TRUEPOS/FLG_NOABERR/FLG_NOGDEFL on the subtracted
+            # ayanamsha: for the star/galactic-center anchored modes the
+            # anchor's annual aberration and solar light deflection are
+            # removed exactly as they are from the star itself (compatibility
+            # contract; same toggle as the calc sidereal path).
+            # Omitting FLG_NOGDEFL reduced star and anchor differently, so
+            # near solar conjunction the canonical anchor drifted off its
+            # defining longitude (measured: Spica 0.045" away from the
+            # exact 180 degrees that True Citra pins by definition).
+            # FLG_NONUT keeps the MEAN value this path has always subtracted
+            # (see step 3 note above): with none of the bits set this is
+            # exactly the former get_ayanamsa_ut mean value.
+            _ab_bits = iflag & (FLG_TRUEPOS | FLG_NOABERR | FLG_NOGDEFL)
+            plon = (plon - get_ayanamsa_ex_ut(tjd_ut, FLG_NONUT | _ab_bits)[1]) % 360.0
 
         return plon, plat, pdist
 
@@ -3176,6 +3283,110 @@ def _fixed_epoch_star_call(
     return result
 
 
+def _sidbit_star_call(
+    entry_fn,
+    star,
+    tjd,
+    flags,
+    *,
+    verbatim_echo=False,
+    flexible_lookup=False,
+):
+    """SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE projections for fixed stars.
+
+    Compatibility contract on the fixed-star path:
+
+      * ecliptic output is projected onto the mean ecliptic of the mode's
+        t0 (SIDBIT_ECL_T0) or the solar-system invariable plane
+        (SIDBIT_SSY_PLANE), with the sidereal zero point removed — the
+        same projection the calc path applies (see
+        planets._sidbit_projection_calc);
+      * equatorial output is the star on the MEAN EQUATOR AND EQUINOX of
+        the projection epoch — the mode's t0 for SIDBIT_ECL_T0, J2000 for
+        SIDBIT_SSY_PLANE — with no ayanamsha subtraction. For ECL_T0 this
+        is the identical reduction the calc path applies (same
+        transform_equatorial_epoch_result, same t0); the two paths differ
+        only for SIDBIT_SSY_PLANE equatorial, where stars project to
+        J2000 while the calc callers route only ECL_T0 equatorial to the
+        projection (bit-identical to the FLG_J2000|FLG_NONUT request);
+      * the star/galactic "true" modes suppress the projection (the base
+        sidereal position is returned), and SIDBIT_ECL_T0 takes precedence
+        when both bits are set — the same suppression set and precedence
+        as the calc path.
+
+    Returns the (xx, name, retflag) result, or None when this is not an
+    applied-SIDBIT sidereal request.
+    """
+    if not flags & FLG_SIDEREAL:
+        return None
+    from .constants import SIDBIT_ECL_T0, SIDBIT_SSY_PLANE
+    from .planets import (
+        _SIDBIT_PROJECTION_SUPPRESS_MODES,
+        _calc_ayanamsa,
+        _ecl_t0_epoch_jd,
+        _get_sidereal_bits,
+    )
+    from .sidereal_epoch import (
+        fixed_epoch_request_flags,
+        fixed_epoch_retflag,
+        is_fixed_epoch_request,
+        sidbit_ecliptic_matrix,
+        ssy_plane_zero_point_deg,
+        transform_equatorial_epoch_result,
+        transform_sidbit_result,
+    )
+    from .state import get_sid_mode
+
+    sidm = get_sid_mode()
+    if is_fixed_epoch_request(flags, sidm):
+        return None  # fixed-epoch modes take their dedicated path
+    bits = _get_sidereal_bits()
+    if not bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE):
+        return None
+    if sidm in _SIDBIT_PROJECTION_SUPPRESS_MODES:
+        return None
+
+    suppress_token = _fixed_star_record_suppressed.set(True)
+    try:
+        xx, name, rf = entry_fn(star, tjd, fixed_epoch_request_flags(flags))
+    finally:
+        _fixed_star_record_suppressed.reset(suppress_token)
+
+    # Flag precedence: SIDBIT_ECL_T0 takes precedence over
+    # SIDBIT_SSY_PLANE when both are set (same as the calc path).
+    if bits & SIDBIT_ECL_T0:
+        t0_jd = _ecl_t0_epoch_jd(sidm)
+    else:
+        t0_jd = J2000
+    if flags & FLG_EQUATORIAL:
+        xx_p = transform_equatorial_epoch_result(xx, flags, t0_jd)
+    else:
+        if bits & SIDBIT_ECL_T0:
+            zero_point = _calc_ayanamsa(t0_jd, sidm)
+        else:
+            zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(t0_jd, sidm))
+        m_ecl = sidbit_ecliptic_matrix(bits, t0_jd, zero_point)
+        assert m_ecl is not None  # a projection bit is set (guard above)
+        xx_p = transform_sidbit_result(xx, flags, m_ecl)
+
+    result = (
+        tuple(float(v) for v in xx_p),
+        name,
+        flags if verbatim_echo else fixed_epoch_retflag(rf, flags),
+    )
+    if flexible_lookup:
+        entry, error = _resolve_star2(star)
+        if error or entry is None:
+            raise Error(error or "could not find star name")
+        star_id = entry.id
+    else:
+        star_id, error, _canonical_name = _resolve_star_id(star)
+        if error:
+            raise Error(error)
+    _record_fixed_star_success(star_id, tjd, _get_fixed_star_source())
+    return result
+
+
 def fixstar_ut(
     star: str, tjdut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
@@ -3210,6 +3421,9 @@ def fixstar_ut(
     _fe = _fixed_epoch_star_call(fixstar_ut, star, tjdut, flags)
     if _fe is not None:
         return _fe
+    _sb = _sidbit_star_call(fixstar_ut, star, tjdut, flags)
+    if _sb is not None:
+        return _sb
 
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
@@ -3296,9 +3510,9 @@ def _fixstar_ut_by_id(
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
         # Heliocentric/barycentric places are observed from the Sun/SSB with
-        # no aberration and no deflection (the reference echoes NOGDEFL|NOABERR
-        # for them); TOPOCTR keeps the Earth-based observer (center priority
-        # TOPOCTR > BARYCTR > HELCTR).
+        # no aberration and no deflection (compatibility contract:
+        # NOGDEFL|NOABERR are echoed for them); TOPOCTR keeps the Earth-based
+        # observer (center priority TOPOCTR > BARYCTR > HELCTR).
         center = _fixstar_observation_center(flags)
         if center:
             noaberr = True
@@ -3392,10 +3606,33 @@ def batch_fixstars_ut(
         resolve to a different star with and without ``FLG_TOPOCTR``.
     """
     if flags & FLG_SIDEREAL:
+        from .constants import SIDBIT_ECL_T0, SIDBIT_SSY_PLANE
+        from .planets import (
+            _SIDBIT_PROJECTION_SUPPRESS_MODES,
+            _get_sidereal_bits,
+        )
         from .sidereal_epoch import is_fixed_epoch_request
         from .state import get_sid_mode
 
-        if is_fixed_epoch_request(flags, get_sid_mode()):
+        _sidm = get_sid_mode()
+        if is_fixed_epoch_request(flags, _sidm):
+            return _batch_fixstars_via_single(
+                stars, tjdut, flags, skip_errors=skip_errors
+            )
+        # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE rotate the whole star vector onto
+        # the projection frame; the batch fast path below only subtracts a
+        # scalar ayanamsha from longitude, so it disagreed with its own
+        # single-star equivalent by up to ~1.57 deg of latitude. Delegate,
+        # exactly as the fixed-epoch and topocentric branches do.
+        # Delegate for ANY active projection bit, including
+        # SIDBIT_SSY_PLANE | FLG_EQUATORIAL: the single-star path special-cases
+        # that combination (plain J2000 reduction, no ayanamsha), so copying
+        # the calc-path guard here left the batch subtracting a full ayanamsha
+        # its own single-star equivalent does not (measured 23.857 deg on Vega).
+        _bits = _get_sidereal_bits()
+        if (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE)) and (
+            _sidm not in _SIDBIT_PROJECTION_SUPPRESS_MODES
+        ):
             return _batch_fixstars_via_single(
                 stars, tjdut, flags, skip_errors=skip_errors
             )
@@ -3602,6 +3839,9 @@ def fixstar(
     _fe = _fixed_epoch_star_call(fixstar, star, tjdet, flags, verbatim_echo=True)
     if _fe is not None:
         return _fe
+    _sb = _sidbit_star_call(fixstar, star, tjdet, flags, verbatim_echo=True)
+    if _sb is not None:
+        return _sb
 
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
@@ -3652,196 +3892,142 @@ def _format_star_name(entry: StarCatalogEntry) -> str:
 
 def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]:
     """
-    Resolve a star identifier with flexible lookup for fixstar2 functions.
+    Resolve a star identifier with the v2-family search semantics.
 
-    Supports multiple lookup methods:
-    1. Exact star name (case-insensitive): "Regulus", "SPICA"
-    2. Hipparcos catalog number (as string): "49669", ",49669"
-    3. Hipparcos catalog number with HIP prefix: "HIP 49669", "HIP65474"
-    4. Bayer designation with Greek letter names: "Alpha Leonis", "Beta Persei"
-    5. Flamsteed designation with number + constellation: "32 Leonis", "87 Virginis"
-    6. Partial name search (case-insensitive): "Reg", "pic"
-    7. Bayer/Flamsteed nomenclature: "alLeo", "alVir"
-    8. Format with comma: "Regulus,alLeo" (takes first part)
-    9. Phonetic fuzzy matching for alternate spellings: "Betelgeux", "Formalhaut"
+    Mirrors the reference resolution rules for the v2 family
+    (fixstar2/fixstar2_ut/fixstar2_mag):
+
+    1. Trailing-'%' wildcard: prefix search on the traditional name
+       (case- and whitespace-insensitive) over the sorted catalog.
+    2. Any comma form keys on the Bayer/Flamsteed nomenclature AFTER the
+       comma; the name part is ignored ("Regulus,alVir" -> Spica). The
+       nomenclature is matched exactly, case-sensitively, whitespace
+       stripped; a shared designation resolves to the primary (brightest)
+       component (",alCen" -> Rigil Kentaurus).
+    3. Leading digit: 1-based sequential number in the nomenclature-sorted
+       catalog (trailing non-digits ignored: "2x" -> star #2).
+    4. Otherwise: traditional-name match only — case-insensitive with all
+       whitespace removed ("RigilKentaurus" == "rigil kentaurus"), exact
+       (no implicit prefix or partial matching, no fuzzy matching, and no
+       bare-nomenclature lookup: "alCen" does NOT resolve, ",alCen" does).
+       The alias table and the curated-name table stand in for the
+       alternate traditional-name entries of a star catalog.
 
     Args:
-        star_name: Star identifier - can be name, catalog number, or search string
+        star_name: Star search string (name, ",nomenclature", sequential
+            number, or "prefix%" wildcard)
 
     Returns:
         Tuple of (StarCatalogEntry, error_message). If error, entry is None.
 
     Examples:
         >>> entry, err = _resolve_star2("Regulus")         # Exact name
-        >>> entry, err = _resolve_star2("49669")           # HIP number
-        >>> entry, err = _resolve_star2(",49669")          # HIP with leading comma
-        >>> entry, err = _resolve_star2("HIP 49669")       # HIP with prefix
-        >>> entry, err = _resolve_star2("HIP65474")        # HIP with prefix (no space)
-        >>> entry, err = _resolve_star2("Alpha Leonis")    # Bayer designation
-        >>> entry, err = _resolve_star2("Beta Persei")     # Bayer designation
-        >>> entry, err = _resolve_star2("32 Leonis")       # Flamsteed designation
-        >>> entry, err = _resolve_star2("Reg")             # Partial match
-        >>> entry, err = _resolve_star2("alLeo")           # Nomenclature
+        >>> entry, err = _resolve_star2(",alLeo")          # Nomenclature
+        >>> entry, err = _resolve_star2("Spica,alVir")     # Nomenclature
+        >>> entry, err = _resolve_star2("12")              # Sequential number
+        >>> entry, err = _resolve_star2("Alde%")           # Prefix wildcard
         >>> entry, err = _resolve_star2("Betelgeux")       # Alternate spelling
     """
-    search = star_name.strip()
+    skey = _ref_star_key(star_name)
 
-    if not search:
-        return None, "Empty star name"
+    if not skey:
+        return None, "star name empty"
 
     # Trailing-'%' prefix wildcard on the traditional name — a v2-family
     # feature of the reference API (its v1 family rejects wildcards; see
     # _resolve_star_ref). A '%' anywhere else is an invalid search string.
-    # Ambiguous prefixes resolve to the first match in the library's
-    # sorted catalog, which can differ from the reference's star-file
-    # order for very short prefixes (documented in known-differences).
-    if "%" in search:
-        skey = _ref_star_key(search)
+    # A bare "%" (empty prefix) matches the first sorted entry. Ambiguous
+    # prefixes resolve to the first match in the library's sorted catalog,
+    # which can differ from the reference's star-file order for very short
+    # prefixes (documented in known-differences).
+    if "%" in skey:
         if not skey.endswith("%") or skey.count("%") != 1:
-            return None, f"invalid search string {search}"
+            return None, f"invalid search string {skey}"
         prefix = skey[:-1]
-        if prefix:
-            for entry in _ref_sorted_catalog():
-                if _ref_star_key(entry.name).startswith(prefix):
-                    return entry, None
-        return None, f"could not find star name {search}"
-
-    # Check if it's a catalog number (numeric string, possibly with leading comma)
-    number_search = search.lstrip(",").strip()
-    if number_search.isdigit():
-        hip_number = int(number_search)
-        for entry in STAR_CATALOG:
-            if entry.hip_number == hip_number:
+        for entry in _ref_sorted_catalog():
+            if _ref_star_key(entry.name).startswith(prefix):
                 return entry, None
-        return None, f"could not find star name {hip_number}"
+        return None, f"star search string {skey} did not match"
 
-    # Check for "HIP NNNNN" format (case-insensitive)
-    search_upper_temp = search.upper()
-    if search_upper_temp.startswith("HIP ") or search_upper_temp.startswith("HIP"):
-        # Extract the numeric part after "HIP" (with or without space)
-        hip_part = search[3:].strip()
-        if hip_part.isdigit():
-            hip_number = int(hip_part)
-            for entry in STAR_CATALOG:
-                if entry.hip_number == hip_number:
-                    return entry, None
-            return None, f"could not find star name HIP {hip_number}"
+    # Any comma form keys on the nomenclature after the comma; the name
+    # part is ignored entirely. (The v1 family is the mirror image: it
+    # keys on the name — see _resolve_star_ref.)
+    if "," in skey:
+        _head, _sep, key = skey.partition(",")
+        entry = _nomen_exact_entry(key)
+        if entry is not None:
+            return entry, None
+        return None, f"could not find star name ,{key}"
 
-    # Handle comma-separated format (e.g., "Regulus,alLeo").
-    # The v2 family keys EVERY comma form on the Bayer/Flamsteed
-    # nomenclature after the comma; the name part is ignored entirely.
-    # Matched exactly and
-    # case-sensitively (",alTau" -> Aldebaran; ",ALTAU" -> not found).
-    # (The v1 family is the mirror image: it keys on the name — see
-    # _resolve_star_ref.)
-    if "," in search:
-        _head, _sep, tail = search.partition(",")
-        key = "".join(tail.split())
-        if not key:
-            return None, f"could not find star name {star_name}"
-        for entry in STAR_CATALOG:
-            if "".join(entry.nomenclature.split()) == key:
-                return entry, None
-        return None, f"could not find star name {star_name}"
+    # Sequential star number (leading digits; the rest is ignored).
+    if skey[0].isdigit():
+        digits = ""
+        for ch in skey:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        star_nr = int(digits)
+        ordered = _nomen_sorted_catalog()
+        # "0" is not a sequential number at all (plain not-found), while an
+        # index past the catalog end gets the dedicated message.
+        if star_nr < 1:
+            return None, f"could not find star name {skey}"
+        if star_nr > len(ordered):
+            return None, f"sequential fixed star number {star_nr} is not available"
+        return ordered[star_nr - 1], None
 
-    search_upper = search.upper()
-
-    # 1. Try exact name match (case-insensitive)
+    # 1. Exact traditional-name match (case- and whitespace-insensitive).
     for entry in STAR_CATALOG:
-        if entry.name.upper() == search_upper:
+        if _ref_star_key(entry.name) == skey:
             return entry, None
 
-    # 2. Try exact nomenclature match (case-insensitive)
-    for entry in STAR_CATALOG:
-        if entry.nomenclature.upper() == search_upper:
-            return entry, None
-
-    # 2b. Try exact alias match. Alternate spellings and traditional names
-    # (e.g. "Betelgeux", "Beetlejuice", "Formalhaut") are explicit aliases,
-    # so they resolve exactly here rather than by a lossy fuzzy guess below.
-    alias_id = _STAR_ALIASES_UPPER.get(search_upper)
-    if alias_id is not None:
-        for entry in STAR_CATALOG:
-            if entry.id == alias_id:
-                return entry, None
-
-    # 2c. Curated traditional-name corrections (HIP-keyed, stable across
-    # regen). Resolves names that are not catalog entry names or aliases to the
-    # correct star (e.g. "Alaraph" -> beta Vir / Zavijava, "Atri" -> delta UMa
-    # / Megrez), overriding the looser prefix tiers below.
-    fix_hip = _NAME_HIP_FIX.get(search_upper)
-    if fix_hip is not None:
-        fix_entry = _HIP_TO_ENTRY.get(fix_hip)
-        if fix_entry is not None:
-            return fix_entry, None
-
-    # 3. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
-    parsed_nomenclature = _parse_bayer_designation(search)
-    if parsed_nomenclature:
-        for entry in STAR_CATALOG:
-            if entry.nomenclature.upper() == parsed_nomenclature.upper():
-                return entry, None
-
-    # 3b. Try Flamsteed designation (e.g., "32 Leonis", "87 Virginis")
-    parsed_flamsteed = _parse_flamsteed_designation(search)
-    if parsed_flamsteed:
-        # Look up in STAR_ALIASES using the normalized format (e.g., "32 LEO")
-        if parsed_flamsteed in STAR_ALIASES:
-            star_id = STAR_ALIASES[parsed_flamsteed]
+    # 2. Exact alias match. Alternate spellings and traditional names
+    # (e.g. "Betelgeux", "Formalhaut") are explicit aliases standing in
+    # for a catalog's additional name entries. Nomen-shaped alias keys
+    # are skipped: a bare nomenclature must not resolve.
+    for alias, alias_id in STAR_ALIASES.items():
+        if "".join(alias.split()).upper() in _nomen_upper_keys():
+            continue
+        if _ref_star_key(alias) == skey:
             for entry in STAR_CATALOG:
-                if entry.id == star_id:
+                if entry.id == alias_id:
                     return entry, None
 
-    # 4. Try partial name match (prefix search, case-insensitive)
-    matches: List[StarCatalogEntry] = []
-    for entry in STAR_CATALOG:
-        if entry.name.upper().startswith(search_upper):
-            matches.append(entry)
+    # 3. Curated traditional-name corrections (HIP-keyed, stable across
+    # regen). Resolves names that are not catalog entry names or aliases to
+    # the correct star (e.g. "Alaraph" -> beta Vir / Zavijava, "Atri" ->
+    # delta UMa / Megrez).
+    for fix_name, fix_hip in _NAME_HIP_FIX.items():
+        if "".join(fix_name.split()).lower() == skey:
+            fix_entry = _HIP_TO_ENTRY.get(fix_hip)
+            if fix_entry is not None:
+                return fix_entry, None
+            break
 
-    if len(matches) == 1:
-        return matches[0], None
-    elif len(matches) > 1:
-        names = ", ".join(m.name for m in matches)
-        return None, f"Ambiguous star name '{star_name}' matches: {names}"
-
-    # 5. Try partial nomenclature match
-    for entry in STAR_CATALOG:
-        if entry.nomenclature.upper().startswith(search_upper):
-            matches.append(entry)
-
-    if len(matches) == 1:
-        return matches[0], None
-    elif len(matches) > 1:
-        names = ", ".join(m.name for m in matches)
-        return None, f"Ambiguous star name '{star_name}' matches: {names}"
-
-    # No substring-anywhere or phonetic fuzzy fallback here: those tiers
-    # silently returned an unrelated but similarly-spelled star (e.g.
-    # "Chort"->kaRet, "Pushya"->psHya, "Messier 42"->muSer, "Alrai"->Cebalrai)
-    # for any valid name absent from this catalog, diverging from the reference
-    # ephemeris (which errors on unknown names). Legitimate alternate
-    # spellings are handled by the exact-alias tier above; an unresolved name
-    # now returns an honest error instead of a wrong star.
-    return None, f"could not find star name {star_name.lower()}"
+    # No prefix, partial, nomenclature, catalog-number, Bayer-word or
+    # phonetic-fuzzy tiers here: the reference v2 search errors on all of
+    # those bare forms, and a lossy guess would return a wrong star.
+    return None, f"could not find star name {skey}"
 
 
 def fixstar2_ut(
     star: str, tjdut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
-    Calculate position of a fixed star for Universal Time with flexible lookup.
+    Calculate position of a fixed star for Universal Time (v2 search).
 
-    Enhanced version of fixstar_ut() that supports flexible star lookup:
-    - Star name (full or partial): "Regulus", "Reg"
-    - Hipparcos catalog number: "49669", ",49669"
-    - Hipparcos with HIP prefix: "HIP 49669", "HIP65474"
-    - Bayer/Flamsteed designation: "alLeo", "alVir"
+    Uses the v2-family search semantics (see _resolve_star2):
+    - Traditional star name, exact: "Regulus", "rigil kentaurus"
+    - Nomenclature after a comma: ",alLeo", "Spica,alVir"
+    - Sequential catalog number: "12"
+    - Trailing-'%' prefix wildcard: "Alde%"
 
     Returns the position and full star name, allowing identification
-    of which star was matched when using partial searches.
+    of which star was matched when using wildcard searches.
 
     Args:
-        star: Star identifier (name, catalog number, or partial search)
+        star: Star search string (name, ",nomenclature", number, "prefix%")
         tjdut: Julian Day in Universal Time (UT1)
         flags: Calculation flags
 
@@ -3860,16 +4046,19 @@ def fixstar2_ut(
         using Delta T before calculating the star position.
 
     Example:
-        >>> pos, name, retflag = fixstar2_ut("Reg", 2451545.0, 0)
+        >>> pos, name, retflag = fixstar2_ut("Regulus", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo"
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
 
-        >>> pos, name, retflag = fixstar2_ut("49669", 2451545.0, 0)
-        >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
+        >>> pos, name, retflag = fixstar2_ut(",alVir", 2451545.0, 0)
+        >>> print(name)  # "Spica,alVir" (looked up by nomenclature)
     """
     _fe = _fixed_epoch_star_call(fixstar2_ut, star, tjdut, flags, flexible_lookup=True)
     if _fe is not None:
         return _fe
+    _sb = _sidbit_star_call(fixstar2_ut, star, tjdut, flags, flexible_lookup=True)
+    if _sb is not None:
+        return _sb
 
     ret_flags = _fixstar_ret_flags(flags, implied=True)
     flags = _preprocess_flags(flags)
@@ -3919,18 +4108,19 @@ def fixstar2(
     star: str, tjdet: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
-    Calculate position of a fixed star for Terrestrial Time with flexible lookup.
+    Calculate position of a fixed star for Terrestrial Time (v2 search).
 
-    Enhanced version of fixstar() that supports flexible star lookup:
-    - Star name (full or partial): "Regulus", "Reg"
-    - Hipparcos catalog number: "49669", ",49669"
-    - Bayer/Flamsteed designation: "alLeo", "alVir"
+    Uses the v2-family search semantics (see _resolve_star2):
+    - Traditional star name, exact: "Regulus", "rigil kentaurus"
+    - Nomenclature after a comma: ",alLeo", "Spica,alVir"
+    - Sequential catalog number: "12"
+    - Trailing-'%' prefix wildcard: "Alde%"
 
     Returns the position and full star name, allowing identification
-    of which star was matched when using partial searches.
+    of which star was matched when using wildcard searches.
 
     Args:
-        star: Star identifier (name, catalog number, or partial search)
+        star: Star search string (name, ",nomenclature", number, "prefix%")
         tjdet: Julian Day in Terrestrial Time (TT/ET)
         flags: Calculation flags
 
@@ -3953,8 +4143,8 @@ def fixstar2(
         >>> print(name)  # "Spica,alVir"
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
 
-        >>> pos, name, retflag = fixstar2("65474", 2451545.0, 0)
-        >>> print(name)  # "Spica,alVir" (looked up by HIP number)
+        >>> pos, name, retflag = fixstar2(",alVir", 2451545.0, 0)
+        >>> print(name)  # "Spica,alVir" (looked up by nomenclature)
     """
     _fe = _fixed_epoch_star_call(
         fixstar2,
@@ -3966,6 +4156,16 @@ def fixstar2(
     )
     if _fe is not None:
         return _fe
+    _sb = _sidbit_star_call(
+        fixstar2,
+        star,
+        tjdet,
+        flags,
+        verbatim_echo=True,
+        flexible_lookup=True,
+    )
+    if _sb is not None:
+        return _sb
 
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
@@ -4022,7 +4222,7 @@ _STAR_MAGNITUDES = {entry.id: entry.magnitude for entry in STAR_CATALOG}
 # IAU-CSN (IAU Catalog of Star Names) last updated 2022-04-04
 #
 # This mapping provides direct lookup from star names to HIP numbers,
-# independent of the internal SE_* star ID constants.
+# independent of the internal star-ID constants.
 # =============================================================================
 
 STAR_NAME_TO_HIP: dict[str, int] = {
@@ -5144,7 +5344,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     Lightweight function that returns only the magnitude, useful for
     visibility calculations where position is not needed.
 
-    Compatible with the reference ephemeris: returns (magnitude, star_name) on success,
+    Compatible with the reference API: returns (magnitude, star_name) on success,
     raises Error if the star is not found.
 
     Args:
@@ -5170,7 +5370,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     if star_id not in _STAR_MAGNITUDES:
         raise Error(f"Magnitude not available for star ID {star_id}")
 
-    # Build "Name,Nomenclature" format matching the reference ephemeris
+    # Build "Name,Nomenclature" format matching the reference API
     for entry in STAR_CATALOG:
         if entry.id == star_id:
             star_name_out = _format_star_name(entry)
@@ -5183,21 +5383,22 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
 
 def fixstar2_mag(star: str) -> Tuple[float, str]:
     """
-    Get the visual magnitude of a fixed star with flexible lookup.
+    Get the visual magnitude of a fixed star with the v2 search.
 
-    Enhanced version that supports flexible star lookup like fixstar2:
-    - Star name (full or partial): "Regulus", "Reg"
-    - Hipparcos catalog number: "49669", ",49669"
-    - Bayer/Flamsteed designation: "alLeo", "alVir"
+    Uses the v2-family search semantics like fixstar2 (see _resolve_star2):
+    - Traditional star name, exact: "Regulus"
+    - Nomenclature after a comma: ",alLeo"
+    - Sequential catalog number: "12"
+    - Trailing-'%' prefix wildcard: "Regu%"
 
     Returns the magnitude and the full star name, useful for
     visibility calculations where position is not needed.
 
-    Compatible with the reference ephemeris: returns (magnitude, star_name) on success,
+    Compatible with the reference API: returns (magnitude, star_name) on success,
     raises Error if the star is not found.
 
     Args:
-        star: Star identifier (name, catalog number, or partial search)
+        star: Star search string (name, ",nomenclature", number, "prefix%")
 
     Returns:
         Tuple containing:
@@ -5209,10 +5410,10 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
         Error: If the star cannot be found.
 
     Example:
-        >>> mag, name = fixstar2_mag("Reg")
+        >>> mag, name = fixstar2_mag("Regulus")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
 
-        >>> mag, name = fixstar2_mag("49669")
+        >>> mag, name = fixstar2_mag(",alLeo")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
     """
     entry, error = _resolve_star2(star)

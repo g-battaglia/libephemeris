@@ -68,9 +68,9 @@ surface:
 
 API compatibility extends beyond signatures to numeric behavior: flag
 semantics, frame conventions, retflag echoes, edge-case handling. That
-behavior is established **by measurement, not by reading source**: the
-reference API is called only for ephemeral pass/fail comparison; its output is
-never added to fixtures, coefficients, tables, or generated artifacts.
+behavior is established by measuring public outputs; the reference API is
+compared behaviorally, and its output is not used as a data source for
+fixtures, coefficients, tables, or generated artifacts.
 Where the two engines legitimately disagree
 (different underlying ephemeris, different ΔT, physical-model choices), the
 difference is measured and documented in
@@ -96,6 +96,33 @@ and its in-code provenance contract is present.
   every systematic difference measured and documented.
 - No runtime dependency on a reference-product component. The package is
   licensed AGPL-3.0-only.
+
+## Behavioral-compatibility inventory
+
+For auditability, the public-API conventions adopted purely for
+interoperability — observable semantics of a published API, never numeric
+data — are concentrated in these families:
+
+- **Call surface**: function names, argument order, tuple shapes and
+  lengths, flag bit values, return-flag echo rules (which request bits are
+  echoed, implied, or consumed), typed-error classes per input family.
+- **Semantic conventions of documented output channels**: which frame a
+  flag combination selects (e.g. the mean frame of a mode's t0 under the
+  ECL_T0 projection), precedence between projection bits, which sidereal
+  modes suppress a projection, the local-noon eclipse slot being defined
+  only within a resolved window, the disc-area obscuration convention, the
+  Hindu-rising bit's latitude-zeroing, and the interpolated-apsis point
+  *concept* (its realization here is fitted to JPL DE440 apsis passages
+  only).
+- **Body-class behavior**: which ids compute, raise, or are consumed by a
+  flag (e.g. the lunar points under the topocentric flag), and the
+  trans-jovian barycentric re-referencing class.
+
+Everything in this inventory is behavior observable from the public API of
+any conforming implementation. Where an external implementation's behavior
+is *not* derivable from published definitions and would alter numeric
+output, it is deliberately not reproduced and is recorded in
+[intentional divergences](../comparison/intentional-divergences.md).
 
 "Swiss Ephemeris" is a product of Astrodienst AG; the name is used here
 nominatively only.

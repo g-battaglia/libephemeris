@@ -138,6 +138,14 @@ class TestStrictGateSourceCheck(_RegisteredOutOfCoverage):
                     return_value=None,
                 )
             )
+            # Hermetic: the gate's source logic is under test, so the LEB
+            # asteroid channels must not serve the request either (see
+            # _calc() above for the same reasoning).
+            from libephemeris.state import get_calc_mode, set_calc_mode
+
+            saved_mode = get_calc_mode()
+            set_calc_mode("skyfield")
+            stack.callback(set_calc_mode, saved_mode)
             eph.set_strict_precision(True)
             eph.set_auto_spk_download(autodl)
             tok = tracing.start_tracing()
@@ -182,14 +190,21 @@ class TestStrictGateSourceCheck(_RegisteredOutOfCoverage):
 
     def test_no_kernel_message_still_says_register(self):
         """With no kernel registered and no ASSIST, the classic message stands."""
-        with patch(
-            "libephemeris.rebound_integration.check_assist_data_available",
-            return_value=False,
-        ):
-            eph.set_strict_precision(True)
-            eph.set_auto_spk_download(False)
-            with pytest.raises(SPKRequiredError) as exc:
-                eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        saved_mode = get_calc_mode()
+        set_calc_mode("skyfield")  # exclude the LEB asteroid channels too
+        try:
+            with patch(
+                "libephemeris.rebound_integration.check_assist_data_available",
+                return_value=False,
+            ):
+                eph.set_strict_precision(True)
+                eph.set_auto_spk_download(False)
+                with pytest.raises(SPKRequiredError) as exc:
+                    eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
+        finally:
+            set_calc_mode(saved_mode)
 
         msg = str(exc.value)
         assert "download_and_register_spk" in msg
@@ -266,6 +281,12 @@ class TestStrictGateRealKernel:
         monkeypatch.setattr(
             planets, "_try_auto_spk_download", lambda t, ipl, iflag: None
         )
+        # This gate is about the SPK source specifically: pin the mode so an
+        # installed LEB (whose asteroid channels can serve Chiron) does not
+        # win the dispatch and make the trace report LEB instead of SPK.
+        from libephemeris.state import set_calc_mode
+
+        set_calc_mode("skyfield")
         eph.set_strict_precision(True)
         eph.set_auto_spk_download(autodl)
         tok = tracing.start_tracing()

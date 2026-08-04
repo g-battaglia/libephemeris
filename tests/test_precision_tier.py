@@ -139,9 +139,7 @@ class TestGetSetPrecisionTier:
         set_precision_tier("base")
         assert state._PLANETS is None
 
-    def test_offline_source_boundary_bypasses_leb_vector_routing(
-        self, monkeypatch
-    ):
+    def test_offline_source_boundary_bypasses_leb_vector_routing(self, monkeypatch):
         """Generators must sample the selected DE kernel, never cached LEB."""
 
         state.set_calc_mode("leb")
@@ -265,8 +263,22 @@ class TestGetSpkDateRangeForTier:
     """Tests for get_spk_date_range_for_tier()."""
 
     def test_default_uses_current_tier(self):
-        """With no argument, should return the current tier's range."""
-        assert get_spk_date_range_for_tier() == ("1900-01-01", "2100-01-01")
+        """With no argument, should return the current tier's (cumulative) range.
+
+        The default tier is medium. Because the precision tiers are cumulative
+        (base subset medium subset extended), the medium SPK window is the union
+        with base -- 1850-2150 -- not the medium literal 1900-2100, which would
+        be *narrower* than base and would drop asteroids at e.g. 1870 to the
+        Keplerian fallback inside the tier's own DE range.
+        """
+        assert get_spk_date_range_for_tier() == ("1850-01-01", "2150-01-01")
+
+    def test_medium_covers_at_least_base(self):
+        """Cumulative tiers: medium's SPK window must not be narrower than base."""
+        base_start, base_end = get_spk_date_range_for_tier("base")
+        med_start, med_end = get_spk_date_range_for_tier("medium")
+        assert med_start <= base_start
+        assert med_end >= base_end
 
     def test_explicit_tier_name(self):
         """With an explicit tier name, should return that tier's range."""

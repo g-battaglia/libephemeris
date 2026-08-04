@@ -270,13 +270,20 @@ class TestFastCalcFlags:
 
     @pytest.mark.integration
     def test_topoctr_requires_topo(self, leb_reader, jd_mid):
-        """FLG_TOPOCTR without set_topo() raises ValueError."""
+        """FLG_TOPOCTR without set_topo() raises ConfigurationError.
+
+        Both backends raise the same typed error for this request (the
+        Skyfield path does too); the assertion previously named ValueError,
+        which ConfigurationError does not subclass, so the test failed
+        whenever it actually ran.
+        """
         from libephemeris import state
+        from libephemeris.exceptions import ConfigurationError
 
         saved = state._TOPO
         state._TOPO = None
         try:
-            with pytest.raises(ValueError, match="set_topo"):
+            with pytest.raises(ConfigurationError, match="set_topo"):
                 fast_calc_ut(leb_reader, jd_mid, SUN, FLG_TOPOCTR)
         finally:
             state._TOPO = saved

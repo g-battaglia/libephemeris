@@ -33,19 +33,26 @@ _J2000_JD = 2451545.0
 _JULIAN_CENTURY_DAYS = 36525.0
 _RATE_HALF_SPAN_DAYS = 0.5
 
-# Mean Earth-orbit eccentricity through T^2 from Simon et al. (1994), A&A
-# 282, 663--683. The interpolated-apse harmonic basis uses its ratio to the
-# J2000 value for solar-anomaly terms.
+# Mean Earth-orbit eccentricity through T^2 from Meeus, Astronomical Algorithms
+# (2nd ed., 1998), eq. 25.4 (after Simon et al. 1994, A&A 282, 663--683). The
+# interpolated-apse harmonic basis uses its ratio to the J2000 value for
+# solar-anomaly terms.
 EARTH_ECCENTRICITY_J2000 = 0.016708634
 EARTH_ECCENTRICITY_T = -0.000042037
 EARTH_ECCENTRICITY_T2 = -0.0000001267
 
-# Conventional mean lunar orbit.  Distances are computed from the exact IAU
-# 2012 astronomical unit rather than copied from another ephemeris product.
+# Conventional mean lunar orbit. The mean distance 384400 km and mean
+# eccentricity 0.0549 are the conventional values (Meeus, Astronomical
+# Algorithms, ch. 47; Astronomical Almanac). Distances are then expressed in
+# AU using the exact IAU 2012 (Resolution B2) astronomical unit.
 _AU_KM = 149_597_870.7
 _MEAN_LUNAR_DISTANCE_KM = 384_400.0
 _MEAN_LUNAR_ECCENTRICITY = 0.0549
-INCLINATION_DEG = 5.145
+# Mean inclination of the lunar orbit to the ecliptic. Chapront-Touzé &
+# Chapront, "Lunar Tables and Programs from 4000 B.C. to A.D. 8000" (ELP
+# 2000-82), give the mean inclination as 5.145396°. The rounded 5.145° value
+# left a constant ~1.000077 latitude-scale error (dlat up to ~1.43").
+INCLINATION_DEG = 5.145396
 MEAN_NODE_DISTANCE_AU = _MEAN_LUNAR_DISTANCE_KM / _AU_KM
 MEAN_APOGEE_DISTANCE_AU = (
     _MEAN_LUNAR_DISTANCE_KM * (1.0 + _MEAN_LUNAR_ECCENTRICITY) / _AU_KM

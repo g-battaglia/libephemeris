@@ -161,14 +161,19 @@ class TestFastCalcUnsupported:
 
     @pytest.mark.unit
     def test_topocentric_requires_topo(self):
-        """FLG_TOPOCTR without set_topo() raises ValueError."""
+        """FLG_TOPOCTR without set_topo() raises ConfigurationError.
+
+        Both backends raise the same typed error; the assertion previously
+        named ValueError, which ConfigurationError does not subclass.
+        """
         from libephemeris import state
+        from libephemeris.exceptions import ConfigurationError
 
         saved_topo = state._TOPO
         state._TOPO = None
         try:
             with open_leb(LEB_BASE_PATH) as reader:
-                with pytest.raises(ValueError, match="set_topo"):
+                with pytest.raises(ConfigurationError, match="set_topo"):
                     fast_calc_ut(reader, 2451545.0, SUN, FLG_TOPOCTR)
         finally:
             state._TOPO = saved_topo

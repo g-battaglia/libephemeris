@@ -64,6 +64,8 @@ from skyfield.framelib import ecliptic_frame
 
 from .download import _is_valid_bsp
 from .exceptions import SPKNotFoundError
+from .exotic_bodies import EXOTIC_IDS as _EXOTIC_IDS
+from .exotic_bodies import exotic_display_name as _exotic_display_name
 from .logging_config import format_file_size, get_logger
 from .net import HTTPError, Request, URLError, open_url, urlencode
 from .state import get_timescale
@@ -273,6 +275,15 @@ _BODY_NAMES: dict[int, str] = {
     10000 + 10: "Hygiea",  # HYGIEA
     10000 + 433: "Eros",  # EROS
 }
+
+# Fill in every remaining precomputed exotic minor body from the single-source
+# registry so SPK diagnostics name the full set (Interamnia, Davida, Europa,
+# Sylvia, Psyche, Sappho, Pandora, Lilith, Amor, Itokawa, Ryugu, Toro,
+# Toutatis, Icarus, Hidalgo) without hand-maintaining a second list. The
+# hard-coded entries above win on any overlap.
+for _exotic_id in _EXOTIC_IDS:
+    _BODY_NAMES.setdefault(_exotic_id, _exotic_display_name(_exotic_id))
+del _exotic_id
 
 
 def _get_body_name(ipl: int) -> Optional[str]:

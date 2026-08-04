@@ -149,3 +149,27 @@ def target_au_map() -> Dict[int, float]:
 def name_map() -> Dict[int, str]:
     """``body_id -> display name`` for ``BODY_NAMES``."""
     return {b.body_id: b.name for b in _REGISTRY}
+
+
+def exotic_display_name(body_id: int) -> str:
+    """Return the public minor-planet name for an ``AST_OFFSET`` registry body.
+
+    Returns the empty string when ``body_id`` is not one of the precomputed
+    exotic minor bodies served by LEB, so a caller can fall through to its own
+    default (the reference API returns the empty string for an unresolved
+    asteroid id). This lets ``planets.get_planet_name`` report the real name for
+    the 31 exotics the library serves from the LEB, matching the reference,
+    which reads the name from its asteroid ephemeris files.
+
+    The internal ``-ast`` disambiguation suffix (asteroid 1181 Lilith is stored
+    as ``"Lilith-ast"`` in the registry to stay distinct from the lunar-apogee
+    "Lilith" point) is stripped so the public name is the IAU minor-planet name,
+    e.g. ``exotic_display_name(11181) == "Lilith"``.
+    """
+    body = EXOTIC_BODIES.get(int(body_id))
+    if body is None:
+        return ""
+    name = body.name
+    if name.endswith("-ast"):
+        name = name[: -len("-ast")]
+    return name

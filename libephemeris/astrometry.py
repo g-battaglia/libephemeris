@@ -19,8 +19,10 @@ References:
 
 Provenance:
     Nutation/precession quantities follow the cited IAU/IERS publications and
-    ERFA/SOFA conventions; aberration is the standard Lorentz transformation of
-    the incoming unit direction by the observer velocity. Constants are labelled
+    ERFA/SOFA conventions; aberration is the first-order (Bradley) stellar
+    aberration of the incoming unit direction by the observer velocity
+    (Explanatory Supplement to the Astronomical Almanac, 3rd ed. 2013,
+    section 7.2.3). Constants are labelled
     with units and epochs beside their use. Project code supplies vector algebra,
     validation, and fallback plumbing only; it does not transcribe another
     ephemeris implementation. The production long-term precession path is
@@ -46,7 +48,13 @@ import numpy as np
 # CONSTANTS
 # =============================================================================
 
-# Speed of light in AU/day
+# Speed of light in AU/day. Adopted across the reduction pipeline (identical to
+# the NOVAS/Skyfield ``C_AUDAY`` constant) so the analytical and Skyfield
+# backends agree bit-for-bit. Basis: c = 299792458 m/s exactly (BIPM/CODATA SI)
+# with the IAU 1976 System astronomical unit (1.49597870691e11 m), for which
+# c*86400/au reproduces 173.1446326846693. (Evaluating with the IAU 2012
+# Resolution B2 au of 149597870700 m instead gives 173.14463267424, ~1e-8
+# smaller; the adopted constant above is kept for cross-backend identity.)
 C_LIGHT_AU_DAY: float = 173.1446326846693
 
 # Julian day constants
@@ -60,9 +68,11 @@ RAD_TO_DEG: float = 180.0 / math.pi
 ARCSEC_TO_RAD: float = math.pi / (180.0 * 3600.0)
 
 # Mean obliquity of the ecliptic at J2000.0 (arcseconds) – IAU 2006
+# (Capitaine, Wallace & Chapront 2003, A&A 412, 567, eq. 37).
 OBLIQUITY_J2000_ARCSEC: float = 84381.406
 
-# IAU 2006 polynomial for mean obliquity
+# IAU 2006 polynomial for mean obliquity, in arcseconds vs Julian centuries TT
+# (Capitaine, Wallace & Chapront 2003, A&A 412, 567, eq. 39).
 OBLIQUITY_COEFFS: Tuple[float, ...] = (
     84381.406,
     -46.836769,
@@ -156,7 +166,13 @@ def _mean_obliquity(jd_tt: float) -> float:
 
 
 def _fundamental_arguments(t: float) -> Tuple[float, float, float, float, float]:
-    """Delaunay arguments for nutation (el, elp, F, D, Omega) in radians."""
+    """Delaunay arguments for nutation (el, elp, F, D, Omega) in radians.
+
+    Luni-solar fundamental (Delaunay) arguments as adopted for the IAU 2000
+    nutation, from Simon et al. (1994), A&A 282, 663 (also IERS Conventions
+    2003, Chapter 5). ``t`` is in Julian centuries (TT) from J2000.0; the
+    polynomial coefficients below are in arcseconds.
+    """
     el = 485868.249036 + t * (
         1717915923.2178 + t * (31.8792 + t * (0.051635 + t * (-0.00024470)))
     )
@@ -267,7 +283,16 @@ _NUTATION_TERMS_IAU2000B: Tuple[Tuple[int, ...], ...] = (
 
 
 def _nutation_angles_numpy(jd_tt: float) -> Tuple[float, float]:
-    """IAU 2000B nutation in longitude/obliquity (pure numpy)."""
+    """IAU 2000B nutation in longitude/obliquity (pure numpy).
+
+    Sums the 77-term truncated luni-solar series. NOTE: this pure-numpy
+    fallback does NOT add the fixed planetary-bias offset (dpsi_pl = -0.135 mas,
+    deps_pl = +0.388 mas) that the full SOFA/ERFA IAU 2000B model applies to
+    approximate the omitted planetary nutation (McCarthy & Luzum 2003, Celest.
+    Mech. Dyn. Astron. 85, 37). It is used only when pyerfa is unavailable; the
+    runtime erfa path (nut00b) does include that bias. Documentation note only:
+    the numerical behaviour of this function is unchanged.
+    """
     t = _jd_to_julian_centuries(jd_tt)
     el, elp, F, D, Omega = _fundamental_arguments(t)
 
@@ -305,7 +330,8 @@ def nutation_angles(jd_tt: float) -> Tuple[float, float]:
 # PRECESSION
 # =============================================================================
 
-# Equatorial precession angles from J2000 (Lieske 1977), polynomial in
+# Equatorial precession angles zeta_A, z_A, theta_A from J2000
+# (Lieske, Lederle, Fricke & Morando 1977, A&A 58, 1), polynomial in
 # Julian centuries TT since J2000: c0 + c1*t + c2*t^2 + c3*t^3 (arcsec)
 ZETA_A_COEFFS: Tuple[float, ...] = (0.0, 2306.2181, 0.30188, 0.017998)
 Z_A_COEFFS: Tuple[float, ...] = (0.0, 2306.2181, 1.09468, 0.018203)

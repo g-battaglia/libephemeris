@@ -164,18 +164,34 @@ class TestContextLEBGracefulError:
 
     @pytest.mark.integration
     def test_invalid_leb_path_falls_back(self):
-        """Context with invalid .leb path should fall back to Skyfield."""
+        """An absent .leb falls back in ``auto`` mode and raises when sealed.
+
+        Sealed ``leb`` mode treats a missing or unreadable artifact as a
+        provisioning error rather than silently substituting another source,
+        so the mode has to be pinned explicitly here instead of inherited
+        from LIBEPHEMERIS_MODE.
+        """
+        import pytest
+
+        from libephemeris.state import get_calc_mode, set_calc_mode
+
+        saved_mode = get_calc_mode()
         ctx = EphemerisContext()
         ctx.set_leb_file("/nonexistent/path/fake.leb")
-
-        # get_leb_reader() should return None (not raise)
-        reader = ctx.get_leb_reader()
-        assert reader is None
-
-        # calc_ut should still work via Skyfield fallback
         jd = 2460000.0  # ~2023
-        result, _ = ctx.calc_ut(jd, SUN, FLG_SPEED)
-        assert 0.0 <= result[0] < 360.0
+        try:
+            set_calc_mode("auto")
+            # get_leb_reader() should return None (not raise)
+            assert ctx.get_leb_reader() is None
+            # calc_ut should still work via the Skyfield fallback
+            result, _ = ctx.calc_ut(jd, SUN, FLG_SPEED)
+            assert 0.0 <= result[0] < 360.0
+
+            set_calc_mode("leb")
+            with pytest.raises((RuntimeError, OSError)):
+                ctx.get_leb_reader()
+        finally:
+            set_calc_mode(saved_mode)
 
     @pytest.mark.integration
     def test_global_invalid_leb_path_falls_back(self):
@@ -327,14 +343,29 @@ class TestCalcMode:
         os.environ["LIBEPHEMERIS_MODE"] = "LEB"
         assert get_calc_mode() == "leb"
 
-    def test_env_var_invalid_ignored(self):
-        """Invalid LIBEPHEMERIS_MODE env var should fall back to auto."""
+    def test_env_var_invalid_rejected(self):
+        """An invalid LIBEPHEMERIS_MODE must fail loudly, not default to auto.
+
+        Silently widening a typo'd mode back to ``auto`` would re-enable
+        source fallback and the network in a deployment that asked to be
+        sealed (see state._validated_calc_mode).
+        """
         import os
+
+        import pytest
 
         from libephemeris.state import get_calc_mode
 
+        saved = os.environ.get("LIBEPHEMERIS_MODE")
         os.environ["LIBEPHEMERIS_MODE"] = "bogus"
-        assert get_calc_mode() == "auto"
+        try:
+            with pytest.raises(ValueError, match="Invalid calculation mode"):
+                get_calc_mode()
+        finally:
+            if saved is None:
+                os.environ.pop("LIBEPHEMERIS_MODE", None)
+            else:
+                os.environ["LIBEPHEMERIS_MODE"] = saved
 
     def test_programmatic_overrides_env_var(self):
         """Programmatic set_calc_mode should override env var."""

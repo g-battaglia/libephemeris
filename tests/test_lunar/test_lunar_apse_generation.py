@@ -66,6 +66,27 @@ def terminal_passage_errors() -> tuple[float, float]:
     return maxima[0], maxima[1]
 
 
+def test_lunar_apse_model_matches_pinned_sha256() -> None:
+    """The generated module is the exact SHA-256-pinned artifact.
+
+    ``libephemeris/lunar_apse_model.py`` is an immutable generator output
+    (see its header): any change must come from rerunning
+    ``scripts/generate_lunar_apse_model.py`` against the reviewed DE440
+    kernel, followed by re-pinning this hash in the same commit. A mismatch
+    here means the artifact was hand-edited or the regeneration was not
+    re-pinned.
+    """
+    import hashlib
+    from pathlib import Path
+
+    import libephemeris.lunar_apse_model as model
+
+    digest = hashlib.sha256(Path(model.__file__).read_bytes()).hexdigest()
+    assert digest == (
+        "0132e75b0b39cd5df540f90acd5ebb740a3f39e593e292ab5c003106ccdc08d9"
+    )
+
+
 def test_apogee_edge_taper_preserves_terminal_passage_precision(
     terminal_passage_errors: tuple[float, float],
 ) -> None:

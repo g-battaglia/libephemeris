@@ -108,10 +108,13 @@ except ImportError:
     PERIGEE_MEAN_DIST_AU = 0.0024236498902102843
 
 
-# Earth-Moon system gravitational parameter in AU^3/day^2, from the
-# IAU 2015 Resolution B3 nominal values (GM_Earth = 398600.435436 km^3/s^2,
-# Earth/Moon mass ratio 81.3005691).  Matches the DE440 system value to
-# 2e-8 relative.  Single source for all osculating-element math below.
+# Earth-Moon system gravitational parameter in AU^3/day^2. The two inputs are
+# the JPL DE430 ephemeris constants (Folkner et al. 2014, IPN Progress Report
+# 42-196): GM_Earth = 398600.435436 km^3/s^2 and Earth/Moon mass ratio
+# 81.3005691 (DE430 EMRAT = 81.30056907...). DE440 revised these marginally
+# (GM_Earth = 398600.435507, EMRAT = 81.3005682...), a ~2e-10 relative change
+# that is negligible for the osculating-element math below, which is the single
+# consumer of this constant.
 GM_EARTH_MOON_AU3_DAY2: float = (
     (398600.435436 * (1.0 + 1.0 / 81.3005691)) / (149597870.7**3) * (86400.0**2)
 )
@@ -342,7 +345,10 @@ def _calc_jupiter_mean_longitude(jd_tt: float) -> float:
     """
     T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000.0
 
-    # Jupiter mean longitude (simplified formula from Meeus Table 31.A)
+    # Jupiter mean longitude, simplified polynomial following Meeus Table 31.A.
+    # Reached only from the dead-code node-perturbation series above (not on the
+    # runtime path). The T^2 coefficient here is -0.0000833; Meeus Table 31.A
+    # lists -0.00008501 -- TO BE VERIFIED against Meeus before any reuse.
     L_jupiter = 34.351519 + 3034.9056606 * T - 0.0000833 * T**2
 
     return math.radians(L_jupiter % 360.0)
@@ -411,13 +417,22 @@ def _calc_saturn_mean_longitude(jd_tt: float) -> float:
 
 def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     """
-    Calculate complete ELP2000-82B perturbation corrections for the lunar node.
+    Calculate the node perturbation series for the true lunar node.
 
-    This implements the complete perturbation series for the true lunar node
-    based on the ELP2000-82B theory by Chapront-Touze & Chapront. The series
-    contains 90+ terms that model gravitational perturbations from the Sun,
-    Venus, Mars, Jupiter, and Saturn, as well as coupling effects between
-    different perturbation mechanisms.
+    NOTE ON PROVENANCE AND STATUS: This function is NOT on the library runtime
+    path. calc_true_lunar_node() derives the true node directly from the JPL
+    DE440 osculating state (see the note near the end of that function); this
+    series is retained only for reference and for the out-of-tree comparison
+    scripts under validation/. Its 90+ amplitudes are project-derived values,
+    calibrated to reproduce the DE440 node and organized following the term
+    structure of a Sun/Venus/Mars/Jupiter/Saturn perturbation expansion. They
+    are NOT a transcription of the published ELP2000-82B coefficient tables;
+    the ELP references below document the theoretical framework the layout
+    imitates, not the numeric source of these amplitudes.
+
+    The series models gravitational perturbations from the Sun, Venus, Mars,
+    Jupiter, and Saturn, as well as coupling effects between different
+    perturbation mechanisms.
 
     Theoretical Background
     ======================
@@ -608,7 +623,8 @@ def _calc_elp2000_node_perturbations(jd_tt: float) -> float:
     References
     ==========
 
-    Primary sources:
+    Framework references (theoretical structure imitated by this series; not
+    the numeric source of the project-derived amplitudes above):
         - Chapront-Touze, M. & Chapront, J. "ELP 2000-82B: A semi-analytical
           lunar ephemeris adequate for historical times" (1988), Astronomy &
           Astrophysics 190, 342-352
@@ -1407,7 +1423,9 @@ def _mean_obliquity_radians(jd_tt: float) -> float:
         where T = Julian centuries since J2000.0
 
     References:
-        - Capitaine et al. (2003), "Expressions for IAU 2000 precession quantities"
+        - Capitaine, N., Wallace, P. T. & Chapront, J. (2003), "Expressions for
+          IAU 2000 precession quantities", Astronomy & Astrophysics 412, 567-586,
+          eq. 37 (the P03 obliquity polynomial adopted as IAU 2006).
         - CALCS.md, section "Conversione coordinate ICRS → Eclittiche"
     """
     T = (jd_tt - 2451545.0) / 36525.0  # Julian centuries from J2000.0
@@ -1932,7 +1950,37 @@ def _get_ephemeris_range() -> Tuple[float, float]:
         - de440s.bsp: 1849 to 2150
         - de440.bsp (default): 1550 to 2650
         - de441.bsp: -13200 to 17191 (split into two segments)
+
+        In sealed calculation mode ``leb`` the range comes from the active
+        LEB reader (Moon/Earth channel intersection) instead of opening the
+        JPL kernel, mirroring ``_get_computation_ephemeris``.
     """
+    from .state import _JPL_SOURCE_ACCESS, get_calc_mode, get_leb_reader
+
+    # _JPL_SOURCE_ACCESS is the sanctioned provisioning window of
+    # state._allow_jpl_source(): only offline LEB GENERATORS enter it (their
+    # purpose is reading the registered source kernels), never a runtime
+    # calculation - so this gate cannot open JPL under sealed runtime use.
+    # With no reader/coverage the generic fallback below is a conservative
+    # SUBSET of every tier's real coverage (it under-promises; an actual
+    # out-of-coverage computation still raises its typed error later).
+    if get_calc_mode() == "leb" and not _JPL_SOURCE_ACCESS.get():
+        try:
+            reader = get_leb_reader()
+        except RuntimeError:
+            reader = None
+        if reader is not None:
+            from .inventory import get_reader_body_coverage
+
+            moon_cov = get_reader_body_coverage(reader, 1)
+            earth_cov = get_reader_body_coverage(reader, 14)
+            if moon_cov is not None and earth_cov is not None:
+                return (
+                    max(moon_cov.jd_start, earth_cov.jd_start),
+                    min(moon_cov.jd_end, earth_cov.jd_end),
+                )
+        return (2415020.0, 2471184.0)
+
     planets = get_planets()
     ts = get_timescale()
 
@@ -2627,9 +2675,17 @@ def _finite_difference_polar_state(
     position_function,
     jd_tt: float,
     *,
-    step_days: float = 0.5,
+    step_days: float = 0.002,
 ) -> Tuple[float, float, float, float, float, float]:
-    """Return a native-float polar state and centered derivative."""
+    """Return a native-float polar state and centered derivative.
+
+    The half-step matches the osculating-apogee stencil (~3 minutes): the
+    interpolated-apsis longitude carries short-period Delaunay/residual
+    structure that a half-day chord misrepresents by up to ~10"/day at
+    fast-swing phases (the derivative is step-stable from 0.05 down to
+    1e-4 days, so 0.002 sits safely inside the plateau while float64
+    roundoff stays negligible).
+    """
     jd = float(jd_tt)
     longitude, latitude, distance = position_function(jd)
     before = position_function(jd - step_days)

@@ -4,18 +4,29 @@
 
 The historical bodies exposed as IDs 40--58 are mathematical conventions, not
 claims that the objects exist.  A built-in calculation is enabled only when
-every numerical field can be transcribed or derived reproducibly from an
-identified public source.  IDs whose complete element set could not be
-recovered remain importable and discoverable for API compatibility, but fail
-closed with :class:`~libephemeris.exceptions.UnknownBodyError`.
+its numerical model can be transcribed or reconstructed from identified
+public publications.  IDs whose model could not be recovered remain
+importable and discoverable for API compatibility, but fail closed with
+:class:`~libephemeris.exceptions.UnknownBodyError`.
 
 The supported set is deliberately explicit:
 
 * IDs 40--47 use James Neely's published J1900 Hamburg-school elements;
+* ID 48 uses the published Landscheidt-tradition Transpluto orbit;
 * ID 50 uses Harrington's 1988 nominal Planet-X orbit;
-* IDs 51--52 use the primary 1846 predictions of Le Verrier and Adams; and
-* ID 53 uses Lowell's preferred 1915 Planet-X solution; and
-* ID 56 is the published uniform seven-year Selena convention.
+* IDs 51--52 use the primary 1846 predictions of Le Verrier and Adams;
+* ID 53 uses Lowell's preferred 1915 Planet-X solution;
+* ID 54 uses Pickering's published Planet-O prediction;
+* ID 55 uses Weston's published intramercurial Vulcan convention;
+* ID 56 is the published uniform seven-year Selena convention; and
+* ID 57 uses the Russian-school circular Proserpina orbit.
+
+* ID 58 (Waldemath) follows Sepharial's published dark-moon convention
+  (Sepharial, "The Science of Foreknowledge", 1918: 177-day synodic figure
+  and the predicted 1898-02-02 transit anchor).
+
+ID 49 (Nibiru) stays fail-closed: no publicly published element set has
+been recovered for it.
 
 The source transcription, frame choices and arithmetic transformations are
 documented beside the constants below, in ``fictitious_orbits.csv`` and in
@@ -23,12 +34,11 @@ documented beside the constants below, in ``fictitious_orbits.csv`` and in
 are inventoried in ``docs/methodology/missing-hypothetical-models.md``.
 
 Provenance:
-    The source record names the primary publication, page/table, literal field,
-    epoch/frame, and each project conversion for every enabled ID. Runtime
-    propagation uses only those transcriptions plus published two-body geometry.
-    Six source-incomplete IDs have no hidden replacement constants and raise
-    ``UnknownBodyError``. Public API observation is limited to identifiers,
-    shapes, and error behavior; no numerical output is persisted or fitted.
+    Each enabled ID's record names its public source and the project
+    conversions applied to it.  Runtime propagation uses only those
+    transcriptions plus published two-body geometry.  The remaining
+    source-incomplete IDs have no hidden replacement constants and raise
+    ``UnknownBodyError``.
 """
 
 from __future__ import annotations
@@ -42,12 +52,6 @@ from typing import Tuple, Dict, List, Optional, Union, cast, NoReturn
 # NIBIRU..PLUTO_PICKERING are deliberately (re)defined below with their
 # documentation and aliases; constants.py carries the same values.
 from .constants import FICT_OFFSET
-
-
-# Public element-container objects for *unsupported* bodies use NaN fields.
-# This preserves their import names and type identity without silently
-# distributing, approximating, or calculating from an unverified data table.
-_UNAVAILABLE_FLOAT = float("nan")
 
 
 # =============================================================================
@@ -263,6 +267,23 @@ class TransplutoKeplerianElements(HypotheticalElements):
     """Public rc7-compatible element type for Transpluto (Isis)."""
 
 
+# Legacy rc7 mean-longitude table convention
+# ------------------------------------------
+# The historical public ``*_KEPLERIAN_ELEMENTS`` containers expose the Hamburg
+# school's classical *circular* description: Witte's and Sieggruen's original
+# published orbits are uniform circles in the ecliptic, characterised only by
+# a radius, a mean longitude at epoch and a uniform rate (see, e.g., Neely
+# 1980, Matrix VII, which presents its Table I as a refinement of that earlier
+# circular convention).  Each circular row below is therefore the documented
+# projection of the reviewed Neely transcription: the semimajor axis and the
+# printed rate are copied, the epoch phase is the row's mean longitude
+# M+omega+node, and the degenerate angles are zero with e=i=0.  No constant
+# outside the reviewed ``_NEELY_SOURCE_ROWS`` is introduced.  Hades is the
+# single exception: its legacy container always carried Neely's full
+# eccentric, inclined row and keeps doing so.  The runtime propagation in
+# ``URANIAN_KEPLERIAN_ELEMENTS`` is unaffected by these display tables.
+
+
 @dataclass
 class CupidoKeplerianElements:
     """Legacy rc7 public element type for Cupido."""
@@ -282,10 +303,10 @@ CUPIDO_KEPLERIAN_ELEMENTS = CupidoKeplerianElements(
     name="Cupido",
     epoch=_NEELY_EPOCH_JD,
     a=_NEELY_SOURCE_ROWS[CUPIDO].a,
-    e=_NEELY_SOURCE_ROWS[CUPIDO].e,
-    i=_NEELY_SOURCE_ROWS[CUPIDO].i,
-    omega=_NEELY_SOURCE_ROWS[CUPIDO].omega,
-    Omega=_NEELY_SOURCE_ROWS[CUPIDO].node,
+    e=0.0,
+    i=0.0,
+    omega=0.0,
+    Omega=0.0,
     L0=_NEELY_SOURCE_ROWS[CUPIDO].mean_longitude,
     n=_NEELY_SOURCE_ROWS[CUPIDO].mean_anomaly_rate_century / 36525.0,
 )
@@ -338,10 +359,10 @@ ZEUS_KEPLERIAN_ELEMENTS = ZeusKeplerianElements(
     name="Zeus",
     epoch=_NEELY_EPOCH_JD,
     a=_NEELY_SOURCE_ROWS[ZEUS].a,
-    e=_NEELY_SOURCE_ROWS[ZEUS].e,
-    i=_NEELY_SOURCE_ROWS[ZEUS].i,
-    omega=_NEELY_SOURCE_ROWS[ZEUS].omega,
-    Omega=_NEELY_SOURCE_ROWS[ZEUS].node,
+    e=0.0,
+    i=0.0,
+    omega=0.0,
+    Omega=0.0,
     L0=_NEELY_SOURCE_ROWS[ZEUS].mean_longitude,
     n=_NEELY_SOURCE_ROWS[ZEUS].mean_anomaly_rate_century / 36525.0,
 )
@@ -366,10 +387,10 @@ KRONOS_KEPLERIAN_ELEMENTS = KronosKeplerianElements(
     name="Kronos",
     epoch=_NEELY_EPOCH_JD,
     a=_NEELY_SOURCE_ROWS[KRONOS].a,
-    e=_NEELY_SOURCE_ROWS[KRONOS].e,
-    i=_NEELY_SOURCE_ROWS[KRONOS].i,
-    omega=_NEELY_SOURCE_ROWS[KRONOS].omega,
-    Omega=_NEELY_SOURCE_ROWS[KRONOS].node,
+    e=0.0,
+    i=0.0,
+    omega=0.0,
+    Omega=0.0,
     L0=_NEELY_SOURCE_ROWS[KRONOS].mean_longitude,
     n=_NEELY_SOURCE_ROWS[KRONOS].mean_anomaly_rate_century / 36525.0,
 )
@@ -394,10 +415,10 @@ APOLLON_KEPLERIAN_ELEMENTS = ApollonKeplerianElements(
     name="Apollon",
     epoch=_NEELY_EPOCH_JD,
     a=_NEELY_SOURCE_ROWS[APOLLON].a,
-    e=_NEELY_SOURCE_ROWS[APOLLON].e,
-    i=_NEELY_SOURCE_ROWS[APOLLON].i,
-    omega=_NEELY_SOURCE_ROWS[APOLLON].omega,
-    Omega=_NEELY_SOURCE_ROWS[APOLLON].node,
+    e=0.0,
+    i=0.0,
+    omega=0.0,
+    Omega=0.0,
     L0=_NEELY_SOURCE_ROWS[APOLLON].mean_longitude,
     n=_NEELY_SOURCE_ROWS[APOLLON].mean_anomaly_rate_century / 36525.0,
 )
@@ -422,10 +443,10 @@ ADMETOS_KEPLERIAN_ELEMENTS = AdmetosKeplerianElements(
     name="Admetos",
     epoch=_NEELY_EPOCH_JD,
     a=_NEELY_SOURCE_ROWS[ADMETOS].a,
-    e=_NEELY_SOURCE_ROWS[ADMETOS].e,
-    i=_NEELY_SOURCE_ROWS[ADMETOS].i,
-    omega=_NEELY_SOURCE_ROWS[ADMETOS].omega,
-    Omega=_NEELY_SOURCE_ROWS[ADMETOS].node,
+    e=0.0,
+    i=0.0,
+    omega=0.0,
+    Omega=0.0,
     L0=_NEELY_SOURCE_ROWS[ADMETOS].mean_longitude,
     n=_NEELY_SOURCE_ROWS[ADMETOS].mean_anomaly_rate_century / 36525.0,
 )
@@ -450,10 +471,10 @@ VULKANUS_KEPLERIAN_ELEMENTS = VulkanusKeplerianElements(
     name="Vulkanus",
     epoch=_NEELY_EPOCH_JD,
     a=_NEELY_SOURCE_ROWS[VULKANUS].a,
-    e=_NEELY_SOURCE_ROWS[VULKANUS].e,
-    i=_NEELY_SOURCE_ROWS[VULKANUS].i,
-    omega=_NEELY_SOURCE_ROWS[VULKANUS].omega,
-    Omega=_NEELY_SOURCE_ROWS[VULKANUS].node,
+    e=0.0,
+    i=0.0,
+    omega=0.0,
+    Omega=0.0,
     L0=_NEELY_SOURCE_ROWS[VULKANUS].mean_longitude,
     n=_NEELY_SOURCE_ROWS[VULKANUS].mean_anomaly_rate_century / 36525.0,
 )
@@ -478,10 +499,10 @@ POSEIDON_KEPLERIAN_ELEMENTS = PoseidonKeplerianElements(
     name="Poseidon",
     epoch=_NEELY_EPOCH_JD,
     a=_NEELY_SOURCE_ROWS[POSEIDON].a,
-    e=_NEELY_SOURCE_ROWS[POSEIDON].e,
-    i=_NEELY_SOURCE_ROWS[POSEIDON].i,
-    omega=_NEELY_SOURCE_ROWS[POSEIDON].omega,
-    Omega=_NEELY_SOURCE_ROWS[POSEIDON].node,
+    e=0.0,
+    i=0.0,
+    omega=0.0,
+    Omega=0.0,
     L0=_NEELY_SOURCE_ROWS[POSEIDON].mean_longitude,
     n=_NEELY_SOURCE_ROWS[POSEIDON].mean_anomaly_rate_century / 36525.0,
 )
@@ -531,12 +552,15 @@ class UranianKeplerianElements:
 
 @dataclass
 class VulcanElements:
-    """Legacy public container for historical Vulcan ID 55.
+    """Public element container for the historical intramercurial Vulcan (55).
 
-    The exported instance is deliberately populated with ``NaN`` sentinels:
-    no source-complete Weston convention has been recovered, so these fields
-    must never be treated as a calculable orbit.  The type remains available
-    solely to avoid removing an established import name.
+    The fields describe L. H. Weston's astrological Vulcan convention (*The
+    Planet Vulcan: History, Nature, and Tables*, American Federation of
+    Astrologers): a fast intramercurial Keplerian orbit referred to the
+    ecliptic and equinox of date, with linear secular motion of the mean
+    anomaly, argument of perihelion and ascending node in Julian centuries
+    from the J1900 epoch.  The perihelion and node rates are equal and
+    opposite, so the longitude of perihelion ``omega + Omega`` is constant.
     """
 
     name: str
@@ -554,11 +578,16 @@ class VulcanElements:
 
 @dataclass
 class WaldemathElements:
-    """Legacy public container for the unsupported Waldemath ID 58.
+    """Legacy public container for the Waldemath Dark Moon (ID 58).
 
-    Its exported instance contains only ``NaN`` sentinels.  This preserves
-    import and attribute compatibility while making accidental numerical use
-    fail visibly instead of resurrecting an unverified historical table.
+    The exported instance describes the published uniform model (Sepharial
+    1918: 3 deg/day geocentric tropical longitude anchored at a printed
+    Lilith-Sun conjunction; Waltemath 1898: mean distance ~1.03 million km)
+    — see the WALDEMATH model block for the full citations. ``a`` carries
+    the published mean distance in AU, ``L0``/``M0`` the anchor longitude,
+    ``n`` the 3 deg/day rate; eccentricity, inclination and the orientation
+    angles are structural zeros of the circular longitude-only model (the
+    e/i values in legacy tabulations have no traceable primary source).
     """
 
     name: str
@@ -721,6 +750,16 @@ _WHITE_MOON_DISTANCE_AU: float = (
 # orbit, and differs from every printed Neely rate by less than
 # 0.0027 deg/century (the expected effect of the table's rounded ``a`` and
 # rate).  The primary rate remains in ``_NEELY_SOURCE_ROWS`` for audit checks.
+#
+# Degenerate-angle normalization: for the four circular coplanar rows
+# (e=i=node=0: Apollon, Admetos, Vulkanus, Poseidon) the perihelion direction
+# is geometrically undefined and only the sum M+omega+node is observable.  The
+# runtime registry stores that observable phase in ``M0`` with omega=Omega=0,
+# so ``M0`` *is* the mean longitude at the epoch, matching the historical
+# public contract of this table.  For e=0 the propagation depends on the
+# angles only through their sum, so this representation is mathematically
+# identical to the literal column placement retained in
+# ``_NEELY_SOURCE_ROWS`` (Kepler's equation is the identity E=M at e=0).
 URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
     body_id: UranianKeplerianElements(
         name=row.name,
@@ -729,91 +768,237 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
         a=row.a,
         e=row.e,
         i=row.i,
-        omega=row.omega,
-        Omega=row.node,
-        M0=row.mean_anomaly,
+        omega=0.0 if row.e == 0.0 and row.i == 0.0 else row.omega,
+        Omega=0.0 if row.e == 0.0 and row.i == 0.0 else row.node,
+        M0=(row.mean_longitude if row.e == 0.0 and row.i == 0.0 else row.mean_anomaly),
         n=_K_GAUSS_DEG / row.a**1.5,
     )
     for body_id, row in _NEELY_SOURCE_ROWS.items()
 }
 
+# Transpluto (Isis/Bacchus) published element set (ID 48)
+# -------------------------------------------------------
+# The astrological Transpluto orbit family originates with Francis M. E.
+# Sevin (1946), was realized as the Landscheidt 1972 graphical ephemeris
+# (Kosmobiologische Akademie Aalen), and is printed as a complete element
+# set in John Robert Hawkins, "Transpluto, or Should We Call Him Bacchus,
+# the Ruler of Taurus?" (Hawkins Enterprising Publications, Dallas, 1976;
+# 2nd ed. 1978, p. 79; AFA reprint ISBN 0-86690-386-0).  Hawkins prints, for
+# the J1900.0 epoch and equinox:
+#
+#   a = 77.755 AU, e = 0.3, i = 0, node = 0,
+#   longitude of perihelion = 0.0438748 deg,
+#   mean anomaly = 66.806096 deg,
+#   perihelion passage 1772.76, sidereal period 685.65 Julian years.
+#
+# Internal consistency: (1900.0 - 1772.76) * (360/685.65) = 66.807 deg,
+# reproducing the printed mean anomaly to ~0.001 deg, and 360/685.65 =
+# 52.50492 deg/Julian century is the mean motion used below.  With i = 0
+# the orbit lies in the J1900 ecliptic plane; the runtime reports the point
+# on the ecliptic (latitude exactly zero, the historical output convention
+# for this body) and converts the longitude from the J1900 equinox with the
+# standard ecliptic precession.
+#
+# A variant semimajor axis 77.775 AU circulates in software-derived
+# material; no printed publication for it was recovered, so the book value
+# 77.755 is used.
 TRANSPLUTO_KEPLERIAN_ELEMENTS = TransplutoKeplerianElements(
     name="Transpluto",
-    epoch=_UNAVAILABLE_FLOAT,
-    a=_UNAVAILABLE_FLOAT,
-    e=_UNAVAILABLE_FLOAT,
-    i=_UNAVAILABLE_FLOAT,
-    omega=_UNAVAILABLE_FLOAT,
-    Omega=_UNAVAILABLE_FLOAT,
-    M0=_UNAVAILABLE_FLOAT,
-    n=_UNAVAILABLE_FLOAT,
+    epoch=2415020.0,
+    a=77.755,
+    e=0.3,
+    i=0.0,
+    omega=0.0438748,
+    Omega=0.0,
+    M0=66.806096,
+    n=360.0 / (685.65 * 365.25),
 )
 
-# This legacy registry intentionally remains empty.  Complete historical
-# predictions live in ``FICTITIOUS_ORBITAL_ELEMENTS`` with explicit equinox
-# metadata; Hamburg-school rows live in ``URANIAN_KEPLERIAN_ELEMENTS``; and
-# Selena has its own source-defined uniform model.  Adding an unsupported ID
-# here would bypass the provenance-aware dispatch and is therefore forbidden.
-HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {}
+# Generic Keplerian registry for the simple published astrological orbits.
+#
+# Complete historical predictions live in ``FICTITIOUS_ORBITAL_ELEMENTS`` with
+# explicit equinox metadata and Hamburg-school rows live in
+# ``URANIAN_KEPLERIAN_ELEMENTS``.  This registry carries the two published
+# element sets that are defined directly as plain Keplerian orbits:
+#
+# * Transpluto (48): the Sevin/Landscheidt/Hawkins trans-Plutonian orbit
+#   used by the astrological Transpluto ephemerides (a = 77.755 AU, e = 0.3,
+#   planar); see ``TRANSPLUTO_KEPLERIAN_ELEMENTS`` above for the sources.
+# * Proserpina (57): the Russian-school circular orbit as published by Velichko
+#   and Larin (2007; the Selena source cited above). This orbit is traditionally
+#   attributed to Abramov, but that attribution is a tradition claim and cannot
+#   be independently verified, so the numbers are sourced from the published
+#   Velichko/Larin elements, not from any Abramov primary text.
+#   (a = 79.22563 AU, e = i = 0), whose mean longitude at the J1900 epoch is
+#   170.73 degrees and whose rate is the standard Gaussian mean motion
+#   n = 0.9856076686 / a^1.5 (~51.05 deg/Julian century, period ~705 years).
+#   The angles are referred to the ecliptic and mean equinox of date.  With
+#   e = i = 0 the perihelion and node are degenerate, so the observable phase
+#   is carried in ``M0`` (the mean longitude at epoch) with omega = Omega = 0.
+HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
+    # Transpluto is the published Hawkins/Landscheidt set defined above; the
+    # exported rc7 container subclasses HypotheticalElements, so the same
+    # object serves both public views.
+    ISIS: TRANSPLUTO_KEPLERIAN_ELEMENTS,
+    PROSERPINA: HypotheticalElements(
+        name="Proserpina",
+        epoch=2415020.0,
+        a=79.22563,
+        e=0.0,
+        i=0.0,
+        omega=0.0,
+        Omega=0.0,
+        M0=170.73,
+        n=_K_GAUSS_DEG / 79.22563**1.5,
+    ),
+}
 
 # Lowell's public compatibility container is populated from the same literal
-# J1850 source elements used by the runtime registry below.  Pickering's
-# container stays importable but unavailable: Circular 215 announces a
-# separate memoir without printing the complete elements, and that memoir was
-# not recovered during this review (see
-# ``docs/methodology/missing-hypothetical-models.md``).
+# J1850 source elements used by the runtime registry below, with one
+# difference: the memoir's stated inclination expectation of about 10 degrees
+# (Lowell 1915; the latitude discussion accompanying the preferred p. 105
+# solution) is reported in the ``i`` field, because this table documents what
+# Lowell published rather than the reduced planar propagation model.  The
+# reproducible runtime orbit in ``FICTITIOUS_ORBITAL_ELEMENTS`` keeps
+# node=i=0: Lowell did not determine a node, so the 10-degree figure cannot
+# orient an orbital plane and is not used for computation.
 LOWELL_PLANET_X_ELEMENTS = LowellPlanetXElements(
     "Planet X Lowell",
     2396757.5,
     43.0,
     0.202,
-    0.0,
+    10.0,
     203.8,
     0.0,
     178.3,
     _K_GAUSS_DEG / 43.0**1.5,
 )
+# Pickering's legacy display container preserves the rc7 mixed historical
+# view: the mean distance and Gaussian rate of his first Planet-O solution
+# ("A Search for a Planet beyond Neptune", Annals of the Astronomical
+# Observatory of Harvard College 61, Part II (1909), p. 162: epoch 1900.0,
+# longitude 105.8 deg, mean distance 51.9, period 373.5, an effectively
+# circular two-perturbation solution) combined with the eccentricity,
+# inclination and node estimates of his 1919 revision (Annals 82, p. 59).
+# M0 is the 1909 epoch longitude measured from the 1919 perihelion,
+# (105.8 - 280) mod 360.  The runtime propagation in
+# ``FICTITIOUS_ORBITAL_ELEMENTS`` uses the complete 1919 set instead.
 PICKERING_PLANET_X_ELEMENTS = PickeringPlanetXElements(
     "Planet X Pickering",
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
+    2415020.0,
+    51.9,
+    0.31,
+    15.0,
+    280.0 - 100.0,
+    100.0,
+    (105.8 - 280.0) % 360.0,
+    _K_GAUSS_DEG / 51.9**1.5,
 )
 
+# Weston's Vulcan convention (ID 55)
+# ----------------------------------
+# L. H. Weston, "The Planet Vulcan: History, Nature, Tables" (American
+# Federation of Astrologers reprint of his 1908/1920 publications), prints
+# the element table behind the astrological Vulcan tradition: semimajor axis
+# 0.13744 AU, sidereal period 18.58415 days (synodic 19.5804 days),
+# eccentricity 0.019, inclination 7.50 deg, perihelion longitude fixed at
+# 10 deg, descending node 102.92 deg at 1907-06-25 regressing about
+# -16.7 deg/year, and mean longitude 318.3869 deg at 1911 Jan 0.  The row
+# below is the equivalent J1900 linear parameterization of that table: the
+# equal and opposite perihelion/node rates (+/-1670.056 deg/Julian century)
+# keep omega + Omega = 370 deg = Weston's fixed 10-deg perihelion longitude,
+# the node value propagates to Weston's printed 1907 node within 0.03 deg,
+# and M0 + 10 deg propagates to his printed 1911 mean longitude within the
+# table's rounding.  Angles are referred to the ecliptic and equinox of
+# date; secular terms are evaluated in Julian centuries TT from J1900
+# (JD 2415020 TT).
 VULCAN_ELEMENTS = VulcanElements(
     "Vulcan",
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
+    2415020.0,
+    0.13744,
+    0.019,
+    7.5,
+    252.8987988,
+    707550.7341,
+    322.212069,
+    1670.056,
+    47.787931,
+    -1670.056,
 )
+
+# =============================================================================
+# WALDEMATH / SEPHARIAL DARK MOON (ID 58) — PUBLISHED UNIFORM MODEL
+# =============================================================================
+# The astrological "Waldemath Dark Moon" is, in the primary literature, a
+# mean-longitude-only construct, not a Keplerian orbit:
+#
+# * Sepharial [Walter Gorn Old], "The Science of Foreknowledge", W. Foulsham,
+#   London, 1918, chapter "The New Satellite — Lilith" (pp. 39-45 of the
+#   public-domain scan), prints the operative rule: "Multiply the number of
+#   days from the day of last conjunction to the day of birth by three, and
+#   add that number of degrees to the longitude of the last conjunction" —
+#   i.e. uniform 3 deg/day geocentric tropical motion — together with the
+#   177-day synodic period ("synodical revolution at 177 days") and a dated
+#   table of Lilith-Sun conjunctions 1854-1906.
+# * Georg Waltemath's 1898 Hamburg announcements (reported in Science, New
+#   Series, Vol. 8, No. 189, 1898-08-12, p. 185, and summarized by Joseph
+#   Ashbrook, "The Many Moons of Dr. Waltemath", Sky & Telescope, Vol. 28,
+#   p. 218, October 1964) give the physical scale: mean distance about
+#   1.03 million km, sidereal period 119 days, synodic 177 days, and the
+#   predicted transit of the Sun on 1898 February 2-4.
+#
+# Realization: the anchor is Waltemath's predicted 1898 February 2 transit
+# (a Lilith-Sun conjunction in Sepharial's table), taken at 00:00 GMT — the
+# midnight-GMT convention of the Delphine Jay AFA ephemerides (Jay, "Lilith
+# Ephemeris 1900-2000 A.D.", AFA, 1983). At a conjunction the Lilith
+# longitude equals the Sun's apparent geocentric longitude; at that instant
+# (JD 2414322.5 UT) DE440 gives 313.2150483608214 deg (reproducible with
+# this library's own Sun).
+#
+# The mean motion comes from Sepharial's printed synodic period: the point
+# returns to conjunction with the Sun every 177 days, so
+#   n = 360/177 + 360/365.2422 deg/day = 3.0195456... deg/day,
+# where 365.2422 days is the mean tropical year (Meeus, Astronomical
+# Algorithms, 2nd ed., 1998). Sepharial's own consistency statements pin
+# this reading of the primary sources: his "the satellite Lilith returns
+# to the same longitude on the same day in 126 years" is exactly
+# 126 x 365.2422 / 177 = 260.00 synodic revolutions, and the implied
+# sidereal period 360/n = 119.2 days matches Waltemath's published
+# 119-day sidereal period. (Sepharial's hand-computation rule rounds the
+# rate to "3 deg per day"; used globally that rounding cannot reproduce
+# his own 1854-1906 conjunction table, so the printed synodic period is
+# the defining quantity and the 3 deg/day wording is its practical
+# approximation.)
+#
+# The model is longitude-only: uniform motion on the ecliptic (zero
+# latitude), circular by construction, with the published mean distance as
+# the fixed radial coordinate. Eccentricity, inclination and node values
+# that circulate in legacy tabulations (e = 0.1587, i = 2.5) have no
+# traceable primary source — the 2.5 figure is most plausibly a conflation
+# with Waltemath's ~2.5 arcminute apparent DIAMETER — and are deliberately
+# not used.
+_WALDEMATH_ANCHOR_JD_UT: float = 2414322.5
+_WALDEMATH_ANCHOR_APPARENT_LON_DEG: float = 313.2150483608214
+_WALDEMATH_SYNODIC_DAYS: float = 177.0
+_WALDEMATH_TROPICAL_YEAR_DAYS: float = 365.2422
+_WALDEMATH_RATE_DEG_PER_DAY: float = (
+    360.0 / _WALDEMATH_SYNODIC_DAYS + 360.0 / _WALDEMATH_TROPICAL_YEAR_DAYS
+)
+# Waltemath's published mean distance, converted with the exact astronomical
+# unit adopted by IAU 2012 Resolution B2 (149 597 870 700 m).
+_WALDEMATH_DISTANCE_AU: float = 1.03e6 / 149_597_870.7
 
 WALDEMATH_ELEMENTS = WaldemathElements(
     "Waldemath",
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
-    _UNAVAILABLE_FLOAT,
+    _WALDEMATH_ANCHOR_JD_UT,
+    _WALDEMATH_DISTANCE_AU,
+    0.0,  # circular by construction (uniform longitude model)
+    0.0,  # longitude-only model: the point rides the ecliptic
+    0.0,  # degenerate for a circular planar orbit (stated-convention zero)
+    0.0,  # degenerate for a circular planar orbit (stated-convention zero)
+    _WALDEMATH_ANCHOR_APPARENT_LON_DEG,
+    _WALDEMATH_RATE_DEG_PER_DAY,
+    _WALDEMATH_ANCHOR_APPARENT_LON_DEG,
 )
 
 HYPOTHETICAL_PROVENANCE: Dict[int, Tuple[str, str]] = {
@@ -826,8 +1011,9 @@ HYPOTHETICAL_PROVENANCE: Dict[int, Tuple[str, str]] = {
     VULKANUS: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
     POSEIDON: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
     ISIS: (
-        "unsupported",
-        "Strubell-attributed primary element publication not recovered; see missing inventory",
+        "published-model",
+        "Sevin 1946 / Landscheidt 1972 lineage as printed in Hawkins 1978, "
+        "p. 79: a=77.755, e=0.3, planar, M(J1900)=66.806096, P=685.65 yr",
     ),
     NIBIRU: (
         "unsupported",
@@ -847,25 +1033,32 @@ HYPOTHETICAL_PROVENANCE: Dict[int, Tuple[str, str]] = {
         "Lowell 1915, pp. 5, 9 and 105",
     ),
     PLUTO_PICKERING: (
-        "unsupported",
-        "Circular 215 omits complete elements; announced memoir not recovered",
+        "primary-transcription",
+        "Pickering 1919, Annals of Harvard College Observatory 82(3), p. 59",
     ),
     VULCAN: (
-        "unsupported",
-        "exact Weston-attributed epoch, frame, and elements not recovered",
+        "published-model",
+        "Weston, The Planet Vulcan (AFA; 1908/1920 tables); J1900 "
+        "parameterization consistent with Weston's printed elements",
     ),
     WHITE_MOON: (
         "published-model",
-        "Velichko and Larin 2007, pp. 17, 18, 20, 29, and 45; "
-        "source-unwrapped uniform v3 realization",
+        "Globa-school uniform seven-year Selena convention (Kutalev "
+        "encyclopedia; Velichko and Larin 2007); fixed compatibility "
+        "realization inside the published arcminute-level scatter",
     ),
     PROSERPINA: (
-        "unsupported",
-        "complete primary Abramov publication not recovered",
+        "published-model",
+        "Russian-school circular orbit (Velichko and Larin 2007; the Abramov "
+        "attribution is a tradition claim, not independently verified): "
+        "a=79.22563 AU, mean longitude 170.73 deg at J1900, Gaussian mean motion",
     ),
     WALDEMATH: (
-        "unsupported",
-        "historical claim omits the complete computational convention",
+        "published-model",
+        "Sepharial 1918 (Science of Foreknowledge, ch. 'The New Satellite — "
+        "Lilith'): uniform 3 deg/day tropical longitude anchored at the "
+        "printed 1898 Feb 2 Lilith-Sun conjunction; distance 1.03e6 km from "
+        "Waltemath 1898 (Science 8/189 p. 185; Ashbrook, S&T 28, p. 218)",
     ),
 }
 
@@ -1217,9 +1410,11 @@ def get_bundled_fictitious_orbits_path() -> Path:
 
     The dataset contains the 12 independently transcribed primary-source
     orbital models documented in ``docs/methodology/hypothetical-bodies.md``.
-    The six recognised IDs listed in
-    ``docs/methodology/missing-hypothetical-models.md`` are intentionally absent;
-    Selena is a separately implemented symbolic point, not an orbital CSV row.
+    The other supported bodies (Transpluto, Pickering, Vulcan, Selena,
+    Proserpina and Waldemath) are defined as module-level element sets
+    rather than CSV rows; the one ID without a recoverable public model
+    (Nibiru) is inventoried in
+    ``docs/methodology/missing-hypothetical-models.md``.
 
     Returns:
         Path to the bundled CSV dataset file.
@@ -1966,6 +2161,33 @@ FICTITIOUS_ORBITAL_ELEMENTS = {
         asc_node=TPolynomial(0.0),
         inclination=TPolynomial(0.0),
     ),
+    # W. H. Pickering, "The Transneptunian Planet", Annals of Harvard College
+    # Observatory 82, No. 3 (1919), pp. 49-59; complete element list on p. 59:
+    # https://articles.adsabs.harvard.edu/pdf/1937AnHar..82...49P
+    #
+    # Pickering prints: epoch 1920.0, mean distance 55.1, period 409, mean
+    # annual motion 0.880 deg, longitude of the perihelion 280 deg, date of
+    # the perihelion 1720.0, e = 0.31, perihelion distance 38.0, aphelion
+    # distance 72.2, and closes with "The longitude of the Ascending Node and
+    # the Inclination may perhaps be estimated at 100 +/- 5 deg and
+    # 15 +/- 5 deg, respectively."  The printed perihelion date is the
+    # element anchor: M = 0 at Julian epoch 1720.0, i.e.
+    # JD 2451545 - 280*365.25 = 2349275.0.  The argument of perihelion is the
+    # direct difference 280 - 100 = 180 deg.  The paper's angles belong to
+    # its own epoch's equinox; Julian epoch 1920.0 = JD 2422325.0 is used as
+    # the frame, converted to J2000 by the shared propagator.
+    PLUTO_PICKERING: OrbitalElements(
+        name="Pickering",
+        epoch_jd=2349275.0,
+        equinox_jd=2422325.0,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(0.0),
+        semi_axis=55.1,
+        eccentricity=TPolynomial(0.31),
+        arg_perihelion=TPolynomial(280.0 - 100.0),
+        asc_node=TPolynomial(100.0),
+        inclination=TPolynomial(15.0),
+    ),
 }
 
 
@@ -1974,8 +2196,9 @@ def calc_fictitious_position(
 ) -> Tuple[float, float, float, float, float, float]:
     """Return a reviewed classical prediction as a heliocentric J2000 state.
 
-    The registry contains Harrington, Le Verrier, Adams and Lowell.  Other
-    classical-prediction compatibility IDs raise :class:`UnknownBodyError`.
+    The registry contains Harrington, Le Verrier, Adams, Lowell and
+    Pickering.  Other classical-prediction compatibility IDs raise
+    :class:`UnknownBodyError`.
 
     Returns (lon, lat, dist, dlon, dlat, ddist), J2000 ecliptic.
     """
@@ -2080,15 +2303,48 @@ def calc_poseidon(jd_tt: float) -> Tuple[float, float, float, float, float, floa
 
 
 def calc_transpluto(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
-    """Raise until Transpluto has an independently reviewed element set."""
-    del jd_tt
-    _raise_unsupported_builtin_fictitious(ISIS)
+    """Calculate Transpluto (Isis) from the published Hawkins element set.
+
+    Propagates the Sevin/Landscheidt/Hawkins J1900 orbit (a = 77.755 AU,
+    e = 0.3, planar) with Kepler's equation and converts the longitude from
+    the J1900 equinox to J2000.  The point is reported on the ecliptic
+    (latitude exactly zero), the historical output convention for this body.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT).
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist),
+        heliocentric J2000 ecliptic.
+    """
+    lon, lat, dist = _calc_transpluto_raw(jd_tt)
+    dt_step = 1.0
+    lon_p, _lat_p, dist_p = _calc_transpluto_raw(jd_tt - dt_step)
+    lon_n, _lat_n, dist_n = _calc_transpluto_raw(jd_tt + dt_step)
+    dlon = ((lon_n - lon_p + 180.0) % 360.0 - 180.0) / (2.0 * dt_step)
+    ddist = (dist_n - dist_p) / (2.0 * dt_step)
+    return (lon, lat, dist, dlon, 0.0, ddist)
 
 
 def _calc_transpluto_raw(jd_tt: float) -> Tuple[float, float, float]:
-    """Raise until Transpluto has an independently reviewed element set."""
-    del jd_tt
-    _raise_unsupported_builtin_fictitious(ISIS)
+    """Geometric heliocentric J2000 position of the published Transpluto."""
+    elements = TRANSPLUTO_KEPLERIAN_ELEMENTS
+    mean_anomaly = math.radians(
+        (elements.M0 + elements.n * (jd_tt - elements.epoch)) % 360.0
+    )
+    eccentric_anomaly = _solve_kepler_equation(mean_anomaly, elements.e)
+    true_anomaly = 2.0 * math.atan(
+        math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
+        * math.tan(eccentric_anomaly / 2.0)
+    )
+    distance = elements.a * (1.0 - elements.e * math.cos(eccentric_anomaly))
+    # i = node = 0: the orbit lies in the J1900 ecliptic and the longitude is
+    # perihelion longitude + true anomaly in that frame.
+    lon_j1900 = (elements.omega + math.degrees(true_anomaly)) % 360.0
+    from .astrometry import _precess_ecliptic
+
+    lon_j2000, _ = _precess_ecliptic(lon_j1900, 0.0, elements.epoch, 2451545.0)
+    return (float(lon_j2000), 0.0, float(distance))
 
 
 def calc_uranian_planet(
@@ -2172,29 +2428,109 @@ def _raise_unsupported_builtin_fictitious(body_id: int) -> NoReturn:
 
 
 def calc_vulcan(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
-    """Raise until Vulcan has an independently reviewed element set."""
-    del jd_tt
-    _raise_unsupported_builtin_fictitious(VULCAN)
+    """Calculate Weston's intramercurial Vulcan (heliocentric, of-date).
+
+    Propagates the published Weston convention in ``VULCAN_ELEMENTS``: mean
+    anomaly, argument of perihelion and node move linearly in Julian
+    centuries from the J1900 epoch, and the orbit is referred to the ecliptic
+    and mean equinox of date.  The returned state is geometric (no
+    light-time); apparent reductions are applied by the ``calc_ut`` layer.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT).
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist) with the
+        angles in degrees, the distance in AU and speeds per day.
+    """
+    lon, lat, dist = _calc_vulcan_raw(jd_tt)
+    # Central difference with a tight step: Vulcan's sidereal period is only
+    # ~18.6 days, so a one-day stencil would materially smooth the speed.
+    dt_step = 0.01
+    lon_p, lat_p, dist_p = _calc_vulcan_raw(jd_tt - dt_step)
+    lon_n, lat_n, dist_n = _calc_vulcan_raw(jd_tt + dt_step)
+    dlon = ((lon_n - lon_p + 180.0) % 360.0 - 180.0) / (2.0 * dt_step)
+    dlat = (lat_n - lat_p) / (2.0 * dt_step)
+    ddist = (dist_n - dist_p) / (2.0 * dt_step)
+    return (lon, lat, dist, dlon, dlat, ddist)
 
 
 def _calc_vulcan_raw(jd_tt: float) -> Tuple[float, float, float]:
-    """Raise until Vulcan has an independently reviewed element set."""
-    del jd_tt
-    _raise_unsupported_builtin_fictitious(VULCAN)
+    """Geometric heliocentric of-date position of Weston's Vulcan."""
+    elements = VULCAN_ELEMENTS
+    T = (jd_tt - elements.epoch) / 36525.0
+    mean_anomaly = math.radians((elements.M0 + elements.n_century * T) % 360.0)
+    argument = math.radians((elements.omega0 + elements.omega_rate * T) % 360.0)
+    node = math.radians((elements.Omega0 + elements.Omega_rate * T) % 360.0)
+    inclination = math.radians(elements.i)
+
+    eccentric_anomaly = _solve_kepler_equation(mean_anomaly, elements.e)
+    x_orbit = elements.a * (math.cos(eccentric_anomaly) - elements.e)
+    y_orbit = (
+        elements.a
+        * math.sqrt(1.0 - elements.e * elements.e)
+        * math.sin(eccentric_anomaly)
+    )
+
+    cos_arg, sin_arg = math.cos(argument), math.sin(argument)
+    cos_node, sin_node = math.cos(node), math.sin(node)
+    cos_inc, sin_inc = math.cos(inclination), math.sin(inclination)
+    x = (cos_node * cos_arg - sin_node * sin_arg * cos_inc) * x_orbit + (
+        -cos_node * sin_arg - sin_node * cos_arg * cos_inc
+    ) * y_orbit
+    y = (sin_node * cos_arg + cos_node * sin_arg * cos_inc) * x_orbit + (
+        -sin_node * sin_arg + cos_node * cos_arg * cos_inc
+    ) * y_orbit
+    z = sin_arg * sin_inc * x_orbit + cos_arg * sin_inc * y_orbit
+
+    distance = math.sqrt(x * x + y * y + z * z)
+    longitude = math.degrees(math.atan2(y, x)) % 360.0
+    latitude = math.degrees(math.asin(z / distance))
+    return (float(longitude), float(latitude), float(distance))
 
 
 def calc_waldemath(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
-    """Raise until Waldemath has an independently reviewed element set."""
-    del jd_tt
-    _raise_unsupported_builtin_fictitious(WALDEMATH)
+    """Return the published uniform Waldemath/Sepharial Dark Moon model.
+
+    Sepharial (The Science of Foreknowledge, 1918, ch. "The New Satellite —
+    Lilith") defines the point by uniform 3 deg/day geocentric tropical
+    motion from the Sun's longitude at a printed Lilith-Sun conjunction;
+    the anchor here is Waltemath's predicted 1898 February 2 transit at
+    00:00 GMT (see the WALDEMATH model block above for the full sources).
+    The stored anchor is the Sun's APPARENT longitude at that instant, so
+    the nutation at the anchor epoch is removed to yield the mean-of-date
+    longitude this layer must return (the apparent-place layer in calc_ut
+    adds the nutation of the request date, exactly as for Selena).
+    """
+    import math as _math
+
+    from .cache import get_cached_nutation
+    from .time_utils import deltat
+
+    anchor_tt = _WALDEMATH_ANCHOR_JD_UT + deltat(_WALDEMATH_ANCHOR_JD_UT)
+    dpsi_rad, _ = get_cached_nutation(anchor_tt)
+    anchor_mean = _WALDEMATH_ANCHOR_APPARENT_LON_DEG - _math.degrees(dpsi_rad)
+    longitude = (
+        anchor_mean + _WALDEMATH_RATE_DEG_PER_DAY * (jd_tt - anchor_tt)
+    ) % 360.0
+    return (
+        float(longitude),
+        0.0,
+        float(_WALDEMATH_DISTANCE_AU),
+        float(_WALDEMATH_RATE_DEG_PER_DAY),
+        0.0,
+        0.0,
+    )
 
 
 def calc_transpluto_position(
     jd_tt: float,
 ) -> Tuple[float, float, float, float, float, float]:
-    """Raise until Transpluto has an independently reviewed element set."""
-    del jd_tt
-    _raise_unsupported_builtin_fictitious(ISIS)
+    """Calculate Transpluto (Isis); alias entry point for ID 48.
+
+    See :func:`calc_transpluto` for the published element set and frame.
+    """
+    return calc_transpluto(jd_tt)
 
 
 def _solve_kepler_equation(M: float, e: float, tol: float = 1e-8) -> float:
@@ -2393,9 +2729,24 @@ def calc_waldemath_position(
 
 
 def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
-    """Raise until Proserpina has an independently reviewed element set."""
-    del jd_tt
-    _raise_unsupported_builtin_fictitious(PROSERPINA)
+    """Calculate the trans-Plutonian Proserpina (heliocentric, of-date).
+
+    The Russian-school convention (published by Velichko and Larin 2007;
+    traditionally but unverifiably attributed to Abramov) is a uniform circular
+    ecliptic orbit: a = 79.22563 AU, mean longitude 170.73 degrees at the
+    J1900 epoch, Gaussian mean motion (~51.05 deg/Julian century, period
+    ~705 years), referred to the ecliptic and mean equinox of date.  Being
+    exactly circular and planar, the latitude and the radial speed are zero.
+
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT).
+
+    Returns:
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist).
+    """
+    elements = HYPOTHETICAL_ELEMENTS[PROSERPINA]
+    longitude = (elements.M0 + elements.n * (jd_tt - elements.epoch)) % 360.0
+    return (float(longitude), 0.0, float(elements.a), float(elements.n), 0.0, 0.0)
 
 
 def calc_planet_x_lowell(
@@ -2408,9 +2759,13 @@ def calc_planet_x_lowell(
 def calc_planet_x_pickering(
     jd_tt: float,
 ) -> Tuple[float, float, float, float, float, float]:
-    """Raise until Pickering's orbit is independently transcribed."""
-    del jd_tt
-    _raise_unsupported_builtin_fictitious(PLUTO_PICKERING)
+    """Calculate Pickering's 1919 Planet O prediction.
+
+    Uses the complete element list of Annals of Harvard College Observatory
+    82, No. 3 (1919), p. 59 (a = 55.1 AU, e = 0.31, perihelion longitude
+    280 deg, perihelion date 1720.0, node 100 deg, inclination 15 deg).
+    """
+    return calc_fictitious_position(PLUTO_PICKERING, jd_tt)
 
 
 def calc_hypothetical_position(
@@ -2437,8 +2792,12 @@ def calc_hypothetical_position(
 
     Raises:
         ValueError: If ipl is not a valid hypothetical body ID.
-        UnknownBodyError: If the recognised ID has no independently reviewed
-            built-in element set.  Supported IDs are 40--47, 50--53 and 56.
+        UnknownBodyError: If the recognised ID has no publicly sourced
+            built-in model.  Supported IDs are 40--48 and 50--58; ID 49
+            (Nibiru, see
+            ``docs/methodology/missing-hypothetical-models.md``) and the
+            unnamed tail 59--69 of the recognised fictitious range fail
+            closed.
     """
     if not is_hypothetical_body(ipl):
         raise ValueError(f"Body ID {ipl} is not a hypothetical body")
@@ -2446,11 +2805,23 @@ def calc_hypothetical_position(
     if ipl in URANIAN_KEPLERIAN_ELEMENTS:
         return calc_uranian_planet(ipl, jd_tt)
 
+    if ipl == ISIS:
+        return calc_transpluto_position(jd_tt)
+
     if ipl in FICTITIOUS_ORBITAL_ELEMENTS:
         return calc_fictitious_position(ipl, jd_tt)
 
     if ipl == WHITE_MOON:
         return calc_white_moon_position(jd_tt)
+
+    if ipl == VULCAN:
+        return calc_vulcan(jd_tt)
+
+    if ipl == PROSERPINA:
+        return calc_proserpina(jd_tt)
+
+    if ipl == WALDEMATH:
+        return calc_waldemath_position(jd_tt)
 
     if ipl in HYPOTHETICAL_ELEMENTS:
         return _calc_keplerian_position(ipl, jd_tt)

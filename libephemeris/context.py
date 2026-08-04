@@ -127,6 +127,10 @@ class EphemerisContext:
         self.sidereal_mode: int = 0  # Default: Fagan/Bradley (SIDM_FAGAN_BRADLEY)
         self.sidereal_t0: float = 2451545.0  # J2000.0
         self.sidereal_ayan_t0: float = 0.0
+        # SIDBIT projection flags qualifying sidereal_mode, per-context like
+        # the mode itself and installed globally only for the duration of a
+        # context call (planets._swapped_context_state).
+        self.sidereal_bits: int = 0
         self._angles_cache: dict[str, float] = {}
         self._spk_body_map: dict[
             int, tuple[str, int]
@@ -257,20 +261,39 @@ class EphemerisContext:
     def get_leb_reader(self) -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
         """Get the active LEBReader for this context, if any.
 
-        If the .leb file path is invalid or corrupted, logs a warning and
-        returns None. The process calculation mode decides whether that is a
-        provisioning error or whether another backend may be tried.
+        A truncated or corrupt file (``LEBCorruptionError``) is always fatal
+        and re-raised: it must never trigger a silent fallback to the global
+        reader. For other open failures, sealed ``leb`` mode with a configured
+        context ``.leb`` fails loudly with the same message as the module path
+        (:func:`state.get_leb_reader`); every other mode logs a warning and
+        returns None so the process calculation mode can try another backend.
 
         Returns:
             LEBReader instance if a .leb file is configured and valid,
             None otherwise.
+
+        Raises:
+            LEBCorruptionError: The configured file is truncated/corrupt.
+            RuntimeError: Mode is ``leb`` and the configured file could not be
+                opened for another reason.
         """
         if self._leb_reader is None and self._leb_file is not None:
             try:
                 from .leb_reader import open_leb
 
                 self._leb_reader = open_leb(self._leb_file)
+            except LEBCorruptionError:
+                # Fatal provisioning error — never fall back to the global
+                # reader (mirrors the sealed-mode contract in state.py).
+                raise
             except (FileNotFoundError, ValueError, OSError) as e:
+                from . import state
+
+                if state.get_calc_mode() == "leb":
+                    raise RuntimeError(
+                        f"LIBEPHEMERIS_MODE=leb but failed to open LEB file "
+                        f"{self._leb_file}: {e}"
+                    ) from e
                 from .logging_config import get_logger
 
                 get_logger().warning(
@@ -327,16 +350,29 @@ class EphemerisContext:
             Affects all position calculations when FLG_SIDEREAL is set.
             The default public ID is Fagan/Bradley (SIDM_FAGAN_BRADLEY = 0).
             Every predefined base mode 0--46 has a runtime definition.
+            The implemented SIDBIT projection flags are stored per-context and
+            applied exactly as by the module-level setter; genuinely
+            unsupported high bits still warn and reduce to the base mode.
         """
-        # Apply the same SIDBIT guard as the global setter (state.set_sid_mode):
-        # strip the SIDBIT_* projection flags (>= 256: ECL_T0, SSY_PLANE,
-        # USER_UT, ECL_DATE, NO_PREC_OFFSET, PREC_ORIG), which select
-        # alternative ecliptic/equinox projections not implemented here.
-        # Keeping only the base ayanamsha mode avoids the silent wrong
-        # fallback the composite value would otherwise trigger downstream
-        # (and the LEB fast-path miss it causes). Warn so the caller knows
-        # the projection was dropped rather than applied.
-        sidbits = mode & ~0xFF
+        # Same split as the module-level setter (planets.set_sid_mode): the
+        # implemented SIDBIT projection flags are kept per-context in
+        # sidereal_bits and installed globally only for the duration of a
+        # context call, while the base ayanamsha mode is stored on its own so
+        # get_sid_mode() reports it in lockstep with state.get_sid_mode().
+        # Stripping every high bit here instead made the context strictly less
+        # capable than the module API for flags this version does implement.
+        from .planets import _IMPLEMENTED_SIDBITS
+
+        if mode >= 0:
+            self.sidereal_bits = mode & _IMPLEMENTED_SIDBITS
+            mode = mode & ~_IMPLEMENTED_SIDBITS
+        else:
+            # A negative mode is an invalid ID, not a SIDBIT composite: its
+            # all-ones two's-complement pattern would otherwise enable every
+            # projection bit. Leave it verbatim for the invalid-mode fallback.
+            self.sidereal_bits = 0
+
+        sidbits = (mode & ~0xFF) if mode >= 0 else 0
         if sidbits:
             warnings.warn(
                 f"SIDBIT projection flags 0x{sidbits:04X} are not supported in "
@@ -624,6 +660,7 @@ class EphemerisContext:
             from .planets import (
                 _calc_nutation_obliquity,
                 _calc_nutation_obliquity_tt,
+                _calc_tt_epheflag_echo,
                 _exclusive_ephemeris_bit,
                 _implied_retflag_bits,
                 _resolve_center_flags,
@@ -636,9 +673,16 @@ class EphemerisContext:
             nut_flags = _exclusive_ephemeris_bit(res_flags)
             if ut:
                 pos, retflag = _calc_nutation_obliquity(tjd, nut_flags)
+                echoed = retflag | _implied_retflag_bits(res_flags)
             else:
                 pos, retflag = _calc_nutation_obliquity_tt(tjd, nut_flags)
-            result = (pos, retflag | _implied_retflag_bits(res_flags))
+                # calc() (TT) echoes only the ephemeris-selection bits the
+                # caller passed (a zero-flag request returns retflag 0), while
+                # calc_ut() injects the SWIEPH default. Mirror the module path.
+                echoed = _calc_tt_epheflag_echo(
+                    retflag | _implied_retflag_bits(res_flags), iflag
+                )
+            result = (pos, echoed)
             from .logging_config import get_logger
 
             get_logger().debug(
@@ -650,7 +694,13 @@ class EphemerisContext:
         # Same normalization preamble as the module-level calc_ut()/calc(),
         # so the context entry points stay 1:1 with the reference API
         # (FLG_MOSEPH strip, ephemeris-bit echo, FLG_SPEED3 mapping) on
-        # every path, including the LEB fast path.
+        # every path, including the LEB fast path. The consumed bits are
+        # dropped BEFORE the raw request is captured, exactly as the module
+        # entry points do: capturing them first made a context call echo
+        # FLG_CENTER_BODY / FLG_JPLHOR(_APPROX) that a module call consumed.
+        from .planets import consume_non_echoed_flags
+
+        iflag = consume_non_echoed_flags(iflag, ipl)
         raw_iflag = iflag
         iflag = _normalize_calc_flags(iflag)
         from .planets import _calc_tt_epheflag_echo, _echo_request_bits
@@ -711,6 +761,46 @@ class EphemerisContext:
                     )
                 return result
 
+            # SIDBIT_ECL_T0 / SIDBIT_SSY_PLANE frame projections, intercepted
+            # here for the same reason as in the module-level entry points:
+            # the projection wraps a rewritten J2000|NONUT sub-request, so it
+            # has to run BEFORE backend dispatch. Applying it only inside the
+            # LEB fast path left a context in Skyfield mode (or without a
+            # reader) returning the ordinary unprojected sidereal position.
+            from .constants import FLG_EQUATORIAL, SIDBIT_ECL_T0, SIDBIT_SSY_PLANE
+            from .planets import (
+                _SIDBIT_PROJECTION_SUPPRESS_MODES,
+                _sidbit_projection_calc,
+            )
+
+            _bits = self.sidereal_bits
+            if (
+                (_bits & (SIDBIT_ECL_T0 | SIDBIT_SSY_PLANE))
+                and (not (iflag & FLG_EQUATORIAL) or (_bits & SIDBIT_ECL_T0))
+                and self.sidereal_mode not in _SIDBIT_PROJECTION_SUPPRESS_MODES
+            ):
+                # Run under the context state swap: the projection resolves
+                # the SIDM_USER epoch and the mode's zero point through the
+                # module-level sidereal globals, so passing only the mode and
+                # the bits let an unrelated module-level set_sid_mode() move
+                # this context's result by tens of degrees (measured 19.03
+                # deg for SIDM_USER | SIDBIT_ECL_T0). The lock is reentrant,
+                # so the nested self.calc_ut()/self.calc() sub-request swaps
+                # the same values again harmlessly.
+                from .planets import _swapped_context_state
+
+                with _swapped_context_state(self):
+                    return _sidbit_projection_calc(
+                        tjd,
+                        ipl,
+                        iflag,
+                        raw_iflag,
+                        self.sidereal_mode,
+                        _bits,
+                        (self.calc_ut if ut else self.calc),
+                        tt_echo=not ut,
+                    )
+
         # Built-in asteroids by AST_OFFSET number (see module calc_ut)
         ipl = _remap_ast_offset(ipl)
 
@@ -769,10 +859,11 @@ class EphemerisContext:
             # Fall back to global reader if context has no .leb
             reader = state.get_leb_reader()
 
-        # The reference treats Earth as the exact coordinate origin even for
-        # a topocentric request. The LEB topocentric reducer would otherwise
-        # expose the geocentre-from-observer offset, so use the shared vector
-        # path for this degenerate case (LEB-backed in sealed LEB mode).
+        # Compatibility contract: Earth is the exact coordinate origin even
+        # for a topocentric request. The LEB topocentric reducer would
+        # otherwise expose the geocentre-from-observer offset, so use the
+        # shared vector path for this degenerate case (LEB-backed in sealed
+        # LEB mode).
         from .constants import EARTH, FLG_TOPOCTR
 
         if ipl == EARTH and (iflag & FLG_TOPOCTR):
@@ -799,6 +890,11 @@ class EphemerisContext:
                     sid_mode=self.sidereal_mode,
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
+                    # The projection flags must travel with the mode they
+                    # qualify: left to the process-global value, this
+                    # explicitly-configured call still read whatever the last
+                    # module-level set_sid_mode() left behind.
+                    sid_bits=self.sidereal_bits,
                     topo=_ctx_topo,
                 )
                 from .logging_config import get_logger
@@ -1058,6 +1154,22 @@ class EphemerisContext:
         # Same out-of-range handling as the module-level calc_pctr()
         if _body_uses_jpl_ephemeris(ipl) or _body_uses_jpl_ephemeris(iplctr):
             validate_jd_range(tjd_ut, ipl, "calc_pctr")
+
+        # Sidereal FRAME requests are whole-vector rotations. The module-level
+        # calc_pctr() intercepts them; without the same interception here a
+        # context returned the base sidereal position with identical retflags,
+        # so a caller could not even detect it (measured 1.354 deg of latitude
+        # under SIDBIT_SSY_PLANE). Run the module path under this context's
+        # state so one implementation serves both.
+        from .constants import FLG_SIDEREAL as _FLG_SID
+
+        if iflag & _FLG_SID:
+            from .planets import _swapped_context_state, calc_pctr as _mod_pctr
+            from .time_utils import deltat as _deltat
+
+            _tt = tjd_ut + _deltat(tjd_ut)
+            with _swapped_context_state(self):
+                return _mod_pctr(_tt, ipl, iplctr, iflag)
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd_ut)

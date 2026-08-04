@@ -104,45 +104,46 @@ class TestFixstar2Mag:
         assert name_upper == name_lower == name_mixed == "Regulus,alLeo"
         assert mag_upper == mag_lower == mag_mixed
 
-    def test_fixstar2_mag_hip_number(self):
-        """Test lookup by Hipparcos catalog number."""
-        mag, name = ephem.fixstar2_mag("49669")
+    def test_fixstar2_mag_no_hip_number(self):
+        """A bare number is a sequential index, never a HIP lookup."""
+        with pytest.raises(Error, match="sequential fixed star number"):
+            ephem.fixstar2_mag("49669")
 
-        assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
-        assert mag == pytest.approx(1.40, abs=0.01)
-
-    def test_fixstar2_mag_hip_number_with_comma(self):
-        """Test lookup by HIP number with leading comma (reference ephemeris format)."""
-        mag, name = ephem.fixstar2_mag(",65474")
-
-        assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"
-        assert mag == pytest.approx(1.04, abs=0.01)
+    def test_fixstar2_mag_no_hip_number_with_comma(self):
+        """A comma form keys on the nomenclature, never on a HIP number."""
+        with pytest.raises(Error, match="could not find star name ,65474"):
+            ephem.fixstar2_mag(",65474")
 
     def test_fixstar2_mag_nomenclature(self):
-        """Test lookup by Bayer/Flamsteed nomenclature."""
-        mag, name = ephem.fixstar2_mag("alLeo")
+        """Nomenclature resolves after a comma; the bare form errors."""
+        mag, name = ephem.fixstar2_mag(",alLeo")
 
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
         assert mag == pytest.approx(1.40, abs=0.01)
 
-    def test_fixstar2_mag_nomenclature_case_insensitive(self):
-        """Test nomenclature lookup is case insensitive."""
-        mag1, name1 = ephem.fixstar2_mag("alVir")
-        mag2, name2 = ephem.fixstar2_mag("ALVIR")
-        mag3, name3 = ephem.fixstar2_mag("AlViR")
+        with pytest.raises(Error, match="could not find star name alleo"):
+            ephem.fixstar2_mag("alLeo")
 
-        assert name1 == name2 == name3 == "Spica,alVir"
-        assert mag1 == mag2 == mag3
+    def test_fixstar2_mag_nomenclature_case_sensitive(self):
+        """The nomenclature key is matched case-sensitively."""
+        mag1, name1 = ephem.fixstar2_mag(",alVir")
+        assert name1 == "Spica,alVir"
 
-    def test_fixstar2_mag_partial_name(self):
-        """Test partial name lookup (prefix search)."""
-        mag, name = ephem.fixstar2_mag("Reg")
+        for wrong_case in (",ALVIR", ",AlViR"):
+            with pytest.raises(Error, match="could not find star name"):
+                ephem.fixstar2_mag(wrong_case)
 
+    def test_fixstar2_mag_no_implicit_partial_name(self):
+        """A partial name errors; the explicit '%' wildcard resolves."""
+        with pytest.raises(Error, match="could not find star name reg"):
+            ephem.fixstar2_mag("Reg")
+
+        mag, name = ephem.fixstar2_mag("Regu%")
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
 
-    def test_fixstar2_mag_partial_name_spica(self):
-        """Test partial name lookup for Spica."""
-        mag, name = ephem.fixstar2_mag("Spi")
+    def test_fixstar2_mag_wildcard_spica(self):
+        """Trailing-'%' prefix lookup for Spica."""
+        mag, name = ephem.fixstar2_mag("Spi%")
 
         assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"
 
@@ -151,14 +152,14 @@ class TestFixstar2Mag:
         with pytest.raises(Error, match="could not find star name"):
             ephem.fixstar2_mag("UnknownStar")
 
-    def test_fixstar2_mag_unknown_hip_number(self):
-        """Test handling of unknown HIP number."""
-        with pytest.raises(Error, match="could not find star name"):
+    def test_fixstar2_mag_out_of_range_number(self):
+        """An out-of-range sequential number errors."""
+        with pytest.raises(Error, match="sequential fixed star number"):
             ephem.fixstar2_mag("99999")
 
     def test_fixstar2_mag_empty_string(self):
         """Test handling of empty star name."""
-        with pytest.raises(Error, match="Empty"):
+        with pytest.raises(Error, match="star name empty"):
             ephem.fixstar2_mag("")
 
     def test_fixstar2_mag_whitespace_handling(self):

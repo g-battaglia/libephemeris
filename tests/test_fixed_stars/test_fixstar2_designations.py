@@ -97,25 +97,27 @@ class TestNomenclatureCodes:
     @pytest.mark.unit
     @pytest.mark.parametrize("code", NOMENCLATURE)
     def test_nomenclature_lookup(self, code):
-        """Nomenclature code resolves to a star."""
-        pos, name_out, _ = swe.fixstar2_ut(code, JD_J2000)
+        """Comma-prefixed nomenclature resolves; the bare code errors."""
+        pos, name_out, _ = swe.fixstar2_ut(f",{code}", JD_J2000)
         assert len(pos) == 6
         assert 0.0 <= pos[0] < 360.0
+        with pytest.raises(swe.Error, match="could not find star name"):
+            swe.fixstar2_ut(code, JD_J2000)
 
     @pytest.mark.unit
     def test_nomenclature_matches_name(self):
-        """Nomenclature code gives same position as star name."""
-        pos_code, _, _ = swe.fixstar2_ut("alCMa", JD_J2000)
+        """Comma-nomenclature gives the same position as the star name."""
+        pos_code, _, _ = swe.fixstar2_ut(",alCMa", JD_J2000)
         pos_name, _, _ = swe.fixstar2_ut("Sirius", JD_J2000)
         assert pos_code[0] == pytest.approx(pos_name[0], abs=1e-6)
 
     @pytest.mark.unit
-    def test_nomenclature_and_hip_consistent(self):
-        """Nomenclature and HIP number give same position."""
-        pos_code, _, _ = swe.fixstar2_ut("alLeo", JD_J2000)
-        # Regulus = HIP 49669
-        pos_hip, _, _ = swe.fixstar2_ut("49669", JD_J2000)
-        assert pos_code[0] == pytest.approx(pos_hip[0], abs=1e-6)
+    def test_nomenclature_and_name_form_consistent(self):
+        """ ",alLeo" and "AnyName,alLeo" resolve to the same star."""
+        pos_code, _, _ = swe.fixstar2_ut(",alLeo", JD_J2000)
+        # The name part before the comma is ignored: the nomen decides.
+        pos_named, _, _ = swe.fixstar2_ut("Nosuch,alLeo", JD_J2000)
+        assert pos_code[0] == pytest.approx(pos_named[0], abs=1e-6)
 
 
 class TestStarMagnitudes:
@@ -123,15 +125,15 @@ class TestStarMagnitudes:
 
     @pytest.mark.unit
     def test_mag_by_nomenclature(self):
-        """fixstar2_mag works with nomenclature codes."""
-        mag, name = swe.fixstar2_mag("alCMa")
+        """fixstar2_mag works with comma-prefixed nomenclature codes."""
+        mag, name = swe.fixstar2_mag(",alCMa")
         assert mag < 0.0  # Sirius is very bright
 
     @pytest.mark.unit
-    def test_mag_by_hip_number(self):
-        """fixstar2_mag works with HIP numbers."""
-        mag, name = swe.fixstar2_mag("32349")  # Sirius
-        assert mag < 0.0
+    def test_mag_no_hip_number(self):
+        """fixstar2_mag rejects a bare number beyond the catalog size."""
+        with pytest.raises(swe.Error, match="sequential fixed star number"):
+            swe.fixstar2_mag("32349")  # HIP numbers are not supported
 
     @pytest.mark.unit
     def test_mag_by_name(self):

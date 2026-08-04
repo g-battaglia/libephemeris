@@ -133,7 +133,7 @@ class TestHorizonsFictitiousAnalytical:
     @pytest.mark.parametrize("body_id", [*range(40, 56), 57])
     def test_heliocentric_historical_models_follow_provenance_boundary(self, body_id):
         """Reviewed models compute; unverified heliocentric models fail closed."""
-        if body_id in {*range(40, 48), 50, 51, 52, 53}:
+        if body_id in {*range(40, 49), *range(50, 56), 57}:
             data, _ = horizons_calc_ut(None, JD_J2000, body_id, FLG_SWIEPH | FLG_HELCTR)
             assert len(data) == 6
             assert 0.0 <= data[0] < 360.0
@@ -149,11 +149,12 @@ class TestHorizonsFictitiousAnalytical:
         assert len(data) == 6
         assert all(math.isfinite(value) for value in data)
 
-    def test_unverified_waldemath_native_geocentric_fails_closed(self):
-        """Waldemath has no reviewed built-in model."""
-        with pytest.raises(UnknownBodyError) as raised:
-            horizons_calc_ut(None, JD_J2000, 58, FLG_SWIEPH)
-        assert raised.value.body_id == 58
+    def test_waldemath_native_geocentric_computes(self):
+        """Waldemath (58) computes via the published Sepharial uniform model."""
+        data, retflag = horizons_calc_ut(None, JD_J2000, 58, FLG_SWIEPH)
+        assert len(data) == 6
+        assert all(math.isfinite(value) for value in data)
+        assert data[1] == 0.0  # longitude-only model rides the ecliptic
 
 
 @pytest.mark.unit

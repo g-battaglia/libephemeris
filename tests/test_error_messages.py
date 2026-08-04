@@ -33,18 +33,20 @@ class TestErrorMessageFormat:
 
     def test_star_not_found_format(self):
         """
-        Error messages for stars not found should contain 'could not find star name'.
+        Star-not-found messages use the measured per-family reference formats.
 
-        The reference ephemeris uses format: "could not find star name {name}"
+        v1 (fixstar/fixstar_ut/fixstar_mag): "star {name} not found", echoing
+        the raw search string. v2 (fixstar2*): "could not find star name
+        {key}", echoing the lowercased space-stripped key.
         """
         from libephemeris.fixed_stars import fixstar_ut, fixstar2_ut
 
-        # Test fixstar_ut
-        with pytest.raises(Error, match="could not find star name"):
+        # Test fixstar_ut (v1 message shape, raw echo)
+        with pytest.raises(Error, match="star NonExistentStar123 not found"):
             fixstar_ut("NonExistentStar123", 2451545.0, 0)
 
-        # Test fixstar2_ut
-        with pytest.raises(Error, match="could not find star name"):
+        # Test fixstar2_ut (v2 message shape, normalized echo)
+        with pytest.raises(Error, match="could not find star name nonexistentstar123"):
             fixstar2_ut("NonExistentStar123", 2451545.0, 0)
 
     def test_polar_circle_error_format_houses(self):
@@ -94,19 +96,19 @@ class TestIllegalPlanetMessages:
 
         assert "illegal planet number" in str(excinfo.value)
 
-    def test_star_resolve_uses_could_not_find(self):
-        """Star resolution errors should use 'could not find star name' format."""
+    def test_star_resolve_error_formats(self):
+        """Each resolver family uses its measured reference message shape."""
         from libephemeris.fixed_stars import _resolve_star_id, _resolve_star2
 
-        # Test _resolve_star_id
+        # _resolve_star_id (v1): "star {raw} not found"
         star_id, error, _ = _resolve_star_id("NonExistentStar")
         assert star_id == -1
-        assert "could not find star name" in error.lower()
+        assert error == "star NonExistentStar not found"
 
-        # Test _resolve_star2
+        # _resolve_star2 (v2): "could not find star name {normalized}"
         entry, error = _resolve_star2("NonExistentStar")
         assert entry is None
-        assert "could not find star name" in error.lower()
+        assert error == "could not find star name nonexistentstar"
 
 
 class TestPatternMatchingCompatibility:
@@ -130,17 +132,22 @@ class TestPatternMatchingCompatibility:
             assert illegal_pattern.group(1) == "999999"
 
     def test_can_detect_star_not_found_pattern(self):
-        """Client code should be able to detect 'could not find star name' pattern."""
-        from libephemeris.fixed_stars import fixstar_ut
+        """Client code can pattern-match the per-family not-found messages."""
+        from libephemeris.fixed_stars import fixstar_ut, fixstar2_ut
 
+        # v1: "star {raw} not found"
         with pytest.raises(Error) as excinfo:
             fixstar_ut("FakeStar", 2451545.0, 0)
+        star_pattern = re.search(r"star (\w+) not found", str(excinfo.value))
+        assert star_pattern is not None, f"Pattern not found in: {excinfo.value}"
+        assert star_pattern.group(1) == "FakeStar"
 
-        error = str(excinfo.value)
-        # Pattern matching that client code might use
-        star_pattern = re.search(r"could not find star name (\w+)", error.lower())
-        assert star_pattern is not None, f"Pattern not found in: {error}"
-        assert "fakestar" in star_pattern.group(1)
+        # v2: "could not find star name {normalized}"
+        with pytest.raises(Error) as excinfo:
+            fixstar2_ut("FakeStar", 2451545.0, 0)
+        star_pattern = re.search(r"could not find star name (\w+)", str(excinfo.value))
+        assert star_pattern is not None, f"Pattern not found in: {excinfo.value}"
+        assert star_pattern.group(1) == "fakestar"
 
     def test_can_detect_polar_circle_pattern(self):
         """Client code should be able to detect 'polar circle' pattern."""

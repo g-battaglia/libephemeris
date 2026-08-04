@@ -257,6 +257,31 @@ class TestSolEclipseWhenGlob:
                 f"but found {year}-{month}-{eclipse_day}"
             )
 
+    def test_local_noon_defined_only_within_resolved_window(self):
+        """tret[1] (eclipse at local apparent noon) is a within-window instant.
+
+        For a regular partial the local-apparent-noon time lies inside the
+        eclipse window [P1, P4]. For an ultra-shallow graze whose penumbra
+        never fully lands on Earth — tret[2]/tret[3] (P1/P4) unresolved (0) —
+        there is no window in which local noon is defined, so tret[1] must be
+        0 rather than a fabricated instant offset from the maximum. Measured
+        reference behavior. Backend agnostic (leb and skyfield agree).
+        """
+        # Regular partial: noon time sits within the resolved [P1, P4] window.
+        _, reg = sol_eclipse_when_glob(2425562.9 - 2.0, FLG_SWIEPH, ECL_PARTIAL)
+        t0, t1, p1, p4 = reg[0], reg[1], reg[2], reg[3]
+        assert p1 and p4  # window resolved
+        assert t1 != 0.0
+        assert p1 <= t1 <= p4
+
+        # Degenerate graze: penumbra never fully lands, so P1/P4 are 0 and the
+        # noon slot collapses to 0 (previously a spurious jd_max +- window time).
+        rf, deg = sol_eclipse_when_glob(2427807.73 - 2.0, FLG_SWIEPH, ECL_PARTIAL)
+        assert rf & ECL_PARTIAL
+        assert abs(deg[0] - 2427807.73) < 0.5  # the same ultra-shallow partial
+        assert deg[2] == 0.0 and deg[3] == 0.0  # P1/P4 unresolved
+        assert deg[1] == 0.0  # no local-apparent-noon instant
+
 
 class TestNewMoonFinding:
     """Tests for internal New Moon finding logic."""
@@ -1325,3 +1350,90 @@ class TestSolEclipseMaxTime:
         # (may be equal due to floating point precision)
         assert gamma_at_max <= gamma_before + 1e-10
         assert gamma_at_max <= gamma_after + 1e-10
+
+
+class TestSolEclipseWhenAdvanceMargin:
+    """The `jd = tret[0]; when(jd)` idiom must advance, not stall.
+
+    A maximum within ``_ECLIPSE_WHEN_EPOCH_MARGIN`` of the search epoch
+    counts as already reached, so starting exactly on a maximum returns the
+    NEIGHBOURING eclipse and iterating on tret[0] walks the series
+    monotonically instead of re-returning the same event forever. The margin
+    is derived from this library's own maximum-refinement resolution (see
+    eclipse._ECLIPSE_WHEN_EPOCH_MARGIN), so these tests assert the derived
+    contract rather than any external transition point.
+    """
+
+    def test_start_on_maximum_advances_forward(self):
+        jd_start = julday(1955, 1, 1, 0)
+        _, t0 = sol_eclipse_when_glob(jd_start, FLG_SWIEPH, 0, False)
+        _, t1 = sol_eclipse_when_glob(t0[0], FLG_SWIEPH, 0, False)
+        # Advances by roughly a lunation or more, never re-returns the same max.
+        assert t1[0] - t0[0] > 1.0
+
+    def test_start_on_maximum_advances_backward(self):
+        jd_start = julday(1955, 1, 1, 0)
+        _, t0 = sol_eclipse_when_glob(jd_start, FLG_SWIEPH, 0, False)
+        _, tb = sol_eclipse_when_glob(t0[0], FLG_SWIEPH, 0, True)
+        assert t0[0] - tb[0] > 1.0
+
+    def test_iteration_does_not_stall(self):
+        jd = julday(1990, 1, 1, 0)
+        prev = None
+        for _ in range(8):
+            _, t = sol_eclipse_when_glob(jd, FLG_SWIEPH, 0, False)
+            if prev is not None:
+                assert t[0] - prev > 1.0  # strictly forward, no stall
+            prev = t[0]
+            jd = t[0]
+
+    def test_transition_boundary_near_maximum(self):
+        """The advance boundary sits at the library's own derived margin.
+
+        A start comfortably outside the margin keeps the current eclipse; a
+        start comfortably inside it advances. The margin itself is a
+        multiple of the golden-section resolution, not a fitted transition
+        point, so the test brackets it rather than pinning an exact instant.
+        """
+        from libephemeris.eclipse import _ECLIPSE_WHEN_EPOCH_MARGIN as _M
+
+        jd_start = julday(1955, 1, 1, 0)
+        _, t0 = sol_eclipse_when_glob(jd_start, FLG_SWIEPH, 0, False)
+        jm = t0[0]
+        _, cur = sol_eclipse_when_glob(jm - 10.0 * _M, FLG_SWIEPH, 0, False)
+        _, nxt = sol_eclipse_when_glob(jm - 0.5 * _M, FLG_SWIEPH, 0, False)
+        assert abs(cur[0] - jm) < 0.5  # still the current eclipse
+        assert nxt[0] - jm > 1.0  # advanced to the next
+
+
+class TestOneTryBitInFlags:
+    """Bit 0x8000 in the flags argument is the one-try hint, not TOPOCTR.
+
+    Measured reference behavior returns identical results with or without
+    the bit in every eclipse function's flags; the topocentric place is
+    defined by the explicit geopos, never by this flag.
+    """
+
+    def test_one_try_bit_is_inert_in_flags(self):
+        import libephemeris as le
+
+        jd = le.julday(2000, 3, 15, 0.0)
+        geopos = (12.5, 41.9, 50.0)
+        plain = le.FLG_SWIEPH
+        with_bit = le.FLG_SWIEPH | le.ECL_ONE_TRY
+
+        r0 = le.sol_eclipse_when_glob(jd, plain, 0, False)
+        r1 = le.sol_eclipse_when_glob(jd, with_bit, 0, False)
+        assert r0[0] == r1[0] and r0[1][0] == r1[1][0]
+
+        r0 = le.lun_eclipse_when(jd, plain, 0, False)
+        r1 = le.lun_eclipse_when(jd, with_bit, 0, False)
+        assert r0[0] == r1[0] and r0[1][0] == r1[1][0]
+
+        r0 = le.lun_eclipse_when_loc(jd, geopos, plain, False)
+        r1 = le.lun_eclipse_when_loc(jd, geopos, with_bit, False)
+        assert r0[0] == r1[0] and r0[1][0] == r1[1][0]
+
+        r0 = le.sol_eclipse_when_loc(jd, geopos, plain, False)
+        r1 = le.sol_eclipse_when_loc(jd, geopos, with_bit, False)
+        assert r0[0] == r1[0] and r0[1][0] == r1[1][0]

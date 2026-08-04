@@ -15,7 +15,6 @@ from libephemeris.constants import (
     SIDM_TRUE_CITRA,
 )
 from libephemeris.ayanamsha_definitions import (
-    AYANAMSHA_DEFINING,
     GALCENT_TARGET_LON,
 )
 from libephemeris.planets import STARS, _get_star_position_ecliptic
@@ -99,21 +98,43 @@ def test_galactic_center_mode_holds_sgr_a_star_at_its_published_target(
     )
 
 
-def test_sheoran_uses_its_published_mahabharata_epoch() -> None:
-    """Sheoran, The Science of Time: -60 deg at the winter solstice 4174 BCE."""
-    from libephemeris.constants import SIDM_TRUE_SHEORAN as _MODE
-    from libephemeris.precession_vondrak import method_b_accumulated_precession
+def test_sheoran_star_anchor_contract() -> None:
+    """Sheoran's rigorous definition: live delta Cancri at 103°29'32.9375".
 
-    defining_value, defining_epoch = AYANAMSHA_DEFINING[_MODE]
-    assert defining_value == -60.0
+    Modes 39 and 29 anchor the SAME star (Asellus Australis / Pushya) at two
+    published fixed longitudes, so their ayanamshas must differ by exactly
+    106° − 103°29'32.9375" at every epoch — an analytic invariant that does
+    not depend on the star's computed position.
+    """
+    from libephemeris.ayanamsha_definitions import SHEORAN_TARGET_LON
+    from libephemeris.constants import SIDM_TRUE_PUSHYA, SIDM_TRUE_SHEORAN
+
+    assert SHEORAN_TARGET_LON == pytest.approx(
+        103.0 + 29.0 / 60.0 + 32.9375 / 3600.0, abs=1e-12
+    )
+    expected_gap = 106.0 - SHEORAN_TARGET_LON
     for jd_ut in TEST_DATES:
-        ephem.set_sid_mode(_MODE)
-        ayanamsha = ephem.get_ayanamsa_ut(jd_ut)
-        jd_tt = float(get_timescale().ut1_jd(jd_ut).tt)
-        expected = (
-            defining_value + method_b_accumulated_precession(jd_tt, defining_epoch)
-        ) % 360.0
-        assert _signed_angle(ayanamsha - expected) == pytest.approx(0.0, abs=2e-9)
+        ephem.set_sid_mode(SIDM_TRUE_SHEORAN)
+        a39 = ephem.get_ayanamsa_ut(jd_ut)
+        ephem.set_sid_mode(SIDM_TRUE_PUSHYA)
+        a29 = ephem.get_ayanamsa_ut(jd_ut)
+        assert _signed_angle(a39 - a29 - expected_gap) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_sheoran_published_2017_checkpoint() -> None:
+    """The Science of Time prints the 'actual' 2017 ayanamsha as 25°28'18".
+
+    The author's own tabulated checkpoint (against his delta-Cancri anchor)
+    must be reproduced by the star-anchored implementation. The instant
+    'the year 2017' is unspecified, so a half-year of precession (~25")
+    plus the print precision bounds the tolerance.
+    """
+    from libephemeris.constants import SIDM_TRUE_SHEORAN
+
+    ephem.set_sid_mode(SIDM_TRUE_SHEORAN)
+    jd_2017 = ephem.julday(2017, 7, 1, 0.0)
+    published = 25.0 + 28.0 / 60.0 + 18.0 / 3600.0
+    assert ephem.get_ayanamsa_ut(jd_2017) == pytest.approx(published, abs=60.0 / 3600.0)
 
 
 def test_all_mode_ids_remain_available() -> None:

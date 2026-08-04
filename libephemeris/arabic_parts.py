@@ -93,7 +93,8 @@ def calc_arabic_part_of_fortune(
 
     The most important Arabic Part, representing body, health, and material fortune.
 
-    Formula (Vettius Valens, Al-Biruni):
+    Formula (Vettius Valens, Anthologiae, Book II; al-Biruni, Book of
+    Instruction in the Elements of the Art of Astrology, section 476):
         - Day chart (Sun above horizon): ASC + Moon - Sun
         - Night chart (Sun below horizon): ASC + Sun - Moon
 

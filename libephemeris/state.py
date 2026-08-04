@@ -13,7 +13,7 @@ This module maintains the library's singleton state including:
 - SPK kernel registry for minor body calculations
 
 All state is stored in module-level globals to provide a stateful module-level API
-compatible with the reference ephemeris's threading model (thread-unsafe by design).
+compatible with the reference API's threading model (thread-unsafe by design).
 
 Provenance:
     Project-authored resource ownership, configuration, and compatibility-state
@@ -25,12 +25,14 @@ Provenance:
 from __future__ import annotations
 
 import os
+import re
 import threading
 import warnings
 import weakref
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, overload
 from skyfield.api import Topos
 from skyfield.timelib import Timescale
@@ -149,8 +151,20 @@ _INIT_LOCK = threading.RLock()
 _STATE_LOCK = _CONTEXT_SWAP_LOCK
 
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
-_EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file to use (default: DE440)
+_EPHEMERIS_FILE: str = "de440.bsp"  # Ephemeris file REQUESTED (default: DE440)
 _EPHEMERIS_FILE_EXPLICIT: bool = False  # True if set_ephemeris_file() was called
+# Filename actually opened by the last load. It differs from the requested one
+# only when _resolve_missing_ephemeris_fallback() substituted the tier default
+# for an unrecognized, absent name. Keeping the two apart matters: overwriting
+# the requested name with the fallback discarded the caller's choice for good,
+# so pointing set_ephe_path() at a directory that does contain the requested
+# file still loaded the fallback.
+_EPHEMERIS_FILE_EFFECTIVE: Optional[str] = None
+# Sticky record of whether the most recent ephemeris load silently replaced an
+# unavailable configured JPL file with the tier default (see
+# _resolve_missing_ephemeris_fallback / jpl_fallback_active), so a caller need
+# not compare filenames to detect the substitution.
+_JPL_FALLBACK_ACTIVE: bool = False
 _EPHEMERIS_ENV_VAR = "LIBEPHEMERIS_EPHEMERIS"  # Env var for ephemeris file selection
 _PRECISION_TIER: Optional[str] = None  # Programmatic tier override
 _LOADER: Optional[Loader] = None  # Skyfield data loader
@@ -168,6 +182,13 @@ _TOPO: Optional[Topos] = None  # Observer location
 _SIDEREAL_MODE: Optional[int] = None  # Active sidereal mode ID
 _SIDEREAL_AYAN_T0: float = 0.0  # Ayanamsha value at reference epoch
 _SIDEREAL_T0: float = 0.0  # Reference epoch (JD) for ayanamsha
+# SIDBIT projection flags carried by the last set_sid_mode() call, read through
+# planets._get_sidereal_bits(). Co-located with the other sidereal fields so
+# that reset_session()/close() clear it with them and _swapped_context_state()
+# swaps it for an EphemerisContext: kept as a separate planets-module global it
+# survived both, leaking a projection into later default sidereal calculations
+# and across the context boundary.
+_SIDEREAL_BITS: int = 0
 _ANGLES_CACHE: dict[str, float] = {}  # Pre-calculated angles {name: longitude}
 _TIDAL_ACCELERATION: Optional[float] = None  # Explicit Delta-T tidal acceleration
 _DELTA_T_USERDEF: Optional[float] = None  # User-defined Delta T value
@@ -304,16 +325,36 @@ def get_calc_mode() -> str:
     # moment earlier.
     if _CALC_MODE is not None:
         return _CALC_MODE
-    env_value = os.environ.get(_CALC_MODE_ENV_VAR, "").lower().strip()
-    if env_value in _VALID_CALC_MODES:
-        return env_value
+    env_raw = os.environ.get(_CALC_MODE_ENV_VAR, "")
+    if env_raw.strip():
+        return _validated_calc_mode(env_raw, _CALC_MODE_ENV_VAR)
     # TOML config fallback
     from ._config_toml import get_str as _toml_str
 
     toml_value = _toml_str("mode")
-    if toml_value and toml_value.lower().strip() in _VALID_CALC_MODES:
-        return toml_value.lower().strip()
+    if toml_value and toml_value.strip():
+        return _validated_calc_mode(toml_value, "TOML key 'mode'")
     return "auto"
+
+
+def _validated_calc_mode(value: str, source: str) -> str:
+    """Normalize a configured calc mode, rejecting unknown spellings.
+
+    A typo in the mode selector (e.g. ``LIBEPHEMERIS_MODE=lebb``) must not
+    silently widen a sealed ``"leb"`` deployment back to ``"auto"`` — where
+    a source fallback is allowed and the network is unsealed. It fails loudly
+    instead, mirroring :func:`libephemeris.net.set_network_policy` /
+    ``_validated_policy`` for ``LIBEPHEMERIS_NETWORK_POLICY`` and the
+    programmatic :func:`set_calc_mode` guard. Absence of the variable is not
+    a typo and still resolves to the ``"auto"`` default upstream.
+    """
+    normalized = value.lower().strip()
+    if normalized not in _VALID_CALC_MODES:
+        raise ValueError(
+            f"Invalid calculation mode from {source}: {value!r}. Must be one "
+            f"of: {list(_VALID_CALC_MODES)}"
+        )
+    return normalized
 
 
 @contextmanager
@@ -621,9 +662,7 @@ def _discover_reviewed_leb_tier_cores() -> dict[str, str]:
         if _is_reviewed_tier_core(bundled, tier):
             discovered[tier] = bundled
         elif os.path.isfile(bundled):
-            get_logger().error(
-                "Bundled LEB core was rejected as unusable: %s", bundled
-            )
+            get_logger().error("Bundled LEB core was rejected as unusable: %s", bundled)
 
     return discovered
 
@@ -1259,7 +1298,7 @@ def set_precision_tier(tier: str) -> None:
         'extended'
     """
     global _PRECISION_TIER, _PLANETS, _LEB_READER, _EPHEMERIS_FILE_EXPLICIT
-    global _PLANET_CENTER_CACHE_TIER
+    global _PLANET_CENTER_CACHE_TIER, _JPL_FALLBACK_ACTIVE
     if tier not in TIERS:
         raise ValueError(
             f"Invalid tier: {tier!r}. Must be one of: {list(TIERS.keys())}"
@@ -1267,6 +1306,7 @@ def set_precision_tier(tier: str) -> None:
     with _STATE_LOCK:
         _PRECISION_TIER = tier
         _EPHEMERIS_FILE_EXPLICIT = False
+        _JPL_FALLBACK_ACTIVE = False
         _PLANET_CENTER_MISSING.clear()
         _PLANET_CENTER_REJECTED_FILES.clear()
         _PLANET_CENTER_CACHE_TIER = None
@@ -1311,12 +1351,28 @@ def list_tiers() -> List[PrecisionTier]:
     return list(TIERS.values())
 
 
+# Priority order of the cumulative precision tiers. A higher tier must cover
+# at least every lower tier's minor-body SPK window.
+_TIER_PRIORITY: Tuple[str, ...] = ("base", "medium", "extended")
+
+
 def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, str]:
     """
     Get the SPK date range for a tier.
 
     This determines the date range used when auto-downloading SPK files
     from JPL Horizons for minor bodies.
+
+    The tiers are **cumulative** (``base`` ⊂ ``medium`` ⊂ ``extended``), so the
+    returned window is the union of the requested tier's own window with every
+    lower-priority tier's window. This guarantees the download window is
+    monotonic in the tier order: without it the ``medium`` literal (1900-2100)
+    is *narrower* than ``base`` (1850-2150), so a fresh ``medium`` install would
+    fetch asteroid SPKs covering less than ``base`` and silently drop to the
+    catastrophic Keplerian fallback at e.g. 1870 — a date inside the tier's own
+    DE range and inside ``base``'s SPK window. The routing (``_find_covering_spk``)
+    already prefers any cached SPK that covers the date regardless of tier; this
+    makes the download window agree with that best-by-date intent.
 
     Args:
         tier_name: Tier name, or None to use the current tier.
@@ -1326,8 +1382,8 @@ def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, s
 
     Example:
         >>> from libephemeris.state import get_spk_date_range_for_tier
-        >>> get_spk_date_range_for_tier()
-        ('1900-01-01', '2100-01-01')
+        >>> get_spk_date_range_for_tier()          # medium, cumulative with base
+        ('1850-01-01', '2150-01-01')
         >>> get_spk_date_range_for_tier("extended")
         ('1600-01-01', '2500-01-01')
     """
@@ -1336,8 +1392,19 @@ def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, s
             raise ValueError(
                 f"Invalid tier: {tier_name!r}. Must be one of: {list(TIERS.keys())}"
             )
-        return TIERS[tier_name].spk_date_range
-    return _get_current_tier().spk_date_range
+        active = tier_name
+    else:
+        active = _get_current_tier().name
+
+    if active not in _TIER_PRIORITY:
+        # Unknown/custom tier: no cumulative ordering to apply.
+        return TIERS[active].spk_date_range
+
+    eligible = _TIER_PRIORITY[: _TIER_PRIORITY.index(active) + 1]
+    starts = [TIERS[t].spk_date_range[0] for t in eligible]
+    ends = [TIERS[t].spk_date_range[1] for t in eligible]
+    # ISO "YYYY-MM-DD" strings order lexicographically, so min/max are correct.
+    return (min(starts), max(ends))
 
 
 def _get_effective_ephemeris_file() -> str:
@@ -1374,6 +1441,92 @@ def _get_effective_ephemeris_file() -> str:
     return tier.ephemeris_file
 
 
+# JPL distributes its planetary ephemerides as ``deNNN.bsp`` / ``deNNNs.bsp``
+# (e.g. de440.bsp, de440s.bsp, de441.bsp, de421.bsp). Only such names are
+# eligible for an on-demand network download; an arbitrary configured filename
+# (e.g. a bogus set_jpl_file() argument) is not.
+_DE_KERNEL_RE = re.compile(r"^de\d+s?\.bsp$", re.IGNORECASE)
+
+
+def _is_recognized_de_kernel(filename: str) -> bool:
+    """Return whether *filename* names a JPL DE planetary ephemeris kernel."""
+    return bool(_DE_KERNEL_RE.match(os.path.basename(filename)))
+
+
+def _ephemeris_file_present(filename: str) -> bool:
+    """Return whether *filename* exists in any ephemeris search location."""
+    if _EPHEMERIS_PATH and os.path.exists(os.path.join(_EPHEMERIS_PATH, filename)):
+        return True
+    return os.path.exists(os.path.join(_resolve_data_dir(), filename))
+
+
+def _resolve_missing_ephemeris_fallback(filename: str, logger) -> str:
+    """Fall back to the tier default for an unrecognized, absent JPL file.
+
+    The reference API, asked for a JPL file it cannot find (e.g. after
+    ``set_jpl_file("bogus.bsp")`` under ``FLG_JPLEPH``), falls back to a valid
+    default ephemeris and returns a position rather than erroring or fetching
+    the missing name. libephemeris must likewise never turn an arbitrary
+    configured filename into a network download of that exact name from
+    ssd.jpl.nasa.gov. Recognized JPL DE kernels (``deNNN[s].bsp``) are still
+    downloaded on demand; any other name that is absent from every local search
+    location is replaced by the active tier's DE kernel.
+
+    (The public retflag echoes SWIEPH instead of the requested JPLEPH once this
+    fallback fires, resolved in ``planets._normalize_calc_flags`` via the
+    ``_JPL_FALLBACK_ACTIVE`` record set here; the source substitution itself only
+    changes which kernel is opened.)
+    """
+    global _JPL_FALLBACK_ACTIVE
+    if _is_recognized_de_kernel(filename) or _ephemeris_file_present(filename):
+        _JPL_FALLBACK_ACTIVE = False
+        return filename
+    _JPL_FALLBACK_ACTIVE = True
+    fallback = _get_current_tier().ephemeris_file
+    logger.warning(
+        "Configured ephemeris file %r is not a recognized JPL DE kernel and is "
+        "not present locally; using the default kernel %s instead of "
+        "downloading the requested name.",
+        filename,
+        fallback,
+    )
+    return fallback
+
+
+def jpl_fallback_active() -> bool:
+    """Return whether the configured JPL file is being silently replaced.
+
+    True exactly when the effective ephemeris file (set_jpl_file() /
+    LIBEPHEMERIS_EPHEMERIS / TOML / tier default) is neither a recognized JPL DE
+    kernel nor present in any local search location, so ``get_planets()``
+    substitutes the active tier's default kernel via
+    ``_resolve_missing_ephemeris_fallback``.
+
+    The public retflag consults this so a requested ``FLG_JPLEPH`` is echoed as
+    ``FLG_SWIEPH`` once the fallback is in effect, matching the reference API:
+    asked for a JPL file it cannot open, it computes from its default ephemeris
+    and echoes SWIEPH rather than JPLEPH. Evaluated eagerly (a filename +
+    filesystem check, no kernel load and no network) so the echo is correct on
+    the first calc, before the kernel is lazily opened. Sealed ``leb`` mode never
+    opens a JPL kernel, so it never reports a fallback.
+    """
+    if get_calc_mode() == "leb":
+        return False
+    # Evaluated from the REQUESTED filename every time. The sticky record set
+    # by the resolver used to short-circuit this, because get_planets() then
+    # overwrote _EPHEMERIS_FILE with the fallback name and the filename check
+    # could no longer see the original request. Now that the requested name is
+    # preserved, the check is authoritative on its own — and the record was
+    # actively wrong after a set_ephe_path() that makes the requested file
+    # available again, echoing SWIEPH for one more call before the reload
+    # cleared it.
+    effective_file = _get_effective_ephemeris_file()
+    return not (
+        _is_recognized_de_kernel(effective_file)
+        or _ephemeris_file_present(effective_file)
+    )
+
+
 def get_planets() -> SpiceKernel:
     """
     Get or load the planetary ephemeris (DE440 by default).
@@ -1400,18 +1553,24 @@ def get_planets() -> SpiceKernel:
             "use the active LEB reader or a declared analytical model"
         )
 
-    global _PLANETS, _EPHEMERIS_FILE
+    global _PLANETS, _EPHEMERIS_FILE_EFFECTIVE
     logger = get_logger()
     if _PLANETS is None:
         with _INIT_LOCK:
             if _PLANETS is None:
                 load = get_loader()
                 effective_file = _get_effective_ephemeris_file()
-                _EPHEMERIS_FILE = effective_file
+                effective_file = _resolve_missing_ephemeris_fallback(
+                    effective_file, logger
+                )
+                # Record what is actually opened WITHOUT destroying the
+                # requested name: a later set_ephe_path() must be able to
+                # re-resolve the caller's original choice.
+                _EPHEMERIS_FILE_EFFECTIVE = effective_file
 
                 # Try custom ephemeris path first if set
                 if _EPHEMERIS_PATH:
-                    bsp_path = os.path.join(_EPHEMERIS_PATH, _EPHEMERIS_FILE)
+                    bsp_path = os.path.join(_EPHEMERIS_PATH, effective_file)
                     if os.path.exists(bsp_path):
                         logger.debug("Using cached ephemeris: %s", bsp_path)
                         _PLANETS = load(bsp_path)
@@ -1420,7 +1579,7 @@ def get_planets() -> SpiceKernel:
 
                 # Load from data dir (downloads automatically if missing)
                 data_dir = _get_data_dir()
-                bsp_path = os.path.join(data_dir, _EPHEMERIS_FILE)
+                bsp_path = os.path.join(data_dir, effective_file)
                 if os.path.exists(bsp_path):
                     logger.debug("Using cached ephemeris: %s", bsp_path)
                     _PLANETS = load(bsp_path)
@@ -1428,9 +1587,9 @@ def get_planets() -> SpiceKernel:
                 else:
                     from .net import require_network
 
-                    require_network(f"Skyfield {_EPHEMERIS_FILE} ephemeris download")
-                    logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
-                    _PLANETS = load(_EPHEMERIS_FILE)
+                    require_network(f"Skyfield {effective_file} ephemeris download")
+                    logger.info("Downloading JPL ephemeris %s...", effective_file)
+                    _PLANETS = load(effective_file)
                     logger.info("Ephemeris downloaded to: %s", data_dir)
     return _PLANETS
 
@@ -1727,7 +1886,13 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
     # only the base ayanamsha mode avoids the silent wrong fallback the
     # composite value would otherwise trigger downstream. Warn so the caller
     # knows the projection was dropped rather than applied.
-    sidbits = mode & ~0xFF
+    # SIDBIT projection flags are positive high bits (>= 256) OR-ed onto a
+    # base mode in 0..255. Only strip them for a non-negative composite: a
+    # negative mode is simply an invalid mode ID, and masking it with 0xFF
+    # would wrap it onto a valid high base mode (e.g. -1 -> 255 = SIDM_USER).
+    # Leave negatives untouched so the ayanamsha reducer applies the reference
+    # invalid-mode fallback (Fagan/Bradley).
+    sidbits = (mode & ~0xFF) if mode >= 0 else 0
     if sidbits:
         warnings.warn(
             f"SIDBIT projection flags 0x{sidbits:04X} are not supported in "
@@ -1830,24 +1995,30 @@ def reset_session() -> None:
     switching ephemeris files, test cleanup, or application shutdown).
     """
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
+    global _SIDEREAL_BITS
     global _ANGLES_CACHE
     with _STATE_LOCK:
         _TOPO = None
         _SIDEREAL_MODE = None
         _SIDEREAL_AYAN_T0 = 0.0
         _SIDEREAL_T0 = 0.0
+        _SIDEREAL_BITS = 0
         _ANGLES_CACHE = {}
     from .cache import clear_observer_cache
 
     clear_observer_cache()
 
 
-def set_ephe_path(path: Optional[str]) -> None:
+def set_ephe_path(path: Optional[str] = None) -> None:
     """
     Set the path for ephemeris files.
 
     Args:
-        path: Path to directory containing ephemeris files.
+        path: Path to directory containing ephemeris files. Omit the argument
+            (or pass ``None``) to reset to the default search location, matching
+            the reference API, whose ``set_ephe_path()`` with no argument resets
+            to its default. A required-positional signature previously raised
+            ``TypeError`` on the no-argument reset call.
 
     Note:
         This sets the directory where get_planets() will look for the ephemeris
@@ -1861,7 +2032,7 @@ def set_ephe_path(path: Optional[str]) -> None:
 
         Idempotent: if the path hasn't changed, no resources are released.
     """
-    global _EPHEMERIS_PATH, _PLANETS
+    global _EPHEMERIS_PATH, _PLANETS, _EPHEMERIS_FILE_EFFECTIVE
     if path == _EPHEMERIS_PATH:
         return  # No-op: path unchanged, keep loaded kernels and caches
     _EPHEMERIS_PATH = path
@@ -1872,6 +2043,10 @@ def set_ephe_path(path: Optional[str]) -> None:
         except (AttributeError, OSError, ValueError):
             pass
     _PLANETS = None
+    # Drop the resolved filename too: the new directory may well contain the
+    # file the caller originally requested, so the next load must re-resolve
+    # from the requested name instead of reusing an earlier fallback.
+    _EPHEMERIS_FILE_EFFECTIVE = None
     from .cache import clear_caches
 
     clear_caches()
@@ -1910,9 +2085,12 @@ def set_ephemeris_file(filename: str) -> None:
         This takes priority over the precision tier setting. To revert to
         tier-based ephemeris selection, call close() to reset state.
     """
-    global _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT, _PLANETS
+    global _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT, _PLANETS, _JPL_FALLBACK_ACTIVE
     _EPHEMERIS_FILE = filename
     _EPHEMERIS_FILE_EXPLICIT = True
+    # A new configured file is unresolved until the next load; drop any stale
+    # fallback record so jpl_fallback_active() re-checks the new name.
+    _JPL_FALLBACK_ACTIVE = False
     # Close old kernel and clear caches before reloading
     if _PLANETS is not None:
         try:
@@ -2228,8 +2406,12 @@ def close() -> None:
           set via set_calc_mode(), the .leb file path set via
           set_leb_file() and the strict-precision setting survive close()
           (they are re-resolved from env/TOML only if never set
-          explicitly). Per-session state (topo, sidereal mode, user
-          Delta-T, open files, caches) is cleared.
+          explicitly). Per-session state (topo, sidereal mode, open files,
+          caches) is cleared.
+        - Compatibility contract: a user-defined Delta-T set via
+          set_delta_t_userdef() is preserved across close() (it is treated
+          as configuration, not per-session state). Clear it explicitly with
+          set_delta_t_userdef(None).
         - This is useful for:
           - Freeing memory and file handles in long-running applications
           - Switching to a different ephemeris file
@@ -2241,16 +2423,9 @@ def close() -> None:
         >>> close()  # Close files and reset state
         >>> pos, _ = calc_ut(2451545.0, SUN, 0)  # Reloads ephemeris
     """
-    global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
-    global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
-    global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
-    global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
-    global _SPK_KERNELS, _SPK_BODY_MAP, _SPK_TYPE21_KERNELS, _AUTO_SPK_DOWNLOAD
-    global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
-    global _PRECISION_TIER
-    global _LEB_FILE, _LEB_READER, _CALC_MODE
-    global _HORIZONS_CLIENT, _HORIZONS_WARNED
-
+    # No global declarations: this wrapper only locks and delegates; the
+    # actual state resets (and their deliberate omissions, e.g. the
+    # preserved user Delta-T) live in _close_inner().
     with _STATE_LOCK:
         _close_inner()
 
@@ -2258,9 +2433,12 @@ def close() -> None:
 def _close_inner() -> None:
     """Inner close implementation (must be called with _STATE_LOCK held)."""
     global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
+    global _EPHEMERIS_FILE_EFFECTIVE
+    global _JPL_FALLBACK_ACTIVE
     global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
-    global _ANGLES_CACHE, _TIDAL_ACCELERATION, _DELTA_T_USERDEF, _LAPSE_RATE
+    global _SIDEREAL_BITS
+    global _ANGLES_CACHE, _TIDAL_ACCELERATION, _LAPSE_RATE
     global _SPK_KERNELS, _SPK_BODY_MAP, _SPK_TYPE21_KERNELS, _AUTO_SPK_DOWNLOAD
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
     global _PRECISION_TIER
@@ -2334,7 +2512,9 @@ def _close_inner() -> None:
     # Reset all global state to initial values
     _EPHEMERIS_PATH = None
     _EPHEMERIS_FILE = "de440.bsp"
+    _EPHEMERIS_FILE_EFFECTIVE = None
     _EPHEMERIS_FILE_EXPLICIT = False
+    _JPL_FALLBACK_ACTIVE = False
     _LOADER = None
     _PLANETS = None
     _PLANET_CENTERS = None
@@ -2346,9 +2526,12 @@ def _close_inner() -> None:
     _SIDEREAL_MODE = None
     _SIDEREAL_AYAN_T0 = 0.0
     _SIDEREAL_T0 = 0.0
+    _SIDEREAL_BITS = 0
     _ANGLES_CACHE = {}
     _TIDAL_ACCELERATION = None
-    _DELTA_T_USERDEF = None
+    # _DELTA_T_USERDEF is deliberately NOT reset here (compatibility
+    # contract): a user-defined Delta-T survives close(). Callers clear
+    # it explicitly via set_delta_t_userdef(None).
     _LAPSE_RATE = None
     _AUTO_SPK_DOWNLOAD = None
     _SPK_CACHE_DIR = None
@@ -2403,6 +2586,83 @@ def _close_inner() -> None:
         pass
 
 
+# Published span of the DE440 long ephemeris (Park et al. 2021, AJ 161:105):
+# JD 2287184.5 to 2688976.5, i.e. 1549-12-31 to 2650-01-25. DE441 is the only
+# JPL kernel in this project's inventory that reaches beyond it.
+_DE440_JD_START = 2287184.5
+_DE440_JD_END = 2688976.5
+
+
+def _leb_source_de_number(
+    jd_start: float, jd_end: float, tier: Optional[str] = None
+) -> int:
+    """Generating JPL Development Ephemeris number for an LEB artifact.
+
+    The LEB format stores no source-kernel identifier, so this reports a
+    number only when one can be substantiated:
+
+    * ``tier`` — set when the artifact was resolved through the tier
+      machinery — is authoritative: each tier declares the DE kernel it is
+      generated from (``TIERS[...].ephemeris_file``).
+    * otherwise, for an artifact named directly with ``set_leb_file()``,
+      coverage reaching outside the published DE440 interval can only come
+      from DE441. Coverage *inside* that interval proves nothing (a DE441
+      artifact cropped to a narrow span looks identical), so the result is
+      0 — the same "no data" value the compatibility API already uses.
+
+    Deriving this from the filename, as an earlier revision did by looking
+    for the word "extended", was wrong in both directions: a renamed DE441
+    artifact reported 440 and a DE440 artifact stored under a path
+    containing "extended" reported 441.
+    """
+    if tier is not None:
+        kernel = TIERS[tier].ephemeris_file if tier in TIERS else ""
+        if "441" in kernel:
+            return 441
+        if "440" in kernel:
+            return 440
+    if jd_start < _DE440_JD_START or jd_end > _DE440_JD_END:
+        return 441
+    return 0
+
+
+def _leb_core_file_metadata(
+    reader, body: int
+) -> "Optional[tuple[str, float, float, int]]":
+    """``(path, jd_start, jd_end, denum)`` for ONE concrete LEB core file.
+
+    A tiered reader holds several per-tier composites with different spans.
+    Reporting the union range next to a single path claimed that file could
+    serve dates outside its own coverage (measured: the base core paired
+    with the medium union). Pick the widest-covering concrete file for
+    ``body`` and report ITS range, so the triple is internally consistent
+    and the tier that produced it identifies the source kernel.
+    """
+    tier_readers = getattr(reader, "_tier_readers", None)
+    candidates: list[tuple[str, tuple[float, float], Optional[str]]] = []
+
+    def _collect(item, tier: Optional[str]) -> None:
+        for child in getattr(item, "_readers", (item,)):
+            if not getattr(child, "has_body", lambda _b: False)(body):
+                continue
+            bounds = getattr(child, "body_coverage", lambda _b: None)(body)
+            if bounds is None:
+                continue
+            path = str(getattr(child, "path", ""))
+            candidates.append((path, (float(bounds[0]), float(bounds[1])), tier))
+
+    if isinstance(tier_readers, Mapping):
+        for tier_name, tier_reader in tier_readers.items():
+            _collect(tier_reader, tier_name)
+    else:
+        _collect(reader, None)
+
+    if not candidates:
+        return None
+    path, (start, end), tier = max(candidates, key=lambda c: c[1][1] - c[1][0])
+    return (path, start, end, _leb_source_de_number(start, end, tier))
+
+
 def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
     """
     Get information about the currently loaded ephemeris file.
@@ -2447,6 +2707,25 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
     if ifno not in (0, 1):
         return ("", 0.0, 0.0, 0)
 
+    # LEB service (sealed mode, or auto mode before any JPL kernel is
+    # opened): report the active LEB artifact serving the planet/Moon
+    # channels instead of an empty tuple. ifno 0 and 1 both map to the
+    # merged core file, like a JPL kernel. The triple describes ONE concrete
+    # file: pairing a single path with a multi-tier union range claimed that
+    # file could serve dates it does not cover.
+    if get_calc_mode() == "leb" or _PLANETS is None:
+        try:
+            _reader = get_leb_reader()
+        except RuntimeError:
+            _reader = None
+        if _reader is not None:
+            _body = 0 if ifno == 0 else 1  # SUN / MOON channel
+            _resolved = _leb_core_file_metadata(_reader, _body)
+            if _resolved is not None:
+                return _resolved
+        if _PLANETS is None:
+            return ("", 0.0, 0.0, 0)
+
     # If no ephemeris loaded, return empty data
     if _PLANETS is None:
         return ("", 0.0, 0.0, 0)
@@ -2484,9 +2763,11 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
                 if end_jd == float("-inf"):
                     end_jd = 0.0
 
-        # Extract DE number from filename (e.g., "de421.bsp" -> 421)
+        # Extract DE number from filename (e.g., "de421.bsp" -> 421). Report
+        # the kernel actually opened, which differs from the requested name
+        # whenever the missing-file fallback substituted the tier default.
         denum = 0
-        filename = _EPHEMERIS_FILE.lower()
+        filename = (_EPHEMERIS_FILE_EFFECTIVE or _EPHEMERIS_FILE).lower()
         if filename.startswith("de") and ".bsp" in filename:
             try:
                 # Extract digits between "de" and ".bsp"
@@ -2818,9 +3099,9 @@ def get_iers_delta_t_enabled() -> bool:
 #     dependency; see THIRD_PARTY_NOTICES.md).
 #   - ``espenak_meeus``: a native reimplementation of the classic Espenak &
 #     Meeus (2006) NASA polynomial set (published coefficients).
-# Neither derives from the reference (copyleft) Swiss Ephemeris; the project
+# Neither derives from the reference (copyleft) ephemeris; the project
 # depends only on permissively-licensed ephemeris tooling (Skyfield/pyerfa).
-# Exact parity with the reference ephemeris (for validation only) is injected
+# Exact parity with the reference API (for validation only) is injected
 # externally via set_delta_t_userdef() in the validation harness.
 # The models only differ outside the IERS-observed range (chiefly ancient and
 # far-future dates); within the well-observed range they agree closely.
@@ -2846,7 +3127,7 @@ def set_delta_t_model(model: Optional[str]) -> None:
     Args:
         model: ``"smh2016"`` (Stephenson-Morrison-Hohenkerk 2016, the default,
             via Skyfield), ``"espenak_meeus"`` (Espenak & Meeus 2006 polynomials,
-            compatible with the reference ephemeris), or ``None`` to defer to the
+            compatible with the reference API), or ``None`` to defer to the
             ``LIBEPHEMERIS_DELTAT_MODEL`` environment variable / TOML config.
 
     Raises:

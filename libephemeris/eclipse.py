@@ -46,9 +46,10 @@ Provenance:
 
 from __future__ import annotations
 
+import contextlib
 import math
 import re
-from typing import Sequence, Tuple, Union, cast
+from typing import Callable, Iterator, Sequence, Tuple, Union, cast
 
 from .constants import (
     SUN,
@@ -86,9 +87,21 @@ from .constants import (
     ECL_3RD_VISIBLE,
     ECL_4TH_VISIBLE,
 )
-from .exceptions import Error, LEBCorruptionError
+from .exceptions import Error, LEBCorruptionError, UnknownBodyError
 from .planets import calc_ut
 from .state import get_calc_mode, get_timescale
+
+
+class _IllegalRiseBodyError(UnknownBodyError, ValueError):
+    """A rise/set/transit target that no active backend can place.
+
+    Raised for an unknown or unsupported body id passed to ``rise_trans`` /
+    ``rise_trans_true_hor`` (e.g. a planetary moon with no registered SPK).
+    It multiply inherits the typed ``UnknownBodyError`` (an ``Error``
+    subclass, the compatibility-contract class for an illegal body) AND the
+    built-in ``ValueError`` so the single "illegal planet number" contract is
+    identical on every backend and satisfies callers catching either type.
+    """
 
 
 _ACTIVE_LEB_READER = object()
@@ -311,6 +324,24 @@ _ECLIPSE_SEARCH_HORIZON_YEARS = 2000
 # stops earlier at the ephemeris boundary.
 _OCCULT_MAX_CONJUNCTIONS = int(_ECLIPSE_SEARCH_HORIZON_YEARS * 13.5)
 
+# Epoch-vs-maximum coincidence margin shared by every eclipse/occultation
+# "when" finder. A candidate maximum within this margin of the search epoch
+# counts as "already reached", so the idiom `jd = tret[0]; when(jd)` advances
+# to the neighbouring event instead of re-returning the one it started on.
+#
+# Derived from this library's own solver, not from any external transition:
+# the maximum is refined by golden section to ~1e-7 day (see _golden_min),
+# and a search restarted from a returned maximum re-brackets from a
+# different interval, so the recomputed instant can differ from the returned
+# one by a few times that resolution. A margin of 100x the resolution
+# absorbs that jitter with a wide safety factor while staying five orders of
+# magnitude below the smallest possible separation between two distinct
+# events (half a synodic month, ~14.8 days), so it can never merge two real
+# eclipses. Callers starting between this margin and ~8.6 s before a maximum
+# may see a different event than an external implementation chooses; that
+# boundary window is documented in docs/comparison/known-differences.md.
+_ECLIPSE_WHEN_EPOCH_MARGIN = 100.0 * 1e-7  # days (0.86 s)
+
 SYNODIC_MONTH = 29.530588853  # Mean synodic month in days
 LUNAR_NODE_PERIOD = 6798.38  # Lunar node regression period in days
 ECLIPSE_LIMIT_SOLAR = 18.5  # Maximum elongation from node for solar eclipse (degrees)
@@ -383,6 +414,24 @@ _ECL_RSUN_AU = 696000.0 / _ECL_AU_KM
 _ECL_RMOON_AU = 1738.15 / _ECL_AU_KM
 _ECL_REARTH_AU = 6378.140 / _ECL_AU_KM
 _ECL_EARTH_FLATTENING = 1.0 / 298.25642
+
+# Inner-contact ("umbral") lunar radius.  Classical eclipse practice adopts
+# two values of k (the ratio of the Moon's radius to Earth's equatorial
+# radius): the larger, k = 0.2725076 (~1738.15 km, the mean lunar limb,
+# adopted by the IAU in 1982), for the penumbral / outer silhouette, and the
+# smaller k = 0.272281 for the umbral / inner geometry, where the marginal
+# valleys of the lunar limb let a thread of photosphere through so that true
+# totality/annularity, and the disappearance/reappearance of an occulted
+# body behind the dark limb, are reckoned against a slightly smaller disc.
+# Sources: Espenak & Meeus, "Five Millennium Canon of Solar Eclipses"
+# (NASA/TP-2006-214141), sec. 1.5 (k = 0.272281 for umbral/central contacts);
+# Explanatory Supplement to the Astronomical Almanac (3rd ed., 2013), eclipse
+# phenomena; Meeus, "Elements of Solar Eclipses 1951-2200" (Willmann-Bell,
+# 1989), ch. 3.  Applied at second/third contact and at occultation
+# disappearance/reappearance while the full disc stays at first/fourth —
+# the convention of the NASA canon, whose published durations these
+# contacts reproduce to ~0.1 s.
+_ECL_RMOON_INNER_AU = 0.272281 * 6378.140 / _ECL_AU_KM
 
 # Danjon lunar-shadow convention used by NASA's Five Millennium Catalog.
 # Instead of multiplying both completed shadow diameters by an empirical
@@ -619,6 +668,39 @@ def _occ_body_geo_xyz(
     return (float(pos[0]), float(pos[1]), float(pos[2]))
 
 
+@contextlib.contextmanager
+def _observer_scope(lon: float, lat: float, alt: float) -> "Iterator[None]":
+    """Temporarily set the topocentric observer for ``calc_ut(FLG_TOPOCTR)``.
+
+    Saves and restores the process-wide observer (``state._TOPO``) so a
+    rise/set or occultation search can request the topocentric apparent place
+    of a body outside ``_PLANET_MAP`` through ``calc_ut`` — the one position
+    source that handles the AST_OFFSET id aliases and both backends — without
+    leaking the observer to the caller. ``set_topo`` clears the observer-at
+    cache on entry; the cache is cleared again on exit so a following calc keys
+    off the caller's own location.
+
+    Thread-safety: intentionally NOT locked. The module-level API is
+    stateful-global by design (matching the reference API, which shares
+    the same process-wide observer model): concurrent module-level calls
+    already race on sid mode, ephemeris path and the observer itself, so
+    a lock here alone would only feign safety. Callers needing concurrent
+    isolation use ``EphemerisContext``, which serializes access to the
+    shared global state around each call.
+    """
+    from . import state as _state
+    from .cache import clear_observer_cache
+    from .state import get_topo, set_topo
+
+    saved = get_topo()
+    set_topo(lon, lat, alt)
+    try:
+        yield
+    finally:
+        _state._TOPO = saved
+        clear_observer_cache()
+
+
 def _occ_body_topo(
     tjd_ut: float,
     body: "Union[int, str]",
@@ -657,10 +739,28 @@ def _occ_body_topo(
         pos = _topo_ecliptic(reader, jd_tt, tjd_ut, body, gp)
         return (float(pos[0]), float(pos[1]), float(pos[2]))
 
+    from .planets import _PLANET_MAP, get_planet_target
+
+    if body not in _PLANET_MAP:
+        # Bodies the classical _PLANET_MAP does not enumerate (Chiron, the
+        # main-belt asteroids, numbered minor planets, ...) have no Skyfield
+        # target name here; without this the id fell through to
+        # ``_PLANET_MAP[body]`` and leaked a raw KeyError on the Skyfield path
+        # (the LEB path already served them via _topo_ecliptic). Position them
+        # topocentrically through calc_ut(FLG_TOPOCTR): the identical
+        # topocentric ecliptic-of-date place as the LEB path (verified to
+        # 0.000"), so both backends share one occulted-body position source. A
+        # genuinely unplaceable id raises the typed error from calc_ut.
+        from .constants import FLG_TOPOCTR
+
+        gp = (float(geopos[0]), float(geopos[1]), float(geopos[2]))
+        with _observer_scope(*gp):
+            pos, _ = calc_ut(tjd_ut, body, _ecl_eph_flags(flags) | FLG_TOPOCTR)
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
+
     from skyfield.api import wgs84
     from skyfield.framelib import ecliptic_frame
 
-    from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets
 
     eph = get_planets()
@@ -806,6 +906,7 @@ def _sol_how_core(
     flags: int,
     reader,
     body: "Union[int, str]" = SUN,
+    where_convention: bool = False,
 ) -> Tuple[int, list]:
     """Local circumstances of a solar eclipse (reference ``attr`` layout).
 
@@ -816,8 +917,16 @@ def _sol_how_core(
     allowing for refraction and the observer's horizon dip.
 
     attr: [0] magnitude as diameter fraction (negative when the limbs do
-    not yet overlap), [1] lunar/solar diameter ratio, [2] obscuration
-    (fraction of the solar disc area covered, 1.0 during totality),
+    not yet overlap), [1] lunar/solar diameter ratio, [2] obscuration.
+    For a solar eclipse the obscuration follows the compatibility
+    contract: the disc-area ratio (r_moon/r_sun)**2 while one disc lies
+    inside the other, so it exceeds 1 during totality (Moon larger) and is
+    (r_moon/r_sun)**2 < 1 during annularity; the partial phase reports the
+    two-disc lens-overlap fraction. For an occultation the obscuration is
+    the covered fraction of the body, bounded at 1.0 on the how/when_loc
+    path — but the WHERE path reports the uncapped disc-area ratio for
+    planet targets (compatibility contract; ``where_convention``),
+    while star targets stay at 1.0 on every path.
     [3] 0 (callers fill the core-shadow width), [4] azimuth of the Sun,
     [5] true altitude, [6] apparent altitude, [7] Moon-Sun center
     separation in degrees, [8] NASA magnitude, [9]/[10] saros series and
@@ -852,26 +961,38 @@ def _sol_how_core(
     attr = [0.0] * 20
     attr[1] = rmoon / rsun if rsun > 0.0 else 0.0
     attr[0] = (rsun + rmoon - dctr) / (2.0 * rsun) if rsun > 0.0 else 1.0
+    # Compatibility contract: a solar eclipse (Sun as the "occulted" body)
+    # reports the disc-area ratio while one disc lies inside the other, so
+    # obscuration exceeds 1 during totality; an occultation of a finite
+    # body caps the covered fraction at 1.0.
+    _is_solar = (not isinstance(body, str)) and body == SUN
     if retc == 0:
-        # No eclipse at this place and time: nothing of the Sun is obscured.
-        # (sol_eclipse_how() zeroes attr on retflag==0, but sol_eclipse_where()
-        # and lun_occult_where() return this attr directly, so set 0.0 here.)
-        attr[2] = 0.0
+        # No eclipse at this place and time. Compatibility contract: this
+        # entry point reports a fixed no-event sentinel of 1.0 in the
+        # obscuration slot — a protocol value in the same class as a
+        # retflag echo or a -99999999.0 sentinel, not an area ratio. It
+        # reads oddly for a channel documented as "fraction of the Sun's
+        # disc covered", but consumers branch on it; sol_eclipse_how()
+        # zeroes its whole attr array on retflag==0 and is unaffected.
+        attr[2] = 1.0
     elif rsun <= 0.0:
         attr[2] = 1.0
     elif retc in (ECL_TOTAL, ECL_ANNULAR):
-        # One disc lies entirely within the other. Total (larger Moon): the
-        # Sun is fully covered, so the obscured fraction is 1.0 — the
-        # published definition of obscuration (fraction of the solar disc
-        # area occulted) is bounded by construction; the > 1 disc area ratio
-        # remains available as attr[1]**2. Annular (smaller Moon): a ring of
-        # Sun remains and the covered fraction is (rmoon/rsun)**2 < 1.
-        attr[2] = min(1.0, (rmoon / rsun) ** 2)
+        # One disc lies entirely within the other. The disc-area ratio is
+        # (rmoon/rsun)**2 — > 1 during totality (larger Moon), < 1 during
+        # annularity (a ring of Sun remains). For a solar eclipse the
+        # reference returns this ratio uncapped; an occultation caps the
+        # covered fraction of the body at 1.0.
+        ratio_sq = (rmoon / rsun) ** 2
+        _uncap = _is_solar or (where_convention and rsun > 0.0)
+        attr[2] = ratio_sq if _uncap else min(1.0, ratio_sq)
     elif dctr <= 0.0:
         # Exactly concentric discs in the partial branch are reachable only at
         # the annular/total boundary (rsun == rmoon); the overlap is the whole
         # smaller disc. Guards the lens-area 1/dctr singularity below.
-        attr[2] = min(1.0, (rmoon / rsun) ** 2)
+        ratio_sq = (rmoon / rsun) ** 2
+        _uncap = _is_solar or (where_convention and rsun > 0.0)
+        attr[2] = ratio_sq if _uncap else min(1.0, ratio_sq)
     else:
         # Standard two-disc overlap (lens) area as a fraction of the
         # solar disc.
@@ -1236,7 +1357,7 @@ def _calc_planet_angular_radius(planet_id: int, dist_au: float) -> float:
     """Compute angular radius of a planet in degrees from its geocentric distance.
 
     Uses the exact geometric formula: angular_radius = arcsin(physical_radius / distance),
-    matching the reference ephemeris approach of computing angular sizes dynamically from
+    matching the reference API approach of computing angular sizes dynamically from
     physical radii and actual distance rather than using static lookup tables.
 
     Args:
@@ -1912,6 +2033,105 @@ def _find_contact_time_besselian(
     return (jd_start + jd_end) / 2
 
 
+def _besselian_contact_residuals(
+    jd: float, flags: int = FLG_SWIEPH
+) -> Tuple[float, float, float]:
+    """Signed Besselian contact residuals on the Earth ellipsoid, in km.
+
+    The global-eclipse contacts (P1/P4, U1/U4, centre line) are the
+    instants at which the Moon's shadow cone is tangent to the Earth's
+    flattened surface. Working in the auxiliary frame in which the polar
+    axis is stretched by 1/(1-f) so the ellipsoid becomes a sphere of
+    equatorial radius (the standard reduction; see the Explanatory
+    Supplement to the Astronomical Almanac, 3rd ed. 2013, ch. 11, and
+    Meeus, "Elements of Solar Eclipses 1951-2200", 1989, ch. 4), the
+    external-tangency condition of a shadow cone of half angle f and
+    fundamental-plane radius L with a sphere of radius R_e whose centre
+    lies at perpendicular distance r0 from the axis is
+
+        (r0 - L) * cos f = R_e      i.e.   r0 = R_e * cos f + L,
+
+    to O(f^2). The cone-depth term z*tan(f) that a plain circle-on-the-
+    fundamental-plane test omits is carried implicitly here: L is the
+    radius on the fundamental plane and the geometry supplies the height
+    of the tangent point through cos f. The Earth's oblateness enters via
+    the same z-stretch that ``_eclipse_where_core`` applies.
+
+    Returns ``(pen, umb, cen)`` where each residual is negative while the
+    corresponding shadow feature is in contact with (or inside) the
+    ellipsoid and positive once it has cleared it:
+
+    * ``pen`` -> penumbral outer edge (first/last contact, P1/P4)
+    * ``umb`` -> umbral/antumbral outer edge (U1/U4)
+    * ``cen`` -> shadow axis vs. the limb (centre line begins/ends)
+
+    The three residuals are built from exactly the quantities
+    ``_eclipse_where_core`` uses for its CENTRAL / NONCENTRAL / PARTIAL
+    classification, so the contact times stay consistent with
+    ``sol_eclipse_where`` at every instant.
+    """
+    _rc, _lon, _lat, dc = _eclipse_where_core(jd, flags)
+    r0_km = dc[2]
+    core_diam_fp_km = dc[3]
+    pen_diam_fp_km = dc[4]
+    cos_f_core = dc[5]
+    cos_f_pen = dc[6]
+    re_km = _ECL_REARTH_AU * _ECL_AU_KM
+    pen = r0_km - (re_km * cos_f_pen + pen_diam_fp_km / 2.0)
+    umb = r0_km - (re_km * cos_f_core + abs(core_diam_fp_km) / 2.0)
+    cen = r0_km - re_km * cos_f_core
+    return pen, umb, cen
+
+
+def _solve_besselian_contact(
+    residual: "Callable[[float], float]",
+    jd_max: float,
+    search_before: bool,
+    max_win: float = 0.35,
+) -> float:
+    """Time of a Besselian contact by bracketing a residual's sign change.
+
+    ``residual(t)`` is one of the signed distances from
+    :func:`_besselian_contact_residuals` (negative while in contact,
+    positive once cleared). The residual is negative at ``jd_max`` for a
+    contact that occurs; this expands a bracket outward from ``jd_max``
+    until the residual turns positive, then bisects. Returns 0.0 when the
+    feature does not touch the Earth at maximum (no such contact) or when
+    no clearing is found within ``max_win`` days.
+    """
+    try:
+        f_max = residual(jd_max)
+    except (KeyError, ValueError, ArithmeticError) as exc:
+        _reraise_if_leb_range_error(exc)
+        return 0.0
+    if f_max is None or f_max >= 0.0:
+        return 0.0
+
+    sign = -1.0 if search_before else 1.0
+    far = 0.0
+    step = 0.02
+    while step <= max_win:
+        t = jd_max + sign * step
+        try:
+            ft = residual(t)
+        except (KeyError, ValueError, ArithmeticError) as exc:
+            _reraise_if_leb_range_error(exc)
+            ft = None
+        if ft is not None and ft > 0.0:
+            far = t
+            break
+        step *= 1.6
+    if far == 0.0:
+        return 0.0
+
+    lo, hi = (far, jd_max) if search_before else (jd_max, far)
+    try:
+        return _root_bisect(residual, lo, hi)
+    except (KeyError, ValueError, ArithmeticError) as exc:
+        _reraise_if_leb_range_error(exc)
+        return 0.0
+
+
 def _calculate_eclipse_phases_besselian(
     jd_max: float, eclipse_type: int
 ) -> Tuple[float, float, float, float, float, float, float, float, float, float]:
@@ -1946,72 +2166,94 @@ def _calculate_eclipse_phases_besselian(
     # A hybrid (annular-total) eclipse sets ECL_ANNULAR_TOTAL only — it shares
     # no bits with ECL_TOTAL/ECL_ANNULAR — so it too has an umbral axis that
     # touches Earth and a center line. Without this it would lose U1/U4 and
-    # the center-line instants (tret[4..7]), which the reference returns.
+    # the center-line instants (tret[4..7]), which belong in the tret
+    # contract for these types.
     is_hybrid = bool(eclipse_type & ECL_ANNULAR_TOTAL)
     has_umbral_contact = is_total or is_annular or is_hybrid
 
-    # Get l1 (penumbral limit) and l2 (umbral limit) at maximum
-    l1 = _calc_penumbra_limit(jd_max)
-    l2 = _calc_umbra_limit(jd_max)
-    gamma_max = _calc_gamma(jd_max)
+    # Contact times are the instants at which the Moon's shadow cone is
+    # tangent to the Earth *ellipsoid*. Each contact is the zero crossing
+    # of the corresponding signed residual from
+    # _besselian_contact_residuals(), which carries both the cone-depth
+    # term (z*tan f, previously omitted by the plain circle-on-the-
+    # fundamental-plane test) and the Earth's oblateness (via the polar-
+    # axis stretch shared with _eclipse_where_core). See that helper for
+    # the geometry and the published references.
+    # The pen/umb/cen residuals share one _eclipse_where_core() evaluation
+    # per instant, and the six contact solvers below revisit the same
+    # instants (jd_max itself, plus the identical bracket-expansion
+    # ladder). Memoise per call — never at module level, where a cached
+    # triple could survive an ephemeris-state change (mode, files, topo).
+    residual_memo: dict[float, Tuple[float, float, float]] = {}
 
-    # For global eclipse, first/fourth contacts occur when gamma = 1 + l1
-    # (penumbral shadow touches Earth's limb from outside)
-    penumbral_limit = 1.0 + l1  # Earth radius + penumbra radius
+    def _residual_triple(jd: float) -> Tuple[float, float, float]:
+        triple = residual_memo.get(jd)
+        if triple is None:
+            triple = _besselian_contact_residuals(jd)
+            residual_memo[jd] = triple
+        return triple
 
-    # Calculate first contact (penumbra first touches Earth)
-    t_first_contact = _find_contact_time_besselian(
-        jd_max, penumbral_limit, search_before=True, search_range=0.15
+    def _pen_residual(jd: float) -> float:
+        return _residual_triple(jd)[0]
+
+    def _umb_residual(jd: float) -> float:
+        return _residual_triple(jd)[1]
+
+    def _cen_residual(jd: float) -> float:
+        return _residual_triple(jd)[2]
+
+    # P1/P4: first/last external tangency of the penumbral cone (eclipse
+    # begins/ends anywhere on Earth).
+    t_first_contact = _solve_besselian_contact(
+        _pen_residual, jd_max, search_before=True
+    )
+    t_fourth_contact = _solve_besselian_contact(
+        _pen_residual, jd_max, search_before=False
     )
 
-    # Calculate fourth contact (penumbra last leaves Earth)
-    t_fourth_contact = _find_contact_time_besselian(
-        jd_max, penumbral_limit, search_before=False, search_range=0.15
-    )
-
-    # For total/annular eclipses, calculate U1/U4 (totality begin/end
-    # anywhere on Earth)
+    # U1/U4: first/last external tangency of the umbral/antumbral cone
+    # (totality/annularity begins/ends anywhere on Earth). The solver
+    # returns 0.0 when the core shadow never reaches the surface, so no
+    # separate gamma gate is needed.
     t_second_contact = 0.0
     t_third_contact = 0.0
-
-    if has_umbral_contact and abs(l2) > 0:
-        # The umbra/antumbra first and last touches Earth at EXTERIOR
-        # tangency: shadow-axis distance = 1 + |l2|. (The previous
-        # interior criterion 1 - |l2| — umbra entirely inside the disc —
-        # was ~2-4 minutes late/early systematically and returned zeros
-        # for grazing-central eclipses.)
-        umbral_limit = 1.0 + abs(l2)
-
-        if gamma_max < umbral_limit:
-            t_second_contact = _find_contact_time_besselian(
-                jd_max, umbral_limit, search_before=True, search_range=0.10
-            )
-            t_third_contact = _find_contact_time_besselian(
-                jd_max, umbral_limit, search_before=False, search_range=0.10
-            )
+    if has_umbral_contact:
+        t_second_contact = _solve_besselian_contact(
+            _umb_residual, jd_max, search_before=True
+        )
+        t_third_contact = _solve_besselian_contact(
+            _umb_residual, jd_max, search_before=False
+        )
 
     # tret[1]: time when the eclipse takes place at local apparent noon —
     # the shadow axis crosses the x = 0 plane (Besselian x sign change)
-    # within the eclipse window.
+    # WITHIN the resolved eclipse window [P1, P4]. "Local apparent noon" is
+    # only defined while the penumbra is in contact with Earth, so the search
+    # is bracketed by the first/last penumbral contacts rather than by a fixed
+    # window around the maximum. When those contacts do not resolve — an
+    # ultra-shallow graze whose penumbra never fully lands, so tret[2]/[3] are
+    # left 0 — there is no such window and tret[1] stays 0. Compatibility
+    # contract: that degenerate partial returns tret[1] = 0. The earlier
+    # fabricated jd_max +- 0.15 d bracket produced a spurious noon instant
+    # tens of minutes from the maximum for exactly those events.
     t_noon = 0.0
-    t_lo = t_first_contact if t_first_contact else jd_max - 0.15
-    t_hi = t_fourth_contact if t_fourth_contact else jd_max + 0.15
-    try:
-        x_lo = calc_besselian_x(t_lo)
-        x_hi = calc_besselian_x(t_hi)
-        if x_lo * x_hi < 0:
-            a, b, fa = t_lo, t_hi, x_lo
-            for _ in range(60):
-                mid = 0.5 * (a + b)
-                fm = calc_besselian_x(mid)
-                if fa * fm <= 0:
-                    b = mid
-                else:
-                    a, fa = mid, fm
-            t_noon = 0.5 * (a + b)
-    except (KeyError, ValueError, ArithmeticError) as _exc:
-        _reraise_if_leb_range_error(_exc)
-        t_noon = 0.0
+    if t_first_contact and t_fourth_contact:
+        try:
+            x_lo = calc_besselian_x(t_first_contact)
+            x_hi = calc_besselian_x(t_fourth_contact)
+            if x_lo * x_hi < 0:
+                a, b, fa = t_first_contact, t_fourth_contact, x_lo
+                for _ in range(60):
+                    mid = 0.5 * (a + b)
+                    fm = calc_besselian_x(mid)
+                    if fa * fm <= 0:
+                        b = mid
+                    else:
+                        a, fa = mid, fm
+                t_noon = 0.5 * (a + b)
+        except (KeyError, ValueError, ArithmeticError) as _exc:
+            _reraise_if_leb_range_error(_exc)
+            t_noon = 0.0
 
     # tret[6]/[7]: center-line begin/end — only when the eclipse is
     # ellipsoidally CENTRAL (the shadow axis actually pierces the flattened
@@ -2023,12 +2265,10 @@ def _calculate_eclipse_phases_besselian(
     t_cl_begin = 0.0
     t_cl_end = 0.0
     if has_umbral_contact and (eclipse_type & ECL_CENTRAL):
-        t_cl_begin = _find_contact_time_besselian(
-            jd_max, 1.0, search_before=True, search_range=0.10
-        )
-        t_cl_end = _find_contact_time_besselian(
-            jd_max, 1.0, search_before=False, search_range=0.10
-        )
+        # Centre line begins/ends when the shadow axis itself grazes the
+        # ellipsoid limb (the cen residual crosses zero).
+        t_cl_begin = _solve_besselian_contact(_cen_residual, jd_max, search_before=True)
+        t_cl_end = _solve_besselian_contact(_cen_residual, jd_max, search_before=False)
 
     # Reference degenerate layout for an ultra-shallow partial: when the
     # penumbra only grazes Earth at the instant of maximum, the P1/P4
@@ -2227,9 +2467,9 @@ def _calculate_eclipse_type_and_magnitude(
         return 0, 0.0, gamma, moon_sun_ratio
 
     # Edge case: near-miss eclipse (gamma very close to limit).
-    # The reference returns PARTIAL|NONCENTRAL (retflag 18) for shallow
-    # partials; the non-reference ECL_GRAZING bit is no longer leaked
-    # into any public retflag.
+    # Compatibility contract: PARTIAL|NONCENTRAL (retflag 18) is returned
+    # for shallow partials; the non-reference ECL_GRAZING bit is no longer
+    # leaked into any public retflag.
     if _is_near_miss_eclipse(gamma, gamma_limit_partial):
         # Graze-boundary gate: the approximate spherical fundamental-plane
         # test (gamma <= 1 + l1) admits penumbral grazes that neither the
@@ -2731,7 +2971,7 @@ def _sol_eclipse_when_glob_pythonic(
                 # Check if eclipse maximum is at or after jd_start
                 # (eclipse might have started before but maximum after)
                 jd_max = result[1][0]
-                if jd_max >= jd_start:
+                if jd_max > jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN:
                     # This eclipse's maximum is after jd_start, use it
                     return result
                 else:
@@ -2747,7 +2987,10 @@ def _sol_eclipse_when_glob_pythonic(
         jd_next_nm = _find_next_new_moon(jd_start)
         if jd_next_nm - jd_start <= BIDIRECTIONAL_WINDOW:
             result = _check_new_moon_for_eclipse(jd_next_nm)
-            if result is not None and result[1][0] < jd_start:
+            if (
+                result is not None
+                and result[1][0] < jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN
+            ):
                 return result
 
         jd = jd_start
@@ -2764,8 +3007,11 @@ def _sol_eclipse_when_glob_pythonic(
             if result is not None:
                 # Direction invariant: a backward search must return an
                 # eclipse whose maximum precedes jd_start (refinement can
-                # drag the maximum across the start time).
-                if result[1][0] < jd_start:
+                # drag the maximum across the start time). The epoch margin
+                # makes a maximum within _ECLIPSE_WHEN_EPOCH_MARGIN of jd_start count as
+                # "reached", so an on-maximum start advances to the previous
+                # eclipse (compatibility contract).
+                if result[1][0] < jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN:
                     return result
             # Go further back
             jd = jd_prev_new_moon - 1
@@ -2792,7 +3038,10 @@ def _sol_eclipse_when_glob_pythonic(
                 raise
         if jd_prev_nm is not None and jd_start - jd_prev_nm <= BIDIRECTIONAL_WINDOW:
             result = _check_new_moon_for_eclipse(jd_prev_nm)
-            if result is not None and result[1][0] > jd_start:
+            if (
+                result is not None
+                and result[1][0] > jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
+            ):
                 return result
 
     jd = jd_start
@@ -2808,12 +3057,15 @@ def _sol_eclipse_when_glob_pythonic(
                 # eclipse exists within coverage (the tier boundary).
                 break
             raise
-        if result is not None and result[1][0] <= jd_start:
+        if result is not None and result[1][0] <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN:
             # Direction invariant: a forward search must return an eclipse
             # whose maximum follows jd_start. The conjunction-anchored
             # candidate can refine to a maximum a few minutes BEFORE the
             # start time; skip to the next lunation instead of returning
-            # a past eclipse (or looping forever in tret[0]+eps scans).
+            # a past eclipse (or looping forever in tret[0]+eps scans). The
+            # epoch margin makes a maximum within _ECLIPSE_WHEN_EPOCH_MARGIN of jd_start count
+            # as "reached", so `jd = tret[0]; when(jd)` advances to the next
+            # eclipse (compatibility contract).
             result = None
         if result is not None:
             # For bidirectional mode, we have a forward result
@@ -2839,6 +3091,23 @@ def _sol_eclipse_when_glob_pythonic(
     )
 
 
+def _strip_one_try_bit(flags: int) -> int:
+    """Drop bit 0x8000 from eclipse-search calculation flags.
+
+    The bit value is shared between ``ECL_ONE_TRY`` and ``FLG_TOPOCTR``.
+    In the eclipse functions' ``flags`` argument it can only mean the
+    one-try optimization hint (the topocentric place is defined by the
+    explicit ``geopos``, never by this flag), and results are identical
+    with or without it (compatibility contract). Passing it
+    through to the position pipeline would instead trip the topocentric
+    configuration guard. The functional one-try request rides on the
+    ``backwards`` parameter, as in the occultation searches.
+    """
+    from .constants import ECL_ONE_TRY
+
+    return flags & ~ECL_ONE_TRY
+
+
 def sol_eclipse_when_glob(
     tjdut: float,
     flags: int = FLG_SWIEPH,
@@ -2857,8 +3126,9 @@ def sol_eclipse_when_glob(
             the direction strings understood by :func:`_coerce_backwards`.
 
     Returns:
-        Tuple of (retflag, tret) matching the reference ephemeris.
+        Tuple of (retflag, tret) matching the reference API.
     """
+    flags = _strip_one_try_bit(flags)
     direction = "backward" if _coerce_backwards(backwards) else "forward"
     return _sol_eclipse_when_glob_pythonic(
         tjdut, flags=flags, eclipse_type=ecltype, search_direction=direction
@@ -3463,6 +3733,7 @@ def sol_eclipse_when_loc(
     fallback for partial/custom LEB files. See the impl docstring for the
     full API contract.
     """
+    flags = _strip_one_try_bit(flags)
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_when_loc_impl,
         tjdut,
@@ -3483,7 +3754,7 @@ def _sol_eclipse_when_loc_impl(
     """
     Find the next solar eclipse visible from a specific geographic location.
 
-    This function matches the reference API signature exactly. It searches forward
+    This function follows the reference API signature exactly. It searches forward
     (or backward if specified) in time from tjdut to find the next solar
     eclipse visible from the observer's location specified by geopos.
 
@@ -3577,11 +3848,18 @@ def _sol_eclipse_when_loc_impl(
         s_p, m_p = _topo_sun_moon(jd, _geopos3, reader)
         return angular_separation(s_p[0], s_p[1], m_p[0], m_p[1])
 
-    def _radii_sep(jd: float) -> Tuple[float, float, float]:
-        """Apparent solar and lunar radii plus center separation at jd."""
+    def _radii_sep(
+        jd: float, rmoon_au: float = _ECL_RMOON_AU
+    ) -> Tuple[float, float, float]:
+        """Apparent solar and lunar radii plus center separation at jd.
+
+        ``rmoon_au`` selects the lunar radius: the default full disc for the
+        outer (penumbral) contacts and magnitude, or the smaller inner-contact
+        radius for second/third contact (see ``_ECL_RMOON_INNER_AU``).
+        """
         s_p, m_p = _topo_sun_moon(jd, _geopos3, reader)
         rs = math.degrees(math.asin(_ECL_RSUN_AU / s_p[2]))
-        rm = math.degrees(math.asin(_ECL_RMOON_AU / m_p[2]))
+        rm = math.degrees(math.asin(rmoon_au / m_p[2]))
         return rs, rm, angular_separation(s_p[0], s_p[1], m_p[0], m_p[1])
 
     def _sun_altaz(jd: float) -> Tuple[float, float, float]:
@@ -3707,15 +3985,17 @@ def _sol_eclipse_when_loc_impl(
             phase = ECL_PARTIAL
 
         # Contact times. Outer contacts: center separation equals the
-        # sum of the apparent radii evaluated at the contact itself.
-        # Inner contacts use the exact tangency of the two apparent discs:
-        # center separation equals the absolute semidiameter difference.
+        # sum of the apparent radii evaluated at the contact itself, with the
+        # full mean lunar disc. Inner contacts use the exact tangency of the
+        # two apparent discs (center separation equals the absolute
+        # semidiameter difference) against the smaller inner-contact lunar
+        # radius, so totality/annularity is reckoned against the umbral disc.
         def _f_outer(jd_c: float) -> float:
             rs_c, rm_c, sep_c = _radii_sep(jd_c)
             return sep_c - (rs_c + rm_c)
 
         def _f_inner(jd_c: float) -> float:
-            rs_c, rm_c, sep_c = _radii_sep(jd_c)
+            rs_c, rm_c, sep_c = _radii_sep(jd_c, _ECL_RMOON_INNER_AU)
             return abs(rs_c - rm_c) - sep_c
 
         two_hours = 2.0 / 24.0
@@ -3740,8 +4020,28 @@ def _sol_eclipse_when_loc_impl(
         # in-progress eclipse from being skipped to the next lunation.
         first_contact = jd_first if jd_first != 0.0 else jd_local_max
         last_contact = jd_fourth if jd_fourth != 0.0 else jd_local_max
-        if (not backwards and last_contact <= tjdut + 1e-4) or (
-            backwards and first_contact >= tjdut - 1e-4
+        # Two independent reasons to skip this lunation:
+        #  * its local phases are wholly past (forward) or wholly future
+        #    (backward) — the contact-anchored test, which is what keeps an
+        #    in-progress eclipse from being dropped; and
+        #  * the caller started AT or past the instant this function would
+        #    return, i.e. the re-entrant `jd = tret[0]; when_loc(jd)` idiom.
+        #    Without the second test the search re-found the same eclipse
+        #    forever (the last contact is still hours ahead of the maximum),
+        #    so enumerating local eclipses hung instead of advancing by the
+        #    ~856-day solar / ~355-day lunar step.
+        if (
+            not backwards
+            and (
+                last_contact <= tjdut + _ECLIPSE_WHEN_EPOCH_MARGIN
+                or jd_local_max <= tjdut + _ECLIPSE_WHEN_EPOCH_MARGIN
+            )
+        ) or (
+            backwards
+            and (
+                first_contact >= tjdut - _ECLIPSE_WHEN_EPOCH_MARGIN
+                or jd_local_max >= tjdut - _ECLIPSE_WHEN_EPOCH_MARGIN
+            )
         ):
             if backwards:
                 jd = jd_max_global - 1
@@ -3897,6 +4197,7 @@ def sol_eclipse_where(
     Wrapper around :func:`_sol_eclipse_where_impl` that applies mode-aware LEB
     range handling. See the implementation docstring for the full API contract.
     """
+    flags = _strip_one_try_bit(flags)
     return _call_with_leb_skyfield_fallback(_sol_eclipse_where_impl, tjdut, flags)
 
 
@@ -4002,6 +4303,7 @@ def sol_eclipse_how(
     fallback for partial/custom LEB files. See the impl docstring for the
     full API contract.
     """
+    flags = _strip_one_try_bit(flags)
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_how_impl,
         tjdut,
@@ -4061,8 +4363,8 @@ def _sol_eclipse_how_impl(
 
     Note:
         The visibility gate uses the Sun's apparent altitude: at or below
-        0 the function returns retflag 0 even mid-eclipse, matching the
-        reference behavior.
+        0 the function returns retflag 0 even mid-eclipse (compatibility
+        contract).
 
     References:
         - Reference API: sol_eclipse_how()
@@ -4998,7 +5300,8 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     # Edge case: shallow penumbral eclipse
     if penumbral_mag > 0 and penumbral_mag < SHALLOW_ECLIPSE_MAG_THRESHOLD:
         # Very shallow penumbral eclipse - mark as grazing
-        # Shallow grazing penumbral: the reference reports plain PENUMBRAL
+        # Shallow grazing penumbral reports plain PENUMBRAL (compatibility
+        # contract)
         eclipse_type = ECL_PENUMBRAL
         penumbral_mag = max(0.0, penumbral_mag)
         return eclipse_type, 0.0, penumbral_mag, gamma, penumbra_radius, umbra_radius
@@ -5012,7 +5315,8 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     # Edge case: shallow umbral (partial) eclipse
     if umbral_mag > 0 and umbral_mag < SHALLOW_ECLIPSE_MAG_THRESHOLD:
         # Very shallow partial umbral eclipse - mark as grazing
-        # Shallow grazing partial: the reference reports plain PARTIAL
+        # Shallow grazing partial reports plain PARTIAL (compatibility
+        # contract)
         eclipse_type = ECL_PARTIAL
         umbral_mag = max(0.0, min(1.0, umbral_mag))
         penumbral_mag = max(0.0, penumbral_mag)
@@ -5322,59 +5626,100 @@ def _lun_eclipse_when_pythonic(
     if eclipse_type == 0:
         eclipse_type = ECL_ALLTYPES_LUNAR
 
+    # Days to look back for the forward pre-probe below (mirror of the
+    # solar search's BIDIRECTIONAL_WINDOW).
+    LUNAR_PRE_PROBE_WINDOW = 15.0
+
+    def _check_full_moon_for_eclipse(
+        jd_full_moon: float,
+    ) -> Union[Tuple[int, Tuple[float, ...]], None]:
+        """Classify the matching eclipse (if any) at a Full Moon.
+
+        Encapsulates the node pre-filter, the maximum refinement, the
+        shadow-geometry classification and the type-mask test so the forward
+        pre-probe and the main lunation walk share one code path. Returns the
+        ``(retflag, tret)`` pair or ``None`` when this Full Moon carries no
+        matching eclipse.
+        """
+        moon_pos, _ = calc_ut(jd_full_moon, MOON, flags | FLG_SPEED)
+        moon_lon = moon_pos[0]
+
+        # Coarse PRE-FILTER (widened well past the physical limit); the true
+        # test is the shadow-geometry classification at the refined maximum
+        # (node distance is not a clean discriminator here).
+        node_dist = _get_moon_node_distance(jd_full_moon, moon_lon)
+        if node_dist >= _LUNAR_NODE_PREFILTER:
+            return None
+
+        # Refine the time of maximum eclipse: deepest immersion of the Moon
+        # in the Earth's shadow, then classify from the shadow geometry.
+        jd_max = _lun_eclipse_max_time(jd_full_moon, flags)
+        retc, _attr_max, _dcore_max = _lun_how_core(jd_max, flags)
+        if retc == 0:
+            return None
+
+        type_matches = (
+            (eclipse_type & ECL_TOTAL and retc & ECL_TOTAL)
+            or (eclipse_type & ECL_PARTIAL and retc & ECL_PARTIAL)
+            or (eclipse_type & ECL_PENUMBRAL and retc & ECL_PENUMBRAL)
+        )
+        if not type_matches:
+            return None
+
+        times = _lun_eclipse_phase_times(jd_max, retc, flags)
+        return retc, times
+
+    # Forward pre-probe (mirror of the solar search). A lunar eclipse's
+    # opposition (Full Moon) precedes its maximum by a few minutes, so a
+    # start epoch that falls in the [opposition, maximum) window would make
+    # _find_next_full_moon() skip to the NEXT lunation and drop the
+    # in-progress eclipse. Probe the previous Full Moon first and return its
+    # eclipse when its maximum is still more than the epoch margin ahead of
+    # jd_start (compatibility contract: the current eclipse is returned
+    # right up to maximum - _ECLIPSE_WHEN_EPOCH_MARGIN).
+    if not backwards:
+        try:
+            jd_prev_fm = _find_previous_full_moon(jd_start)
+        except Exception as _exc:
+            if _is_ephemeris_boundary(_exc):
+                jd_prev_fm = None
+            else:
+                raise
+        if jd_prev_fm is not None and jd_start - jd_prev_fm <= LUNAR_PRE_PROBE_WINDOW:
+            pre = _check_full_moon_for_eclipse(jd_prev_fm)
+            if pre is not None and pre[1][0] > jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN:
+                return pre
+
     jd = jd_start
 
     for _ in range(MAX_FULL_MOONS):
-        # Find next (or previous) Full Moon
+        # Find next (or previous) Full Moon and classify any eclipse there.
         try:
             if backwards:
                 jd_full_moon = _find_previous_full_moon(jd)
             else:
                 jd_full_moon = _find_next_full_moon(jd)
-
-            # Get Moon position at Full Moon
-            moon_pos, _ = calc_ut(jd_full_moon, MOON, flags | FLG_SPEED)
+            result = _check_full_moon_for_eclipse(jd_full_moon)
         except Exception as _exc:
             if _is_ephemeris_boundary(_exc):
                 # Walked off the ephemeris: no matching eclipse within coverage.
                 break
             raise
-        moon_lon = moon_pos[0]
-        moon_pos[1]
 
-        # Check if close enough to ecliptic for eclipse. This is only a
-        # coarse PRE-FILTER (widened well past the physical limit); the
-        # true test is the shadow-geometry classification at the refined
-        # maximum below (node distance is not a clean discriminator here).
-        node_dist = _get_moon_node_distance(jd_full_moon, moon_lon)
-
-        if node_dist < _LUNAR_NODE_PREFILTER:
-            # Refine the time of maximum eclipse: deepest immersion of
-            # the Moon in the Earth's shadow.
-            jd_max = _lun_eclipse_max_time(jd_full_moon, flags)
+        if result is not None:
+            jd_max = result[1][0]
 
             # Direction invariant: a forward search must return an eclipse
             # after jd_start, a backward search one before it (refinement
-            # can drag the maximum across the start time).
-            if (not backwards and jd_max <= jd_start) or (
-                backwards and jd_max >= jd_start
-            ):
-                jd = jd_full_moon + (-25 if backwards else 25)
-                continue
-
-            # Classify from the shadow geometry at maximum.
-            retc, _attr_max, _dcore_max = _lun_how_core(jd_max, flags)
-
-            if retc != 0:
-                type_matches = (
-                    (eclipse_type & ECL_TOTAL and retc & ECL_TOTAL)
-                    or (eclipse_type & ECL_PARTIAL and retc & ECL_PARTIAL)
-                    or (eclipse_type & ECL_PENUMBRAL and retc & ECL_PENUMBRAL)
-                )
-
-                if type_matches:
-                    times = _lun_eclipse_phase_times(jd_max, retc, flags)
-                    return retc, times
+            # can drag the maximum across the start time). The epoch margin
+            # makes a maximum within _ECLIPSE_WHEN_EPOCH_MARGIN of jd_start count as "reached",
+            # so `jd = tret[0]; when(jd)` advances to the neighbouring
+            # eclipse (compatibility contract).
+            skip = (
+                not backwards and jd_max <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
+            ) or (backwards and jd_max >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN)
+            if not skip:
+                return result
 
         # Advance (or retreat) to the next lunation: ~25 days keeps us
         # safely within one synodic month of the next Full Moon.
@@ -5404,8 +5749,9 @@ def lun_eclipse_when(
             the direction strings understood by :func:`_coerce_backwards`.
 
     Returns:
-        Tuple of (retflag, tret) matching the reference ephemeris.
+        Tuple of (retflag, tret) matching the reference API.
     """
+    flags = _strip_one_try_bit(flags)
     return _lun_eclipse_when_pythonic(
         tjdut,
         flags=flags,
@@ -5588,8 +5934,21 @@ def _lun_eclipse_when_loc_pythonic(
         # not yet begun at moonrise), wedging the sequential search on an
         # already-finished eclipse. tret[0] is still the geocentric maximum
         # here, so the search advance matches the other skips.
-        if (not backwards and last_visible <= jd_start + 1e-4) or (
-            backwards and first_visible >= jd_start - 1e-4
+        if (
+            not backwards
+            and (
+                last_visible <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
+                # Re-entrancy: the caller started at or past the instant this
+                # function would return, so advance instead of re-finding the
+                # same eclipse (see the solar twin).
+                or tret[0] <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
+            )
+        ) or (
+            backwards
+            and (
+                first_visible >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN
+                or tret[0] >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN
+            )
         ):
             search_jd = tret[0] + (-25.0 if backwards else 25.0)
             continue
@@ -5628,8 +5987,9 @@ def lun_eclipse_when_loc(
             the direction strings understood by :func:`_coerce_backwards`.
 
     Returns:
-        Tuple of (retflag, tret, attr) matching the reference ephemeris.
+        Tuple of (retflag, tret, attr) matching the reference API.
     """
+    flags = _strip_one_try_bit(flags)
     if len(geopos) < 3:
         raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
 
@@ -5889,6 +6249,7 @@ def lun_eclipse_how(
     fallback for partial/custom LEB files. See the impl docstring for the
     full API contract.
     """
+    flags = _strip_one_try_bit(flags)
     return _call_with_leb_skyfield_fallback(
         _lun_eclipse_how_impl,
         tjdut,
@@ -5987,6 +6348,21 @@ def _kernel_jd_bounds(eph) -> Tuple[float, float]:
     return min(starts), max(ends)
 
 
+def _reject_moon_self_occultation(body: "int | str") -> None:
+    """Reject the degenerate Moon-occults-Moon request with the typed error.
+
+    The Moon cannot occult itself; without this guard the shadow geometry
+    would divide by the zero Moon-to-body distance. Behavioral comparison
+    with one external implementation showed no defined result for this
+    request either (the call fails to terminate), so the shared typed
+    contract error is raised instead by every lun_occult_* entry point.
+    """
+    if isinstance(body, int) and body == MOON:
+        from .exceptions import Error as _Error
+
+        raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
+
+
 def lun_occult_when_glob(
     tjdut: float,
     body: "int | str",
@@ -6016,6 +6392,7 @@ def lun_occult_when_glob(
         examined; a miss returns retflag zero and a continuation date in the
         first time slot.
     """
+    _reject_moon_self_occultation(body)
     from .exceptions import Error
     from .constants import ECL_ONE_TRY
 
@@ -6115,8 +6492,8 @@ def lun_occult_when_glob(
 
         tret = [0.0] * 10
         tret[0] = tjd
-        if (backward and tret[0] >= tjdut - 1e-4) or (
-            not backward and tret[0] <= tjdut + 1e-4
+        if (backward and tret[0] >= tjdut - _ECLIPSE_WHEN_EPOCH_MARGIN) or (
+            not backward and tret[0] <= tjdut + _ECLIPSE_WHEN_EPOCH_MARGIN
         ):
             t = tjd + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
@@ -6288,11 +6665,13 @@ def _lun_occult_when_loc_pythonic(
         pos, _ = calc_ut(jd, cast(int, body), eph_flags)
         return float(pos[0]), float(pos[1])
 
-    def _radii_sep(jd: float) -> Tuple[float, float, float]:
+    def _radii_sep(
+        jd: float, rmoon_au: float = _ECL_RMOON_AU
+    ) -> Tuple[float, float, float]:
         b_p = _occ_body_topo(jd, body, geopos3, flags, reader)
         _s_p, m_p = _topo_sun_moon(jd, geopos3, reader)
         rb = math.degrees(math.asin(body_radius_au / b_p[2])) if body_radius_au else 0.0
-        rm = math.degrees(math.asin(_ECL_RMOON_AU / m_p[2]))
+        rm = math.degrees(math.asin(rmoon_au / m_p[2]))
         return rb, rm, angular_separation(b_p[0], b_p[1], m_p[0], m_p[1])
 
     def _sep_minus_radii(jd: float) -> float:
@@ -6337,8 +6716,8 @@ def _lun_occult_when_loc_pythonic(
             t = jd_max + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
-        if (backward and jd_max >= jd_start - 1e-4) or (
-            not backward and jd_max <= jd_start + 1e-4
+        if (backward and jd_max >= jd_start - _ECLIPSE_WHEN_EPOCH_MARGIN) or (
+            not backward and jd_max <= jd_start + _ECLIPSE_WHEN_EPOCH_MARGIN
         ):
             if one_try:
                 return _one_try_miss(jd_max + direction)
@@ -6352,14 +6731,16 @@ def _lun_occult_when_loc_pythonic(
         else:
             phase = ECL_PARTIAL
 
-        # Inner contacts use exact apparent-disc tangency; for point-source
-        # stars the outer contacts coincide with them.
+        # Inner contacts use exact apparent-disc tangency against the smaller
+        # inner-contact lunar radius (disappearance/reappearance behind the
+        # dark limb); for point-source stars the outer contacts coincide with
+        # them. Outer contacts use the full mean lunar disc.
         def _f_outer(jd_c: float) -> float:
             rb_c, rm_c, sep_c = _radii_sep(jd_c)
             return sep_c - (rb_c + rm_c)
 
         def _f_inner(jd_c: float) -> float:
-            rb_c, rm_c, sep_c = _radii_sep(jd_c)
+            rb_c, rm_c, sep_c = _radii_sep(jd_c, _ECL_RMOON_INNER_AU)
             return abs(rb_c - rm_c) - sep_c
 
         jd_second = 0.0
@@ -6500,6 +6881,7 @@ def lun_occult_when_loc(
         Local attributes include covered diameter/disc fractions, target
         azimuth and altitude, elongation, and the event contact times.
     """
+    _reject_moon_self_occultation(body)
 
     # Validate geopos
     if len(geopos) < 3:
@@ -6592,7 +6974,12 @@ def _lun_occult_where_pythonic(
     """
     retflag, center_lon, center_lat, dcore = _eclipse_where_core(tjdut, flags, body)
     _rc_how, attr_list = _sol_how_core(
-        tjdut, (center_lon, center_lat, 0.0), flags, reader, body
+        tjdut,
+        (center_lon, center_lat, 0.0),
+        flags,
+        reader,
+        body,
+        where_convention=True,
     )
     attr_list[3] = dcore[0]
     geopos = (center_lon, center_lat, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -6617,8 +7004,9 @@ def lun_occult_where(
         flags: Calculation flags (default FLG_SWIEPH).
 
     Returns:
-        Tuple of (retflag, geopos, attr) matching the reference ephemeris.
+        Tuple of (retflag, geopos, attr) matching the reference API.
     """
+    _reject_moon_self_occultation(body)
     if isinstance(body, int):
         from .fixed_stars import FIXED_STARS as _FS
         from .fixed_stars import get_canonical_star_name as _star_name_by_id
@@ -6694,6 +7082,11 @@ def _rise_trans_impl(
             - CALC_MTRANSIT (4): Upper meridian transit (culmination)
             - CALC_ITRANSIT (8): Lower meridian transit (anti-culmination)
             Additional flags (OR with event type):
+            - BIT_GEOCTR_NO_ECL_LAT (128): Use the geocentric apparent place
+              projected onto the ecliptic (ecliptic latitude zeroed) instead
+              of the topocentric place - the Hindu-rising convention. Affects
+              rise/set and twilight; ignored for meridian transits. Component
+              of BIT_HINDU_RISING (896).
             - BIT_DISC_CENTER (256): Use disc center instead of upper limb
             - BIT_DISC_BOTTOM (8192): Use lower limb of disc
             - BIT_NO_REFRACTION (512): Ignore atmospheric refraction
@@ -6767,14 +7160,20 @@ def _make_tret(jd_event: float = 0.0) -> Tuple[float, ...]:
     return (float(jd_event), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
-def _calculate_transit_leb(
+def _calculate_transit(
     jd_start: float,
     lon: float,
     event_type: int,
     get_ra_dec,
     CALC_ITRANSIT: int,
 ) -> Tuple[int, Tuple[float, ...]]:
-    """LEB version of _calculate_transit using a callable for RA/Dec."""
+    """Meridian transit time from a backend-agnostic RA/Dec callable.
+
+    ``get_ra_dec(jd)`` returns the body's apparent (RA hours, Dec deg). It is
+    sourced from calc_ut(FLG_EQUATORIAL) / fixstar_ut, so the LEB and Skyfield
+    backends share one transit engine (the meridian crossing is geocentric, so
+    no observer/parallax is needed).
+    """
 
     def _get_body_hour_angle(jd: float) -> float:
         ra_hours, _ = get_ra_dec(jd)
@@ -6814,90 +7213,6 @@ def _calculate_transit_leb(
             return 0, _make_tret(jd_guess)
         jd_guess -= ha / (360.0 / sidereal_day)
 
-    return 0, _make_tret(jd_guess)
-
-
-def _calculate_transit(
-    jd_start: float,
-    lat: float,
-    lon: float,
-    event_type: int,
-    ts,
-    earth,
-    target,
-    observer,
-    CALC_ITRANSIT: int,
-) -> Tuple[int, Tuple[float, ...]]:
-    """Calculate meridian transit time."""
-    # Transit occurs when body's RA = Local Sidereal Time
-    # LST = GMST + longitude (in hours)
-    # So transit occurs when GMST = RA - longitude/15
-
-    def _get_body_hour_angle(jd: float) -> float:
-        """Calculate body's hour angle (in degrees). 0 = on meridian."""
-        t = ts.ut1_jd(jd)
-
-        # Get body's RA (epoch of date)
-        body_app = earth.at(t).observe(target).apparent()
-        ra, _, _ = body_app.radec(epoch="date")
-        ra_deg = ra.hours * 15.0  # Convert to degrees
-
-        # Get Local APPARENT Sidereal Time (apparent RA pairs with GAST;
-        # GMST left a ~1.1 s equation-of-equinoxes error in transits)
-        gast = t.gast  # in hours
-        lst = gast + lon / 15.0  # in hours
-        lst_deg = lst * 15.0  # Convert to degrees
-
-        # Hour angle = LST - RA (normalized to -180 to +180)
-        ha = (lst_deg - ra_deg) % 360.0
-        if ha > 180:
-            ha -= 360
-        return ha
-
-    # Get initial hour angle
-    ha = _get_body_hour_angle(jd_start)
-
-    # Adjust for lower transit (HA = 180 instead of 0)
-    if event_type == CALC_ITRANSIT:
-        ha = (ha - 180) % 360
-        if ha > 180:
-            ha -= 360
-
-    # Estimate time to next transit
-    # Earth rotates 360° in ~23h56m (sidereal day)
-    # So hour angle changes ~15°/hour = 360°/day (approximately)
-    sidereal_day = 0.99726957  # days
-
-    if ha > 0:
-        # Body is west of meridian, wait for it to come around
-        dt = (360.0 - ha) / 360.0 * sidereal_day
-    else:
-        # Body is east of meridian, it will cross soon
-        dt = (-ha) / 360.0 * sidereal_day
-
-    jd_guess = jd_start + dt
-
-    # Newton-Raphson refinement
-    for _ in range(30):
-        ha = _get_body_hour_angle(jd_guess)
-
-        # Adjust for lower transit
-        if event_type == CALC_ITRANSIT:
-            ha = (ha - 180) % 360
-            if ha > 180:
-                ha -= 360
-
-        # Check convergence (< 1 arcsecond in HA = < 0.07 seconds in time)
-        if abs(ha) < 1.0 / 3600.0:
-            return 0, _make_tret(jd_guess)
-
-        # Rate of change of HA: approximately 360°/sidereal day
-        ha_rate = 360.0 / sidereal_day  # degrees/day
-
-        # Newton-Raphson step
-        jd_guess -= ha / ha_rate
-
-    # If we get here, convergence failed but return best estimate
     return 0, _make_tret(jd_guess)
 
 
@@ -6975,13 +7290,81 @@ def _calculate_rise_set(
         return -2, _make_tret()
     assert jd_cross_end is not None
 
-    # Bisection: 0.0001 degrees corresponds to well under a second of
-    # time at typical horizon crossing speeds.
-    for _ in range(50):
+    # Bisection with a rate-aware altitude tolerance for near-tangential
+    # grazing crossings.
+    #
+    # A fixed altitude residual maps to a time error of |h| / |dh/dt|. On a
+    # steep crossing (the Sun rises/sets at ~15"/s at mid latitudes) 0.0001 deg
+    # is well under 0.03 s, so that tolerance is kept and the crossing exits
+    # exactly as before. Only when the apparent altitude sweeps the horizon
+    # very slowly — the Sun skimming the horizon at a solstice essentially at
+    # the polar circle, where |dh/dt| <~ 2"/s — does 0.0001 deg span an
+    # appreciable time (up to ~0.4 s). There the loop keeps bisecting until the
+    # *time* (not the altitude) is pinned to ~0.03 s, using the local slope
+    # |dh/dt| measured at the candidate by a tight symmetric probe.
+    #
+    # The slope gate deliberately excludes the steeper high-summer sub-polar
+    # geometry, where the rise/set sits on the refraction "dip" discontinuity
+    # (the apparent altitude jumps by ~the horizon refraction across the
+    # crossing): the documented stop convention there is the refracted branch
+    # above the jump, so converging onto |h| = 0 would leave it. Those
+    # crossings keep the historic exit unchanged. The gate separates two
+    # slope populations rather than deriving from the tolerance target: a
+    # near-tangential grazing approaches zero slope by definition (the
+    # altitude curve flattens at tangency), while an ordinary crossing
+    # runs at ~15"/s and the dip branch far steeper, so any gate in the
+    # wide gap between the grazing population and the ordinary one
+    # classifies the two identically; 2"/s sits in that gap. At the gate
+    # itself the historic altitude exit still carries up to
+    # 0.36"/(2"/s) = 0.18 s of time error (the mapping above), shrinking
+    # as 1/slope for steeper crossings — accepted for the non-grazing
+    # population, whose exit convention is unchanged.
+    _TIME_TOL_S = 0.03
+    _SLOPE_PROBE_S = 0.05
+    _GRAZE_SLOPE_DEG_S = 2.0 / 3600.0  # ~2"/s: near-tangential grazing only
+    # ~100"/s: far above any real apparent-altitude rate (a body on the
+    # celestial equator sweeps at most ~16"/s), so a measured slope this steep
+    # is the sub-polar refraction "dip" discontinuity, not a genuine crossing.
+    _DIP_SLOPE_DEG_S = 100.0 / 3600.0
+    for _ in range(60):
         jd_mid = (jd_cross_start + jd_cross_end) / 2
         h_mid = _event_height(jd_mid)
-        if abs(h_mid) < 0.0001:
-            return 0, _make_tret(jd_mid)
+        if abs(h_mid) < 1e-4:
+            span = jd_cross_end - jd_cross_start
+            dt = _SLOPE_PROBE_S / 86400.0
+            if dt > 0.25 * span:
+                dt = 0.25 * span
+            slope = 0.0
+            slope_signed = 0.0
+            if dt > 0.0:
+                slope_signed = (
+                    _event_height(jd_mid + dt) - _event_height(jd_mid - dt)
+                ) / (2.0 * dt * 86400.0)
+                slope = abs(slope_signed)
+            if (
+                slope <= 0.0
+                or slope >= _GRAZE_SLOPE_DEG_S
+                or abs(h_mid) < slope * _TIME_TOL_S
+            ):
+                # Refine an ordinary, well-conditioned crossing onto its true
+                # root (h == 0) with one Newton step, so the event time is fixed
+                # by the geometry rather than by which loose |h| < 1e-4 midpoint
+                # the bisection happened to reach first. That first-inside-band
+                # exit left a ~0.024 s ambiguity that stopped the LEB and
+                # Skyfield backends - whose apparent places differ only by the
+                # ~0.0003" LEB approximation - up to ~0.055 s apart. Only the
+                # ordinary rise/set slope band is refined: near-tangential
+                # grazing keeps the time-based exit above, and the near-vertical
+                # apparent-altitude jump of the sub-polar refraction "dip" (a
+                # slope orders of magnitude above any real motion) keeps the
+                # historic midpoint so it still stops on the refracted branch
+                # above the jump.
+                jd_out = jd_mid
+                if _GRAZE_SLOPE_DEG_S <= slope < _DIP_SLOPE_DEG_S:
+                    jd_step = jd_mid - h_mid / (slope_signed * 86400.0)
+                    if jd_cross_start <= jd_step <= jd_cross_end:
+                        jd_out = jd_step
+                return 0, _make_tret(jd_out)
         if event_type == CALC_RISE:
             if h_mid < 0.0:
                 jd_cross_start = jd_mid
@@ -7058,6 +7441,9 @@ def _rise_trans_true_hor_impl(
             - CALC_MTRANSIT (4): Upper meridian transit (culmination)
             - CALC_ITRANSIT (8): Lower meridian transit (anti-culmination)
             Additional flags (OR with event type):
+            - BIT_GEOCTR_NO_ECL_LAT (128): Use the geocentric apparent place
+              with the ecliptic latitude zeroed (Hindu-rising convention;
+              see the note below). Component of BIT_HINDU_RISING (896).
             - BIT_DISC_CENTER (256): Use disc center instead of upper limb
             - BIT_DISC_BOTTOM (8192): Use lower limb of disc
             - BIT_NO_REFRACTION (512): Ignore atmospheric refraction
@@ -7088,10 +7474,23 @@ def _rise_trans_true_hor_impl(
         For transits, circumpolar objects still have valid transit times.
 
         Twilight flags (BIT_CIVIL_TWILIGHT, BIT_NAUTIC_TWILIGHT,
-        BIT_ASTRO_TWILIGHT) are honored for the Sun: they switch the
-        event to a geometric Sun-center crossing of -6/-12/-18 degrees
-        and override horhgt, matching the reference behavior. The
-        special value horhgt=-100 requests the dip of the sea horizon.
+        BIT_ASTRO_TWILIGHT) are honored for the Sun and for fixed
+        stars: they switch the event to a geometric center crossing of
+        -6/-12/-18 degrees and override horhgt, matching the reference
+        behavior (planets and the Moon keep their ordinary horizon
+        crossing). The special value horhgt=-100 requests the dip of
+        the sea horizon.
+
+        BIT_GEOCTR_NO_ECL_LAT (128) replaces the ordinary topocentric place
+        with the body's GEOCENTRIC apparent place projected onto the ecliptic
+        (ecliptic latitude set to zero, longitude and distance kept), then
+        rotates that direction to the observer's horizon. This drops both the
+        topocentric parallax and the ecliptic latitude, so a body far from the
+        ecliptic rises/sets at a very different time (e.g. the Moon shifts by
+        tens of minutes toward its ecliptic-longitude crossing). Compatibility
+        contract: the bit affects rise/set and twilight but is
+        ignored for meridian transits. It is the latitude-zeroing component of
+        BIT_HINDU_RISING (896 = 128 | 256 | 512).
 
     Algorithm:
         1. For transits: Find when body crosses the local meridian
@@ -7116,8 +7515,6 @@ def _rise_trans_true_hor_impl(
         - Reference API: rise_trans_true_hor()
         - Meeus "Astronomical Algorithms" Ch. 15 (Rise, Set, Transit)
     """
-    from skyfield.api import wgs84
-
     from .constants import (
         CALC_RISE,
         CALC_SET,
@@ -7131,13 +7528,28 @@ def _rise_trans_true_hor_impl(
         BIT_ASTRO_TWILIGHT,
         BIT_FIXED_DISC_SIZE,
     )
-    from .planets import _PLANET_MAP, get_planet_target
-    from .state import get_planets, get_timescale
+    from .planets import _PLANET_MAP
 
-    # Unpack geopos: [longitude, latitude, altitude]
-    lon = float(geopos[0])
-    lat = float(geopos[1])
-    altitude = float(geopos[2]) if len(geopos) > 2 else 0.0
+    # Unpack geopos: [longitude, latitude, altitude]. The length is enforced
+    # here as it is on every sibling entry point: accepting a 2-element
+    # sequence silently defaulted the altitude to 0, and a shorter or
+    # non-numeric one escaped as IndexError/ValueError, neither of which
+    # derives from this library's Error — so `except Error:` (the drop-in
+    # for the reference's own exception) missed them.
+    try:
+        _n_geo = len(geopos)
+    except TypeError:
+        _n_geo = 0
+    if _n_geo < 3:
+        raise ValueError("geopos must be a sequence of [longitude, latitude, altitude]")
+    try:
+        lon = float(geopos[0])
+        lat = float(geopos[1])
+        altitude = float(geopos[2])
+    except (TypeError, ValueError) as _geo_exc:
+        raise ValueError(
+            "geopos must be a sequence of [longitude, latitude, altitude]"
+        ) from _geo_exc
 
     # Map parameter names for internal use
     jd_start = tjdut
@@ -7164,7 +7576,44 @@ def _rise_trans_true_hor_impl(
     _reader_rt = reader
     _use_leb_rt = _reader_rt is not None
 
-    if _use_leb_rt:
+    # Bodies the classical _PLANET_MAP does not enumerate (the lunar nodes and
+    # apsides, Chiron, the main-belt asteroids, numbered minor planets, ...)
+    # are still placeable by calc_ut, so the reference computes their rise, set
+    # and transit. Route them through one backend-agnostic pipeline: the
+    # geocentric apparent place -> azalt for the altitude and calc_ut
+    # EQUATORIAL for the transit RA/Dec. calc_ut dispatches to the active
+    # backend (the LEB reader when sealed, JPL/Skyfield otherwise) and already
+    # enforces the typed error contract, so a genuinely unknown id or an
+    # out-of-range date raises there. These are point sources: zero disc radius
+    # and negligible (geocentric) parallax — the compatibility-contract
+    # rise/set geometry.
+    use_calc_body = (not is_fixed_star) and (cast(int, body) not in _PLANET_MAP)
+    if use_calc_body:
+        # Validate positionability up front so an unplaceable body raises the
+        # typed error at the call (compatibility contract: rejection happens
+        # at the call), not mid-search; the fast_calc probe below uses the
+        # wrong id space for AST_OFFSET-aliased ids, so it is skipped for
+        # these bodies.
+        try:
+            calc_ut(jd_start, cast(int, body), FLG_SPEED)
+        except (KeyError, ValueError, Error) as _probe_exc:
+            from .exceptions import EphemerisRangeError
+
+            # A known body whose date is outside coverage (or a corrupt LEB)
+            # keeps its typed range error - never masked as an illegal body.
+            _reraise_if_leb_range_error(_probe_exc)
+            if isinstance(_probe_exc, EphemerisRangeError):
+                raise
+            # A target calc_ut cannot place at all (a planetary moon with no
+            # registered SPK, an unknown id, ...) is illegal for rise/set. One
+            # typed error on every backend, carrying the reference's "illegal
+            # planet number" message (both an Error and a ValueError).
+            raise _IllegalRiseBodyError(
+                "illegal planet number %d." % cast(int, body),
+                body_id=cast(int, body),
+            ) from _probe_exc
+
+    if _use_leb_rt and not use_calc_body:
         try:
             from . import fast_calc as _fc_rt
 
@@ -7181,44 +7630,52 @@ def _rise_trans_true_hor_impl(
             _reraise_if_leb_range_error(_probe_exc)
             _use_leb_rt = False
 
-    if _use_leb_rt:
-        from .constants import FLG_EQUATORIAL
-
-        geopos_leb = (lon, lat, altitude)
-        if is_fixed_star:
-            planet = -1
-        else:
-            planet = cast(int, body)
-            if planet not in _PLANET_MAP:
-                raise ValueError("illegal planet number %d." % planet)
-        ts = get_timescale()
-        earth = None
-        target = None
-        observer = None
+    # Both backends evaluate the horizon geometry through ONE pipeline: the
+    # topocentric apparent place from calc_ut(FLG_TOPOCTR) (fixstar_ut for
+    # stars) rotated to the observer's horizon by azalt, plus the equatorial
+    # place from calc_ut(FLG_EQUATORIAL) for the meridian transit. calc_ut and
+    # fixstar_ut dispatch to the active backend (the LEB reader when sealed,
+    # JPL/Skyfield otherwise) and azalt is the shared transform, so the LEB and
+    # Skyfield results differ only by the tiny (~0.0003") LEB-vs-Skyfield
+    # position difference instead of by the coordinate frame. The earlier split
+    # - a Skyfield-native topocentric altaz frame on one path and azalt on the
+    # other - drove rise/set times apart by up to ~0.11 s even when the two
+    # backends agreed on the position to 0.0003"; sharing the chain removes that
+    # backend-specific divergence.
+    if is_fixed_star:
+        planet = -1
     else:
-        eph = get_planets()
-        ts = get_timescale()
-        earth = eph["earth"]
-        if is_fixed_star:
-            from skyfield.api import Star as SkyfieldStar
-            from .fixed_stars import FIXED_STARS, _resolve_star_id
+        planet = cast(int, body)
+        from .constants import ECL_NUT as _ECL_NUT
 
-            star_id, err, _ = _resolve_star_id(cast(str, body))
-            if err is not None:
-                raise ValueError(err)
-            star_entry = FIXED_STARS[star_id]
-            t_years = (jd_start - 2451545.0) / 365.25
-            ra_deg = star_entry.ra_j2000 + (star_entry.pm_ra * t_years) / 3600.0
-            dec_deg = star_entry.dec_j2000 + (star_entry.pm_dec * t_years) / 3600.0
-            target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-            planet = -1
-        else:
-            planet = cast(int, body)
-            if planet not in _PLANET_MAP:
-                raise ValueError("illegal planet number %d." % planet)
-            target_name = _PLANET_MAP[planet]
-            target = get_planet_target(eph, target_name)
-        observer = wgs84.latlon(lat, lon, altitude)
+        if planet in (EARTH, _ECL_NUT):
+            # Neither id denotes a direction in the sky, so no horizon event
+            # exists: EARTH *is* the observer (calc_ut returns the zero
+            # coordinate origin) and ECL_NUT is not a body at all (its first
+            # slots carry nutation and obliquity). Feeding either tuple to
+            # azalt would manufacture a location-dependent rise/set from
+            # data that is not a direction.
+            #
+            # The measured external value is not reproducible: it returns
+            # tjd_start + 0.083333254 days for both ids at every latitude
+            # tested, rise and set identical — an internal sentinel, not an
+            # astronomical result, and encoding that constant would be
+            # reconstructing output. Fail explicitly instead, as this library
+            # does for every other degenerate self-request.
+            from .exceptions import Error as _Error
+
+            raise _Error(
+                "rise/set/transit is undefined for body %d: it has no "
+                "apparent direction in the sky." % planet
+            )
+        if planet not in _PLANET_MAP and not use_calc_body:
+            # Defensive only: an out-of-map body is validated up front (it sets
+            # use_calc_body, and an unplaceable id already raised the unified
+            # illegal-body error there), so this branch is unreachable in
+            # practice; keep the reference's illegal-body message regardless.
+            from .exceptions import UnknownBodyError
+
+            raise UnknownBodyError("illegal planet number %d." % planet)
 
     # atpress == 0: estimate pressure from the observer altitude with the
     # reference's barometric expression; attemp is used verbatim (0 means
@@ -7242,13 +7699,16 @@ def _rise_trans_true_hor_impl(
             max(altitude, 0.0), atpress=pressure, attemp=temperature
         )
 
-    # Twilight events: geometric Sun-center crossings of -6/-12/-18
-    # degrees (the horizon height is ignored for twilight).
+    # Twilight events: geometric center crossings of -6/-12/-18 degrees
+    # (the horizon height is ignored for twilight). Compatibility contract:
+    # the twilight bits are honored for the Sun AND for fixed stars
+    # (heliacal-style star visibility at a chosen solar-depression class),
+    # while planets and the Moon keep their ordinary horizon crossing.
     rsmi_eff = rsmi
     is_twilight = bool(
         rsmi & (BIT_CIVIL_TWILIGHT | BIT_NAUTIC_TWILIGHT | BIT_ASTRO_TWILIGHT)
     )
-    if is_twilight and planet == SUN:
+    if is_twilight and (planet == SUN or is_fixed_star):
         rsmi_eff = rsmi | BIT_NO_REFRACTION | BIT_DISC_CENTER
         if rsmi & BIT_CIVIL_TWILIGHT:
             horizon_alt = -6.0
@@ -7278,77 +7738,159 @@ def _rise_trans_true_hor_impl(
             _r_km = _PLANET_RADIUS_KM.get(planet)
             _body_radius_au = (_r_km / _ECL_AU_KM) if _r_km else 0.0
 
-    if _use_leb_rt:
-        from .fast_calc import _topo_ecliptic
-        from .time_utils import deltat
+    from .constants import FLG_EQUATORIAL, FLG_TOPOCTR as _FLG_TOPO_RT
+    from .utils import azalt, ECL2HOR
+
+    geopos_rt = (lon, lat, altitude)
+
+    def _get_body_altaz(jd: float) -> Tuple[float, float, float]:
+        """(true altitude, azimuth, distance) of the ordinary topocentric
+        apparent place, evaluated identically on every backend.
+
+        Planets and points use calc_ut(FLG_TOPOCTR) (the observer is set once
+        around the search, see the dispatch tail); fixed stars use their
+        geocentric apparent place (diurnal parallax is negligible for
+        rise/set). azalt then rotates the ecliptic-of-date place to the
+        observer's horizon. calc_ut/fixstar_ut dispatch to the active backend
+        and azalt is the shared transform, so the LEB and Skyfield altitudes
+        agree to the position precision (~0.0003") and rise/set/transit are
+        backend-independent.
+        """
+        if is_fixed_star:
+            from .fixed_stars import fixstar_ut
+
+            star_pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
+            az, alt_true, _ = azalt(jd, ECL2HOR, geopos_rt, 0, 0, star_pos[:3])
+            return alt_true, az, star_pos[2]
+        pos, _ = calc_ut(jd, planet, _FLG_TOPO_RT | FLG_SPEED)
+        az, alt_true, _ = azalt(jd, ECL2HOR, geopos_rt, 0, 0, pos[:3])
+        return alt_true, az, pos[2]
+
+    def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
+        """Apparent RA (hours) and Dec (deg), evaluated identically on every
+        backend: calc_ut(FLG_EQUATORIAL) for planets/points, fixstar_ut for
+        fixed stars."""
+        if is_fixed_star:
+            from .fixed_stars import fixstar_ut
+
+            pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_EQUATORIAL | FLG_SPEED)
+            return pos[0] / 15.0, pos[1]
+        eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
+        return eq[0] / 15.0, eq[1]
+
+    # Hindu-rising convention (BIT_GEOCTR_NO_ECL_LAT): the event uses the
+    # body's GEOCENTRIC apparent place projected onto the ecliptic (ecliptic
+    # latitude zeroed), not the ordinary topocentric place. Compatibility
+    # contract: this shifts rise/set AND twilight (e.g. the Moon's rise moves by
+    # ~25 min toward its ecliptic-longitude crossing) but leaves meridian
+    # transits untouched - the transit path below returns before the altitude
+    # engine, so the bit is naturally ignored there. Built on calc_ut/azalt so
+    # both backends share one geocentric pipeline (automatic LEB<->Skyfield
+    # parity).
+    from .constants import BIT_GEOCTR_NO_ECL_LAT
+
+    use_geoctr_nolat = bool(rsmi_eff & BIT_GEOCTR_NO_ECL_LAT)
+
+    def _get_body_altaz_geoctr_nolat(jd: float) -> Tuple[float, float, float]:
+        """(true altitude, azimuth, distance) from the geocentric apparent
+        place with the ecliptic latitude zeroed.
+
+        Keeps the body's geocentric ecliptic longitude and distance, drops its
+        parallax (geocentric, not topocentric) and its ecliptic latitude, then
+        rotates to the observer's horizon. The horizon rotation still uses the
+        observer's geographic location and the of-date true obliquity.
+        """
         from .utils import azalt, ECL2HOR
 
-        def _get_body_altaz(jd: float) -> Tuple[float, float, float]:
-            jd_tt = jd + deltat(jd)
-            if is_fixed_star:
-                from .fixed_stars import fixstar_ut
+        if is_fixed_star:
+            from .fixed_stars import fixstar_ut
 
-                star_pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
-                az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, star_pos[:3])
-                dist = star_pos[2]
-            else:
-                pos = _topo_ecliptic(
-                    _reader_rt, jd_tt, jd, planet, geopos_leb, FLG_SPEED
-                )
-                az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, pos[:3])
-                dist = pos[2]
-            return alt_true, az, dist
+            pos_s, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
+            lon_b, dist_b = float(pos_s[0]), float(pos_s[2])
+        else:
+            pos_p, _ = calc_ut(jd, planet, FLG_SPEED)
+            lon_b, dist_b = float(pos_p[0]), float(pos_p[2])
+        az, alt_true, _ = azalt(
+            jd, ECL2HOR, (lon, lat, altitude), 0.0, 0.0, (lon_b, 0.0, dist_b)
+        )
+        return alt_true, az, dist_b
 
-        def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
-            if is_fixed_star:
-                from .fixed_stars import fixstar_ut
+    def _get_body_ra_dec_geoctr_nolat(jd: float) -> Tuple[float, float]:
+        """Apparent RA (hours) and Dec (deg) of the ecliptic-latitude-zeroed
+        geocentric place used by the Hindu-rising path.
 
-                pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_EQUATORIAL | FLG_SPEED)
-                return pos[0] / 15.0, pos[1]
-            else:
-                eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
-                return eq[0] / 15.0, eq[1]
-    else:
+        The rise/set solver's circumpolar pre-check derives the culmination
+        altitudes from a declination. Under BIT_GEOCTR_NO_ECL_LAT the body is
+        projected onto the ecliptic (latitude 0) BEFORE the horizon rotation,
+        which lowers |Dec|, so that pre-check must use the SAME projected
+        declination the solve uses. Otherwise a body far from the ecliptic (the
+        Moon near its maximum latitude) is judged circumpolar on its true,
+        higher declination while the solve — already working on the lower
+        projected declination — would have found the event: the two disagree
+        and rise/set is spuriously reported circumpolar (res=-2) at high
+        geographic latitude. Compatibility contract: the event exists and
+        must be returned.
 
-        def _get_body_altaz(jd: float) -> Tuple[float, float, float]:
-            t = ts.ut1_jd(jd)
-            assert earth is not None and observer is not None and target is not None
-            observer_at = earth + observer
-            body_app = observer_at.at(t).observe(target).apparent()
-            alt, az, _ = body_app.altaz()
-            return alt.degrees, (az.degrees + 180.0) % 360.0, body_app.distance().au
+        The projection uses the same of-date true obliquity azalt applies in
+        _get_body_altaz_geoctr_nolat, so this declination is exactly the one the
+        horizon rotation sees.
+        """
+        import erfa
 
-        def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
-            t = ts.ut1_jd(jd)
-            assert earth is not None and target is not None
-            body_app = earth.at(t).observe(target).apparent()
-            ra, dec, _ = body_app.radec(epoch="date")
-            return ra.hours, dec.degrees
+        from .precession_vondrak import vondrak_mean_obliquity_deg
+        from .utils import cotrans
+
+        if is_fixed_star:
+            from .fixed_stars import fixstar_ut
+
+            pos_s, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
+            lon_b, dist_b = float(pos_s[0]), float(pos_s[2])
+        else:
+            pos_p, _ = calc_ut(jd, planet, FLG_SPEED)
+            lon_b, dist_b = float(pos_p[0]), float(pos_p[2])
+        jd_tt = get_timescale().ut1_jd(jd).tt
+        eps0 = vondrak_mean_obliquity_deg(jd_tt)
+        _, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
+        eps = eps0 + math.degrees(deps_rad)
+        ra, dec, _ = cotrans((lon_b, 0.0, dist_b), -eps)
+        return ra / 15.0, dec
+
+    # The ordinary (non-Hindu) altitude and the transit RA/Dec both flow
+    # through the shared, backend-agnostic _get_body_altaz / _get_body_ra_dec
+    # above (calc_ut/fixstar_ut + azalt), so in-map bodies, out-of-map bodies
+    # (nodes, apsides, Chiron, asteroids, numbered minor planets) and fixed
+    # stars all use one pipeline on both backends.
+    _altaz_for_event = (
+        _get_body_altaz_geoctr_nolat if use_geoctr_nolat else _get_body_altaz
+    )
+    _ra_dec_for_event = _get_body_ra_dec
+    # The rise/set circumpolar pre-check must see the SAME declination the
+    # altitude solve uses. Under the Hindu bit that is the ecliptic-latitude-
+    # zeroed projected declination (see _get_body_ra_dec_geoctr_nolat); the
+    # transit path keeps the true RA/Dec (the bit is ignored for transits).
+    _ra_dec_for_circumpolar = (
+        _get_body_ra_dec_geoctr_nolat if use_geoctr_nolat else _get_body_ra_dec
+    )
+
+    # The ordinary rise/set path samples the TOPOCENTRIC apparent altitude
+    # (calc_ut(FLG_TOPOCTR)) for every planet/point; set the observer once for
+    # the whole search and restore it afterwards so the diurnal parallax is
+    # applied without churning global state per sample. Fixed stars (geocentric)
+    # and the Hindu geocentric path ignore the observer.
+    _topo_scope = (not is_fixed_star) and not use_geoctr_nolat
 
     if event_type in (CALC_MTRANSIT, CALC_ITRANSIT):
-        if _use_leb_rt:
-            return _calculate_transit_leb(
-                jd_start,
-                lon,
-                event_type,
-                _get_body_ra_dec,
-                CALC_ITRANSIT,
-            )
         return _calculate_transit(
             jd_start,
-            lat,
             lon,
             event_type,
-            ts,
-            earth,
-            target,
-            observer,
+            _ra_dec_for_event,
             CALC_ITRANSIT,
         )
 
     def _event_height(jd: float) -> float:
         """Height of the configured disc point above the configured horizon."""
-        alt_true, _az, dist = _get_body_altaz(jd)
+        alt_true, _az, dist = _altaz_for_event(jd)
         alt_pt = alt_true
         if disc_sign != 0 and _body_radius_au > 0.0:
             cur = dist
@@ -7372,17 +7914,21 @@ def _rise_trans_true_hor_impl(
     if disc_sign != 0:
         lift_max += 0.30
 
-    return _calculate_rise_set(
-        jd_start,
-        lat,
-        event_type,
-        _event_height,
-        _get_body_ra_dec,
-        CALC_RISE,
-        CALC_SET,
-        horizon_alt,
-        lift_max,
+    _rt_scope = (
+        _observer_scope(lon, lat, altitude) if _topo_scope else contextlib.nullcontext()
     )
+    with _rt_scope:
+        return _calculate_rise_set(
+            jd_start,
+            lat,
+            event_type,
+            _event_height,
+            _ra_dec_for_circumpolar,
+            CALC_RISE,
+            CALC_SET,
+            horizon_alt,
+            lift_max,
+        )
 
 
 # Alias for reference API compatibility
@@ -9277,10 +9823,10 @@ def calc_eclipse_first_contact_c1(
     touches the Sun's disk, marking the beginning of a solar eclipse. At this
     instant, the penumbral shadow cone first touches Earth's surface.
 
-    This function uses Besselian elements to precisely calculate C1. The
-    condition for C1 is when gamma (the distance of the shadow axis from
-    Earth's center) equals 1 + l1 (Earth radius plus penumbral cone radius),
-    occurring before eclipse maximum.
+    This function uses Besselian-element geometry to precisely calculate
+    C1: the instant, before eclipse maximum, at which the penumbral shadow
+    cone is externally tangent to the Earth ellipsoid (the penumbral
+    contact residual of ``_besselian_contact_residuals`` crosses zero).
 
     Args:
         jd_max: Julian Day (UT) of eclipse maximum. This should be the time
@@ -9296,15 +9842,17 @@ def calc_eclipse_first_contact_c1(
         solar eclipse).
 
     Algorithm:
-        1. Calculate l1 (penumbral radius) at eclipse maximum
-        2. Compute target gamma = 1 + l1 (condition for penumbra touching Earth)
-        3. Use binary search to find when gamma equals this target before maximum
-        4. The search proceeds from (jd_max - search_range) to jd_max
+        1. Evaluate the signed penumbral contact residual of
+           ``_besselian_contact_residuals`` (tangency of the penumbral cone
+           with the Earth *ellipsoid*, in km; negative while in contact)
+        2. Expand a bracket backwards from jd_max until the residual turns
+           positive (penumbra clear of Earth)
+        3. Bisect the sign change to the first external tangency (P1)
 
     Precision:
-        The calculation achieves timing precision better than 1 second by
-        iterating until the gamma value converges to within 1e-8 Earth radii,
-        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+        The ellipsoidal residual is bisected to sub-second timing; the
+        residual carries the cone-depth term and the Earth's oblateness,
+        so the standalone helper matches sol_eclipse_when_glob's tret[2].
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -9335,20 +9883,15 @@ def calc_eclipse_first_contact_c1(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Get l1 (penumbral radius) at maximum eclipse
-    l1 = _calc_penumbra_limit(jd_max)
-
-    # For global eclipse, first contact occurs when gamma = 1 + l1
-    # (penumbral shadow touches Earth's limb from outside)
-    penumbral_limit = 1.0 + l1  # Earth radius + penumbra radius
-
-    # Calculate first contact (penumbra first touches Earth)
-    # Search backward from maximum with a range of ~3.6 hours
-    t_first_contact = _find_contact_time_besselian(
-        jd_max, penumbral_limit, search_before=True, search_range=0.15
+    # First contact (P1): the first external tangency of the penumbral cone
+    # with the Earth *ellipsoid*, before maximum. Uses the same ellipsoidal
+    # contact solver as sol_eclipse_when_glob (tret[2]), so the standalone
+    # helper and the global-eclipse array stay consistent.
+    return _solve_besselian_contact(
+        lambda jd: _besselian_contact_residuals(jd, flags)[0],
+        jd_max,
+        search_before=True,
     )
-
-    return t_first_contact
 
 
 def calc_eclipse_second_contact_c2(
@@ -9363,10 +9906,10 @@ def calc_eclipse_second_contact_c2(
     the Sun's disk. At this instant, the umbral (total) or antumbral (annular)
     shadow first touches Earth's surface.
 
-    This function uses Besselian elements to precisely calculate C2. The
-    condition for C2 is when gamma (the distance of the shadow axis from
-    Earth's center) equals ``1 - abs(l2)`` (Earth radius minus umbral/antumbral cone
-    radius), occurring before eclipse maximum.
+    This function uses Besselian-element geometry to precisely calculate
+    C2: the instant, before eclipse maximum, at which the umbral/antumbral
+    shadow cone is externally tangent to the Earth ellipsoid (the core
+    contact residual of ``_besselian_contact_residuals`` crosses zero).
 
     Note: C2 only exists for central eclipses (total or annular). For partial
     eclipses, this function returns 0.0.
@@ -9382,20 +9925,23 @@ def calc_eclipse_second_contact_c2(
     Returns:
         Julian Day (UT) of second contact C2. Returns 0.0 if:
         - The eclipse is not a central eclipse (total or annular)
-        - C2 cannot be determined (gamma at maximum exceeds umbral limit)
+        - C2 cannot be determined (the core shadow never reaches the surface)
         - The input time is not near a valid solar eclipse
 
     Algorithm:
-        1. Calculate l2 (umbral/antumbral radius) at eclipse maximum
-        2. Compute target gamma = ``1 - abs(l2)`` (umbra touching Earth)
-        3. Check if gamma at maximum is less than umbral limit (central phase possible)
-        4. Use binary search to find when gamma equals this target before maximum
-        5. The search proceeds from (jd_max - search_range) to jd_max
+        1. Evaluate the signed umbral/antumbral contact residual of
+           ``_besselian_contact_residuals`` (tangency of the core shadow
+           cone with the Earth *ellipsoid*, in km; negative while in
+           contact). A residual that is already positive at jd_max means
+           the core shadow never reaches the surface: no U1, return 0.0
+        2. Expand a bracket backwards from jd_max until the residual turns
+           positive (core shadow clear of Earth)
+        3. Bisect the sign change to the first external tangency (U1)
 
     Precision:
-        The calculation achieves timing precision better than 1 second by
-        iterating until the gamma value converges to within 1e-8 Earth radii,
-        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+        The ellipsoidal residual is bisected to sub-second timing; the
+        residual carries the cone-depth term and the Earth's oblateness,
+        so the standalone helper matches sol_eclipse_when_glob's tret[4].
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -9429,30 +9975,17 @@ def calc_eclipse_second_contact_c2(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Get l2 (umbral/antumbral radius) at maximum eclipse
-    l2 = _calc_umbra_limit(jd_max)
-
-    # Get gamma at maximum to check if central phase is possible
-    gamma_max = _calc_gamma(jd_max)
-
-    # The umbra/antumbra first touches Earth at EXTERIOR tangency:
-    # shadow-axis distance = 1 + |l2| (consistent with tret[4] of
-    # sol_eclipse_when_glob and with NASA's U1 convention).
-    umbral_limit = 1.0 + abs(l2)
-
-    # Check if a total/annular phase is possible anywhere on Earth
-    if gamma_max >= umbral_limit:
-        # No umbral contact - eclipse is partial only
-        return 0.0
-
-    # Calculate second contact (umbra/antumbra first touches Earth)
-    # Search backward from maximum with a range of ~2.4 hours
-    # (umbral contact typically occurs 0.5-1.5 hours before maximum)
-    t_second_contact = _find_contact_time_besselian(
-        jd_max, umbral_limit, search_before=True, search_range=0.10
+    # Second contact (U1): the first external tangency of the umbral /
+    # antumbral cone with the Earth ellipsoid, before maximum. The solver
+    # returns 0.0 when the core shadow never reaches the surface (a
+    # penumbra-only partial eclipse), so no separate central-phase gate is
+    # needed. Shares the ellipsoidal contact solver with tret[4] of
+    # sol_eclipse_when_glob.
+    return _solve_besselian_contact(
+        lambda jd: _besselian_contact_residuals(jd, flags)[1],
+        jd_max,
+        search_before=True,
     )
-
-    return t_second_contact
 
 
 def calc_eclipse_third_contact_c3(
@@ -9467,10 +10000,10 @@ def calc_eclipse_third_contact_c3(
     Earth's surface. At this instant, the central phase of the eclipse ends
     and the partial phase resumes.
 
-    This function uses Besselian elements to precisely calculate C3. The
-    condition for C3 is when gamma (the distance of the shadow axis from
-    Earth's center) equals ``1 - abs(l2)`` (Earth radius minus umbral/antumbral cone
-    radius), occurring after eclipse maximum.
+    This function uses Besselian-element geometry to precisely calculate
+    C3: the instant, after eclipse maximum, at which the umbral/antumbral
+    shadow cone is externally tangent to the Earth ellipsoid (the core
+    contact residual of ``_besselian_contact_residuals`` crosses zero).
 
     Note: C3 only exists for central eclipses (total or annular). For partial
     eclipses, this function returns 0.0.
@@ -9486,20 +10019,23 @@ def calc_eclipse_third_contact_c3(
     Returns:
         Julian Day (UT) of third contact C3. Returns 0.0 if:
         - The eclipse is not a central eclipse (total or annular)
-        - C3 cannot be determined (gamma at maximum exceeds umbral limit)
+        - C3 cannot be determined (the core shadow never reaches the surface)
         - The input time is not near a valid solar eclipse
 
     Algorithm:
-        1. Calculate l2 (umbral/antumbral radius) at eclipse maximum
-        2. Compute target gamma = ``1 - abs(l2)`` (umbra leaving Earth)
-        3. Check if gamma at maximum is less than umbral limit (central phase possible)
-        4. Use binary search to find when gamma equals this target after maximum
-        5. The search proceeds from jd_max to (jd_max + search_range)
+        1. Evaluate the signed umbral/antumbral contact residual of
+           ``_besselian_contact_residuals`` (tangency of the core shadow
+           cone with the Earth *ellipsoid*, in km; negative while in
+           contact). A residual that is already positive at jd_max means
+           the core shadow never reaches the surface: no U4, return 0.0
+        2. Expand a bracket forwards from jd_max until the residual turns
+           positive (core shadow clear of Earth)
+        3. Bisect the sign change to the last external tangency (U4)
 
     Precision:
-        The calculation achieves timing precision better than 1 second by
-        iterating until the gamma value converges to within 1e-8 Earth radii,
-        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+        The ellipsoidal residual is bisected to sub-second timing; the
+        residual carries the cone-depth term and the Earth's oblateness,
+        so the standalone helper matches sol_eclipse_when_glob's tret[5].
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -9534,30 +10070,15 @@ def calc_eclipse_third_contact_c3(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Get l2 (umbral/antumbral radius) at maximum eclipse
-    l2 = _calc_umbra_limit(jd_max)
-
-    # Get gamma at maximum to check if central phase is possible
-    gamma_max = _calc_gamma(jd_max)
-
-    # For central eclipse, third contact occurs when gamma = 1 - |l2|
-    # (umbral/antumbral shadow leaves Earth's limb from inside)
-    # Exterior tangency, consistent with tret[5]/U4 (see C2 helper)
-    umbral_limit = 1.0 + abs(l2)
-
-    # Check if central phase is possible (gamma at max must be less than umbral limit)
-    if gamma_max >= umbral_limit:
-        # No central phase - eclipse is partial only
-        return 0.0
-
-    # Calculate third contact (umbra/antumbra last leaves Earth)
-    # Search forward from maximum with a range of ~2.4 hours
-    # (umbral contact typically occurs 0.5-1.5 hours after maximum)
-    t_third_contact = _find_contact_time_besselian(
-        jd_max, umbral_limit, search_before=False, search_range=0.10
+    # Third contact (U4): the last external tangency of the umbral /
+    # antumbral cone with the Earth ellipsoid, after maximum. Returns 0.0
+    # for a penumbra-only partial eclipse. Shares the ellipsoidal contact
+    # solver with tret[5]/U4 of sol_eclipse_when_glob.
+    return _solve_besselian_contact(
+        lambda jd: _besselian_contact_residuals(jd, flags)[1],
+        jd_max,
+        search_before=False,
     )
-
-    return t_third_contact
 
 
 def calc_eclipse_fourth_contact_c4(
@@ -9571,10 +10092,10 @@ def calc_eclipse_fourth_contact_c4(
     from the Sun's disk externally, marking the end of a solar eclipse. At this
     instant, the penumbral shadow cone last touches Earth's surface.
 
-    This function uses Besselian elements to precisely calculate C4. The
-    condition for C4 is when gamma (the distance of the shadow axis from
-    Earth's center) equals 1 + l1 (Earth radius plus penumbral cone radius),
-    occurring after eclipse maximum.
+    This function uses Besselian-element geometry to precisely calculate
+    C4: the instant, after eclipse maximum, at which the penumbral shadow
+    cone is externally tangent to the Earth ellipsoid (the penumbral
+    contact residual of ``_besselian_contact_residuals`` crosses zero).
 
     Args:
         jd_max: Julian Day (UT) of eclipse maximum. This should be the time
@@ -9590,15 +10111,17 @@ def calc_eclipse_fourth_contact_c4(
         solar eclipse).
 
     Algorithm:
-        1. Calculate l1 (penumbral radius) at eclipse maximum
-        2. Compute target gamma = 1 + l1 (condition for penumbra leaving Earth)
-        3. Use binary search to find when gamma equals this target after maximum
-        4. The search proceeds from jd_max to (jd_max + search_range)
+        1. Evaluate the signed penumbral contact residual of
+           ``_besselian_contact_residuals`` (tangency of the penumbral cone
+           with the Earth *ellipsoid*, in km; negative while in contact)
+        2. Expand a bracket forwards from jd_max until the residual turns
+           positive (penumbra clear of Earth)
+        3. Bisect the sign change to the last external tangency (P4)
 
     Precision:
-        The calculation achieves timing precision better than 1 second by
-        iterating until the gamma value converges to within 1e-8 Earth radii,
-        which corresponds to approximately 0.06 km or 0.04 seconds of time.
+        The ellipsoidal residual is bisected to sub-second timing; the
+        residual carries the cone-depth term and the Earth's oblateness,
+        so the standalone helper matches sol_eclipse_when_glob's tret[3].
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -9634,21 +10157,14 @@ def calc_eclipse_fourth_contact_c4(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Get l1 (penumbral radius) at maximum eclipse
-    l1 = _calc_penumbra_limit(jd_max)
-
-    # For global eclipse, fourth contact occurs when gamma = 1 + l1
-    # (penumbral shadow leaves Earth's limb from inside)
-    penumbral_limit = 1.0 + l1  # Earth radius + penumbra radius
-
-    # Calculate fourth contact (penumbra completely leaves Earth)
-    # Search forward from maximum with a range of ~3.6 hours
-    # (penumbral contact typically occurs 1.5-3 hours after maximum)
-    t_fourth_contact = _find_contact_time_besselian(
-        jd_max, penumbral_limit, search_before=False, search_range=0.15
+    # Fourth contact (P4): the last external tangency of the penumbral cone
+    # with the Earth ellipsoid, after maximum. Shares the ellipsoidal
+    # contact solver with tret[3] of sol_eclipse_when_glob.
+    return _solve_besselian_contact(
+        lambda jd: _besselian_contact_residuals(jd, flags)[0],
+        jd_max,
+        search_before=False,
     )
-
-    return t_fourth_contact
 
 
 def _calc_lunar_eclipse_penumbral_separation(jd: float) -> float:
@@ -10579,8 +11095,9 @@ def calc_solar_eclipse_duration(
         3. Return (C3 - C2) converted from days to minutes
 
     Precision:
-        The central-line duration matches the reference local maximum-eclipse
-        duration to within about ±0.05 minutes (±3 seconds).
+        The central-line duration agrees with one external implementation's
+        local maximum-eclipse duration to within about ±0.05 minutes
+        (±3 seconds).
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -10595,8 +11112,8 @@ def calc_solar_eclipse_duration(
 
     Note:
         - This is the central-line maximum duration (as seen from the point of
-          greatest eclipse), the same quantity the reference reports as the
-          local maximum-eclipse duration
+          greatest eclipse), the quantity the compatibility contract labels
+          the local maximum-eclipse duration
         - Duration at other observer locations on the path is typically shorter;
           for a specific location use _sol_eclipse_when_loc_pythonic()
         - Total solar eclipses can have central durations up to ~7.5 minutes
@@ -11375,8 +11892,16 @@ def _get_saros_info(
             best_series = ref_saros
             best_member = ref_member + n_cycles
 
-    # The reference accepts a member only within 2 days of the saros
-    # grid; outside that it reports its no-match sentinel.
+    # Acceptance window around the mean-cycle grid. True members of a series
+    # wobble around the mean saros extrapolation (223 synodic months beat
+    # against 242 draconic and 239 anomalistic months — Meeus, Mathematical
+    # Astronomy Morsels; Espenak & Meeus, NASA/TP-2006-214141), while the
+    # nearest eclipse belonging to a *different* series sits at least one
+    # synodic month (~29.53 d) off the grid. Any window between those two
+    # scales discriminates identically near the pinned reference members;
+    # 2.0 days is the conservative low end. Outside it the no-match protocol
+    # sentinel (-99999999.0, -99999999.0) is returned (compatibility
+    # contract).
     if best_residual > 2.0:
         return (-99999999.0, -99999999.0)
 
@@ -12207,7 +12732,7 @@ def sol_eclipse_magnitude_at_loc(
     """
     Calculate the eclipse magnitude at a specific geographic location and time.
 
-    This function matches the reference API naming convention. It is a convenience
+    This function follows the reference API naming convention. It is a convenience
     wrapper that returns just the eclipse magnitude (fraction of solar diameter
     covered by the Moon) without the full attribute array.
 
@@ -12481,7 +13006,7 @@ def sol_eclipse_obscuration_at_loc(
     """
     Calculate the eclipse obscuration at a specific geographic location and time.
 
-    This function matches the reference API naming convention. It is a convenience
+    This function follows the reference API naming convention. It is a convenience
     wrapper that returns just the eclipse obscuration (fraction of solar disc
     area covered by the Moon) without the full attribute array.
 
@@ -12623,7 +13148,7 @@ def lun_eclipse_umbral_magnitude(
     """
     Calculate the umbral magnitude for a lunar eclipse at a specific time.
 
-    This function matches the reference API naming convention. It is a convenience
+    This function follows the reference API naming convention. It is a convenience
     function that returns just the umbral magnitude (fraction of Moon's diameter
     within Earth's umbral shadow).
 
@@ -12739,7 +13264,7 @@ def lun_eclipse_penumbral_magnitude(
     """
     Calculate the penumbral magnitude for a lunar eclipse at a specific time.
 
-    This function matches the reference API naming convention. It is a convenience
+    This function follows the reference API naming convention. It is a convenience
     function that returns just the penumbral magnitude (fraction of Moon's diameter
     within Earth's penumbral shadow).
 
@@ -12864,7 +13389,7 @@ def lun_eclipse_gamma(
 ) -> float:
     """Calculate lunar-eclipse gamma at a specific time.
 
-    This function matches the reference API naming convention. Gamma represents
+    This function follows the reference API naming convention. Gamma represents
     the distance of the Moon's center from Earth's shadow axis, measured in
     Earth radii.
 

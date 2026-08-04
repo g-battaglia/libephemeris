@@ -47,9 +47,6 @@ project cites their scientific statements and writes its own code and prose;
 it does not claim ownership of the publications or copy their expressive text.
 
 Likewise, API compatibility is an output contract, not a scientific source.
-During development another implementation's public API may be called for an
-ephemeral pass/fail comparison. Those observations are not persisted as model
-tables, fitted as coefficients, or used to choose an undocumented formula.
 When a published definition and compatibility behavior differ, the published
 definition controls and the measured divergence is documented.
 
@@ -318,7 +315,7 @@ experiments and retired tools.
 | `experimental-short-period-fit` | Rejected residual-fit experiment; output not shipped or imported. |
 | `leb-generators` | Registered JPL/IAU runtime channels plus measured compression error. |
 | `leb-diagnostics` | Measurement only; thresholds cannot silently become generated coefficients. |
-| `cross-backend-verification` | Ephemeral project/JPL backend reports; prohibited as model inputs. |
+| `cross-backend-verification` | Project/JPL backend cross-checks; verification only. |
 | `focused-verification` | State, precession, and Galilean invariants; no emitted runtime artifact. |
 | `performance-tools` | Timing/profiling only; measurements cannot change numerical models. |
 | `regression-fixture-helper` | Snapshots the project's reviewed core for regression only, never as scientific provenance. |

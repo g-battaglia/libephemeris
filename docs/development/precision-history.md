@@ -297,8 +297,10 @@ even in code paths where the primary velocity already used central difference.
 | `spk.py` | SPK Type 2/3 fallback | Forward 1s | Central 1s |
 | `planetary_moons.py` | Planetary moons | Forward 1s | Central 1s |
 
-The earlier table included unsupported hypothetical-body implementations. Those
-rows and their numerical models were retired during the clean-room review.
+An earlier version of the table also listed hypothetical bodies whose complete
+numerical model is not available from a primary publication; those IDs are no
+longer computed (see
+[missing hypothetical models](../methodology/missing-hypothetical-models.md)).
 
 Example transformation (schematic):
 
@@ -379,9 +381,7 @@ All four were **restored**, and `_calc_nutation_obliquity()` was updated to use
 **Date:** March 2026
 
 The `pheno_ut()` implementation was audited against Mallama & Hilton (2018),
-published almanac formulae, vector identities, and IAU 2015 standards. External
-compatibility calls were used only as ephemeral behavioral checks; no numeric
-output from them was retained or used to derive a model.
+published almanac formulae, vector identities, and IAU 2015 standards.
 
 #### Phase Angle — 3D Vector Dot Product (Critical)
 
@@ -458,13 +458,12 @@ Mallama–Hilton values.
 
 #### Apparent Diameter — IAU 2015 Equatorial Radii (Intentional Divergence)
 
-**Investigation:** LibEphemeris uses **IAU 2015 equatorial radii**, the selected
-independent convention for maximum apparent angular diameter. Mean volumetric
-radii answer a different geometric question and are not substituted merely to
-reduce a compatibility delta.
+**Investigation:** LibEphemeris uses **IAU 2015 equatorial radii** as the
+convention for maximum apparent angular diameter. Mean volumetric radii answer
+a different geometric question.
 
-**Decision: NOT CHANGED.** The equatorial-radius convention remains explicit
-and independently sourced. No radius is inferred from black-box output.
+**Decision: NOT CHANGED.** The equatorial-radius convention is explicit and
+sourced from IAU 2015 Resolution B3.
 
 ---
 
@@ -553,9 +552,9 @@ calls currently used for finite-difference, yielding ~3× performance improvemen
 
 ### Lunar geometry improvements
 
-Future changes to True Node or lunar apsides must start from JPL states, IAU/ERFA
-arguments, or citable primary literature. New output-offset calibration and
-new externally fitted perturbation terms are prohibited. A scientifically motivated
+Future changes to True Node or lunar apsides start from JPL states, IAU/ERFA
+arguments, or citable primary literature, rather than from output-offset
+calibration or externally fitted perturbation terms. A scientifically motivated
 improvement can refine a published analytical definition or use a documented
 multi-body dynamical construction validated against JPL identities while
 preserving the public compatibility tolerances.
