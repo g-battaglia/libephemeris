@@ -2,7 +2,7 @@
 
 The authoritative, machine-checkable change history lives in
 [`CHANGELOG.md`](CHANGELOG.md). Long-form notes for each release live under
-[`release-notes/`](release-notes/). This page points to the candidate currently
+[`release-notes/`](release-notes/). This page points to the release currently
 prepared in the source tree.
 
 ---

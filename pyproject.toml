@@ -32,7 +32,7 @@ keywords = [
 classifiers = [
     # Bumped to "5 - Production/Stable" at the v3.0.0 final tag (with the
     # version bump off the current rc8 candidate); kept Beta for prereleases.
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "Intended Audience :: Education",
