@@ -45,6 +45,10 @@ def test_set_ephemeris_file_changes_file():
     set_ephemeris_file("de440.bsp")
 
 
+@pytest.mark.skipif(
+    os.environ.get("LIBEPHEMERIS_MODE", "").lower() == "leb",
+    reason="get_planets() opens the JPL/SPICE source, disabled in sealed leb mode",
+)
 def test_set_ephe_path_clears_cache():
     """Test that set_ephe_path() clears the planets cache"""
     from libephemeris import state

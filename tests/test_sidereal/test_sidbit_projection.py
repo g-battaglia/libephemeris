@@ -604,3 +604,89 @@ class TestBabylonianFamilyEclT0Epochs:
         assert incrs[0] == pytest.approx(incrs[1], abs=0.01)
         assert incrs[1] == pytest.approx(incrs[2], abs=0.01)
         assert abs(incrs[0]) > 500.0  # a genuinely ancient plane
+
+
+class TestEclT0EquatorialCalcStarCoherence:
+    """The calc and fixstar paths share one ECL_T0 equatorial reduction.
+
+    Both `planets._sidbit_projection_calc` and
+    `fixed_stars._sidbit_star_call` must reduce equatorial ECL_T0 output
+    with the same transform (`transform_equatorial_epoch_result`) and the
+    same projection epoch. This pins the compatibility contract whose
+    docstrings previously contradicted each other: each path's projected
+    output must equal its own FLG_J2000|FLG_NONUT baseline pushed through
+    the shared transform at the mode's t0.
+    """
+
+    T0_1900 = 2415021.0
+
+    def _expected(self, base, flags, t0_jd):
+        from libephemeris.sidereal_epoch import transform_equatorial_epoch_result
+
+        return transform_equatorial_epoch_result(tuple(base), flags, t0_jd)
+
+    @pytest.mark.unit
+    def test_calc_path_uses_shared_transform_at_t0(self):
+        from libephemeris.constants import FLG_J2000
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        ephem.set_sid_mode(SIDM_USER | SIDBIT_ECL_T0, self.T0_1900, 24.0)
+        t0 = _ecl_t0_epoch_jd(SIDM_USER)
+        assert t0 == pytest.approx(self.T0_1900)
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL | FLG_SPEED
+        proj, _ = ephem.calc_ut(JD, MARS, flags)
+        base, _ = ephem.calc_ut(
+            JD, MARS, FLG_J2000 | FLG_NONUT | FLG_EQUATORIAL | FLG_SPEED
+        )
+        expected = self._expected(base, flags, t0)
+        for i in range(6):
+            assert proj[i] == pytest.approx(expected[i], abs=1e-9), f"slot {i}"
+
+    @pytest.mark.unit
+    def test_star_path_uses_shared_transform_at_t0(self):
+        from libephemeris.constants import FLG_J2000
+        from libephemeris.planets import _ecl_t0_epoch_jd
+
+        ephem.set_sid_mode(SIDM_USER | SIDBIT_ECL_T0, self.T0_1900, 24.0)
+        t0 = _ecl_t0_epoch_jd(SIDM_USER)
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL
+        proj = ephem.fixstar_ut("Aldebaran", JD, flags)[0]
+        base = ephem.fixstar_ut(
+            "Aldebaran", JD, FLG_J2000 | FLG_NONUT | FLG_EQUATORIAL
+        )[0]
+        expected = self._expected(base, flags, t0)
+        for i in range(3):
+            assert proj[i] == pytest.approx(expected[i], abs=1e-9), f"slot {i}"
+
+    @pytest.mark.unit
+    def test_paths_agree_module_and_context(self):
+        """The context entry point applies the same reduction as the module."""
+        from libephemeris.context import EphemerisContext
+
+        ephem.set_sid_mode(SIDM_USER | SIDBIT_ECL_T0, self.T0_1900, 24.0)
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL
+        module_xx, module_rf = ephem.calc_ut(JD, MARS, flags)
+        ctx = EphemerisContext()
+        ctx.set_sid_mode(SIDM_USER | SIDBIT_ECL_T0, self.T0_1900, 24.0)
+        ctx_xx, ctx_rf = ctx.calc_ut(JD, MARS, flags)
+        assert ctx_rf == module_rf
+        for i in range(3):
+            assert ctx_xx[i] == pytest.approx(module_xx[i], abs=1e-9), f"slot {i}"
+
+    @pytest.mark.unit
+    def test_ssy_plane_divergence_is_the_documented_one(self):
+        """Where the two paths differ (SSY_PLANE equatorial): the star path
+        reduces to J2000 while the calc path leaves the equator unchanged."""
+        from libephemeris.constants import FLG_J2000
+
+        ephem.set_sid_mode(SIDM_LAHIRI | SIDBIT_SSY_PLANE)
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL
+        star_proj = ephem.fixstar_ut("Aldebaran", JD, flags)[0]
+        star_j2k = ephem.fixstar_ut(
+            "Aldebaran", JD, FLG_J2000 | FLG_NONUT | FLG_EQUATORIAL
+        )[0]
+        assert star_proj[0] == pytest.approx(star_j2k[0], abs=1e-9)
+        calc_proj, _ = ephem.calc_ut(JD, MARS, flags)
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        calc_base, _ = ephem.calc_ut(JD, MARS, flags)
+        assert calc_proj[0] == pytest.approx(calc_base[0], abs=1e-9)
