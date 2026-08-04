@@ -19,6 +19,7 @@ isolation for thread-safe concurrent calculations.
 import concurrent.futures
 import threading
 import time
+import math
 import warnings
 
 import pytest
@@ -213,7 +214,14 @@ class TestSequentialAyanamshaCalculations:
     """Tests for calculations with different ayanamsha systems."""
 
     def test_public_modes_follow_native_and_fallback_contract(self, test_ayanamshas):
-        """Unsupported IDs converge on one deterministic fallback result."""
+        """Every public mode is natively implemented and deterministic.
+
+        Historical note: before the rc9-rc15 independence round these seven
+        star/galactic modes were unsupported and converged on one shared
+        fallback value; they now each carry their own published-source
+        implementation, so the old all-equal assertion inverted into a
+        not-all-equal one.
+        """
         jd = 2451545.0  # J2000.0
         results: dict[int, float] = {}
 
@@ -223,8 +231,13 @@ class TestSequentialAyanamshaCalculations:
                 ephem.set_sid_mode(mode)
                 pos, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
                 results[mode] = pos[0]
+                # Deterministic: a repeated request reproduces the value.
+                ephem.set_sid_mode(mode)
+                pos2, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
+                assert pos2[0] == results[mode]
+                assert math.isfinite(results[mode])
 
-        fallback_modes = (
+        native_modes = (
             SIDM_TRUE_REVATI,
             SIDM_TRUE_PUSHYA,
             SIDM_GALCENT_RGILBRAND,
@@ -233,9 +246,10 @@ class TestSequentialAyanamshaCalculations:
             SIDM_GALCENT_MULA_WILHELM,
             SIDM_GALCENT_COCHRANE,
         )
-        expected = results[fallback_modes[0]]
-        for mode in fallback_modes[1:]:
-            assert results[mode] == pytest.approx(expected, abs=2e-12)
+        distinct = {round(results[mode], 9) for mode in native_modes}
+        # A collapse back to one shared value would mean the native
+        # implementations regressed to the old common fallback.
+        assert len(distinct) == len(native_modes)
 
 
 # =============================================================================

@@ -491,5 +491,8 @@ class TestSweSolEclipseWhereLimits:
         assert retflag == 0
         assert geopos[0] != 0.0 or geopos[1] != 0.0
         assert attr[0] < 0.0
-        # No eclipse -> nothing of the Sun is obscured (not the 1.0 fallback).
-        assert attr[2] == 0.0
+        # No eclipse -> the obscuration slot carries the fixed no-event
+        # protocol sentinel 1.0 (compatibility contract; see the Breaking
+        # entry in CHANGELOG 3.0.0 and eclipse.py). The pre-rc9 0.0 rested
+        # on a comment that asserted the opposite measurement.
+        assert attr[2] == 1.0
