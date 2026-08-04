@@ -23,7 +23,7 @@ pyswisseph**: same function names, parameter order, tuple shapes, flag encoding,
 and exception surface, plus its own performance/offline extensions. This skill
 targets an agent writing Python **against** the library (not developing it).
 
-Key facts to anchor on (verified against the installed package, `3.0.0rc14`):
+Key facts to anchor on (verified against the installed package, `3.0.0`):
 
 - The public API uses **canonical bare names** — `calc_ut`, `SUN`, `FLG_SPEED`,
   `SIDM_LAHIRI` — never the `swe_` / `SE_` / `SEFLG_` prefixes. (The lone
@@ -35,13 +35,11 @@ Key facts to anchor on (verified against the installed package, `3.0.0rc14`):
 ## Quick start
 
 ```bash
-# 3.0.0 is still a pre-release: plain `pip install libephemeris` resolves to
-# the 2.x stable line, which has none of the APIs this skill documents.
-pip install --pre libephemeris==3.0.0rc14
-                                  # wheel already bundles the base-tier core:
-                                  # the 14 core bodies + Hamburg/Uranian companion,
-                                  # JD range 1850–2150. No download needed for
-                                  # that slice.
+pip install libephemeris         # 3.0.0 stable. The wheel already bundles
+                                  # the base-tier core: the 14 core bodies
+                                  # + Hamburg/Uranian companion, JD range
+                                  # 1850–2150. No download needed for that
+                                  # slice.
 ```
 
 ```python
