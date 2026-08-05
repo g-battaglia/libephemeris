@@ -2,29 +2,47 @@
 
 The neighbouring `test_rise_set_independent.py` adjudicates rise/set against an
 erfa observed-altitude reference, but it deliberately passes
-``BIT_NO_REFRACTION`` "so lib and erfa share the same altitude condition — pure
-geometry". That makes it blind by construction to everything this module cares
-about: the refraction model, the disc-limb offset, the topocentric parallax and
-the observer-altitude convention are exactly the terms it switches off. A
-17-second temperature-default change or a dropped parallax would sail through it.
+``BIT_NO_REFRACTION`` "so lib and erfa share the same altitude condition". That
+makes it blind by construction to everything this module cares about: the
+refraction model, the disc-limb offset and the topocentric parallax are exactly
+the terms it switches off.
 
 So this module asks a different question. It does not compare our event time to
 someone else's event time — a comparison that is ill-conditioned near the poles,
 where the Sun grazes the horizon and a milliarcsecond of altitude becomes minutes
-of clock. It takes the instant we return and asks an INDEPENDENT computation
-where the Sun actually was. That is well conditioned everywhere, it is stated in
-arcminutes rather than seconds, and the answer must be the same number over the
-whole globe:
+of clock. It takes the instant we return and asks where the Sun actually was.
+That is well conditioned everywhere, it is stated in arcminutes rather than
+seconds, and the answer must be the same number over the whole globe:
 
-    at every sunrise and sunset we return, the Sun's true topocentric UPPER LIMB
-    sits on the refracted horizon.
+    at every sunrise and sunset we return, the Sun's true UPPER LIMB sits on the
+    refracted horizon.
 
-Independence comes from erfa (IAU SOFA) for the sidereal rotation, fed the
-library's own topocentric apparent RA/Dec — the same split the Moon case in
-`test_rise_set_independent.py` already uses, and the one that keeps the ~8.8"
-solar diurnal parallax in the measurement instead of quietly dropping it.
+WHY THE ORACLE IS SKYFIELD AND NOT ERFA
+---------------------------------------
+The first version of this module measured the altitude from the library's own
+``calc_ut(FLG_TOPOCTR)`` and rotated it with erfa, and claimed that asking for
+``FLG_TOPOCTR`` "is what keeps the diurnal parallax in". That claim was false in
+the only way that matters. The event solves ``alt_true + SD + refraction = 0``
+using the library's altitude; measuring ``alt_true + SD`` from the *same* source
+cancels any error common to both, so the invariant held identically whether or
+not the parallax was there. Demonstrated by mutation: stripping ``FLG_TOPOCTR``
+inside ``calc_ut`` — i.e. deleting the diurnal parallax globally — moved sunrise
+by 0.77 s and every assertion still passed.
 
-Network-free; needs pyerfa.
+Skyfield reads its own JPL kernel through its own frame pipeline, so the
+position is genuinely a second opinion and the parallax becomes an independent
+term. Under the same mutation the measured limb now moves to −33.734′, which is
+0.141′ from target — seven times the tolerance below. The refraction and
+semidiameter terms were already independent (they are the test's own arithmetic,
+not the library's) and mutating either still fails, as before.
+
+The cost is a coverage window: `de421.bsp` spans 1899-07-29 to 2053, and outside
+it Skyfield RAISES rather than quietly drifting. That is the right failure — a
+maintainer adding a 1750 or 2145 case gets "outside the oracle's coverage"
+instead of a misleading message about refraction. The library itself reaches far
+wider; this module deliberately does not claim to check those epochs.
+
+Needs `skyfield` and `skyfield-data`, both hard install dependencies.
 """
 
 from __future__ import annotations
@@ -37,15 +55,14 @@ import libephemeris as L
 from libephemeris.constants import (
     SUN,
     FLG_SWIEPH,
-    FLG_EQUATORIAL,
-    FLG_TOPOCTR,
     CALC_RISE,
     CALC_SET,
     BIT_DISC_CENTER,
     BIT_NO_REFRACTION,
 )
 
-erfa = pytest.importorskip("erfa")
+skyfield_api = pytest.importorskip("skyfield.api")
+skyfield_data = pytest.importorskip("skyfield_data")
 
 _AU_KM = 149597870.7
 _RSUN_KM = 696000.0
@@ -55,21 +72,30 @@ _RSUN_KM = 696000.0
 _STD_PRESSURE = 1013.25
 _STD_TEMPERATURE = 15.0
 
-#: Where the Sun's true upper limb sits at the event under the standard
-#: atmosphere: minus the refraction at the apparent horizon. Measured across the
-#: grid below, the spread is 0.0069' (0.42"), so this is an invariant and not an
-#: average. The tolerance is ~4x that spread — tight enough that dropping the
-#: solar parallax (0.147') or switching to a fixed 16' semidiameter would fail it,
-#: loose enough that ordinary ephemeris noise cannot.
-_LIMB_ON_HORIZON_ARCMIN = -33.590
-_LIMB_TOL_ARCMIN = 0.03
+#: Where the Sun's true upper limb sits at the event: minus the refraction at the
+#: apparent horizon. DERIVED, not measured — it is exactly
+#: ``_sinclair_refraction_deg(0.0, 1013.25, 15.0)`` = 33.59332', which is what
+#: every event away from sea level returns to five decimal places.
+_LIMB_ON_HORIZON_ARCMIN = -33.5933
+
+#: The grid below is at ``geopos[2] = 0``, where the measured values spread over
+#: 0.0069' (0.41") rather than landing on the constant exactly. That spread is
+#: not ephemeris noise: at sea level ``calc_dip`` returns exactly 0, so
+#: ``_rise_true_to_apparent``'s clamp puts a 0.56-degree step in the objective
+#: function right at the root, the solver classifies it as the dip discontinuity
+#: and returns a bisection midpoint instead of refining. Move the observer to
+#: 50 m and the same grid spreads 0.0014" — 300x tighter. Sea level is kept
+#: because it is the convention rise/set tables use, so the tolerance has to
+#: cover the artifact: 0.02' is ~3x it, and still 7x below the 0.141' a dropped
+#: parallax costs.
+_LIMB_TOL_ARCMIN = 0.02
 
 #: Same quantity with the library default atmosphere (0 C): colder air refracts
 #: more, so the Sun has further to climb.
-_LIMB_AT_ZERO_C_ARCMIN = -36.736
+_LIMB_AT_ZERO_C_ARCMIN = -36.7363
 
-#: Equator to just inside the polar circle, both hemispheres, all four seasons.
-#: The point is that ONE number has to hold across all of it.
+#: Equator to just inside the polar circle, both hemispheres, all four seasons,
+#: all inside the oracle's coverage window (see the module docstring).
 _GRID = [
     ("rome_equinox", 12.5, 41.9, 2024, 3, 20),
     ("rome_solstice", 12.5, 41.9, 2024, 6, 21),
@@ -81,87 +107,111 @@ _GRID = [
     ("singapore", 103.8, 1.35, 2025, 8, 5),
 ]
 
+_EVENTS = [("rise", CALC_RISE), ("set", CALC_SET)]
 
-def _true_altitude_arcmin(jd_ut: float, lon: float, lat: float) -> float:
-    """Sun's true topocentric altitude, rotated by erfa rather than by us.
 
-    The position is the library's own topocentric apparent RA/Dec (validated
-    elsewhere); the hour angle comes from erfa's GST. Asking for FLG_TOPOCTR is
-    what keeps the diurnal parallax in — the term an ICRS-fed ``erfa.atco13``
-    with ``px=0`` would silently discard, moving the answer by 8.8".
+@pytest.fixture(scope="module")
+def oracle():
+    """Skyfield, loaded once: the second opinion everything is checked against."""
+    loader = skyfield_api.Loader(skyfield_data.get_skyfield_data_path(), verbose=False)
+    ephemeris = loader("de421.bsp")
+    return {
+        "ts": loader.timescale(),
+        "earth": ephemeris["earth"],
+        "sun": ephemeris["sun"],
+        "wgs84": skyfield_api.wgs84,
+    }
+
+
+@pytest.fixture(autouse=True)
+def _restore_observer():
+    """Nothing here sets the global observer, but assert that stays true.
+
+    The first draft called ``L.set_topo`` inside its measurement helpers and left
+    it set, which only stayed contained because `tests/conftest.py` happens to
+    save and restore `_TOPO`. Depending on a sibling fixture for isolation is how
+    a module leaks Singapore into whatever runs after it.
     """
-    L.set_topo(lon, lat, 0.0)
-    radec, _ = L.calc_ut(jd_ut, SUN, FLG_SWIEPH | FLG_EQUATORIAL | FLG_TOPOCTR)
-    ra, dec = math.radians(radec[0]), math.radians(radec[1])
-    gst = erfa.gst06a(2400000.5, jd_ut - 2400000.5, 2400000.5, jd_ut - 2400000.5)
-    hour_angle = gst + math.radians(lon) - ra
-    phi = math.radians(lat)
-    altitude = math.asin(
-        math.sin(dec) * math.sin(phi)
-        + math.cos(dec) * math.cos(phi) * math.cos(hour_angle)
-    )
-    return math.degrees(altitude) * 60.0
+    yield
+    L.set_topo(0.0, 0.0, 0.0)
 
 
-def _semidiameter_arcmin(jd_ut: float, lon: float, lat: float) -> float:
-    """Topocentric solar semidiameter, from the actual distance of the day."""
-    L.set_topo(lon, lat, 0.0)
-    position, _ = L.calc_ut(jd_ut, SUN, FLG_SWIEPH | FLG_TOPOCTR)
-    return math.degrees(math.asin(_RSUN_KM / (position[2] * _AU_KM))) * 60.0
+def _true_altitude_and_semidiameter(oracle, jd_ut: float, lon: float, lat: float):
+    """Sun's true topocentric altitude and semidiameter, in arcminutes.
+
+    Both come from Skyfield — its kernel, its frames, its topocentric geometry —
+    so nothing on this side of the comparison is computed by the code under test.
+    """
+    time = oracle["ts"].ut1_jd(jd_ut)
+    observer = oracle["earth"] + oracle["wgs84"].latlon(lat, lon, elevation_m=0)
+    apparent = observer.at(time).observe(oracle["sun"]).apparent()
+    altitude, _azimuth, distance = apparent.altaz()
+    semidiameter = math.degrees(math.asin(_RSUN_KM / (distance.au * _AU_KM)))
+    return altitude.degrees * 60.0, semidiameter * 60.0
 
 
 def _event(jd0, lon, lat, rsmi, atpress=_STD_PRESSURE, attemp=_STD_TEMPERATURE, alt=0.0):
-    retflag, tret = L.rise_trans(jd0, SUN, rsmi, (lon, lat, alt), atpress, attemp)
+    retflag, tret = L.rise_trans(jd0, SUN, rsmi, (lon, lat, alt), atpress, attemp, FLG_SWIEPH)
     assert retflag == 0, f"expected an event, got retflag={retflag}"
     return tret[0]
 
 
-@pytest.mark.parametrize("name,lon,lat,y,m,d", _GRID, ids=lambda v: v if isinstance(v, str) else "")
-@pytest.mark.parametrize("rsmi,label", [(CALC_RISE, "rise"), (CALC_SET, "set")])
-def test_the_upper_limb_sits_on_the_refracted_horizon(name, lon, lat, y, m, d, rsmi, label):
+def _ids(value):
+    return value if isinstance(value, str) else None
+
+
+@pytest.mark.parametrize("name,lon,lat,y,m,d", _GRID, ids=_ids)
+@pytest.mark.parametrize("label,rsmi", _EVENTS, ids=_ids)
+def test_the_upper_limb_sits_on_the_refracted_horizon(oracle, name, lon, lat, y, m, d, label, rsmi):
     """The one invariant: independent of latitude, season and hemisphere."""
     jd0 = L.julday(y, m, d, 0.0, L.GREG_CAL)
     jd = _event(jd0, lon, lat, rsmi)
-    limb = _true_altitude_arcmin(jd, lon, lat) + _semidiameter_arcmin(jd, lon, lat)
+    altitude, semidiameter = _true_altitude_and_semidiameter(oracle, jd, lon, lat)
+    limb = altitude + semidiameter
     assert abs(limb - _LIMB_ON_HORIZON_ARCMIN) < _LIMB_TOL_ARCMIN, (
-        f"{name} {label}: upper limb at {limb:.4f}', expected "
+        f"{name} {label}: upper limb at {limb:.5f}', expected "
         f"{_LIMB_ON_HORIZON_ARCMIN:.4f}' +/- {_LIMB_TOL_ARCMIN}'. The horizon "
         f"convention moved — check the refraction model, the semidiameter term "
-        f"or the topocentric parallax before regenerating anything."
+        f"and the topocentric parallax, in that order of likelihood."
     )
 
 
-@pytest.mark.parametrize("name,lon,lat,y,m,d", _GRID, ids=lambda v: v if isinstance(v, str) else "")
-def test_disc_center_moves_the_target_from_the_limb_to_the_centre(name, lon, lat, y, m, d):
+@pytest.mark.parametrize("name,lon,lat,y,m,d", _GRID, ids=_ids)
+@pytest.mark.parametrize("label,rsmi", _EVENTS, ids=_ids)
+def test_disc_center_moves_the_target_from_the_limb_to_the_centre(oracle, name, lon, lat, y, m, d, label, rsmi):
     """BIT_DISC_CENTER drops the semidiameter and nothing else.
 
-    Guards the flag against being wired to the wrong sign, which would look
-    correct in an ordering test and be a full solar diameter out here.
+    Both directions, because a sign error that only affects setting would look
+    correct in every rise-only assertion above.
     """
     jd0 = L.julday(y, m, d, 0.0, L.GREG_CAL)
-    jd = _event(jd0, lon, lat, CALC_RISE | BIT_DISC_CENTER)
-    centre = _true_altitude_arcmin(jd, lon, lat)
+    jd = _event(jd0, lon, lat, rsmi | BIT_DISC_CENTER)
+    centre, _semidiameter = _true_altitude_and_semidiameter(oracle, jd, lon, lat)
     assert abs(centre - _LIMB_ON_HORIZON_ARCMIN) < _LIMB_TOL_ARCMIN, (
-        f"{name}: with BIT_DISC_CENTER the CENTRE should sit where the limb "
-        f"otherwise does ({_LIMB_ON_HORIZON_ARCMIN:.4f}'), got {centre:.4f}'"
+        f"{name} {label}: with BIT_DISC_CENTER the CENTRE should sit where the limb "
+        f"otherwise does ({_LIMB_ON_HORIZON_ARCMIN:.4f}'), got {centre:.5f}'"
     )
 
 
-@pytest.mark.parametrize("name,lon,lat,y,m,d", _GRID, ids=lambda v: v if isinstance(v, str) else "")
-def test_the_geometric_horizon_is_exactly_zero(name, lon, lat, y, m, d):
-    """Disc centre with refraction off must land on 0.000', not merely near it.
+@pytest.mark.parametrize("name,lon,lat,y,m,d", _GRID, ids=_ids)
+@pytest.mark.parametrize("label,rsmi", _EVENTS, ids=_ids)
+def test_the_geometric_horizon_is_exactly_zero(oracle, name, lon, lat, y, m, d, label, rsmi):
+    """Disc centre with refraction off must land on 0.0000', not merely near it.
 
-    This is the tightest statement the suite can make, and it is the one that
-    would catch the search itself drifting: with both physical terms removed the
-    only thing left is the root-finder and the position pipeline.
+    With both physical terms removed the only things left are the root-finder and
+    the two position pipelines, so this is the tightest statement the module can
+    make. 2e-4' is ~20x the worst observed residual (1.1e-5') and ~1 ms of time;
+    it is deliberately not looser, because loosening it is how a search
+    regression hides. Disabling the solver's Newton refinement fails 5 of 8
+    sites at this tolerance.
     """
     jd0 = L.julday(y, m, d, 0.0, L.GREG_CAL)
-    jd = _event(jd0, lon, lat, CALC_RISE | BIT_DISC_CENTER | BIT_NO_REFRACTION)
-    centre = _true_altitude_arcmin(jd, lon, lat)
-    assert abs(centre) < 0.002, f"{name}: geometric horizon crossing at {centre:.5f}', expected 0"
+    jd = _event(jd0, lon, lat, rsmi | BIT_DISC_CENTER | BIT_NO_REFRACTION)
+    centre, _semidiameter = _true_altitude_and_semidiameter(oracle, jd, lon, lat)
+    assert abs(centre) < 2e-4, f"{name} {label}: geometric horizon crossing at {centre:.6f}', expected 0"
 
 
-def test_the_zero_default_is_zero_celsius_not_the_standard_atmosphere():
+def test_the_zero_default_is_zero_celsius_not_the_standard_atmosphere(oracle):
     """attemp=0 means 0 C, as in the reference — not an implicit 15 C.
 
     Worth its own test because it is the cheapest mistake to make in a caller and
@@ -174,9 +224,10 @@ def test_the_zero_default_is_zero_celsius_not_the_standard_atmosphere():
     default_jd = _event(jd0, lon, lat, CALC_RISE, atpress=0.0, attemp=0.0)
     standard_jd = _event(jd0, lon, lat, CALC_RISE)
 
-    limb = _true_altitude_arcmin(default_jd, lon, lat) + _semidiameter_arcmin(default_jd, lon, lat)
+    altitude, semidiameter = _true_altitude_and_semidiameter(oracle, default_jd, lon, lat)
+    limb = altitude + semidiameter
     assert abs(limb - _LIMB_AT_ZERO_C_ARCMIN) < _LIMB_TOL_ARCMIN, (
-        f"default-atmosphere limb at {limb:.4f}', expected {_LIMB_AT_ZERO_C_ARCMIN:.4f}' (0 C)"
+        f"default-atmosphere limb at {limb:.5f}', expected {_LIMB_AT_ZERO_C_ARCMIN:.4f}' (0 C)"
     )
 
     seconds = (standard_jd - default_jd) * 86400.0
@@ -190,14 +241,13 @@ def test_observer_elevation_does_not_lower_the_horizon():
 
     Three statements, because the naive one is wrong in an instructive way:
 
-    1. With an EXPLICIT pressure, elevation changes the event by nothing at all
-       (only the parallax sees it, and that is far below a second of time).
+    1. With an EXPLICIT pressure, elevation changes the event by nothing that
+       matters (13 ms, and not for the reason one would guess — see the note in
+       `rise_trans`).
     2. With the default atpress=0 the elevation is what the barometric estimate
        reads, so a higher observer gets thinner air, less refraction and a LATER
        sunrise — the opposite of the physical intuition, and the reason this
-       looks like a bug when it is a convention. rise_trans keeps the level sea
-       horizon at any elevation, which is exactly what published rise/set tables
-       do.
+       looks like a bug when it is a convention.
     3. Lowering the horizon is opt-in through horhgt=-100, and it is worth
        minutes, not seconds.
     """
@@ -219,12 +269,51 @@ def test_observer_elevation_does_not_lower_the_horizon():
         f"1000 m with an estimated pressure should push sunrise ~24 s LATER, got {later_seconds:+.1f} s"
     )
 
-    # (3) the dip is the only thing that actually lowers the horizon
+    # (3) the dip is the only thing that actually lowers the horizon. Measured
+    # under the SAME standard atmosphere as `fixed_high`, because the effect is
+    # atmosphere-dependent: the default 0 C gives -362.3 s here, not -360.0 s.
     retflag, tret = L.rise_trans_true_hor(
         jd0, SUN, CALC_RISE, (lon, lat, 1000.0), _STD_PRESSURE, _STD_TEMPERATURE, -100.0
     )
     assert retflag == 0
     dip_seconds = (tret[0] - fixed_high) * 86400.0
-    assert -400.0 < dip_seconds < -320.0, (
+    assert -380.0 < dip_seconds < -340.0, (
         f"horhgt=-100 at 1000 m should pull sunrise ~360 s EARLIER, got {dip_seconds:+.1f} s"
+    )
+
+
+def test_a_shallow_horhgt_at_sea_level_does_nothing():
+    """The dead band beside horhgt=0, pinned because the docs now warn about it.
+
+    `_rise_true_to_apparent` clamps to the unrefracted altitude whenever the
+    apparent altitude falls below the dip, and at sea level the dip is exactly 0.
+    So the whole 0.56 degrees of refraction between horhgt=0 and horhgt=-0.56 is
+    a range in which asking for a lower horizon changes nothing at all, and then
+    the answer jumps 13 s in one step. A caller who asks for a horizon depressed
+    by 30 arcminutes gets the undepressed sunrise.
+
+    Pre-existing behaviour and not obviously wrong to fix — but it is exactly
+    the trap `horhgt` documentation should stop, so it is written down as a fact
+    rather than left to be rediscovered.
+    """
+    jd0 = L.julday(2024, 3, 20, 0.0, L.GREG_CAL)
+    geopos = (12.5, 41.9, 0.0)
+
+    def rise(horhgt):
+        retflag, tret = L.rise_trans_true_hor(
+            jd0, SUN, CALC_RISE, geopos, _STD_PRESSURE, _STD_TEMPERATURE, horhgt
+        )
+        assert retflag == 0
+        return tret[0]
+
+    flat = rise(0.0)
+    for inside_band in (-0.10, -0.30, -0.50):
+        assert abs(rise(inside_band) - flat) * 86400.0 < 1.0, (
+            f"horhgt={inside_band} moved the event; the dead band this test documents is gone, "
+            f"which is an improvement — update the docstring in eclipse.py to match"
+        )
+
+    beyond = (rise(-0.60) - flat) * 86400.0
+    assert beyond < -5.0, (
+        f"past the refraction the horizon should finally move; got {beyond:+.1f} s"
     )
