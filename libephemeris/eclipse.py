@@ -7143,10 +7143,15 @@ def _rise_trans_impl(
 
         The observer altitude in geopos[2] does NOT lower the horizon, at any
         elevation. With an explicit atpress it is inert for the timing: the
-        residual is about 13 ms, and it is NOT the parallax (which is only
-        0.0014" at 1000 m, a hundred times smaller) - it is calc_dip switching
-        from exactly 0 to non-zero, which moves the clamp discontinuity below
-        off the root. With the default atpress=0 the elevation is what the
+        residual is about 13 ms, and it is neither the parallax (only 0.0014" at
+        1000 m, a hundred times too small) nor the dip - the same 13 ms appears
+        between horhgt=0 and horhgt=-0.01 at sea level, where calc_dip is exactly
+        0 in both. It is the solver's stopping rule: it exits as soon as
+        |height| < 1e-4 deg, and at sea level with horhgt=0 the root sits inside
+        that band, so bisection stops ~13 ms early. Any perturbation that moves
+        the root out of the band - a non-zero dip OR a non-zero horhgt - forces
+        full convergence, which means the ELEVATED answer is the accurate one and
+        the 13 ms is an error in the sea-level baseline. With the default atpress=0 the elevation is what the
         barometric estimate reads, so a HIGHER observer gets thinner air, less
         refraction and a LATER sunrise - the opposite of the physical intuition:
         Rome 2024-03-20, +2.5 s at 100 m, +24.2 s at 1000 m, +66.0 s at 3000 m.
@@ -7168,13 +7173,19 @@ def _rise_trans_impl(
         One trap in that choice. `_rise_true_to_apparent` clamps to the
         UNREFRACTED altitude whenever the apparent altitude would fall below the
         dip, and at sea level the dip is exactly 0. So between horhgt=0 and
-        horhgt=-0.56 - the whole width of the refraction - asking for a lower
-        horizon changes nothing at all, and then the answer steps by ~13 s at
-        once. A caller at sea level requesting a horizon depressed by 30
-        arcminutes gets the undepressed sunrise. horhgt=-100 resolves to
-        dip + 1e-4 deg, i.e. it lands just past the edge of that band, so its
-        effect is determinate but the last 0.02-0.04 s of the figures above
-        should not be read as physics.
+        horhgt=-0.559889 - the whole width of the refraction at the horizon -
+        asking for a lower horizon changes nothing (to within the 13 ms above).
+        A caller at sea level requesting a horizon depressed by 30 arcminutes
+        gets the undepressed sunrise.
+
+        Past that edge the response is a KINK, not a step: the derivative goes
+        from 0 to 322 s per degree and stays there. Rome 2024-03-20 measured:
+        -0.5599 -> -0.01 s, -0.561 -> -0.37 s, -0.57 -> -3.27 s, -0.60 ->
+        -12.93 s, -0.80 -> -77.35 s. (An earlier version of this note called it a
+        13-second jump; 13 s is simply the value at -0.60.) horhgt=-100 resolves
+        to dip + 1e-4 deg, i.e. just past the edge, so its effect is determinate
+        but the last 0.02-0.04 s of the figures above is solver residue rather
+        than physics.
 
     Algorithm:
         1. For transits: Find when body crosses the local meridian
@@ -7523,11 +7534,12 @@ def _rise_trans_true_hor_impl(
             CAVEAT: "depressed" only holds outside a dead band next to 0. The
             refraction inversion clamps to the unrefracted altitude whenever the
             apparent altitude would fall below the dip, and at sea level the dip
-            is exactly 0 - so at geopos[2]=0 every horhgt from 0 down to about
-            -0.56 returns the SAME time, and the answer then steps by ~13 s in
-            one go. Requesting a 30-arcminute depression at sea level gets the
-            undepressed event. The band tracks the dip, so it moves with
-            elevation (~1.0 deg wide at 3000 m).
+            is exactly 0 - so at geopos[2]=0 every horhgt from 0 down to
+            -0.559889 returns the same time to within 13 ms, and past that edge
+            the response is a KINK rather than a step: 322 s per degree, so -0.57
+            is -3.3 s and -0.60 is -12.9 s. Requesting a 30-arcminute depression
+            at sea level gets the undepressed event. The band tracks the dip, so
+            it moves with elevation (~1.0 deg wide at 3000 m).
             The special value -100.0 is not an angle: it asks for the computed
             dip of the SEA horizon at geopos[2], via calc_dip() (Thom's
             refraction-corrected dip, not the schoolbook 1.76*sqrt(h)), and it

@@ -92,7 +92,7 @@ _LIMB_TOL_ARCMIN = 0.02
 
 #: Same quantity with the library default atmosphere (0 C): colder air refracts
 #: more, so the Sun has further to climb.
-_LIMB_AT_ZERO_C_ARCMIN = -36.7363
+_LIMB_AT_ZERO_C_ARCMIN = -36.7395
 
 #: Equator to just inside the polar circle, both hemispheres, all four seasons,
 #: all inside the oracle's coverage window (see the module docstring).
@@ -123,17 +123,15 @@ def oracle():
     }
 
 
-@pytest.fixture(autouse=True)
-def _restore_observer():
-    """Nothing here sets the global observer, but assert that stays true.
-
-    The first draft called ``L.set_topo`` inside its measurement helpers and left
-    it set, which only stayed contained because `tests/conftest.py` happens to
-    save and restore `_TOPO`. Depending on a sibling fixture for isolation is how
-    a module leaks Singapore into whatever runs after it.
-    """
-    yield
-    L.set_topo(0.0, 0.0, 0.0)
+# NOTE ON GLOBAL STATE. Nothing in this module touches the global observer: the
+# oracle is Skyfield, which takes the site as an argument. An earlier version
+# added an autouse fixture that called ``L.set_topo(0, 0, 0)`` on teardown,
+# claiming to "assert" the invariant. It asserted nothing, it duplicated
+# `tests/conftest.py`'s `reset_ephemeris_state` (which saves and restores
+# `_TOPO` at a wider scope, so its teardown runs later anyway), and it moved the
+# state in the wrong direction: `_TOPO = None` makes `calc_ut(FLG_TOPOCTR)`
+# raise, while `Topos(0, 0, 0)` silently returns a Null-Island position. Four
+# other tests depend on that raise.
 
 
 def _true_altitude_and_semidiameter(oracle, jd_ut: float, lon: float, lat: float):
@@ -148,6 +146,13 @@ def _true_altitude_and_semidiameter(oracle, jd_ut: float, lon: float, lat: float
     altitude, _azimuth, distance = apparent.altaz()
     semidiameter = math.degrees(math.asin(_RSUN_KM / (distance.au * _AU_KM)))
     return altitude.degrees * 60.0, semidiameter * 60.0
+
+
+def _altitude_rate_arcsec_per_second(oracle, jd_ut: float, lon: float, lat: float) -> float:
+    """Signed vertical rate at `jd_ut`. Positive rising, negative setting."""
+    before, _ = _true_altitude_and_semidiameter(oracle, jd_ut - 30.0 / 86400.0, lon, lat)
+    after, _ = _true_altitude_and_semidiameter(oracle, jd_ut + 30.0 / 86400.0, lon, lat)
+    return (after - before) * 60.0 / 60.0
 
 
 def _event(jd0, lon, lat, rsmi, atpress=_STD_PRESSURE, attemp=_STD_TEMPERATURE, alt=0.0):
@@ -173,6 +178,17 @@ def test_the_upper_limb_sits_on_the_refracted_horizon(oracle, name, lon, lat, y,
         f"{_LIMB_ON_HORIZON_ARCMIN:.4f}' +/- {_LIMB_TOL_ARCMIN}'. The horizon "
         f"convention moved — check the refraction model, the semidiameter term "
         f"and the topocentric parallax, in that order of likelihood."
+    )
+
+    # The altitude invariant is SYMMETRIC in rise and set, so on its own the two
+    # parametrised directions are one assertion run twice. A mutant that returns
+    # the rising crossing for CALC_SET passed all 51 tests. The sign of the
+    # vertical rate is the one thing that tells them apart, so it is asserted.
+    rate = _altitude_rate_arcsec_per_second(oracle, jd, lon, lat)
+    expected_sign = 1.0 if rsmi == CALC_RISE else -1.0
+    assert rate * expected_sign > 0.0, (
+        f"{name} {label}: the Sun's altitude is moving {rate:+.2f}\"/s here, which is the "
+        f"wrong direction for a {label} — the event type is not selecting what it claims"
     )
 
 
@@ -202,8 +218,8 @@ def test_the_geometric_horizon_is_exactly_zero(oracle, name, lon, lat, y, m, d, 
     the two position pipelines, so this is the tightest statement the module can
     make. 2e-4' is ~20x the worst observed residual (1.1e-5') and ~1 ms of time;
     it is deliberately not looser, because loosening it is how a search
-    regression hides. Disabling the solver's Newton refinement fails 5 of 8
-    sites at this tolerance.
+    regression hides. Disabling the solver's Newton refinement fails 15 of the 16
+    cases at this tolerance.
     """
     jd0 = L.julday(y, m, d, 0.0, L.GREG_CAL)
     jd = _event(jd0, lon, lat, rsmi | BIT_DISC_CENTER | BIT_NO_REFRACTION)
@@ -288,9 +304,10 @@ def test_a_shallow_horhgt_at_sea_level_does_nothing():
     `_rise_true_to_apparent` clamps to the unrefracted altitude whenever the
     apparent altitude falls below the dip, and at sea level the dip is exactly 0.
     So the whole 0.56 degrees of refraction between horhgt=0 and horhgt=-0.56 is
-    a range in which asking for a lower horizon changes nothing at all, and then
-    the answer jumps 13 s in one step. A caller who asks for a horizon depressed
-    by 30 arcminutes gets the undepressed sunrise.
+    a range in which asking for a lower horizon changes nothing, and past its
+    edge the response is a KINK rather than a step — 322 s per degree, so -0.57
+    moves the event 3.3 s and -0.60 moves it 12.9 s. A caller who asks for a
+    horizon depressed by 30 arcminutes gets the undepressed sunrise.
 
     Pre-existing behaviour and not obviously wrong to fix — but it is exactly
     the trap `horhgt` documentation should stop, so it is written down as a fact
