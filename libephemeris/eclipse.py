@@ -7096,9 +7096,18 @@ def _rise_trans_impl(
         geopos: Geographic position as sequence [lon, lat, alt]:
             - 0: geographic longitude in degrees (eastern positive)
             - 1: geographic latitude in degrees (northern positive)
-            - 2: geographic altitude in meters above sea level
-        atpress: Atmospheric pressure in mbar/hPa for refraction (default 0.0)
-        attemp: Atmospheric temperature in degrees Celsius (default 0.0)
+            - 2: geographic altitude in meters above sea level. It feeds the
+              topocentric parallax and the barometric pressure estimate; it
+              does NOT depress the horizon (see "Horizon convention").
+        atpress: Atmospheric pressure in mbar/hPa for refraction (default 0.0).
+            0 means "estimate it from geopos[2] with the barometric
+            expression", not "no pressure".
+        attemp: Atmospheric temperature in degrees Celsius (default 0.0). The
+            default is a literal 0 C, as in the reference - NOT an implicit
+            15 C standard atmosphere. It is not a free parameter: measured at
+            Rome for 2024-03-20, attemp=15.0 moves sunrise +16.9 s against the
+            0 C default (-10 C: -13.1 s; +30 C: +31.1 s). A caller that means
+            the standard atmosphere has to pass 1013.25 / 15.0 explicitly.
         flags: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
@@ -7113,6 +7122,34 @@ def _rise_trans_impl(
         For circumpolar objects (always above or below horizon at the given
         latitude), the function returns (-2, tret) with tret[0] = 0.0.
         For transits, circumpolar objects still have valid transit times.
+
+    Horizon convention:
+        A rise/set is the instant the body's APPARENT UPPER LIMB meets the
+        horizon. The true altitude is raised by the topocentric semidiameter -
+        computed from the actual distance, so it tracks the Earth-Sun distance
+        through the year rather than using a fixed 16' - and the result is then
+        refracted. Under 1013.25 hPa / 15 C that leaves the Sun's true
+        geometric CENTRE near -49.6' at the event (it ranges about -49.3' to
+        -49.9' over a year, which is the semidiameter breathing). BIT_DISC_CENTER
+        drops the semidiameter term; BIT_NO_REFRACTION drops the refraction one.
+
+        The observer altitude in geopos[2] does NOT lower the horizon, at any
+        elevation. With an explicit atpress it is inert for the timing (only the
+        parallax sees it, far below a second). With the default atpress=0 it is
+        what the barometric estimate reads, so a HIGHER observer gets thinner
+        air, less refraction and a LATER sunrise - the opposite of the physical
+        intuition: Rome 2024-03-20, +2.5 s at 100 m, +24.2 s at 1000 m, +66.0 s
+        at 3000 m. That is deliberate, not an oversight - published rise/set
+        tables are computed for a level sea horizon whatever the observer's
+        elevation, and horhgt=0 is what reproduces them.
+
+        To model an observer who genuinely sees over the curve, call
+        rise_trans_true_hor() with horhgt=-100, which asks for the dip of the
+        sea horizon at geopos[2]. Same place and date, that moves sunrise
+        -110.6 s at 100 m, -362.3 s at 1000 m and -640.7 s at 3000 m against
+        horhgt=0 - minutes, which dwarfs every other term in this function's
+        error budget. Choosing between the two is a convention decision the
+        caller owns; this function cannot infer it from geopos[2] alone.
 
     Algorithm:
         1. For transits: Find when body crosses the local meridian
@@ -7458,6 +7495,16 @@ def _rise_trans_true_hor_impl(
             so rise times will be later and set times earlier.
             Negative values mean the horizon is depressed (e.g., observer
             on a mountain).
+            The special value -100.0 is not an angle: it asks for the computed
+            dip of the SEA horizon at geopos[2], via calc_dip() (Thom's
+            refraction-corrected dip, not the schoolbook 1.76*sqrt(h)).
+            This is the only way to make the observer's elevation actually
+            lower the horizon - geopos[2] on its own does not (see the
+            "Horizon convention" section of rise_trans). It is worth minutes,
+            not seconds: at Rome for 2024-03-20, horhgt=-100 against horhgt=0
+            moves sunrise -110.6 s at 100 m, -362.3 s at 1000 m and -640.7 s at
+            3000 m. Note the default 0.0 is what reproduces published rise/set
+            tables, which assume a level sea horizon at any elevation.
         flags: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
