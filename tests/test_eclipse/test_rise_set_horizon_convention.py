@@ -65,6 +65,12 @@ skyfield_api = pytest.importorskip("skyfield.api")
 skyfield_data = pytest.importorskip("skyfield_data")
 
 _AU_KM = 149597870.7
+
+#: Deliberately the library's own solar radius, so what the limb assertion
+#: checks is the semidiameter TERM (computed here from Skyfield's distance),
+#: not the radius constant — which is common mode: a change of the library's
+#: value by up to ~800 km (the IAU 2015 nominal 695700 included) moves the limb
+#: by <= 0.007' and passes inside the 0.02' tolerance unseen.
 _RSUN_KM = 696000.0
 
 #: Standard atmosphere. Passed EXPLICITLY everywhere below, because the library
@@ -216,7 +222,7 @@ def test_the_geometric_horizon_is_exactly_zero(oracle, name, lon, lat, y, m, d, 
 
     With both physical terms removed the only things left are the root-finder and
     the two position pipelines, so this is the tightest statement the module can
-    make. 2e-4' is ~20x the worst observed residual (1.1e-5') and ~1 ms of time;
+    make. 2e-4' is ~10x the worst observed residual (1.9e-5') and ~1 ms of time;
     it is deliberately not looser, because loosening it is how a search
     regression hides. Disabling the solver's Newton refinement fails 15 of the 16
     cases at this tolerance.

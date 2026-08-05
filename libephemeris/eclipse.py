@@ -7148,7 +7148,8 @@ def _rise_trans_impl(
         between horhgt=0 and horhgt=-0.01 at sea level, where calc_dip is exactly
         0 in both. It is the solver's stopping rule: it exits as soon as
         |height| < 1e-4 deg, and at sea level with horhgt=0 the root sits inside
-        that band, so bisection stops ~13 ms early. Any perturbation that moves
+        that band, so bisection stops ~13 ms short of convergence - which leaves
+        the sea-level answer ~13 ms LATE, not early. Any perturbation that moves
         the root out of the band - a non-zero dip OR a non-zero horhgt - forces
         full convergence, which means the ELEVATED answer is the accurate one and
         the 13 ms is an error in the sea-level baseline. With the default atpress=0 the elevation is what the
@@ -7180,7 +7181,7 @@ def _rise_trans_impl(
 
         Past that edge the response is a KINK, not a step: the derivative goes
         from 0 to 322 s per degree and stays there. Rome 2024-03-20 measured:
-        -0.5599 -> -0.01 s, -0.561 -> -0.37 s, -0.57 -> -3.27 s, -0.60 ->
+        -0.5599 -> -0.02 s, -0.561 -> -0.37 s, -0.57 -> -3.27 s, -0.60 ->
         -12.93 s, -0.80 -> -77.35 s. (An earlier version of this note called it a
         13-second jump; 13 s is simply the value at -0.60.) horhgt=-100 resolves
         to dip + 1e-4 deg, i.e. just past the edge, so its effect is determinate
