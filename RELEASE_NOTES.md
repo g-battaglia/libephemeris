@@ -7,7 +7,7 @@ prepared in the source tree.
 
 ---
 
-## 3.1.0 — current source-tree release (2026-08-10)
+## 3.1.0 — current source-tree release (2026-08-11)
 
 `3.1.0` retires the `uranians` LEB companion (fictitious bodies are always
 served by their runtime analytical models) and stops sealed `leb` mode from
