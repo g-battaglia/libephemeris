@@ -275,9 +275,9 @@ curati senza un canale persistente sensato usano un modello locale tracciato
 
 Come le efemeridi JPL, anche i file LEB esistono in tre versioni:
 
-- **`base`** (~52 MB nei cinque gruppi) — copre 1850–2150
-- **`medium`** (~172 MB nei cinque gruppi) — copre 1550–2650
-- **`extended`** (~2.9 GB nei cinque gruppi) — copre l'intervallo condiviso esatto di DE441 (circa -13200 a +17191)
+- **`base`** (~52 MB nei quattro gruppi) — copre 1850–2150
+- **`medium`** (~172 MB nei quattro gruppi) — copre 1550–2650
+- **`extended`** (~2.9 GB nei quattro gruppi) — copre l'intervallo condiviso esatto di DE441 (circa -13200 a +17191)
 
 ---
 
@@ -523,9 +523,9 @@ ephem.download_for_tier("medium")
 
 ### File LEB aggiuntivi
 
-L'inventario del runtime sigillato comprende cinque gruppi LEB2 con hash
-verificato per ciascun tier eleggibile: `core`, `asteroids`, `exotics`,
-`apogee` e `uranians`. Un deploy extended valida quindi quindici file. In
+L'inventario del runtime sigillato comprende quattro gruppi LEB2 con hash
+verificato per ciascun tier eleggibile: `core`, `asteroids`, `exotics` e
+`apogee`. Un deploy extended valida quindi dodici file. In
 modalità `leb` non servono kernel DE né BSP dei centri planetari.
 
 ### Directory dei dati

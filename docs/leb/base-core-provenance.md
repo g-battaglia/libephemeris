@@ -1,7 +1,7 @@
 # Bundled base-tier LEB2 provenance
 
-This is the build record for the two tracked prebuilt LEB artifacts in the
-repository: the base core and the small Hamburg-body companion.
+This is the build record for the tracked prebuilt LEB artifact in the
+repository: the base core.
 
 ## Core artifact
 
@@ -73,36 +73,15 @@ This record covers every payload in the file, not only the body channels:
   generated entirely by the repository's LEB2 serializer from the body and
   auxiliary values described above.
 
-## Hamburg-body companion
+## Hamburg-body companion (retired)
 
-- Path: `libephemeris/data/leb2/base_uranians.leb2`
-- Build date: 2026-07-18
-- Size: 46,148 bytes
-- SHA-256: `2b052321672f995a2c2f6c6c3abe4dd623e2721eb17f7319873d0c8b0d65ee8c`
-- Body IDs: 40–47
-- Coverage: JD 2396758.5–2506331.5 (1850–2150)
-- Format: LEB2 v2; populated section types 0 and 6
+The formerly bundled `base_uranians.leb2` companion (Hamburg bodies 40–47)
+was retired in 3.1.0; those bodies are always computed from the runtime
+Neely (1980) propagation in `libephemeris.hypothetical`.
 
-Exact generation-input pin:
-
-- `libephemeris/hypothetical.py` SHA-256 (as built, tree of commit
-  `ea052c5`):
-  `b9c64cca9fb3c8263103992200bc5937f5e3c80f85fe64b39f35a500e917cdf8`.
-  Later commits revise this module's documentation and citations; the pin
-  identifies the bytes whose Neely (1980) propagation produced the stored
-  channels.
-
-The standalone `ephemeris_base_uranians.leb` partial is generated from the
-Neely (1980) propagation in
-`libephemeris.hypothetical`, verified over 500 samples per body, converted with
-the `1e-12` native-component target, and verified over another 200 samples per
-body. Shared nutation, Delta-T, and star-catalog tables are intentionally owned
-by the core and are not duplicated in this or any other named companion.
-
-Both assets were regenerated from the inputs listed above rather than
+The core asset was regenerated from the inputs listed above rather than
 converted from a previously published LEB file. The core artifact contains no
-fictitious body IDs: the Hamburg bodies (40–47) ship separately as the
-manifest-pinned `base_uranians.leb2` companion.
+fictitious body IDs.
 
 This page is an external build record. The command, hashes, and input
 description are not embedded as metadata inside the LEB2 format.

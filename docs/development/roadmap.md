@@ -106,8 +106,8 @@ Make the library fully transparent without LEB. A user can use `libephemeris` by
 - **3.3 Environment variable for explicit mode** — Implemented `LIBEPHEMERIS_MODE` with four values: `auto` (default: LEB → Horizons → Skyfield), `skyfield` (force Skyfield), `leb` (require LEB with auto-discovery), `horizons` (prefer Horizons API). Added `set_calc_mode()`/`get_calc_mode()` in `state.py`, exported in `__init__.py`, reset in `close()`.
 - **3.4 Mode-aware handling of missing LEB** — `auto` can continue through its independent non-LEB source chain when no LEB is configured. Sealed `leb` treats a missing or corrupt canonical group as a provisioning failure, fails core range misses explicitly, and permits only a source-labelled local model for a companion body outside its meaningful stored interval.
 - **3.5 Distribution of pre-generated LEB files** — The wheel bundles the
-  manifest-pinned base core and Hamburg-body companion. The cumulative
-  `data-v3` manifest supplies all five groups for base, medium, and extended;
+  manifest-pinned base core. The cumulative
+  `data-v3` manifest supplies all four groups for base, medium, and extended;
   `download auto` installs every eligible tier so routing remains per body and
   date. Locally generated LEB1 and LEB2 files remain available through explicit
   configuration.

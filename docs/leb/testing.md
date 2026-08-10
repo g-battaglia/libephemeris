@@ -340,10 +340,10 @@ external-comparison measurements.
 
 ### Hypothetical bodies
 
-Legacy or unpinned LEB channels for IDs 40–58 are always bypassed. IDs 40–47
-serve from the manifest-pinned `uranians` companion when present, else the
-reviewed local runtime model; IDs 50–53 and 56 are always runtime-model; IDs
-48, 49, 54, 55, 57, and 58 remain unavailable and raise `UnknownBodyError`.
+LEB channels for IDs 40–58 are always bypassed (legacy files may still carry
+them). IDs 40–47, 50–53, and 56 are always computed from their reviewed local
+runtime models; IDs 48, 49, 54, 55, 57, and 58 remain unavailable and raise
+`UnknownBodyError`.
 
 ---
 

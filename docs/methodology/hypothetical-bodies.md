@@ -330,30 +330,17 @@ two-body mathematics:
 No correction term is fitted to a compatibility engine. No output from a
 reference engine is stored as an element, fixture, or coefficient.
 
-## Precomputed companion for IDs 40–47
+## Retired precomputed companion for IDs 40–47 (removed in 3.1.0)
 
-The eight Hamburg-school bodies also ship as the `uranians` LEB2 companion
-(`{tier}_uranians.leb2`). Its Chebyshev coefficients are fitted exclusively by
-sampling the runtime propagation above (`generate_body_helio` in
-`scripts/generate_leb.py` calls `_calc_uranian_planet_raw`); two-body orbits
-are smooth enough that 10-year segments at degree 8 reproduce the model to
-about `1e-12` degrees, and the compressed channels keep a `1e-12`
-native-component target (the channels store degrees, so the default
-AU-calibrated target would be too loose).
-
-The runtime registry remains the source of truth:
-
-- the partial `ephemeris_{tier}_uranians.leb` never merges into a main LEB1
-  file, and conversion authenticates the exact {40..47} inventory;
-- at runtime the companion is attached and consulted only when the file
-  byte-matches its `DATA_FILES` SHA-256 pin, both at composite discovery and
-  again when a calculation sources a fictitious body;
-- dates outside the companion range, absent readers, or hash mismatches all
-  fall back to the analytical model with identical public semantics — the
-  Uranian branch keeps its own transform and centered-derivative chain and
-  only swaps where raw body/Earth positions come from;
-- `fast_calc` continues to reject IDs 40–58 from persisted channels, and IDs
-  48–58 have no persisted representation at all.
+Earlier releases also shipped the eight Hamburg-school bodies as a precomputed
+`uranians` LEB2 companion (`{tier}_uranians.leb2`) whose coefficients were
+fitted by sampling the runtime propagation above, guarded by a SHA-256
+byte-match gate. That companion was retired in 3.1.0: IDs 40–47 — like IDs
+48–58, which never had a persisted representation — are now always computed
+from the runtime analytical model, provenance reports `Analytical`, and
+`fast_calc` continues to reject IDs 40–58 from persisted channels. Legacy
+`{tier}_uranians.leb2` files on disk are recognized and ignored, never
+consulted.
 
 ## Custom orbits
 

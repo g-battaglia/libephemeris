@@ -332,9 +332,9 @@ compatibility-model artifacts or oracle-output generators to rebuild. See
 ### `leph release` — Release management
 
 The historical LEB upload tasks are retired. The cumulative `data-v3` GitHub
-release contains all five SHA-256-pinned LEB2 groups for base, medium, and extended;
-the wheel bundles byte-identical copies of `base_core.leb2` and
-`base_uranians.leb2`. Maintainers rebuild the complete matrix with
+release contains all four SHA-256-pinned LEB2 groups for base, medium, and extended;
+the wheel bundles a byte-identical copy of `base_core.leb2`.
+Maintainers rebuild the complete matrix with
 `./regenerate-leb.sh all`; the legacy release workflow must not be used.
 
 ### `leph manual` — Documentation builds
@@ -388,9 +388,9 @@ libephemeris download medium --quiet           # Suppress all output
 
 The historical monolithic LEB download commands remain retired. In `auto` or
 `leb` mode, `libephemeris download auto` installs every SHA-256-pinned LEB2
-group cumulatively through the configured tier: 5 files for base, 10 through
-medium, or 15 through extended. The wheel supplies the two bundled base
-resources and the remaining files come from the immutable `data-v3` release.
+group cumulatively through the configured tier: 4 files for base, 8 through
+medium, or 12 through extended. The wheel supplies the bundled
+`base_core.leb2` and the remaining files come from the immutable `data-v3` release.
 
 ### `libephemeris status` output
 
@@ -401,7 +401,7 @@ The `status` command shows a comprehensive overview:
 - **Planet Center Corrections**: per-tier BSP files, active tier marked with `*`
 - **Locally generated LEB1 Binary Ephemeris**: per-tier .leb files, active one marked with `*`
 - **LEB2 Compressed Ephemeris**: per-tier group counts
-  (core/asteroids/exotics/apogee/uranians)
+  (core/asteroids/exotics/apogee)
 - **SPK Asteroid Cache**: directory path, file count, total size
 - **ASSIST N-body Data**: planet ephemeris + asteroid perturbers
 - **IERS Earth Orientation Data**: finals2000A, leap seconds, delta T with age in days
@@ -409,12 +409,12 @@ The `status` command shows a comprehensive overview:
 
 ### Backward compatibility
 
-The reader can decode legacy LEB files that contain the hypothetical group.
-Since 3.0.0rc15 a file named after a manifest artifact is trusted on presence
-at both companion attach and calculation sourcing; its SHA-256 is verified once,
-when the installer writes it. The
-`<tier>-uranians` selectors convert and verify that regenerated companion from
-its standalone LEB1 partial.
+The reader can decode legacy LEB files that contain the retired hypothetical
+group: pre-3.1.0 `{tier}_uranians.leb2` companions left on disk are recognized
+by the tier guard and ignored harmlessly — fictitious-body channels are never
+consulted, and the `<tier>-uranians` selectors are gone. Since 3.0.0rc15 a
+file named after a manifest artifact is trusted on presence; its SHA-256 is
+verified once, when the installer writes it.
 
 Old colon-separated syntax still works:
 

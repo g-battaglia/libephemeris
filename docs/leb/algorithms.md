@@ -448,11 +448,13 @@ coordinate system of the date. These bodies are computed by analytical
 formulas that directly output ecliptic coordinates; storing them in ICRS
 would require an unnecessary inverse rotation.
 
-#### COORD_HELIO_ECL (type 2) — Heliocentric Ecliptic
+#### Type 2 — Retired (was Heliocentric Ecliptic)
 
-Reserved for locally generated bodies whose independently sourced definition is
-heliocentric ecliptic. The reviewed bundled core does not use this coordinate
-type. Unsupported compatibility IDs must never be materialized into LEB data.
+Value 2 carried the heliocentric-ecliptic channels of the pre-3.1.0
+`uranians` companion. The companion and its evaluation pipeline are retired:
+fictitious bodies are always served by their runtime analytical models, and
+no body may be materialized with this coordinate type. The value stays
+reserved so legacy files in the wild keep an unambiguous meaning.
 
 #### COORD_GEO_ECLIPTIC (type 3) — Reserved
 

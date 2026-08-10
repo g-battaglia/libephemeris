@@ -519,9 +519,9 @@ ephem.download_for_tier("medium")
 
 ### Additional LEB files
 
-The sealed runtime inventory consists of five hash-pinned LEB2 groups per
-eligible tier: `core`, `asteroids`, `exotics`, `apogee`, and `uranians`. An
-extended deployment therefore validates fifteen files. No DE kernel or
+The sealed runtime inventory consists of four hash-pinned LEB2 groups per
+eligible tier: `core`, `asteroids`, `exotics`, and `apogee`. An
+extended deployment therefore validates twelve files. No DE kernel or
 planet-center BSP is required in `leb` mode. Historical `.leb` files remain
 readable when selected explicitly.
 

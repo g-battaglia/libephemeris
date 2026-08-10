@@ -36,10 +36,9 @@ Key facts to anchor on (verified against the installed package, `3.0.0`):
 
 ```bash
 pip install libephemeris         # 3.0.0 stable. The wheel already bundles
-                                  # the base-tier core: the 14 core bodies
-                                  # + Hamburg/Uranian companion, JD range
-                                  # 1850–2150. No download needed for that
-                                  # slice.
+                                  # the base-tier core: the 14 core bodies,
+                                  # JD range 1850–2150. No download needed
+                                  # for that slice.
 ```
 
 ```python

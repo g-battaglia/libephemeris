@@ -6,9 +6,9 @@
 pip install libephemeris
 ```
 
-The PyPI wheel includes the bundled LEB2 base-tier core (~10.23 MB) and
-Hamburg-body companion (~46 KB), covering 1850–2150. The immutable `data-v3`
-release supplies all five SHA-256-pinned groups for every tier. In `auto` or
+The PyPI wheel includes the bundled LEB2 base-tier core (~10.23 MB),
+covering 1850–2150. The immutable `data-v3`
+release supplies all four SHA-256-pinned groups for every tier. In `auto` or
 `leb` mode, `libephemeris download auto` installs them cumulatively through the
 configured tier (5, 10, or 15 files). Historical LEB1 files remain readable and
 their standard tier filenames are auto-discovered.

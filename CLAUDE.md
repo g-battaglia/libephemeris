@@ -87,7 +87,6 @@ LEB Chebyshev approximation error vs Skyfield reference, per body group and tier
 | **Asteroids** (Chiron-Vesta) | <0.001" (0.000045") | <0.001" (0.000036") | <0.001" |
 | **Ecliptic** (Nodes, Lilith) | <0.001" (0.000049") | <0.001" (0.000075") | <0.001" modern, up to 0.054" extreme dates |
 | **IntpApog/IntpPerig** | Covered by the ecliptic tolerance | Covered by the ecliptic tolerance | Covered by the 0.1" extreme-date tolerance |
-| **Uranians** | ~0.000000" | ~0.000000" | ~0.000000" |
 
 The table compares like-for-like states (system barycenters for the outer
 planets). In non-sealed `skyfield` mode the runtime additionally applies the
@@ -157,38 +156,30 @@ the declared inventory and per-body metadata against LEB1.
 | `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | ~2.15 MB |
 | `apogee` | OscuApog, IntpApog, IntpPerig (3) | ~9.8 MB |
 | `exotics` | Centaurs, TNOs, NEAs (31) | ~29.4 MB |
-| `uranians` | Hamburg bodies Cupido-Poseidon (40-47, 8) | ~46 KB |
 
-`uranians` is companion-only: fitted from the runtime Neely (1980) propagation
-in `libephemeris.hypothetical` (never from legacy coefficients), generated from
-the standalone `ephemeris_{tier}_uranians.leb` partial (merged mains carry no
-fictitious IDs). Since 3.0.0rc15 the runtime trusts it on presence under a
-`DATA_FILES` name; its SHA-256 is verified once, by the installer that writes
-it. With a trusted reader active, the Uranian branch in `planets.py`
-sources body and Earth positions from the LEB (same transform chain, ~4x
-faster geocentric speed); `fast_calc` still rejects IDs 40-58 from persisted
-channels. Other hypothetical bodies (48-58) remain runtime-only; each registry
-row carries a source annotation checked by the integrity gate.
+The `uranians` companion group was retired in 3.1.0. All fictitious bodies
+(40-58) are runtime-only: the Hamburg bodies (40-47), like 48-58, are always
+computed from the analytical models in `libephemeris.hypothetical` (merged
+mains carry no fictitious IDs, and `fast_calc` rejects IDs 40-58 from
+persisted channels via the typed `FictitiousRuntimeDispatch` signal, logged
+at DEBUG). Legacy `{tier}_uranians.leb2` files on disk are recognized by the
+tier guard and ignored. Each registry row carries a source annotation checked
+by the integrity gate.
 
 ### Per-body Precision Targets (`BODY_TARGET_AU` in `leb_compression.py`)
 
-Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amplifies errors through the pipeline (light-time, deflection, aberration). Inner planets use 1e-10 AU. Uranians (40-47) use 1e-12 because their channels store degrees natively, and the default AU-calibrated target would allow ~5e-9 deg of angular error.
+Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amplifies errors through the pipeline (light-time, deflection, aberration). Inner planets use 1e-10 AU.
 
 ### Key Commands
 
 ```bash
-poe leb2:convert:base              # Convert LEB1 -> LEB2 (all 5 groups)
+poe leb2:convert:base              # Convert LEB1 -> LEB2 (all 4 groups)
 ./leph leb2 convert base-core      # Core group only (~10.2 MB)
 ./leph leb2 convert base-exotics   # Exotic registry group only
-./leph leb2 convert base-uranians  # Hamburg companion (from the standalone partial)
 poe leb2:verify:base               # Verify base_core.leb2 against LEB1
-./leph leb2 verify base-uranians   # Verify the Hamburg companion (--group/--tier)
 ./leph test leb2-format all             # Unit tests (compression + reader)
 ./leph test leb2-format precision-base  # Fast precision test
 ./leph test leb2-format precision-all   # Core companions, all tiers
-
-# Regenerate the uranians partial (companion-only, never merged)
-python scripts/generate_leb.py --tier base --group uranians
 ```
 
 ### Full documentation
@@ -223,7 +214,7 @@ Set via `set_calc_mode()` or env var `LIBEPHEMERIS_MODE`.
 - Planets (Sun-Pluto, Earth): via Horizons VECTORS API
 - Asteroids (Chiron, Ceres, Pallas, Juno, Vesta): via Horizons small-body syntax
 - Mean Node, Mean Apogee: analytical (no HTTP)
-- Uranians: analytical heliocentric (no HTTP)
+- Uranians (40-47): runtime analytical models (no HTTP)
 - NOT supported: fixed stars, planetary moons, `FLG_TOPOCTR` -> fallback to Skyfield
 
 ### Full documentation

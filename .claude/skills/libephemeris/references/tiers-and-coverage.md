@@ -32,11 +32,14 @@ reloads the correct data.
 
 ## The `data-v3` artifact set (rc14)
 
-Each tier ships **five** LEB2 groups:
-`("core", "asteroids", "exotics", "apogee", "uranians")`. Three tiers × five
-groups = **15 immutable, SHA-256-pinned files**. `base_core.leb2` and
-`base_uranians.leb2` also ship inside the wheel and are byte-identical to the
-GitHub release assets.
+Each tier ships **four** LEB2 groups:
+`("core", "asteroids", "exotics", "apogee")`. Three tiers × four
+groups = **12 immutable, SHA-256-pinned files**. `base_core.leb2` also ships
+inside the wheel and is byte-identical to the GitHub release asset. The
+Hamburg/Uranian bodies (IDs 40–47) — like all fictitious IDs 40–58 — are
+**runtime-analytical**: no LEB group, provenance/tracing reports
+`"Analytical"`, and `get_body_coverage(...)` returns `None` for them (the
+pre-3.1.0 `uranians` companion is retired; legacy files are ignored).
 
 - Shared nutation, ΔT, and fixed-star tables live once in each `core`; named
   companions carry only their own body channels (lightweight modular design).
@@ -80,7 +83,7 @@ here", then decide explicitly (switch tier/mode, or handle the gap).
 Methods: `cov.contains(jd)` → bool; `cov.to_dict()` → JSON-serializable.
 
 `precision_class` values you will see: `"ephemeris"` (direct JPL-derived),
-`"analytical"` (nodes/apsides/Lilith, hypothetical IDs 40–58), `"numerical-model"`
+`"analytical"` (nodes/apsides/Lilith), `"numerical-model"`
 (ASSIST-integrated extended exotics), `"mixed"` (date-less union spanning classes),
 `"unverified-local"` (not manifest-reviewed).
 
@@ -99,8 +102,8 @@ Methods: `cov.contains(jd)` → bool; `cov.to_dict()` → JSON-serializable.
 
 ## Provisioning
 
-The wheel already contains the base-tier core (14 core bodies) plus the Hamburg
-(Uranian) companion for 1850–2150 — usable with zero downloads. For anything
+The wheel already contains the base-tier core (14 core bodies) for 1850–2150 —
+usable with zero downloads. For anything
 else:
 
 ```bash
@@ -114,13 +117,13 @@ libephemeris status --json        # machine-readable
 ```
 
 The `leb2-*` commands install the SHA-256-pinned LEB2 groups cumulatively
-through the named tier: **5 files for base, 10 through medium, 15 through
-extended**. The wheel supplies the two bundled base resources; the rest come
+through the named tier: **4 files for base, 8 through medium, 12 through
+extended**. The wheel supplies the bundled `base_core.leb2`; the rest come
 from the immutable `data-v3` release.
 
 `download auto` resolves against the *configured mode*:
 
-- `mode = "leb"` — LEB2 only: exactly the 5/10/15 files for the configured tier.
+- `mode = "leb"` — LEB2 only: exactly the 4/8/12 files for the configured tier.
 - `mode = "auto"` (the default) — the same LEB2 groups **plus** the DE kernel,
   `planet_centers.bsp` and the minor-body SPKs; that is multi-GB at `extended`.
 - `mode = "skyfield"` — DE kernel + SPKs only, no LEB2.

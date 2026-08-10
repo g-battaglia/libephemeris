@@ -202,7 +202,7 @@ pip install libephemeris
 ```
 
 Out of the box, the wheel includes the LEB2 base-tier core for the 14 core
-bodies plus the lightweight Hamburg-body companion (1850–2150). Mean lunar
+bodies (1850–2150). Mean lunar
 points come from ERFA/IERS arguments;
 interpolated apsides are anchored to the actual JPL DE440 apsis passages
 (documented in the [lunar methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/interpolated-perigee.md)).

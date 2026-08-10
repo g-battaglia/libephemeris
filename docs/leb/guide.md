@@ -98,12 +98,12 @@ data/leb/
   ephemeris_extended.leb  Locally generated extended tier (exact shared DE441 interval)
 
 data/leb2/
-  {base,medium,extended}_{core,asteroids,exotics,apogee,uranians}.leb2
+  {base,medium,extended}_{core,asteroids,exotics,apogee}.leb2
 
 tests/test_leb/
   test_leb_format.py      Format constants and serialization
   test_leb_reader.py      Reader, Clenshaw, segment lookup
-  test_fast_calc.py       Pipeline A/A'/B/C, flags, sidereal
+  test_fast_calc.py       Pipeline A/A'/B, flags, sidereal
   test_generate_leb.py    Generator functions, fitting, verification
   test_context_leb.py     EphemerisContext LEB integration
   conftest.py             Shared fixtures
@@ -132,7 +132,6 @@ planets.py: calc_ut()
   |     |     COORD_ICRS_BARY         -> _pipeline_icrs()                  [Pipeline A]
   |     |     COORD_ICRS_BARY_SYSTEM  -> _pipeline_icrs(is_system_bary=True) [Pipeline A']
   |     |     COORD_ECLIPTIC          -> _pipeline_ecliptic()              [Pipeline B]
-  |     |     COORD_HELIO_ECL         -> _pipeline_helio()                 [Pipeline C]
   |     |-- Gravitational deflection (Sun, Jupiter, Saturn) [Pipeline A/A']
   |     |-- Sidereal correction (if FLG_SIDEREAL)
   |     |-- Return (lon, lat, dist, dlon, dlat, ddist), iflag
@@ -145,7 +144,7 @@ planets.py: calc_ut()
 ### Activation
 
 The wheel's reviewed `base_core.leb2` is available automatically. The data-v3
-manifest defines five files for every tier. An active precision tier is
+manifest defines four files for every tier. An active precision tier is
 cumulative: base opens base, medium opens base+medium, and extended opens all
 three. Every implicitly selected file must be named in the distribution
 manifest and present on disk; its SHA-256 is verified once, when the installer
@@ -290,7 +289,7 @@ struct SectionEntry {
 // Struct format: "<iIIdddIIQ"
 struct BodyEntry {
     int32_t  body_id;        // SE_* constant (0=Sun, 1=Moon, ...)
-    uint32_t coord_type;     // 0=ICRS_BARY, 1=ECLIPTIC, 2=HELIO_ECL
+    uint32_t coord_type;     // 0=ICRS_BARY, 1=ECLIPTIC, 4=ICRS_BARY_SYSTEM (2 retired)
     uint32_t segment_count;  // Number of Chebyshev segments
     float64  jd_start;       // Body coverage start (JD TT)
     float64  jd_end;         // Body coverage end (JD TT)
@@ -385,7 +384,7 @@ struct StarEntry {
 |-------|----------|---------|--------|
 | 0 | `COORD_ICRS_BARY` | ICRS barycentric planet center (x, y, z) in AU | Sun, Moon, Mercury, Venus, Mars, Earth, Chiron, Ceres-Vesta |
 | 1 | `COORD_ECLIPTIC` | Ecliptic of date (lon, lat, dist) in deg/deg/AU | Mean/True Node, Mean/Oscu Apogee, Interp Apogee/Perigee |
-| 2 | `COORD_HELIO_ECL` | Heliocentric ecliptic (lon, lat, dist) | Format capability for locally sourced custom models |
+| 2 | *(retired)* | Heliocentric ecliptic (lon, lat, dist) — carried the pre-3.1.0 `uranians` companion channels; **never reuse this value** (legacy files in the wild still encode it) | None |
 | 3 | `COORD_GEO_ECLIPTIC` | Geocentric ecliptic of date — **reserved, not used** | None |
 | 4 | `COORD_ICRS_BARY_SYSTEM` | ICRS system barycenter (x, y, z) in AU, COB at runtime | Jupiter, Saturn, Uranus, Neptune, Pluto |
 
@@ -519,7 +518,7 @@ def eval_body(self, body_id: int, jd: float):
         vel.append(deriv * 2.0 / body.interval_days)
 
     # 5. Longitude wrapping for ecliptic bodies
-    if coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL):
+    if coord_type in (COORD_ECLIPTIC, COORD_GEO_ECLIPTIC):
         pos[0] = pos[0] % 360.0
 
     return tuple(pos), tuple(vel)
@@ -751,22 +750,20 @@ Interpolated Apogee, Interpolated Perigee (6 bodies)
 **No light-time or aberration** is applied to these bodies (they are
 Earth-relative analytical quantities).
 
-### 5.5 Pipeline C: Heliocentric-format data
+### 5.5 Fictitious bodies: runtime-model dispatch (no pipeline)
 
-The format represents a heliocentric J2000 ecliptic channel and transforms it
-to geocentric output. The Hamburg bodies at IDs 40–47 serve from a persisted
-heliocentric-ecliptic channel only when the providing file byte-matches its
-`DATA_FILES` SHA-256 pin (the regenerated `{tier}_uranians.leb2` companion);
-an unpinned or legacy artifact is bypassed and the reviewed source-backed
-runtime model is used instead. IDs 50–53 and 56 are always runtime-model; IDs
-48, 49, 54, 55, 57, and 58 fail closed. Old files remain readable without
-reviving embedded legacy data.
+Fictitious bodies (IDs 40–58) are never sourced from a persisted LEB channel.
+`fast_calc_ut` raises the typed `FictitiousRuntimeDispatch` signal (a
+`KeyError` subclass) so `calc`/`calc_ut` continue to the runtime analytical
+models in `libephemeris.hypothetical`: the Hamburg bodies at IDs 40–47 and
+IDs 50–53 and 56 use their reviewed source-backed models, while IDs 48, 49,
+54, 55, 57, and 58 fail closed. The sealed-mode fallback logger records this
+by-design dispatch at DEBUG, not as a degradation warning.
 
-Generation, conversion, and publication emit the `uranians` group as a
-companion only — fitted from the runtime Neely (1980) propagation and never
-merged into a main file. Legacy files containing the retired group stay
-decode-compatible, but their fictitious coefficients are never served: the
-per-file pin gate applies at both companion attach and calculation sourcing.
+The heliocentric Pipeline C and the `uranians` LEB2 companion that fed it
+were retired in 3.1.0 (coordinate value 2 is retired and never reused).
+Legacy `{tier}_uranians.leb2` files remain decode-compatible and are
+recognized by the tier guard, but their coefficients are never served.
 
 ### 5.6 Sidereal Correction
 
@@ -1508,8 +1505,8 @@ Minor bodies outside the curated registry (for example Bennu) require an SPK
 in `auto`/`skyfield` mode. They fail explicitly in sealed `leb` mode because
 there is neither a LEB coefficient stream nor a reviewed local model.
 
-IDs 40–47 can use the manifest-trusted `uranians` LEB2 companion and otherwise
-fall back to the same primary-source runtime model. IDs 50–53 and 56 use local
+IDs 40–47 always use their primary-source runtime models (the pre-3.1.0
+`uranians` LEB2 companion is retired). IDs 50–53 and 56 use local
 primary-source models; the six IDs without independently reviewed complete
 definitions fail closed.
 
@@ -1812,8 +1809,6 @@ python scripts/generate_leb.py --tier base --group planets
 python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --group exotics
 python scripts/generate_leb.py --tier base --group analytical
-# Companion-only partial: generated separately, never merged into the main
-python scripts/generate_leb.py --tier base --group uranians
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
@@ -2052,7 +2047,6 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 | `asteroids` | 5 | 2.15 MB | Chiron, Ceres, Pallas, Juno, Vesta |
 | `exotics` | 31 | 29.4 MB | Centaurs, TNOs, main-belt & NEA minor bodies (Pholus, Eris, …) |
 | `apogee` | 3 | 9.8 MB | Oscu Apogee, Interp Apogee/Perigee |
-| `uranians` | 8 | 46 KB | Hamburg bodies Cupido-Poseidon (IDs 40-47) |
 
 The table gives the base-tier inventory. Medium also has 31 exotics; extended
 contains exactly the 23 regular exotics and excludes all eight chaotic NEAs.
@@ -2070,16 +2064,14 @@ body's stored window, sealed `leb` mode uses the declared local Keplerian
 model and records that provenance; `auto` may use JPL/SPK first.
 
 The `exotics` group (`LEB2_GROUPS` in `libephemeris/leb_groups.py`) is often
-the largest. All five groups are versioned artifacts with immutable URL and
-SHA-256 manifest entries for every supported tier. The wheel also bundles the
-base core and base uranians artifacts; mean lunar points and smoothed apsides
-require no standalone lunar model binary.
+the largest. All four groups are versioned artifacts with immutable URL and
+SHA-256 manifest entries for every supported tier. The wheel bundles only the
+base core artifact; mean lunar points and smoothed apsides require no
+standalone lunar model binary.
 
-The `uranians` group is **companion-only**: its coefficients are fitted from
-the runtime Neely (1980) propagation in `libephemeris.hypothetical`, its
-LEB1 partial (`ephemeris_{tier}_uranians.leb`) never merges into a main file,
-and both companion attach and calculation sourcing require the artifact to
-byte-match its manifest SHA-256 (see
+The former `uranians` group (`{tier}_uranians.leb2`, Hamburg bodies IDs
+40–47) was retired in 3.1.0: those bodies are always computed from the
+runtime Neely (1980) propagation in `libephemeris.hypothetical` (see
 `docs/methodology/hypothetical-bodies.md`).
 
 **File naming convention:** `{tier}_{group}.leb2` (e.g. `base_core.leb2`,
@@ -2095,11 +2087,11 @@ and dispatches `eval_body()` to the reader containing the requested body.
 **Companion discovery:** when `set_leb_file()` explicitly selects a locally
 generated group file (for example, `local_base_core.leb2`), companion files in
 the same directory with the same prefix are loaded. The exact hash-pinned
-manifest-pinned tier core opens alone unless manifest-pinned siblings (e.g.
-the bundled `base_uranians.leb2`) are present, so stale cache files cannot
-silently extend its trust boundary. Fictitious-carrying companions
-(`*_uranians.leb2`) attach only when they byte-match their manifest pin,
-regardless of how the composite was assembled.
+manifest-pinned tier core opens alone unless manifest-pinned siblings are
+present, so stale cache files cannot silently extend its trust boundary.
+`uranians` stays recognized as a legacy filename suffix purely for tier
+safety: pre-3.1.0 `*_uranians.leb2` files on disk are identified and left
+harmlessly unused — fictitious-body channels are never consulted.
 
 ```python
 import libephemeris as swe
@@ -2175,10 +2167,7 @@ LEB2 files are produced by **converting** existing LEB1 files. The conversion
 applies the compression pipeline (§13.4) to each body's raw coefficients.
 
 **Prerequisites:** a locally generated full-registry LEB1 file for the target
-tier must exist in `data/leb/`. The `uranians` group additionally needs the
-standalone `ephemeris_{tier}_uranians.leb` partial (it is companion-only and
-never merges into the main file); `convert-all` exits non-zero when a
-companion partial is missing unless `--allow-missing-companions` is passed.
+tier must exist in `data/leb/`.
 Smaller historical monolithic release assets do not contain the full registry
 and cannot be used as conversion inputs.
 
@@ -2186,12 +2175,10 @@ and cannot be used as conversion inputs.
 
 ```bash
 # Step 1: Generate LEB1 (if not already present).
-# The group workflow produces the four mergeable groups + the merged main;
-# the uranians partial is generated separately.
+# The group workflow produces the four mergeable groups + the merged main.
 leph leb generate base groups
-python scripts/generate_leb.py --tier base --group uranians
 
-# Step 2: Convert LEB1 → LEB2 (all 5 groups; uranians reads its partial)
+# Step 2: Convert LEB1 → LEB2 (all 4 groups)
 leph leb2 convert base
 
 # Step 3: Verify the core LEB2 companion against its LEB1 reference
@@ -2214,13 +2201,9 @@ python scripts/generate_leb2.py generate --tier base --group core -o data/leb2/b
 
 ```bash
 # Convert LEB1 → LEB2 (all groups for a tier)
-leph leb2 convert base       # Base tier → core, asteroids, exotics, apogee, uranians
+leph leb2 convert base       # Base tier → core, asteroids, exotics, apogee
 leph leb2 convert medium            # Medium tier
 leph leb2 convert extended          # Extended tier
-
-# Per-group conversion/verification (uranians reads the standalone partial)
-leph leb2 convert base-uranians
-leph leb2 verify base-uranians      # exact 8-body inventory, 500 samples per body
 
 # Verify the core companion against its LEB1 reference
 leph leb2 verify base               # exact 14-body core, 500 samples per body
@@ -2255,8 +2238,8 @@ python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
 
 ### 13.12 Compression measurement
 
-`base_core.leb2` and `base_uranians.leb2` are bundled in the wheel; reviewed
-medium and extended cores and uranians companions are published as hash-pinned
+`base_core.leb2` is bundled in the wheel; reviewed
+medium and extended cores are published as hash-pinned
 downloads. For a locally generated file, use the verifier to report its
 current coefficient payload, error bounds, and on-disk size from that file
 itself.
@@ -2269,7 +2252,7 @@ itself.
 
 The body is absent from the loaded file's inventory. Base and medium local
 generation can include up to 53 registered bodies; extended generation omits
-eight chaotic NEAs and contains 45. Verify that all five pinned companions for
+eight chaotic NEAs and contains 45. Verify that all four pinned companions for
 the selected tier are installed and valid. If the body is intentionally not a
 LEB coefficient stream, the calculation follows the selected mode's declared
 local/JPL policy; missing or corrupt required companions are provisioning

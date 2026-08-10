@@ -54,8 +54,8 @@ Chapter 15 — the Cookbook — is designed for those in a hurry: copy-paste rec
 pip install libephemeris
 ```
 
-The PyPI wheel includes the LEB2 base-tier core for the 14 main bodies plus the
-Hamburg-body companion (1850–2150). In `auto` or sealed `leb` mode, install the
+The PyPI wheel includes the LEB2 base-tier core for the 14 main bodies
+(1850–2150). In `auto` or sealed `leb` mode, install the
 reviewed data-v3 groups cumulatively through your configured tier with:
 
 ```bash
