@@ -248,9 +248,9 @@ The wheel bundles only the reviewed `base_core.leb2`
 file. Exact SHA-256-pinned medium and extended cores
 are available through the compatibility commands `libephemeris download
 leb-medium` and `leb-extended` (or the corresponding `leb2-*` modular
-commands). The remaining modular companions (asteroids/apogee/exotics beyond
-the cores) stay unpublished; generate and verify them locally from NASA JPL
-data.
+commands). The asteroids, exotics, and apogee companions are published and
+SHA-256-pinned in the same data-v3 manifest; the tier download installs
+them alongside each core.
 
 ---
 

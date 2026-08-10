@@ -115,7 +115,7 @@ def test_sdist_runtime_data_is_exactly_allowlisted() -> None:
     assert "recursive-include libephemeris/data" not in manifest
     assert "include libephemeris/data/fictitious_orbits.csv" in manifest
     assert "include libephemeris/data/leb2/base_core.leb2" in manifest
-    assert "base_uranians" not in manifest
+    assert "uranians" not in manifest
 
 
 def test_vendored_mit_copyright_notices_are_retained() -> None:

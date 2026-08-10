@@ -335,7 +335,7 @@ BODY_GROUPS: dict[str, List[int]] = {
     "analytical": sorted(
         bid
         for bid in BODY_PARAMS
-        if bid not in _PLANET_MAP and bid not in _ASTEROID_NAIF and not 40 <= bid <= 49
+        if bid not in _PLANET_MAP and bid not in _ASTEROID_NAIF and not 40 <= bid <= 58
     ),  # ecliptic/helio analytical bodies
 }
 

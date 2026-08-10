@@ -1,7 +1,7 @@
 # LEB (LibEphemeris Binary) — Complete Technical Guide
 
 > **Last verified:** July 2026
-> **Status:** Production-ready formats; the cumulative data-v3 artifact set is a release candidate until all fifteen regenerated LEB2 files are published and pinned.
+> **Status:** Production-ready formats; the cumulative data-v3 artifact set is a release candidate until all twelve regenerated LEB2 files are published and pinned.
 > **Source of truth:** This document. See also [Algorithms & Theory](algorithms.md) for detailed mathematical foundations.
 > **Quick reference:** [Generation Quickstart](quickstart.md) — step-by-step commands for generating LEB1 and LEB2 files.
 > **Bundled artifact:** [Base-core build provenance](base-core-provenance.md).
@@ -86,7 +86,7 @@ libephemeris/
   leb_compression.py  Error-bounded compression and chunk codecs
   leb_composite.py Dispatch across core/companion LEB files
   leb_groups.py    Canonical group inventories
-  fast_calc.py     Four calculation pipelines (A/A'/B/C), flag dispatch, sidereal/ayanamsa,
+  fast_calc.py     Calculation pipelines (A/A'/B), flag dispatch, sidereal/ayanamsa,
                    gravitational deflection, COB corrections
 
 scripts/

@@ -1085,7 +1085,7 @@ def convert_all_groups(
     tier_name: str,
     target_precision: float = DEFAULT_TARGET_AU,
     verbose: bool = True,
-) -> list[str]:
+) -> None:
     """Convert a LEB1 file into separate LEB2 files for each group.
 
     Produces one ``{output_dir}/{tier_name}_{group}.leb2`` per registered

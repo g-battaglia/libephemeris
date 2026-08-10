@@ -4150,6 +4150,12 @@ def _calc_body(
         def _uranian_pos(jd: float) -> Tuple[float, float, float]:
             return hypothetical._calc_uranian_planet_raw(ipl, jd)
 
+        # The runtime analytical model is the definitive source for these
+        # bodies; the optional LEB reader only serves the Earth/Sun vectors.
+        # The trace fallback classifier would land on "Analytical" anyway,
+        # but every sibling branch marks its source explicitly — so do we.
+        _mark_dispatch_source("Analytical")
+
         def _uranian_helio_state(
             jd: float,
         ) -> Tuple[float, float, float, float, float, float]:

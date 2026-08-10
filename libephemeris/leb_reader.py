@@ -473,8 +473,10 @@ class LEBReader:
             vel.append(deriv * scale)
 
         # Wrap longitude for ecliptic-frame bodies (COORD_GEO_ECLIPTIC is
-        # reserved/unused but included for format completeness)
-        if body.coord_type in (COORD_ECLIPTIC, COORD_GEO_ECLIPTIC):
+        # reserved/unused but included for format completeness; raw value 2
+        # is the retired heliocentric-ecliptic type — legacy uranians
+        # channels store degrees, so direct eval_body reads stay normalized)
+        if body.coord_type in (COORD_ECLIPTIC, 2, COORD_GEO_ECLIPTIC):
             pos[0] = pos[0] % 360.0
 
         result = tuple(pos), tuple(vel)  # type: ignore[return-value]

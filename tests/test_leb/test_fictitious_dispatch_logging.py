@@ -37,7 +37,7 @@ def sealed_leb(test_leb_file):
     ephem.set_leb_file(test_leb_file)
     yield
     ephem.set_calc_mode(prev_mode)
-    ephem.set_leb_file("")
+    ephem.set_leb_file(None)
 
 
 @pytest.fixture
