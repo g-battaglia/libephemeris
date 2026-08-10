@@ -91,3 +91,41 @@ def test_dispatch_signal_is_an_ordinary_keyerror() -> None:
         "Fictitious body 40 is calculated from its runtime analytical model"
     )
     assert "runtime analytical model" in str(err)
+
+
+def test_legacy_uranians_range_cannot_veto_the_runtime_model(sealed_leb) -> None:
+    """A stored fictitious range in a selected file never escalates.
+
+    An explicitly selected pre-3.1.0 uranians-only file carries body-40
+    channels with a finite stored interval and no Sun/Earth support states.
+    The dispatch signal is not a range miss: a heliocentric request outside
+    that interval must still reach the runtime model instead of being
+    escalated to EphemerisRangeError by _escalate_sealed_range_miss.
+    """
+    import math
+
+    from libephemeris.constants import FLG_HELCTR
+    from libephemeris import state
+
+    class LegacyUraniansOnly:
+        """Uranians-only legacy file: body 40, narrow range, no support states."""
+
+        _bodies = {40: object()}
+
+        def has_body(self, body_id):
+            return body_id == 40
+
+        def body_coverage(self, body_id):
+            if body_id == 40:
+                return (2451545.0, 2451546.0)  # one day around J2000
+            return None
+
+    prev = state._LEB_READER
+    state._LEB_READER = LegacyUraniansOnly()
+    try:
+        # Far outside the fake stored interval; heliocentric, so the runtime
+        # model needs no Earth/Sun state from the (empty) file.
+        pos, _ = ephem.calc_ut(JD, 40, FLAGS | FLG_HELCTR)
+        assert all(math.isfinite(v) for v in pos)
+    finally:
+        state._LEB_READER = prev

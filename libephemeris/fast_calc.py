@@ -2182,6 +2182,15 @@ def _escalate_sealed_range_miss(
     unsupported-flag ``KeyError`` on an in-range body), or when the reader does
     not expose per-body coverage.
     """
+    # The typed dispatch signal is not a range miss: fictitious bodies never
+    # have an LEB requirement, whatever channels an explicitly selected
+    # legacy uranians file may still carry. Escalating on their stored range
+    # would let a retired record veto the runtime model (e.g. heliocentric
+    # Cupido in 2200 against a pre-3.1.0 medium companion) — let the
+    # runtime-model fall-through proceed instead.
+    if isinstance(err, FictitiousRuntimeDispatch):
+        return None
+
     from .state import get_calc_mode
 
     if get_calc_mode() != "leb":
