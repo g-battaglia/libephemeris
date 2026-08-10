@@ -25,8 +25,11 @@ from libephemeris.time_utils import julday
 FLAGS = FLG_SWIEPH | FLG_SPEED
 JD = julday(2024, 3, 15, 7.25)  # inside the test LEB file range (2023-2028)
 
-# The supported fictitious set: the eight Hamburg bodies plus White Moon.
-SUPPORTED_FICTITIOUS = tuple(range(40, 48)) + (56,)
+# Every fictitious ID the library serves: Hamburg bodies (40-47), Isis (48),
+# Harrington (50), Leverrier/Adams (51-52), Lowell/Pickering (53-54),
+# Vulcan (55), White Moon (56), Proserpina (57), Waldemath (58).
+# Nibiru (49) has no runtime model and raises UnknownBodyError instead.
+SUPPORTED_FICTITIOUS = tuple(range(40, 49)) + tuple(range(50, 59))
 
 
 @pytest.fixture

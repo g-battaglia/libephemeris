@@ -183,3 +183,53 @@ def test_reviewed_core_attaches_every_same_prefix_sibling(tmp_path):
     finally:
         ephem.set_leb_file(None)
         ephem.set_calc_mode(prev_mode)
+
+
+def test_legacy_uranians_companions_are_never_attached(tmp_path):
+    """A leftover {tier}_uranians file is ignored by every discovery path.
+
+    Pins the 3.1.0 contract: fictitious provenance is invariantly
+    "Analytical" — a stale companion must not resurface source="LEB"
+    coverage for bodies 40-47 (attaching it would, via get_body_coverage).
+    """
+    import os
+    import shutil
+
+    import libephemeris as ephem
+    from libephemeris import state
+
+    bundled_core = os.path.join(
+        os.path.dirname(state.__file__), "data", "leb2", "base_core.leb2"
+    )
+    core = tmp_path / "base_core.leb2"
+    shutil.copy(bundled_core, core)
+    # Any valid LEB2 payload works: the skip must key on the filename.
+    shutil.copy(bundled_core, tmp_path / "base_uranians.leb2")
+
+    # from_file_with_companions (both trust modes)
+    for pinned_only in (False, True):
+        comp = CompositeLEBReader.from_file_with_companions(
+            str(core), pinned_only=pinned_only
+        )
+        try:
+            assert len(comp._readers) == 1
+        finally:
+            comp.close()
+
+    # from_directory
+    comp = CompositeLEBReader.from_directory(str(tmp_path))
+    try:
+        assert len(comp._readers) == 1
+    finally:
+        comp.close()
+
+    # End to end: activated reader reports no coverage for fictitious ids.
+    prev_mode = state.get_calc_mode()
+    ephem.set_calc_mode("leb")
+    ephem.set_leb_file(str(core))
+    try:
+        for body_id in (40, 47, 56):
+            assert ephem.get_body_coverage(body_id) is None
+    finally:
+        ephem.set_leb_file(None)
+        ephem.set_calc_mode(prev_mode)

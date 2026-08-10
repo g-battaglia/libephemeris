@@ -113,6 +113,7 @@ _ALLOWED_GROUP_INVENTORIES: dict[str, tuple[frozenset[int], ...]] = {
 _ANGULAR_COORD_TYPES = {COORD_ECLIPTIC, COORD_GEO_ECLIPTIC}
 _CARTESIAN_COORD_TYPES = {COORD_ICRS_BARY, COORD_ICRS_BARY_SYSTEM}
 
+
 def _group_inventory_error(
     group: str,
     body_ids: Iterable[int],

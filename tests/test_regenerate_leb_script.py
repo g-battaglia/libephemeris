@@ -103,8 +103,6 @@ def test_no_merge_with_leb1_only_is_accepted() -> None:
     assert result.stdout.strip().endswith("OK")
 
 
-
-
 def test_extended_generation_uses_the_full_de441_range() -> None:
     result = _run_sourced_script(
         'printf \'%s..%s\\n\' "$(tier_start_jd extended)" "$(tier_end_jd extended)"'

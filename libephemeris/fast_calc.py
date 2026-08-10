@@ -73,6 +73,7 @@ from .leb_format import (
     COORD_ICRS_BARY,
     COORD_ICRS_BARY_SYSTEM,
 )
+from .exceptions import FictitiousRuntimeDispatch
 from .precession_vondrak import (
     method_b_accumulated_precession,
     vondrak_mean_obliquity_deg,
@@ -2564,8 +2565,6 @@ def _fast_calc_core(
         # the normal LEB miss signal — calc/calc_ut continue to that path —
         # and tells the fallback logger this is the by-design source, not a
         # sealed-mode degradation.
-        from .exceptions import FictitiousRuntimeDispatch
-
         raise FictitiousRuntimeDispatch(
             f"Fictitious body {ipl} is calculated from its runtime analytical model"
         )

@@ -23,7 +23,7 @@ pyswisseph**: same function names, parameter order, tuple shapes, flag encoding,
 and exception surface, plus its own performance/offline extensions. This skill
 targets an agent writing Python **against** the library (not developing it).
 
-Key facts to anchor on (verified against the installed package, `3.0.0`):
+Key facts to anchor on (verified against the installed package, `3.1.0`):
 
 - The public API uses **canonical bare names** — `calc_ut`, `SUN`, `FLG_SPEED`,
   `SIDM_LAHIRI` — never the `swe_` / `SE_` / `SEFLG_` prefixes. (The lone

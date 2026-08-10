@@ -52,9 +52,11 @@ VERSION = 1
 # Coordinate types
 COORD_ICRS_BARY = 0  # ICRS barycentric planet center (x, y, z) in AU
 COORD_ECLIPTIC = 1  # Ecliptic of date (lon, lat, dist) in deg/deg/AU
-# Value 2 (heliocentric ecliptic) is retired — it carried the pre-3.1.0
-# uranians companion channels, which the calculation path never serves.
-# Never reuse the value: legacy files in the wild still encode it.
+# Retired — value 2 carried the pre-3.1.0 uranians companion channels
+# (heliocentric ecliptic, degrees), which the calculation path never serves.
+# Never reuse the value: legacy files in the wild still encode it, and the
+# readers keep normalizing its longitude channel on direct eval_body reads.
+COORD_HELIO_ECL_RETIRED = 2
 COORD_GEO_ECLIPTIC = 3  # Reserved — not used (retrograde cusps; see algorithms.md §16)
 COORD_ICRS_BARY_SYSTEM = 4  # ICRS system barycenter (x, y, z) in AU — runtime COB
 

@@ -34,6 +34,7 @@ from .leb_format import (
     BODY_ENTRY_SIZE,
     COORD_ECLIPTIC,
     COORD_GEO_ECLIPTIC,
+    COORD_HELIO_ECL_RETIRED,
     DELTA_T_ENTRY_FMT,
     DELTA_T_ENTRY_SIZE,
     DELTA_T_HEADER_FMT,
@@ -62,7 +63,7 @@ from .leb_format import (
     _madvise_ranges,
     _madvise_dontneed,
 )
-from .exceptions import LEBCorruptionError
+from .exceptions import FictitiousRuntimeDispatch, LEBCorruptionError
 
 
 # =============================================================================
@@ -472,11 +473,13 @@ class LEBReader:
             pos.append(val)
             vel.append(deriv * scale)
 
-        # Wrap longitude for ecliptic-frame bodies (COORD_GEO_ECLIPTIC is
-        # reserved/unused but included for format completeness; raw value 2
-        # is the retired heliocentric-ecliptic type — legacy uranians
-        # channels store degrees, so direct eval_body reads stay normalized)
-        if body.coord_type in (COORD_ECLIPTIC, 2, COORD_GEO_ECLIPTIC):
+        # Wrap longitude for every ecliptic-frame coordinate type, the
+        # retired legacy one included (see COORD_HELIO_ECL_RETIRED).
+        if body.coord_type in (
+            COORD_ECLIPTIC,
+            COORD_HELIO_ECL_RETIRED,
+            COORD_GEO_ECLIPTIC,
+        ):
             pos[0] = pos[0] % 360.0
 
         result = tuple(pos), tuple(vel)  # type: ignore[return-value]
@@ -656,7 +659,6 @@ def log_leb_fallback(context: str, err: Exception) -> None:
         context: Short label of the calling path (e.g. "star", "pheno").
         err: The exception that triggered the fallback.
     """
-    from .exceptions import FictitiousRuntimeDispatch
     from .logging_config import get_logger
 
     from .state import get_calc_mode
@@ -666,7 +668,12 @@ def log_leb_fallback(context: str, err: Exception) -> None:
             "LEB %s fallback (corrupted or truncated LEB data): %s", context, err
         )
     elif isinstance(err, FictitiousRuntimeDispatch):
-        get_logger().debug("LEB %s runtime-model dispatch: %s", context, err)
+        # KeyError.__str__ repr-quotes args[0]; log the plain message.
+        get_logger().debug(
+            "LEB %s runtime-model dispatch: %s",
+            context,
+            err.args[0] if err.args else err,
+        )
     elif get_calc_mode() == "leb":
         get_logger().warning("LEB %s unavailable in sealed mode: %s", context, err)
     else:

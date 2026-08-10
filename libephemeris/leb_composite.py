@@ -26,6 +26,15 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from .leb_format import StarEntry
 
+# Filename group suffixes recognized by the composite heuristics
+# ({tier}_{group} naming). ``uranians`` is legacy-only: pre-3.1.0 installs
+# left those companions on disk, and discovery must classify the filename —
+# but never open or attach the file. Its fictitious channels are retired;
+# attaching one would resurface source="LEB" coverage for bodies 40-47 and
+# break the 3.1.0 invariant that fictitious provenance is "Analytical".
+_GROUP_SUFFIXES = frozenset({"core", "asteroids", "apogee", "uranians", "exotics"})
+_RETIRED_GROUP_SUFFIXES = frozenset({"uranians"})
+
 
 class CompositeLEBReader:
     """Wraps multiple LEB readers and dispatches by body_id.
@@ -112,10 +121,6 @@ class CompositeLEBReader:
         # (group-file scheme), as {custom}_{tier}_{group}, or as a bare
         # known-tier token (e.g. ephemeris_base.leb); files with no recognizable
         # tier are not constrained by the guard below.
-        # ``uranians`` is recognized only as a legacy filename for tier-safety
-        # (pre-3.1.0 installs left those companions on disk); fictitious-body
-        # channels are never served by the public calculation path.
-        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians", "exotics"}
         _KNOWN_TIERS = {"base", "medium", "extended"}
 
         def _file_tier(path: str) -> Optional[str]:
@@ -139,6 +144,9 @@ class CompositeLEBReader:
         readers = []
         opened_paths = []
         for path in leb_files:
+            name_parts = os.path.basename(path).rsplit(".", 1)[0].split("_")
+            if name_parts[-1] in _RETIRED_GROUP_SUFFIXES:
+                continue  # legacy uranians companion: ignored, never opened
             try:
                 readers.append(open_leb(path))
                 opened_paths.append(path)
@@ -204,12 +212,6 @@ class CompositeLEBReader:
         # is complete on its own — a bare first-token prefix match would
         # pull in other tiers ("ephemeris_medium.leb", ...) and stale
         # partials, silently mixing tiers in one composite.
-        # ``uranians`` stays recognized as a legacy suffix so pre-3.1.0 files
-        # left on disk are treated as same-tier companions (harmless: their
-        # fictitious channels are never consulted) instead of tripping the
-        # naming heuristics.
-        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians", "exotics"}
-
         if len(parts) >= 2 and parts[-1] in _GROUP_SUFFIXES:
             prefix = "_".join(parts[:-1])  # e.g., "base"
             companions = sorted(
@@ -221,6 +223,8 @@ class CompositeLEBReader:
                 cparts = cname.split("_")
                 if cparts[:-1] != parts[:-1] or cparts[-1] not in _GROUP_SUFFIXES:
                     continue
+                if cparts[-1] in _RETIRED_GROUP_SUFFIXES:
+                    continue  # legacy uranians companion: ignored, never opened
                 if os.path.abspath(companion_path) == os.path.abspath(path):
                     continue
                 if pinned_only:

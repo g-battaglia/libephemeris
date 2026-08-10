@@ -154,15 +154,23 @@ def _true_altitude_and_semidiameter(oracle, jd_ut: float, lon: float, lat: float
     return altitude.degrees * 60.0, semidiameter * 60.0
 
 
-def _altitude_rate_arcsec_per_second(oracle, jd_ut: float, lon: float, lat: float) -> float:
+def _altitude_rate_arcsec_per_second(
+    oracle, jd_ut: float, lon: float, lat: float
+) -> float:
     """Signed vertical rate at `jd_ut`. Positive rising, negative setting."""
-    before, _ = _true_altitude_and_semidiameter(oracle, jd_ut - 30.0 / 86400.0, lon, lat)
+    before, _ = _true_altitude_and_semidiameter(
+        oracle, jd_ut - 30.0 / 86400.0, lon, lat
+    )
     after, _ = _true_altitude_and_semidiameter(oracle, jd_ut + 30.0 / 86400.0, lon, lat)
     return (after - before) * 60.0 / 60.0
 
 
-def _event(jd0, lon, lat, rsmi, atpress=_STD_PRESSURE, attemp=_STD_TEMPERATURE, alt=0.0):
-    retflag, tret = L.rise_trans(jd0, SUN, rsmi, (lon, lat, alt), atpress, attemp, FLG_SWIEPH)
+def _event(
+    jd0, lon, lat, rsmi, atpress=_STD_PRESSURE, attemp=_STD_TEMPERATURE, alt=0.0
+):
+    retflag, tret = L.rise_trans(
+        jd0, SUN, rsmi, (lon, lat, alt), atpress, attemp, FLG_SWIEPH
+    )
     assert retflag == 0, f"expected an event, got retflag={retflag}"
     return tret[0]
 
@@ -173,7 +181,9 @@ def _ids(value):
 
 @pytest.mark.parametrize("name,lon,lat,y,m,d", _GRID, ids=_ids)
 @pytest.mark.parametrize("label,rsmi", _EVENTS, ids=_ids)
-def test_the_upper_limb_sits_on_the_refracted_horizon(oracle, name, lon, lat, y, m, d, label, rsmi):
+def test_the_upper_limb_sits_on_the_refracted_horizon(
+    oracle, name, lon, lat, y, m, d, label, rsmi
+):
     """The one invariant: independent of latitude, season and hemisphere."""
     jd0 = L.julday(y, m, d, 0.0, L.GREG_CAL)
     jd = _event(jd0, lon, lat, rsmi)
@@ -200,7 +210,9 @@ def test_the_upper_limb_sits_on_the_refracted_horizon(oracle, name, lon, lat, y,
 
 @pytest.mark.parametrize("name,lon,lat,y,m,d", _GRID, ids=_ids)
 @pytest.mark.parametrize("label,rsmi", _EVENTS, ids=_ids)
-def test_disc_center_moves_the_target_from_the_limb_to_the_centre(oracle, name, lon, lat, y, m, d, label, rsmi):
+def test_disc_center_moves_the_target_from_the_limb_to_the_centre(
+    oracle, name, lon, lat, y, m, d, label, rsmi
+):
     """BIT_DISC_CENTER drops the semidiameter and nothing else.
 
     Both directions, because a sign error that only affects setting would look
@@ -217,7 +229,9 @@ def test_disc_center_moves_the_target_from_the_limb_to_the_centre(oracle, name, 
 
 @pytest.mark.parametrize("name,lon,lat,y,m,d", _GRID, ids=_ids)
 @pytest.mark.parametrize("label,rsmi", _EVENTS, ids=_ids)
-def test_the_geometric_horizon_is_exactly_zero(oracle, name, lon, lat, y, m, d, label, rsmi):
+def test_the_geometric_horizon_is_exactly_zero(
+    oracle, name, lon, lat, y, m, d, label, rsmi
+):
     """Disc centre with refraction off must land on 0.0000', not merely near it.
 
     With both physical terms removed the only things left are the root-finder and
@@ -230,7 +244,9 @@ def test_the_geometric_horizon_is_exactly_zero(oracle, name, lon, lat, y, m, d, 
     jd0 = L.julday(y, m, d, 0.0, L.GREG_CAL)
     jd = _event(jd0, lon, lat, rsmi | BIT_DISC_CENTER | BIT_NO_REFRACTION)
     centre, _semidiameter = _true_altitude_and_semidiameter(oracle, jd, lon, lat)
-    assert abs(centre) < 2e-4, f"{name} {label}: geometric horizon crossing at {centre:.6f}', expected 0"
+    assert abs(centre) < 2e-4, (
+        f"{name} {label}: geometric horizon crossing at {centre:.6f}', expected 0"
+    )
 
 
 def test_the_zero_default_is_zero_celsius_not_the_standard_atmosphere(oracle):
@@ -246,7 +262,9 @@ def test_the_zero_default_is_zero_celsius_not_the_standard_atmosphere(oracle):
     default_jd = _event(jd0, lon, lat, CALC_RISE, atpress=0.0, attemp=0.0)
     standard_jd = _event(jd0, lon, lat, CALC_RISE)
 
-    altitude, semidiameter = _true_altitude_and_semidiameter(oracle, default_jd, lon, lat)
+    altitude, semidiameter = _true_altitude_and_semidiameter(
+        oracle, default_jd, lon, lat
+    )
     limb = altitude + semidiameter
     assert abs(limb - _LIMB_AT_ZERO_C_ARCMIN) < _LIMB_TOL_ARCMIN, (
         f"default-atmosphere limb at {limb:.5f}', expected {_LIMB_AT_ZERO_C_ARCMIN:.4f}' (0 C)"

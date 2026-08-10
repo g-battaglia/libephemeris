@@ -25,7 +25,6 @@ import pytest
 import libephemeris.fast_calc as fc
 from libephemeris.constants import (
     EARTH,
-    HARRINGTON,
     MEAN_NODE,
     MOON,
     OSCU_APOG,
@@ -601,9 +600,7 @@ def test_fast_calc_tt_icrs_heliocentric_raises(reader, monkeypatch):
     monkeypatch.setitem(
         real_bodies,
         fake_id,
-        SimpleNamespace(
-            coord_type=2, jd_start=JD - 1000.0, jd_end=JD + 1000.0
-        ),
+        SimpleNamespace(coord_type=2, jd_start=JD - 1000.0, jd_end=JD + 1000.0),
     )
     with pytest.raises(KeyError):
         fast_calc_tt(reader, JD, fake_id, FLG_ICRS | FLG_SPEED)

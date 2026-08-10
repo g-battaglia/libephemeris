@@ -172,6 +172,10 @@ def _serving_reader(reader: Any, body_id: int, jd: float | None = None) -> Any |
 def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | None:
     """Return active LEB coverage for ``body_id`` and optionally ``jd``.
 
+    Fictitious bodies (40-58) always answer ``None``: their runtime
+    analytical models are the only source since 3.1.0, so no file — not even
+    a legacy uranians companion left on disk — provides coverage for them.
+
     ``None`` means that the active LEB reader does not contain the body. It
     does not imply that an analytical or online fallback exists.
 
@@ -185,6 +189,12 @@ def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | N
     tier file; a date outside every stored interval reports the union coverage
     without pretending that one file served the request.
     """
+    # Fictitious range (FICT_OFFSET..WALDEMATH): discovery never attaches a
+    # legacy uranians companion, but a hand-selected custom file could still
+    # carry those channels — the answer stays None regardless.
+    if 40 <= body_id <= 58:
+        return None
+
     from .state import get_leb_reader
 
     try:

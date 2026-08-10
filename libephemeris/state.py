@@ -1064,8 +1064,6 @@ def _release_when_unused(obj: object) -> None:
     warn from their own ``__del__``). The callback holds the raw handles,
     not the object, so it cannot keep the object alive.
     """
-    import weakref
-
     handles: list = []
     # Skyfield SpiceKernel: kernel.spk.daf.file (BufferedReader).
     daf = getattr(getattr(obj, "spk", None), "daf", None)
