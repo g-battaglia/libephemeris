@@ -188,6 +188,14 @@ def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | N
     date-aware tiered reader, a covered ``jd`` reports the concrete selected
     tier file; a date outside every stored interval reports the union coverage
     without pretending that one file served the request.
+
+    Args:
+        body_id: Body identifier in the public numbering.
+        jd: Optional Julian Day the coverage question is about.
+
+    Returns:
+        The active reader's coverage record, or ``None`` when no file covers
+        the body — always ``None`` for fictitious ids (40-58).
     """
     # Fictitious range (FICT_OFFSET..WALDEMATH): discovery never attaches a
     # legacy uranians companion, but a hand-selected custom file could still
@@ -215,7 +223,21 @@ def get_reader_body_coverage(
     supplied reader (e.g. a context-local file) instead of the active global
     one, so failures can be classified against the file that actually served
     the attempt.
+
+    Args:
+        reader: The reader to inspect (plain, composite, or tiered).
+        body_id: Body identifier in the public numbering.
+        jd: Optional Julian Day the coverage question is about.
+
+    Returns:
+        The reader's coverage record, or ``None`` when the reader does not
+        carry the body — always ``None`` for fictitious ids (40-58).
     """
+    # Same fictitious-range policy as get_body_coverage: a custom or
+    # context-local file carrying retired channels must not report coverage.
+    if 40 <= body_id <= 58:
+        return None
+
     selected_fn = getattr(reader, "selected_body_reader", None)
     selected = (
         selected_fn(int(body_id), float(jd))

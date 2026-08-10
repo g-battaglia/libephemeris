@@ -175,13 +175,14 @@ def test_reviewed_core_attaches_every_same_prefix_sibling(tmp_path):
     shutil.copy(bundled_core, tmp_path / "base_apogee.leb2")
 
     prev_mode = state.get_calc_mode()
+    prev_leb_file = state._LEB_FILE
     ephem.set_calc_mode("auto")
     ephem.set_leb_file(str(core))
     try:
         reader = state.get_leb_reader()
         assert len(reader._readers) == 3
     finally:
-        ephem.set_leb_file(None)
+        ephem.set_leb_file(prev_leb_file)
         ephem.set_calc_mode(prev_mode)
 
 
@@ -225,11 +226,12 @@ def test_legacy_uranians_companions_are_never_attached(tmp_path):
 
     # End to end: activated reader reports no coverage for fictitious ids.
     prev_mode = state.get_calc_mode()
+    prev_leb_file = state._LEB_FILE
     ephem.set_calc_mode("leb")
     ephem.set_leb_file(str(core))
     try:
         for body_id in (40, 47, 56):
             assert ephem.get_body_coverage(body_id) is None
     finally:
-        ephem.set_leb_file(None)
+        ephem.set_leb_file(prev_leb_file)
         ephem.set_calc_mode(prev_mode)
