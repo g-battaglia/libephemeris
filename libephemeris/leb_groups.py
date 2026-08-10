@@ -28,15 +28,13 @@ from __future__ import annotations
 LEB1_GROUPS = ("planets", "asteroids", "exotics", "analytical")
 
 # Standalone LEB1 companions that must be generated and verified but never
-# merged into ``ephemeris_<tier>.leb``.  They are independent conversion
-# sources for the matching LEB2 companion.
-LEB1_COMPANION_GROUPS = ("uranians",)
+# merged into ``ephemeris_<tier>.leb``. Empty since 3.1.0: the ``uranians``
+# companion was retired — fictitious bodies (40-58) are always served by
+# their runtime analytical models, so there is nothing to persist.
+LEB1_COMPANION_GROUPS: tuple[str, ...] = ()
 LEB1_GENERATION_GROUPS = LEB1_GROUPS + LEB1_COMPANION_GROUPS
 
 # LEB2 distribution partition → ``{tier}_{group}.leb2`` companion files.
-# ``uranians`` carries the eight Hamburg-school bodies (IDs 40-47),
-# regenerated from the independently sourced Neely (1980) transcription in
-# ``libephemeris.hypothetical``. Runtime trust is per-file: a companion is
-# attached only when it matches its pinned manifest SHA-256, so pre-existing
-# artifacts with the same name remain unused.
-LEB2_GROUPS = ("core", "asteroids", "exotics", "apogee", "uranians")
+# (``uranians`` was a fifth group until 3.1.0; legacy files with that name
+# are still recognized by the tier guard but never consulted.)
+LEB2_GROUPS = ("core", "asteroids", "exotics", "apogee")

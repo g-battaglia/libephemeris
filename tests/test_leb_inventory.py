@@ -53,10 +53,10 @@ def test_runtime_requirements_follow_manifest_and_canonical_groups(
     assert [item.group for item in requirements if item.kind == "leb2"] == [
         group
         for _tier in ("base", "medium", "extended")
-        for group in ("core", "asteroids", "exotics", "apogee", "uranians")
+        for group in ("core", "asteroids", "exotics", "apogee")
     ]
-    assert requirements[-1].name == "extended_uranians.leb2"
-    assert len(requirements) == 15
+    assert requirements[-1].name == "extended_apogee.leb2"
+    assert len(requirements) == 12
     assert all(item.kind == "leb2" for item in requirements)
     assert all(len(item.sha256) == 64 for item in requirements)
     assert requirements[0].path == str(tmp_path / "leb" / "base_core.leb2")

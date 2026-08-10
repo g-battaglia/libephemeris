@@ -39,7 +39,6 @@ from libephemeris.constants import (
     FLG_SPEED,
     FLG_TOPOCTR,
 )
-from libephemeris.leb_format import COORD_HELIO_ECL
 from libephemeris.fast_calc import (
     _apply_aberration,
     _apply_cob_correction,
@@ -49,7 +48,6 @@ from libephemeris.fast_calc import (
     _get_precession_matrix,
     _get_skyfield_frame_data,
     _pipeline_ecliptic,
-    _pipeline_helio,
     _pipeline_icrs,
     _prec_matrix,
     _topo_ecliptic,
@@ -69,11 +67,6 @@ SKIP_NO_LEB = pytest.mark.skipif(
     reason="LEB base file not found",
 )
 
-# Independently reviewed heliocentric fictitious orbit (COORD_HELIO_ECL).
-HARRINGTON_ID = HARRINGTON
-# Regenerated Hamburg body carried by the uranians companion: the only
-# public COORD_HELIO_ECL channel, used to exercise Pipeline C directly.
-URANIAN_HELIO_ID = 40
 JD = 2451545.0
 
 
@@ -82,51 +75,13 @@ def reader():
     """Open and yield the base LEB reader for a single test.
 
     Binds the reader as the thread-local active reader so direct calls to
-    ``_pipeline_ecliptic`` / ``_pipeline_helio`` (which do not call
+    ``_pipeline_ecliptic`` (which does not call
     ``_set_active_reader`` themselves) resolve frame data against this reader
     rather than a stale, closed reader left over from a previous test.
     """
     with open_leb(LEB_BASE_PATH) as r:
         fc._set_active_reader(r)
         yield r
-
-
-@pytest.fixture(scope="module")
-def _uranians_partial_path(tmp_path_factory):
-    """Small uranians LEB1 partial spanning J2000 for Pipeline C tests."""
-    from scripts.generate_leb import assemble_leb
-
-    path = tmp_path_factory.mktemp("helio") / "ephemeris_test_uranians.leb"
-    assemble_leb(
-        output=str(path),
-        jd_start=JD - 1500.0,
-        jd_end=JD + 1500.0,
-        bodies=list(range(40, 48)),
-        workers=1,
-        verbose=False,
-        skip_aux=True,
-    )
-    return str(path)
-
-
-@pytest.fixture
-def helio_reader(_uranians_partial_path):
-    """Composite reader adding real COORD_HELIO_ECL channels to the base LEB.
-
-    ``_pipeline_helio`` needs Earth/Sun (base file) plus a heliocentric body
-    channel; merged mains carry no fictitious IDs, so the regenerated uranians
-    partial provides bodies 40-47.
-    """
-    from libephemeris.leb_composite import CompositeLEBReader
-
-    composite = CompositeLEBReader(
-        [open_leb(LEB_BASE_PATH), open_leb(_uranians_partial_path)]
-    )
-    try:
-        fc._set_active_reader(composite)
-        yield composite
-    finally:
-        composite.close()
 
 
 # =============================================================================
@@ -570,16 +525,8 @@ def test_pipeline_ecliptic_j2000_wrap_negative(reader, monkeypatch):
 
 
 # =============================================================================
-# Pipeline C heliocentric (1614, 1616, 1631-1651, 1658, 1671, 1673)
+# Fictitious dispatch guard
 # =============================================================================
-
-
-@SKIP_NO_LEB
-def test_pipeline_helio_geocentric_default(helio_reader):
-    """Default geocentric helio conversion (covers _geo_j2000 path)."""
-    res = _pipeline_helio(helio_reader, JD, URANIAN_HELIO_ID, FLG_SPEED)
-    assert len(res) == 6
-    assert 0.0 <= res[0] < 360.0
 
 
 @pytest.mark.parametrize("body_id", range(40, 59))
@@ -592,115 +539,6 @@ def test_fictitious_channels_fall_through_to_runtime_dispatch(body_id):
 
     with pytest.raises(KeyError, match="runtime analytical model"):
         fast_calc_tt(LegacyReader(), JD, body_id, 0)
-
-
-@SKIP_NO_LEB
-def test_pipeline_helio_dlon_wrap_positive(helio_reader, monkeypatch):
-    """Geocentric helio: dlon > 180 wrap (line 1614)."""
-    # Patch _precess_ecliptic to passthrough (default branch precesses), and
-    # patch reader.eval_body so the body's geocentric longitude straddles
-    # 0/360 between prev (jd-1) and nxt (jd+1).
-    real_eval = helio_reader.eval_body
-
-    def fake_eval(body_id, jd):
-        if body_id == URANIAN_HELIO_ID:
-            # Heliocentric (lon, lat, dist) sweeping across the wrap.
-            if jd < JD:
-                lon = 359.0
-            elif jd > JD:
-                lon = 1.0
-            else:
-                lon = 0.0
-            return (lon, 0.0, 40.0), (0.0, 0.0, 0.0)
-        return real_eval(body_id, jd)
-
-    monkeypatch.setattr(helio_reader, "eval_body", fake_eval)
-    monkeypatch.setattr(fc, "_precess_ecliptic", lambda lo, la, a, b: (lo, la))
-    res = _pipeline_helio(helio_reader, JD, URANIAN_HELIO_ID, FLG_SPEED)
-    assert all(math.isfinite(v) for v in res)
-
-
-@SKIP_NO_LEB
-def test_pipeline_helio_dlon_wrap_negative(helio_reader, monkeypatch):
-    """Geocentric helio: dlon < -180 wrap (line 1616)."""
-    real_eval = helio_reader.eval_body
-
-    def fake_eval(body_id, jd):
-        if body_id == URANIAN_HELIO_ID:
-            if jd < JD:
-                lon = 1.0
-            elif jd > JD:
-                lon = 359.0
-            else:
-                lon = 0.0
-            return (lon, 0.0, 40.0), (0.0, 0.0, 0.0)
-        return real_eval(body_id, jd)
-
-    monkeypatch.setattr(helio_reader, "eval_body", fake_eval)
-    monkeypatch.setattr(fc, "_precess_ecliptic", lambda lo, la, a, b: (lo, la))
-    res = _pipeline_helio(helio_reader, JD, URANIAN_HELIO_ID, FLG_SPEED)
-    assert all(math.isfinite(v) for v in res)
-
-
-@SKIP_NO_LEB
-def test_pipeline_helio_eq_j2000(helio_reader):
-    """Helio EQ+J2000 path (lines 1631-1651)."""
-    res = _pipeline_helio(
-        helio_reader, JD, URANIAN_HELIO_ID, FLG_SPEED | FLG_EQUATORIAL | FLG_J2000
-    )
-    assert len(res) == 6
-    assert all(math.isfinite(v) for v in res)
-
-
-@SKIP_NO_LEB
-def test_pipeline_helio_eq_j2000_sidereal_meanobl(helio_reader):
-    """Helio EQ+J2000 sidereal -> mean obliquity branch (line 1631)."""
-    res = _pipeline_helio(
-        helio_reader,
-        JD,
-        URANIAN_HELIO_ID,
-        FLG_SPEED | FLG_EQUATORIAL | FLG_J2000 | FLG_SIDEREAL,
-    )
-    assert all(math.isfinite(v) for v in res)
-
-
-@SKIP_NO_LEB
-def test_pipeline_helio_eq_of_date_sidereal_meanobl(helio_reader):
-    """Helio EQ of date sidereal -> mean obliquity (line 1658)."""
-    res = _pipeline_helio(
-        helio_reader, JD, URANIAN_HELIO_ID, FLG_SPEED | FLG_EQUATORIAL | FLG_SIDEREAL
-    )
-    assert all(math.isfinite(v) for v in res)
-
-
-@SKIP_NO_LEB
-def test_pipeline_helio_eq_of_date_wrap_positive(helio_reader, monkeypatch):
-    """Helio EQ of date: d_eq_lon > 180 wrap (line 1671)."""
-    seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
-
-    def fake_cotrans(lon, lat, eps):
-        return next(seq)
-
-    monkeypatch.setattr(fc, "_cotrans", fake_cotrans)
-    res = _pipeline_helio(
-        helio_reader, JD, URANIAN_HELIO_ID, FLG_SPEED | FLG_EQUATORIAL
-    )
-    assert all(math.isfinite(v) for v in res)
-
-
-@SKIP_NO_LEB
-def test_pipeline_helio_eq_of_date_wrap_negative(helio_reader, monkeypatch):
-    """Helio EQ of date: d_eq_lon < -180 wrap (line 1673)."""
-    seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
-
-    def fake_cotrans(lon, lat, eps):
-        return next(seq)
-
-    monkeypatch.setattr(fc, "_cotrans", fake_cotrans)
-    res = _pipeline_helio(
-        helio_reader, JD, URANIAN_HELIO_ID, FLG_SPEED | FLG_EQUATORIAL
-    )
-    assert all(math.isfinite(v) for v in res)
 
 
 # =============================================================================
@@ -745,9 +583,8 @@ def test_fast_calc_tt_icrs_heliocentric_raises(reader, monkeypatch):
     """FLG_ICRS still raises KeyError for heliocentric (Pipeline-C) bodies.
 
     Only the barycentric ICRS and ecliptic-direct pipelines are served in
-    place; a heliocentric channel has no in-place ICRS reducer and routes to
-    the caller's mode-aware resolver. No public non-fictitious body carries a
-    COORD_HELIO_ECL channel, so a synthetic id exercises the guard directly.
+    place; a legacy heliocentric channel (retired coord value 2) has no
+    in-place ICRS reducer, so a synthetic id exercises the guard directly.
     """
     from types import SimpleNamespace
 
@@ -765,7 +602,7 @@ def test_fast_calc_tt_icrs_heliocentric_raises(reader, monkeypatch):
         real_bodies,
         fake_id,
         SimpleNamespace(
-            coord_type=COORD_HELIO_ECL, jd_start=JD - 1000.0, jd_end=JD + 1000.0
+            coord_type=2, jd_start=JD - 1000.0, jd_end=JD + 1000.0
         ),
     )
     with pytest.raises(KeyError):
@@ -827,27 +664,8 @@ def test_fast_calc_tt_sidereal_snapshot(reader):
 
 
 # =============================================================================
-# _fast_calc_core HELIO+TOPOCTR (1976) and unknown coord_type (1983)
+# Unknown coord_type (1983)
 # =============================================================================
-
-
-@SKIP_NO_LEB
-def test_helio_body_topoctr_raises(helio_reader):
-    """Fictitious IDs fail closed before the helio TOPOCTR rejection.
-
-    Every COORD_HELIO_ECL channel belongs to a fictitious body, so the
-    persisted-channel guard fires first and the TOPOCTR rejection for
-    heliocentric bodies stays dormant until a trusted fictitious dispatch
-    narrows the guard.
-    """
-    with pytest.raises(KeyError, match="runtime analytical model"):
-        fast_calc_tt(
-            helio_reader,
-            JD,
-            URANIAN_HELIO_ID,
-            FLG_TOPOCTR | FLG_SPEED,
-            topo=(12.5, 41.9, 0.0),
-        )
 
 
 @SKIP_NO_LEB

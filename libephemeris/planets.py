@@ -4131,44 +4131,24 @@ def _calc_body(
         # applied only on the geocentric branch below.
         apply_aberration = not (iflag & FLG_TRUEPOS) and not (iflag & FLG_NOABERR)
 
-        # Position sourcing. With an active LEB reader the vector-resolver
-        # Earth evaluation — and, when the serving file byte-matches its
-        # pinned manifest SHA-256, the body propagation itself — come from the
-        # reader. Every frame transform and finite-difference realization
-        # below is shared by both sources, so the public speed semantics do
-        # not depend on where the raw positions come from; the residual source
-        # delta is the LEB approximation class (~1e-12 deg for the body,
-        # <0.001" for Earth). Out-of-range dates fall back per sample.
-        from .state import get_leb_reader, leb_fictitious_source_trusted
+        # Position sourcing: always the runtime analytical model — it is the
+        # definition of these bodies, so there is nothing to interpolate from
+        # a file. An active LEB reader still serves the vector-resolver Earth
+        # evaluation below (<0.001" residual vs the kernel), which is
+        # orthogonal to the body source.
+        from .state import get_leb_reader
 
         # In mode="leb" get_leb_reader() raises when no global LEB resolves.
         # A context calculation may carry its own LEB while the global one is
-        # absent; treat that as "no reader here" and fall back to the runtime
-        # model exactly as the pre-companion branch did, instead of surfacing
-        # the RuntimeError to the public caller.
+        # absent; treat that as "no reader here" instead of surfacing the
+        # RuntimeError to the public caller.
         try:
             _reader = get_leb_reader()
         except RuntimeError:
             _reader = None
 
-        if _reader is not None and leb_fictitious_source_trusted(_reader, ipl):
-            # The body position is served from the manifest-pinned companion,
-            # so report LEB as the dispatch backend (mirrors the SPK branch).
-            _mark_dispatch_source("LEB")
-
-            def _uranian_pos(jd: float) -> Tuple[float, float, float]:
-                try:
-                    (u_lon, u_lat, u_dist), _ = _reader.eval_body(ipl, jd)
-                except LEBCorruptionError:
-                    raise
-                except (KeyError, ValueError):
-                    return hypothetical._calc_uranian_planet_raw(ipl, jd)
-                return u_lon, u_lat, u_dist
-
-        else:
-
-            def _uranian_pos(jd: float) -> Tuple[float, float, float]:
-                return hypothetical._calc_uranian_planet_raw(ipl, jd)
+        def _uranian_pos(jd: float) -> Tuple[float, float, float]:
+            return hypothetical._calc_uranian_planet_raw(ipl, jd)
 
         def _uranian_helio_state(
             jd: float,

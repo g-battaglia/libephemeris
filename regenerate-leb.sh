@@ -30,8 +30,8 @@ readonly LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-60}"
 # `libephemeris.leb_groups.LEB2_GROUPS`.
 TIERS=(base medium extended)
 LEB1_MERGED_GROUPS=(planets asteroids exotics analytical)
-LEB1_GROUPS=(planets asteroids exotics analytical uranians)
-LEB2_GROUPS=(core asteroids exotics apogee uranians)
+LEB1_GROUPS=(planets asteroids exotics analytical)
+LEB2_GROUPS=(core asteroids exotics apogee)
 
 # These seven TNO kernels must be refreshed before exotics regeneration unless
 # the operator explicitly opts into reusing the SPK cache.
@@ -176,8 +176,7 @@ Tier selection:
   base|medium|extended|all may also be passed positionally.
 
 LEB1 group selection:
-  --group GROUP           planets, asteroids, exotics, analytical, uranians,
-                          or all.
+  --group GROUP           planets, asteroids, exotics, analytical, or all.
   --groups LIST           Comma-separated groups, e.g. planets,exotics.
   --no-merge              Generate partial LEB1 files without updating the main
                           data/leb/ephemeris_<tier>.leb file.
@@ -186,8 +185,8 @@ LEB2 selection:
   --leb1-only             Generate, merge, and verify LEB1 only.
   --leb2-only             Convert and verify LEB2 from existing LEB1 files only.
   --leb2-groups LIST      Comma-separated groups: core, asteroids, exotics,
-                          apogee, uranians, or all. When omitted, groups are
-                          inferred from the selected LEB1 groups.
+                          apogee, or all. When omitted, groups are inferred
+                          from the selected LEB1 groups.
 
 Verification:
   --no-verify             Skip LEB1 and LEB2 verification.
@@ -434,7 +433,7 @@ resolve_leb1_group_selection() {
   IFS=',' read -r -a requested_groups <<< "$normalized_selection"
   for requested_group in "${requested_groups[@]}"; do
     case "$requested_group" in
-      planets|asteroids|exotics|analytical|uranians)
+      planets|asteroids|exotics|analytical)
         candidates=("$requested_group")
         ;;
       all)
@@ -470,9 +469,6 @@ infer_leb2_groups_from_leb1() {
         append_unique_leb2_group core
         append_unique_leb2_group apogee
         ;;
-      uranians)
-        append_unique_leb2_group uranians
-        ;;
     esac
   done
 }
@@ -499,7 +495,7 @@ resolve_leb2_group_selection() {
   IFS=',' read -r -a requested_groups <<< "$normalized_selection"
   for requested_group in "${requested_groups[@]}"; do
     case "$requested_group" in
-      core|asteroids|exotics|apogee|uranians)
+      core|asteroids|exotics|apogee)
         candidates=("$requested_group")
         ;;
       all)
@@ -526,16 +522,11 @@ resolve_configuration() {
   resolve_leb1_group_selection
   resolve_leb2_group_selection
 
-  # Every LEB2 group except the companion-only Uranians reads from the merged
-  # main LEB1. Reject a stale conversion plan before expensive generation.
+  # Every LEB2 group reads from the merged main LEB1. Reject a stale
+  # conversion plan before expensive generation.
   if ! ((ENABLE_MERGE)) && ((ENABLE_LEB2)); then
-    local leb2_group
-    for leb2_group in "${SELECTED_LEB2_GROUPS[@]}"; do
-      if [[ "$leb2_group" != "uranians" ]]; then
-        fatal "--no-merge leaves the main LEB1 file stale; combine it with" \
-          "--leb1-only or select only --leb2-groups uranians"
-      fi
-    done
+    fatal "--no-merge leaves the main LEB1 file stale; combine it with" \
+      "--leb1-only"
   fi
 }
 
@@ -1364,10 +1355,10 @@ verify_leb1_for_tier() {
     run_logged "$PYTHON" "${command_args[@]}" || return 1
   fi
 
-  # Companion-only partials are never represented in the merged main. Without
-  # a merge, every freshly generated partial is verified independently.
+  # Without a merge, every freshly generated partial is verified
+  # independently.
   for group in "${SELECTED_LEB1_GROUPS[@]}"; do
-    if ((ENABLE_MERGE)) && [[ "$group" != "uranians" ]]; then
+    if ((ENABLE_MERGE)); then
       continue
     fi
     target_path="$(leb1_partial_path "$tier" "$group")"
@@ -1420,7 +1411,7 @@ assert_leb1_main_is_fresh() {
 
   # Main-file LEB2 groups are converted from the merged LEB1. A newer merged
   # partial means somebody used --no-merge, so conversion would ship stale
-  # data. The standalone Uranian companion is intentionally ignored here.
+  # data. Legacy standalone uranians partials are intentionally ignored.
   for partial_path in data/leb/ephemeris_"$tier"_*.leb; do
     [[ -e "$partial_path" ]] || continue
     [[ "$partial_path" == *_uranians.leb ]] && continue
@@ -1447,21 +1438,12 @@ convert_leb2_for_tier() {
   ensure_directory data/leb2
 
   source_path="$(leb1_main_path "$tier")"
-  if ! ((DRY_RUN)); then
-    for group in "${SELECTED_LEB2_GROUPS[@]}"; do
-      if [[ "$group" != "uranians" ]]; then
-        assert_leb1_main_is_fresh "$tier" "$source_path"
-        break
-      fi
-    done
+  if ! ((DRY_RUN)) && [[ ${#SELECTED_LEB2_GROUPS[@]} -gt 0 ]]; then
+    assert_leb1_main_is_fresh "$tier" "$source_path"
   fi
 
   for group in "${SELECTED_LEB2_GROUPS[@]}"; do
-    if [[ "$group" == "uranians" ]]; then
-      source_path="$(leb1_partial_path "$tier" uranians)"
-    else
-      source_path="$(leb1_main_path "$tier")"
-    fi
+    source_path="$(leb1_main_path "$tier")"
     output_path="$(leb2_output_path "$tier" "$group")"
     backup_file_if_present "$output_path"
 
@@ -1493,11 +1475,7 @@ verify_leb2_for_tier() {
   fi
 
   for group in "${SELECTED_LEB2_GROUPS[@]}"; do
-    if [[ "$group" == "uranians" ]]; then
-      reference_path="$(leb1_partial_path "$tier" uranians)"
-    else
-      reference_path="$(leb1_main_path "$tier")"
-    fi
+    reference_path="$(leb1_main_path "$tier")"
     input_path="$(leb2_output_path "$tier" "$group")"
     command_args=(
       scripts/generate_leb2.py

@@ -60,13 +60,6 @@ BODY_TARGET_AU: dict[int, float] = {
     4: 1e-10,  # Mars    — d_geo ~ 0.37 AU
 }
 
-# Hamburg bodies (40-47) store DEGREES in their longitude/latitude channels:
-# the DEFAULT_TARGET_AU heuristic (calibrated for Cartesian AU channels) would
-# allow ~5e-9 deg of angular error there. Pin the native-component target to
-# 1e-12 so the compressed channels preserve the ~1e-13 deg fit quality
-# (measured cost: ~20% larger files, identical eval speed).
-BODY_TARGET_AU.update({bid: 1e-12 for bid in range(40, 48)})
-
 # Exotic minor bodies with tighter-than-default targets (close-approach NEAs).
 # Registry is the single source of truth: libephemeris.exotic_bodies.
 BODY_TARGET_AU.update(_exotic_target_au())

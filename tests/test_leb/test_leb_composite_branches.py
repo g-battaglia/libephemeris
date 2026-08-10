@@ -147,3 +147,39 @@ def test_from_file_with_companions_filters_and_skips_bad(tmp_path, monkeypatch):
     comp = CompositeLEBReader.from_file_with_companions(str(primary))
     # asteroids failed to open, weird filtered by suffix -> only primary remains.
     assert len(comp._readers) == 1
+
+
+def test_reviewed_core_attaches_every_same_prefix_sibling(tmp_path):
+    """Discovery: a reviewed core attaches all its same-prefix siblings.
+
+    Exercises the production wiring (_has_pinned_sibling_companions +
+    pinned_only=True) end to end. Since runtime content verification was
+    removed, presence is the only requirement: every same-prefix group file
+    on disk attaches. Ported from the retired uranians-companion suite to
+    the asteroids/apogee groups.
+    """
+    import os
+    import shutil
+
+    import libephemeris as ephem
+    from libephemeris import state
+
+    bundled_core = os.path.join(
+        os.path.dirname(state.__file__), "data", "leb2", "base_core.leb2"
+    )
+    core = tmp_path / "base_core.leb2"
+    shutil.copy(bundled_core, core)
+    # Same-prefix manifest-named siblings; bytes are irrelevant (a valid LEB2
+    # payload is enough), so reuse the core bytes for both.
+    shutil.copy(bundled_core, tmp_path / "base_asteroids.leb2")
+    shutil.copy(bundled_core, tmp_path / "base_apogee.leb2")
+
+    prev_mode = state.get_calc_mode()
+    ephem.set_calc_mode("auto")
+    ephem.set_leb_file(str(core))
+    try:
+        reader = state.get_leb_reader()
+        assert len(reader._readers) == 3
+    finally:
+        ephem.set_leb_file(None)
+        ephem.set_calc_mode(prev_mode)

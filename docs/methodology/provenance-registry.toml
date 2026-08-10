@@ -774,10 +774,3 @@ sources = ["JPL_DE", "IERS_2010", "ERFA", "CLENSHAW_1955"]
 documentation = ["docs/leb/base-core-provenance.md"]
 generator = ["scripts/generate_leb.py", "scripts/generate_leb2.py"]
 
-[[asset]]
-path = "libephemeris/data/leb2/base_uranians.leb2"
-category = "generated-scientific-data"
-origin = "Chebyshev fit of the project-owned Keplerian propagation of the Neely (1980) Hamburg-body transcription; no legacy or third-party coefficients."
-sources = ["HYPOTHETICAL_PRIMARY", "CLENSHAW_1955"]
-documentation = ["docs/methodology/hypothetical-bodies.md"]
-generator = ["scripts/generate_leb.py", "scripts/generate_leb2.py"]

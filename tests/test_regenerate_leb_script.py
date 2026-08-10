@@ -65,14 +65,14 @@ def test_all_selects_only_canonical_leb2_groups() -> None:
     assert tuple(result.stdout.splitlines()) == LEB2_GROUPS
 
 
-def test_uranians_group_is_accepted_as_standalone_companion() -> None:
+def test_uranians_group_is_rejected_since_retirement() -> None:
+    """The retired companion group is an invalid selection, not a silent no-op."""
     result = _run_sourced_script(
-        "parse_arguments --leb2-only --leb2-groups uranians; "
-        "resolve_configuration; printf '%s\\n' \"${SELECTED_LEB2_GROUPS[@]}\""
+        "parse_arguments --leb2-only --leb2-groups uranians; resolve_configuration"
     )
 
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "uranians"
+    assert result.returncode != 0
+    assert "invalid LEB2 group" in result.stderr
 
 
 def test_analytical_leb1_affects_only_surviving_leb2_groups() -> None:
@@ -103,14 +103,6 @@ def test_no_merge_with_leb1_only_is_accepted() -> None:
     assert result.stdout.strip().endswith("OK")
 
 
-def test_no_merge_can_convert_standalone_uranians() -> None:
-    result = _run_sourced_script(
-        "parse_arguments --no-merge --group uranians --leb2-groups uranians; "
-        "resolve_configuration; echo OK"
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip().endswith("OK")
 
 
 def test_extended_generation_uses_the_full_de441_range() -> None:

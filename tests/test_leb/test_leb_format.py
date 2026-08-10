@@ -15,7 +15,6 @@ from libephemeris.leb_format import (
     BODY_ENTRY_SIZE,
     BODY_PARAMS,
     COORD_ECLIPTIC,
-    COORD_HELIO_ECL,
     COORD_ICRS_BARY,
     COORD_ICRS_BARY_SYSTEM,
     DELTA_T_ENTRY_FMT,
@@ -255,14 +254,12 @@ class TestBodyParams:
 
     @pytest.mark.unit
     def test_reviewed_hypothetical_policy(self):
-        """Only the independently sourced Hamburg bodies have persisted channels.
+        """No fictitious body (40-58) may have a persisted LEB channel.
 
-        IDs 40-47 are fitted from the Neely (1980) runtime propagation and
-        ship as the pinned uranians companion; every other fictitious ID
-        (48-58) must never enter persisted LEB data.
+        Their runtime analytical models are the definition of those bodies;
+        the pre-3.1.0 uranians companion (40-47) is retired.
         """
-        assert set(range(40, 48)) <= set(BODY_PARAMS)
-        assert not set(range(48, 59)).intersection(BODY_PARAMS)
+        assert not set(range(40, 59)).intersection(BODY_PARAMS)
 
     @pytest.mark.unit
     def test_coord_types_valid(self):
@@ -271,7 +268,6 @@ class TestBodyParams:
             COORD_ICRS_BARY,
             COORD_ICRS_BARY_SYSTEM,
             COORD_ECLIPTIC,
-            COORD_HELIO_ECL,
         }
         for body_id, params in BODY_PARAMS.items():
             _, _, coord_type, _ = params

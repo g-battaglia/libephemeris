@@ -700,7 +700,6 @@ class TestGeneratorValidation:
         monkeypatch.setattr(leb_reader, "LEBReader", Reader)
         monkeypatch.setattr(libephemeris, "set_auto_spk_download", lambda _on: None)
         monkeypatch.setattr(generate_leb, "_build_ecliptic_eval_funcs", lambda: {})
-        monkeypatch.setattr(generate_leb, "_build_helio_eval_funcs", lambda: {})
         monkeypatch.setattr(generate_leb, "_verify_icrs_planet", verify_source_boundary)
 
         assert generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)
@@ -731,7 +730,6 @@ class TestGeneratorValidation:
         monkeypatch.setattr(leb_reader, "LEBReader", Reader)
         monkeypatch.setattr(libephemeris, "set_auto_spk_download", lambda _on: None)
         monkeypatch.setattr(generate_leb, "_build_ecliptic_eval_funcs", lambda: {})
-        monkeypatch.setattr(generate_leb, "_build_helio_eval_funcs", lambda: {})
 
         assert not generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)
 
@@ -766,7 +764,6 @@ class TestGeneratorValidation:
         monkeypatch.setattr(leb_reader, "LEBReader", Reader)
         monkeypatch.setattr(libephemeris, "set_auto_spk_download", lambda _on: None)
         monkeypatch.setattr(generate_leb, "_build_ecliptic_eval_funcs", lambda: {})
-        monkeypatch.setattr(generate_leb, "_build_helio_eval_funcs", lambda: {})
         monkeypatch.setattr(generate_leb, "_verify_icrs_planet", compare)
 
         assert not generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)
@@ -802,6 +799,5 @@ class TestGeneratorValidation:
             "_build_ecliptic_eval_funcs",
             lambda: {body_id: lambda _jd: np.zeros(3)},
         )
-        monkeypatch.setattr(generate_leb, "_build_helio_eval_funcs", lambda: {})
 
         assert not generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)

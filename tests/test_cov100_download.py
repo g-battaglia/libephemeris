@@ -676,7 +676,7 @@ def test_print_data_status_text_output(tmp_path, monkeypatch, capsys):
     leb_dir.mkdir()
     (leb_dir / "base_core.leb2").write_bytes(b"x" * 9)
     (leb_dir / "base_asteroids.leb2").write_bytes(b"x" * 9)
-    # Leave apogee + uranians missing so present != total.
+    # Leave apogee missing so present != total.
 
     # Provide an SPK cache directory with one file -> files>0 branch.
     spk_dir = tmp_path / "spk"
@@ -1449,7 +1449,7 @@ def test_download_leb2_for_tier_full(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(state, "set_leb_file", lambda p: activated.update(path=p))
 
     # Include a bogus group to hit the "not in DATA_FILES" SKIP arm.
-    groups = ["core", "asteroids", "exotics", "apogee", "uranians", "bogus"]
+    groups = ["core", "asteroids", "exotics", "apogee", "bogus"]
     downloaded = dl.download_leb2_for_tier(
         "base", groups=groups, force=False, quiet=False, activate=True
     )
@@ -1466,7 +1466,6 @@ def test_download_leb2_for_tier_full(tmp_path, monkeypatch, capsys):
         "base_asteroids.leb2",
         "base_exotics.leb2",
         "base_apogee.leb2",
-        "base_uranians.leb2",
     }
 
 
@@ -1513,52 +1512,10 @@ def test_download_leb2_remote_asset_requires_and_passes_sha_pin(tmp_path, monkey
     ]
 
 
-def test_download_leb2_uranians_remote_asset_passes_sha_pin(tmp_path, monkeypatch):
-    """The medium/extended uranians companions download through the pinned path."""
-    monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
-    payload = b"synthetic reviewed uranians companion"
-    digest = hashlib.sha256(payload).hexdigest()
-    monkeypatch.setitem(
-        dl.DATA_FILES,
-        "medium_uranians.leb2",
-        {
-            "url": "https://example.invalid/medium_uranians.leb2",
-            "sha256": digest,
-            "size_mb": 0.17,
-            "description": "test",
-            "dest_subdir": "leb",
-        },
-    )
-    calls = []
-
-    def _download(url, dest_path, **kwargs):
-        calls.append((url, kwargs))
-        Path(dest_path).write_bytes(payload)
-        return True
-
-    monkeypatch.setattr(dl, "download_file", _download)
-    monkeypatch.setattr(dl, "_is_valid_leb", lambda path: True)
-
-    result = dl.download_leb2_for_tier(
-        "medium", groups=["uranians"], quiet=True, activate=False
-    )
-
-    assert result == [tmp_path / "leb" / "medium_uranians.leb2"]
-    assert calls == [
-        (
-            "https://example.invalid/medium_uranians.leb2",
-            {
-                "description": "medium_uranians.leb2",
-                "show_progress": True,
-                "expected_sha256": digest,
-            },
-        )
-    ]
-
-
-def test_download_leb2_default_groups_include_uranians() -> None:
-    """The tier download resolves uranians as a default (fifth) group."""
-    assert "uranians" in dl.LEB2_GROUPS
+def test_download_leb2_default_groups_exclude_uranians() -> None:
+    """The retired uranians group never re-enters the tier download (3.1.0)."""
+    assert "uranians" not in dl.LEB2_GROUPS
+    assert not any("uranians" in name for name in dl.DATA_FILES)
 
 
 def test_download_leb2_for_tier_default_groups_quiet(tmp_path, monkeypatch):
@@ -1586,7 +1543,6 @@ def test_download_leb2_for_tier_default_groups_quiet(tmp_path, monkeypatch):
         "base_asteroids.leb2",
         "base_core.leb2",
         "base_exotics.leb2",
-        "base_uranians.leb2",
     ]
 
 
@@ -1615,7 +1571,7 @@ def test_download_leb2_for_tier_quiet_arcs(tmp_path, monkeypatch):
 
     monkeypatch.setattr(state, "set_leb_file", lambda p: None)
 
-    groups = ["core", "asteroids", "apogee", "uranians", "bogus"]
+    groups = ["core", "asteroids", "apogee", "bogus"]
     downloaded = dl.download_leb2_for_tier(
         "base", groups=groups, force=False, quiet=True, activate=True
     )
@@ -1623,7 +1579,6 @@ def test_download_leb2_for_tier_quiet_arcs(tmp_path, monkeypatch):
         "base_apogee.leb2",
         "base_asteroids.leb2",
         "base_core.leb2",
-        "base_uranians.leb2",
     ]
 
 

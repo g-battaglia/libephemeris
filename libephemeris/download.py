@@ -233,36 +233,10 @@ DATA_FILES: dict[str, dict[str, Any]] = {
         "description": "LEB2 curated minor bodies for 'extended' tier",
         "dest_subdir": "leb",
     },
-    # Uranians (8 Hamburg bodies, 40-47): regenerated from the independently
-    # sourced Neely (1980) propagation in libephemeris.hypothetical, converted
-    # from the standalone LEB1 partial with a 1e-12 native-component target.
-    # Companion attach and calculation sourcing both require these exact pins.
-    "base_uranians.leb2": {
-        # Ships in every wheel; installed from package resources.
-        "url": None,
-        "bundled_resource": "data/leb2/base_uranians.leb2",
-        "sha256": "2b052321672f995a2c2f6c6c3abe4dd623e2721eb17f7319873d0c8b0d65ee8c",
-        "size_mb": 0.05,
-        "description": "LEB2 Hamburg bodies for 'base' tier (1850-2150)",
-        "dest_subdir": "leb",
-    },
-    "medium_uranians.leb2": {
-        "url": f"{LEB_RELEASES}/medium_uranians.leb2",
-        "sha256": "322394b1a32fea7abdf627d836bba5f28481856bb8ea84bac4a51ef6a4532ef8",
-        "size_mb": 0.17,
-        "description": "LEB2 Hamburg bodies for 'medium' tier (1550-2650)",
-        "dest_subdir": "leb",
-    },
-    "extended_uranians.leb2": {
-        "url": f"{LEB_RELEASES}/extended_uranians.leb2",
-        "sha256": "14634b8e836e1484c0f0f05daffac9c63526016cec9dce8807f37d9529e1fa4c",
-        "size_mb": 4.67,
-        "description": (
-            "LEB2 Hamburg bodies for 'extended' tier "
-            "(exact coverage stored in the artifact)"
-        ),
-        "dest_subdir": "leb",
-    },
+    # The pre-3.1.0 ``{tier}_uranians.leb2`` companions are retired: the
+    # Hamburg bodies (40-47), like every fictitious body, are served by their
+    # runtime analytical models. Legacy files left on disk are harmless —
+    # the calculation path never consults fictitious channels.
 }
 
 

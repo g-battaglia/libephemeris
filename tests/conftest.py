@@ -615,13 +615,6 @@ def reset_ephemeris_state():
     state._LEB_FILE = saved_leb_file
     state._LEB_READER = None
 
-    # The fictitious-body trust caches are keyed by a (size, mtime) stat
-    # fingerprint that does not change when a monkeypatched DATA_FILES pin is
-    # undone at teardown, so a verdict computed under a temporary pin could
-    # otherwise leak into the next test in this worker.
-    state._FICTITIOUS_SOURCE_CACHE.clear()
-    state._FICTITIOUS_TRUST_BY_READER.clear()
-
     if saved_env_mode is not None:
         os.environ["LIBEPHEMERIS_MODE"] = saved_env_mode
     else:

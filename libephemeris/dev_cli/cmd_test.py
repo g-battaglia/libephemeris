@@ -287,7 +287,7 @@ _LEB_ESSENTIAL_FILES = [
 _LEB_BACKEND_FILES = _LEB_ESSENTIAL_FILES + [
     "tests/test_leb/test_fast_calc.py",
     "tests/test_leb/test_context_leb.py",
-    "tests/test_leb/test_uranians_companion.py",
+    "tests/test_leb/test_fictitious_dispatch_logging.py",
     "tests/test_leb/compare/test_compare_leb_pctr_nodaps.py",
     "tests/test_planets/test_nod_aps.py",
     "tests/test_fixed_stars/test_fixstar2.py",

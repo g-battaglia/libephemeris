@@ -185,16 +185,8 @@ def base_apogee() -> None:
     )
 
 
-# Companion-only groups convert from their standalone LEB1 partial: merged
-# main files carry no fictitious body IDs. The regenerated group is sourced
-# from libephemeris.hypothetical (Neely 1980 transcription).
-_COMPANION_SOURCE_GROUPS = frozenset({"uranians"})
-
-
 def _group_source_path(tier: str, group: str) -> str:
-    """LEB1 source for a group: the merged main, or the standalone partial."""
-    if group in _COMPANION_SOURCE_GROUPS:
-        return f"data/leb/ephemeris_{tier}_{group}.leb"
+    """LEB1 source for a group: the merged main file."""
     return f"data/leb/ephemeris_{tier}.leb"
 
 

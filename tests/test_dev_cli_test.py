@@ -207,8 +207,8 @@ def test_leb2_root_help_preserves_separate_examples() -> None:
     result = CliRunner().invoke(cmd_leb2.leb2_group, ["--help"])
 
     assert result.exit_code == 0
-    assert "all 5 body groups" in result.output
-    assert ("exotics, apogee, uranians\n    leph leb2 verify base") in result.output
+    assert "all 4 body groups" in result.output
+    assert ("exotics, apogee\n    leph leb2 verify base") in result.output
 
 
 def test_leb2_dynamic_group_command_uses_matching_paths() -> None:
@@ -226,50 +226,6 @@ def test_leb2_dynamic_group_command_uses_matching_paths() -> None:
             "data/leb2/medium_exotics.leb2",
             "--group",
             "exotics",
-            "--tier",
-            "medium",
-        ]
-    )
-
-
-def test_leb2_uranian_conversion_reads_standalone_partial() -> None:
-    """The regenerated group converts from its partial, never a merged main."""
-    runner = CliRunner()
-    with patch.object(cmd_leb2, "_leb2") as run_leb2:
-        result = runner.invoke(cmd_leb2.convert_group, ["base-uranians"])
-
-    assert result.exit_code == 0
-    run_leb2.assert_called_once_with(
-        [
-            "convert",
-            "data/leb/ephemeris_base_uranians.leb",
-            "-o",
-            "data/leb2/base_uranians.leb2",
-            "--group",
-            "uranians",
-            "--tier",
-            "base",
-        ]
-    )
-
-
-def test_leb2_uranian_verify_authenticates_partial_reference() -> None:
-    """Verification compares against the standalone partial with group + tier."""
-    runner = CliRunner()
-    with patch.object(cmd_leb2, "_leb2") as run_leb2:
-        result = runner.invoke(cmd_leb2.verify_group, ["medium-uranians"])
-
-    assert result.exit_code == 0
-    run_leb2.assert_called_once_with(
-        [
-            "verify",
-            "data/leb2/medium_uranians.leb2",
-            "--reference",
-            "data/leb/ephemeris_medium_uranians.leb",
-            "--samples",
-            "500",
-            "--group",
-            "uranians",
             "--tier",
             "medium",
         ]
@@ -855,28 +811,25 @@ def test_init_wizard_does_not_require_unpublished_exotics() -> None:
 
 
 def test_init_wizard_estimates_only_reviewed_artifacts() -> None:
-    """Size estimates pin the cumulative data-v3 manifest: 5 groups per tier."""
+    """Size estimates pin the cumulative data-v3 manifest: 4 groups per tier."""
     assert init_wizard._LEB2_SIZES == {
         "base": {
             "core": 10.23,
             "asteroids": 2.15,
             "exotics": 29.38,
             "apogee": 9.78,
-            "uranians": 0.05,
         },
         "medium": {
             "core": 37.28,
             "asteroids": 6.48,
             "exotics": 92.33,
             "apogee": 36.19,
-            "uranians": 0.17,
         },
         "extended": {
             "core": 1153.9,
             "asteroids": 6.48,
             "exotics": 234.01,
             "apogee": 1481.19,
-            "uranians": 4.67,
         },
     }
 

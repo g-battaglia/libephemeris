@@ -52,7 +52,9 @@ VERSION = 1
 # Coordinate types
 COORD_ICRS_BARY = 0  # ICRS barycentric planet center (x, y, z) in AU
 COORD_ECLIPTIC = 1  # Ecliptic of date (lon, lat, dist) in deg/deg/AU
-COORD_HELIO_ECL = 2  # Heliocentric ecliptic (lon, lat, dist) in deg/deg/AU
+# Value 2 (heliocentric ecliptic) is retired — it carried the pre-3.1.0
+# uranians companion channels, which the calculation path never serves.
+# Never reuse the value: legacy files in the wild still encode it.
 COORD_GEO_ECLIPTIC = 3  # Reserved — not used (retrograde cusps; see algorithms.md §16)
 COORD_ICRS_BARY_SYSTEM = 4  # ICRS system barycenter (x, y, z) in AU — runtime COB
 
@@ -146,7 +148,7 @@ class BodyEntry:
     """Body index entry (52 bytes)."""
 
     body_id: int
-    coord_type: int  # COORD_ICRS_BARY, COORD_ECLIPTIC, COORD_HELIO_ECL
+    coord_type: int  # COORD_ICRS_BARY, COORD_ECLIPTIC, ...
     segment_count: int
     jd_start: float
     jd_end: float
@@ -275,19 +277,10 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     18: (8, 13, COORD_ICRS_BARY, 3),  # PALLAS
     19: (8, 13, COORD_ICRS_BARY, 3),  # JUNO
     20: (8, 13, COORD_ICRS_BARY, 3),  # VESTA
-    # Hamburg-school hypothetical bodies: heliocentric J2000 ecliptic
-    # (lon, lat, dist) sampled from the runtime Keplerian propagation of the
-    # Neely (1980) element transcription in libephemeris.hypothetical (see
-    # docs/methodology/hypothetical-bodies.md). Two-body orbits are smooth:
-    # 10-year segments at degree 8 fit to ~1e-12 deg.
-    40: (3652.5, 8, COORD_HELIO_ECL, 3),  # CUPIDO
-    41: (3652.5, 8, COORD_HELIO_ECL, 3),  # HADES
-    42: (3652.5, 8, COORD_HELIO_ECL, 3),  # ZEUS
-    43: (3652.5, 8, COORD_HELIO_ECL, 3),  # KRONOS
-    44: (3652.5, 8, COORD_HELIO_ECL, 3),  # APOLLON
-    45: (3652.5, 8, COORD_HELIO_ECL, 3),  # ADMETOS
-    46: (3652.5, 8, COORD_HELIO_ECL, 3),  # VULKANUS
-    47: (3652.5, 8, COORD_HELIO_ECL, 3),  # POSEIDON
+    # Fictitious bodies (40-58) have no LEB channels: their runtime
+    # analytical models in libephemeris.hypothetical are the definition of
+    # those bodies, so there is nothing to sample into a file (see
+    # docs/methodology/hypothetical-bodies.md).
 }
 
 # Exotic minor bodies (centaurs / TNOs / NEAs) served from JPL SPK over their

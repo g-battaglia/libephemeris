@@ -477,7 +477,6 @@ def test_status_verbose_levels(monkeypatch, tmp_path):
     _write_file(leb_dir / "base_core.leb2", 12)
     _write_file(leb_dir / "base_asteroids.leb2", 12)
     _write_file(leb_dir / "base_apogee.leb2", 12)
-    _write_file(leb_dir / "base_uranians.leb2", 12)
     _write_file(spk_dir / "alpha.bsp", 24)
     _write_file(spk_dir / "beta.bsp", 24)
     _write_file(assist_dir / "linux_p1550p2650.440", 20)

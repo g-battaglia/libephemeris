@@ -190,7 +190,7 @@ def test_inventory_distinguishes_persisted_model_classes(monkeypatch) -> None:
 
 @pytest.mark.parametrize(
     ("tier", "expected_count"),
-    [("base", 5), ("medium", 10), ("extended", 15)],
+    [("base", 4), ("medium", 8), ("extended", 12)],
 )
 def test_sealed_runtime_requirements_include_every_more_precise_tier(
     tier: str, expected_count: int
@@ -198,7 +198,7 @@ def test_sealed_runtime_requirements_include_every_more_precise_tier(
     requirements = get_runtime_data_requirements(tier)
 
     assert len(requirements) == expected_count
-    assert requirements[-1].name == f"{tier}_uranians.leb2"
+    assert requirements[-1].name == f"{tier}_apogee.leb2"
 
 
 def _patch_auto_discovery(

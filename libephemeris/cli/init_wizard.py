@@ -54,21 +54,18 @@ _LEB2_SIZES: Dict[str, Dict[str, float]] = {
         "asteroids": 2.15,
         "exotics": 29.38,
         "apogee": 9.78,
-        "uranians": 0.05,
     },
     "medium": {
         "core": 37.28,
         "asteroids": 6.48,
         "exotics": 92.33,
         "apogee": 36.19,
-        "uranians": 0.17,
     },
     "extended": {
         "core": 1153.9,
         "asteroids": 6.48,
         "exotics": 234.01,
         "apogee": 1481.19,
-        "uranians": 4.67,
     },
 }
 

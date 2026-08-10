@@ -7,10 +7,9 @@ This module reimplements the Skyfield pipeline using LEBReader as the data
 source, handling coordinate transforms, light-time correction, aberration,
 and flag dispatch.
 
-Three pipelines:
+Two pipelines:
     A: ICRS barycentric bodies (Sun-Pluto, Earth, Chiron, Ceres-Vesta)
     B: Ecliptic direct bodies (lunar nodes, Lilith variants)
-    C: Independently sourced heliocentric fictitious bodies
 
 Provenance:
     Stored coefficients are generated from the registered NASA JPL/IAU source
@@ -71,7 +70,6 @@ from .constants import (
 
 from .leb_format import (
     COORD_ECLIPTIC,
-    COORD_HELIO_ECL,
     COORD_ICRS_BARY,
     COORD_ICRS_BARY_SYSTEM,
 )
@@ -2158,194 +2156,6 @@ def _pipeline_ecliptic(
 
 
 # =============================================================================
-# PIPELINE C: HELIOCENTRIC BODIES
-# =============================================================================
-
-
-def _pipeline_helio(
-    reader: "LEBReaderLike",
-    jd_tt: float,
-    ipl: int,
-    iflag: int,
-) -> Tuple[float, float, float, float, float, float]:
-    """Pipeline C: evaluate reviewed heliocentric ecliptic bodies.
-
-    LEB stores these as heliocentric J2000 ecliptic (lon, lat, dist).
-    Default output is geocentric ecliptic of date, consistent with the
-    Skyfield path in planets.py.
-
-    Returns:
-        (lon, lat, dist, dlon, dlat, ddist)
-    """
-    is_helio = bool(iflag & FLG_HELCTR)
-
-    if is_helio:
-        # Heliocentric: LEB data is already heliocentric J2000 ecliptic
-        (lon, lat, dist), (dlon, dlat, ddist) = reader.eval_body(ipl, jd_tt)
-    else:
-        # Geocentric: convert heliocentric J2000 ecliptic → geocentric J2000
-        cos_e = math.cos(OBLIQUITY_J2000_RAD)
-        sin_e = math.sin(OBLIQUITY_J2000_RAD)
-
-        def _geo_j2000(jd: float) -> Tuple[float, float, float]:
-            """Geocentric J2000 ecliptic position from LEB data."""
-            (h_lon, h_lat, h_dist), _ = reader.eval_body(ipl, jd)
-            # Heliocentric J2000 ecliptic → Cartesian
-            h_lon_r = math.radians(h_lon)
-            h_lat_r = math.radians(h_lat)
-            cl = math.cos(h_lat_r)
-            xh = h_dist * cl * math.cos(h_lon_r)
-            yh = h_dist * cl * math.sin(h_lon_r)
-            zh = h_dist * math.sin(h_lat_r)
-            # Earth heliocentric: bary(Earth) - bary(Sun) in ICRS
-            # Apply light-time correction by evaluating Earth at the retarded
-            # epoch while the solar observer remains at observation time.
-            earth_pos, _ = reader.eval_body(EARTH, jd)
-            sun_pos, _ = reader.eval_body(SUN, jd)
-            ex0 = earth_pos[0] - sun_pos[0]
-            ey0 = earth_pos[1] - sun_pos[1]
-            ez0 = earth_pos[2] - sun_pos[2]
-            r_es = math.sqrt(ex0 * ex0 + ey0 * ey0 + ez0 * ez0)
-            lt_es = r_es / C_LIGHT_AU_DAY
-            earth_ret, _ = reader.eval_body(EARTH, jd - lt_es)
-            ex = earth_ret[0] - sun_pos[0]
-            ey = earth_ret[1] - sun_pos[1]
-            ez = earth_ret[2] - sun_pos[2]
-            # Rotate ICRS (≈J2000 equatorial) → J2000 ecliptic
-            earth_ecl_x = ex
-            earth_ecl_y = ey * cos_e + ez * sin_e
-            earth_ecl_z = -ey * sin_e + ez * cos_e
-            # Geocentric = body_helio - earth_helio
-            xg = xh - earth_ecl_x
-            yg = yh - earth_ecl_y
-            zg = zh - earth_ecl_z
-            rg = math.sqrt(xg * xg + yg * yg + zg * zg)
-            lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
-            sin_b = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
-            lat_g = math.degrees(math.asin(sin_b))
-            return lon_g, lat_g, rg
-
-        lon, lat, dist = _geo_j2000(jd_tt)
-        # Velocity via central difference (matching Skyfield path: dt=1.0 day)
-        dt_v = 1.0
-        prev = _geo_j2000(jd_tt - dt_v)
-        nxt = _geo_j2000(jd_tt + dt_v)
-        dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
-        # Unwrap a 0/360 boundary crossing: the longitudes are in [0, 360), so a
-        # crossing is a ~360 deg jump in the raw difference; after dividing by
-        # 2*dt_v the threshold and correction carry the same 1/(2*dt_v) factor.
-        # Valid only because these bodies are slow (<<90 deg/day at dt_v=1): a
-        # real speed above 180/(2*dt_v) cannot occur, so it can only be a wrap.
-        # Do NOT reuse this for fast bodies -- it would misread real motion.
-        if dlon > 180.0 / (2.0 * dt_v):
-            dlon -= 360.0 / (2.0 * dt_v)
-        elif dlon < -180.0 / (2.0 * dt_v):
-            dlon += 360.0 / (2.0 * dt_v)
-        dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
-        ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
-
-    # Position is now J2000 ecliptic (helio or geo).
-    is_j2000 = bool(iflag & FLG_J2000)
-    is_equatorial = bool(iflag & FLG_EQUATORIAL)
-
-    # For any of-date output (J2000 flag not set), precess the J2000 position
-    # AND velocity to the ecliptic of date. Carrying the velocity through the
-    # SAME (epoch-varying) precession — instead of leaving it frozen in the
-    # J2000 frame — makes the of-date speed the true time derivative of the
-    # of-date position: it picks up the ~50.29"/yr general-precession rate,
-    # matching the Skyfield backend (_precess_ecliptic_state). Without this,
-    # the derivative would omit the precession contribution.
-    if not is_j2000:
-        dt_step = 0.001  # days
-        now_lon, now_lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
-        fwd_lon, fwd_lat = _precess_ecliptic(
-            lon + dlon * dt_step, lat + dlat * dt_step, J2000, jd_tt + dt_step
-        )
-        d_lon = fwd_lon - now_lon
-        if d_lon > 180.0:
-            d_lon -= 360.0
-        elif d_lon < -180.0:
-            d_lon += 360.0
-        dlon = d_lon / dt_step
-        dlat = (fwd_lat - now_lat) / dt_step
-        lon = now_lon
-        lat = now_lat
-
-    # Rotate the mean ecliptic of date onto the TRUE ecliptic of date by adding
-    # nutation in longitude (Δψ), so these bodies are reported on the true
-    # ecliptic like every other of-date body. The velocity picks up the
-    # nutation-in-longitude
-    # rate dΔψ/dt so the reported speed stays the exact derivative of the
-    # reported longitude. Skipped for the nutation-free frames: FLG_J2000 (the
-    # J2000 ecliptic carries no nutation), FLG_NONUT (mean ecliptic), and
-    # SIDEREAL+EQUATORIAL (rotated to the equator with the mean obliquity below,
-    # so the longitude must stay mean too). For plain SIDEREAL the true ayanamsha
-    # (mean + Δψ) is subtracted downstream in _fast_calc_core, which then also
-    # removes dΔψ/dt from the speed — the Δψ added here is what makes that
-    # cancellation land on the intrinsic sidereal rate.
-    _sid_eq = bool(iflag & FLG_SIDEREAL) and is_equatorial
-    if not is_j2000 and not (iflag & FLG_NONUT) and not _sid_eq:
-        _, dpsi_rad, _, _ = _frame_data(jd_tt)
-        lon = (lon + math.degrees(dpsi_rad)) % 360.0
-        if iflag & FLG_SPEED:
-            dlon += _nutation_rate_deg_day(jd_tt)
-
-    # For EQ+J2000, both backends rotate the J2000 ecliptic to the equator with
-    # the J2000 obliquity — a consistent J2000 equatorial frame, same as every
-    # other body class under the shared IAU 2006 frame definition.
-    if is_equatorial and is_j2000:
-        # EQ+J2000: J2000 ecliptic → J2000 equatorial (fixed J2000 obliquity).
-        eps = OBLIQUITY_J2000_REF_DEG
-
-        dt_step = 0.001
-        eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)
-        eq_fwd_lon, eq_fwd_lat = _cotrans(
-            lon + dlon * dt_step, lat + dlat * dt_step, -eps
-        )
-        d_eq_lon = eq_fwd_lon - eq_now_lon
-        if d_eq_lon > 180.0:
-            d_eq_lon -= 360.0
-        elif d_eq_lon < -180.0:
-            d_eq_lon += 360.0
-        dlon = d_eq_lon / dt_step
-        dlat = (eq_fwd_lat - eq_now_lat) / dt_step
-        lon = eq_now_lon
-        lat = eq_now_lat
-
-    elif is_equatorial:
-        # Equatorial of date: coords (position and velocity) are now on the
-        # ecliptic of date (precessed above); rotate ecliptic-of-date →
-        # equatorial-of-date with the of-date obliquity (a fixed-obliquity
-        # rotation). Sidereal/NONUT modes use mean obliquity (no nutation).
-        if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
-            eps = vondrak_mean_obliquity_deg(jd_tt)
-        else:
-            _, _, deps, _ = _frame_data(jd_tt)
-            eps_mean = vondrak_mean_obliquity_deg(jd_tt)
-            eps = eps_mean + math.degrees(deps)
-
-        dt_step = 0.001
-        eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)
-        eq_fwd_lon, eq_fwd_lat = _cotrans(
-            lon + dlon * dt_step, lat + dlat * dt_step, -eps
-        )
-        d_eq_lon = eq_fwd_lon - eq_now_lon
-        if d_eq_lon > 180.0:
-            d_eq_lon -= 360.0
-        elif d_eq_lon < -180.0:
-            d_eq_lon += 360.0
-        dlon = d_eq_lon / dt_step
-        dlat = (eq_fwd_lat - eq_now_lat) / dt_step
-        lon = eq_now_lon
-        lat = eq_now_lat
-
-    # else: J2000 ecliptic (already in frame) or of-date ecliptic (precessed
-    # above) — position and velocity are final.
-
-    return lon, lat, dist, dlon, dlat, ddist
-
-
-# =============================================================================
 # ENTRY POINTS
 # =============================================================================
 
@@ -2750,9 +2560,13 @@ def _fast_calc_core(
     if FICT_OFFSET <= ipl <= WALDEMATH:
         # Never source a fictitious-body position from a persisted LEB channel.
         # Legacy files may contain obsolete coefficients, while all public
-        # IDs 40--58 now have runtime analytical dispatch. A KeyError is the
-        # normal LEB miss signal and lets calc/calc_ut continue to that path.
-        raise KeyError(
+        # IDs 40--58 have runtime analytical dispatch. The typed KeyError is
+        # the normal LEB miss signal — calc/calc_ut continue to that path —
+        # and tells the fallback logger this is the by-design source, not a
+        # sealed-mode degradation.
+        from .exceptions import FictitiousRuntimeDispatch
+
+        raise FictitiousRuntimeDispatch(
             f"Fictitious body {ipl} is calculated from its runtime analytical model"
         )
     # FLG_J2000 is honored uniformly for every lunar point, including the
@@ -2797,8 +2611,8 @@ def _fast_calc_core(
     # osculating longitude is hypersensitive to the lunar velocity, so OscuApog
     # drifted from the Skyfield place by up to ~0.8" of longitude (TrueNode less).
     #
-    # The heliocentric (Pipeline C) bodies have no ICRS reducer here; a KeyError
-    # routes only those to the caller's mode-aware resolver, exactly as before.
+    # Legacy heliocentric channels (retired coord value 2) have no ICRS
+    # reducer here; a KeyError routes them to the caller's mode-aware resolver.
     if (iflag & FLG_ICRS) and coord_type not in (
         COORD_ICRS_BARY,
         COORD_ICRS_BARY_SYSTEM,
@@ -2807,7 +2621,6 @@ def _fast_calc_core(
         raise KeyError("FLG_ICRS not supported in LEB mode")
 
     _pipeline_a = False
-    _pipeline_c = False
 
     # Dispatch to appropriate pipeline based on coordinate type.
     # When XYZ+SIDEREAL, force Pipeline A to return spherical so the
@@ -2876,15 +2689,6 @@ def _fast_calc_core(
         lon, lat, dist, dlon, dlat, ddist = _pipeline_ecliptic(
             reader, jd_tt, ipl, iflag
         )
-        if not (iflag & FLG_SPEED):
-            dlon, dlat, ddist = 0.0, 0.0, 0.0
-
-    elif coord_type == COORD_HELIO_ECL:
-        if iflag & FLG_TOPOCTR:
-            raise KeyError("FLG_TOPOCTR not supported for heliocentric bodies")
-        # Pipeline C: heliocentric
-        _pipeline_c = True
-        lon, lat, dist, dlon, dlat, ddist = _pipeline_helio(reader, jd_tt, ipl, iflag)
         if not (iflag & FLG_SPEED):
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 

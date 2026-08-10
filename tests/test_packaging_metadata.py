@@ -115,7 +115,7 @@ def test_sdist_runtime_data_is_exactly_allowlisted() -> None:
     assert "recursive-include libephemeris/data" not in manifest
     assert "include libephemeris/data/fictitious_orbits.csv" in manifest
     assert "include libephemeris/data/leb2/base_core.leb2" in manifest
-    assert "include libephemeris/data/leb2/base_uranians.leb2" in manifest
+    assert "base_uranians" not in manifest
 
 
 def test_vendored_mit_copyright_notices_are_retained() -> None:
@@ -154,7 +154,6 @@ def test_archive_gate_allows_project_owned_runtime_data() -> None:
     allowed = [
         "libephemeris/data/fictitious_orbits.csv",
         "libephemeris/data/leb2/base_core.leb2",
-        "libephemeris/data/leb2/base_uranians.leb2",
         "libephemeris/vendor/spktype21.py",
     ]
 
@@ -171,14 +170,12 @@ def test_bundled_core_matches_reviewed_manifest_hash() -> None:
     assert digest == DATA_FILES["base_core.leb2"]["sha256"]
 
 
-def test_bundled_uranians_matches_reviewed_manifest_hash() -> None:
-    """The bundled Hamburg companion must match its pin (regenerate-then-repin trap)."""
+def test_uranians_companions_are_fully_retired() -> None:
+    """No uranians artifact may ship, be pinned, or be re-bundled (3.1.0)."""
     from libephemeris.download import DATA_FILES
 
-    companion = _PROJECT_ROOT / "libephemeris/data/leb2/base_uranians.leb2"
-    digest = hashlib.sha256(companion.read_bytes()).hexdigest()
-
-    assert digest == DATA_FILES["base_uranians.leb2"]["sha256"]
+    assert not any("uranians" in name for name in DATA_FILES)
+    assert not (_PROJECT_ROOT / "libephemeris/data/leb2/base_uranians.leb2").exists()
 
 
 def test_tar_directory_type_is_used_when_name_has_no_trailing_slash() -> None:

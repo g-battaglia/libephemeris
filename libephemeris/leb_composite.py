@@ -112,8 +112,9 @@ class CompositeLEBReader:
         # (group-file scheme), as {custom}_{tier}_{group}, or as a bare
         # known-tier token (e.g. ephemeris_base.leb); files with no recognizable
         # tier are not constrained by the guard below.
-        # ``uranians`` is recognized only as a legacy filename for tier-safety;
-        # fictitious-body channels are rejected by the public calculation path.
+        # ``uranians`` is recognized only as a legacy filename for tier-safety
+        # (pre-3.1.0 installs left those companions on disk); fictitious-body
+        # channels are never served by the public calculation path.
         _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians", "exotics"}
         _KNOWN_TIERS = {"base", "medium", "extended"}
 
@@ -175,18 +176,14 @@ class CompositeLEBReader:
         file is ``base_core.leb2``, companions would be ``base_asteroids.leb2``,
         ``base_apogee.leb2``, and ``base_exotics.leb2``.
 
-        Fictitious-carrying companions (``*_uranians.leb2``) are checked
-        against the manifest regardless of ``pinned_only``; a candidate that
-        does not resolve is skipped with a log message and never serves
-        coefficients.
-
         If no companions are found, returns a composite with a single reader.
 
         Args:
             path: Path to the primary .leb or .leb2 file.
-            pinned_only: When True (the reviewed-core trust unit), EVERY
-                companion is checked against the manifest to attach, not just
-                the fictitious-carrying ones.
+            pinned_only: When True (the reviewed-core trust unit), every
+                companion is checked against the manifest to attach; a
+                candidate that does not resolve is skipped with a log
+                message.
 
         Returns:
             CompositeLEBReader wrapping the primary and companion readers.
@@ -207,10 +204,11 @@ class CompositeLEBReader:
         # is complete on its own — a bare first-token prefix match would
         # pull in other tiers ("ephemeris_medium.leb", ...) and stale
         # partials, silently mixing tiers in one composite.
+        # ``uranians`` stays recognized as a legacy suffix so pre-3.1.0 files
+        # left on disk are treated as same-tier companions (harmless: their
+        # fictitious channels are never consulted) instead of tripping the
+        # naming heuristics.
         _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians", "exotics"}
-        # Groups whose files carry fictitious-body channels. Their trust is
-        # per-file: only the regenerated, manifest-pinned artifact may attach.
-        _FICTITIOUS_GROUP_SUFFIXES = {"uranians"}
 
         if len(parts) >= 2 and parts[-1] in _GROUP_SUFFIXES:
             prefix = "_".join(parts[:-1])  # e.g., "base"
@@ -225,7 +223,7 @@ class CompositeLEBReader:
                     continue
                 if os.path.abspath(companion_path) == os.path.abspath(path):
                     continue
-                if pinned_only or cparts[-1] in _FICTITIOUS_GROUP_SUFFIXES:
+                if pinned_only:
                     # Lazy import: state also imports this module lazily, so
                     # there is no module-level cycle.
                     from .logging_config import get_logger
