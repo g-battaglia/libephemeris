@@ -34,7 +34,6 @@ from .leb_format import (
     BODY_ENTRY_SIZE,
     COORD_ECLIPTIC,
     COORD_GEO_ECLIPTIC,
-    COORD_HELIO_ECL,
     DELTA_T_ENTRY_FMT,
     DELTA_T_ENTRY_SIZE,
     DELTA_T_HEADER_FMT,
@@ -475,7 +474,7 @@ class LEBReader:
 
         # Wrap longitude for ecliptic-frame bodies (COORD_GEO_ECLIPTIC is
         # reserved/unused but included for format completeness)
-        if body.coord_type in (COORD_ECLIPTIC, COORD_HELIO_ECL, COORD_GEO_ECLIPTIC):
+        if body.coord_type in (COORD_ECLIPTIC, COORD_GEO_ECLIPTIC):
             pos[0] = pos[0] % 360.0
 
         result = tuple(pos), tuple(vel)  # type: ignore[return-value]
@@ -645,14 +644,17 @@ def log_leb_fallback(context: str, err: Exception) -> None:
     dates, missing sections, unsupported flags) are routine, by-design
     dispatch events in ``auto`` mode (DEBUG). Sealed ``leb`` mode reports
     them at WARNING because only another LEB-backed algorithm or an explicitly
-    declared local model may continue. ``LEBCorruptionError`` is always a
-    visible provisioning failure. Classification is by exception type rather
-    than fragile message matching.
+    declared local model may continue. ``FictitiousRuntimeDispatch`` IS that
+    declared local model being selected (fictitious bodies never have an LEB
+    channel), so it stays at DEBUG even in sealed mode. ``LEBCorruptionError``
+    is always a visible provisioning failure. Classification is by exception
+    type rather than fragile message matching.
 
     Args:
         context: Short label of the calling path (e.g. "star", "pheno").
         err: The exception that triggered the fallback.
     """
+    from .exceptions import FictitiousRuntimeDispatch
     from .logging_config import get_logger
 
     from .state import get_calc_mode
@@ -661,6 +663,8 @@ def log_leb_fallback(context: str, err: Exception) -> None:
         get_logger().warning(
             "LEB %s fallback (corrupted or truncated LEB data): %s", context, err
         )
+    elif isinstance(err, FictitiousRuntimeDispatch):
+        get_logger().debug("LEB %s runtime-model dispatch: %s", context, err)
     elif get_calc_mode() == "leb":
         get_logger().warning("LEB %s unavailable in sealed mode: %s", context, err)
     else:

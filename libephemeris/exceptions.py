@@ -820,6 +820,21 @@ class LEBCorruptionError(ValueError):
     """
 
 
+class FictitiousRuntimeDispatch(KeyError):
+    """A fictitious body (40-58) was routed to its runtime analytical model.
+
+    Deliberately subclasses ``KeyError`` so the LEB fast-path callers that
+    catch ``(KeyError, ValueError)`` treat it as the ordinary miss signal and
+    continue to the analytical dispatch. The distinct type lets the fallback
+    logger recognize the miss as the by-design source selection for these
+    bodies — their runtime model IS the declared local source — instead of a
+    sealed-mode degradation worth a warning.
+
+    This is an internal dispatch signal rather than a user-facing API
+    exception; it is not re-exported from the package root.
+    """
+
+
 # =============================================================================
 # VALIDATION HELPER FUNCTIONS
 # =============================================================================
