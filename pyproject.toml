@@ -1,6 +1,6 @@
 [project]
 name = "libephemeris"
-version = "3.0.0"
+version = "3.1.0"
 description = "A high-precision astronomical ephemeris library for Python, powered by NASA JPL DE440/DE441."
 readme = "README.md"
 requires-python = ">=3.12"

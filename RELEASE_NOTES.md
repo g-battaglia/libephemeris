@@ -7,16 +7,17 @@ prepared in the source tree.
 
 ---
 
-## 3.0.0 — current source-tree release (2026-08-04)
+## 3.1.0 — current source-tree release (2026-08-10)
 
-`3.0.0` is the stable release prepared in this source tree. The
-per-release breakdown for the whole `3.0.0rc*` series is recorded in
-[`CHANGELOG.md`](CHANGELOG.md), with the consolidated long-form notes in
-[`release-notes/v3.0.0.md`](release-notes/v3.0.0.md). This page only
+`3.1.0` retires the `uranians` LEB companion (fictitious bodies are always
+served by their runtime analytical models) and stops sealed `leb` mode from
+warning on the by-design fictitious-body dispatch. Details in
+[`CHANGELOG.md`](CHANGELOG.md) and
+[`release-notes/v3.1.0.md`](release-notes/v3.1.0.md). This page only
 records which version the tree currently carries; it does not duplicate
 the changelog.
 
-After publication it is installable with `pip install libephemeris==3.0.0`.
+After publication it is installable with `pip install libephemeris==3.1.0`.
 
 For the complete, structured change history across the `3.0.0rc*` series and
 upgrade details, see [`CHANGELOG.md`](CHANGELOG.md), the per-release notes under

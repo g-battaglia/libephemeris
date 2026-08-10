@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-08-10
+
+### Changed
+
+- The `uranians` LEB companion is retired. The Hamburg bodies (IDs 40-47)
+  are now always computed from their runtime analytical models in
+  `libephemeris.hypothetical` (Neely 1980 transcription) — exactly as White
+  Moon (56) and every other fictitious body already was. The models are the
+  definition of those bodies; the file-backed channel reproduced them to
+  1e-9 deg while buying no measurable end-to-end performance (~430 vs
+  ~419 us per `calc_ut` call, median of 1500 samples), so the parallel
+  sourcing path, its per-file trust machinery, and the distribution
+  artifacts are removed.
+- Tier distribution now has four LEB2 groups per tier (`core`, `asteroids`,
+  `exotics`, `apogee`): 4/8/12 cumulative files for base/medium/extended
+  (was 5/10/15). `download_leb2_for_tier` no longer installs
+  `{tier}_uranians.leb2`; the wheel bundles only `base_core.leb2`. Legacy
+  uranians files on disk are recognized by the tier guard and ignored.
+- Source tracing and body coverage for IDs 40-47 now report `Analytical`
+  with no coverage entry (previously `LEB` when a pinned companion was
+  attached). Positions change by at most the retired file's fit residual
+  (~1e-9 deg).
+- The LEB format retires coordinate type 2 (`COORD_HELIO_ECL`) and the
+  heliocentric evaluation pipeline; no shipped body used them outside the
+  retired companion. The value is reserved and will not be reused.
+
+### Fixed
+
+- Sealed `leb` mode no longer logs a WARNING for every fictitious-body
+  calculation. Routing IDs 40-58 to their runtime analytical model is the
+  by-design source selection, now signalled with the typed internal
+  `FictitiousRuntimeDispatch` and logged at DEBUG. This removes the
+  per-body, per-date warning flood reported downstream
+  (kerykeion issue #240) while keeping genuine sealed-mode degradations at
+  WARNING.
+
 ## [3.0.0] - 2026-08-04
 
 The stable v3.0.0 release. Consolidates the whole `3.0.0rc*` series — the
