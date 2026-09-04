@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `nod_aps()` / `nod_aps_ut()`: method values whose low byte is non-zero but
+  carries neither `NODBIT_MEAN` nor `NODBIT_OSCU` / `NODBIT_OSCU_BAR` (for
+  example 8 and 16) now select the osculating model, as the reference does.
+  Model selection follows the measured contract exactly: mean when
+  `method & 0xFF == 0` or `NODBIT_MEAN` is set, osculating for every other
+  non-zero low byte. No validation is added; every integer is still accepted
+  (#78).
+
 ### Added
 
 - Contributor governance files: `CONTRIBUTING.md` (workflow, code style,

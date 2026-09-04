@@ -249,7 +249,6 @@ from .constants import (
     SIDM_LAHIRI_ICRC,
     SIDM_USER,
     NODBIT_MEAN,
-    NODBIT_OSCU,
     NODBIT_OSCU_BAR,
     NODBIT_FOPOINT,
 )
@@ -7984,6 +7983,15 @@ def nod_aps_ut(
             - NODBIT_OSCU (2): Osculating elements (instantaneous)
             - NODBIT_OSCU_BAR (4): Barycentric osculating elements
             - NODBIT_FOPOINT (256): Include focal point
+
+            Model selection follows the reference contract and looks only at
+            the low byte of ``method``: the mean model is used when
+            ``method & 0xFF == 0`` (0, 256, 1024, ...) or when NODBIT_MEAN is
+            set (1, 3, 5, 7, 99, -1, ...); every other value with a non-zero
+            low byte (2, 4, 6, 8, 16, -2, ...) uses the osculating model.
+            NODBIT_OSCU_BAR and NODBIT_FOPOINT are read from the full integer
+            on top of that choice. Any integer is accepted; no validation is
+            performed.
         flags: Calculation flags (FLG_SPEED, etc.)
 
     Returns:
@@ -8031,7 +8039,11 @@ def nod_aps(
     Args:
         tjdet: Julian Day in Terrestrial Time (TT/ET)
         planet: Planet/body ID (SUN, MOON, etc.)
-        method: Method for node/apse calculation (NODBIT_MEAN, etc.)
+        method: Method for node/apse calculation (NODBIT_MEAN, etc.). The
+            model is chosen from the low byte of ``method`` exactly as in
+            nod_aps_ut(): mean when ``method & 0xFF == 0`` or NODBIT_MEAN is
+            set, osculating for any other non-zero low byte (so 8 and 16
+            behave like NODBIT_OSCU).
         flags: Calculation flags (default: FLG_SWIEPH | FLG_SPEED)
 
     Returns:
@@ -8358,8 +8370,10 @@ def _calc_nod_aps(
         t: Skyfield Time object
         ipl: Planet ID (MERCURY, VENUS, MARS, etc.)
         iflag: Calculation flags
-        method: Node/apse calculation method (NODBIT_MEAN, NODBIT_OSCU, etc.)
-            Currently all methods use osculating elements from JPL ephemeris.
+        method: Node/apse calculation method (NODBIT_MEAN, NODBIT_OSCU, etc.).
+            The mean model is selected when the low byte of ``method`` is zero
+            or when NODBIT_MEAN is set; any other non-zero low byte selects
+            the osculating model (see the precedence note in the body).
 
     Returns:
         Tuple of (ascending_node, descending_node, perihelion, aphelion)
@@ -8374,17 +8388,23 @@ def _calc_nod_aps(
     # membership test as _calc_orbital_elements so the two stay in lockstep.
     is_minor = ipl in _MINOR_BODY_NODAPS or (AST_OFFSET < ipl < FIXSTAR_OFFSET)
 
-    # Method-bit precedence (compatibility contract): NODBIT_MEAN wins
-    # whenever it is set, even alongside NODBIT_OSCU / NODBIT_OSCU_BAR, so
-    # methods 3/5/7 track method 1 (mean), not 2/4/6 (osculating); method 0
-    # (no bits) also defaults to mean. An osculating bit only takes effect when
-    # the mean bit is absent. The barycentric center (NODBIT_OSCU_BAR) is an
-    # independent choice that applies only on the osculating path (see bar_mode
-    # below); a body without mean elements (Pluto, minor bodies) therefore still
-    # honors OSCU_BAR under method 5/7 because it falls through to osculating.
-    prefer_mean = bool(method & NODBIT_MEAN) or not (
-        method & (NODBIT_OSCU | NODBIT_OSCU_BAR)
-    )
+    # Method-bit precedence (measured compatibility contract): the model is
+    # chosen from the low byte of ``method`` only.
+    #   * low byte == 0 (0, 256, 1024, 65536, -256, ...) -> mean (default)
+    #   * NODBIT_MEAN set (1, 3, 5, 7, 99, 257, -1, -255, ...) -> mean, even
+    #     alongside NODBIT_OSCU / NODBIT_OSCU_BAR
+    #   * any other non-zero low byte (2, 4, 6, 8, 16, 64, -2, ...) -> osculating
+    # So an unassigned low bit such as 8 or 16 selects the osculating model
+    # exactly like NODBIT_OSCU does (issue #78), while bits above the low byte
+    # never influence the model choice. NODBIT_OSCU_BAR and NODBIT_FOPOINT are
+    # read from the full integer independently of that choice (a negative
+    # value such as -1 therefore carries both): the barycentric center applies
+    # only on the osculating path (see bar_mode below), so a body without mean
+    # elements (Pluto, minor bodies) still honors OSCU_BAR under method 5/7
+    # because it falls through to osculating, and the focal point replaces
+    # the aphelion slot whenever bit 256 is set. Every integer is accepted:
+    # the contract has no validation.
+    prefer_mean = (method & 0xFF) == 0 or bool(method & NODBIT_MEAN)
 
     # Interpolated lunar apsides (INTP_APOG / INTP_PERG): the interpolated
     # point is not an orbital-element body, so it has no node/apse
