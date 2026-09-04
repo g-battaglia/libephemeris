@@ -31,6 +31,7 @@ from libephemeris.constants import (
     MARS,
     JUPITER,
     EARTH,
+    ECL_NUT,
     FLG_EQUATORIAL,
     FLG_J2000,
     FLG_NONUT,
@@ -79,22 +80,31 @@ def test_calc_pctr_earth_reduces_to_geocentric(
 
 @pytest.mark.leb_compare
 @pytest.mark.parametrize("body,bname", [(MARS, "Mars"), (JUPITER, "Jupiter")])
-def test_nod_aps_nonut_node_invariant(compare: CompareHelper, body: int, bname: str):
-    """nod_aps honors FLG_NONUT and the node longitude stays nutation-invariant.
+def test_nod_aps_nonut_shifts_the_osculating_node_by_nutation(
+    compare: CompareHelper, body: int, bname: str
+):
+    """nod_aps honors FLG_NONUT on the osculating node in both backends.
 
-    The osculating node longitude does not carry nutation (verified vs
-    the reference ephemeris), so NONUT must run cleanly and leave the node unchanged.
+    The osculating node longitude is reported on the true ecliptic of date,
+    so FLG_NONUT moves it by exactly the nutation in longitude (measured
+    against the reference: 17.52" at JD 2415021, -13.93" at J2000). The two
+    backends must apply the same shift.
+
+    The arguments are passed by keyword: an earlier form of this test
+    swapped ``method`` and ``flags`` and compared the mean node with itself.
     """
     jds = [ephem.julday(y, 1, 1, 12.0) for y in (1900, 2000, 2100)]
     for mode_name, run in (("skyfield", compare.skyfield), ("leb", compare.leb)):
         for jd in jds:
-            base = run(ephem.nod_aps, jd, body, 0, NODBIT_OSCU)
-            nonut = run(ephem.nod_aps, jd, body, FLG_NONUT, NODBIT_OSCU)
+            base = run(ephem.nod_aps, jd, body, method=NODBIT_OSCU, flags=0)
+            nonut = run(ephem.nod_aps, jd, body, method=NODBIT_OSCU, flags=FLG_NONUT)
+            nut, _ = run(ephem.calc, jd, ECL_NUT, 0)
+            dpsi_arcsec = nut[2] * 3600.0
             for idx in (0, 1):  # ascending, descending node
-                err = lon_error_arcsec(base[idx][0], nonut[idx][0])
-                assert err < 0.01, (
-                    f"{mode_name} nod_aps({bname}) node[{idx}] moved under NONUT: "
-                    f'Δ={err:.4f}" @JD{jd:.0f}'
+                shift = lon_error_arcsec(base[idx][0], nonut[idx][0])
+                assert abs(shift - abs(dpsi_arcsec)) < 0.01, (
+                    f"{mode_name} nod_aps({bname}) node[{idx}] NONUT shift "
+                    f'{shift:.4f}" != |nutation| {abs(dpsi_arcsec):.4f}" @JD{jd:.0f}'
                 )
 
 
