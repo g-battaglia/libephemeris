@@ -136,6 +136,26 @@ def test_the_apsides_agree_with_the_other_bodies(sealed_leb):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("name", "body"),
+    _MODEL_SERVED_POINTS,
+    ids=lambda v: v if isinstance(v, str) else "",
+)
+@pytest.mark.parametrize(
+    ("frame", "flags"), _FRAME_FLAGS, ids=lambda v: v if isinstance(v, str) else ""
+)
+def test_the_context_api_enforces_the_same_range(sealed_leb, name, body, frame, flags):
+    """EphemerisContext has its own LEB fast path and the same gap."""
+    from libephemeris.context import EphemerisContext
+
+    context = EphemerisContext()
+    with pytest.raises(EphemerisRangeError):
+        context.calc_ut(_OUT_OF_RANGE_JD[0], body, flags)
+    position, _retflag = context.calc_ut(_IN_RANGE_JD, body, flags)
+    assert 0.0 <= position[0] < 360.0
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("mode", ["auto", "skyfield"])
 @pytest.mark.parametrize(
     ("name", "body"),
