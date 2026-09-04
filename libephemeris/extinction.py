@@ -115,11 +115,12 @@ def _validate_airmass_method(method: object) -> AirmassMethod:
     """Return a supported airmass method, or raise for every other object."""
     from .exceptions import InputValidationError
 
-    # Tuple membership is deliberately safe for both hashable and unhashable
-    # objects, keeps matching exact and case-sensitive, and narrows ``method``
-    # to ``AirmassMethod`` for the type checker without a cast.
-    if method in AIRMASS_METHODS:
-        return method
+    # Equality against each registered token is safe for both hashable and
+    # unhashable objects, keeps matching exact and case-sensitive, and returns
+    # the registered ``AirmassMethod`` token itself, so no cast is needed.
+    for candidate in AIRMASS_METHODS:
+        if method == candidate:
+            return candidate
     raise InputValidationError(
         f"calc_airmass: unknown method {method!r}. "
         f"Valid methods: {', '.join(AIRMASS_METHODS)}"
@@ -151,8 +152,9 @@ def normalize_eye_adaptation(state: object, function: str) -> EyeAdaptationState
     if isinstance(state, str):
         if state == "scotopic":
             return "dark"
-        if state in EYE_ADAPTATION_STATES:
-            return state
+        for candidate in EYE_ADAPTATION_STATES:
+            if state == candidate:
+                return candidate
     raise InputValidationError(
         f"{function}: unknown eye adaptation state {state!r}. "
         "Valid states: photopic, mesopic, dark (or 'scotopic' for 'dark')"

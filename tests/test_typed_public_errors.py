@@ -60,7 +60,9 @@ def sun_answers():
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    ("label", "call"), _OCCULT_ENTRY_POINTS, ids=[l for l, _ in _OCCULT_ENTRY_POINTS]
+    ("label", "call"),
+    _OCCULT_ENTRY_POINTS,
+    ids=[name for name, _ in _OCCULT_ENTRY_POINTS],
 )
 @pytest.mark.parametrize("body", [-1, -2, -1000])
 def test_negative_body_is_answered_as_the_sun(label, call, body, sun_answers):
@@ -79,7 +81,9 @@ def test_negative_body_no_longer_raises_a_bare_key_error():
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    ("label", "call"), _OCCULT_ENTRY_POINTS, ids=[l for l, _ in _OCCULT_ENTRY_POINTS]
+    ("label", "call"),
+    _OCCULT_ENTRY_POINTS,
+    ids=[name for name, _ in _OCCULT_ENTRY_POINTS],
 )
 def test_an_unknown_body_raises_the_documented_contract(label, call):
     """The docstrings promise both UnknownBodyError and ValueError."""
