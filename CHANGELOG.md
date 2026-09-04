@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Contributor governance files: `CONTRIBUTING.md` (workflow, code style,
+  provenance requirements, clean-room policy, and the Contributor License
+  Agreement), `AUTHORS`, `.mailmap`, and a `.clabot` configuration so the CLA
+  bot checks every pull request on GitHub.
+
+### Changed
+
+- Contributions are now accepted only under the Contributor License Agreement:
+  copyright in each contribution is assigned to the maintainer (with an
+  exclusive licence as a fallback where assignment is not effective under local
+  law), which lets the maintainer re-license the project under any other terms.
+  The project itself remains publicly available under AGPL-3.0-only and
+  published AGPL releases stay AGPL. `LICENSING.md` and the README's
+  contributing section were updated accordingly; the previous
+  "no separate contributor license agreement is required" statement no longer
+  applies to contributions submitted from now on.
+
 ## [3.1.0] - 2026-08-11
 
 ### Changed

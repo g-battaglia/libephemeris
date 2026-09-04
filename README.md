@@ -273,6 +273,18 @@ poe test:leb:fast                  # Recommended fast unit suite
 poe test:skyfield:fast             # Skyfield backend unit suite
 ```
 
+See [CONTRIBUTING.md](https://github.com/g-battaglia/libephemeris/blob/main/CONTRIBUTING.md)
+for the full workflow, the code style, and the clean-room policy.
+
+By submitting a contribution you agree to the
+[Contributor License Agreement](https://github.com/g-battaglia/libephemeris/blob/main/CONTRIBUTING.md#contributor-license-agreement-cla--copyright-assignment):
+the copyright of your contribution is assigned to the maintainer, who may
+re-license the project under any other terms. The project stays openly
+available under the AGPL for everyone, while the re-licensing option helps
+sustain future development. Your authorship remains acknowledged in the commit
+history, in [AUTHORS](https://github.com/g-battaglia/libephemeris/blob/main/AUTHORS),
+and in the release notes.
+
 ---
 
 ## Part of the Kerykeion Ecosystem

@@ -47,11 +47,23 @@ details.
 
 ## Contributions
 
-Contributions are accepted under the terms of the AGPL-3.0-only: unless
-you explicitly state otherwise, any contribution you intentionally submit for
-inclusion in the work shall be licensed as AGPL-3.0-only, without any
-additional terms or conditions. No separate contributor license agreement
-is required.
+Contributions are accepted only under the Contributor License Agreement in
+[CONTRIBUTING.md](CONTRIBUTING.md). By submitting a pull request or any other
+contribution you irrevocably assign its copyright to the maintainer, Giacomo
+Battaglia (with an exclusive licence as a fallback where such an assignment is
+not effective under local law), and you keep a perpetual licence to reuse your
+own work.
+
+Centralizing copyright is what allows the maintainer to re-license the project
+— in whole or in part, including your contribution — under any other terms,
+open-source or proprietary, at their sole discretion. The project itself stays
+publicly available under AGPL-3.0-only, and published AGPL releases remain
+AGPL: those grants are irrevocable. Your authorship is credited in the Git
+history, in [AUTHORS](AUTHORS), and, where appropriate, in release notes.
+
+On GitHub, a CLA bot checks each pull request against the recorded list of
+contributors who have agreed (`.clabot`) and comments with instructions when an
+author is not yet on it.
 
 ## Relationship to Swiss Ephemeris
 
