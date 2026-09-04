@@ -319,6 +319,31 @@ class StarNotFoundError(DataNotFoundError):
         )
 
 
+class IllegalBodyError(UnknownBodyError, ValueError):
+    """A rise/set/transit target that no active backend can place.
+
+    Raised by ``rise_trans`` and ``rise_trans_true_hor`` for an unknown or
+    unsupported body id (for example a planetary moon with no registered
+    SPK). It multiply inherits :class:`UnknownBodyError` — the
+    compatibility-contract type for an illegal body, itself an
+    :class:`Error` — and the built-in :class:`ValueError`, so the single
+    "illegal planet number" contract is identical on every backend and
+    satisfies callers catching either type.
+
+    The class is public because it is what a traceback names. While it was
+    private, an ordinary failure printed an underscore-prefixed internal
+    class to the user.
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.rise_trans(2451545.0, -5, ephem.CALC_RISE, [12.0, 42.0, 0.0])
+        ... except ephem.IllegalBodyError as e:
+        ...     print(e.body_id)
+        -5
+    """
+
+
 class SPKNotFoundError(DataNotFoundError):
     """Error raised when an SPK file is requested but not available.
 
