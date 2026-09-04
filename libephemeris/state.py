@@ -1904,19 +1904,10 @@ def clear_angles_cache() -> None:
 def reset_session() -> None:
     """Reset per-calculation state without closing files or clearing caches.
 
-    Resets: topo, sidereal mode, angles cache, observer cache, and the SPK
-    body registrations installed by register_spk_body() /
-    download_and_register_spk() / the auto-SPK path.
-    Keeps alive: LEB reader, Skyfield timescale, open SPK kernels, LRU
-    caches, and process-level configuration (calculation mode, strict
-    precision).
-
-    The body map is session state: a registration silently redirects a body
-    from its Keplerian elements to a kernel, so leaving it behind made the
-    next "reset" session compute from an ephemeris it never asked for. The
-    kernels the map pointed at stay open in ``_SPK_KERNELS``, so a body that
-    registers again after the reset reuses the loaded kernel and re-reads
-    nothing from disk.
+    Resets: topo, sidereal mode, angles cache, observer cache.
+    Keeps alive: LEB reader, Skyfield timescale, SPK kernels and body
+    registrations, LRU caches, and process-level configuration (calculation
+    mode, strict precision).
 
     Use this between independent calculations that may use different
     topo/sidereal settings. Use close() only for full teardown (e.g.
@@ -1925,7 +1916,6 @@ def reset_session() -> None:
     global _TOPO, _SIDEREAL_MODE, _SIDEREAL_AYAN_T0, _SIDEREAL_T0
     global _SIDEREAL_BITS
     global _ANGLES_CACHE
-    global _SPK_BODY_MAP
     with _STATE_LOCK:
         _TOPO = None
         _SIDEREAL_MODE = None
@@ -1933,7 +1923,6 @@ def reset_session() -> None:
         _SIDEREAL_T0 = 0.0
         _SIDEREAL_BITS = 0
         _ANGLES_CACHE = {}
-        _SPK_BODY_MAP = {}
     from .cache import clear_observer_cache
 
     clear_observer_cache()

@@ -37,9 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `os.replace()`; a failed repair therefore leaves the previous file in place.
   `download_spk()` and `download_and_register_spk()` now honour
   `set_spk_cache_dir()` / `LIBEPHEMERIS_SPK_DIR`, the directory every
-  automatic SPK lookup consults; `reset_session()` clears the SPK body map so
-  a registration does not outlive the session; `libephemeris config` prints
-  paths only and no longer touches the network.
+  automatic SPK lookup consults; `libephemeris config` prints paths only
+  and no longer touches the network.
 - Fixed-star lookups now raise `StarNotFoundError` (a subclass of
   `DataNotFoundError` and `Error`) for an unknown name, the comma form, an
   out-of-range sequential number, a wildcard that matched nothing, and the

@@ -16,10 +16,6 @@ Three invariants are pinned here.
    ``download_spk`` writes there — the directory every ``spk_auto`` lookup
    consults. Without an override the file keeps landing in ``<data dir>/spk``,
    so kernels downloaded by earlier versions stay visible.
-
-3. **A registration is session state.** ``download_and_register_spk()``
-   redirects a body to a kernel by mutating the process-wide SPK body map;
-   ``reset_session()`` puts it back.
 """
 
 from __future__ import annotations
@@ -341,91 +337,3 @@ class TestSpkCacheDirIsHonoured:
         path = spk.download_spk("2060", "2020-01-01", "2025-01-01")
 
         assert os.path.dirname(path) == str(tmp_path / "data" / "spk")
-
-
-# ---------------------------------------------------------------------------
-# 3. An SPK registration does not outlive the session that made it
-# ---------------------------------------------------------------------------
-
-
-class TestSpkBodyMapIsSessionState:
-    """reset_session() must undo what download_and_register_spk() did."""
-
-    def teardown_method(self):
-        state._SPK_BODY_MAP.clear()
-
-    def test_reset_session_drops_the_registration(self):
-        state._SPK_BODY_MAP[15] = ("/nowhere/chiron.bsp", 2002060)
-
-        state.reset_session()
-
-        assert spk.get_spk_body_info(15) is None
-        assert state._SPK_BODY_MAP == {}
-
-    def test_reset_session_keeps_the_loaded_kernels(self):
-        """Only the mapping is session state; the open kernels stay cached."""
-        sentinel = object()
-        state._SPK_KERNELS["/nowhere/chiron.bsp"] = sentinel  # type: ignore[assignment]
-        state._SPK_BODY_MAP[15] = ("/nowhere/chiron.bsp", 2002060)
-        try:
-            state.reset_session()
-
-            assert state._SPK_BODY_MAP == {}
-            assert state._SPK_KERNELS["/nowhere/chiron.bsp"] is sentinel
-        finally:
-            state._SPK_KERNELS.pop("/nowhere/chiron.bsp", None)
-
-    def test_registration_through_the_public_api_is_undone(self, tmp_path, monkeypatch):
-        """The real mutation, made by the entry point users actually call."""
-
-        class _FakeKernel:
-            def __getitem__(self, key):
-                if key == 2002060:
-                    return object()
-                raise KeyError(key)
-
-        kernel_path = tmp_path / "chiron.bsp"
-        kernel_path.write_bytes(b"\x00" * 16)
-        monkeypatch.setattr(state, "_load_spk_kernel", lambda path: None)
-        monkeypatch.setitem(state._SPK_KERNELS, str(kernel_path), _FakeKernel())
-
-        spk.register_spk_body(15, str(kernel_path), 2002060)
-        assert spk.get_spk_body_info(15) == (str(kernel_path), 2002060)
-
-        state.reset_session()
-
-        assert spk.get_spk_body_info(15) is None
-
-    def test_download_and_register_spk_is_undone_by_reset_session(
-        self, tmp_path, monkeypatch
-    ):
-        """Issue #55: list_spk_bodies() returns to its pre-download state.
-
-        Only the network is stubbed (download_spk hands back a fake kernel);
-        the registration goes through the real download_and_register_spk().
-        """
-
-        class _FakeKernel:
-            def __getitem__(self, key):
-                if key == 2002060:
-                    return object()
-                raise KeyError(key)
-
-        kernel_path = tmp_path / "2060_202001_202501.bsp"
-        kernel_path.write_bytes(b"\x00" * 16)
-        monkeypatch.setattr(spk, "download_spk", lambda *args, **kw: str(kernel_path))
-        monkeypatch.setattr(spk, "_spk_covers_dates", lambda *args: True)
-        monkeypatch.setattr(state, "_load_spk_kernel", lambda path: None)
-        monkeypatch.setitem(state._SPK_KERNELS, str(kernel_path), _FakeKernel())
-
-        before = spk.list_spk_bodies()
-        assert 15 not in before
-
-        spk.download_and_register_spk(
-            "2060", 15, "2020-01-01", "2025-01-01", naif_id=2002060
-        )
-        assert spk.list_spk_bodies()[15] == (str(kernel_path), 2002060)
-
-        state.reset_session()
-
-        assert spk.list_spk_bodies() == before
