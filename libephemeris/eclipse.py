@@ -12213,6 +12213,20 @@ def get_inex_number(
     return best_match_series
 
 
+def _step_minutes_to_days(step_minutes: float) -> float:
+    """Convert a sampling interval in minutes to days.
+
+    A non-positive step never satisfies ``jd <= jd_end`` in the path
+    samplers, so reject it before the loop.
+
+    Raises:
+        Error: If ``step_minutes`` is zero or negative.
+    """
+    if step_minutes <= 0:
+        raise Error(f"step_minutes must be positive, got {step_minutes}")
+    return step_minutes / (24.0 * 60.0)
+
+
 def calc_eclipse_central_line(
     jd_start: float,
     jd_end: float,
@@ -12294,8 +12308,7 @@ def calc_eclipse_central_line(
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
 
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
+    step_days = _step_minutes_to_days(step_minutes)
 
     # Iterate through time range
     jd = jd_start
@@ -12383,8 +12396,7 @@ def calc_eclipse_northern_limit(
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
 
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
+    step_days = _step_minutes_to_days(step_minutes)
 
     # Iterate through time range
     jd = jd_start
@@ -12540,8 +12552,7 @@ def calc_eclipse_southern_limit(
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
 
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
+    step_days = _step_minutes_to_days(step_minutes)
 
     # Iterate through time range
     jd = jd_start
