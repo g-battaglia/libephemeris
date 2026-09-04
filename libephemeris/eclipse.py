@@ -291,19 +291,34 @@ def _sol_glob_accepts(mask: int, retflag: int) -> bool:
 def _sol_glob_reject_impossible(mask: int) -> None:
     """Raise for ``sol_eclipse_when_glob`` type masks with no realisable event.
 
-    Two masks describe eclipse geometries that cannot occur and the
-    reference rejects them up front rather than searching:
+    Two geometries cannot occur, and a mask that asks for one of them and
+    nothing else is rejected up front rather than searched:
 
     * ECL_CENTRAL | ECL_PARTIAL - a partial eclipse is never central.
     * ECL_NONCENTRAL | ECL_ANNULAR_TOTAL - a hybrid (annular-total)
       eclipse always has a central line, so it is never non-central.
+
+    The test is on the bits, not on the whole mask. Comparing the masked
+    value for equality let an unrelated bit smuggle an impossible request
+    past the guard: ECL_PARTIAL | ECL_CENTRAL was refused, while
+    ECL_PARTIAL | ECL_CENTRAL | ECL_NONCENTRAL - the same impossible pair
+    with one more bit - was accepted and searched.
+
+    What matters is whether the mask offers a realisable alternative *type*.
+    A request naming only partial eclipses and central geometry describes
+    nothing, whatever the geometry bits say, because no partial eclipse is
+    ever central. A request that also names totals does describe something
+    (a central total), so it is searched and the impossible part simply
+    never matches.
     """
     valid = ECL_CENTRAL | ECL_NONCENTRAL | ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL
     valid |= ECL_ANNULAR_TOTAL
     m = mask & valid
-    if m == (ECL_CENTRAL | ECL_PARTIAL):
+    types = m & (ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL)
+    geom = m & (ECL_CENTRAL | ECL_NONCENTRAL)
+    if types == ECL_PARTIAL and geom & ECL_CENTRAL:
         raise Error("central partial eclipses do not exist")
-    if m == (ECL_NONCENTRAL | ECL_ANNULAR_TOTAL):
+    if types == ECL_ANNULAR_TOTAL and geom & ECL_NONCENTRAL:
         raise Error("non-central hybrid (annular-total) eclipses do not exist")
 
 
@@ -490,7 +505,12 @@ def _normalize_occultation_filter(ecltype: int, body: "int | str", is_sun: bool)
     from .exceptions import Error
 
     wanted = ecltype
-    if wanted == (ECL_PARTIAL | ECL_CENTRAL):
+    # Bit test, not mask equality: an unrelated bit must not smuggle the
+    # impossible pair past the guard. The request is refused only when
+    # partial is the sole type named, so "everything" filters that happen to
+    # include both ECL_PARTIAL and ECL_CENTRAL keep working.
+    named_types = wanted & (ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL)
+    if named_types == ECL_PARTIAL and wanted & ECL_CENTRAL:
         raise Error("central partial eclipses do not exist")
     if not is_sun:
         base_classes = wanted & ~(ECL_NONCENTRAL | ECL_CENTRAL)
