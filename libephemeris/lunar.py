@@ -143,6 +143,48 @@ _APSE_EDGE_TAPER_YEARS: float = 1.0
 _APSE_EDGE_TAPER_DAYS: float = 365.25
 
 
+def _interpolated_apse_model_window(body_id: int) -> tuple[float, float] | None:
+    """Return the exact inclusive TT window of an interpolated-apse model.
+
+    The bounds come directly from the generated residual-grid metadata in
+    ``lunar_apse_model``: the first grid Julian Day and the Julian Day of its
+    last sample (``start + step * (count - 1)``).  They describe the model,
+    not a binary file, so they remain available when no ``apogee`` group is
+    installed.
+
+    Args:
+        body_id: ``INTP_APOG`` (21) or ``INTP_PERG`` (22).
+
+    Returns:
+        ``(jd_start, jd_end)`` in TT, or ``None`` for another body or when the
+        generated residual grid is unavailable.  A caller holding a UT day
+        number may compare it directly: the delta-T offset is minutes against
+        a grid sampled every few days, and the interpolation tapers rather
+        than steps past the last sample.
+    """
+    from .constants import INTP_APOG, INTP_PERG
+
+    if not _APSE_CORRECTIONS_AVAILABLE:
+        return None
+    if body_id == INTP_APOG:
+        start, step, count = (
+            APOGEE_CT_JD_START,
+            APOGEE_CT_STEP_DAYS,
+            APOGEE_CT_COUNT,
+        )
+    elif body_id == INTP_PERG:
+        start, step, count = (
+            PERIGEE_CT_JD_START,
+            PERIGEE_CT_STEP_DAYS,
+            PERIGEE_CT_COUNT,
+        )
+    else:
+        return None
+    if count < 1:
+        return None
+    return float(start), float(start) + float(step) * float(count - 1)
+
+
 def _interpolate_perigee_correction(jd_tt: float) -> float:
     """
     Interpolate perigee perturbation correction from precomputed table.

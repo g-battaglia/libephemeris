@@ -39,6 +39,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"dark"`; `"scotopic"`, which the documentation used to present as a
   returned state, is accepted as an input alias for `"dark"` and is reported
   back as `"dark"`. `None` remains the auto-detection sentinel.
+- Sealed `leb` mode now refuses the model-served lunar points (`MEAN_NODE`,
+  `MEAN_APOG`, `INTP_APOG`, `INTP_PERG`) outside coverage on the date alone,
+  whatever the frame flags; previously the refusal fired only when the
+  requested frame happened to need nutation. The interpolated apsides are
+  additionally bounded by the fitted window of their packaged model, read
+  from the residual-grid metadata (JD 2286820.5 to 2689310.5 for the apogee
+  and to 2689316.5 for the perigee, i.e. 1549-01-01 to late December 2650 in
+  TT), so the refusal also holds when only `base_core.leb2` is installed and
+  no `apogee` group declares coverage for them — the configuration in which
+  `calc_ut(625673.5, INTP_APOG)` answered while `SUN` raised. An installed
+  `apogee` group still narrows the window to its own stored interval. Inside
+  the window nothing changes; `auto`, `skyfield` and `horizons` keep the
+  documented edge taper. (#62)
 
 ## [3.1.0] - 2026-08-11
 

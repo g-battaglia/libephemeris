@@ -277,6 +277,21 @@ _LEB_CORE_BODY_IDS = frozenset(range(SUN, MEAN_APOG + 1)) | {
 # refusal depends on the date alone.
 _LEB_MODEL_SERVED_POINTS = frozenset({MEAN_NODE, MEAN_APOG, INTP_APOG, INTP_PERG})
 
+# Model-served points whose model was fitted over a bounded interval, so the
+# model itself — not a stored channel — is what runs out.  The interpolated
+# apsides live in the ``apogee`` group, so a configuration that installs only
+# ``<tier>_core`` declares no coverage for them at all: without their own
+# window there would be nothing left to enforce, which is exactly the
+# configuration the sealed refusal was reported missing in.  The window is a
+# property of the shipped residual grids, so it applies whatever groups are
+# installed, and it intersects with any declared coverage rather than
+# replacing it.
+#
+# MEAN_NODE and MEAN_APOG are deliberately absent: their IERS 2003 Delaunay
+# series is a closed analytical expression with no fitted grid and therefore
+# no window of its own.  They keep answering to their declared coverage.
+_LEB_MODEL_WINDOW_POINTS = frozenset({INTP_APOG, INTP_PERG})
+
 # Core bodies whose only sealed source is their own stored LEB channel.  The
 # node/apsis points are excluded: the vector pipeline derives them from Moon
 # states, and the mean points have runtime analytical models, so a file that
@@ -402,6 +417,58 @@ def _log_successful_source(
         logger.debug("body=%d jd=%.1f source=%s%s", body_id, jd, source, suffix)
 
 
+def _raise_leb_model_window_miss(body_id: int, jd: float) -> None:
+    """Fail closed outside the fitted window of the model serving ``body_id``.
+
+    The interpolated apsides never read a stored channel.  Their exact
+    inclusive bounds come from the packaged residual-grid metadata, so those
+    bounds remain enforceable when the ``apogee`` group is not installed and
+    can narrow a wider stored tier when it is installed.
+
+    ``jd`` is compared on the caller's own time scale, exactly as the stored
+    coverage check does for every other body: ``calc_ut`` passes the UT day
+    number and ``calc`` the TT one, while the window itself is a TT grid.
+    The two entry points therefore place the refusal delta-T apart — about
+    three minutes at the 1549 edge and about half an hour at the 2650 edge —
+    against a grid sampled every 2 or 10 days.  At the exact bounds both
+    entries answer; one step beyond, both refuse.  A UT request at the upper
+    bound evaluates the model delta-T past its last sample, where the residual
+    grid's one-year edge taper scales the last correction by well under 1e-4.
+
+    Args:
+        body_id: Body identifier in the public numbering.
+        jd: The requested Julian Day, on the calling entry point's time scale.
+
+    Raises:
+        EphemerisRangeError: When the point is model-served and ``jd`` falls
+            outside the window its model was fitted on.  The error carries the
+            window as ``start_jd``/``end_jd`` and no ``ephemeris_file``: no
+            file ran out.
+    """
+    if body_id not in _LEB_MODEL_WINDOW_POINTS:
+        return
+    from .lunar import _interpolated_apse_model_window
+
+    window = _interpolated_apse_model_window(body_id)
+    if window is None:
+        return
+    start_jd, end_jd = window
+    if start_jd <= jd <= end_jd:
+        return
+    raise EphemerisRangeError(
+        message=(
+            f"Body {body_id} ({_PLANET_NAMES.get(body_id, 'unnamed')}) at JD "
+            f"{jd:.6f} is outside the fitted window [{start_jd:.6f}, "
+            f"{end_jd:.6f}] of the packaged model that serves it. LEB mode "
+            "does not silently substitute a lower-precision source."
+        ),
+        requested_jd=jd,
+        start_jd=start_jd,
+        end_jd=end_jd,
+        body_id=body_id,
+    )
+
+
 def _raise_leb_range_miss(
     body_id: int, jd: float, context_reader: object | None = None
 ) -> None:
@@ -419,12 +486,17 @@ def _raise_leb_range_miss(
     keeps deciding whether the miss may fall through (it can still serve the
     state), but when it cannot, the typed error must describe the file that
     failed rather than misreport the global configuration.
+
+    A point served by a packaged model is bounded by that model's own fitted
+    window as well, which is enforced first: it is the only bound left when
+    the group that would declare coverage for the point is not installed.
     """
     from .inventory import get_body_coverage, get_reader_body_coverage
     from .state import get_calc_mode
 
     if get_calc_mode() != "leb" or body_id not in _LEB_CORE_BODY_IDS:
         return
+    _raise_leb_model_window_miss(body_id, jd)
     body_coverage = get_body_coverage(body_id, jd)
     if body_coverage is not None and body_coverage.contains(jd):
         return
