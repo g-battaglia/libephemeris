@@ -77,13 +77,34 @@ def test_every_v2_search_form_reports_its_kind(search, expected_type):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("search", ["NoSuchStar12345", "", "99999"])
-def test_v1_family_reports_the_identifier_that_failed(search):
-    """The v1 family carries the same attributes."""
+@pytest.mark.parametrize(
+    ("search", "expected_type"),
+    [
+        ("NoSuchStar12345", "name"),
+        ("", "empty"),
+        ("99999", "sequential"),
+        (",zzNoSuchNomenclature", "nomenclature"),
+        ("ZzzzNoSuchPrefix%", "name"),
+    ],
+)
+def test_v1_search_forms_report_their_kind(search, expected_type):
+    """The v1 grammar treats a percent sign as ordinary name text."""
     with pytest.raises(StarNotFoundError) as excinfo:
         eph.fixstar_ut(search, _JD)
     assert excinfo.value.star_id == search
-    assert excinfo.value.search_type
+    assert excinfo.value.search_type == expected_type
+
+
+@pytest.mark.unit
+def test_percent_search_type_depends_on_the_resolver_family():
+    """The same unresolved percent string is a wildcard only in v2."""
+    with pytest.raises(StarNotFoundError) as v1_excinfo:
+        eph.fixstar_ut("Zzz%", _JD)
+    with pytest.raises(StarNotFoundError) as v2_excinfo:
+        eph.fixstar2_ut("Zzz%", _JD)
+
+    assert v1_excinfo.value.search_type == "name"
+    assert v2_excinfo.value.search_type == "wildcard"
 
 
 @pytest.mark.unit

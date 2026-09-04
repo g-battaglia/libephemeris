@@ -277,14 +277,17 @@ class UnknownBodyError(DataNotFoundError):
 class StarNotFoundError(DataNotFoundError):
     """Error raised when a fixed star is not found in the catalog.
 
-    This exception is raised when attempting to look up a fixed star by
-    name, Hipparcos number, or other identifier that is not in the star
-    catalog.
+    This exception is raised when a fixed-star lookup cannot resolve its
+    search string. It remains a subclass of :class:`Error`, so existing broad
+    exception handlers continue to catch it.
 
     Attributes:
-        message: Human-readable error message
-        star_id: The star identifier that was not found
-        search_type: The type of search performed ("name", "hip", etc.)
+        message: Human-readable error message.
+        star_id: The star search string that was not found.
+        search_type: The selected search form: ``"name"``, ``"empty"``,
+            ``"wildcard"``, ``"nomenclature"``, or ``"sequential"``.
+            ``"wildcard"`` applies only to the v2 family; the v1 family treats
+            a percent sign as part of a normal ``"name"`` search.
 
     Example:
         >>> import libephemeris as ephem
@@ -294,8 +297,8 @@ class StarNotFoundError(DataNotFoundError):
         ...     print(f"Star not found: {e.star_id}")
 
     See Also:
-        fixstar_ut: Fixed star position calculation
-        fixstar2_ut: Fixed star position with HIP identifier
+        fixstar_ut: Fixed-star position calculation with v1 search semantics.
+        fixstar2_ut: Fixed-star position calculation with v2 search semantics.
     """
 
     def __init__(
