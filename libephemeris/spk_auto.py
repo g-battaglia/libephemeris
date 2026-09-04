@@ -1402,8 +1402,10 @@ def auto_get_spk(
         jd_start: Start of the date range (Julian Day)
         jd_end: End of the date range (Julian Day)
         cache_dir: Directory for storing/finding SPK files.
-            Default: Uses set_spk_cache_dir() value if set, otherwise
-            ~/.libephemeris/spk/
+            Default: the set_spk_cache_dir() / LIBEPHEMERIS_SPK_DIR / TOML
+            value if set, then ``<data dir>/spk`` when the data directory has
+            been redirected, otherwise ~/.libephemeris/spk/. See
+            :func:`resolve_cache_dir`.
         ipl: Optional libephemeris body ID (e.g., CHIRON). If provided,
             the SPK body is automatically registered after download.
         naif_id: Optional NAIF ID for SPK lookup. If not provided but ipl is,

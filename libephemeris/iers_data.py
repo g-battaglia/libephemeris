@@ -1433,6 +1433,10 @@ def delete_iers_cache_files(dry_run: bool = False) -> int:
     if dry_run:
         return sum(1 for filepath in paths if os.path.exists(filepath))
 
+    # One critical section for both halves: a concurrent load landing between
+    # the removal and the clear would be erased by the clear, or would leave
+    # tables in memory whose files are gone. _IERS_LOCK is reentrant, so the
+    # nested acquisition inside clear_iers_cache() is fine.
     with _IERS_LOCK:
         for filepath in paths:
             if os.path.exists(filepath):
@@ -1442,8 +1446,8 @@ def delete_iers_cache_files(dry_run: bool = False) -> int:
                 except OSError:
                     pass
 
-    # Also clear in-memory cache
-    clear_iers_cache()
+        # Also clear in-memory cache
+        clear_iers_cache()
 
     return deleted
 

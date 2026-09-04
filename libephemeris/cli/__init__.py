@@ -827,7 +827,9 @@ def config() -> None:
         from ..iers_data import get_iers_cache_info
 
         iers_dir = str(get_iers_cache_info()["cache_dir"])
-    except Exception:
+    except (ImportError, OSError, KeyError, ValueError):
+        # Resolving the cache path touches the filesystem and the optional
+        # config layer; anything else is a defect and should surface.
         iers_dir = f"{data_dir}/iers_cache"
     click.echo(f"  Location: {iers_dir}")
     click.echo("  Python:   set_iers_cache_dir('/custom/path')")

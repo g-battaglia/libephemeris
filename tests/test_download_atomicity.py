@@ -131,6 +131,36 @@ def test_network_failure_leaves_existing_file_untouched(tmp_path, monkeypatch):
     assert list(tmp_path.glob("*.download")) == []
 
 
+def test_unexpected_validator_error_leaves_no_temp_file(tmp_path, monkeypatch):
+    """A validator is arbitrary caller code and may raise anything.
+
+    The cleanup is unconditional for that reason: a narrow except clause
+    would let an unforeseen exception orphan a fully written .download file
+    in the data directory, which for these artifacts means hundreds of
+    megabytes of dead weight.
+    """
+    dest = tmp_path / "artifact.bsp"
+    dest.write_bytes(b"the good copy")
+    monkeypatch.setattr(dl, "open_url", _serving(b"new payload"))
+
+    class _Unexpected(BaseException):
+        pass
+
+    def _explodes(path: str) -> bool:
+        raise _Unexpected("validator defect")
+
+    with pytest.raises(_Unexpected):
+        dl.download_file(
+            "http://example.invalid/a.bsp",
+            dest,
+            show_progress=False,
+            validator=_explodes,
+        )
+
+    assert dest.read_bytes() == b"the good copy"
+    assert list(tmp_path.glob("*.download")) == []
+
+
 def test_validator_runs_before_publication(tmp_path, monkeypatch):
     """The validator sees the temp file, not the destination.
 
