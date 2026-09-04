@@ -64,6 +64,7 @@ from functools import lru_cache
 from collections.abc import Iterator
 
 import math
+import operator
 import warnings
 from typing import Optional, Tuple, TYPE_CHECKING
 
@@ -7862,6 +7863,62 @@ def _nodaps_sidereal_frame_projection(
     return tuple(_project(pt) for pt in sub)
 
 
+# The four documented method bits. A method argument is a combination of
+# these and nothing else; see _validate_nodaps_method.
+_NODAPS_METHOD_BITS: int = NODBIT_MEAN | NODBIT_OSCU | NODBIT_OSCU_BAR | NODBIT_FOPOINT
+
+_NODAPS_METHOD_NAMES: tuple[tuple[int, str], ...] = (
+    (NODBIT_MEAN, "NODBIT_MEAN"),
+    (NODBIT_OSCU, "NODBIT_OSCU"),
+    (NODBIT_OSCU_BAR, "NODBIT_OSCU_BAR"),
+    (NODBIT_FOPOINT, "NODBIT_FOPOINT"),
+)
+
+
+def _validate_nodaps_method(method: int) -> int:
+    """Reject a nod_aps method that is not a combination of the NODBIT flags.
+
+    Every unrecognised value used to reach the calculation, where the
+    method-bit precedence rule turned it into NODBIT_MEAN: passing 8, or -1,
+    or any other stray bit returned a plausible mean-element answer with no
+    signal that the requested model had been ignored. Silently substituting
+    a different model is the worst outcome, because the result looks right.
+
+    Zero keeps its documented meaning. It is the absence of a model bit, not
+    an unknown one, and the compatibility contract resolves it to
+    NODBIT_MEAN — the same resolution NODBIT_OSCU | NODBIT_MEAN gets.
+
+    Args:
+        method: The caller's method argument.
+
+    Returns:
+        The method, unchanged, when it is valid.
+
+    Raises:
+        InputValidationError: If method is not an integer, is negative, or
+            carries a bit outside the documented set.
+    """
+    from .exceptions import InputValidationError
+
+    try:
+        value = operator.index(method)
+    except TypeError:
+        raise InputValidationError(
+            f"nod_aps method must be an integer combination of the NODBIT_* "
+            f"flags, got {method!r}"
+        ) from None
+
+    unknown = value & ~_NODAPS_METHOD_BITS
+    if value < 0 or unknown:
+        known = ", ".join(f"{name} ({bit})" for bit, name in _NODAPS_METHOD_NAMES)
+        detail = f"unknown bits {unknown:#x}" if value >= 0 else "negative value"
+        raise InputValidationError(
+            f"nod_aps method {value} is not a combination of the NODBIT_* "
+            f"flags ({detail}). Valid bits: {known}."
+        )
+    return value
+
+
 def nod_aps_ut(
     tjdut: float,
     planet: int,
@@ -7886,6 +7943,7 @@ def nod_aps_ut(
             - NODBIT_OSCU (2): Osculating elements (instantaneous)
             - NODBIT_OSCU_BAR (4): Barycentric osculating elements
             - NODBIT_FOPOINT (256): Include focal point
+            Any other value is rejected; 0 means NODBIT_MEAN.
         flags: Calculation flags (FLG_SPEED, etc.)
 
     Returns:
@@ -7905,7 +7963,12 @@ def nod_aps_ut(
         This function uses mean orbital elements for reliable results.
         For planets, the mean elements provide smooth, predictable values.
         Osculating elements can show rapid variations due to perturbations.
+
+    Raises:
+        InputValidationError: If method is not a combination of the
+            documented NODBIT_* flags.
     """
+    method = _validate_nodaps_method(method)
     ts = get_timescale()
     t = ts.ut1_jd(tjdut)
     projected = _nodaps_sidereal_frame_projection(
@@ -7933,7 +7996,9 @@ def nod_aps(
     Args:
         tjdet: Julian Day in Terrestrial Time (TT/ET)
         planet: Planet/body ID (SUN, MOON, etc.)
-        method: Method for node/apse calculation (NODBIT_MEAN, etc.)
+        method: Method for node/apse calculation (NODBIT_MEAN, etc.).
+            Any value outside the documented NODBIT_* flags is rejected;
+            0 means NODBIT_MEAN.
         flags: Calculation flags (default: FLG_SWIEPH | FLG_SPEED)
 
     Returns:
@@ -7942,7 +8007,12 @@ def nod_aps(
     Example:
         >>> from libephemeris import nod_aps, JUPITER, NODBIT_OSCU
         >>> nasc, ndsc, peri, aphe = nod_aps(2451545.0, JUPITER, NODBIT_OSCU)
+
+    Raises:
+        InputValidationError: If method is not a combination of the
+            documented NODBIT_* flags.
     """
+    method = _validate_nodaps_method(method)
     ts = get_timescale()
     t = ts.tt_jd(tjdet)
     projected = _nodaps_sidereal_frame_projection(
