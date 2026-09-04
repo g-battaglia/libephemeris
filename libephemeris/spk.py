@@ -693,9 +693,27 @@ def register_spk_body(
                 f"Failed to load type 21 SPK file {spk_file}. "
                 "Install spktype21: pip install spktype21"
             )
-        # Note: spktype21 doesn't provide a way to list segments easily,
-        # so we skip validation for type 21 kernels. The computation will
-        # fail at runtime if the NAIF ID is not in the kernel.
+        # Validate the target, exactly as the type 2/3 branch does. The reader
+        # DOES expose its segment summaries (.target, .center, .data_type), so
+        # the premise that it could not be checked was wrong — and the cost of
+        # not checking was invisible: a mismatched NAIF ID registered without
+        # complaint and then made every calculation raise
+        # ValueError('Invalid Target and/or Center') inside the reader, which
+        # the caller catches and answers from the Keplerian approximation.
+        # A registration error is the right place to learn this.
+        if not _type21_segments_for(kernel, naif_id):
+            available = sorted(
+                {
+                    int(segment.target)
+                    for segment in getattr(kernel, "segments", [])
+                    if getattr(segment, "data_type", None) == 21
+                    and getattr(segment, "target", None) is not None
+                }
+            )
+            raise ValueError(
+                f"NAIF ID {naif_id} has no type 21 segment in SPK kernel "
+                f"{spk_file}. Available type 21 targets: {available[:10]}"
+            )
     else:
         # Type 2/3: Use Skyfield
         state._load_spk_kernel(spk_file)
@@ -956,17 +974,29 @@ class _SpkType21Target:
     error from the manual ecliptic J2000 + precession/nutation approach.
     """
 
-    def __init__(self, kernel, naif_id: int, sun_target):
+    def __init__(
+        self,
+        kernel,
+        naif_id: int,
+        sun_target,
+        center: Optional[int] = None,
+    ):
         """Initialize with spktype21 kernel and Sun target.
 
         Args:
             kernel: SPKType21 kernel object
             naif_id: NAIF ID of the asteroid in the kernel
             sun_target: Skyfield VectorFunction for the Sun (from SSB)
+            center: Segment center for compute_type21. Read from the kernel
+                when omitted rather than assumed to be the Sun.
         """
         self._kernel = kernel
         self._naif_id = naif_id
         self._sun = sun_target
+        # The kernel's own segment center, read rather than assumed.
+        self._segment_center = (
+            center if center is not None else _type21_center(kernel, naif_id)
+        )
         self.center = 0  # SSB-centered (required for observe())
         self.target = naif_id
 
@@ -995,7 +1025,7 @@ class _SpkType21Target:
         if np.ndim(jd_tdb) == 0:
             # Scalar time
             pos_km, vel_km_s = self._kernel.compute_type21(
-                10, self._naif_id, float(jd_tdb)
+                self._segment_center, self._naif_id, float(jd_tdb)
             )
             pos_au = np.array(pos_km) / AU_KM
             vel_au_d = np.array(vel_km_s) * 86400.0 / AU_KM
@@ -1015,7 +1045,7 @@ class _SpkType21Target:
             velocity = np.empty((3, n))
             for i in range(n):
                 pos_km, vel_km_s = self._kernel.compute_type21(
-                    10, self._naif_id, float(jd_tdb[i])
+                    self._segment_center, self._naif_id, float(jd_tdb[i])
                 )
                 pos_au = np.array(pos_km) / AU_KM
                 vel_au_d = np.array(vel_km_s) * 86400.0 / AU_KM
@@ -1052,6 +1082,121 @@ class _SpkType21Target:
         return f"<SpkType21Target NAIF={self._naif_id}>"
 
 
+# Heliocentric default center for a Horizons-generated type-21 kernel. It is a
+# default, not an assumption: _type21_center() reads the kernel's own segment
+# and only falls back to this when the file offers nothing to read.
+_TYPE21_DEFAULT_CENTER = 10  # Sun
+
+# Light-time margin floor (days) for the inner small bodies, and the safety
+# factor absorbing the light-time iteration at the coverage edges.
+_TYPE21_MIN_MARGIN_DAYS = 0.2
+_TYPE21_MARGIN_SAFETY = 1.2
+# Assumed heliocentric distance (AU) when the edge probe itself fails: a
+# distant body, so the margin errs wide rather than short.
+_TYPE21_FALLBACK_HELIO_AU = 175.0
+
+_AU_KM = 149597870.7
+_C_AU_DAY = 173.1446326846693
+
+
+def _type21_segments_for(kernel, naif_id: int) -> list:
+    """Return the type-21 segments of ``kernel`` that target ``naif_id``.
+
+    ``SPKType21`` does expose its segment summaries — ``.target``,
+    ``.center``, ``.data_type``, ``.start_jd``, ``.end_jd`` — so a kernel can
+    be checked against the id it is being registered for, and its own center
+    can be read instead of assumed.
+    """
+    segments = getattr(kernel, "segments", None)
+    if not segments:
+        return []
+    return [
+        segment
+        for segment in segments
+        if getattr(segment, "target", None) == naif_id
+        and getattr(segment, "data_type", None) == 21
+    ]
+
+
+def _type21_center(kernel, naif_id: int) -> int:
+    """Return the center of ``naif_id``'s type-21 segments in ``kernel``.
+
+    Every call site used to hardcode the Sun. Horizons kernels are indeed
+    Sun-centered today, so the happy path worked, but a kernel with any other
+    center passed registration and then failed on every single evaluation
+    with ``ValueError('Invalid Target and/or Center')`` — caught, turned into
+    None, and answered from the Keplerian approximation instead.
+    """
+    for segment in _type21_segments_for(kernel, naif_id):
+        center = getattr(segment, "center", None)
+        if center is not None:
+            return int(center)
+    return _TYPE21_DEFAULT_CENTER
+
+
+def _type21_coverage(kernel, naif_id: int) -> Optional[tuple[float, float]]:
+    """Return the JD span actually covered for ``naif_id``, or None.
+
+    Read from the segments of this target rather than from every segment in
+    the file, so the advertised span is the one that can really be evaluated.
+    """
+    segments = _type21_segments_for(kernel, naif_id)
+    if not segments:
+        return None
+    starts = [float(seg.start_jd) for seg in segments if hasattr(seg, "start_jd")]
+    ends = [float(seg.end_jd) for seg in segments if hasattr(seg, "end_jd")]
+    if not starts or not ends:
+        return None
+    return min(starts), max(ends)
+
+
+def _type21_light_time_margin(
+    kernel, naif_id: int, center: int, jd_probe: float
+) -> float:
+    """Days of coverage unusable at each edge because of light-time retardation.
+
+    The apparent-place pipeline evaluates the kernel at ``jd - distance/c``,
+    so a request within one light-time of the segment start retards below it
+    and a request at the very end lands on the exclusive upper bound. Both
+    windows are inside the *advertised* coverage, which is what made the
+    degradation invisible: registration succeeded, the coverage query said
+    yes, and the answer quietly came from somewhere else.
+
+    Sized from the body's own heliocentric distance: a margin sized for
+    Chiron (~0.11 d) is far too small for Eris or Sedna (~0.5 d).
+    """
+    try:
+        pos_km, _ = kernel.compute_type21(center, naif_id, float(jd_probe))
+        helio_au = math.sqrt(pos_km[0] ** 2 + pos_km[1] ** 2 + pos_km[2] ** 2) / _AU_KM
+    except Exception:  # noqa: BLE001  # intentional best-effort probe
+        # A probe failure must never escape this sizing: the underlying
+        # compute_type21 / get_MDA_record / spke21 raise RuntimeError as well
+        # as ValueError. Assume a distant body so the margin errs wide.
+        helio_au = _TYPE21_FALLBACK_HELIO_AU
+    # Earth's orbit adds at most ~1 AU to the geocentric distance.
+    return max(
+        _TYPE21_MIN_MARGIN_DAYS,
+        (helio_au + 1.0) / _C_AU_DAY * _TYPE21_MARGIN_SAFETY,
+    )
+
+
+def _type21_effective_coverage(
+    kernel, naif_id: int, center: int, spk_file: str, jd_probe: float
+) -> Optional[tuple[float, float]]:
+    """Return the span a type-21 body can actually be evaluated over.
+
+    ``[start + margin, end - margin)`` — the advertised coverage minus the
+    two light-time edge zones. Returns None when the file advertises no
+    coverage at all.
+    """
+    coverage = _type21_coverage(kernel, naif_id) or get_spk_coverage(spk_file)
+    if coverage is None:
+        return None
+    start_jd, end_jd = coverage
+    margin = _type21_light_time_margin(kernel, naif_id, center, jd_probe)
+    return start_jd + margin, end_jd - margin
+
+
 def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
     """Get a Skyfield-compatible VectorFunction target for a type 21 asteroid.
 
@@ -1086,48 +1231,26 @@ def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
     if kernel is None:
         return None
 
+    center = _type21_center(kernel, naif_id)
+
     if jd_tt is not None:
-        coverage = get_spk_coverage(spk_file)
-        if coverage is not None:
-            start_jd, end_jd = coverage
-            # Outside the raw coverage: caller falls through to the direct /
-            # Keplerian out-of-coverage path.
-            if jd_tt <= start_jd or jd_tt >= end_jd:
-                return None
-            # Coverage-edge margin: Skyfield's observe() retards the target by
-            # the one-way light-time, so jd_tt must sit at least that far inside
-            # the kernel or observe() raises instead of falling through to the
-            # documented Keplerian path. Size it from the body's actual
-            # heliocentric distance — a fixed margin sized for Chiron (~0.11 d
-            # near aphelion) is far too small for distant TNOs (Eris/Sedna reach
-            # ~0.5 d). Floor at 0.2 d for the inner small bodies.
-            _AU_KM = 149597870.7
-            _C_AU_DAY = 173.1446326846693
-            try:
-                pos_km, _ = kernel.compute_type21(10, naif_id, float(jd_tt))
-                helio_au = (
-                    math.sqrt(pos_km[0] ** 2 + pos_km[1] ** 2 + pos_km[2] ** 2) / _AU_KM
-                )
-            except Exception:  # noqa: BLE001  # intentional best-effort probe
-                # Probe failed near the edge: assume a distant body (~175 AU,
-                # ~1 d light-time) so the margin is conservative, not too small.
-                # Catch broadly — the probe is best-effort and the underlying
-                # compute_type21/get_MDA_record/spke21 also raise RuntimeError
-                # (e.g. "Invalid data" / segment errors); a probe failure must
-                # never escape this margin sizing and break the documented
-                # graceful fall-through to the Keplerian out-of-coverage path.
-                helio_au = 175.0
-            # Earth's orbit adds at most ~1 AU to the geocentric distance; a
-            # 1.2 safety factor absorbs the light-time iteration and slop.
-            margin = max(0.2, (helio_au + 1.0) / _C_AU_DAY * 1.2)
-            if jd_tt < start_jd + margin or jd_tt > end_jd - margin:
+        # The effective span is the advertised one minus the light-time edge
+        # zones, computed by the same helper the direct path uses so the two
+        # routes agree on where this kernel can be evaluated.
+        effective = _type21_effective_coverage(kernel, naif_id, center, spk_file, jd_tt)
+        if effective is not None:
+            usable_start, usable_end = effective
+            if jd_tt < usable_start or jd_tt >= usable_end:
+                # Caller falls through to the direct path, which raises the
+                # typed range error and lands on the documented
+                # out-of-coverage handling.
                 return None
 
     # Get the Sun target from the main ephemeris
     planets = state.get_planets()
     sun = planets["sun"]
 
-    return _SpkType21Target(kernel, naif_id, sun)
+    return _SpkType21Target(kernel, naif_id, sun, center=center)
 
 
 def _calc_type21_position(
@@ -1196,6 +1319,10 @@ def _calc_type21_position(
     _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
     apply_nutation = not (iflag & FLG_NONUT) and not _sid_eq and apply_precession
 
+    # The kernel's own segment center, not a hardcoded Sun: a kernel with any
+    # other center used to register cleanly and then fail every evaluation.
+    segment_center = _type21_center(kernel, naif_id)
+
     # Earth/Sun sources for geocentric reduction and stellar aberration.
     planets = state.get_planets()
     sun = planets["sun"]
@@ -1238,7 +1365,9 @@ def _calc_type21_position(
         if apply_light_time:
             for _ in range(3):
                 try:
-                    pos_km, _vel_km = kernel.compute_type21(10, naif_id, jd_compute)
+                    pos_km, _vel_km = kernel.compute_type21(
+                        segment_center, naif_id, jd_compute
+                    )
                 except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
                     get_logger().debug("SPK type 21 computation failed: %s", e)
                     return None
@@ -1251,7 +1380,7 @@ def _calc_type21_position(
 
         # Position at the (light-time corrected) emission epoch.
         try:
-            pos_km, _vel_km = kernel.compute_type21(10, naif_id, jd_compute)
+            pos_km, _vel_km = kernel.compute_type21(segment_center, naif_id, jd_compute)
         except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
             # RuntimeError included to match the documented graceful
             # fall-through (compute_type21/spke21 raise RuntimeError on
@@ -1539,18 +1668,60 @@ def calc_spk_body_position(
         # Out-of-coverage epochs raise EphemerisRangeError exactly like
         # the type 2/3 branch below; None stays reserved for genuine
         # computation failures (unreadable/corrupt kernel data).
+        #
+        # The gate is on the EFFECTIVE span, not the advertised one, and on
+        # t.tdb, which is what the kernel is evaluated at. Two windows inside
+        # the advertised coverage cannot actually be evaluated:
+        #
+        #   * the last instant, because the reader's upper bound is
+        #     exclusive while this gate was inclusive; and
+        #   * the first light-time of the span, because the apparent-place
+        #     pipeline retards the epoch by the one-way light time and lands
+        #     before the segment (~0.11 d for Chiron, ~1.2 d for a
+        #     Sedna-class distance).
+        #
+        # Both used to raise inside the reader, be caught, return None, and
+        # answer from the Keplerian approximation — a silent swap of an
+        # arcsecond-grade source for an arcminute-grade one, logged at debug
+        # level only, while registration and the coverage query both said the
+        # epoch was covered. Raising here routes them through the documented
+        # out-of-coverage handling instead.
+        # Advertised-range miss first: it needs no kernel, so an unreadable
+        # file still reports the range error rather than a silent None.
         coverage = get_spk_coverage(spk_file)
         if coverage is not None:
             start_jd, end_jd = coverage
-            if t.tt < start_jd or t.tt > end_jd:
+            if t.tdb < start_jd or t.tdb > end_jd:
                 from .exceptions import EphemerisRangeError
 
                 raise EphemerisRangeError(
-                    f"JD {t.tt:.1f} outside SPK coverage "
+                    f"JD {t.tdb:.1f} outside SPK coverage "
                     f"[{start_jd:.1f}, {end_jd:.1f}] for body {ipl}"
                 )
+
         kernel = _load_type21_kernel(spk_file)
         if kernel is not None:
+            jd_eval = float(t.tdb)
+            center = _type21_center(kernel, naif_id)
+            effective = _type21_effective_coverage(
+                kernel, naif_id, center, spk_file, jd_eval
+            )
+            if effective is not None:
+                usable_start, usable_end = effective
+                if jd_eval < usable_start or jd_eval >= usable_end:
+                    from .exceptions import EphemerisRangeError
+
+                    raise EphemerisRangeError(
+                        f"JD {jd_eval:.6f} outside usable SPK type-21 coverage "
+                        f"[{usable_start:.6f}, {usable_end:.6f}) for body {ipl}. "
+                        "The bounds exclude the light-time edge zones, which "
+                        "the kernel advertises but cannot evaluate.",
+                        requested_jd=jd_eval,
+                        start_jd=usable_start,
+                        end_jd=usable_end,
+                        body_id=ipl,
+                        ephemeris_file=spk_file,
+                    )
             result = _calc_type21_position(kernel, naif_id, t, iflag)
             if result is not None:
                 return result

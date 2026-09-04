@@ -91,11 +91,25 @@ class _FakeSegment:
             self.end_jd = end_jd
 
 
+class _FakeType21Segment:
+    """Double for one spktype21 segment summary."""
+
+    def __init__(self, target, center=10, data_type=21, start_jd=0.0, end_jd=1e7):
+        self.target = target
+        self.center = center
+        self.data_type = data_type
+        self.start_jd = start_jd
+        self.end_jd = end_jd
+
+
 class _FakeType21Kernel:
     """Double for an spktype21 kernel object."""
 
-    def __init__(self, fail=False):
+    def __init__(self, fail=False, targets=(2002060,), center=10):
         self._fail = fail
+        self.segments = [
+            _FakeType21Segment(target, center=center) for target in targets
+        ]
 
     def compute_type21(self, center, naif_id, jd):
         if self._fail:
@@ -486,18 +500,37 @@ class TestRegisterSpkBody:
                 spk.register_spk_body(CHIRON, str(f), 2002060)
 
     def test_type21_kernel_ok(self, tmp_path):
-        """Type 21 with kernel loaded -> registers (skips validation)."""
+        """Type 21 with a matching segment -> registers."""
         f = tmp_path / "t21.bsp"
         f.write_bytes(b"\x00" * 16)
         with (
             patch("libephemeris.spk._detect_spk_type", return_value=21),
             patch(
                 "libephemeris.spk._load_type21_kernel",
-                return_value=_FakeType21Kernel(),
+                return_value=_FakeType21Kernel(targets=(2002060,)),
             ),
         ):
             spk.register_spk_body(CHIRON, str(f), 2002060)
         assert CHIRON in state._SPK_BODY_MAP
+
+    def test_type21_naif_id_absent_is_refused(self, tmp_path):
+        """A NAIF ID with no type 21 segment must fail at registration.
+
+        It used to register cleanly and then make every calculation fall
+        back to the Keplerian approximation.
+        """
+        f = tmp_path / "t21.bsp"
+        f.write_bytes(b"\x00" * 16)
+        with (
+            patch("libephemeris.spk._detect_spk_type", return_value=21),
+            patch(
+                "libephemeris.spk._load_type21_kernel",
+                return_value=_FakeType21Kernel(targets=(2000001,)),
+            ),
+        ):
+            with pytest.raises(ValueError, match="no type 21 segment"):
+                spk.register_spk_body(CHIRON, str(f), 2002060)
+        assert CHIRON not in state._SPK_BODY_MAP
 
     def test_type2_naif_found_via_str(self, tmp_path):
         """Type 2/3: int key KeyError, str key OK (628-629 success)."""
