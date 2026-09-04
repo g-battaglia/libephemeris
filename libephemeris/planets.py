@@ -257,7 +257,25 @@ from .constants import (
 # Persisted core identities are semantic, not a filename convention.  This is
 # intentionally body-based so a monolithic ``ephemeris_<tier>.leb`` receives
 # the same fail-closed range policy as ``<tier>_core.leb2``.
-_LEB_CORE_BODY_IDS = frozenset(range(SUN, MEAN_APOG + 1)) | {EARTH}
+_LEB_CORE_BODY_IDS = frozenset(range(SUN, MEAN_APOG + 1)) | {
+    EARTH,
+    INTP_APOG,
+    INTP_PERG,
+}
+
+# Lunar points the sealed LEB path serves from a packaged runtime model
+# rather than from a stored channel. No reader lookup fails for them, so the
+# range policy that reaches every other body through an exception never ran.
+# It fired only when the requested frame happened to need nutation, which
+# left each of these points answering outside coverage under one flag
+# combination and refusing under another:
+#
+#   MEAN_NODE / MEAN_APOG   refused of-date, answered under FLG_NONUT
+#   INTP_APOG / INTP_PERG   answered of-date, refused under FLG_NONUT
+#
+# The guard is applied explicitly instead, before the fast path, so the
+# refusal depends on the date alone.
+_LEB_MODEL_SERVED_POINTS = frozenset({MEAN_NODE, MEAN_APOG, INTP_APOG, INTP_PERG})
 
 # Core bodies whose only sealed source is their own stored LEB channel.  The
 # node/apsis points are excluded: the vector pipeline derives them from Moon
@@ -2100,6 +2118,10 @@ def calc_ut(
     if planet == EARTH and (flags & FLG_TOPOCTR):
         reader = None
     if reader is not None:
+        # Model-served points never raise from the reader, so the sealed
+        # range policy has to be asked for explicitly.
+        if planet in _LEB_MODEL_SERVED_POINTS:
+            _raise_leb_range_miss(planet, tjdut)
         try:
             from . import fast_calc
 
@@ -2390,6 +2412,10 @@ def calc(
     if planet == EARTH and (flags & FLG_TOPOCTR):
         reader = None
     if reader is not None:
+        # Model-served points never raise from the reader, so the sealed
+        # range policy has to be asked for explicitly.
+        if planet in _LEB_MODEL_SERVED_POINTS:
+            _raise_leb_range_miss(planet, tjdet)
         try:
             from . import fast_calc
 
