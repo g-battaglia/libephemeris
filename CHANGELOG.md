@@ -7,16 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- `nod_aps()` / `nod_aps_ut()`: method values whose low byte is non-zero but
-  carries neither `NODBIT_MEAN` nor `NODBIT_OSCU` / `NODBIT_OSCU_BAR` (for
-  example 8 and 16) now select the osculating model, as the reference does.
-  Model selection follows the measured contract exactly: mean when
-  `method & 0xFF == 0` or `NODBIT_MEAN` is set, osculating for every other
-  non-zero low byte. No validation is added; every integer is still accepted
-  (#78).
-
 ### Added
 
 - Contributor governance files: `CONTRIBUTING.md` (workflow, code style,
@@ -37,6 +27,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   applies to contributions submitted from now on.
 
 ### Fixed
+
+- `download_for_tier()`, `download_planet_centers()`, `download_leb2_for_tier()`,
+  `download_spk()`, `download_and_register_spk()`, `download_assist_data()`
+  and the REBOUND data download no longer remove the existing artifact before
+  its replacement is verified (#55). Every payload streams into a temporary
+  file next to the destination, the digest and the structural validator run
+  on that temporary file, and only a verified artifact is published with
+  `os.replace()`; a failed repair therefore leaves the previous file in place.
+  `download_spk()` and `download_and_register_spk()` now honour
+  `set_spk_cache_dir()` / `LIBEPHEMERIS_SPK_DIR`, the directory every
+  automatic SPK lookup consults; `reset_session()` clears the SPK body map so
+  a registration does not outlive the session; `libephemeris config` prints
+  paths only and no longer touches the network.
+- Fixed-star lookups now raise `StarNotFoundError` (a subclass of
+  `DataNotFoundError` and `Error`) for an unknown name, the comma form, an
+  out-of-range sequential number, a wildcard that matched nothing, and the
+  empty string, across `fixstar` / `fixstar_ut` / `fixstar2` / `fixstar2_ut`,
+  their magnitude helpers and the batch resolver (#59). The exception was
+  exported and documented but never raised. It carries the identifier and
+  the `search_type` that was attempted, classified per resolver family (a
+  `%` is a wildcard only in the v2 family). Error messages are unchanged and
+  every existing `except Error` clause keeps working.
+- Public entry points no longer let standard-library exceptions escape where
+  the typed hierarchy is the documented contract (#60):
+  `house_name`, `houses`, `houses_ex`, `houses_ex2`, `houses_armc`,
+  `houses_armc_ex2`, `house_pos` and the `fallback_hsys` parameter of the
+  fallback helpers fold an int selector that `chr()` rejects (for example
+  `-1`) to the unknown-selector default, exactly as `999` already did;
+  `parse_orbital_elements("")` and a directory path raise the documented
+  `FileNotFoundError` instead of `IsADirectoryError`, while special files
+  such as `/dev/null` still parse; `date_conversion`, `get_saros_number` and
+  `get_inex_number` raise their own `ValueError` for a non-string calendar
+  flag instead of `AttributeError`; `lun_occult_where`,
+  `lun_occult_when_glob` and `lun_occult_when_loc` no longer surface a
+  bare `KeyError` for a negative body id — it is folded to the Sun, as the
+  reference answers — and re-raise an unknown body as the new exported
+  `IllegalBodyError` (both `UnknownBodyError` and `ValueError`), which is
+  also the type `rise_trans` / `rise_trans_true_hor` raise for an illegal
+  body in place of a private class.
+- `nod_aps()` / `nod_aps_ut()`: method values whose low byte is non-zero but
+  carries neither `NODBIT_MEAN` nor `NODBIT_OSCU` / `NODBIT_OSCU_BAR` (for
+  example 8 and 16) now select the osculating model, as the reference does.
+  Model selection follows the measured contract exactly: mean when
+  `method & 0xFF == 0` or `NODBIT_MEAN` is set, osculating for every other
+  non-zero low byte. No validation is added; every integer is still accepted
+  (#78).
 
 - `calc_airmass` now raises `InputValidationError` for a `method` it does not
   implement instead of silently computing Kasten-Young for it (#65). The
