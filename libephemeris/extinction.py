@@ -52,7 +52,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 
 # Standard wavelengths in nanometers for common photometric bands
@@ -92,6 +92,51 @@ class ExtinctionCoefficients:
     k_total: float
 
 
+# The airmass models this module implements. A method outside this set is a
+# caller mistake, not a request for the default: silently computing
+# Kasten-Young for it returns a valid-looking number from a model the caller
+# did not ask for, and nothing in the result says so.
+AIRMASS_METHODS: Tuple[str, ...] = ("secant", "kasten_young", "rozenberg")
+
+# The adaptation states this module returns and accepts. "dark" is the token;
+# "scotopic" is the name of the same physiological regime and is accepted as
+# an input alias, because the documentation used to name it as though it were
+# a returned value.
+EYE_ADAPTATION_STATES: Tuple[str, ...] = ("photopic", "mesopic", "dark")
+_EYE_ADAPTATION_ALIASES: dict = {"scotopic": "dark"}
+
+
+def _validate_airmass_method(method: str) -> str:
+    """Return ``method`` if this module implements it, else raise."""
+    from .exceptions import InputValidationError
+
+    if method in AIRMASS_METHODS:
+        return method
+    raise InputValidationError(
+        f"calc_airmass: unknown method {method!r}. "
+        f"Valid methods: {', '.join(AIRMASS_METHODS)}"
+    )
+
+
+def normalize_eye_adaptation(state: str, function: str) -> str:
+    """Return the canonical adaptation token for ``state``, else raise.
+
+    ``"scotopic"`` maps to ``"dark"``: they name the same regime, and the
+    documentation used to present the former as a returned value.
+    """
+    from .exceptions import InputValidationError
+
+    if isinstance(state, str):
+        canonical = _EYE_ADAPTATION_ALIASES.get(state, state)
+        if canonical in EYE_ADAPTATION_STATES:
+            return canonical
+    raise InputValidationError(
+        f"{function}: unknown eye adaptation state {state!r}. "
+        f"Valid states: {', '.join(EYE_ADAPTATION_STATES)} "
+        f"(or 'scotopic' for 'dark')"
+    )
+
+
 def calc_airmass(altitude_deg: float, method: str = "kasten_young") -> float:
     """Calculate relative optical path length through the atmosphere.
 
@@ -99,11 +144,15 @@ def calc_airmass(altitude_deg: float, method: str = "kasten_young") -> float:
         altitude_deg: Object altitude above the horizon in degrees.
         method: One of ``"secant"``, ``"kasten_young"``, or
             ``"rozenberg"``. The default Kasten-Young model remains useful
-            down to the horizon.
+            down to the horizon. Any other value is rejected.
 
     Returns:
         Dimensionless airmass. Objects at or below the horizon use the
         practical cap of 40.0.
+
+    Raises:
+        InputValidationError: If ``method`` is not one of the implemented
+            models.
 
     Notes:
         The plane-parallel model uses ``X = sec(z)``. The Kasten-Young model
@@ -113,6 +162,8 @@ def calc_airmass(altitude_deg: float, method: str = "kasten_young") -> float:
         Kasten and Young (1989), *Applied Optics* 28, 4735-4738; Rozenberg
         (1966), *Twilight: A Study in Atmospheric Optics*.
     """
+    method = _validate_airmass_method(method)
+
     # Handle objects at or below horizon
     if altitude_deg <= 0:
         return 40.0  # Practical maximum airmass
@@ -144,14 +195,10 @@ def calc_airmass(altitude_deg: float, method: str = "kasten_young") -> float:
         # denominator slightly exceeds 1 there and would return <1 otherwise.
         return min(max(1.0 / denominator, 1.0), 40.0)
 
-    elif method == "rozenberg":
-        # Rozenberg (1966) formula, good for very low altitudes
-        cos_z = math.cos(zenith_rad)
-        return max(1.0 / (cos_z + 0.025 * math.exp(-11.0 * cos_z)), 1.0)
-
-    else:
-        # Default to Kasten & Young
-        return calc_airmass(altitude_deg, method="kasten_young")
+    # Rozenberg (1966) formula, good for very low altitudes. The method was
+    # validated on entry, so this is the last of the three.
+    cos_z = math.cos(zenith_rad)
+    return max(1.0 / (cos_z + 0.025 * math.exp(-11.0 * cos_z)), 1.0)
 
 
 def calc_rayleigh_coefficient(
@@ -1189,31 +1236,38 @@ def calc_eye_adaptation_state(sky_brightness: float) -> str:
     Determine the eye's adaptation state based on sky brightness.
 
     The human eye adapts to ambient light levels, transitioning between
-    three states: photopic (cone vision, bright conditions), mesopic
+    three regimes: photopic (cone vision, bright conditions), mesopic
     (mixed rod/cone vision, twilight), and scotopic (rod vision, dark).
+
+    The returned token for the scotopic regime is ``"dark"``. The whole
+    module speaks that vocabulary — it is what the eye_adaptation parameters
+    accept and what VisibilityResult reports — while the prose here used to
+    name "scotopic" as though it were a returned value, so code comparing
+    against that name never matched. ``"scotopic"`` is accepted wherever a
+    state is taken as input.
 
     Args:
         sky_brightness: Sky surface brightness in mag/arcsec^2.
                        Lower values = brighter sky.
 
     Returns:
-        Adaptation state as a string:
+        One of ``EYE_ADAPTATION_STATES``:
             - "photopic": Bright conditions (sky < 16 mag/arcsec^2)
             - "mesopic": Twilight conditions (16 <= sky < 20)
-            - "dark": Dark-adapted (sky >= 20)
+            - "dark": Dark-adapted, the scotopic regime (sky >= 20)
 
     Algorithm:
         The transitions are based on approximate luminance levels:
-        - Photopic: > 3 cd/m^2 (roughly < 16 mag/arcsec^2)
-        - Mesopic: 0.001 to 3 cd/m^2 (16-20 mag/arcsec^2)
-        - Scotopic: < 0.001 cd/m^2 (> 20 mag/arcsec^2)
+        - Photopic: > 3 cd/m^2 (roughly < 16 mag/arcsec^2) -> "photopic"
+        - Mesopic: 0.001 to 3 cd/m^2 (16-20 mag/arcsec^2) -> "mesopic"
+        - Scotopic: < 0.001 cd/m^2 (> 20 mag/arcsec^2) -> "dark"
 
     Example:
         >>> calc_eye_adaptation_state(15.0)  # Civil twilight
         'photopic'
         >>> calc_eye_adaptation_state(18.0)  # Late twilight
         'mesopic'
-        >>> calc_eye_adaptation_state(21.5)  # Dark sky
+        >>> calc_eye_adaptation_state(21.5)  # Dark sky (scotopic regime)
         'dark'
 
     References:
@@ -1221,10 +1275,9 @@ def calc_eye_adaptation_state(sky_brightness: float) -> str:
     """
     if sky_brightness < 16.0:
         return "photopic"
-    elif sky_brightness < 20.0:
+    if sky_brightness < 20.0:
         return "mesopic"
-    else:
-        return "dark"
+    return "dark"
 
 
 def calc_contrast_threshold(
@@ -1250,8 +1303,11 @@ def calc_contrast_threshold(
 
     Args:
         sky_brightness: Sky surface brightness in mag/arcsec^2.
-        eye_adaptation: Eye adaptation state ("photopic", "mesopic", or "dark").
-                       If None, automatically determined from sky brightness.
+        eye_adaptation: Eye adaptation state, one of ``EYE_ADAPTATION_STATES``
+                       ("photopic", "mesopic", "dark"); "scotopic" is accepted
+                       as an alias for "dark". If None, automatically
+                       determined from sky brightness. Any other value is
+                       rejected.
         observer_skill: Observer skill level (1-4):
             - 1 (OBSERVER_SKILL_INEXPERIENCED): Inexperienced observer
             - 2 (OBSERVER_SKILL_AVERAGE): Average observer
@@ -1304,7 +1360,13 @@ def calc_contrast_threshold(
     #   - Civil twilight (B=8): m_lim ~0.5, so delta_m = 7.5
     #   - Day sky (B=3): m_lim ~-4.0, so delta_m = 7.0
 
-    # Calculate limiting magnitude based on sky brightness and adaptation
+    # Calculate limiting magnitude based on sky brightness and adaptation.
+    # The state is validated rather than allowed to fall through: an
+    # unrecognised one used to land on the photopic branch, which is the
+    # same silent substitution as an unknown airmass method.
+    eye_adaptation = normalize_eye_adaptation(
+        eye_adaptation, "calc_contrast_threshold"
+    )
     if eye_adaptation == "dark":
         # Dark-adapted vision: best sensitivity
         # At B=21.5, limit ~6.0; at B=20, limit ~5.5
@@ -1389,8 +1451,11 @@ def calc_visibility_threshold(
                          Brighter objects have lower (more negative) values.
         sky_brightness: Sky surface brightness in mag/arcsec^2.
                        Typical values: 3 (civil twilight) to 22 (dark sky).
-        eye_adaptation: Eye adaptation state ("photopic", "mesopic", or "dark").
-                       If None, automatically determined from sky brightness.
+        eye_adaptation: Eye adaptation state, one of ``EYE_ADAPTATION_STATES``
+                       ("photopic", "mesopic", "dark"); "scotopic" is accepted
+                       as an alias for "dark". If None, automatically
+                       determined from sky brightness. Any other value is
+                       rejected.
         observer_skill: Observer skill level (1-4):
             - 1 (OBSERVER_SKILL_INEXPERIENCED): Inexperienced observer
             - 2 (OBSERVER_SKILL_AVERAGE): Average observer
@@ -1479,9 +1544,15 @@ def calc_visibility_threshold(
         )
         effective_magnitude = object_magnitude + extinction
 
-    # Determine eye adaptation state
+    # Determine eye adaptation state. Normalise here as well as in the
+    # threshold call, so the state reported back in VisibilityResult is the
+    # canonical token rather than whatever alias the caller passed.
     if eye_adaptation is None:
         eye_adaptation = calc_eye_adaptation_state(sky_brightness)
+    else:
+        eye_adaptation = normalize_eye_adaptation(
+            eye_adaptation, "calc_visibility_threshold"
+        )
 
     # Calculate contrast threshold
     threshold = calc_contrast_threshold(
