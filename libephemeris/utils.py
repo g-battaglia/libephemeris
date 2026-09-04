@@ -1521,7 +1521,10 @@ def _decompose_to_dms(ddeg: float, has_rounding: bool) -> Tuple[int, int, int, f
 
     When *has_rounding* is ``True`` the sub-second fraction ``secfr`` is
     set to the integer seconds value (as a float) rather than the true
-    fractional part.
+    fractional part. Callers pass the result through
+    :func:`_truncate_to_rounding_unit`, which owns the rounded output and
+    zeroes everything below the requested unit; this value only survives on
+    the unrounded path.
     """
     ideg = int(ddeg)
     ddeg = max(ddeg - ideg, 0.0)
