@@ -413,7 +413,9 @@ def download_spk(
         end: End date in YYYY-MM-DD format
         path: Directory to save the file. If None, uses the configured SPK
             cache directory (set_spk_cache_dir() / LIBEPHEMERIS_SPK_DIR /
-            TOML ``spk_dir``), otherwise ~/.libephemeris/spk/
+            TOML ``spk_dir``); failing that, ``<data dir>/spk`` when the data
+            directory has been redirected via LIBEPHEMERIS_DATA_DIR or TOML
+            ``data_dir``; otherwise ~/.libephemeris/spk/
         center: Reference center for ephemeris (default: "500@0" = SSB).
             Use "500@0" for compatibility with Skyfield/DE kernels.
         overwrite: If True, overwrite existing file. If False, skip if exists.
@@ -1400,7 +1402,8 @@ def download_and_register_spk(
         naif_id: NAIF ID in the kernel. If None, auto-detected from SPK file.
             JPL Horizons uses: asteroid_number + 20000000
         path: Directory to save file (default: the configured SPK cache
-            directory, otherwise ~/.libephemeris/spk/)
+            directory, then ``<data dir>/spk`` if the data directory has been
+            redirected, otherwise ~/.libephemeris/spk/)
         center: Reference center (default: "500@0" = SSB)
         overwrite: Overwrite existing file if True
         timeout: Request timeout in seconds

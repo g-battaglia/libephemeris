@@ -48,7 +48,7 @@ import certifi
 
 from .leb_groups import LEB2_GROUPS as _CANONICAL_LEB2_GROUPS
 from .logging_config import get_logger
-from .net import HTTPError, HTTPException, Request, open_url
+from .net import HTTPError, Request, open_url
 
 
 def _is_valid_bsp(filepath: str) -> bool:
@@ -439,6 +439,7 @@ def download_file(
     # Use a temporary file for atomic download
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     temp_fd, temp_path = tempfile.mkstemp(dir=dest_path.parent, suffix=".download")
+    published = False
 
     try:
         # Open URL and get content length
@@ -509,24 +510,27 @@ def download_file(
 
         # Atomic move to final destination
         publish_temp_file(temp_path, dest_path)
+        published = True
         logger.info("Download complete: %s", dest_path.name)
         return True
 
-    # HTTPException (e.g. IncompleteRead when the server closes
-    # the connection mid-body) is NOT an OSError, so it must be caught
-    # explicitly to clean up the temp file instead of orphaning it.
-    except (OSError, ValueError, KeyError, RuntimeError, HTTPException):
-        # Close the temp fd if it was never handed to os.fdopen (e.g. urlopen
-        # raised first); otherwise it leaks until the process exits.
-        if temp_fd != -1:
+    # The cleanup is unconditional. Narrow except clauses would miss anything
+    # a caller-supplied validator raises (it is arbitrary code), orphaning a
+    # fully written .download file in the data directory.
+    finally:
+        if not published:
+            # Close the temp fd if it was never handed to os.fdopen (e.g.
+            # urlopen raised first); otherwise it leaks until the process
+            # exits.
+            if temp_fd != -1:
+                try:
+                    os.close(temp_fd)
+                except OSError:
+                    pass
             try:
-                os.close(temp_fd)
+                os.unlink(temp_path)
             except OSError:
                 pass
-        # Clean up temp file on error
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-        raise
 
 
 def _install_bundled_file(
