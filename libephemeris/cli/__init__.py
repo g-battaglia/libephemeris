@@ -823,7 +823,14 @@ def config() -> None:
     click.echo(_b("IERS Earth orientation data"))
     iers_auto = os.environ.get("LIBEPHEMERIS_IERS_AUTO_DOWNLOAD", "")
     iers_dt = os.environ.get("LIBEPHEMERIS_IERS_DELTA_T", "")
-    click.echo(f"  Location: {data_dir}/iers_cache/")
+    try:
+        from ..iers_data import get_iers_cache_info
+
+        iers_dir = str(get_iers_cache_info()["cache_dir"])
+    except Exception:
+        iers_dir = f"{data_dir}/iers_cache"
+    click.echo(f"  Location: {iers_dir}")
+    click.echo("  Python:   set_iers_cache_dir('/custom/path')")
     _cur = f"  [current: {iers_auto}]" if iers_auto else ""
     click.echo(f"  Env var:  {_e('LIBEPHEMERIS_IERS_AUTO_DOWNLOAD')}  (1/0){_cur}")
     _cur = f"  [current: {iers_dt}]" if iers_dt else ""
@@ -831,7 +838,7 @@ def config() -> None:
         f"  Env var:  {_e('LIBEPHEMERIS_IERS_DELTA_T')}  (1/0, use observed Delta T)"
         f"{_cur}"
     )
-    click.echo("  Files:    finals2000A.data, Leap_Second.dat, deltat.data")
+    click.echo("  Files:    finals2000A.data, leap_seconds.dat, deltat.data")
     click.echo()
 
     # --- Delta T model ---

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import sys
 import types
 import urllib.error
@@ -224,8 +225,12 @@ class TestDownloadSpk:
             )
         assert path.endswith(".bsp")
 
-    def test_cached_corrupt_remove_oserror(self, tmp_path):
-        """os.remove raising OSError is swallowed (lines 403-404)."""
+    def test_cached_corrupt_is_overwritten_not_unlinked(self, tmp_path):
+        """The corrupt cache is replaced by the atomic publish, not removed.
+
+        os.remove must never be reached on this path: the download has not
+        happened yet when the cache is judged corrupt.
+        """
         existing = tmp_path / "2060_202001_202501.bsp"
         existing.write_bytes(b"\x00" * 16)
 
@@ -235,7 +240,10 @@ class TestDownloadSpk:
                 "libephemeris.spk._is_valid_bsp",
                 side_effect=[False, True],
             ),
-            patch("libephemeris.spk.os.remove", side_effect=OSError("denied")),
+            patch(
+                "libephemeris.spk.os.remove",
+                side_effect=AssertionError("must not unlink before replacing"),
+            ),
         ):
             path = spk.download_spk(
                 "2060", "2020-01-01", "2025-01-01", path=str(tmp_path)
@@ -378,17 +386,57 @@ class TestDownloadSpk:
                 spk.download_spk("2060", "2020-01-01", "2025-01-01", path=str(tmp_path))
 
     def test_default_path_branch(self, tmp_path):
-        """path=None uses _get_data_dir()/spk (line 379-382)."""
+        """path=None resolves through the shared SPK cache resolver.
+
+        The writer must land where every spk_auto lookup looks, otherwise a
+        downloaded kernel is never found again (issue #55).
+        """
+        cache_dir = tmp_path / "spk"
         with (
-            patch(
-                "libephemeris.state._get_data_dir",
-                return_value=str(tmp_path),
-            ),
+            patch("libephemeris.state.get_spk_cache_dir", return_value=str(cache_dir)),
             patch("urllib.request.urlopen", _mock_urlopen(_valid_spk_payload())),
             patch("libephemeris.spk._is_valid_bsp", return_value=True),
         ):
             path = spk.download_spk("Chiron", "2020-01-01", "2025-01-01")
-        assert str(tmp_path) in path
+        assert path.startswith(str(cache_dir))
+        assert os.path.isdir(cache_dir)
+
+    def test_configured_cache_dir_is_where_lookups_look(self, tmp_path):
+        """download_spk writes exactly where spk_auto expects to find it."""
+        from libephemeris import spk_auto
+
+        cache_dir = tmp_path / "custom-spk"
+        with (
+            patch("libephemeris.state.get_spk_cache_dir", return_value=str(cache_dir)),
+            patch("urllib.request.urlopen", _mock_urlopen(_valid_spk_payload())),
+            patch("libephemeris.spk._is_valid_bsp", return_value=True),
+        ):
+            path = spk.download_spk("2060", "2020-01-01", "2025-01-01")
+            resolved = spk_auto.resolve_cache_dir()
+
+        assert os.path.dirname(path) == resolved
+
+    def test_corrupt_cache_survives_a_failed_redownload(self, tmp_path):
+        """A corrupt cached kernel is not deleted when the network fails.
+
+        Removing it up front turned a repair attempt into a total loss
+        (issue #55); the atomic publish makes the removal unnecessary.
+        """
+        existing = tmp_path / "2060_202001_202501.bsp"
+        existing.write_bytes(b"\x00" * 16)
+
+        with (
+            patch(
+                "urllib.request.urlopen",
+                side_effect=urllib.error.URLError("offline"),
+            ),
+            patch("libephemeris.spk._is_valid_bsp", return_value=False),
+            patch("libephemeris.spk.time.sleep"),
+        ):
+            with pytest.raises(ConnectionError):
+                spk.download_spk("2060", "2020-01-01", "2025-01-01", path=str(tmp_path))
+
+        assert existing.read_bytes() == b"\x00" * 16
 
 
 # ---------------------------------------------------------------------------

@@ -74,6 +74,32 @@ def _make_urlopen(data: bytes, content_length):
     return _fake_urlopen
 
 
+def _fake_download_file(payload: bytes = b"fresh"):
+    """Stand in for ``download_file`` while honouring its atomicity contract.
+
+    The real function writes ``payload`` to a temp file, runs ``validator``
+    on it, and only publishes over ``dest_path`` when the check passes. A
+    stub that writes straight to ``dest_path`` would silently exempt callers
+    from the very guarantee these tests exist to pin down.
+    """
+
+    def _download(url, dest_path, validator=None, **kwargs):
+        dest_path = Path(dest_path)
+        temp_path = dest_path.parent / (dest_path.name + ".fake-download")
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path.write_bytes(payload)
+        if validator is not None and not validator(str(temp_path)):
+            temp_path.unlink()
+            raise ValueError(
+                f"Downloaded file {kwargs.get('description', dest_path.name)} "
+                "failed validation - corrupt or incomplete"
+            )
+        temp_path.replace(dest_path)
+        return True
+
+    return _download
+
+
 # ---------------------------------------------------------------------------
 # get_data_dir / _format_size
 # ---------------------------------------------------------------------------
@@ -325,59 +351,72 @@ def test_download_planet_centers_already_valid_quiet(tmp_path, monkeypatch, caps
 
 
 def test_download_planet_centers_corrupt_then_download(tmp_path, monkeypatch, capsys):
-    """Corrupt cache is removed, then download succeeds (459-507)."""
+    """Corrupt cache is replaced only once a valid download is verified."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     dest = tmp_path / "planet_centers.bsp"
     dest.write_bytes(b"corrupt")
     # Cached file is corrupt (invalid), the freshly downloaded one is valid.
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: Path(p).read_bytes() == b"fresh")
+    monkeypatch.setattr(dl, "download_file", _fake_download_file(b"fresh"))
 
-    def _fake_download_file(url, dest_path, **kwargs):
-        Path(dest_path).write_bytes(b"fresh")
-        return True
-
-    monkeypatch.setattr(dl, "download_file", _fake_download_file)
     result = dl.download_planet_centers(force=False, quiet=False)
     assert result == dest
+    assert dest.read_bytes() == b"fresh"
     out = capsys.readouterr().out
     assert "Downloading planet_centers.bsp" in out
     assert "Downloaded to:" in out
 
 
-def test_download_planet_centers_corrupt_remove_oserror(tmp_path, monkeypatch):
-    """os.remove raising OSError is swallowed (462-463)."""
+def test_download_planet_centers_keeps_cache_when_download_fails(tmp_path, monkeypatch):
+    """A failed re-download leaves the existing artifact byte-for-byte intact.
+
+    This is the data-loss regression: the cached file used to be unlinked
+    before the replacement had been fetched, so an offline repair attempt
+    ended with no file at all.
+    """
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     dest = tmp_path / "planet_centers.bsp"
-    dest.write_bytes(b"corrupt")
-    # Cached file is corrupt (invalid), the freshly downloaded one is valid.
-    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: Path(p).read_bytes() == b"fresh")
+    dest.write_bytes(b"stale but usable")
+    # Cached bytes fail the pinned digest, so the re-download path is taken.
+    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: True)
+    monkeypatch.setattr(dl, "_file_sha256", lambda path: "0" * 64)
 
-    def _raise_remove(path):
-        raise OSError("cannot remove")
+    def _offline(url, dest_path, **kwargs):
+        raise OSError("network down")
 
-    monkeypatch.setattr(dl.os, "remove", _raise_remove)
-    monkeypatch.setattr(
-        dl,
-        "download_file",
-        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"fresh"),
-    )
-    result = dl.download_planet_centers(force=False, quiet=True)
-    assert result == dest
+    monkeypatch.setattr(dl, "download_file", _offline)
+
+    with pytest.raises(OSError, match="network down"):
+        dl.download_planet_centers(force=False, quiet=True)
+
+    assert dest.read_bytes() == b"stale but usable"
 
 
 def test_download_planet_centers_download_invalid(tmp_path, monkeypatch):
-    """A download that produces an invalid BSP is removed and raises ValueError."""
+    """A structurally invalid download raises and never lands on disk."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
-    monkeypatch.setattr(
-        dl,
-        "download_file",
-        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
-    )
+    monkeypatch.setattr(dl, "download_file", _fake_download_file(b"x"))
+
     with pytest.raises(ValueError, match="failed validation"):
         dl.download_planet_centers(force=True, quiet=True)
     # The corrupt download must not be left behind.
     assert not (tmp_path / "planet_centers.bsp").exists()
+    assert list(tmp_path.glob("*.fake-download")) == []
+
+
+def test_download_planet_centers_invalid_download_keeps_previous(tmp_path, monkeypatch):
+    """A corrupt payload never displaces the artifact already installed."""
+    monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
+    dest = tmp_path / "planet_centers.bsp"
+    dest.write_bytes(b"known good")
+    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
+    monkeypatch.setattr(dl, "download_file", _fake_download_file(b"truncated"))
+
+    with pytest.raises(ValueError, match="failed validation"):
+        dl.download_planet_centers(force=True, quiet=True)
+
+    assert dest.read_bytes() == b"known good"
 
 
 def test_download_planet_centers_http_404(tmp_path, monkeypatch, capsys):
@@ -1500,16 +1539,15 @@ def test_download_leb2_remote_asset_requires_and_passes_sha_pin(tmp_path, monkey
     )
 
     assert result == [tmp_path / "leb" / "medium_core.leb2"]
-    assert calls == [
-        (
-            "https://example.invalid/medium_core.leb2",
-            {
-                "description": "medium_core.leb2",
-                "show_progress": True,
-                "expected_sha256": digest,
-            },
-        )
-    ]
+    assert len(calls) == 1
+    url, kwargs = calls[0]
+    assert url == "https://example.invalid/medium_core.leb2"
+    assert kwargs["description"] == "medium_core.leb2"
+    assert kwargs["show_progress"] is True
+    assert kwargs["expected_sha256"] == digest
+    # The structural check is handed to the downloader so it runs on the
+    # temp file, before the atomic replace.
+    assert kwargs["validator"] is dl._is_valid_leb
 
 
 def test_download_leb2_default_groups_exclude_uranians() -> None:
@@ -1622,7 +1660,7 @@ def test_download_leb2_replaces_valid_but_unreviewed_bundled_core(
     monkeypatch.setattr(dl, "_is_valid_leb", lambda path: True)
     installed = []
 
-    def _install(resource_path, dest_path, *, expected_sha256):
+    def _install(resource_path, dest_path, *, expected_sha256, validator=None):
         installed.append((resource_path, expected_sha256))
         Path(dest_path).write_bytes(b"reviewed core")
 
@@ -1710,71 +1748,78 @@ def test_download_planet_centers_for_tier_existing_valid_quiet(tmp_path, monkeyp
     assert result == dest
 
 
-def test_download_planet_centers_for_tier_corrupt_remove_oserror(tmp_path, monkeypatch):
-    """Corrupt cache + os.remove OSError swallowed, then re-download (1589-1594)."""
+def test_download_planet_centers_for_tier_corrupt_then_download(tmp_path, monkeypatch):
+    """A corrupt cache is replaced by a verified download, never before it."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     dest = tmp_path / "planet_centers_base.bsp"
     dest.write_bytes(b"corrupt")
 
-    valid_states = {"n": 0}
+    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: Path(p).read_bytes() == b"fresh")
+    monkeypatch.setattr(dl, "download_file", _fake_download_file(b"fresh"))
 
-    def _is_valid(p):
-        valid_states["n"] += 1
-        return valid_states["n"] > 1
-
-    monkeypatch.setattr(dl, "_is_valid_bsp", _is_valid)
-    monkeypatch.setattr(
-        dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
-    )
-    monkeypatch.setattr(
-        dl,
-        "download_file",
-        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"f"),
-    )
     result = dl._download_planet_centers_for_tier("base", force=False, quiet=True)
     assert result == dest
+    assert dest.read_bytes() == b"fresh"
+
+
+def test_download_planet_centers_for_tier_keeps_cache_when_offline(
+    tmp_path, monkeypatch
+):
+    """Issue #55: a digest-mismatched tier file survives a failed download.
+
+    Reproduces the reported sequence — an artifact from an earlier data
+    release, a pinned digest that no longer matches, and no network — and
+    pins the invariant that the 191 MB file is still there afterwards.
+    """
+    monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
+    dest = tmp_path / "planet_centers_medium.bsp"
+    dest.write_bytes(b"previous data release")
+    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: True)
+    monkeypatch.setattr(dl, "_file_sha256", lambda path: "0" * 64)
+
+    def _offline(url, dest_path, **kwargs):
+        raise OSError("network is unreachable")
+
+    monkeypatch.setattr(dl, "download_file", _offline)
+
+    with pytest.raises(OSError, match="network is unreachable"):
+        dl._download_planet_centers_for_tier("medium", force=False, quiet=True)
+
+    assert dest.read_bytes() == b"previous data release"
 
 
 def test_download_planet_centers_for_tier_download_invalid(tmp_path, monkeypatch):
-    """Downloaded file fails validation -> remove + raise (1613-1620)."""
+    """A structurally invalid download raises and leaves nothing behind."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
-    monkeypatch.setattr(
-        dl,
-        "download_file",
-        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
-    )
+    monkeypatch.setattr(dl, "download_file", _fake_download_file(b"x"))
+
     with pytest.raises(ValueError, match="failed validation"):
         dl._download_planet_centers_for_tier("base", force=True, quiet=False)
+    assert not (tmp_path / "planet_centers_base.bsp").exists()
 
 
-def test_download_planet_centers_for_tier_download_invalid_remove_oserror(
+def test_download_planet_centers_for_tier_invalid_download_keeps_previous(
     tmp_path, monkeypatch
 ):
-    """Validation-failure os.remove OSError swallowed before raise (1615-1617)."""
+    """A corrupt payload never displaces the tier file already installed."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
+    dest = tmp_path / "planet_centers_base.bsp"
+    dest.write_bytes(b"known good")
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
-    monkeypatch.setattr(
-        dl,
-        "download_file",
-        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
-    )
-    monkeypatch.setattr(
-        dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
-    )
+    monkeypatch.setattr(dl, "download_file", _fake_download_file(b"truncated"))
+
     with pytest.raises(ValueError, match="failed validation"):
         dl._download_planet_centers_for_tier("base", force=True, quiet=True)
+
+    assert dest.read_bytes() == b"known good"
 
 
 def test_download_planet_centers_for_tier_success(tmp_path, monkeypatch, capsys):
     """Happy path: download + validate + final print (1605-1625)."""
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: True)
-    monkeypatch.setattr(
-        dl,
-        "download_file",
-        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
-    )
+    monkeypatch.setattr(dl, "download_file", _fake_download_file(b"x"))
     result = dl._download_planet_centers_for_tier("medium", force=True, quiet=False)
     assert result == tmp_path / "planet_centers_medium.bsp"
     out = capsys.readouterr().out

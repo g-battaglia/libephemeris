@@ -507,7 +507,7 @@ class TestDownloadAssistData:
         """Both files downloaded into an explicit target dir."""
         calls = []
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             calls.append(description)
             Path(dest).write_bytes(b"x")
 
@@ -524,7 +524,7 @@ class TestDownloadAssistData:
         """planets=False, asteroids=True downloads only one file (line 417)."""
         calls = []
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             calls.append(description)
             Path(dest).write_bytes(b"x")
 
@@ -558,11 +558,11 @@ class TestDownloadAssistData:
         assert "All files already present and verified." in out
 
     def test_redownloads_invalid_file(self, tmp_path, capsys):
-        """Existing-but-invalid file is unlinked and re-downloaded (429-434)."""
+        """An unverifiable file is replaced in place, never unlinked first."""
         planets = tmp_path / "linux_p1550p2650.440"
         planets.write_bytes(b"corrupt")
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             Path(dest).write_bytes(b"fresh")
 
         with (
@@ -585,7 +585,7 @@ class TestDownloadAssistData:
         planets.write_bytes(b"old")
         calls = []
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             calls.append(description)
             Path(dest).write_bytes(b"new")
 
@@ -624,7 +624,7 @@ class TestDownloadAssistData:
         planets = tmp_path / "linux_p1550p2650.440"
         planets.write_bytes(b"corrupt")
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             Path(dest).write_bytes(b"fresh")
 
         with (
@@ -658,7 +658,7 @@ class TestDownloadAssistData:
         """target_dir=None uses _ASSIST_DEFAULT_DIR (lines 398-399)."""
         fake_default = tmp_path / "default_assist"
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             Path(dest).write_bytes(b"x")
 
         with (
