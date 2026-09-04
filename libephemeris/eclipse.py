@@ -12213,6 +12213,68 @@ def get_inex_number(
     return best_match_series
 
 
+def _validate_path_sampling(
+    jd_start: float, jd_end: float, step_minutes: float, function: str
+) -> float:
+    """Validate a shadow-path sampling window and return its step in days.
+
+    The three path samplers walk an instant from ``jd_start`` and stop once
+    it passes ``jd_end``. That exit depends on the instant actually
+    advancing, which is a stronger requirement than a positive step:
+
+    * a zero or negative step moves it backwards or not at all, so the
+      condition never becomes false and the call never returns;
+    * a step small enough that ``jd + step`` rounds back to ``jd`` does the
+      same, and a sign test accepts it. Julian dates are ~2.4e6, so their
+      representable spacing is around 5e-10 d — roughly 7e-7 minutes — and
+      any step below that is inert;
+    * a non-finite bound makes ``jd <= jd_end`` either always false or,
+      for two infinities, always true with no possible progress.
+
+    The advancement test uses the caller's own ``jd_start`` rather than a
+    fixed epsilon, so it stays correct across the whole ephemeris range,
+    where that spacing changes with the magnitude of the date.
+
+    Args:
+        jd_start: First instant of the sampling window (JD UT).
+        jd_end: Last instant of the sampling window (JD UT).
+        step_minutes: Sampling interval in minutes.
+        function: Name of the calling function, for the error message.
+
+    Returns:
+        The sampling interval expressed in days.
+
+    Raises:
+        InputValidationError: If a bound is not finite, or the step is not a
+            finite positive value that advances ``jd_start``.
+    """
+    from .exceptions import InputValidationError
+
+    for name, bound in (("jd_start", jd_start), ("jd_end", jd_end)):
+        if not math.isfinite(float(bound)):
+            raise InputValidationError(
+                f"{function}: {name} must be a finite Julian Day, got {bound!r}"
+            )
+
+    step = float(step_minutes)
+    if not math.isfinite(step):
+        raise InputValidationError(
+            f"{function}: step_minutes must be a finite number, got {step_minutes!r}"
+        )
+    if step <= 0.0:
+        raise InputValidationError(
+            f"{function}: step_minutes must be positive, got {step!r}"
+        )
+
+    step_days = step / (24.0 * 60.0)
+    if float(jd_start) + step_days <= float(jd_start):
+        raise InputValidationError(
+            f"{function}: step_minutes {step!r} is too small to advance "
+            f"JD {jd_start!r}; the sampler would never reach jd_end"
+        )
+    return step_days
+
+
 def calc_eclipse_central_line(
     jd_start: float,
     jd_end: float,
@@ -12290,12 +12352,13 @@ def calc_eclipse_central_line(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac, Ch. 11
     """
+    step_days = _validate_path_sampling(
+        jd_start, jd_end, step_minutes, "calc_eclipse_central_line"
+    )
+
     times_list: list[float] = []
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
-
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
 
     # Iterate through time range
     jd = jd_start
@@ -12379,12 +12442,13 @@ def calc_eclipse_northern_limit(
     # WGS84 ellipsoid parameters
     EARTH_FLATTENING = 1.0 / 298.257223563
 
+    step_days = _validate_path_sampling(
+        jd_start, jd_end, step_minutes, "calc_eclipse_northern_limit"
+    )
+
     times_list: list[float] = []
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
-
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
 
     # Iterate through time range
     jd = jd_start
@@ -12536,12 +12600,13 @@ def calc_eclipse_southern_limit(
     # WGS84 ellipsoid parameters
     EARTH_FLATTENING = 1.0 / 298.257223563
 
+    step_days = _validate_path_sampling(
+        jd_start, jd_end, step_minutes, "calc_eclipse_southern_limit"
+    )
+
     times_list: list[float] = []
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
-
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
 
     # Iterate through time range
     jd = jd_start
