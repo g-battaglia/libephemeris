@@ -283,6 +283,35 @@ def test_registration_error_lists_what_the_kernel_does_carry(tmp_path):
 
 
 @pytest.mark.unit
+def test_a_reader_exposing_no_segments_is_not_refused(tmp_path):
+    """Silence from the reader is not evidence that the target is absent.
+
+    Refusing every id because a reader reports no summaries would be a
+    worse failure than the missing check it replaces.
+    """
+
+    class _Opaque:
+        segments: list = []
+
+        def compute_type21(self, center, target, jd1, jd2=0.0):  # pragma: no cover
+            return ([0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
+
+    path = tmp_path / "opaque.bsp"
+    path.write_bytes(b"\x00" * 16)
+    saved = dict(state._SPK_BODY_MAP)
+    try:
+        with (
+            patch("libephemeris.spk._detect_spk_type", return_value=21),
+            patch("libephemeris.spk._load_type21_kernel", return_value=_Opaque()),
+        ):
+            spk.register_spk_body(CHIRON, str(path), _NAIF)
+        assert CHIRON in state._SPK_BODY_MAP
+    finally:
+        state._SPK_BODY_MAP.clear()
+        state._SPK_BODY_MAP.update(saved)
+
+
+@pytest.mark.unit
 def test_registration_accepts_a_matching_target(tmp_path):
     path = tmp_path / "chiron.bsp"
     path.write_bytes(b"\x00" * 16)

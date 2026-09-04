@@ -701,11 +701,15 @@ def register_spk_body(
         # ValueError('Invalid Target and/or Center') inside the reader, which
         # the caller catches and answers from the Keplerian approximation.
         # A registration error is the right place to learn this.
-        if not _type21_segments_for(kernel, naif_id):
+        # Only enforce when the reader actually exposes summaries. A reader
+        # that reports none tells us nothing about the kernel, and refusing
+        # every id on that silence would be worse than the missing check.
+        kernel_segments = getattr(kernel, "segments", None)
+        if kernel_segments and not _type21_segments_for(kernel, naif_id):
             available = sorted(
                 {
                     int(segment.target)
-                    for segment in getattr(kernel, "segments", [])
+                    for segment in kernel_segments
                     if getattr(segment, "data_type", None) == 21
                     and getattr(segment, "target", None) is not None
                 }
