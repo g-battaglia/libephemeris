@@ -1371,10 +1371,15 @@ def parse_orbital_elements(filepath: Union[str, Path]) -> List[OrbitalElements]:
         >>> [element.name for element in elements]
         ['MyPlanet']
     """
+    given = filepath
     filepath = Path(filepath)
 
-    if not filepath.exists():
-        raise FileNotFoundError(f"Orbital elements file not found: {filepath}")
+    # is_file(), not exists(): Path("") is Path("."), and a directory exists.
+    # The guard was bypassed for the empty string and for any directory path,
+    # so open() raised IsADirectoryError instead of the documented
+    # FileNotFoundError. The message names what the caller actually passed.
+    if not filepath.is_file():
+        raise FileNotFoundError(f"Orbital elements file not found: {given!r}")
 
     elements: List[OrbitalElements] = []
 

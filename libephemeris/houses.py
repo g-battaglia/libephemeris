@@ -120,6 +120,13 @@ from .time_utils import deltat as _deltat
 _SIGN_PINNED_HSYS = frozenset({"W", "N"})
 
 
+# An int outside the character range is an unknown house-system selector like
+# any other. Letting chr() raise made -1 fail with an untyped ValueError while
+# 999 - equally unmapped - fell through to the documented default. U+FFFD is
+# never a house-system code, so it reaches that same default.
+_UNKNOWN_HSYS_CHAR = "\ufffd"
+
+
 def _fold_hsys_case(hsys_char: str) -> str:
     """Fold a house-system selector to its canonical case.
 
@@ -773,14 +780,7 @@ def houses(
     # Determine if we need to flip MC (and thus ARMC) for specific systems
     # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
 
-    hsys_char: str
-    if isinstance(hsys, int):
-        hsys_char = chr(hsys)
-    elif isinstance(hsys, bytes):
-        hsys_char = hsys.decode("latin-1")
-    else:
-        hsys_char = str(hsys)
-    hsys_char = _fold_hsys_case(hsys_char)
+    hsys_char = _hsys_to_char(hsys)
 
     # Determine if we need to flip MC (and thus ARMC) for specific systems
     # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
@@ -1158,7 +1158,7 @@ def houses_with_fallback(
         "N": "Natural Gradient",
     }
 
-    hsys_char = _fold_hsys_case(chr(hsys) if isinstance(hsys, int) else hsys)
+    hsys_char = _hsys_to_char(hsys)
     fallback_char = (
         chr(fallback_hsys) if isinstance(fallback_hsys, int) else fallback_hsys
     )
@@ -1269,7 +1269,7 @@ def houses_armc_with_fallback(
         "N": "Natural Gradient",
     }
 
-    hsys_char = _fold_hsys_case(chr(hsys) if isinstance(hsys, int) else hsys)
+    hsys_char = _hsys_to_char(hsys)
     fallback_char = (
         chr(fallback_hsys) if isinstance(fallback_hsys, int) else fallback_hsys
     )
@@ -1366,14 +1366,7 @@ def houses_armc(
     armc_deg = armc % 360.0
 
     # Convert house system identifier to character
-    hsys_char: str
-    if isinstance(hsys, int):
-        hsys_char = chr(hsys)
-    elif isinstance(hsys, bytes):
-        hsys_char = hsys.decode("latin-1")
-    else:
-        hsys_char = str(hsys)
-    hsys_char = _fold_hsys_case(hsys_char)
+    hsys_char = _hsys_to_char(hsys)
 
     # Determine if we need to flip MC (and thus ARMC) for specific systems
     # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
@@ -1635,9 +1628,19 @@ def houses_armc(
 
 
 def _hsys_to_char(hsys: int | bytes | str) -> str:
-    """Normalize a house-system selector (int code, bytes, or str) to a char."""
+    """Normalize a house-system selector (int code, bytes, or str) to a char.
+
+    An integer outside the Unicode range is an unknown selector like any
+    other and folds to ``_UNKNOWN_HSYS_CHAR``. Letting ``chr()`` raise made
+    one class of unknown selector fail with an untyped ValueError while
+    every other unmapped value reached the documented default.
+    """
     if isinstance(hsys, int):
-        return _fold_hsys_case(chr(hsys))
+        try:
+            hsys_char = chr(hsys)
+        except (ValueError, OverflowError):
+            return _UNKNOWN_HSYS_CHAR
+        return _fold_hsys_case(hsys_char)
     if isinstance(hsys, bytes):
         return _fold_hsys_case(hsys.decode("latin-1"))
     return _fold_hsys_case(str(hsys))
@@ -2080,13 +2083,7 @@ def houses_ex(
     """
     # House-system character, needed up front to seed the tropical computation
     # for the ayanamsha-mode sidereal Sunshine 'i'.
-    if isinstance(hsys, int):
-        hsys_char = chr(hsys)
-    elif isinstance(hsys, bytes):
-        hsys_char = hsys.decode("latin-1")
-    else:
-        hsys_char = str(hsys)
-    hsys_char = _fold_hsys_case(hsys_char)
+    hsys_char = _hsys_to_char(hsys)
 
     # In an ayanamsha (non-fixed-epoch) sidereal zodiac the reference computes
     # Sunshine 'i' (Makransky) identically to 'I' (Treindl): the Makransky
@@ -2115,13 +2112,7 @@ def houses_ex(
 
         _sidm_hx = _get_sid_mode_hx()
         if _sidm_hx in FIXED_EPOCH_T0:
-            if isinstance(hsys, int):
-                _hch = chr(hsys)
-            elif isinstance(hsys, bytes):
-                _hch = hsys.decode("latin-1")
-            else:
-                _hch = str(hsys)
-            _hch = _fold_hsys_case(_hch)
+            _hch = _hsys_to_char(hsys)
             cusps, ascmc = _houses_fixed_epoch_sidereal(
                 tjdut, lat, _hch, cusps, ascmc, flags, _sidm_hx
             )
@@ -2440,14 +2431,7 @@ def house_name(hsys: int) -> str:
     """
     Get the name of a house system.
     """
-    hsys_char: str
-    if isinstance(hsys, int):
-        hsys_char = chr(hsys)
-    elif isinstance(hsys, bytes):
-        hsys_char = hsys.decode("latin-1")
-    else:
-        hsys_char = str(hsys)
-    hsys_char = _fold_hsys_case(hsys_char)
+    hsys_char = _hsys_to_char(hsys)
 
     names = {
         "P": "Placidus",

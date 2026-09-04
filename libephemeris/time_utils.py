@@ -487,6 +487,10 @@ def date_conversion(
     # Black-box compatibility: the public API accepts bytes calendar codes.
     if isinstance(calendar, bytes):
         calendar = calendar.decode("ascii")
+    # Type first: normalising before validating let a non-string leak
+    # AttributeError from .lower() instead of this function's own ValueError.
+    if not isinstance(calendar, str):
+        raise ValueError(f"calendar must be 'j' or 'g', got: {calendar!r}")
     calendar = calendar.lower()
     if calendar not in ("j", "g"):
         raise ValueError(f"calendar must be 'j' or 'g', got: {calendar!r}")

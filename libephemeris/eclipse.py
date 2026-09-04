@@ -87,21 +87,20 @@ from .constants import (
     ECL_3RD_VISIBLE,
     ECL_4TH_VISIBLE,
 )
-from .exceptions import Error, LEBCorruptionError, UnknownBodyError
+from .exceptions import (
+    Error,
+    IllegalBodyError,
+    LEBCorruptionError,
+    UnknownBodyError,
+)
 from .planets import calc_ut
 from .state import get_calc_mode, get_timescale
 
 
-class _IllegalRiseBodyError(UnknownBodyError, ValueError):
-    """A rise/set/transit target that no active backend can place.
-
-    Raised for an unknown or unsupported body id passed to ``rise_trans`` /
-    ``rise_trans_true_hor`` (e.g. a planetary moon with no registered SPK).
-    It multiply inherits the typed ``UnknownBodyError`` (an ``Error``
-    subclass, the compatibility-contract class for an illegal body) AND the
-    built-in ``ValueError`` so the single "illegal planet number" contract is
-    identical on every backend and satisfies callers catching either type.
-    """
+# Retained as an internal alias: the class itself is public so that a
+# traceback names libephemeris.exceptions.IllegalBodyError rather than an
+# underscore-prefixed internal one.
+_IllegalRiseBodyError = IllegalBodyError
 
 
 _ACTIVE_LEB_READER = object()
@@ -134,8 +133,18 @@ _LEB_RANGE_MISS_RE = re.compile(
 )
 _LEB_RANGE_MISS_BODY_RE = re.compile(r"for body (?P<body>\d+)")
 _LEB_BODY_MISS_RE = re.compile(
-    r"Body (?P<body>\d+) not in (?:any )?(?:LEB file|installed LEB tier)"
+    r"Body (?P<body>-?\d+) not in (?:any )?(?:LEB file|installed LEB tier)"
 )
+
+
+def _is_leb_body_miss(exc: BaseException) -> bool:
+    """Return True when the reader reports a body absent from every tier.
+
+    Distinct from :func:`_is_leb_out_of_range`, which is about the date. A
+    body miss is a property of the request, not of the artifact's coverage
+    window, and must never reach a caller as a bare ``KeyError``.
+    """
+    return isinstance(exc, KeyError) and bool(_LEB_BODY_MISS_RE.search(str(exc)))
 
 
 def _raise_if_sealed_leb_miss(exc: BaseException) -> None:
@@ -225,7 +234,10 @@ def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
             # Sealed leb mode never returns here: the miss surfaces as the
             # documented typed error (or re-raises verbatim).
             _raise_if_sealed_leb_miss(exc)
-            if not _is_leb_out_of_range(exc):
+            # A body the installed artifact does not carry is exactly what
+            # the non-LEB retry exists for, and letting its KeyError escape
+            # put an untyped error on a public entry point.
+            if not (_is_leb_out_of_range(exc) or _is_leb_body_miss(exc)):
                 raise
     return impl(*args, reader=None, **kwargs)
 
@@ -6363,6 +6375,20 @@ def _reject_moon_self_occultation(body: "int | str") -> None:
         raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
 
 
+def _reject_non_occultable_body(body: "int | str") -> None:
+    """Reject an occultation target that is not a body.
+
+    Negative ids are reserved for pseudo-targets such as ``ECL_NUT`` (-1),
+    which calc_ut answers with obliquity and nutation rather than a
+    position. Asking for its occultation is meaningless, and without this
+    guard the request reached the ephemeris reader and surfaced as a bare
+    ``KeyError`` from an internal lookup instead of the typed error every
+    other unknown body gets.
+    """
+    if isinstance(body, int) and body < 0:
+        raise UnknownBodyError("illegal planet number %d." % body, body_id=body)
+
+
 def lun_occult_when_glob(
     tjdut: float,
     body: "int | str",
@@ -6393,6 +6419,7 @@ def lun_occult_when_glob(
         first time slot.
     """
     _reject_moon_self_occultation(body)
+    _reject_non_occultable_body(body)
     from .exceptions import Error
     from .constants import ECL_ONE_TRY
 
@@ -6882,6 +6909,7 @@ def lun_occult_when_loc(
         azimuth and altitude, elongation, and the event contact times.
     """
     _reject_moon_self_occultation(body)
+    _reject_non_occultable_body(body)
 
     # Validate geopos
     if len(geopos) < 3:
@@ -7007,6 +7035,7 @@ def lun_occult_where(
         Tuple of (retflag, geopos, attr) matching the reference API.
     """
     _reject_moon_self_occultation(body)
+    _reject_non_occultable_body(body)
     if isinstance(body, int):
         from .fixed_stars import FIXED_STARS as _FS
         from .fixed_stars import get_canonical_star_name as _star_name_by_id
@@ -12065,9 +12094,14 @@ def get_saros_number(
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
         - van Gent, R.H. "A Catalogue of Eclipse Cycles"
     """
-    if eclipse_type.lower() not in ("solar", "lunar"):
+    # Type first: .lower() on a non-string leaked AttributeError instead of
+    # this function's own ValueError.
+    if not isinstance(eclipse_type, str) or eclipse_type.lower() not in (
+        "solar",
+        "lunar",
+    ):
         raise ValueError(
-            f"eclipse_type must be 'solar' or 'lunar', got '{eclipse_type}'"
+            f"eclipse_type must be 'solar' or 'lunar', got {eclipse_type!r}"
         )
     saros_series, _ = _get_saros_info(jd_eclipse, eclipse_type)
     return int(saros_series)
@@ -12173,13 +12207,19 @@ def get_inex_number(
         - Meeus, J. "Mathematical Astronomy Morsels"
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
     """
+    # Type first: .lower() on a non-string leaked AttributeError instead of
+    # this function's own ValueError.
+    if not isinstance(eclipse_type, str):
+        raise ValueError(
+            f"eclipse_type must be 'solar' or 'lunar', got {eclipse_type!r}"
+        )
     if eclipse_type.lower() == "solar":
         references = _SOLAR_INEX_REFERENCES
     elif eclipse_type.lower() == "lunar":
         references = _LUNAR_INEX_REFERENCES
     else:
         raise ValueError(
-            f"eclipse_type must be 'solar' or 'lunar', got '{eclipse_type}'"
+            f"eclipse_type must be 'solar' or 'lunar', got {eclipse_type!r}"
         )
 
     # Use the first reference eclipse as our anchor point

@@ -77,6 +77,7 @@ from .exceptions import (
     # Category: Data not found errors
     DataNotFoundError,
     UnknownBodyError,
+    IllegalBodyError,
     StarNotFoundError,
     SPKNotFoundError,
     SPKRequiredError,
@@ -647,6 +648,10 @@ def date_conversion(
     """
     if isinstance(cal, bytes):
         cal = cal.decode("ascii")
+    # Validate the type before normalising: .lower() on a non-string leaked
+    # AttributeError instead of this function's documented ValueError.
+    if not isinstance(cal, str):
+        raise ValueError(f"calendar must be 'j' or 'g', got: {cal!r}")
     cal_char = cal.lower()
     if cal_char not in ("j", "g"):
         raise ValueError(f"calendar must be 'j' or 'g', got: {cal!r}")
@@ -701,6 +706,7 @@ __all__ = [
     # Exceptions - Data Not Found Category
     "DataNotFoundError",
     "UnknownBodyError",
+    "IllegalBodyError",
     "StarNotFoundError",
     "SPKNotFoundError",
     "SPKRequiredError",
