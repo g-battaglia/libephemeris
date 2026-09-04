@@ -409,11 +409,19 @@ class TestUsableCoverage:
             assert source == "SPK", jd_tdb
             assert math.isfinite(pos[3]) and pos[3] != 0.0
 
-    def test_outside_the_reported_span_is_a_range_miss(self, synthetic):
+    def test_outside_the_reported_span_is_a_range_miss(self, synthetic, monkeypatch):
         path, _ = synthetic(10)
         start, end = spk.get_spk_coverage(path)
         ts = _ts()
         eph.set_strict_precision(False)
+        # The out-of-coverage chain lands on ASSIST when its data files are
+        # installed and on the Keplerian elements otherwise; pin the latter so
+        # the assertions below do not depend on the machine.
+        from libephemeris import rebound_integration
+
+        monkeypatch.setattr(
+            rebound_integration, "check_assist_data_available", lambda: False
+        )
         one_second = 1.0 / 86400.0
         # Light-time band, exclusive end, beyond the end: never served.
         for jd_tdb, flags in (
