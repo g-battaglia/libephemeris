@@ -41,7 +41,7 @@ from libephemeris.constants import (
     FLG_TRUEPOS,
     NAIF_ASTEROID_OFFSET,
 )
-from libephemeris.exceptions import EphemerisRangeError
+from libephemeris.exceptions import EphemerisRangeError, SPKEvaluationError
 
 
 # ---------------------------------------------------------------------------
@@ -93,16 +93,24 @@ class _FakeSegment:
 
 
 class _FakeType21Kernel:
-    """Double for an spktype21 kernel object."""
+    """Double for an spktype21 kernel object.
 
-    def __init__(self, fail=False):
+    ``segments`` is empty by default (a reader without summaries); pass
+    ``segments=[...]`` to exercise the coverage/center helpers.
+    """
+
+    def __init__(self, fail=False, segments=None):
         self._fail = fail
+        self.segments = list(segments or [])
 
-    def compute_type21(self, center, naif_id, jd):
+    def compute_type21(self, center, naif_id, jd, jd2=0.0):
         if self._fail:
             raise ValueError("boom")
         # Return a plausible heliocentric position (km) and velocity (km/s).
         return ([1.0e8, 2.0e8, 3.0e7], [1.0, 2.0, 0.5])
+
+    def close(self):
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -631,58 +639,63 @@ class TestGetSpkCoverage:
             assert spk.get_spk_coverage("found.bsp") is None
 
     def test_type21_coverage(self, tmp_path):
-        """Type 21: iterate jplephem segments and compute (726->725, 735-736)."""
+        """Type 21: usable span over the file's type-21 targets, read through
+        the reader (segments without start/end are skipped)."""
         f = tmp_path / "t21.bsp"
         f.write_bytes(b"\x00" * 16)
 
-        fake_spk = MagicMock()
-        fake_spk.segments = [
-            _FakeSegment(start_jd=2451545.0, end_jd=2470000.0),
-            _FakeSegment(start_jd=2440000.0, end_jd=2460000.0),
-            _FakeSegment(),  # no start_jd/end_jd -> 726->725 skip branch
-        ]
-        fake_mod = types.ModuleType("jplephem.spk")
-        fake_mod.SPK = MagicMock()
-        fake_mod.SPK.open = MagicMock(return_value=fake_spk)
+        kernel = _FakeType21Kernel(
+            segments=[
+                _FakeSegment(
+                    target=20002060, data_type=21, start_jd=2451545.0, end_jd=2470000.0
+                ),
+                _FakeSegment(
+                    target=20002060, data_type=21, start_jd=2440000.0, end_jd=2460000.0
+                ),
+                _FakeSegment(target=20002060, data_type=21),  # no start/end
+            ]
+        )
+        for seg in kernel.segments:
+            seg.center = 10
 
         with (
             patch("libephemeris.spk._detect_spk_type", return_value=21),
-            patch.dict(sys.modules, {"jplephem.spk": fake_mod}),
+            patch("libephemeris.spk._get_spktype21") as mock_reader,
         ):
+            mock_reader.return_value.open = MagicMock(return_value=kernel)
             cov = spk.get_spk_coverage(str(f))
-        assert cov == (2440000.0, 2470000.0)
+        assert cov is not None
+        start, end = cov
+        stencil = spk._type21_speed_stencil_days()
+        # Start: stored start + light-time band (~2.2 AU from the fake state
+        # plus the Earth reach) + stencil; end: stored end minus the stencil.
+        assert start > 2440000.0 + stencil
+        assert start < 2440000.0 + 0.05
+        assert end == pytest.approx(2470000.0 - stencil, abs=1e-9)
 
     def test_type21_no_valid_segments(self, tmp_path):
-        """Type 21: segments lack start/end -> start_jd None -> None (735->739)."""
+        """Type 21: no type-21 target with start/end -> None."""
         f = tmp_path / "t21.bsp"
         f.write_bytes(b"\x00" * 16)
 
-        fake_spk = MagicMock()
-        # Segments with no start_jd/end_jd attributes at all.
-        fake_spk.segments = [_FakeSegment(), _FakeSegment()]
-        fake_mod = types.ModuleType("jplephem.spk")
-        fake_mod.SPK = MagicMock()
-        fake_mod.SPK.open = MagicMock(return_value=fake_spk)
-
+        kernel = _FakeType21Kernel(segments=[_FakeSegment(), _FakeSegment()])
         with (
             patch("libephemeris.spk._detect_spk_type", return_value=21),
-            patch.dict(sys.modules, {"jplephem.spk": fake_mod}),
+            patch("libephemeris.spk._get_spktype21") as mock_reader,
         ):
+            mock_reader.return_value.open = MagicMock(return_value=kernel)
             assert spk.get_spk_coverage(str(f)) is None
 
     def test_type21_coverage_exception(self, tmp_path):
-        """Type 21: jplephem raising -> None (737-739)."""
+        """Type 21: the reader raising on open -> None."""
         f = tmp_path / "t21.bsp"
         f.write_bytes(b"\x00" * 16)
 
-        fake_mod = types.ModuleType("jplephem.spk")
-        fake_mod.SPK = MagicMock()
-        fake_mod.SPK.open = MagicMock(side_effect=OSError("nope"))
-
         with (
             patch("libephemeris.spk._detect_spk_type", return_value=21),
-            patch.dict(sys.modules, {"jplephem.spk": fake_mod}),
+            patch("libephemeris.spk._get_spktype21") as mock_reader,
         ):
+            mock_reader.return_value.open = MagicMock(side_effect=OSError("nope"))
             assert spk.get_spk_coverage(str(f)) is None
 
     def test_type2_load_failure_returns_none(self, tmp_path):
@@ -977,11 +990,13 @@ class TestCalcType21Position:
         _pole_pos = [0.0, _y * _au_km, _z * _au_km]
 
         class _PoleKernel:
-            def compute_type21(self, c, naif, jd):
+            def compute_type21(self, c, naif, jd, jd2=0.0):
                 return (list(_pole_pos), [0.0, 0.0, 0.0])
 
-        # Heliocentric so pos_final == pos_ecl (stays at the pole).
-        result = self._run(FLG_HELCTR | FLG_SPEED, kernel=_PoleKernel())
+        # Heliocentric with FLG_TRUEPOS: the observer is the Sun and the
+        # emission epoch is the observation epoch, so the Sun-relative state
+        # is exactly the fake pole vector.
+        result = self._run(FLG_HELCTR | FLG_SPEED | FLG_TRUEPOS, kernel=_PoleKernel())
         assert result is not None
         # x == y == 0 -> longitude speed is zero.
         assert result[3] == 0.0
@@ -1011,32 +1026,36 @@ class TestCalcType21Position:
         assert result is not None
 
     def test_light_time_compute_fails(self):
-        """compute_type21 raising during light-time loop -> None (1113-1116)."""
+        """compute_type21 raising during the light-time loop -> typed error."""
         kernel = _FakeType21Kernel(fail=True)
-        assert self._run(FLG_SPEED, kernel=kernel) is None
+        with pytest.raises(SPKEvaluationError, match="could not evaluate"):
+            self._run(FLG_SPEED, kernel=kernel)
 
     def test_no_lighttime_compute_fails(self):
-        """compute_type21 raising on the no-light-time branch -> None
-        (1136-1138)."""
+        """compute_type21 raising on the no-light-time branch -> typed error."""
         kernel = _FakeType21Kernel(fail=True)
-        assert self._run(FLG_TRUEPOS, kernel=kernel) is None
+        with pytest.raises(SPKEvaluationError):
+            self._run(FLG_TRUEPOS, kernel=kernel)
 
     def test_final_compute_fails(self):
-        """Final compute raising -> None (1143-1145).
+        """Final compute raising -> typed error, never a silent None.
 
         First three light-time computes succeed, the final one fails.
         """
         calls = {"n": 0}
 
         class _K:
-            def compute_type21(self, c, naif, jd):
+            segments = []
+
+            def compute_type21(self, c, naif, jd, jd2=0.0):
                 calls["n"] += 1
                 # 3 iterations in the light-time loop, then the final compute.
                 if calls["n"] >= 4:
                     raise ValueError("final fail")
                 return ([1.0e8, 2.0e8, 3.0e7], [1.0, 2.0, 0.5])
 
-        assert self._run(FLG_SPEED, kernel=_K()) is None
+        with pytest.raises(SPKEvaluationError, match="final fail"):
+            self._run(FLG_SPEED, kernel=_K())
 
 
 # ---------------------------------------------------------------------------
@@ -1233,18 +1252,23 @@ class _WrapTarget:
 
 class TestCalcSpkBodyPosition:
     def test_type21_out_of_coverage_raises(self):
-        """Type 21, jd outside coverage -> EphemerisRangeError (1385-1398)."""
+        """Type 21 jd outside the usable coverage -> EphemerisRangeError."""
         state._SPK_BODY_MAP[CHIRON] = ("f.bsp", 20002060)
         ts = state.get_timescale()
         t = ts.tt_jd(2451545.0)
+        kernel = _FakeType21Kernel(
+            segments=[
+                _FakeSegment(
+                    target=20002060, data_type=21, start_jd=2460000.0, end_jd=2470000.0
+                )
+            ]
+        )
+        kernel.segments[0].center = 10
         with (
             patch("libephemeris.spk._detect_spk_type", return_value=21),
-            patch(
-                "libephemeris.spk.get_spk_coverage",
-                return_value=(2460000.0, 2470000.0),
-            ),
+            patch("libephemeris.spk._load_type21_kernel", return_value=kernel),
         ):
-            with pytest.raises(EphemerisRangeError):
+            with pytest.raises(EphemerisRangeError, match="usable coverage"):
                 spk.calc_spk_body_position(t, CHIRON, 0)
 
     def test_type21_success(self):
@@ -1283,7 +1307,7 @@ class TestCalcSpkBodyPosition:
             assert spk.calc_spk_body_position(t, CHIRON, 0) is None
 
     def test_type21_kernel_none(self):
-        """Type 21 kernel load fails -> None (1404-1405)."""
+        """Type 21 kernel that can no longer be opened -> typed error, not None."""
         state._SPK_BODY_MAP[CHIRON] = ("f.bsp", 20002060)
         ts = state.get_timescale()
         t = ts.tt_jd(2451545.0)
@@ -1292,7 +1316,8 @@ class TestCalcSpkBodyPosition:
             patch("libephemeris.spk.get_spk_coverage", return_value=None),
             patch("libephemeris.spk._load_type21_kernel", return_value=None),
         ):
-            assert spk.calc_spk_body_position(t, CHIRON, 0) is None
+            with pytest.raises(SPKEvaluationError, match="could not be opened"):
+                spk.calc_spk_body_position(t, CHIRON, 0)
 
     def test_type2_kernel_none(self):
         """Type 2/3 with no cached kernel -> None (1408-1410)."""

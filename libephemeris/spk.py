@@ -55,6 +55,7 @@ import re
 import ssl
 import tempfile
 import time
+from contextlib import contextmanager
 from typing import Optional, Union
 
 import certifi
@@ -93,6 +94,53 @@ _PROGRESS_THRESHOLD_BYTES = 1 * 1024 * 1024
 
 # Obliquity of J2000 for ICRS to ecliptic rotation
 _OBLIQUITY_J2000_RAD = math.radians(23.4392911)
+
+# Kilometres per astronomical unit (IAU 2012 Resolution B2) and the speed of
+# light in AU/day (c = 299792.458 km/s, CODATA), shared by the type-21 state
+# conversion and the light-time edge sizing.
+_AU_KM = 149597870.7
+_C_AU_DAY = 173.1446326846693
+
+# Center assumed for a type-21 kernel whose reader exposes no segment
+# summaries: JPL Horizons small-body kernels are heliocentric.
+_TYPE21_DEFAULT_CENTER = 10
+
+# Upper bounds (AU) on the Earth-to-center distance for the centers a type-21
+# kernel may declare. Earth's aphelion is 1.017 AU and the Sun stays within
+# 0.02 AU of the barycenter (NASA planetary fact sheet), so 1.1 AU bounds both
+# the Earth-to-Sun and the Earth-to-barycenter distance. A planetary-system
+# center (barycenter 1-9, or a body of that system such as 399 or 301) adds
+# that system's aphelion, rounded up to the next 0.1 AU (same source).
+_EARTH_REACH_FROM_SUN_OR_SSB_AU = 1.1
+_PLANET_SYSTEM_APHELION_AU = {
+    1: 0.5,
+    2: 0.8,
+    3: 1.1,
+    4: 1.7,
+    5: 5.5,
+    6: 10.2,
+    7: 20.2,
+    8: 30.4,
+    9: 49.4,
+}
+
+# Offset (days) of the light-time distance probe from the first segment
+# start. The reader converts JD to seconds past J2000; probing a hair inside
+# the segment keeps that round trip clear of the inclusive lower bound.
+_TYPE21_PROBE_OFFSET_DAYS = 1.0e-6
+
+# Half-step (days) of the FLG_SPEED central difference in the direct type-21
+# path (_calc_type21_position). The planet pipeline's own half-steps live in
+# planets.py; _type21_speed_stencil_days() takes the largest of them all.
+_TYPE21_LEGACY_SPEED_HALF_STEP_DAYS = 1.0 / 86400.0
+
+# Tolerances (days) when deciding whether a cached kernel covers a requested
+# date range. The reported start is the usable start, one light-time plus
+# the speed stencil inside the stored span: 1.5 days absorbs that band for
+# any body within ~250 AU. The end tolerance covers the stencil and the
+# sub-day rounding of Horizons coverage boundaries.
+_SPK_COVERAGE_START_TOLERANCE_DAYS = 1.5
+_SPK_COVERAGE_END_TOLERANCE_DAYS = 0.5
 
 
 # =============================================================================
@@ -618,9 +666,13 @@ def _spk_covers_dates(spk_path: str, start: str, end: str) -> bool:
 
     start_jd, end_jd = _date_to_jd(start), _date_to_jd(end)
     cov_start, cov_end = coverage
-    # Horizons kernels can report coverage at sub-day precision; allow a
-    # small tolerance around midnight request boundaries.
-    return cov_start <= start_jd + 0.5 and cov_end >= end_jd - 0.5
+    # The coverage is the usable span: its start sits one light-time inside
+    # the stored data, and Horizons reports boundaries at sub-day precision,
+    # so allow the documented tolerances around the request boundaries.
+    return (
+        cov_start <= start_jd + _SPK_COVERAGE_START_TOLERANCE_DAYS
+        and cov_end >= end_jd - _SPK_COVERAGE_END_TOLERANCE_DAYS
+    )
 
 
 # =============================================================================
@@ -648,7 +700,9 @@ def register_spk_body(
 
     Raises:
         SPKNotFoundError: If SPK file not found (with helpful instructions)
-        ValueError: If naif_id not found in SPK kernel
+        ValueError: If naif_id not found in SPK kernel, or (type 21) if the
+            target's segments declare more than one center or a center the
+            base ephemeris cannot resolve
 
     Example:
         >>> register_spk_body(CHIRON, "/path/to/chiron.bsp", 2002060)
@@ -703,9 +757,20 @@ def register_spk_body(
                 f"Failed to load type 21 SPK file {spk_file}. "
                 "Install spktype21: pip install spktype21"
             )
-        # Note: spktype21 doesn't provide a way to list segments easily,
-        # so we skip validation for type 21 kernels. The computation will
-        # fail at runtime if the NAIF ID is not in the kernel.
+        # Validate the target and its center against the reader's segment
+        # summaries, as the type 2/3 branch validates against Skyfield. An
+        # unknown NAIF ID or an unresolvable center would otherwise fail on
+        # every evaluation; registration is where that belongs. A reader
+        # that exposes no summaries cannot be checked and registers as is.
+        if getattr(kernel, "segments", None):
+            if not _type21_segments_for(kernel, naif_id):
+                available = _type21_targets(kernel)
+                raise ValueError(
+                    f"NAIF ID {naif_id} has no type 21 segment in SPK kernel "
+                    f"{spk_file}. Available type 21 targets (first 10): "
+                    f"{available[:10]}"
+                )
+            _validate_type21_center(_type21_center(kernel, naif_id), naif_id, spk_file)
     else:
         # Type 2/3: Use Skyfield
         state._load_spk_kernel(spk_file)
@@ -779,15 +844,24 @@ def list_spk_bodies() -> dict[int, tuple[str, int]]:
 
 def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
     """
-    Get the time coverage of an SPK kernel.
+    Get the usable time coverage of an SPK kernel.
 
-    Supports both type 2/3 (Skyfield) and type 21 (spktype21) kernels.
+    Supports both type 2/3 (Skyfield) and type 21 (spktype21) kernels. The
+    bounds are Julian Days in TDB, the scale the kernels are evaluated in.
+
+    For a type 21 kernel the span is the one every epoch of which can be
+    served by the apparent-place pipeline: the stored span minus the
+    light-time band at its start (the pipeline retards the evaluation epoch
+    by the Earth-to-body light-time) and minus the FLG_SPEED stencil at both
+    ends. An epoch inside the returned span is never answered from a
+    lower-precision source.
 
     Args:
         spk_file: Path to SPK file
 
     Returns:
-        Tuple of (start_jd, end_jd) Julian Day coverage, or None if error.
+        Tuple of (start_jd, end_jd) Julian Day (TDB) coverage, or None if
+        the kernel exposes no readable coverage.
     """
     from . import state
 
@@ -809,29 +883,26 @@ def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
     spk_type = _detect_spk_type(spk_file)
 
     if spk_type == 21:
-        # Use jplephem to get coverage for type 21
+        # Usable span across the file's type-21 targets, read through the
+        # reader that evaluates them (registered kernels come from the cache;
+        # a scanned file is opened for the probe and closed again).
         try:
-            from jplephem.spk import SPK
-
-            spk = SPK.open(spk_file)
-            try:
-                start_jd = None
-                end_jd = None
-                for segment in spk.segments:
-                    if hasattr(segment, "start_jd") and hasattr(segment, "end_jd"):
-                        seg_start = float(segment.start_jd)
-                        seg_end = float(segment.end_jd)
-                        if start_jd is None or seg_start < start_jd:
-                            start_jd = seg_start
-                        if end_jd is None or seg_end > end_jd:
-                            end_jd = seg_end
-            finally:
-                spk.close()
-            if start_jd is not None and end_jd is not None:
-                return (start_jd, end_jd)
-        except (OSError, ValueError, KeyError, IndexError):
-            pass
-        return None
+            with _type21_kernel_for_probe(spk_file) as kernel:
+                if kernel is None:
+                    return None
+                spans = [
+                    span
+                    for span in (
+                        _type21_usable_span(kernel, target)
+                        for target in _type21_targets(kernel)
+                    )
+                    if span is not None
+                ]
+        except (OSError, ValueError, KeyError, IndexError, RuntimeError):
+            return None
+        if not spans:
+            return None
+        return (min(span[0] for span in spans), max(span[1] for span in spans))
 
     # Type 2/3: Use Skyfield
     if spk_file not in state._SPK_KERNELS:
@@ -950,88 +1021,416 @@ def _icrs_to_ecliptic_j2000(x: float, y: float, z: float) -> tuple:
 
 
 # =============================================================================
+# SPK TYPE 21: SEGMENT METADATA, CENTER RESOLUTION, USABLE COVERAGE
+# =============================================================================
+
+
+def _type21_segments_for(kernel, naif_id: int) -> list:
+    """Return the type-21 segments of ``kernel`` whose target is ``naif_id``.
+
+    The reader exposes its segment summaries (``target``, ``center``,
+    ``data_type``, ``start_jd``, ``end_jd``), so a kernel can be checked
+    against the id it is registered for and its own center can be read
+    instead of assumed. A reader without summaries yields an empty list.
+    """
+    segments = getattr(kernel, "segments", None) or []
+    return [
+        segment
+        for segment in segments
+        if getattr(segment, "target", None) == naif_id
+        and getattr(segment, "data_type", None) == 21
+    ]
+
+
+def _type21_targets(kernel) -> list[int]:
+    """Return the sorted NAIF ids that have type-21 segments in ``kernel``."""
+    segments = getattr(kernel, "segments", None) or []
+    return sorted(
+        {
+            int(segment.target)
+            for segment in segments
+            if getattr(segment, "data_type", None) == 21
+            and getattr(segment, "target", None) is not None
+        }
+    )
+
+
+def _type21_center(kernel, naif_id: int) -> int:
+    """Return the center declared by ``naif_id``'s type-21 segments.
+
+    Falls back to the heliocentric default when the reader exposes no
+    summaries. The reader serves one (target, center) pair per evaluation,
+    so segments declaring different centers for the same target are
+    rejected here rather than half-served at runtime.
+
+    Raises:
+        ValueError: If the target's segments declare more than one center.
+    """
+    centers = {
+        int(segment.center)
+        for segment in _type21_segments_for(kernel, naif_id)
+        if getattr(segment, "center", None) is not None
+    }
+    if not centers:
+        return _TYPE21_DEFAULT_CENTER
+    if len(centers) > 1:
+        raise ValueError(
+            f"NAIF ID {naif_id} has type 21 segments with different centers "
+            f"{sorted(centers)}; a single center per target is required"
+        )
+    return centers.pop()
+
+
+def _type21_earth_reach_au(center: int) -> Optional[float]:
+    """Upper bound (AU) on the distance between Earth and ``center``.
+
+    Returns None for a center that is neither the Sun, the barycenter nor a
+    planetary-system id, i.e. one the base ephemeris cannot resolve.
+    """
+    if center in (0, 10):
+        return _EARTH_REACH_FROM_SUN_OR_SSB_AU
+    if center < 0:
+        return None
+    system = center if center < 10 else center // 100
+    aphelion = _PLANET_SYSTEM_APHELION_AU.get(system)
+    if aphelion is None:
+        return None
+    return aphelion + _EARTH_REACH_FROM_SUN_OR_SSB_AU
+
+
+def _type21_center_target(center: int, planets):
+    """Return the base-ephemeris VectorFunction of ``center`` (None for the SSB).
+
+    Center 0 is the barycenter itself, so its state is identically zero. Any
+    other center is looked up by NAIF id in the base ephemeris; the lookup
+    errors propagate to the caller, which decides how to report them.
+    """
+    if center == 0:
+        return None
+    return planets[center]
+
+
+def _validate_type21_center(center: int, naif_id: int, spk_file: str) -> None:
+    """Reject, at registration, a type-21 center the runtime chain cannot use.
+
+    The Sun and the barycenter need no lookup. Any other center must be a
+    planetary-system id and must resolve in the base ephemeris now, so the
+    failure is a registration error rather than a per-evaluation one.
+
+    Raises:
+        ValueError: If the center is unknown or absent from the base ephemeris.
+    """
+    if _type21_earth_reach_au(center) is None:
+        raise ValueError(
+            f"Center {center} of NAIF ID {naif_id} in SPK kernel {spk_file} is "
+            "neither the Sun (10), the solar-system barycenter (0) nor a "
+            "planetary-system id; it cannot be resolved against the base "
+            "ephemeris"
+        )
+    if center in (0, 10):
+        return
+    from . import state
+
+    try:
+        _type21_center_target(center, state.get_planets())
+    except (KeyError, ValueError, IndexError, TypeError, RuntimeError, OSError) as exc:
+        raise ValueError(
+            f"Center {center} of NAIF ID {naif_id} in SPK kernel {spk_file} is "
+            f"not available in the base ephemeris: {exc}"
+        ) from exc
+
+
+def _type21_speed_stencil_days() -> float:
+    """Largest half-step any FLG_SPEED central difference applies to a type-21 body."""
+    from .planets import (
+        _ASTEROID_TRUEPOS_SPEED_HALF_STEP_DAYS,
+        _BODY_SPEED_HALF_STEP_DAYS,
+    )
+
+    return max(
+        _ASTEROID_TRUEPOS_SPEED_HALF_STEP_DAYS,
+        _BODY_SPEED_HALF_STEP_DAYS,
+        _TYPE21_LEGACY_SPEED_HALF_STEP_DAYS,
+    )
+
+
+def _type21_request_stencil_days(iflag: int) -> float:
+    """Half-step the planet pipeline samples around a FLG_SPEED request.
+
+    Zero without FLG_SPEED (the stencil samples themselves arrive without
+    the flag); otherwise the pipeline's own half-step for a type-21 body:
+    five minutes for the geometric place, one second for the apparent one.
+    """
+    from .constants import FLG_SPEED, FLG_TRUEPOS
+
+    if not iflag & FLG_SPEED:
+        return 0.0
+    from .planets import (
+        _ASTEROID_TRUEPOS_SPEED_HALF_STEP_DAYS,
+        _BODY_SPEED_HALF_STEP_DAYS,
+    )
+
+    if iflag & FLG_TRUEPOS:
+        return _ASTEROID_TRUEPOS_SPEED_HALF_STEP_DAYS
+    return _BODY_SPEED_HALF_STEP_DAYS
+
+
+def _type21_stored_span(kernel, naif_id: int) -> Optional[tuple[float, float]]:
+    """Return the TDB span ``[start, end)`` stored for ``naif_id``, or None.
+
+    The reader evaluates a target over the union of its segments, from the
+    earliest start (inclusive) to the latest end (exclusive).
+    """
+    segments = _type21_segments_for(kernel, naif_id)
+    starts = [float(seg.start_jd) for seg in segments if hasattr(seg, "start_jd")]
+    ends = [float(seg.end_jd) for seg in segments if hasattr(seg, "end_jd")]
+    if not starts or not ends:
+        return None
+    return min(starts), max(ends)
+
+
+def _type21_usable_span(
+    kernel,
+    naif_id: int,
+    center: Optional[int] = None,
+    *,
+    stencil_days: Optional[float] = None,
+) -> Optional[tuple[float, float]]:
+    """Return the TDB span ``[usable_start, usable_end)`` servable for ``naif_id``.
+
+    The apparent-place pipeline never evaluates the kernel at the requested
+    epoch alone: light-time retardation moves the evaluation epoch backwards
+    by up to one observer-to-body light-time, and FLG_SPEED samples a
+    half-step on either side. The stored span therefore has an unusable band
+    at its start (light-time plus stencil), while at its end only the stencil
+    is lost, because retardation moves away from the end. The light-time
+    bound is the body's distance from its center at the segment start plus
+    the Earth-to-center bound for that center, divided by c.
+
+    ``stencil_days`` selects the stencil to subtract. The default (None) is
+    the largest half-step any path applies, which is what the reported
+    coverage and the direct path (it samples its stencil internally) use.
+    The planet pipeline reaches this module once per request AND once per
+    stencil sample, so its gate passes the request's own half-step -- zero
+    for a sample, which arrives without FLG_SPEED -- and never subtracts
+    the stencil twice.
+
+    Returns None when the kernel exposes no segment metadata for the target,
+    when its center cannot be bounded, or when the distance probe fails.
+    """
+    stored = _type21_stored_span(kernel, naif_id)
+    if stored is None:
+        return None
+    start_jd, end_jd = stored
+    if center is None:
+        center = _type21_center(kernel, naif_id)
+    reach_au = _type21_earth_reach_au(center)
+    if reach_au is None:
+        return None
+    try:
+        pos_km, _vel_km_s = kernel.compute_type21(
+            center, naif_id, start_jd + _TYPE21_PROBE_OFFSET_DAYS
+        )
+    except (OSError, ValueError, KeyError, IndexError, RuntimeError):
+        return None
+    distance_au = (
+        math.sqrt(float(pos_km[0]) ** 2 + float(pos_km[1]) ** 2 + float(pos_km[2]) ** 2)
+        / _AU_KM
+    )
+    stencil = _type21_speed_stencil_days() if stencil_days is None else stencil_days
+    usable_start = start_jd + (distance_au + reach_au) / _C_AU_DAY + stencil
+    usable_end = end_jd - stencil
+    return usable_start, usable_end
+
+
+@contextmanager
+def _type21_kernel_for_probe(spk_file: str):
+    """Yield a type-21 reader for ``spk_file`` without caching an extra handle.
+
+    A registered kernel comes from the cache; an unregistered file (a cache
+    directory scan) is opened for the duration of the block and closed
+    again. Yields None when the reader module is unavailable.
+    """
+    from . import state
+
+    kernel = state._SPK_TYPE21_KERNELS.get(spk_file)
+    if kernel is not None:
+        yield kernel
+        return
+    reader_cls = _get_spktype21()
+    if reader_cls is None:
+        yield None
+        return
+    kernel = reader_cls.open(spk_file)
+    try:
+        yield kernel
+    finally:
+        kernel.close()
+
+
+# =============================================================================
 # SKYFIELD VECTORFUNCTION WRAPPER FOR SPK TYPE 21
 # =============================================================================
 
 
 class _SpkType21Target:
-    """Skyfield VectorFunction-compatible wrapper for SPK type 21 asteroids.
+    """Skyfield VectorFunction-compatible wrapper for an SPK type-21 body.
 
-    Combines spktype21 heliocentric positions with the Sun's SSB position
-    to produce SSB-centered ICRS positions, compatible with Skyfield's
-    observe()/apparent() pipeline.
+    The reader returns the body's state relative to the center its segments
+    declare. This wrapper adds the barycentric state of that center -- zero
+    for the barycenter itself, the base-ephemeris Sun for center 10, the
+    base-ephemeris body for any other center -- so the result is an
+    SSB-centered ICRS state compatible with Skyfield's observe()/apparent()
+    pipeline. Reader failures surface as SPKEvaluationError: a kernel that
+    cannot serve an epoch inside its usable coverage is never answered from
+    a lower-precision source on the caller's behalf.
 
-    This ensures asteroids use the same coordinate transformation path as
-    planets (ICRS → Skyfield frame_latlon), avoiding the ~0.3" systematic
-    error from the manual ecliptic J2000 + precession/nutation approach.
+    Routing the body through the planet pipeline keeps the same ICRS ->
+    frame_latlon reduction as the planets, avoiding the ~0.3" systematic
+    error of the manual ecliptic J2000 + precession/nutation approach.
     """
 
-    def __init__(self, kernel, naif_id: int, sun_target):
-        """Initialize with spktype21 kernel and Sun target.
+    def __init__(
+        self,
+        kernel,
+        naif_id: int,
+        center_target=None,
+        center: Optional[int] = None,
+        *,
+        spk_file: Optional[str] = None,
+        body_id: Optional[int] = None,
+    ):
+        """Initialize with a reader and the base-ephemeris target of its center.
 
         Args:
             kernel: SPKType21 kernel object
-            naif_id: NAIF ID of the asteroid in the kernel
-            sun_target: Skyfield VectorFunction for the Sun (from SSB)
+            naif_id: NAIF ID of the body in the kernel
+            center_target: Skyfield VectorFunction (SSB-relative) of the
+                center the segments declare; None when that center is the
+                barycenter itself.
+            center: NAIF id of the declared center. Read from the kernel
+                when omitted; heliocentric when the reader has no summaries.
+            spk_file: Kernel path, for error messages.
+            body_id: libephemeris body id, for error messages.
+
+        Raises:
+            ValueError: If a non-barycentric center comes without its target.
         """
         self._kernel = kernel
         self._naif_id = naif_id
-        self._sun = sun_target
+        self._segment_center = (
+            center if center is not None else _type21_center(kernel, naif_id)
+        )
+        if self._segment_center != 0 and center_target is None:
+            raise ValueError(
+                f"center_target is required for type 21 center {self._segment_center}"
+            )
+        self._center_target = None if self._segment_center == 0 else center_target
+        self._spk_file = spk_file
+        self._body_id = body_id
         self.center = 0  # SSB-centered (required for observe())
         self.target = naif_id
 
+    @property
+    def segment_center(self) -> int:
+        """NAIF id of the center the kernel segments declare."""
+        return self._segment_center
+
+    def relative_state_au(
+        self, jd_tdb: float, jd_fraction: float = 0.0
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Body state relative to the kernel center (ICRS, AU and AU/day).
+
+        Args:
+            jd_tdb: Evaluation epoch, Julian Day TDB (the reader's scale).
+            jd_fraction: Optional second part of the epoch, added to
+                ``jd_tdb`` by the reader. Passing a Skyfield time as
+                ``(whole, tdb_fraction)`` keeps sub-ULP spacing, which a
+                one-second speed stencil needs.
+
+        Raises:
+            SPKEvaluationError: If the reader cannot serve the epoch.
+        """
+        try:
+            pos_km, vel_km_s = self._kernel.compute_type21(
+                self._segment_center, self._naif_id, float(jd_tdb), float(jd_fraction)
+            )
+        except (OSError, ValueError, KeyError, IndexError, RuntimeError) as exc:
+            raise self._evaluation_error(
+                float(jd_tdb) + float(jd_fraction), exc
+            ) from exc
+        position = np.asarray(pos_km, dtype=float) / _AU_KM
+        velocity = np.asarray(vel_km_s, dtype=float) * (86400.0 / _AU_KM)
+        return position, velocity
+
+    def state_at(self, t) -> tuple[np.ndarray, np.ndarray]:
+        """SSB-centered ICRS state (AU, AU/day) at a scalar Skyfield time.
+
+        The center chain: state relative to the declared center, plus the
+        barycentric state of that center from the base ephemeris.
+        """
+        rel_pos, rel_vel = self.relative_state_au(float(t.whole), float(t.tdb_fraction))
+        if self._center_target is None:
+            return rel_pos, rel_vel
+        center = self._center_target.at(t)
+        return (
+            np.asarray(center.position.au, dtype=float) + rel_pos,
+            np.asarray(center.velocity.au_per_d, dtype=float) + rel_vel,
+        )
+
+    def _evaluation_error(self, jd_tdb: float, exc: BaseException):
+        """Build the typed error for a reader failure at ``jd_tdb``."""
+        from .exceptions import SPKEvaluationError
+
+        stored = _type21_stored_span(self._kernel, self._naif_id)
+        span_note = (
+            f" (stored segments cover [{stored[0]:.6f}, {stored[1]:.6f}) TDB)"
+            if stored is not None
+            else ""
+        )
+        where = f" {self._spk_file}" if self._spk_file else ""
+        return SPKEvaluationError(
+            f"SPK type 21 kernel{where} could not evaluate NAIF ID "
+            f"{self._naif_id} (center {self._segment_center}) at JD "
+            f"{jd_tdb:.6f} TDB{span_note}: {exc}. The position is not degraded "
+            "to the Keplerian approximation; register a kernel that serves "
+            "this epoch or unregister the body.",
+            body_id=self._body_id,
+            naif_id=self._naif_id,
+            spk_file=self._spk_file,
+            requested_jd=jd_tdb,
+        )
+
     def _at(self, t):
-        """Compute SSB-centered ICRS position at time t.
+        """Compute SSB-centered ICRS state at time t.
 
         Matches the Skyfield VectorFunction._at() protocol:
         Returns (position_au, velocity_au_per_d, gcrs_position, message).
 
         Args:
-            t: Skyfield Time object
+            t: Skyfield Time object (scalar or array)
 
         Returns:
             Tuple of (position, velocity, None, None)
         """
-        AU_KM = 149597870.7  # 1 AU in km (IAU 2012 Resolution B2)
-
-        # Get Sun SSB position (ICRS, AU)
-        sun_pos = self._sun.at(t)
-        sun_au = sun_pos.position.au
-        sun_vel = sun_pos.velocity.au_per_d
-
-        # Get heliocentric position from spktype21
-        # Handle both scalar and array times
         jd_tdb = t.tdb
         if np.ndim(jd_tdb) == 0:
-            # Scalar time
-            pos_km, vel_km_s = self._kernel.compute_type21(
-                10, self._naif_id, float(jd_tdb)
-            )
-            pos_au = np.array(pos_km) / AU_KM
-            vel_au_d = np.array(vel_km_s) * 86400.0 / AU_KM
-            # SSB = Sun + heliocentric
-            position = (
-                sun_au + pos_au.reshape(3, 1) if sun_au.ndim > 1 else sun_au + pos_au
-            )
-            velocity = (
-                sun_vel + vel_au_d.reshape(3, 1)
-                if sun_vel.ndim > 1
-                else sun_vel + vel_au_d
-            )
-        else:
-            # Array of times
-            n = len(jd_tdb)
-            position = np.empty((3, n))
-            velocity = np.empty((3, n))
-            for i in range(n):
-                pos_km, vel_km_s = self._kernel.compute_type21(
-                    10, self._naif_id, float(jd_tdb[i])
-                )
-                pos_au = np.array(pos_km) / AU_KM
-                vel_au_d = np.array(vel_km_s) * 86400.0 / AU_KM
-                position[:, i] = sun_au[:, i] + pos_au
-                velocity[:, i] = sun_vel[:, i] + vel_au_d
+            position, velocity = self.state_at(t)
+            return position, velocity, None, None
 
+        n = len(jd_tdb)
+        whole = np.asarray(t.whole, dtype=float)
+        fraction = np.asarray(t.tdb_fraction, dtype=float)
+        position = np.empty((3, n))
+        velocity = np.empty((3, n))
+        for i in range(n):
+            position[:, i], velocity[:, i] = self.relative_state_au(
+                float(whole[i]), float(fraction[i])
+            )
+        if self._center_target is not None:
+            center = self._center_target.at(t)
+            position += np.asarray(center.position.au, dtype=float)
+            velocity += np.asarray(center.velocity.au_per_d, dtype=float)
         return position, velocity, None, None
 
     def at(self, t):
@@ -1059,10 +1458,66 @@ class _SpkType21Target:
         return _correct_for_light_travel_time(observer, self)
 
     def __repr__(self):
-        return f"<SpkType21Target NAIF={self._naif_id}>"
+        return f"<SpkType21Target NAIF={self._naif_id} center={self._segment_center}>"
 
 
-def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
+def _type21_declared_center(
+    kernel, naif_id: int, spk_file: Optional[str], body_id: Optional[int]
+) -> int:
+    """Read the declared center of ``naif_id`` for the runtime paths.
+
+    Raises:
+        SPKEvaluationError: If the segments declare more than one center.
+    """
+    try:
+        return _type21_center(kernel, naif_id)
+    except ValueError as exc:
+        from .exceptions import SPKEvaluationError
+
+        raise SPKEvaluationError(
+            str(exc), body_id=body_id, naif_id=naif_id, spk_file=spk_file
+        ) from exc
+
+
+def _type21_target_for(
+    kernel,
+    naif_id: int,
+    spk_file: Optional[str] = None,
+    body_id: Optional[int] = None,
+    center: Optional[int] = None,
+) -> _SpkType21Target:
+    """Build the SSB-centered wrapper for ``naif_id`` with its center resolved.
+
+    Raises:
+        SPKEvaluationError: If the declared center is ambiguous or not
+            available in the base ephemeris.
+    """
+    from . import state
+
+    if center is None:
+        center = _type21_declared_center(kernel, naif_id, spk_file, body_id)
+    center_target = None
+    if center != 0:
+        try:
+            center_target = _type21_center_target(center, state.get_planets())
+        except (KeyError, ValueError, IndexError, TypeError) as exc:
+            from .exceptions import SPKEvaluationError
+
+            where = f" in {spk_file}" if spk_file else ""
+            raise SPKEvaluationError(
+                f"Center {center} declared by the SPK type 21 segments of NAIF "
+                f"ID {naif_id}{where} is not available in the base ephemeris: "
+                f"{exc}",
+                body_id=body_id,
+                naif_id=naif_id,
+                spk_file=spk_file,
+            ) from exc
+    return _SpkType21Target(
+        kernel, naif_id, center_target, center, spk_file=spk_file, body_id=body_id
+    )
+
+
+def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None, iflag: int = 0):
     """Get a Skyfield-compatible VectorFunction target for a type 21 asteroid.
 
     Returns a _SpkType21Target that can be used with Skyfield's observe/apparent
@@ -1070,15 +1525,23 @@ def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
 
     Args:
         ipl: libephemeris body ID (e.g., CHIRON=15, CERES=17)
-        jd_tt: Optional epoch (JD TT).  When given and outside the
-            kernel's coverage, returns None so the caller falls through
-            to the legacy path, which raises EphemerisRangeError and
-            lands on the documented Keplerian out-of-coverage fallback —
-            the same flow as type 2/3 kernels.  (A small margin covers
-            the light-time retardation at the coverage edges.)
+        jd_tt: Optional epoch (JD TT). It is converted to TDB, the reader's
+            scale, and checked against the span the kernel can serve for this
+            request: the stored span minus the light-time band at its start
+            and minus the request's own FLG_SPEED half-step at both ends
+            (see get_spk_coverage). Outside it, returns None so the caller
+            falls through to calc_spk_body_position, which raises
+            EphemerisRangeError and lands on the documented out-of-coverage
+            handling -- the same flow as type 2/3 kernels.
+        iflag: Calculation flags of the request; only FLG_SPEED and
+            FLG_TRUEPOS matter (they size the stencil).
 
     Returns:
         _SpkType21Target or None
+
+    Raises:
+        SPKEvaluationError: If the kernel's declared center is ambiguous or
+            cannot be resolved in the base ephemeris.
     """
     from . import state
 
@@ -1096,48 +1559,22 @@ def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
     if kernel is None:
         return None
 
+    center = _type21_declared_center(kernel, naif_id, spk_file, ipl)
+
     if jd_tt is not None:
-        coverage = get_spk_coverage(spk_file)
-        if coverage is not None:
-            start_jd, end_jd = coverage
-            # Outside the raw coverage: caller falls through to the direct /
-            # Keplerian out-of-coverage path.
-            if jd_tt <= start_jd or jd_tt >= end_jd:
-                return None
-            # Coverage-edge margin: Skyfield's observe() retards the target by
-            # the one-way light-time, so jd_tt must sit at least that far inside
-            # the kernel or observe() raises instead of falling through to the
-            # documented Keplerian path. Size it from the body's actual
-            # heliocentric distance — a fixed margin sized for Chiron (~0.11 d
-            # near aphelion) is far too small for distant TNOs (Eris/Sedna reach
-            # ~0.5 d). Floor at 0.2 d for the inner small bodies.
-            _AU_KM = 149597870.7
-            _C_AU_DAY = 173.1446326846693
-            try:
-                pos_km, _ = kernel.compute_type21(10, naif_id, float(jd_tt))
-                helio_au = (
-                    math.sqrt(pos_km[0] ** 2 + pos_km[1] ** 2 + pos_km[2] ** 2) / _AU_KM
-                )
-            except Exception:  # noqa: BLE001  # intentional best-effort probe
-                # Probe failed near the edge: assume a distant body (~175 AU,
-                # ~1 d light-time) so the margin is conservative, not too small.
-                # Catch broadly — the probe is best-effort and the underlying
-                # compute_type21/get_MDA_record/spke21 also raise RuntimeError
-                # (e.g. "Invalid data" / segment errors); a probe failure must
-                # never escape this margin sizing and break the documented
-                # graceful fall-through to the Keplerian out-of-coverage path.
-                helio_au = 175.0
-            # Earth's orbit adds at most ~1 AU to the geocentric distance; a
-            # 1.2 safety factor absorbs the light-time iteration and slop.
-            margin = max(0.2, (helio_au + 1.0) / _C_AU_DAY * 1.2)
-            if jd_tt < start_jd + margin or jd_tt > end_jd - margin:
+        # Gate with the request's own stencil: the planet pipeline calls back
+        # here for each FLG_SPEED sample (without the flag), so a request is
+        # accepted exactly when its samples will be (see _type21_usable_span).
+        span = _type21_usable_span(
+            kernel, naif_id, center, stencil_days=_type21_request_stencil_days(iflag)
+        )
+        if span is not None:
+            usable_start, usable_end = span
+            jd_tdb = float(get_timescale().tt_jd(jd_tt).tdb)
+            if jd_tdb < usable_start or jd_tdb >= usable_end:
                 return None
 
-    # Get the Sun target from the main ephemeris
-    planets = state.get_planets()
-    sun = planets["sun"]
-
-    return _SpkType21Target(kernel, naif_id, sun)
+    return _type21_target_for(kernel, naif_id, spk_file, ipl, center=center)
 
 
 def _calc_type21_position(
@@ -1145,12 +1582,14 @@ def _calc_type21_position(
     naif_id: int,
     t,
     iflag: int,
-) -> Optional[tuple]:
+    target: Optional[_SpkType21Target] = None,
+) -> tuple:
     """
     Calculate body position using SPK type 21 kernel.
 
-    This function uses the spktype21 library to compute heliocentric
-    coordinates, then converts to geocentric apparent positions with:
+    The reader's state (relative to the center its segments declare) is
+    completed to a barycentric ICRS state by the center chain of
+    :class:`_SpkType21Target`, then reduced to the requested observer with:
     - Light-time correction (unless FLG_TRUEPOS)
     - Aberration correction (unless FLG_NOABERR)
     - Precession to equinox of date (unless FLG_J2000)
@@ -1161,10 +1600,14 @@ def _calc_type21_position(
         naif_id: NAIF ID of the target body (e.g., 20002060 for Chiron)
         t: Skyfield Time object
         iflag: Calculation flags
+        target: Prebuilt wrapper for ``naif_id``; built here when omitted.
 
     Returns:
         Position tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        or None if calculation fails.
+
+    Raises:
+        SPKEvaluationError: If the kernel cannot serve an evaluation epoch or
+            its declared center cannot be resolved in the base ephemeris.
     """
     from . import state
     from .constants import (
@@ -1183,16 +1626,15 @@ def _calc_type21_position(
         apply_aberration_to_position,
     )
 
-    # Constants
-    AU_KM = 149597870.7
-    C_LIGHT_AU_DAY = 173.1446326846693  # Speed of light in AU/day
+    if target is None:
+        target = _type21_target_for(kernel, naif_id)
 
     # Check flags
     is_heliocentric = bool(iflag & FLG_HELCTR)
     # Light-time is applied for heliocentric output too (retarded by the
-    # Sun->body light time, see the iteration below); the reference and the
-    # rest of the library retard heliocentric positions. Aberration, however,
-    # is a geocentric-observer effect and is excluded from heliocentric output.
+    # Sun->body light time, see the iteration below); the rest of the library
+    # retards heliocentric positions as well. Aberration, however, is a
+    # geocentric-observer effect and is excluded from heliocentric output.
     apply_light_time = not (iflag & FLG_TRUEPOS)
     # FLG_TRUEPOS requests the geometric place: it suppresses aberration too,
     # exactly like the Keplerian path (planets.py) and planetary_moons.py.
@@ -1206,86 +1648,65 @@ def _calc_type21_position(
     _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
     apply_nutation = not (iflag & FLG_NONUT) and not _sid_eq and apply_precession
 
-    # Earth/Sun sources for geocentric reduction and stellar aberration.
+    # Observer for the geocentric / heliocentric reduction. Both are
+    # barycentric states, like the target chain, so the subtraction is exact
+    # whatever center the kernel declares.
     planets = state.get_planets()
-    sun = planets["sun"]
-    earth = planets["earth"]
+    observer = planets["sun"] if is_heliocentric else planets["earth"]
+    ts = get_timescale()
 
     def _of_date_lon_lat_dist(t_eval):
         """Tropical of-date (lon, lat, dist) for this type-21 body at t_eval.
 
         Runs the full apparent-place pipeline -- light-time iteration,
-        geocentric reduction, annual aberration, precession J2000->of-date, and
+        observer reduction, annual aberration, precession J2000->of-date, and
         nutation of the equinox -- so the returned longitude/latitude live in
         the SAME of-date frame as this function's position output. Sampling it
         at t +/- dt lets FLG_SPEED central-difference the of-date longitude,
-        which (unlike the previous J2000-frame analytic derivative) includes
-        the frame-rotation rate -- precession plus nutation of the equinox,
-        ~0.2"/day. This mirrors the type-2/3 path in calc_spk_body_position().
-        Returns None on kernel-read failure.
+        which includes the frame-rotation rate -- precession plus nutation of
+        the equinox, ~0.2"/day. This mirrors the type-2/3 path in
+        calc_spk_body_position(). Reader failures raise SPKEvaluationError.
         """
-        jd_tdb_e = t_eval.tdb
         jd_tt_e = t_eval.tt
 
-        # Earth heliocentric position (ecliptic J2000) for geocentric output.
-        earth_ssb = np.array(earth.at(t_eval).position.au)
-        sun_ssb = np.array(sun.at(t_eval).position.au)
-        earth_helio_ecl = np.array(_icrs_to_ecliptic_j2000(*(earth_ssb - sun_ssb)))
+        # Observer barycentric state at the observation epoch (ICRS, AU).
+        obs_at = observer.at(t_eval)
+        obs_pos = np.asarray(obs_at.position.au, dtype=float)
 
-        # Earth barycentric (SSB) velocity (ecliptic J2000) for stellar
-        # aberration -- the IAU frame shared with the planets.py pipeline.
-        if apply_aberration:
-            earth_vel_bary_ecl = np.array(
-                _icrs_to_ecliptic_j2000(*np.array(earth.at(t_eval).velocity.au_per_d))
-            )
-        else:
-            earth_vel_bary_ecl = np.array([0.0, 0.0, 0.0])
-
-        # Step 1: heliocentric position from SPK, with light-time iteration.
-        # Light-time distance is Sun->body for heliocentric output and
-        # Earth->body for geocentric output.
-        jd_compute = jd_tdb_e
+        # Step 1: barycentric target state at the emission epoch. The
+        # light-time iteration retards the epoch by the observer->body
+        # distance (Sun->body for heliocentric output, the observer being
+        # the Sun). The reader is evaluated in TDB, its own scale.
+        # The retarded epoch keeps Skyfield's two-part form (whole, fraction)
+        # so the speed stencil's one-second spacing survives the retardation.
+        t_emit = t_eval
         if apply_light_time:
             for _ in range(3):
-                try:
-                    pos_km, _vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-                except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
-                    get_logger().debug("SPK type 21 computation failed: %s", e)
-                    return None
-                pos_ecl = np.array(_icrs_to_ecliptic_j2000(*(np.array(pos_km) / AU_KM)))
-                if is_heliocentric:
-                    dist_au = float(np.linalg.norm(pos_ecl))
-                else:
-                    dist_au = float(np.linalg.norm(pos_ecl - earth_helio_ecl))
-                jd_compute = jd_tdb_e - dist_au / C_LIGHT_AU_DAY
+                tgt_pos, _tgt_vel = target.state_at(t_emit)
+                dist_au = float(np.linalg.norm(tgt_pos - obs_pos))
+                t_emit = ts.tdb_jd(
+                    t_eval.whole, t_eval.tdb_fraction - dist_au / _C_AU_DAY
+                )
+        tgt_pos, _tgt_vel = target.state_at(t_emit)
 
-        # Position at the (light-time corrected) emission epoch.
-        try:
-            pos_km, _vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-        except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
-            # RuntimeError included to match the documented graceful
-            # fall-through (compute_type21/spke21 raise RuntimeError on
-            # segment / "Invalid data" errors).
-            get_logger().debug("SPK type 21 computation failed: %s", e)
-            return None
+        # Step 2: observer-relative vector in the J2000 ecliptic.
+        pos_final = np.asarray(
+            _icrs_to_ecliptic_j2000(*(tgt_pos - obs_pos)), dtype=float
+        )
 
-        pos_ecl = np.array(_icrs_to_ecliptic_j2000(*(np.array(pos_km) / AU_KM)))
-
-        # Step 2: geocentric reduction (unless heliocentric output requested).
-        if is_heliocentric:
-            pos_final = pos_ecl
-        else:
-            pos_final = pos_ecl - earth_helio_ecl
-
-        # Step 3: annual aberration (geocentric apparent place only).
+        # Step 3: annual aberration (geocentric apparent place only), from
+        # the observer's barycentric velocity in the same ecliptic frame.
         if apply_aberration:
+            obs_vel_ecl = _icrs_to_ecliptic_j2000(
+                *np.asarray(obs_at.velocity.au_per_d, dtype=float)
+            )
             pos_final = np.array(
                 apply_aberration_to_position(
                     (float(pos_final[0]), float(pos_final[1]), float(pos_final[2])),
                     (
-                        float(earth_vel_bary_ecl[0]),
-                        float(earth_vel_bary_ecl[1]),
-                        float(earth_vel_bary_ecl[2]),
+                        float(obs_vel_ecl[0]),
+                        float(obs_vel_ecl[1]),
+                        float(obs_vel_ecl[2]),
                     ),
                 )
             )
@@ -1310,44 +1731,39 @@ def _calc_type21_position(
 
         return (lon_d % 360.0, lat_d, r)
 
-    base = _of_date_lon_lat_dist(t)
-    if base is None:
-        return None
-    lon, lat, r = base
+    lon, lat, r = _of_date_lon_lat_dist(t)
 
     # =========================================================================
     # Step 7: Calculate speeds if requested
     # =========================================================================
     # Central finite-difference of the OF-DATE longitude/latitude/distance, so
     # the of-date frame-rotation rate (precession + nutation of the equinox) is
-    # included. The previous analytic derivative was evaluated in the fixed
-    # J2000 ecliptic and omitted that ~0.2"/day term. Mirrors the type-2/3
-    # path in calc_spk_body_position().
+    # included. Mirrors the type-2/3 path in calc_spk_body_position(). The
+    # samples stay inside the kernel because the usable coverage subtracts
+    # the stencil at both ends.
     if iflag & FLG_SPEED:
-        dt = 1.0 / 86400.0  # 1 second, in days
-        ts = get_timescale()
-        prev = _of_date_lon_lat_dist(ts.tt_jd(t.tt - dt))
-        nxt = _of_date_lon_lat_dist(ts.tt_jd(t.tt + dt))
-        if prev is not None and nxt is not None:
-            lon_prev, lat_prev, dist_prev = prev
-            lon_next, lat_next, dist_next = nxt
-            speed_lon = (lon_next - lon_prev) / (2.0 * dt)
-            speed_lat = (lat_next - lat_prev) / (2.0 * dt)
-            speed_dist = (dist_next - dist_prev) / (2.0 * dt)
-            # Unwrap a 0/360 boundary crossing between the two samples.
-            if speed_lon > 180.0 / (2.0 * dt):
-                speed_lon -= 360.0 / (2.0 * dt)
-            elif speed_lon < -180.0 / (2.0 * dt):
-                speed_lon += 360.0 / (2.0 * dt)
-            # At (numerically) the ecliptic pole the longitude -- atan2 of
-            # two ~zero components -- is undefined, so its central difference
-            # measures the arbitrary branch picked at each sample, not a
-            # physical rate. Report 0.0, matching the xy_sq == 0 guard of the
-            # analytic derivative this central difference replaced.
-            if max(abs(lat), abs(lat_prev), abs(lat_next)) >= 90.0 - 1e-9:
-                speed_lon = 0.0
-        else:
-            speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
+        dt = _TYPE21_LEGACY_SPEED_HALF_STEP_DAYS
+        # Two-argument tt_jd(whole, fraction): collapsing t.tt +/- dt into one
+        # float64 quantizes the step to the JD ULP (~4.6e-10 d), a ~4e-5
+        # relative error on a one-second step; keeping dt in the fraction
+        # slot preserves the exact spacing (as the planet pipeline does).
+        lon_prev, lat_prev, dist_prev = _of_date_lon_lat_dist(ts.tt_jd(t.tt, -dt))
+        lon_next, lat_next, dist_next = _of_date_lon_lat_dist(ts.tt_jd(t.tt, dt))
+        speed_lon = (lon_next - lon_prev) / (2.0 * dt)
+        speed_lat = (lat_next - lat_prev) / (2.0 * dt)
+        speed_dist = (dist_next - dist_prev) / (2.0 * dt)
+        # Unwrap a 0/360 boundary crossing between the two samples.
+        if speed_lon > 180.0 / (2.0 * dt):
+            speed_lon -= 360.0 / (2.0 * dt)
+        elif speed_lon < -180.0 / (2.0 * dt):
+            speed_lon += 360.0 / (2.0 * dt)
+        # At (numerically) the ecliptic pole the longitude -- atan2 of
+        # two ~zero components -- is undefined, so its central difference
+        # measures the arbitrary branch picked at each sample, not a
+        # physical rate. Report 0.0, matching the xy_sq == 0 guard of the
+        # analytic derivative this central difference replaced.
+        if max(abs(lat), abs(lat_prev), abs(lat_next)) >= 90.0 - 1e-9:
+            speed_lon = 0.0
     else:
         speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
 
@@ -1513,6 +1929,16 @@ def calc_spk_body_position(
     - Type 21: Uses spktype21 library (JPL Horizons asteroids/comets)
     - Type 2/3: Uses Skyfield (Chebyshev polynomials)
 
+    Two failure classes are kept apart, because every caller treats them
+    differently:
+
+    - ``EphemerisRangeError``: the epoch lies outside the kernel's usable
+      coverage (see get_spk_coverage). Callers may continue with the
+      documented lower-precision chain.
+    - ``SPKEvaluationError`` (type 21): the epoch lies inside the usable
+      coverage and the kernel still could not serve it. No caller catches
+      it; the error reaches the user instead of a silently degraded value.
+
     Args:
         t: Skyfield Time object
         ipl: libephemeris body ID
@@ -1520,10 +1946,12 @@ def calc_spk_body_position(
 
     Returns:
         Position tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-        or None if body not registered or outside coverage.
+        or None if body not registered (type 2/3: kernel or target missing).
 
     Raises:
-        ValueError: If JD is outside SPK coverage
+        EphemerisRangeError: If the epoch is outside the usable coverage.
+        SPKEvaluationError: If a type 21 kernel cannot be opened, its center
+            cannot be resolved, or it fails inside its usable coverage.
     """
     from . import state
     from .constants import (
@@ -1547,26 +1975,43 @@ def calc_spk_body_position(
 
     # Handle type 21 (JPL Horizons asteroids/comets)
     if spk_type == 21:
-        # Out-of-coverage epochs raise EphemerisRangeError exactly like
-        # the type 2/3 branch below; None stays reserved for genuine
-        # computation failures (unreadable/corrupt kernel data).
-        coverage = get_spk_coverage(spk_file)
-        if coverage is not None:
-            start_jd, end_jd = coverage
-            if t.tt < start_jd or t.tt > end_jd:
+        kernel = _load_type21_kernel(spk_file)
+        if kernel is None:
+            from .exceptions import SPKEvaluationError
+
+            raise SPKEvaluationError(
+                f"SPK type 21 kernel {spk_file} registered for body {ipl} "
+                "could not be opened",
+                body_id=ipl,
+                naif_id=naif_id,
+                spk_file=spk_file,
+            )
+        center = _type21_declared_center(kernel, naif_id, spk_file, ipl)
+
+        # Gate on the usable coverage, in TDB (the scale the kernel is
+        # evaluated in). Every epoch inside it can be served: the band the
+        # light-time retardation and the speed stencil cannot reach is
+        # already excluded, so nothing inside the reported span is refused.
+        jd_tdb = float(t.tdb)
+        span = _type21_usable_span(kernel, naif_id, center)
+        if span is not None:
+            usable_start, usable_end = span
+            if jd_tdb < usable_start or jd_tdb >= usable_end:
                 from .exceptions import EphemerisRangeError
 
                 raise EphemerisRangeError(
-                    f"JD {t.tt:.1f} outside SPK coverage "
-                    f"[{start_jd:.1f}, {end_jd:.1f}] for body {ipl}"
+                    f"JD {jd_tdb:.6f} (TDB) is outside the usable coverage "
+                    f"[{usable_start:.6f}, {usable_end:.6f}) of SPK kernel "
+                    f"{spk_file} for body {ipl}",
+                    requested_jd=jd_tdb,
+                    start_jd=usable_start,
+                    end_jd=usable_end,
+                    body_id=ipl,
+                    ephemeris_file=spk_file,
                 )
-        kernel = _load_type21_kernel(spk_file)
-        if kernel is not None:
-            result = _calc_type21_position(kernel, naif_id, t, iflag)
-            if result is not None:
-                return result
-        # Fall through to return None if type 21 calculation fails
-        return None
+
+        target = _type21_target_for(kernel, naif_id, spk_file, ipl, center=center)
+        return _calc_type21_position(kernel, naif_id, t, iflag, target=target)
 
     # Type 2/3: Use Skyfield
     kernel = state._SPK_KERNELS.get(spk_file)

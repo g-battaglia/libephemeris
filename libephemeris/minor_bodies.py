@@ -2779,7 +2779,9 @@ def calc_minor_body_heliocentric(
                     lon, lat, dist, _, _, _ = result
                     return lon, lat, dist
         except (ImportError, ValueError, KeyError, EphemerisRangeError):
-            # Fall through to Keplerian calculation
+            # Fall through to Keplerian calculation (epoch outside the
+            # kernel's usable coverage). SPKEvaluationError -- a failure
+            # inside the usable coverage -- is deliberately not caught.
             pass
 
     # Fall back to Keplerian calculation
@@ -3721,7 +3723,9 @@ def calc_asteroid_by_number(
                     lon, lat, dist, _, _, _ = result
                     return lon, lat, dist
         except (ImportError, ValueError, EphemerisRangeError):
-            # Fall through to Keplerian calculation
+            # Fall through to Keplerian calculation (epoch outside the
+            # kernel's usable coverage). SPKEvaluationError -- a failure
+            # inside the usable coverage -- is deliberately not caught.
             pass
 
     # No SPK available, fetch orbital elements from SBDB and calculate

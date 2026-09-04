@@ -1769,7 +1769,9 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         return None
     except EphemerisRangeError as e:
         # The freshly downloaded kernel does not cover the requested epoch;
-        # fall back to the Keplerian path like any other SPK miss.
+        # fall back to the Keplerian path like any other SPK miss. A kernel
+        # that fails INSIDE its usable coverage raises SPKEvaluationError,
+        # which is deliberately not caught here: it must reach the caller.
         logger.warning("Auto SPK coverage miss for body %d: %s", ipl, e)
         return None
 
@@ -5204,7 +5206,7 @@ def _calc_body(
         from .logging_config import get_logger
 
         # First check if already registered
-        _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
+        _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt, iflag)
         auto_download_attempted = False
 
         if _spk_type21_target is None:
@@ -5217,7 +5219,7 @@ def _calc_body(
                 except (OSError, ValueError, KeyError, RuntimeError, TypeError):
                     pass
                 # Re-check after download
-                _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
+                _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt, iflag)
 
         if _spk_type21_target is not None:
             # Route through the planet pipeline below (observe/apparent)
@@ -5227,8 +5229,10 @@ def _calc_body(
             try:
                 spk_result = spk.calc_spk_body_position(t, ipl, iflag)
             except EphemerisRangeError:
-                # Outside the registered kernel's coverage — continue to
-                # the Keplerian path (documented out-of-coverage behavior).
+                # Outside the registered kernel's usable coverage — continue
+                # to the Keplerian path (documented out-of-coverage behavior).
+                # SPKEvaluationError (a failure INSIDE the usable coverage)
+                # is deliberately not caught: it propagates to the caller.
                 spk_result = None
             if spk_result is not None:
                 # _calc_type21_position performs the full frame reduction

@@ -86,6 +86,7 @@ from .exceptions import (
     PolarCircleError,
     EphemerisRangeError,
     ConvergenceError,
+    SPKEvaluationError,
     # Category: Configuration errors
     ConfigurationError,
     NetworkSealedError,
@@ -715,6 +716,7 @@ __all__ = [
     "PolarCircleError",
     "EphemerisRangeError",
     "ConvergenceError",
+    "SPKEvaluationError",
     # Exceptions - Configuration Category
     "ConfigurationError",
     "NetworkSealedError",
