@@ -219,7 +219,7 @@ from .constants import (
 )
 from .utils import cotrans
 from .cache import get_true_obliquity, get_mean_obliquity
-from .exceptions import Error, LEBCorruptionError
+from .exceptions import Error, LEBCorruptionError, StarNotFoundError
 from .planets import _wrap_ephemeris_range_error
 
 _fixed_star_source: ContextVar[str | None] = ContextVar(
@@ -2903,6 +2903,44 @@ def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
     return _resolve_star_ref(star_name)
 
 
+def _star_search_type(star_name: object) -> str:
+    """Classify a star search string by the lookup form it selects.
+
+    Reported as ``StarNotFoundError.search_type`` so a caller can tell which
+    of the catalogue's search forms was attempted, rather than inferring it
+    from the message text.
+    """
+    if not isinstance(star_name, str):
+        return "name"
+    key = _ref_star_key(star_name)
+    if not key:
+        return "empty"
+    if "%" in key:
+        return "wildcard"
+    if "," in key:
+        return "nomenclature"
+    if key[0].isdigit():
+        return "sequential"
+    return "name"
+
+
+def _star_not_found(star_name: object, error: str | None) -> StarNotFoundError:
+    """Build the typed error for a fixed-star lookup that resolved nothing.
+
+    Every failure mode of both star families — an unknown name, the comma
+    form, an out-of-range sequential number, a wildcard that matched
+    nothing, the empty string — is the same event and carries the same
+    type. Raising the base Error here meant the exception the hierarchy and
+    the documentation promise was never raised, so code catching it never
+    ran.
+    """
+    return StarNotFoundError(
+        error or "could not find star name",
+        star_id=star_name if isinstance(star_name, str) else str(star_name),
+        search_type=_star_search_type(star_name),
+    )
+
+
 def _preprocess_flags(iflag: int) -> int:
     """Preprocess calculation flags for fixed star functions.
 
@@ -3273,12 +3311,12 @@ def _fixed_epoch_star_call(
     if flexible_lookup:
         entry, error = _resolve_star2(star)
         if error or entry is None:
-            raise Error(error or "could not find star name")
+            raise _star_not_found(star, error)
         star_id = entry.id
     else:
         star_id, error, _canonical_name = _resolve_star_id(star)
         if error:
-            raise Error(error)
+            raise _star_not_found(star, error)
     _record_fixed_star_success(star_id, tjd, _get_fixed_star_source())
     return result
 
@@ -3377,12 +3415,12 @@ def _sidbit_star_call(
     if flexible_lookup:
         entry, error = _resolve_star2(star)
         if error or entry is None:
-            raise Error(error or "could not find star name")
+            raise _star_not_found(star, error)
         star_id = entry.id
     else:
         star_id, error, _canonical_name = _resolve_star_id(star)
         if error:
-            raise Error(error)
+            raise _star_not_found(star, error)
     _record_fixed_star_success(star_id, tjd, _get_fixed_star_source())
     return result
 
@@ -3427,7 +3465,7 @@ def fixstar_ut(
 
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
-        raise Error(error)
+        raise _star_not_found(star, error)
     return _fixstar_ut_by_id(star_id, canonical_name, tjdut, flags)
 
 
@@ -3565,7 +3603,7 @@ def _batch_fixstars_via_single(
                 results.append(fixstar_ut(star_name, tjdut, flags))
                 star_id, error, _canonical_name = _resolve_star_id(star_name)
                 if error:
-                    raise Error(error)
+                    raise _star_not_found(star_name, error)
                 traces.append((star_id, _get_fixed_star_source()))
             except Error:
                 if skip_errors:
@@ -3656,7 +3694,7 @@ def batch_fixstars_ut(
         if error:
             if skip_errors:
                 continue
-            raise Error(error)
+            raise _star_not_found(star_name, error)
         resolved.append((index, star_id, canonical_name or ""))
 
     if not resolved:
@@ -3848,7 +3886,7 @@ def fixstar(
 
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
-        raise Error(error)
+        raise _star_not_found(star, error)
 
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
@@ -4065,7 +4103,7 @@ def fixstar2_ut(
 
     entry, error = _resolve_star2(star)
     if error or entry is None:
-        raise Error(error or "could not find star name")
+        raise _star_not_found(star, error)
 
     from .state import get_timescale
 
@@ -4172,7 +4210,7 @@ def fixstar2(
 
     entry, error = _resolve_star2(star)
     if error or entry is None:
-        raise Error(error or "could not find star name")
+        raise _star_not_found(star, error)
 
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
@@ -5365,7 +5403,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     """
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
-        raise Error(error)
+        raise _star_not_found(star, error)
 
     if star_id not in _STAR_MAGNITUDES:
         raise Error(f"Magnitude not available for star ID {star_id}")
@@ -5418,7 +5456,7 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
     """
     entry, error = _resolve_star2(star)
     if error or entry is None:
-        raise Error(error or "could not find star name")
+        raise _star_not_found(star, error)
 
     star_name_out = _format_star_name(entry)
     return (entry.magnitude, star_name_out)
