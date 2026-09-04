@@ -1490,6 +1490,29 @@ def _rounding_offset(roundflag: int) -> float:
     return 0.0
 
 
+def _truncate_to_rounding_unit(
+    roundflag: int, ideg: int, imin: int, isec: int, secfr: float
+) -> Tuple[int, int, int, float]:
+    """Zero the components finer than the requested rounding unit.
+
+    The half-unit offset added before the split carries the value up to the
+    nearest unit; this discards what is left below it. Without this step the
+    offset itself surfaces in the output — rounding 0 degrees to the nearest
+    minute reported 0d00'30" instead of 0d00'00", the leftover half-minute
+    being the offset rather than any part of the input.
+
+    A fraction of an arc second is meaningless once the caller has asked for
+    a rounded value, so ``secfr`` is zero for every rounding level.
+    """
+    if roundflag & SPLIT_DEG_ROUND_DEG:
+        return ideg, 0, 0, 0.0
+    if roundflag & SPLIT_DEG_ROUND_MIN:
+        return ideg, imin, 0, 0.0
+    if roundflag & SPLIT_DEG_ROUND_SEC:
+        return ideg, imin, isec, 0.0
+    return ideg, imin, isec, secfr
+
+
 def _decompose_to_dms(ddeg: float, has_rounding: bool) -> Tuple[int, int, int, float]:
     """Break a non-negative decimal degree value into deg, min, sec, secfr.
 
@@ -1600,6 +1623,9 @@ def _split_deg_nakshatra(
         nak_idx = 0
 
     ideg, imin, isec, secfr = _decompose_arcsec_to_dms(pos_arcsec, has_rounding)
+    ideg, imin, isec, secfr = _truncate_to_rounding_unit(
+        roundflag, ideg, imin, isec, secfr
+    )
     return (ideg, imin, isec, secfr, nak_idx)
 
 
@@ -1631,8 +1657,8 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
                non-negative NAKSHATRA split), otherwise total absolute degrees
         - min: Arc minutes (0-59)
         - sec: Arc seconds (0-59)
-        - secfr: Fraction of arc second (0.0-0.999...), or the rounded seconds
-                 value when rounding flags are used
+        - secfr: Fraction of arc second (0.0-0.999...), or 0.0 when any
+                 rounding flag is set
         - sign: Raw zodiac/nakshatra segment index, or +1/-1
           for an ordinary positive/negative split
 
@@ -1646,7 +1672,9 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
           and returns ``-1``. If ZODIACAL is also set, the zodiacal split of the
           absolute value applies instead. For non-negative input, NAKSHATRA
           takes precedence when both format bits are set.
-        - Rounding flags affect how values are truncated/rounded
+        - A rounding flag rounds to its unit and zeroes everything finer:
+          ROUND_DEG yields min = sec = secfr = 0, ROUND_MIN yields
+          sec = secfr = 0, ROUND_SEC yields secfr = 0
         - KEEP_SIGN prevents rounding from advancing to the next sign
         - KEEP_DEG prevents rounding from advancing to the next degree
 
@@ -1659,6 +1687,10 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
         (30, 30, 0, 0.0, -1)
         >>> split_deg(-30.5, SPLIT_DEG_ZODIACAL)  # Negative with zodiac: uses absolute
         (0, 30, 0, 0.0, 1)
+        >>> split_deg(10.6, SPLIT_DEG_ROUND_MIN)  # Exactly 10deg 36min
+        (10, 36, 0, 0.0, 1)
+        >>> split_deg(10.6, SPLIT_DEG_ROUND_DEG)  # Nearest degree
+        (11, 0, 0, 0.0, 1)
     """
     # --- Negative handling and nakshatra dispatch ---
     # Negative inputs never enter nakshatra mode; they are made positive
@@ -1709,6 +1741,9 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
 
     # --- Decompose into deg / min / sec / secfr ---
     ideg, imin, isec, secfr = _decompose_to_dms(ddeg, has_rounding)
+    ideg, imin, isec, secfr = _truncate_to_rounding_unit(
+        roundflag, ideg, imin, isec, secfr
+    )
 
     return (ideg, imin, isec, secfr, sign_out)
 

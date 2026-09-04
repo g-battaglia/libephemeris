@@ -402,11 +402,28 @@ class TestSplitDegNakshatra:
         assert result[4] == 0
 
     @pytest.mark.unit
-    def test_nakshatra_round_deg_uses_exact_segment_geometry(self):
-        """Rounding follows the exact 360/27 segment geometry."""
-        result = split_deg(0.09, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ROUND_DEG)
+    def test_nakshatra_uses_exact_segment_geometry(self):
+        """The split follows the exact 360/27 segment geometry.
+
+        0.09 deg is 324 arcsec into nakshatra 0. Reducing in the arc-second
+        domain gives 0d05'24" exactly; degree-domain arithmetic would render
+        the same position one arc second low.
+        """
+        result = split_deg(0.09, SPLIT_DEG_NAKSHATRA)
         assert result[4] == 0
-        assert result[:2] == (0, 35)
+        assert result[:3] == (0, 5, 24)
+
+    @pytest.mark.unit
+    def test_nakshatra_round_min_keeps_the_exact_minute(self):
+        """Rounding to minutes keeps the segment geometry and zeroes below."""
+        result = split_deg(0.09, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ROUND_MIN)
+        assert result == (0, 5, 0, 0.0, 0)
+
+    @pytest.mark.unit
+    def test_nakshatra_round_deg_zeroes_finer_components(self):
+        """Rounding to degrees leaves no minutes or seconds behind."""
+        result = split_deg(0.09, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ROUND_DEG)
+        assert result == (0, 0, 0, 0.0, 0)
 
     @pytest.mark.unit
     def test_nakshatra_index_beyond_one_turn_is_not_reduced(self):
