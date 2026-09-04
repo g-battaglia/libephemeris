@@ -538,19 +538,117 @@ def _trace_ray(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Domain guards
+# ---------------------------------------------------------------------------
+#
+# Every refraction formula here is a fit valid over a physical domain. Fed an
+# argument outside it, the arithmetic still produces a float: an altitude of
+# 180 degrees drives the tangent series past the pole and returns ~1e43
+# degrees, and a temperature at absolute zero drives the pressure/temperature
+# scale through a vanishing denominator. Those numbers are not errors the
+# caller can notice — they are answers, and they flow onward into whatever
+# they feed.
+
+# Absolute zero in degrees Celsius. A temperature at or below it has no
+# atmosphere to refract through, and it is where the conventional
+# 273 + T scale factor changes sign.
+_ABSOLUTE_ZERO_C: float = -273.15
+
+# Altitude is an angle above the horizon: outside [-90, 90] it names no
+# direction in the sky.
+_MAX_ALTITUDE_DEG: float = 90.0
+
+
+def _reject_non_finite(value: float, name: str, function: str) -> float:
+    """Return ``value`` as a float, refusing NaN and infinity.
+
+    A non-finite argument propagates silently through every formula in this
+    module and comes back out as a non-finite result, which the caller then
+    has to notice on its own.
+    """
+    from .exceptions import InputValidationError
+
+    number = float(value)
+    if not math.isfinite(number):
+        raise InputValidationError(
+            f"{function}: {name} must be a finite number, got {value!r}"
+        )
+    return number
+
+
+def _validate_altitude(alt: float, function: str, name: str = "altitude") -> float:
+    """Validate an altitude in degrees above the horizon."""
+    from .exceptions import InputValidationError
+
+    number = _reject_non_finite(alt, name, function)
+    if abs(number) > _MAX_ALTITUDE_DEG:
+        raise InputValidationError(
+            f"{function}: {name} must be within "
+            f"[-{_MAX_ALTITUDE_DEG:g}, {_MAX_ALTITUDE_DEG:g}] degrees, "
+            f"got {number!r}"
+        )
+    return number
+
+
+def _validate_atmosphere(
+    pressure: float, temperature_C: float, function: str
+) -> Tuple[float, float]:
+    """Validate an observer's pressure and temperature.
+
+    Zero pressure keeps its documented meaning (refraction disabled, or the
+    standard atmosphere estimated from the observer's altitude, depending on
+    the entry point). A negative absolute pressure is not a low pressure, and
+    a temperature at or below absolute zero is not a cold one.
+    """
+    from .exceptions import InputValidationError
+
+    pressure_value = _reject_non_finite(pressure, "pressure", function)
+    temperature_value = _reject_non_finite(temperature_C, "temperature", function)
+    if pressure_value < 0.0:
+        raise InputValidationError(
+            f"{function}: pressure must not be negative, got {pressure_value!r} mbar"
+        )
+    if temperature_value <= _ABSOLUTE_ZERO_C:
+        raise InputValidationError(
+            f"{function}: temperature must be above absolute zero "
+            f"({_ABSOLUTE_ZERO_C} C), got {temperature_value!r} C"
+        )
+    return pressure_value, temperature_value
+
+
+def validate_lapse_rate(lapse_rate: float, function: str = "lapse rate") -> float:
+    """Validate a tropospheric lapse rate in K/m.
+
+    Only finiteness is required. A negative lapse rate is a temperature
+    inversion, which is a real atmospheric condition, so the sign is not
+    constrained.
+    """
+    return _reject_non_finite(lapse_rate, "lapse_rate", function)
+
+
 def _compat_atmosphere_scale(pressure: float, temperature_C: float) -> float:
     """Return the conventional pressure/temperature refraction scale.
 
-    The explicit zero-denominator handling keeps physically invalid edge
-    inputs deterministic instead of raising Python's ``ZeroDivisionError``.
+    The scale has a pole where its conventional 273 + T denominator
+    vanishes, at exactly -273 C. That temperature is a fraction of a kelvin
+    above absolute zero, so it passes the physical guard, and the scale then
+    returned an infinite refraction. An infinity is the extreme case of the
+    answer this module must not produce: it is not an error the caller can
+    notice, and it propagates into whatever it feeds.
     """
+    from .exceptions import InputValidationError
+
     numerator = pressure / _COMPAT_PRESSURE_REF * _COMPAT_TEMPERATURE_NUMERATOR
     denominator = _COMPAT_TEMPERATURE_OFFSET + temperature_C
-    if denominator != 0.0:
-        return numerator / denominator
-    if numerator == 0.0 or math.isnan(numerator):
-        return math.nan
-    return math.copysign(math.inf, numerator)
+    if denominator == 0.0:
+        raise InputValidationError(
+            "refrac: temperature "
+            f"{-_COMPAT_TEMPERATURE_OFFSET:g} C is the pole of the "
+            "pressure/temperature refraction scale; no finite refraction "
+            "is defined there"
+        )
+    return numerator / denominator
 
 
 def calc_refrac_compat_true_to_app(
@@ -563,11 +661,10 @@ def calc_refrac_compat_true_to_app(
     the ICAO ray tracer. Values at or below -5 degrees, and candidates that do
     not rise strictly above zero, are returned unchanged.
     """
-    true_alt = float(true_alt)
-    pressure = float(pressure)
-    temperature_C = float(temperature_C)
+    true_alt = _validate_altitude(true_alt, "refrac", "altitude")
+    pressure, temperature_C = _validate_atmosphere(pressure, temperature_C, "refrac")
 
-    if not math.isfinite(true_alt) or true_alt <= _COMPAT_TRUE_LOW_LIMIT:
+    if true_alt <= _COMPAT_TRUE_LOW_LIMIT:
         return true_alt
 
     scale = _compat_atmosphere_scale(pressure, temperature_C)
@@ -592,12 +689,8 @@ def calc_refrac_compat_app_to_true(
     The reverse direction uses Bennett's independently published closed form
     rather than numerically inverting :func:`calc_refrac_compat_true_to_app`.
     """
-    apparent_alt = float(apparent_alt)
-    pressure = float(pressure)
-    temperature_C = float(temperature_C)
-
-    if not math.isfinite(apparent_alt):
-        return apparent_alt
+    apparent_alt = _validate_altitude(apparent_alt, "refrac", "altitude")
+    pressure, temperature_C = _validate_atmosphere(pressure, temperature_C, "refrac")
 
     try:
         angle = apparent_alt + 7.31 / (apparent_alt + 4.4)
@@ -648,7 +741,21 @@ def calc_refraction_true_to_app(
     -------
     float
         Refraction in degrees (>= 0).
+
+    Raises
+    ------
+    InputValidationError
+        If any argument is non-finite, the altitude is outside [-90, 90],
+        the pressure is negative, or the temperature is at or below
+        absolute zero.
     """
+    true_alt = _validate_altitude(true_alt, "calc_refraction_true_to_app", "true_alt")
+    pressure, temperature_C = _validate_atmosphere(
+        pressure, temperature_C, "calc_refraction_true_to_app"
+    )
+    obs_alt = _reject_non_finite(obs_alt, "obs_alt", "calc_refraction_true_to_app")
+    lapse_rate = validate_lapse_rate(lapse_rate, "calc_refraction_true_to_app")
+
     if pressure <= 0:
         return 0.0
     zenith = 90.0 - true_alt
@@ -684,7 +791,23 @@ def calc_refraction_app_to_true(
     -------
     float
         Refraction in degrees (>= 0).
+
+    Raises
+    ------
+    InputValidationError
+        If any argument is non-finite, the altitude is outside [-90, 90],
+        the pressure is negative, or the temperature is at or below
+        absolute zero.
     """
+    apparent_alt = _validate_altitude(
+        apparent_alt, "calc_refraction_app_to_true", "apparent_alt"
+    )
+    pressure, temperature_C = _validate_atmosphere(
+        pressure, temperature_C, "calc_refraction_app_to_true"
+    )
+    obs_alt = _reject_non_finite(obs_alt, "obs_alt", "calc_refraction_app_to_true")
+    lapse_rate = validate_lapse_rate(lapse_rate, "calc_refraction_app_to_true")
+
     if pressure <= 0:
         return 0.0
 
@@ -790,7 +913,19 @@ def calc_dip(
     ----------
     Thom, A. (1971), "Megalithic Lunar Observatories", Oxford, ch. 3
     Bomford, "Geodesy" (1980), 4th ed., §2.17-2.20
+
+    Raises
+    ------
+    InputValidationError
+        If any argument is non-finite, the pressure is negative, or the
+        temperature is at or below absolute zero. Without the temperature
+        guard the refraction coefficient divides by a vanishing squared
+        Kelvin temperature and the dip runs to thousands of degrees.
     """
+    obs_alt = _reject_non_finite(obs_alt, "obs_alt", "calc_dip")
+    lapse_rate = validate_lapse_rate(lapse_rate, "calc_dip")
+    atpress, attemp = _validate_atmosphere(atpress, attemp, "calc_dip")
+
     if obs_alt <= 0:
         return 0.0
 

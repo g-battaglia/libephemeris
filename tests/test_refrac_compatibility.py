@@ -62,15 +62,32 @@ def test_every_nonzero_flag_selects_reverse_direction(flag: int) -> None:
 
 @pytest.mark.unit
 def test_nonfinite_inputs_are_guarded() -> None:
-    assert math.isnan(refrac(math.nan, 1013.25, 15.0, TRUE_TO_APP))
-    assert refrac(math.inf, 1013.25, 15.0, TRUE_TO_APP) == math.inf
-    assert refrac(-math.inf, 1013.25, 15.0, APP_TO_TRUE) == -math.inf
-    assert refrac(10.0, math.nan, 15.0, TRUE_TO_APP) == 10.0
+    """A non-finite argument is refused, not carried through the result."""
+    from libephemeris.exceptions import InputValidationError
+
+    with pytest.raises(InputValidationError):
+        refrac(math.nan, 1013.25, 15.0, TRUE_TO_APP)
+    with pytest.raises(InputValidationError):
+        refrac(math.inf, 1013.25, 15.0, TRUE_TO_APP)
+    with pytest.raises(InputValidationError):
+        refrac(-math.inf, 1013.25, 15.0, APP_TO_TRUE)
+    with pytest.raises(InputValidationError):
+        refrac(10.0, math.nan, 15.0, TRUE_TO_APP)
 
 
 @pytest.mark.unit
-def test_singular_temperature_does_not_raise() -> None:
-    assert math.isinf(refrac(10.0, 1.0, -273.0, TRUE_TO_APP))
+def test_singular_temperature_is_refused() -> None:
+    """The pole of the conventional scale has no finite refraction.
+
+    -273 C is a fraction of a kelvin above absolute zero, so it passes the
+    physical guard, but it is exactly where the 273 + T denominator
+    vanishes. Returning an infinity there is the extreme case of the answer
+    this module must not produce.
+    """
+    from libephemeris.exceptions import InputValidationError
+
+    with pytest.raises(InputValidationError):
+        refrac(10.0, 1.0, -273.0, TRUE_TO_APP)
 
 
 @pytest.mark.unit

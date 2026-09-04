@@ -2247,8 +2247,18 @@ def set_lapse_rate(lrate: Optional[float]) -> None:
         >>> set_lapse_rate(None)  # Reset to default
         >>> get_lapse_rate()
         0.0065
+
+    Raises:
+        InputValidationError: If lrate is not a finite number. Validating
+            here rather than letting the value through means the failure is
+            reported where it was introduced, instead of surfacing later
+            inside refrac_extended() or as a NaN in a dip.
     """
     global _LAPSE_RATE
+    if lrate is not None:
+        from .refraction import validate_lapse_rate
+
+        lrate = validate_lapse_rate(lrate, "set_lapse_rate")
     _LAPSE_RATE = lrate
 
 

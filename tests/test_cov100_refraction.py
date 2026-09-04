@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import math
 
+import pytest
+
 from libephemeris import refraction as refr
 
 
@@ -186,10 +188,17 @@ def test_trace_ray_below_horizon_extrapolation() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_true_to_app_nonpositive_pressure() -> None:
-    """Non-positive pressure short-circuits to zero refraction."""
+def test_true_to_app_zero_pressure() -> None:
+    """Zero pressure keeps its documented meaning: no refraction."""
     assert refr.calc_refraction_true_to_app(45.0, pressure=0.0) == 0.0
-    assert refr.calc_refraction_true_to_app(45.0, pressure=-10.0) == 0.0
+
+
+def test_true_to_app_negative_pressure_is_refused() -> None:
+    """A negative absolute pressure is not a low pressure."""
+    from libephemeris.exceptions import InputValidationError
+
+    with pytest.raises(InputValidationError):
+        refr.calc_refraction_true_to_app(45.0, pressure=-10.0)
 
 
 def test_true_to_app_normal() -> None:
@@ -203,10 +212,17 @@ def test_true_to_app_normal() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_app_to_true_nonpositive_pressure() -> None:
-    """Non-positive pressure short-circuits to zero refraction."""
+def test_app_to_true_zero_pressure() -> None:
+    """Zero pressure keeps its documented meaning: no refraction."""
     assert refr.calc_refraction_app_to_true(45.0, pressure=0.0) == 0.0
-    assert refr.calc_refraction_app_to_true(45.0, pressure=-3.0) == 0.0
+
+
+def test_app_to_true_negative_pressure_is_refused() -> None:
+    """A negative absolute pressure is not a low pressure."""
+    from libephemeris.exceptions import InputValidationError
+
+    with pytest.raises(InputValidationError):
+        refr.calc_refraction_app_to_true(45.0, pressure=-3.0)
 
 
 def test_app_to_true_loop_exhausts_without_break() -> None:
