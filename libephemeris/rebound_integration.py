@@ -77,7 +77,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Optional, Tuple, List
+from typing import TYPE_CHECKING, Callable, Optional, Tuple, List
 
 if TYPE_CHECKING:
     from .minor_bodies import OrbitalElements
@@ -242,7 +242,7 @@ _ASSIST_EXPECTED_SIZES = {
 _ASSIST_MIN_SIZE_RATIO = 0.90
 
 
-def _verify_assist_file(path: Path) -> bool:
+def _verify_assist_file(path: Path, name: Optional[str] = None) -> bool:
     """Verify that an ASSIST data file looks valid.
 
     Checks that the file exists and its size is within the expected range.
@@ -250,6 +250,9 @@ def _verify_assist_file(path: Path) -> bool:
 
     Args:
         path: Path to the file to verify.
+        name: Logical filename to look the expectations up under. Defaults to
+            ``path.name``; pass the final name explicitly when verifying a
+            temporary download, whose own name carries no expectations.
 
     Returns:
         True if the file passes verification, False otherwise.
@@ -257,18 +260,20 @@ def _verify_assist_file(path: Path) -> bool:
     if not path.exists():
         return False
 
+    logical_name = name if name is not None else path.name
+
     actual_size = path.stat().st_size
     if actual_size == 0:
         return False
 
-    expected = _ASSIST_EXPECTED_SIZES.get(path.name)
+    expected = _ASSIST_EXPECTED_SIZES.get(logical_name)
     if expected is not None:
         min_size = int(expected * _ASSIST_MIN_SIZE_RATIO)
         if actual_size < min_size:
             return False
 
     # For BSP files, try structural validation
-    if path.suffix == ".bsp":
+    if logical_name.endswith(".bsp"):
         try:
             from jplephem.spk import SPK
 
@@ -303,6 +308,7 @@ def _download_single_file(
     description: str,
     show_progress: bool = True,
     quiet: bool = False,
+    validator: Optional[Callable[[str], bool]] = None,
 ) -> None:
     """Download a single file with progress, atomic write, and SSL support.
 
@@ -312,6 +318,13 @@ def _download_single_file(
         description: Human-readable description for progress output.
         show_progress: Whether to show a progress bar.
         quiet: Suppress all non-error output.
+        validator: Optional check applied to the *temporary* file before it
+            is published. Verifying before the atomic replace is what keeps a
+            truncated multi-hundred-megabyte download from destroying the
+            copy already on disk.
+
+    Raises:
+        ValueError: If ``validator`` rejects the downloaded payload.
     """
     import hashlib
     import tempfile
@@ -362,6 +375,13 @@ def _download_single_file(
 
             if progress:
                 progress.close()
+
+        if validator is not None and not validator(temp_path):
+            os.unlink(temp_path)
+            raise ValueError(
+                f"Downloaded file {dest.name} failed verification - "
+                "corrupt or incomplete"
+            )
 
         # Atomic move to final destination (also restores 0644 permissions)
         from .download import publish_temp_file
@@ -460,12 +480,11 @@ def download_assist_data(
                     print(f"  {description} already exists ({size_mb:.1f} MB): {dest}")
                 skipped += 1
                 continue
-            else:
-                if not quiet:
-                    print(
-                        f"  {description} exists but failed verification, re-downloading"
-                    )
-                dest.unlink()
+            elif not quiet:
+                # The existing file stays until a verified replacement is
+                # ready: these downloads are 98 MB to 2.6 GB, and unlinking
+                # first turns a failed repair into an expensive loss.
+                print(f"  {description} exists but failed verification, re-downloading")
 
         _download_single_file(
             url=url,
@@ -473,6 +492,9 @@ def download_assist_data(
             description=description,
             show_progress=show_progress,
             quiet=quiet,
+            validator=lambda temp, _name=filename: _verify_assist_file(
+                Path(temp), name=_name
+            ),
         )
         downloaded += 1
 

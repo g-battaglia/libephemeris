@@ -42,7 +42,7 @@ import sys
 import tempfile
 from importlib import resources
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import certifi
 
@@ -403,8 +403,16 @@ def download_file(
     expected_sha256: Optional[str] = None,
     show_progress: bool = True,
     timeout: int = 30,
+    validator: Optional[Callable[[str], bool]] = None,
 ) -> bool:
     """Download a file with progress bar.
+
+    The download is atomic: bytes stream into a temporary file next to
+    ``dest_path``, the digest and the optional structural ``validator`` run
+    on that temporary file, and only a fully verified artifact is published
+    over ``dest_path`` with :func:`publish_temp_file`. Any failure leaves an
+    existing ``dest_path`` byte-for-byte untouched, so a repair attempt can
+    never end with less data on disk than it started with.
 
     Args:
         url: URL to download from
@@ -413,13 +421,18 @@ def download_file(
         expected_sha256: Expected SHA256 hash (optional, for verification)
         show_progress: Whether to show progress bar
         timeout: Network timeout in seconds
+        validator: Optional structural check applied to the *temporary* file
+            before publication (e.g. :func:`_is_valid_bsp`). It receives the
+            temp path and returns True when the payload parses. Validating
+            before the atomic replace is what keeps a corrupt download from
+            destroying a good cached file.
 
     Returns:
         True if download successful, False otherwise
 
     Raises:
         urllib.error.URLError: If download fails
-        ValueError: If hash verification fails
+        ValueError: If hash or structural verification fails
     """
     logger = get_logger()
 
@@ -484,6 +497,16 @@ def download_file(
                     f"Hash mismatch: expected {expected_sha256}, got {actual_hash}"
                 )
 
+        # Structural validation happens on the temp file, never after
+        # publication: a truncated payload must not be able to replace a
+        # good cached artifact and then be deleted.
+        if validator is not None and not validator(temp_path):
+            os.unlink(temp_path)
+            raise ValueError(
+                f"Downloaded file {description} failed validation - "
+                "corrupt or incomplete"
+            )
+
         # Atomic move to final destination
         publish_temp_file(temp_path, dest_path)
         logger.info("Download complete: %s", dest_path.name)
@@ -511,8 +534,14 @@ def _install_bundled_file(
     dest_path: Path,
     *,
     expected_sha256: str,
+    validator: Optional[Callable[[str], bool]] = None,
 ) -> None:
-    """Atomically install a hash-pinned package resource into the data dir."""
+    """Atomically install a hash-pinned package resource into the data dir.
+
+    Like :func:`download_file`, the digest and the optional structural
+    ``validator`` both run on the temporary copy, so a corrupt resource can
+    never replace an installed artifact.
+    """
     source = resources.files("libephemeris").joinpath(resource_path)
     if not source.is_file():
         raise FileNotFoundError(f"Bundled data resource is missing: {resource_path}")
@@ -533,6 +562,11 @@ def _install_bundled_file(
             raise ValueError(
                 "Bundled data hash mismatch: "
                 f"expected {expected_sha256}, got {actual_sha256}"
+            )
+        if validator is not None and not validator(temp_path):
+            raise ValueError(
+                f"Bundled data resource {resource_path} failed validation - "
+                "corrupt or incomplete"
             )
         publish_temp_file(temp_path, dest_path)
     except BaseException:
@@ -596,15 +630,14 @@ def download_planet_centers(
                 print(f"planet_centers.bsp already exists at {dest_path}")
                 print("Use --force to re-download.")
             return dest_path
+        # The cached file is kept until a verified replacement is on disk.
+        # download_file publishes atomically, so a failed re-download leaves
+        # the user with the file they already had rather than with nothing.
         logger.warning(
             "Cached file %s is corrupt or does not match the pinned SHA-256; "
             "re-downloading",
             dest_path,
         )
-        try:
-            os.remove(dest_path)
-        except OSError:
-            pass
 
     if not quiet:
         print(f"Downloading planet_centers.bsp (~{file_info['size_mb']:.1f} MB)...")
@@ -620,17 +653,8 @@ def download_planet_centers(
             if file_info.get("sha256")
             else None,
             show_progress=show_progress,
+            validator=_is_valid_bsp,
         )
-
-        if not _is_valid_bsp(str(dest_path)):
-            try:
-                os.remove(dest_path)
-            except OSError:
-                pass
-            raise ValueError(
-                "Downloaded file planet_centers.bsp failed validation - "
-                "corrupt or incomplete"
-            )
 
         if not quiet:
             print()
@@ -1645,11 +1669,15 @@ def download_leb2_for_tier(
             print(f"  Installing {filename} (~{size_mb:.0f} MB)...")
 
         try:
+            # The structural check runs on the temp file, before the atomic
+            # replace: a corrupt payload must never displace an installed
+            # group and then be deleted, leaving the tier incomplete.
             if isinstance(bundled_resource, str):
                 _install_bundled_file(
                     bundled_resource,
                     dest_path,
                     expected_sha256=expected_sha256,
+                    validator=_is_valid_leb,
                 )
             else:
                 download_file(
@@ -1658,16 +1686,8 @@ def download_leb2_for_tier(
                     description=filename,
                     show_progress=show_progress,
                     expected_sha256=expected_sha256,
+                    validator=_is_valid_leb,
                 )
-            # Validate the installed file independently of its pinned hash.
-            if not _is_valid_leb(str(dest_path)):
-                try:
-                    dest_path.unlink()
-                except OSError:
-                    pass
-                if not quiet:
-                    print(f"  [FAIL] {filename}: downloaded file is corrupt")
-                continue
             downloaded.append(dest_path)
             if not quiet:
                 print(f"  [OK] {filename}")
@@ -1729,15 +1749,15 @@ def _download_planet_centers_for_tier(
                 print(f"  {filename} already exists at {dest_path}")
             return dest_path
         else:
+            # Deliberately not removed here: the cached file stays in place
+            # until download_file has a digest-verified replacement to swap
+            # in. Removing it first is what turned a failed repair into
+            # data loss.
             logger.warning(
                 "Cached file %s is corrupt or does not match the pinned "
                 "SHA-256; re-downloading",
                 dest_path,
             )
-            try:
-                os.remove(dest_path)
-            except OSError:
-                pass
 
     url = file_info["url"]
     expected_size_mb = file_info.get("size_mb", 50)
@@ -1745,25 +1765,17 @@ def _download_planet_centers_for_tier(
     if not quiet:
         print(f"  Downloading {filename} (~{expected_size_mb:.0f} MB)...")
 
-    # download_file streams to a temp file, verifies the release sha256,
-    # and atomically replaces dest_path — an existing (force=True) valid
-    # file survives any failure.
+    # download_file streams to a temp file, verifies the release sha256 and
+    # the SPK structure there, and only then atomically replaces dest_path —
+    # any existing file survives every failure mode.
     download_file(
         url=str(url),
         dest_path=dest_path,
         description=filename,
         expected_sha256=str(file_info["sha256"]) if file_info.get("sha256") else None,
         show_progress=show_progress and not quiet,
+        validator=_is_valid_bsp,
     )
-
-    if not _is_valid_bsp(str(dest_path)):
-        try:
-            os.remove(dest_path)
-        except OSError:
-            pass
-        raise ValueError(
-            f"Downloaded file {filename} failed validation - corrupt or incomplete"
-        )
 
     if not quiet:
         print(f"  Downloaded to {dest_path}")
