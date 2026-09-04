@@ -7,6 +7,11 @@ arguments that stop that walk from ever finishing, which must be refused
 before the loop starts, and the arguments that must keep sampling exactly as
 they did before the guard existed.
 
+Every behavioural test goes through the three public samplers. The private
+validator they share is touched by a single test, through the
+:func:`step_helper` fixture, so that renaming it fails one test with a clear
+message rather than the whole module at collection.
+
 Bounded by construction
 -----------------------
 A test that fed a bad argument straight to the real loop would hang instead of
@@ -26,6 +31,7 @@ interpreter that has to notice the timeout.
 
 from __future__ import annotations
 
+import importlib
 import math
 from typing import Any, Callable
 
@@ -33,13 +39,14 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris import (
+    EphemerisRangeError,
     InputValidationError,
     calc_eclipse_central_line,
     calc_eclipse_northern_limit,
     calc_eclipse_southern_limit,
 )
 from libephemeris import eclipse as eclipse_module
-from libephemeris.eclipse import _eclipse_sampling_step_days
+from libephemeris.exceptions import validate_jd_range
 
 # Around the total solar eclipse of 2024-04-08, close to greatest eclipse.
 JD_ECLIPSE = ephem.julday(2024, 4, 8, 18.3)
@@ -101,20 +108,46 @@ def sealed_loop_body(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(eclipse_module, name, _tripwire)
 
 
+@pytest.fixture
+def step_helper() -> Callable[[float, float, float, str], float]:
+    """Resolve the private step validator shared by the three samplers.
+
+    The validator is an implementation detail: only the test that checks the
+    unit of its return value needs it, and every other test in this module
+    goes through the public samplers. Resolving it here by name, at call
+    time, means a rename fails exactly that one test with a message naming
+    the helper, instead of failing the whole module at collection.
+
+    Returns:
+        The validator, ``(jd_start, jd_end, step_minutes, func_name) -> days``.
+    """
+    module = importlib.import_module("libephemeris.eclipse")
+    helper = getattr(module, "_eclipse_sampling_step_days", None)
+    assert callable(helper), (
+        "libephemeris.eclipse._eclipse_sampling_step_days was renamed or removed"
+    )
+    return helper
+
+
 def _expect_rejected(
-    sampler: Callable[..., Any], *args: Any, **kwargs: Any
-) -> InputValidationError:
+    sampler: Callable[..., Any],
+    *args: Any,
+    error_type: type[ephem.Error] = InputValidationError,
+    **kwargs: Any,
+) -> Any:
     """Assert that ``sampler`` refuses the given arguments.
 
     Args:
         sampler: One of the three eclipse path samplers.
         *args: Positional arguments for the sampler.
+        error_type: The error the refusal must raise: ``InputValidationError``
+            for a bad step, ``EphemerisRangeError`` for a non-finite bound.
         **kwargs: Keyword arguments for the sampler.
 
     Returns:
         The raised exception, for further assertions.
     """
-    with pytest.raises(InputValidationError) as excinfo:
+    with pytest.raises(error_type) as excinfo:
         sampler(*args, **kwargs)
     return excinfo.value
 
@@ -230,9 +263,18 @@ class TestStepsThatNeverTerminate:
         """An infinite bound breaks the exit test itself.
 
         ``jd`` never exceeds an infinite ``jd_end``, and ``-inf`` plus any
-        finite step is still ``-inf``.
+        finite step is still ``-inf``. A bound is a Julian Day, so it is
+        refused with the range error, which reports the offending value.
         """
-        _expect_rejected(sampler, jd_start, jd_end, step_minutes=1.0)
+        error = _expect_rejected(
+            sampler,
+            jd_start,
+            jd_end,
+            step_minutes=1.0,
+            error_type=EphemerisRangeError,
+        )
+        assert error.requested_jd in (jd_start, jd_end)
+        assert not math.isfinite(error.requested_jd)
 
 
 class TestStepsThatTerminateButLie:
@@ -264,17 +306,29 @@ class TestStepsThatTerminateButLie:
         ids=["nan_start", "nan_end", "nan_both"],
     )
     def test_nan_window_is_rejected(self, sampler, jd_start, jd_end, sealed_loop_body):
-        """A ``nan`` bound silently yields the "no central path" answer."""
-        error = _expect_rejected(sampler, jd_start, jd_end, step_minutes=1.0)
+        """A ``nan`` bound used to yield the "no central path" answer.
+
+        ``jd <= nan`` is false, so the walk left at once and returned empty
+        tuples, indistinguishable from a partial-only eclipse. The bound is
+        now refused with the range error, which reports the ``nan``.
+        """
+        error = _expect_rejected(
+            sampler,
+            jd_start,
+            jd_end,
+            step_minutes=1.0,
+            error_type=EphemerisRangeError,
+        )
         assert "finite" in str(error)
+        assert math.isnan(error.requested_jd)
 
 
 class TestGuardContract:
     """Where the rejection comes from and what it looks like."""
 
     @SAMPLERS
-    def test_error_is_a_library_error(self, sampler, sealed_loop_body):
-        """The refusal uses the library's own typed error hierarchy."""
+    def test_step_error_is_an_input_validation_error(self, sampler, sealed_loop_body):
+        """A bad step is bad input, in the library's own error hierarchy."""
         error = _expect_rejected(
             sampler, JD_ECLIPSE, JD_ECLIPSE + 1.0 / 1440.0, step_minutes=0.0
         )
@@ -282,13 +336,52 @@ class TestGuardContract:
         assert isinstance(error, ephem.InputValidationError)
 
     @SAMPLERS
+    def test_bound_error_matches_the_canonical_validator(
+        self, sampler, sealed_loop_body
+    ):
+        """A non-finite bound raises what ``validate_jd_range`` raises.
+
+        The window bounds are Julian Days, so they get the range error the
+        canonical validator already uses for a non-finite Julian Day, with
+        the same ``requested_jd`` attribute carrying the offending value.
+        """
+        with pytest.raises(EphemerisRangeError) as canonical:
+            validate_jd_range(INF)
+        error = _expect_rejected(
+            sampler,
+            JD_ECLIPSE,
+            INF,
+            step_minutes=1.0,
+            error_type=EphemerisRangeError,
+        )
+        assert isinstance(error, ephem.Error)
+        assert type(error) is type(canonical.value)
+        assert error.requested_jd == canonical.value.requested_jd == INF
+
+    @SAMPLERS
     def test_message_names_the_function_and_parameter(self, sampler, sealed_loop_body):
-        """The message points at the offending call and argument."""
+        """The step message points at the offending call and argument."""
         error = _expect_rejected(
             sampler, JD_ECLIPSE, JD_ECLIPSE + 1.0 / 1440.0, step_minutes=-5.0
         )
         assert sampler.__name__ in str(error)
         assert "step_minutes" in str(error)
+
+    @SAMPLERS
+    def test_bound_message_names_the_function_and_bounds(
+        self, sampler, sealed_loop_body
+    ):
+        """The range message points at the offending call and both bounds."""
+        error = _expect_rejected(
+            sampler,
+            JD_ECLIPSE,
+            NAN,
+            step_minutes=1.0,
+            error_type=EphemerisRangeError,
+        )
+        assert sampler.__name__ in str(error)
+        assert "jd_start" in str(error)
+        assert "jd_end" in str(error)
 
     @SAMPLERS
     def test_rejection_precedes_any_calculation(self, sampler, sealed_loop_body):
@@ -300,32 +393,42 @@ class TestGuardContract:
         error = _expect_rejected(sampler, 1.0e9, 1.0e9 + 1.0, step_minutes=0.0)
         assert "step_minutes" in str(error)
 
-    def test_helper_returns_the_step_in_days(self):
-        """Accepted steps come back converted to days, unchanged in value."""
-        step_days = _eclipse_sampling_step_days(
-            JD_ECLIPSE, JD_ECLIPSE + 1.0, 30.0, "test"
+    @SAMPLERS
+    def test_bounds_are_checked_before_the_step(self, sampler, sealed_loop_body):
+        """With both a bad bound and a bad step, the bound is reported.
+
+        The resolution test needs finite bounds to know where the walk is
+        hardest to advance, so the bounds are validated first and a call that
+        gets both wrong hears about the bound.
+        """
+        _expect_rejected(
+            sampler,
+            NAN,
+            JD_ECLIPSE,
+            step_minutes=0.0,
+            error_type=EphemerisRangeError,
         )
-        assert step_days == 30.0 / 1440.0
 
-    def test_helper_boundary_is_half_the_double_spacing(self):
-        """The accept/reject boundary sits exactly at half the spacing.
+    @SAMPLERS
+    def test_accept_boundary_is_just_above_half_the_spacing(self, sampler):
+        """The first double above half the spacing is accepted and advances.
 
-        Half the spacing is refused (ties round to even, so it advances from
-        some samples only); the next double above it is accepted, and it does
-        advance the accumulator.
+        Half the spacing itself is refused (``test_half_spacing_step_is_rejected``:
+        ties round to even, so it advances from some samples only). The next
+        double above it must be accepted, and it does move the accumulator.
+        The window is a single instant, so this samples at most once however
+        small the step is.
         """
         half_spacing_minutes = (JD_SPACING_DAYS / 2.0) * MINUTES_PER_DAY
-        with pytest.raises(InputValidationError):
-            _eclipse_sampling_step_days(
-                JD_ECLIPSE, JD_ECLIPSE, half_spacing_minutes, "test"
-            )
         smallest_ok = math.nextafter(half_spacing_minutes, math.inf)
-        step_days = _eclipse_sampling_step_days(
-            JD_ECLIPSE, JD_ECLIPSE, smallest_ok, "test"
-        )
-        assert JD_ECLIPSE + step_days > JD_ECLIPSE
+        assert JD_ECLIPSE + smallest_ok / MINUTES_PER_DAY > JD_ECLIPSE
+        result = sampler(JD_ECLIPSE, JD_ECLIPSE, step_minutes=smallest_ok)
+        _assert_path_shape(result, JD_ECLIPSE, JD_ECLIPSE)
 
-    def test_helper_uses_the_largest_magnitude_of_the_window(self):
+    @SAMPLERS
+    def test_spacing_is_taken_at_the_largest_magnitude_of_the_window(
+        self, sampler, sealed_loop_body
+    ):
         """The spacing is taken where the walk is hardest to advance.
 
         A step fine enough near JD 0 is still absorbed at JD 2.46e6, so the
@@ -334,8 +437,16 @@ class TestGuardContract:
         step_minutes = 1e-7
         assert 1.0 + step_minutes / MINUTES_PER_DAY > 1.0
         assert JD_ECLIPSE + step_minutes / MINUTES_PER_DAY == JD_ECLIPSE
-        with pytest.raises(InputValidationError):
-            _eclipse_sampling_step_days(1.0, JD_ECLIPSE, step_minutes, "test")
+        _expect_rejected(sampler, 1.0, JD_ECLIPSE, step_minutes=step_minutes)
+
+    def test_helper_returns_the_step_in_days(self, step_helper):
+        """Accepted steps come back converted to days, unchanged in value.
+
+        The only test that touches the private validator: the unit of its
+        return value is not observable through the samplers.
+        """
+        step_days = step_helper(JD_ECLIPSE, JD_ECLIPSE + 1.0, 30.0, "test")
+        assert step_days == 30.0 / 1440.0
 
 
 class TestInputsThatMustKeepWorking:

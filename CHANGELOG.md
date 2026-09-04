@@ -52,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `apogee` group still narrows the window to its own stored interval. Inside
   the window nothing changes; `auto`, `skyfield` and `horizons` keep the
   documented edge taper. (#62)
+- `calc_eclipse_central_line`, `calc_eclipse_northern_limit` and
+  `calc_eclipse_southern_limit` no longer hang on a sampling step that cannot
+  move the Julian Day accumulator (issue #61). A `step_minutes` that is zero,
+  negative, non-finite, or too small to advance a double-precision Julian Day
+  in the window now raises `InputValidationError`; a non-finite `jd_start` or
+  `jd_end` raises `EphemerisRangeError`, as `validate_jd_range` does for any
+  non-finite Julian Day, where a `nan` bound previously returned empty tuples.
 
 ## [3.1.0] - 2026-08-11
 

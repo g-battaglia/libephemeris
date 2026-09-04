@@ -89,6 +89,7 @@ from .constants import (
     ECL_4TH_VISIBLE,
 )
 from .exceptions import (
+    EphemerisRangeError,
     Error,
     IllegalBodyError,
     InputValidationError,
@@ -12331,11 +12332,12 @@ def _eclipse_sampling_step_days(
       accumulator stands still. The same stall happens when a denormal
       ``step_minutes`` underflows to zero once divided by 1440.
     - Non-finite window bounds break the exit test itself: a ``jd_end`` of
-      ``+inf`` is never exceeded, ``-inf`` plus any finite step is still
-      ``-inf``, and a ``nan`` bound makes ``jd <= jd_end`` false immediately,
-      which returns the empty result the API reserves for "this eclipse has
-      no central path". Rejecting them matches ``validate_jd_range``, which
-      refuses non-finite Julian Days for the same reason.
+      ``+inf`` is never exceeded, and ``-inf`` plus any finite step is still
+      ``-inf``. Before this guard, a ``nan`` bound made
+      ``jd <= jd_end`` false immediately and silently returned the empty result
+      reserved for "this eclipse has no central path"; it is now rejected.
+      This uses the same :class:`EphemerisRangeError` semantics as the canonical
+      ``validate_jd_range`` validator.
 
     Only conditions that make the walk non-terminating or meaningless are
     refused. A finite window that merely needs a very large number of
@@ -12354,14 +12356,19 @@ def _eclipse_sampling_step_days(
         accumulator at every instant the loop can visit.
 
     Raises:
-        InputValidationError: If the window bounds are not finite, or if
-            ``step_minutes`` is not a finite positive number, or if it is too
-            small to advance a double-precision Julian Day in this window.
+        EphemerisRangeError: If either window bound is not finite.
+        InputValidationError: If ``step_minutes`` is not a finite positive
+            number, or if it is too small to advance a double-precision Julian
+            Day in this window.
     """
     if not math.isfinite(jd_start) or not math.isfinite(jd_end):
-        raise InputValidationError(
-            f"{func_name}: jd_start and jd_end must be finite Julian Days, got "
-            f"jd_start={jd_start!r}, jd_end={jd_end!r}"
+        invalid_jd = jd_start if not math.isfinite(jd_start) else jd_end
+        raise EphemerisRangeError(
+            message=(
+                f"{func_name}: jd_start and jd_end must be finite Julian Days, got "
+                f"jd_start={jd_start!r}, jd_end={jd_end!r}"
+            ),
+            requested_jd=invalid_jd,
         )
 
     # Checked before the sign test: ``nan <= 0.0`` is false, so a ``nan`` step
@@ -12444,10 +12451,15 @@ def calc_eclipse_central_line(
         are omitted from the results.
 
     Raises:
-        InputValidationError: If jd_start or jd_end is not finite, or if
-            step_minutes is not a finite number greater than zero, or is too
-            small to advance a double-precision Julian Day in this window.
-            Such a step would leave the sampling loop running for ever.
+        EphemerisRangeError: If jd_start or jd_end is not finite, the same
+            error validate_jd_range raises for any non-finite Julian Day. An
+            infinite bound would leave the sampling loop running for ever; a
+            ``nan`` bound used to return empty tuples, indistinguishable from
+            an eclipse with no central path, and is now refused.
+        InputValidationError: If step_minutes is not a finite number greater
+            than zero, or is too small to advance a double-precision Julian
+            Day in this window. Such a step would leave the sampling loop
+            running for ever.
 
     Algorithm:
         For each time step, uses sol_eclipse_where() to find the central
@@ -12565,10 +12577,15 @@ def calc_eclipse_northern_limit(
         longitudes. Coordinates are native Python floats in degrees.
 
     Raises:
-        InputValidationError: If jd_start or jd_end is not finite, or if
-            step_minutes is not a finite number greater than zero, or is too
-            small to advance a double-precision Julian Day in this window.
-            Such a step would leave the sampling loop running for ever.
+        EphemerisRangeError: If jd_start or jd_end is not finite, the same
+            error validate_jd_range raises for any non-finite Julian Day. An
+            infinite bound would leave the sampling loop running for ever; a
+            ``nan`` bound used to return empty tuples, indistinguishable from
+            an eclipse with no central path, and is now refused.
+        InputValidationError: If step_minutes is not a finite number greater
+            than zero, or is too small to advance a double-precision Julian
+            Day in this window. Such a step would leave the sampling loop
+            running for ever.
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -12734,10 +12751,15 @@ def calc_eclipse_southern_limit(
         longitudes. Coordinates are native Python floats in degrees.
 
     Raises:
-        InputValidationError: If jd_start or jd_end is not finite, or if
-            step_minutes is not a finite number greater than zero, or is too
-            small to advance a double-precision Julian Day in this window.
-            Such a step would leave the sampling loop running for ever.
+        EphemerisRangeError: If jd_start or jd_end is not finite, the same
+            error validate_jd_range raises for any non-finite Julian Day. An
+            infinite bound would leave the sampling loop running for ever; a
+            ``nan`` bound used to return empty tuples, indistinguishable from
+            an eclipse with no central path, and is now refused.
+        InputValidationError: If step_minutes is not a finite number greater
+            than zero, or is too small to advance a double-precision Julian
+            Day in this window. Such a step would leave the sampling loop
+            running for ever.
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
