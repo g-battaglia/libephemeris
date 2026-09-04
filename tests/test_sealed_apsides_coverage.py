@@ -234,6 +234,7 @@ def bundled_core_only():
     for them while the Sun and the mean node report the base interval.
     """
     previous_mode = eph.get_calc_mode()
+    previous_leb = eph.state._LEB_FILE
     eph.set_leb_file(str(_BUNDLED_CORE))
     eph.set_calc_mode("leb")
     assert get_body_coverage(eph.INTP_APOG, _IN_RANGE_JD) is None
@@ -242,7 +243,7 @@ def bundled_core_only():
     try:
         yield
     finally:
-        eph.set_leb_file(None)
+        eph.set_leb_file(previous_leb)
         eph.set_calc_mode(previous_mode)
 
 
@@ -454,6 +455,7 @@ def test_an_installed_apogee_group_intersects_with_the_window(tier, name, body):
     if not (core.is_file() and group.is_file()):
         pytest.skip(f"{core.name} + {group.name} not installed under {_HOME_LEB_DIR}")
     previous_mode = eph.get_calc_mode()
+    previous_leb = eph.state._LEB_FILE
     eph.set_leb_file(str(core))
     eph.set_calc_mode("leb")
     try:
@@ -478,5 +480,5 @@ def test_an_installed_apogee_group_intersects_with_the_window(tier, name, body):
             assert excinfo.value.start_jd == coverage.jd_start
             assert excinfo.value.ephemeris_file == coverage.data_file
     finally:
-        eph.set_leb_file(None)
+        eph.set_leb_file(previous_leb)
         eph.set_calc_mode(previous_mode)

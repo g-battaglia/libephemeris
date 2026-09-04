@@ -330,37 +330,26 @@ class TestVerifyAssistFile:
         assert ri._verify_assist_file(temp) is True
         assert ri._verify_assist_file(temp, name="linux_p1550p2650.440") is False
 
-    def test_short_known_file_is_a_warning_when_size_is_not_enforced(self, tmp_path):
-        """enforce_size=False turns the size shortfall into a warning.
-
-        The expected sizes are unpinned heuristics: an upstream republication
-        that legitimately shrinks a file must still install.
-        """
+    def test_short_known_file_is_rejected_under_its_final_name(self, tmp_path):
+        """The size threshold is the planet files' only integrity check."""
         p = tmp_path / "linux_p1550p2650.440"
         p.write_bytes(b"x" * 10)
-
-        with patch("libephemeris.logging_config.get_logger") as get_logger:
-            assert ri._verify_assist_file(p, enforce_size=False) is True
-
-        get_logger.return_value.warning.assert_called_once()
         assert ri._verify_assist_file(p) is False
 
-    def test_empty_file_fails_even_when_size_is_not_enforced(self, tmp_path):
-        """Truncation to nothing is still caught with the size advisory."""
+    def test_empty_file_fails(self, tmp_path):
         p = tmp_path / "linux_p1550p2650.440"
         p.write_bytes(b"")
-        assert ri._verify_assist_file(p, enforce_size=False) is False
+        assert ri._verify_assist_file(p) is False
 
     def test_download_validator_checks_the_temp_file_under_the_final_name(
         self, tmp_path
     ):
-        """The pre-publication validator is advisory on size, strict on structure."""
+        """A short or empty payload is refused before publication."""
         validator = ri._assist_download_validator("linux_p1550p2650.440")
 
         short = tmp_path / "tmp123.download"
         short.write_bytes(b"x" * 10)
-        with patch("libephemeris.logging_config.get_logger"):
-            assert validator(str(short)) is True
+        assert validator(str(short)) is False
 
         empty = tmp_path / "tmp456.download"
         empty.write_bytes(b"")

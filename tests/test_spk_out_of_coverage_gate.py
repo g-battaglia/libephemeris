@@ -354,7 +354,9 @@ class TestStrictGateRealKernel:
                 break
         assert handoff is not None
 
-        for jd in (handoff, end):
+        # The reported end is exclusive and the sample is converted TT->TDB,
+        # so stay a hair inside it.
+        for jd in (handoff, end - 1e-6):
             s = spk_lon(jd)
             a = assist_lon(jd)
             assert s is not None

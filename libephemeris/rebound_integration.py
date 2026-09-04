@@ -242,12 +242,7 @@ _ASSIST_EXPECTED_SIZES = {
 _ASSIST_MIN_SIZE_RATIO = 0.90
 
 
-def _verify_assist_file(
-    path: Path,
-    name: Optional[str] = None,
-    *,
-    enforce_size: bool = True,
-) -> bool:
+def _verify_assist_file(path: Path, name: Optional[str] = None) -> bool:
     """Verify that an ASSIST data file looks valid.
 
     Checks that the file exists and its size is within the expected range.
@@ -257,15 +252,10 @@ def _verify_assist_file(
         path: Path to the file to verify.
         name: Logical filename to look the expectations up under. Defaults to
             ``path.name``; pass the final name explicitly when verifying a
-            temporary download, whose own name carries no expectations.
-        enforce_size: When True the size comparison against
-            :data:`_ASSIST_EXPECTED_SIZES` can fail the check; when False a
-            short file only produces a warning. The expected sizes are
-            hard-coded for URLs that carry no hash pin, so an upstream
-            republication that legitimately shrinks a file must still be
-            installable — the heuristic decides whether to *re-fetch*, never
-            whether a fetched payload is allowed to exist. Truncation is
-            still caught by the zero-byte and structural checks below.
+            temporary download, whose own name carries no expectations. The
+            size threshold is the only integrity check the planet files
+            (``.440`` / ``.441``) have, so it is enforced for a fresh payload
+            as well: a truncated download must never replace a good file.
 
     Returns:
         True if the file passes verification, False otherwise.
@@ -283,17 +273,7 @@ def _verify_assist_file(
     if expected is not None:
         min_size = int(expected * _ASSIST_MIN_SIZE_RATIO)
         if actual_size < min_size:
-            if enforce_size:
-                return False
-            from .logging_config import get_logger
-
-            get_logger().warning(
-                "%s is %d bytes, below the %d expected for this release; "
-                "installing it anyway (the published size is not pinned)",
-                logical_name,
-                actual_size,
-                min_size,
-            )
+            return False
 
     # For BSP files, try structural validation
     if logical_name.endswith(".bsp"):
@@ -329,10 +309,12 @@ def _assist_download_validator(name: str) -> Callable[[str], bool]:
     """Build the pre-publication check for one ASSIST download.
 
     The check runs on the temporary file, whose random name carries no size
-    expectation, so the final ``name`` is passed explicitly. The size is
-    advisory there (``enforce_size=False``): the expected sizes are unpinned
-    heuristics that decide whether to re-fetch, never whether a fetched
-    payload may be installed.
+    expectation, so the final ``name`` is passed explicitly. The size
+    threshold is enforced there too: for the planet files it is the only
+    integrity check, so a short payload is rejected before publication and
+    the file already on disk survives. A legitimate upstream republication
+    that shrinks a file is installed only after ``_ASSIST_EXPECTED_SIZES``
+    is updated with it.
 
     Args:
         name: Final filename the download will be published under.
@@ -343,7 +325,7 @@ def _assist_download_validator(name: str) -> Callable[[str], bool]:
     """
 
     def _validate(temp_path: str) -> bool:
-        return _verify_assist_file(Path(temp_path), name=name, enforce_size=False)
+        return _verify_assist_file(Path(temp_path), name=name)
 
     return _validate
 

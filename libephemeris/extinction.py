@@ -115,12 +115,14 @@ def _validate_airmass_method(method: object) -> AirmassMethod:
     """Return a supported airmass method, or raise for every other object."""
     from .exceptions import InputValidationError
 
-    # Equality against each registered token is safe for both hashable and
-    # unhashable objects, keeps matching exact and case-sensitive, and returns
+    # Only a str can name a method: an arbitrary object whose ``__eq__``
+    # answers True must not be accepted as one. Equality against each
+    # registered token keeps matching exact and case-sensitive and returns
     # the registered ``AirmassMethod`` token itself, so no cast is needed.
-    for candidate in AIRMASS_METHODS:
-        if method == candidate:
-            return candidate
+    if isinstance(method, str):
+        for candidate in AIRMASS_METHODS:
+            if method == candidate:
+                return candidate
     raise InputValidationError(
         f"calc_airmass: unknown method {method!r}. "
         f"Valid methods: {', '.join(AIRMASS_METHODS)}"
