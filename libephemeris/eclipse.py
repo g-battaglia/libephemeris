@@ -91,6 +91,7 @@ from .constants import (
 from .exceptions import (
     Error,
     IllegalBodyError,
+    InputValidationError,
     LEBCorruptionError,
     UnknownBodyError,
 )
@@ -12301,6 +12302,109 @@ def get_inex_number(
     return best_match_series
 
 
+def _eclipse_sampling_step_days(
+    jd_start: float,
+    jd_end: float,
+    step_minutes: float,
+    func_name: str,
+) -> float:
+    """Validate an eclipse path sampling interval and convert it to days.
+
+    The three eclipse path samplers walk their window with the accumulator
+    loop ``while jd <= jd_end: ...; jd += step_days``. That loop terminates
+    only if every addition moves ``jd`` strictly towards ``jd_end``, which is
+    a stronger requirement than "the step is not zero":
+
+    - A zero step never moves the accumulator. ``-0.0`` counts as zero here:
+      it is not caught by a ``step_minutes < 0`` test, yet ``jd += -0.0``
+      leaves ``jd`` exactly where it was.
+    - A negative step moves the accumulator away from ``jd_end`` for ever.
+    - A ``nan`` step neither advances nor stops the walk on purpose: every
+      comparison against ``nan`` is false, so the loop leaves after a single
+      sample and hands back a silently truncated path instead of an error.
+    - An infinite step jumps straight past ``jd_end``, so nothing beyond the
+      first instant of the window is ever sampled.
+    - A *positive* step can still be absorbed by binary floating point.
+      Julian Days used here are large numbers: around JD 2.46e6 consecutive
+      doubles are about 4.7e-10 days (~40 microseconds) apart, so a step
+      below half that spacing rounds away in ``jd += step_days`` and the
+      accumulator stands still. The same stall happens when a denormal
+      ``step_minutes`` underflows to zero once divided by 1440.
+    - Non-finite window bounds break the exit test itself: a ``jd_end`` of
+      ``+inf`` is never exceeded, ``-inf`` plus any finite step is still
+      ``-inf``, and a ``nan`` bound makes ``jd <= jd_end`` false immediately,
+      which returns the empty result the API reserves for "this eclipse has
+      no central path". Rejecting them matches ``validate_jd_range``, which
+      refuses non-finite Julian Days for the same reason.
+
+    Only conditions that make the walk non-terminating or meaningless are
+    refused. A finite window that merely needs a very large number of
+    iterations is accepted: it does terminate, and any cap on the iteration
+    count would be an arbitrary policy that could reject a legitimate fine
+    sampling.
+
+    Args:
+        jd_start: First Julian Day (UT) of the sampling window.
+        jd_end: Last Julian Day (UT) of the sampling window.
+        step_minutes: Requested sampling interval in minutes.
+        func_name: Name of the calling public function, for error messages.
+
+    Returns:
+        The sampling interval expressed in days, guaranteed to advance the
+        accumulator at every instant the loop can visit.
+
+    Raises:
+        InputValidationError: If the window bounds are not finite, or if
+            ``step_minutes`` is not a finite positive number, or if it is too
+            small to advance a double-precision Julian Day in this window.
+    """
+    if not math.isfinite(jd_start) or not math.isfinite(jd_end):
+        raise InputValidationError(
+            f"{func_name}: jd_start and jd_end must be finite Julian Days, got "
+            f"jd_start={jd_start!r}, jd_end={jd_end!r}"
+        )
+
+    # Checked before the sign test: ``nan <= 0.0`` is false, so a ``nan`` step
+    # would slip through the positivity test below.
+    if not math.isfinite(step_minutes):
+        raise InputValidationError(
+            f"{func_name}: step_minutes must be a finite number of minutes, "
+            f"got {step_minutes!r}"
+        )
+
+    # ``<= 0.0`` rather than ``< 0.0``: it also refuses ``0.0`` (the reported
+    # hang) and ``-0.0``, which compares as neither negative nor greater than
+    # zero but still leaves the accumulator untouched.
+    if step_minutes <= 0.0:
+        raise InputValidationError(
+            f"{func_name}: step_minutes must be greater than zero, got {step_minutes!r}"
+        )
+
+    step_days = step_minutes / (24.0 * 60.0)
+
+    # Resolution test. The spacing between consecutive doubles grows with
+    # magnitude, so the hardest instant to advance is the one with the largest
+    # absolute value the loop can reach: it starts at ``jd_start`` and adds the
+    # step only while ``jd <= jd_end``. Requiring the step to be strictly more
+    # than half that spacing guarantees progress at every visited instant. The
+    # comparison is exact: doubling a finite double is exact, and ``spacing``
+    # is a power of two. Half the spacing exactly is refused as well, because
+    # it lands on a round-half-to-even tie that advances only from odd
+    # mantissas, i.e. from some samples of the window but not all of them.
+    pivot = max(abs(jd_start), abs(jd_end))
+    spacing = math.nextafter(pivot, math.inf) - pivot
+    if 2.0 * step_days <= spacing:
+        min_minutes = (spacing / 2.0) * (24.0 * 60.0)
+        raise InputValidationError(
+            f"{func_name}: step_minutes={step_minutes!r} cannot advance the "
+            f"sampling instant near Julian Day {pivot:.1f}, where consecutive "
+            f"double-precision values are {spacing:.3e} days apart; use a step "
+            f"larger than {min_minutes:.3e} minutes"
+        )
+
+    return step_days
+
+
 def calc_eclipse_central_line(
     jd_start: float,
     jd_end: float,
@@ -12325,6 +12429,9 @@ def calc_eclipse_central_line(
                 Should be after jd_start and during the same eclipse.
         step_minutes: Time step in minutes between calculated points (default 1.0).
                       Smaller values give a more detailed path but take longer.
+                      Must be finite and greater than zero, and large enough to
+                      move a double-precision Julian Day (about 3e-7 minutes at
+                      present-day dates).
         flags: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
@@ -12335,6 +12442,12 @@ def calc_eclipse_central_line(
 
         Points where the shadow axis doesn't intersect Earth's surface
         are omitted from the results.
+
+    Raises:
+        InputValidationError: If jd_start or jd_end is not finite, or if
+            step_minutes is not a finite number greater than zero, or is too
+            small to advance a double-precision Julian Day in this window.
+            Such a step would leave the sampling loop running for ever.
 
     Algorithm:
         For each time step, uses sol_eclipse_where() to find the central
@@ -12382,8 +12495,12 @@ def calc_eclipse_central_line(
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
 
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
+    # Validate the sampling parameters before the walk starts: the loop
+    # below terminates only for a step that provably advances ``jd``
+    # towards ``jd_end`` (see _eclipse_sampling_step_days).
+    step_days = _eclipse_sampling_step_days(
+        jd_start, jd_end, step_minutes, "calc_eclipse_central_line"
+    )
 
     # Iterate through time range
     jd = jd_start
@@ -12438,12 +12555,20 @@ def calc_eclipse_northern_limit(
     Args:
         jd_start: First Julian Day in UT, during a central solar eclipse.
         jd_end: Last Julian Day in UT, during the same eclipse.
-        step_minutes: Sampling interval in minutes.
+        step_minutes: Sampling interval in minutes. Must be finite and
+            greater than zero, and large enough to move a double-precision
+            Julian Day (about 3e-7 minutes at present-day dates).
         flags: Calculation flags.
 
     Returns:
         Three tuples containing sample times, geodetic latitudes, and
         longitudes. Coordinates are native Python floats in degrees.
+
+    Raises:
+        InputValidationError: If jd_start or jd_end is not finite, or if
+            step_minutes is not a finite number greater than zero, or is too
+            small to advance a double-precision Julian Day in this window.
+            Such a step would leave the sampling loop running for ever.
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -12471,8 +12596,12 @@ def calc_eclipse_northern_limit(
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
 
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
+    # Validate the sampling parameters before the walk starts: the loop
+    # below terminates only for a step that provably advances ``jd``
+    # towards ``jd_end`` (see _eclipse_sampling_step_days).
+    step_days = _eclipse_sampling_step_days(
+        jd_start, jd_end, step_minutes, "calc_eclipse_northern_limit"
+    )
 
     # Iterate through time range
     jd = jd_start
@@ -12595,12 +12724,20 @@ def calc_eclipse_southern_limit(
     Args:
         jd_start: First Julian Day in UT, during a central solar eclipse.
         jd_end: Last Julian Day in UT, during the same eclipse.
-        step_minutes: Sampling interval in minutes.
+        step_minutes: Sampling interval in minutes. Must be finite and
+            greater than zero, and large enough to move a double-precision
+            Julian Day (about 3e-7 minutes at present-day dates).
         flags: Calculation flags.
 
     Returns:
         Three tuples containing sample times, geodetic latitudes, and
         longitudes. Coordinates are native Python floats in degrees.
+
+    Raises:
+        InputValidationError: If jd_start or jd_end is not finite, or if
+            step_minutes is not a finite number greater than zero, or is too
+            small to advance a double-precision Julian Day in this window.
+            Such a step would leave the sampling loop running for ever.
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -12628,8 +12765,12 @@ def calc_eclipse_southern_limit(
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
 
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
+    # Validate the sampling parameters before the walk starts: the loop
+    # below terminates only for a step that provably advances ``jd``
+    # towards ``jd_end`` (see _eclipse_sampling_step_days).
+    step_days = _eclipse_sampling_step_days(
+        jd_start, jd_end, step_minutes, "calc_eclipse_southern_limit"
+    )
 
     # Iterate through time range
     jd = jd_start
