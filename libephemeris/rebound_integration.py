@@ -242,7 +242,12 @@ _ASSIST_EXPECTED_SIZES = {
 _ASSIST_MIN_SIZE_RATIO = 0.90
 
 
-def _verify_assist_file(path: Path, name: Optional[str] = None) -> bool:
+def _verify_assist_file(
+    path: Path,
+    name: Optional[str] = None,
+    *,
+    enforce_size: bool = True,
+) -> bool:
     """Verify that an ASSIST data file looks valid.
 
     Checks that the file exists and its size is within the expected range.
@@ -253,6 +258,14 @@ def _verify_assist_file(path: Path, name: Optional[str] = None) -> bool:
         name: Logical filename to look the expectations up under. Defaults to
             ``path.name``; pass the final name explicitly when verifying a
             temporary download, whose own name carries no expectations.
+        enforce_size: When True the size comparison against
+            :data:`_ASSIST_EXPECTED_SIZES` can fail the check; when False a
+            short file only produces a warning. The expected sizes are
+            hard-coded for URLs that carry no hash pin, so an upstream
+            republication that legitimately shrinks a file must still be
+            installable — the heuristic decides whether to *re-fetch*, never
+            whether a fetched payload is allowed to exist. Truncation is
+            still caught by the zero-byte and structural checks below.
 
     Returns:
         True if the file passes verification, False otherwise.
@@ -270,7 +283,17 @@ def _verify_assist_file(path: Path, name: Optional[str] = None) -> bool:
     if expected is not None:
         min_size = int(expected * _ASSIST_MIN_SIZE_RATIO)
         if actual_size < min_size:
-            return False
+            if enforce_size:
+                return False
+            from .logging_config import get_logger
+
+            get_logger().warning(
+                "%s is %d bytes, below the %d expected for this release; "
+                "installing it anyway (the published size is not pinned)",
+                logical_name,
+                actual_size,
+                min_size,
+            )
 
     # For BSP files, try structural validation
     if logical_name.endswith(".bsp"):
@@ -300,6 +323,29 @@ def _create_ssl_context():
         return ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         return ssl.create_default_context()
+
+
+def _assist_download_validator(name: str) -> Callable[[str], bool]:
+    """Build the pre-publication check for one ASSIST download.
+
+    The check runs on the temporary file, whose random name carries no size
+    expectation, so the final ``name`` is passed explicitly. The size is
+    advisory there (``enforce_size=False``): the expected sizes are unpinned
+    heuristics that decide whether to re-fetch, never whether a fetched
+    payload may be installed.
+
+    Args:
+        name: Final filename the download will be published under.
+
+    Returns:
+        A callable taking the temp path and returning True when the payload
+        passes the structural checks.
+    """
+
+    def _validate(temp_path: str) -> bool:
+        return _verify_assist_file(Path(temp_path), name=name, enforce_size=False)
+
+    return _validate
 
 
 def _download_single_file(
@@ -333,6 +379,7 @@ def _download_single_file(
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     temp_fd, temp_path = tempfile.mkstemp(dir=dest.parent, suffix=".download")
+    published = False
 
     try:
         from .net import Request
@@ -364,6 +411,7 @@ def _download_single_file(
             chunk_size = 256 * 1024  # 256 KB chunks for large files
 
             with os.fdopen(temp_fd, "wb") as f:
+                temp_fd = -1
                 while True:
                     chunk = response.read(chunk_size)
                     if not chunk:
@@ -377,7 +425,6 @@ def _download_single_file(
                 progress.close()
 
         if validator is not None and not validator(temp_path):
-            os.unlink(temp_path)
             raise ValueError(
                 f"Downloaded file {dest.name} failed verification - "
                 "corrupt or incomplete"
@@ -387,20 +434,28 @@ def _download_single_file(
         from .download import publish_temp_file
 
         publish_temp_file(temp_path, dest)
+        published = True
 
         if not quiet:
             actual_mb = dest.stat().st_size / (1024 * 1024)
             print(f"  Done ({actual_mb:.1f} MB, sha256: {sha256.hexdigest()[:16]}...)")
 
-    except (ImportError, RuntimeError, ValueError, OSError):
-        # Clean up temp file on error.  OSError also covers the
-        # urllib.error.URLError network failures raised mid-download.
-        try:
-            if os.path.exists(temp_path):
+    # The cleanup is unconditional. Narrow except clauses would miss anything
+    # a caller-supplied validator raises (it is arbitrary code), orphaning a
+    # fully written .download file next to a multi-gigabyte data set.
+    finally:
+        if not published:
+            # The descriptor is only handed to os.fdopen once the response is
+            # open; a failure before that would otherwise leak it.
+            if temp_fd != -1:
+                try:
+                    os.close(temp_fd)
+                except OSError:
+                    pass
+            try:
                 os.unlink(temp_path)
-        except OSError:
-            pass
-        raise
+            except OSError:
+                pass
 
 
 def download_assist_data(
@@ -492,9 +547,7 @@ def download_assist_data(
             description=description,
             show_progress=show_progress,
             quiet=quiet,
-            validator=lambda temp, _name=filename: _verify_assist_file(
-                Path(temp), name=_name
-            ),
+            validator=_assist_download_validator(filename),
         )
         downloaded += 1
 

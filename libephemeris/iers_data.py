@@ -252,20 +252,6 @@ def get_iers_auto_download() -> bool:
 # =============================================================================
 
 
-def _resolve_cache_dir() -> str:
-    """Resolve the IERS cache directory without creating it.
-
-    Honours :func:`set_iers_cache_dir`, then the data directory. Queries and
-    deletions use this: neither should have the side effect of creating a
-    directory. The downloader creates it on the way to writing a file.
-    """
-    from .state import _resolve_data_dir
-
-    if _IERS_CACHE_DIR is not None:
-        return os.path.abspath(_IERS_CACHE_DIR)
-    return os.path.join(_resolve_data_dir(), DEFAULT_CACHE_DIR)
-
-
 def _get_cache_dir() -> str:
     """Get the IERS cache directory, creating it if necessary."""
     from .state import _get_data_dir
@@ -281,26 +267,19 @@ def _get_cache_dir() -> str:
     return cache_path
 
 
-# Basenames of the three cached IERS tables, in the order reported by
-# get_iers_cache_info() and removed by delete_iers_cache_files().
-_FINALS_FILENAME = "finals2000A.data"
-_LEAP_SECONDS_FILENAME = "leap_seconds.dat"
-_DELTA_T_FILENAME = "deltat.data"
-
-
 def _get_finals_cache_path() -> str:
     """Get the path for the cached finals2000A.data file."""
-    return os.path.join(_resolve_cache_dir(), _FINALS_FILENAME)
+    return os.path.join(_get_cache_dir(), "finals2000A.data")
 
 
 def _get_leap_seconds_cache_path() -> str:
     """Get the path for the cached leap seconds file."""
-    return os.path.join(_resolve_cache_dir(), _LEAP_SECONDS_FILENAME)
+    return os.path.join(_get_cache_dir(), "leap_seconds.dat")
 
 
 def _get_delta_t_cache_path() -> str:
     """Get the path for the cached IERS Delta T file."""
-    return os.path.join(_resolve_cache_dir(), _DELTA_T_FILENAME)
+    return os.path.join(_get_cache_dir(), "deltat.data")
 
 
 # =============================================================================
@@ -1406,48 +1385,27 @@ def clear_iers_cache() -> None:
         _DELTA_T_DATA_TIMESTAMP = None
 
 
-def delete_iers_cache_files(dry_run: bool = False) -> int:
+def delete_iers_cache_files() -> int:
     """
     Delete cached IERS data files from disk.
 
-    The files are taken from the same three path helpers the downloaders and
-    :func:`get_iers_cache_info` use, so the set removed here can never drift
-    from the set actually written. The location honours
-    :func:`set_iers_cache_dir`.
-
-    Args:
-        dry_run: When True, report how many files *would* be removed without
-            deleting anything and without clearing the in-memory tables.
-
     Returns:
-        Number of files deleted, or the number that would be deleted when
-        ``dry_run`` is True.
+        Number of files deleted
     """
     deleted = 0
-    paths = (
-        _get_finals_cache_path(),
-        _get_leap_seconds_cache_path(),
-        _get_delta_t_cache_path(),
-    )
+    cache_dir = _get_cache_dir()
 
-    if dry_run:
-        return sum(1 for filepath in paths if os.path.exists(filepath))
+    for filename in ["finals2000A.data", "leap_seconds.dat", "deltat.data"]:
+        filepath = os.path.join(cache_dir, filename)
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                deleted += 1
+            except OSError:
+                pass
 
-    # One critical section for both halves: a concurrent load landing between
-    # the removal and the clear would be erased by the clear, or would leave
-    # tables in memory whose files are gone. _IERS_LOCK is reentrant, so the
-    # nested acquisition inside clear_iers_cache() is fine.
-    with _IERS_LOCK:
-        for filepath in paths:
-            if os.path.exists(filepath):
-                try:
-                    os.remove(filepath)
-                    deleted += 1
-                except OSError:
-                    pass
-
-        # Also clear in-memory cache
-        clear_iers_cache()
+    # Also clear in-memory cache
+    clear_iers_cache()
 
     return deleted
 
@@ -1473,7 +1431,7 @@ def get_iers_cache_info() -> dict[str, Union[str, int, float, bool, None]]:
             - delta_t_range_start_jd: Start of Delta T data range (JD), or None
             - delta_t_range_end_jd: End of Delta T data range (JD), or None
     """
-    cache_dir = _resolve_cache_dir()
+    cache_dir = _get_cache_dir()
     finals_path = _get_finals_cache_path()
     leap_path = _get_leap_seconds_cache_path()
     delta_t_path = _get_delta_t_cache_path()

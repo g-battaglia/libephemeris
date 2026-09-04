@@ -11,26 +11,29 @@ Three invariants are pinned here.
    files involved are 10 MB to 2.6 GB, so a failed repair used to be an
    expensive loss.
 
-2. **The SPK cache has one address.** The writer (``spk.download_spk``) and
-   every reader in ``spk_auto`` resolve the directory through the same
-   function. When they disagreed, a downloaded kernel was never found again
-   and each process re-downloaded it.
+2. **The SPK writer honours the configured cache directory.** When
+   ``set_spk_cache_dir()`` (or LIBEPHEMERIS_SPK_DIR) names a directory,
+   ``download_spk`` writes there — the directory every ``spk_auto`` lookup
+   consults. Without an override the file keeps landing in ``<data dir>/spk``,
+   so kernels downloaded by earlier versions stay visible.
 
-3. **Deleting the IERS cache is scoped and previewable.** The deletion
-   honours ``set_iers_cache_dir()``, reuses the same path helpers the
-   downloaders use, and can report what it would remove without removing it.
+3. **A registration is session state.** ``download_and_register_spk()``
+   redirects a body to a kernel by mutating the process-wide SPK body map;
+   ``reset_session()`` puts it back.
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import json
 import os
 from pathlib import Path
 
 import pytest
 
 import libephemeris.download as dl
-from libephemeris import iers_data, spk_auto, state
+from libephemeris import spk, spk_auto, state
 
 pytestmark = pytest.mark.usefixtures("allow_mocked_network")
 
@@ -57,10 +60,11 @@ class _FakeResponse:
     def __exit__(self, *exc):
         return False
 
-    def read(self, size):
+    def read(self, size=None):
         if self._offset >= len(self._data):
             return b""
-        chunk = self._data[self._offset : self._offset + size]
+        end = len(self._data) if size is None else self._offset + size
+        chunk = self._data[self._offset : end]
         self._offset += len(chunk)
         return chunk
 
@@ -267,117 +271,161 @@ def test_assist_file_survives_a_failed_reverification(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 2. The SPK cache resolves to one directory for readers and writers alike
+# 2. The SPK writer honours the configured cache directory (issue #55)
 # ---------------------------------------------------------------------------
 
 
-class TestSpkCacheDirIsShared:
-    """The lookup path and the download path must never diverge."""
+def _horizons_serving(spk_bytes: bytes = b"\x00" * 1024):
+    """Stand in for the Horizons SPK-generation endpoint."""
+    payload = json.dumps(
+        {
+            "spk_file_id": "test_id",
+            "spk": base64.b64encode(spk_bytes).decode("ascii"),
+        }
+    ).encode("utf-8")
+
+    def _open_url(req, purpose=None, timeout=None, context=None, **kwargs):
+        return _FakeResponse(payload)
+
+    return _open_url
+
+
+class TestSpkCacheDirIsHonoured:
+    """The downloader must write where the configured lookups look."""
 
     def teardown_method(self):
         state.set_spk_cache_dir(None)
 
-    def test_setter_is_honoured_by_every_consumer(self, tmp_path, monkeypatch):
+    def test_configured_cache_dir_is_where_the_kernel_lands(
+        self, tmp_path, monkeypatch
+    ):
+        """Issue #55: download_spk() honours set_spk_cache_dir()."""
         monkeypatch.delenv("LIBEPHEMERIS_SPK_DIR", raising=False)
         target = tmp_path / "configured"
         state.set_spk_cache_dir(str(target))
+        monkeypatch.setattr(spk, "open_url", _horizons_serving())
+        monkeypatch.setattr(spk, "_is_valid_bsp", lambda path: True)
 
-        resolved = spk_auto.resolve_cache_dir()
-        assert resolved == str(target)
-        assert os.path.dirname(spk_auto.get_cache_path("2060")) == resolved
-        assert spk_auto.cache_info()["cache_dir"] == resolved
-        assert spk_auto.get_cache_info()["cache_dir"] == resolved
-        assert spk_auto.ensure_cache_dir() == resolved
+        path = spk.download_spk("2060", "2020-01-01", "2025-01-01")
 
-        config = spk_auto.AutoSpkConfig(ipl=15, body_id="2060")
-        assert config.get_cache_dir() == resolved
+        assert os.path.dirname(path) == str(target)
+        # The same directory every spk_auto lookup resolves to, which is the
+        # whole point: a kernel written elsewhere is downloaded again forever.
+        assert spk_auto.ensure_cache_dir() == str(target)
 
     def test_env_var_is_honoured(self, tmp_path, monkeypatch):
         target = tmp_path / "from-env"
-        monkeypatch.setenv("LIBEPHEMERIS_SPK_DIR", str(target))
         state.set_spk_cache_dir(None)
+        monkeypatch.setenv("LIBEPHEMERIS_SPK_DIR", str(target))
+        monkeypatch.setattr(spk, "open_url", _horizons_serving())
+        monkeypatch.setattr(spk, "_is_valid_bsp", lambda path: True)
 
-        assert spk_auto.resolve_cache_dir() == str(target)
+        path = spk.download_spk("2060", "2020-01-01", "2025-01-01")
 
-    def test_data_dir_redirect_keeps_the_cache_inside_it(self, tmp_path, monkeypatch):
-        """A redirected data directory owns its own spk/ subdirectory.
+        assert os.path.dirname(path) == str(target)
 
-        This is where ``download_spk`` has always written; the readers now
-        agree instead of looking under the home directory.
+    def test_without_an_override_the_data_directory_still_owns_the_cache(
+        self, tmp_path, monkeypatch
+    ):
+        """No override: the kernel keeps landing exactly where it used to.
+
+        Relocating this path would hide every kernel already downloaded by an
+        installation whose data directory has been redirected.
         """
         monkeypatch.delenv("LIBEPHEMERIS_SPK_DIR", raising=False)
         monkeypatch.setattr(state, "get_spk_cache_dir", lambda: None)
-        monkeypatch.setenv("LIBEPHEMERIS_DATA_DIR", str(tmp_path / "data"))
+        monkeypatch.setattr(state, "_get_data_dir", lambda: str(tmp_path / "data"))
+        monkeypatch.setattr(spk, "open_url", _horizons_serving())
+        monkeypatch.setattr(spk, "_is_valid_bsp", lambda path: True)
 
-        assert spk_auto.resolve_cache_dir() == str(tmp_path / "data" / "spk")
+        path = spk.download_spk("2060", "2020-01-01", "2025-01-01")
 
-    def test_default_stays_under_the_home_directory(self, monkeypatch):
-        monkeypatch.delenv("LIBEPHEMERIS_SPK_DIR", raising=False)
-        monkeypatch.delenv("LIBEPHEMERIS_DATA_DIR", raising=False)
-        monkeypatch.setattr(state, "get_spk_cache_dir", lambda: None)
-        monkeypatch.setattr(state, "_resolve_data_dir", lambda: state.DEFAULT_DATA_DIR)
-
-        assert spk_auto.resolve_cache_dir() == os.path.abspath(
-            spk_auto.DEFAULT_AUTO_SPK_DIR
-        )
+        assert os.path.dirname(path) == str(tmp_path / "data" / "spk")
 
 
 # ---------------------------------------------------------------------------
-# 3. Deleting the IERS cache is scoped, previewable and side-effect free
+# 3. An SPK registration does not outlive the session that made it
 # ---------------------------------------------------------------------------
 
 
-class TestDeleteIersCacheFiles:
+class TestSpkBodyMapIsSessionState:
+    """reset_session() must undo what download_and_register_spk() did."""
+
     def teardown_method(self):
-        iers_data.set_iers_cache_dir(None)
+        state._SPK_BODY_MAP.clear()
 
-    def test_dry_run_reports_without_deleting(self, tmp_path):
-        cache = tmp_path / "iers"
-        cache.mkdir()
-        iers_data.set_iers_cache_dir(str(cache))
-        names = ("finals2000A.data", "leap_seconds.dat", "deltat.data")
-        for name in names:
-            (cache / name).write_text("x")
+    def test_reset_session_drops_the_registration(self):
+        state._SPK_BODY_MAP[15] = ("/nowhere/chiron.bsp", 2002060)
 
-        assert iers_data.delete_iers_cache_files(dry_run=True) == 3
-        assert all((cache / name).exists() for name in names)
+        state.reset_session()
 
-        assert iers_data.delete_iers_cache_files() == 3
-        assert not any((cache / name).exists() for name in names)
+        assert spk.get_spk_body_info(15) is None
+        assert state._SPK_BODY_MAP == {}
 
-    def test_only_the_configured_directory_is_touched(self, tmp_path):
-        """The override is honoured, so the real cache is never at risk."""
-        other = tmp_path / "untouched"
-        other.mkdir()
-        (other / "finals2000A.data").write_text("keep me")
+    def test_reset_session_keeps_the_loaded_kernels(self):
+        """Only the mapping is session state; the open kernels stay cached."""
+        sentinel = object()
+        state._SPK_KERNELS["/nowhere/chiron.bsp"] = sentinel  # type: ignore[assignment]
+        state._SPK_BODY_MAP[15] = ("/nowhere/chiron.bsp", 2002060)
+        try:
+            state.reset_session()
 
-        cache = tmp_path / "iers"
-        cache.mkdir()
-        (cache / "finals2000A.data").write_text("delete me")
-        iers_data.set_iers_cache_dir(str(cache))
+            assert state._SPK_BODY_MAP == {}
+            assert state._SPK_KERNELS["/nowhere/chiron.bsp"] is sentinel
+        finally:
+            state._SPK_KERNELS.pop("/nowhere/chiron.bsp", None)
 
-        assert iers_data.delete_iers_cache_files() == 1
-        assert (other / "finals2000A.data").read_text() == "keep me"
+    def test_registration_through_the_public_api_is_undone(self, tmp_path, monkeypatch):
+        """The real mutation, made by the entry point users actually call."""
 
-    def test_does_not_create_the_cache_directory(self, tmp_path):
-        """A deletion must not have the side effect of creating a directory."""
-        cache = tmp_path / "never-created"
-        iers_data.set_iers_cache_dir(str(cache))
+        class _FakeKernel:
+            def __getitem__(self, key):
+                if key == 2002060:
+                    return object()
+                raise KeyError(key)
 
-        assert iers_data.delete_iers_cache_files(dry_run=True) == 0
-        assert iers_data.delete_iers_cache_files() == 0
-        assert not cache.exists()
+        kernel_path = tmp_path / "chiron.bsp"
+        kernel_path.write_bytes(b"\x00" * 16)
+        monkeypatch.setattr(state, "_load_spk_kernel", lambda path: None)
+        monkeypatch.setitem(state._SPK_KERNELS, str(kernel_path), _FakeKernel())
 
-    def test_paths_come_from_the_shared_helpers(self, tmp_path):
-        """The removed set cannot drift from the written set."""
-        cache = tmp_path / "iers"
-        cache.mkdir()
-        iers_data.set_iers_cache_dir(str(cache))
-        for path in (
-            iers_data._get_finals_cache_path(),
-            iers_data._get_leap_seconds_cache_path(),
-            iers_data._get_delta_t_cache_path(),
-        ):
-            Path(path).write_text("x")
+        spk.register_spk_body(15, str(kernel_path), 2002060)
+        assert spk.get_spk_body_info(15) == (str(kernel_path), 2002060)
 
-        assert iers_data.delete_iers_cache_files() == 3
+        state.reset_session()
+
+        assert spk.get_spk_body_info(15) is None
+
+    def test_download_and_register_spk_is_undone_by_reset_session(
+        self, tmp_path, monkeypatch
+    ):
+        """Issue #55: list_spk_bodies() returns to its pre-download state.
+
+        Only the network is stubbed (download_spk hands back a fake kernel);
+        the registration goes through the real download_and_register_spk().
+        """
+
+        class _FakeKernel:
+            def __getitem__(self, key):
+                if key == 2002060:
+                    return object()
+                raise KeyError(key)
+
+        kernel_path = tmp_path / "2060_202001_202501.bsp"
+        kernel_path.write_bytes(b"\x00" * 16)
+        monkeypatch.setattr(spk, "download_spk", lambda *args, **kw: str(kernel_path))
+        monkeypatch.setattr(spk, "_spk_covers_dates", lambda *args: True)
+        monkeypatch.setattr(state, "_load_spk_kernel", lambda path: None)
+        monkeypatch.setitem(state._SPK_KERNELS, str(kernel_path), _FakeKernel())
+
+        before = spk.list_spk_bodies()
+        assert 15 not in before
+
+        spk.download_and_register_spk(
+            "2060", 15, "2020-01-01", "2025-01-01", naif_id=2002060
+        )
+        assert spk.list_spk_bodies()[15] == (str(kernel_path), 2002060)
+
+        state.reset_session()
+
+        assert spk.list_spk_bodies() == before

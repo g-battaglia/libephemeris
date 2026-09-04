@@ -386,7 +386,7 @@ class TestDownloadSpk:
                 spk.download_spk("2060", "2020-01-01", "2025-01-01", path=str(tmp_path))
 
     def test_default_path_branch(self, tmp_path):
-        """path=None resolves through the shared SPK cache resolver.
+        """path=None honours the configured SPK cache directory.
 
         The writer must land where every spk_auto lookup looks, otherwise a
         downloaded kernel is never found again (issue #55).
@@ -412,7 +412,7 @@ class TestDownloadSpk:
             patch("libephemeris.spk._is_valid_bsp", return_value=True),
         ):
             path = spk.download_spk("2060", "2020-01-01", "2025-01-01")
-            resolved = spk_auto.resolve_cache_dir()
+            resolved = spk_auto.ensure_cache_dir()
 
         assert os.path.dirname(path) == resolved
 

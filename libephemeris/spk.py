@@ -413,9 +413,7 @@ def download_spk(
         end: End date in YYYY-MM-DD format
         path: Directory to save the file. If None, uses the configured SPK
             cache directory (set_spk_cache_dir() / LIBEPHEMERIS_SPK_DIR /
-            TOML ``spk_dir``); failing that, ``<data dir>/spk`` when the data
-            directory has been redirected via LIBEPHEMERIS_DATA_DIR or TOML
-            ``data_dir``; otherwise ~/.libephemeris/spk/
+            TOML ``spk_dir``) when one is set, otherwise ``<data dir>/spk``.
         center: Reference center for ephemeris (default: "500@0" = SSB).
             Use "500@0" for compatibility with Skyfield/DE kernels.
         overwrite: If True, overwrite existing file. If False, skip if exists.
@@ -434,12 +432,23 @@ def download_spk(
         >>> print(path)
         /path/to/kernels/chiron_2000_2100.bsp
     """
-    # Determine output directory. The writer must use the same resolver as
-    # every cache lookup in spk_auto: when the two disagree a downloaded
-    # kernel is never found again and every process re-downloads it.
-    from .spk_auto import ensure_cache_dir
+    # Determine output directory. An explicit set_spk_cache_dir() /
+    # LIBEPHEMERIS_SPK_DIR override wins, because that is the only directory
+    # every spk_auto lookup consults; without one the file keeps landing in
+    # <data dir>/spk, which in the default configuration is the same path the
+    # lookups use. Honouring the override is what issue #55 asked for; moving
+    # the cache anywhere else would hide kernels users already downloaded.
+    if path is None:
+        from .state import get_spk_cache_dir
 
-    path = ensure_cache_dir(path)
+        path = get_spk_cache_dir()
+    if path is None:
+        from .state import _get_data_dir
+
+        path = os.path.join(_get_data_dir(), "spk")
+
+    # Ensure directory exists
+    os.makedirs(path, exist_ok=True)
 
     # Generate filename
     body_safe = _sanitize_filename(body)
@@ -654,17 +663,10 @@ def register_spk_body(
     # Resolve file path
     if not os.path.isabs(spk_file):
         from .state import _get_data_dir
-        from .spk_auto import resolve_cache_dir
 
         data_dir = _get_data_dir()
-        # Try the configured SPK cache, the data dir's spk subdirectory and
-        # the data dir itself. The configured cache comes first because that
-        # is where download_spk() writes.
-        for search_dir in [
-            resolve_cache_dir(),
-            os.path.join(data_dir, "spk"),
-            data_dir,
-        ]:
+        # Try data dir and spk subdirectory
+        for search_dir in [os.path.join(data_dir, "spk"), data_dir]:
             full_path = os.path.join(search_dir, spk_file)
             if os.path.exists(full_path):
                 spk_file = full_path
@@ -792,14 +794,9 @@ def get_spk_coverage(spk_file: str) -> Optional[tuple[float, float]]:
     # Resolve path
     if not os.path.isabs(spk_file):
         from .state import _get_data_dir
-        from .spk_auto import resolve_cache_dir
 
         data_dir = _get_data_dir()
-        for search_dir in [
-            resolve_cache_dir(),
-            os.path.join(data_dir, "spk"),
-            data_dir,
-        ]:
+        for search_dir in [os.path.join(data_dir, "spk"), data_dir]:
             full_path = os.path.join(search_dir, spk_file)
             if os.path.exists(full_path):
                 spk_file = full_path
@@ -1402,8 +1399,7 @@ def download_and_register_spk(
         naif_id: NAIF ID in the kernel. If None, auto-detected from SPK file.
             JPL Horizons uses: asteroid_number + 20000000
         path: Directory to save file (default: the configured SPK cache
-            directory, then ``<data dir>/spk`` if the data directory has been
-            redirected, otherwise ~/.libephemeris/spk/)
+            directory when one is set, otherwise ``<data dir>/spk``)
         center: Reference center (default: "500@0" = SSB)
         overwrite: Overwrite existing file if True
         timeout: Request timeout in seconds

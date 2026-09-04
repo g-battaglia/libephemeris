@@ -823,16 +823,10 @@ def config() -> None:
     click.echo(_b("IERS Earth orientation data"))
     iers_auto = os.environ.get("LIBEPHEMERIS_IERS_AUTO_DOWNLOAD", "")
     iers_dt = os.environ.get("LIBEPHEMERIS_IERS_DELTA_T", "")
-    try:
-        from ..iers_data import get_iers_cache_info
-
-        iers_dir = str(get_iers_cache_info()["cache_dir"])
-    except (ImportError, OSError, KeyError, ValueError):
-        # Resolving the cache path touches the filesystem and the optional
-        # config layer; anything else is a defect and should surface.
-        iers_dir = f"{data_dir}/iers_cache"
-    click.echo(f"  Location: {iers_dir}")
-    click.echo("  Python:   set_iers_cache_dir('/custom/path')")
+    # Printed, never resolved: get_iers_cache_info() parses the cached tables
+    # and can trigger an IERS download, which has no business running inside a
+    # read-only "show me the configuration" command.
+    click.echo(f"  Location: {data_dir}/iers_cache/")
     _cur = f"  [current: {iers_auto}]" if iers_auto else ""
     click.echo(f"  Env var:  {_e('LIBEPHEMERIS_IERS_AUTO_DOWNLOAD')}  (1/0){_cur}")
     _cur = f"  [current: {iers_dt}]" if iers_dt else ""

@@ -553,6 +553,7 @@ def _install_bundled_file(
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     temp_fd, temp_path = tempfile.mkstemp(dir=dest_path.parent, suffix=".bundled")
     digest = hashlib.sha256()
+    published = False
     try:
         with source.open("rb") as src, os.fdopen(temp_fd, "wb") as dst:
             temp_fd = -1
@@ -573,17 +574,22 @@ def _install_bundled_file(
                 "corrupt or incomplete"
             )
         publish_temp_file(temp_path, dest_path)
-    except BaseException:
-        if temp_fd != -1:
+        published = True
+    # Same shape as download_file: the cleanup runs on every exit path, and it
+    # tolerates any OSError rather than only FileNotFoundError, so a failing
+    # unlink can neither mask the original error nor leave the temp copy of a
+    # multi-megabyte resource behind.
+    finally:
+        if not published:
+            if temp_fd != -1:
+                try:
+                    os.close(temp_fd)
+                except OSError:
+                    pass
             try:
-                os.close(temp_fd)
+                os.unlink(temp_path)
             except OSError:
                 pass
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
-        raise
 
 
 def _file_sha256(path: Path) -> str:

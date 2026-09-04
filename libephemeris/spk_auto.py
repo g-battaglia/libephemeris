@@ -95,59 +95,21 @@ DEFAULT_END_DATE = "2100-01-01"
 # =============================================================================
 
 
-def resolve_cache_dir(cache_dir: Optional[str] = None) -> str:
-    """
-    Resolve the SPK cache directory without creating it.
-
-    This is the single source of truth for where SPK kernels live. Every
-    reader and every writer must go through it: when the lookup path and
-    the download path disagree, a cached kernel is never found again and
-    each process re-downloads it.
-
-    Resolution order:
-        1. The explicit ``cache_dir`` argument
-        2. set_spk_cache_dir() / LIBEPHEMERIS_SPK_DIR / TOML ``spk_dir``
-        3. ``<data dir>/spk`` when the data directory has been redirected
-           via LIBEPHEMERIS_DATA_DIR or TOML ``data_dir``
-        4. DEFAULT_AUTO_SPK_DIR (~/.libephemeris/spk/)
-
-    Step 3 keeps the cache inside an explicitly chosen data directory, which
-    is where the downloader has always written it. In the default
-    configuration steps 3 and 4 name the same directory.
-
-    Args:
-        cache_dir: Optional custom cache directory path.
-
-    Returns:
-        str: Absolute path to the cache directory (not created).
-    """
-    if cache_dir is None:
-        from .state import get_spk_cache_dir
-
-        cache_dir = get_spk_cache_dir()
-
-    if cache_dir is None:
-        from . import state
-
-        data_dir = state._resolve_data_dir()
-        if data_dir != os.path.abspath(os.path.expanduser(state.DEFAULT_DATA_DIR)):
-            return os.path.join(data_dir, "spk")
-        cache_dir = DEFAULT_AUTO_SPK_DIR
-
-    return os.path.abspath(cache_dir)
-
-
 def ensure_cache_dir(cache_dir: Optional[str] = None) -> str:
     """
     Ensure the SPK cache directory exists, creating it if necessary.
 
     This function creates the cache directory if it doesn't exist and returns
-    the absolute path to the cache directory. The location is resolved by
-    :func:`resolve_cache_dir`.
+    the absolute path to the cache directory.
+
+    Resolution order when cache_dir is None:
+        1. Value from set_spk_cache_dir() (programmatic override)
+        2. LIBEPHEMERIS_SPK_DIR environment variable
+        3. DEFAULT_AUTO_SPK_DIR (~/.libephemeris/spk/)
 
     Args:
         cache_dir: Optional custom cache directory path. If None, resolves
-            via set_spk_cache_dir() / env var / data dir / default.
+            via set_spk_cache_dir() / env var / default.
 
     Returns:
         str: Absolute path to the cache directory.
@@ -160,7 +122,14 @@ def ensure_cache_dir(cache_dir: Optional[str] = None) -> str:
         >>> # Custom cache directory
         >>> cache_path = ensure_cache_dir("/custom/cache/path")
     """
-    cache_path = resolve_cache_dir(cache_dir)
+    if cache_dir is None:
+        from .state import get_spk_cache_dir
+
+        cache_dir = get_spk_cache_dir()
+    if cache_dir is None:
+        cache_dir = DEFAULT_AUTO_SPK_DIR
+
+    cache_path = os.path.abspath(cache_dir)
     os.makedirs(cache_path, exist_ok=True)
     return cache_path
 
@@ -178,8 +147,8 @@ def get_cache_path(body_id: Union[int, str], cache_dir: Optional[str] = None) ->
         body_id: JPL Horizons body identifier. Can be:
             - Asteroid number (int or str): 2060, "2060", "136199"
             - Name (str): "Chiron", "Eris"
-        cache_dir: Optional custom cache directory path. If None, resolves
-            via :func:`resolve_cache_dir`.
+        cache_dir: Optional custom cache directory path. If None, uses the
+            default cache directory ({library_path}/spk_cache/).
 
     Returns:
         str: Full path where the SPK file would be stored.
@@ -194,7 +163,10 @@ def get_cache_path(body_id: Union[int, str], cache_dir: Optional[str] = None) ->
         >>> print(path)
         /path/to/libephemeris/spk_cache/chiron.bsp
     """
-    dir_path = resolve_cache_dir(cache_dir)
+    if cache_dir is not None:
+        dir_path = os.path.abspath(cache_dir)
+    else:
+        dir_path = DEFAULT_AUTO_SPK_DIR
 
     # Sanitize body_id for filename (shared writer/reader sanitizer)
     from .spk import _sanitize_filename
@@ -215,8 +187,8 @@ def cache_info(
     number of files, total size, and list of cached filenames.
 
     Args:
-        cache_dir: Optional custom cache directory path. If None, resolves
-            via :func:`resolve_cache_dir`.
+        cache_dir: Optional custom cache directory path. If None, uses the
+            default cache directory ({library_path}/spk_cache/).
 
     Returns:
         dict: Cache information with the following keys:
@@ -232,7 +204,10 @@ def cache_info(
         >>> print(f"Files cached: {info['num_files']}")
         >>> print(f"Total size: {info['total_size_mb']:.2f} MB")
     """
-    dir_path = resolve_cache_dir(cache_dir)
+    if cache_dir is not None:
+        dir_path = os.path.abspath(cache_dir)
+    else:
+        dir_path = DEFAULT_AUTO_SPK_DIR
 
     if not os.path.exists(dir_path):
         return {
@@ -292,7 +267,20 @@ class AutoSpkConfig:
 
     def get_cache_dir(self) -> str:
         """Get the cache directory, creating if necessary."""
-        return ensure_cache_dir(self.cache_dir or None)
+        from . import state
+
+        cache_path: str
+        if self.cache_dir:
+            cache_path = self.cache_dir
+        elif state.get_spk_cache_dir() is not None:
+            cache_path = state.get_spk_cache_dir()  # type: ignore
+        else:
+            cache_path = DEFAULT_AUTO_SPK_DIR
+
+        if not os.path.exists(cache_path):
+            os.makedirs(cache_path, exist_ok=True)
+
+        return cache_path
 
     def get_cache_filename(self) -> str:
         """Generate a unique cache filename based on configuration."""
@@ -691,7 +679,7 @@ def get_cache_info() -> dict[str, Union[int, float, str, list[str]]]:
             - total_size_mb: Total size in MB
             - files: List of cached file names
     """
-    cache_dir = resolve_cache_dir()
+    cache_dir = DEFAULT_AUTO_SPK_DIR
 
     if not os.path.exists(cache_dir):
         return {
@@ -761,8 +749,10 @@ def list_cached_spk(
         dirs_to_check = [os.path.abspath(cache_dir)]
     else:
         # Check both the resolved default and the legacy cache directory
-        resolved_dir = resolve_cache_dir()
-        default_cache = os.path.abspath(DEFAULT_AUTO_SPK_DIR)
+        from .state import get_spk_cache_dir
+
+        resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
+        default_cache = DEFAULT_AUTO_SPK_DIR
         # Dedupe: in the default configuration both entries resolve to the
         # same directory, which would double-count sizes and listings.
         dirs_to_check = list(dict.fromkeys([default_cache, resolved_dir]))
@@ -853,8 +843,10 @@ def clear_spk_cache(cache_dir: Optional[str] = None) -> int:
         dirs_to_clear = [os.path.abspath(cache_dir)]
     else:
         # Clear both the resolved default and the legacy cache directory
-        resolved_dir = resolve_cache_dir()
-        default_cache = os.path.abspath(DEFAULT_AUTO_SPK_DIR)
+        from .state import get_spk_cache_dir
+
+        resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
+        default_cache = DEFAULT_AUTO_SPK_DIR
         dirs_to_clear = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_clear:
@@ -913,8 +905,10 @@ def get_cache_size(cache_dir: Optional[str] = None) -> float:
         dirs_to_check = [os.path.abspath(cache_dir)]
     else:
         # Check both the resolved default and the legacy cache directory
-        resolved_dir = resolve_cache_dir()
-        default_cache = os.path.abspath(DEFAULT_AUTO_SPK_DIR)
+        from .state import get_spk_cache_dir
+
+        resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
+        default_cache = DEFAULT_AUTO_SPK_DIR
         # Dedupe: in the default configuration both entries resolve to the
         # same directory, which would double-count sizes and listings.
         dirs_to_check = list(dict.fromkeys([default_cache, resolved_dir]))
@@ -990,8 +984,10 @@ def prune_old_cache(
         dirs_to_prune = [os.path.abspath(cache_dir)]
     else:
         # Prune both the resolved default and the legacy cache directory
-        resolved_dir = resolve_cache_dir()
-        default_cache = os.path.abspath(DEFAULT_AUTO_SPK_DIR)
+        from .state import get_spk_cache_dir
+
+        resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
+        default_cache = DEFAULT_AUTO_SPK_DIR
         dirs_to_prune = [default_cache, resolved_dir]
 
     for dir_path in dirs_to_prune:
@@ -1339,8 +1335,13 @@ def is_spk_cached(
         ... else:
         ...     print("Need to download Chiron SPK")
     """
-    # Determine cache directory (single shared resolver)
-    cache_dir = resolve_cache_dir(cache_dir)
+    # Determine cache directory (resolve via state/env/default)
+    if cache_dir is None:
+        from .state import get_spk_cache_dir
+
+        cache_dir = get_spk_cache_dir()
+    if cache_dir is None:
+        cache_dir = DEFAULT_AUTO_SPK_DIR
 
     if not os.path.exists(cache_dir):
         return False
@@ -1402,10 +1403,8 @@ def auto_get_spk(
         jd_start: Start of the date range (Julian Day)
         jd_end: End of the date range (Julian Day)
         cache_dir: Directory for storing/finding SPK files.
-            Default: the set_spk_cache_dir() / LIBEPHEMERIS_SPK_DIR / TOML
-            value if set, then ``<data dir>/spk`` when the data directory has
-            been redirected, otherwise ~/.libephemeris/spk/. See
-            :func:`resolve_cache_dir`.
+            Default: Uses set_spk_cache_dir() value if set, otherwise
+            ~/.libephemeris/spk/
         ipl: Optional libephemeris body ID (e.g., CHIRON). If provided,
             the SPK body is automatically registered after download.
         naif_id: Optional NAIF ID for SPK lookup. If not provided but ipl is,
@@ -1443,8 +1442,11 @@ def auto_get_spk(
     # Import state to get configuration settings
     from . import state
 
-    # Determine cache directory (single shared resolver)
-    cache_dir = resolve_cache_dir(cache_dir)
+    # Determine cache directory (parameter > global config > default)
+    if cache_dir is None:
+        cache_dir = state.get_spk_cache_dir()
+    if cache_dir is None:
+        cache_dir = DEFAULT_AUTO_SPK_DIR
 
     # Apply date padding from global configuration
     date_padding = state.get_spk_date_padding()
