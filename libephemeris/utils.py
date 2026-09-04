@@ -505,15 +505,23 @@ def refrac(
     """Convert between true and apparent altitude.
 
     Args:
-        alt: Input altitude in degrees.
-        atpress: Atmospheric pressure in hPa. Zero disables refraction;
-            negative values are accepted as compatibility extrapolations.
-        attemp: Atmospheric temperature in degrees Celsius.
+        alt: Input altitude in degrees, within [-90, 90].
+        atpress: Atmospheric pressure in hPa. Zero disables refraction.
+            A negative absolute pressure is rejected: it is not a low
+            pressure, and the conventional scale it feeds turns it into a
+            refraction of the wrong sign.
+        attemp: Atmospheric temperature in degrees Celsius, above absolute
+            zero.
         flag: ``TRUE_TO_APP`` adds refraction; ``APP_TO_TRUE`` removes it.
 
     Returns:
         Apparent altitude for ``TRUE_TO_APP``, or true altitude for
         ``APP_TO_TRUE``, in degrees.
+
+    Raises:
+        InputValidationError: If any argument is non-finite, the altitude is
+            outside [-90, 90], the pressure is negative, or the temperature
+            is at or below absolute zero.
 
     Notes:
         Plain refraction follows a clean-room closed-form behavioral model of
@@ -556,13 +564,15 @@ def refrac_extended(
                   For APP_TO_TRUE, this is the apparent (observed) altitude.
         geoalt: Altitude of observer above sea level in meters.
         atpress: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
-                  Use 0 to disable refraction correction.
-        attemp: Atmospheric temperature at observer in degrees Celsius.
-                     Default is 15.0.
+                  Use 0 to disable refraction correction. A negative absolute
+                  pressure is rejected.
+        attemp: Atmospheric temperature at observer in degrees Celsius, above
+                     absolute zero. Default is 15.0.
         lapserate: Temperature lapse rate dT/dh in degrees Kelvin per meter.
                     Default is None (uses global value from set_lapse_rate(),
-                    or 0.0065 K/m if not set).
-                    Typical values range from 0.0034 to 0.010 K/m.
+                    or 0.0065 K/m if not set). Must be finite; typical values
+                    range from 0.0034 to 0.010 K/m, and a negative value is a
+                    temperature inversion, which is accepted.
         flag: Direction of conversion:
             - TRUE_TO_APP (0): Convert true altitude to apparent altitude
             - APP_TO_TRUE (1): Convert apparent altitude to true altitude
