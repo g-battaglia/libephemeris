@@ -47,6 +47,7 @@ Provenance:
 from __future__ import annotations
 
 import contextlib
+import functools
 import math
 import re
 from typing import Callable, Iterator, Sequence, Tuple, Union, cast
@@ -101,6 +102,33 @@ from .state import get_calc_mode, get_timescale
 # traceback names libephemeris.exceptions.IllegalBodyError rather than an
 # underscore-prefixed internal one.
 _IllegalRiseBodyError = IllegalBodyError
+
+
+def _illegal_body_contract[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    """Give a public entry point the single illegal-body error contract.
+
+    The ``lun_occult_*`` entry points document an unknown or unplaceable
+    body as raising both an ``UnknownBodyError`` and a ``ValueError``;
+    :class:`IllegalBodyError` is that type, the same one ``rise_trans``
+    raises. The body fails to resolve somewhere inside the dispatch (an
+    unknown id in calc_ut, a body absent from a sealed LEB artifact, a
+    body the active backend does not support) and surfaces there as the
+    plain ``UnknownBodyError``; the wrapper re-raises it as the contract
+    type with the same message and ``body_id``, chained to the original.
+    An error that already satisfies both contracts passes through as is,
+    and so does every other typed error (range, corruption, star lookup).
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        try:
+            return func(*args, **kwargs)
+        except UnknownBodyError as exc:
+            if isinstance(exc, ValueError):
+                raise
+            raise IllegalBodyError(exc.message, body_id=exc.body_id) from exc
+
+    return wrapper
 
 
 _ACTIVE_LEB_READER = object()
@@ -6375,20 +6403,23 @@ def _reject_moon_self_occultation(body: "int | str") -> None:
         raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
 
 
-def _reject_non_occultable_body(body: "int | str") -> None:
-    """Reject an occultation target that is not a body.
+def _fold_pseudo_body_to_sun(body: "int | str") -> "int | str":
+    """Answer a negative body id as the Sun, as the reference does.
 
     Negative ids are reserved for pseudo-targets such as ``ECL_NUT`` (-1),
     which calc_ut answers with obliquity and nutation rather than a
-    position. Asking for its occultation is meaningless, and without this
-    guard the request reached the ephemeris reader and surfaced as a bare
-    ``KeyError`` from an internal lookup instead of the typed error every
-    other unknown body gets.
+    position. Behavioral comparison with the reference showed each
+    lun_occult_* entry point answering every negative id exactly as it
+    answers body 0, so the fold keeps the outputs identical. Without it the
+    id reached the ephemeris reader and surfaced as a bare ``KeyError`` from
+    an internal lookup.
     """
     if isinstance(body, int) and body < 0:
-        raise UnknownBodyError("illegal planet number %d." % body, body_id=body)
+        return SUN
+    return body
 
 
+@_illegal_body_contract
 def lun_occult_when_glob(
     tjdut: float,
     body: "int | str",
@@ -6400,7 +6431,8 @@ def lun_occult_when_glob(
 
     Args:
         tjdut: Search start as a Julian Day in UT.
-        body: Planet identifier or fixed-star name.
+        body: Planet identifier or fixed-star name. A negative id is
+            answered as the Sun, as the reference does.
         flags: Calculation flags.
         ecltype: Requested occultation-type mask, or zero for any type.
         backwards: Search direction. Integer values may also include
@@ -6412,6 +6444,9 @@ def lun_occult_when_glob(
     Raises:
         Error: If the type filter is impossible or no event is found in the
             search window.
+        IllegalBodyError: If the body is unknown or no active backend can
+            place it; the error is both an ``UnknownBodyError`` and a
+            ``ValueError``.
 
     Notes:
         With ``ECL_ONE_TRY``, only the conjunction nearest the start is
@@ -6419,7 +6454,7 @@ def lun_occult_when_glob(
         first time slot.
     """
     _reject_moon_self_occultation(body)
-    _reject_non_occultable_body(body)
+    body = _fold_pseudo_body_to_sun(body)
     from .exceptions import Error
     from .constants import ECL_ONE_TRY
 
@@ -6877,6 +6912,7 @@ def _lun_occult_when_loc_pythonic(
     )
 
 
+@_illegal_body_contract
 def lun_occult_when_loc(
     tjdut: float,
     body: "int | str",
@@ -6889,6 +6925,7 @@ def lun_occult_when_loc(
     Args:
         tjdut: Search start as a Julian Day in UT.
         body: Planet identifier, fixed-star identifier, or fixed-star name.
+            A negative id is answered as the Sun, as the reference does.
         geopos: Longitude, latitude, and altitude in metres.
         flags: Calculation flags.
         backwards: Search direction. Integer values may also include
@@ -6902,14 +6939,18 @@ def lun_occult_when_loc(
 
     Raises:
         Error: If no visible occultation is found in the search window.
-        ValueError: If the body or geographic position is invalid.
+        IllegalBodyError: If the body is unknown or no active backend can
+            place it; the error is both an ``UnknownBodyError`` and a
+            ``ValueError``.
+        ValueError: If the geographic position has fewer than three
+            elements.
 
     Notes:
         Local attributes include covered diameter/disc fractions, target
         azimuth and altitude, elongation, and the event contact times.
     """
     _reject_moon_self_occultation(body)
-    _reject_non_occultable_body(body)
+    body = _fold_pseudo_body_to_sun(body)
 
     # Validate geopos
     if len(geopos) < 3:
@@ -7017,6 +7058,7 @@ def _lun_occult_where_pythonic(
 _lun_occult_where_internal = _lun_occult_where_pythonic
 
 
+@_illegal_body_contract
 def lun_occult_where(
     tjdut: float,
     body: "int | str" = 0,
@@ -7028,14 +7070,20 @@ def lun_occult_where(
 
     Args:
         tjdut: Julian Day (UT) of the moment to calculate.
-        body: Planet identifier (int) or star name (str).
+        body: Planet identifier (int) or star name (str). A negative id is
+            answered as the Sun, as the reference does.
         flags: Calculation flags (default FLG_SWIEPH).
 
     Returns:
         Tuple of (retflag, geopos, attr) matching the reference API.
+
+    Raises:
+        IllegalBodyError: If the body is unknown or no active backend can
+            place it; the error is both an ``UnknownBodyError`` and a
+            ``ValueError``.
     """
     _reject_moon_self_occultation(body)
-    _reject_non_occultable_body(body)
+    body = _fold_pseudo_body_to_sun(body)
     if isinstance(body, int):
         from .fixed_stars import FIXED_STARS as _FS
         from .fixed_stars import get_canonical_star_name as _star_name_by_id

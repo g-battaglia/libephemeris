@@ -127,6 +127,21 @@ _SIGN_PINNED_HSYS = frozenset({"W", "N"})
 _UNKNOWN_HSYS_CHAR = "\ufffd"
 
 
+def _int_hsys_to_char(code: int) -> str:
+    """``chr()`` for a house-system selector given as an integer code.
+
+    An int outside the range ``chr()`` accepts is an unknown selector like
+    any other and folds to ``_UNKNOWN_HSYS_CHAR``, so it reaches the same
+    default as every other unmapped value instead of leaking ``chr()``'s
+    ValueError. Every int-to-char conversion of a selector goes through
+    here; the reference answers an unmapped selector with the default.
+    """
+    try:
+        return chr(code)
+    except (ValueError, OverflowError):
+        return _UNKNOWN_HSYS_CHAR
+
+
 def _fold_hsys_case(hsys_char: str) -> str:
     """Fold a house-system selector to its canonical case.
 
@@ -184,12 +199,12 @@ def _hsys_code(hsys: int | bytes | str) -> int:
         The integer character code of the (first character of the) identifier.
     """
     if isinstance(hsys, int):
-        code = hsys
+        hsys_char = _int_hsys_to_char(hsys)
     elif isinstance(hsys, bytes):
-        code = hsys[0]  # first byte == ord of the first character
+        hsys_char = chr(hsys[0])  # first byte == the first latin-1 character
     else:
-        code = ord(hsys[0])
-    return ord(_fold_hsys_case(chr(code)))
+        hsys_char = hsys[0]
+    return ord(_fold_hsys_case(hsys_char))
 
 
 def _house_armc_obliquity(tjdut: float) -> tuple[float, float]:
@@ -1160,7 +1175,9 @@ def houses_with_fallback(
 
     hsys_char = _hsys_to_char(hsys)
     fallback_char = (
-        chr(fallback_hsys) if isinstance(fallback_hsys, int) else fallback_hsys
+        _int_hsys_to_char(fallback_hsys)
+        if isinstance(fallback_hsys, int)
+        else fallback_hsys
     )
     primary_name = system_names.get(hsys_char, hsys_char)
     fallback_name = system_names.get(fallback_char, fallback_char)
@@ -1271,7 +1288,9 @@ def houses_armc_with_fallback(
 
     hsys_char = _hsys_to_char(hsys)
     fallback_char = (
-        chr(fallback_hsys) if isinstance(fallback_hsys, int) else fallback_hsys
+        _int_hsys_to_char(fallback_hsys)
+        if isinstance(fallback_hsys, int)
+        else fallback_hsys
     )
     primary_name = system_names.get(hsys_char, hsys_char)
     fallback_name = system_names.get(fallback_char, fallback_char)
@@ -1631,16 +1650,13 @@ def _hsys_to_char(hsys: int | bytes | str) -> str:
     """Normalize a house-system selector (int code, bytes, or str) to a char.
 
     An integer outside the Unicode range is an unknown selector like any
-    other and folds to ``_UNKNOWN_HSYS_CHAR``. Letting ``chr()`` raise made
-    one class of unknown selector fail with an untyped ValueError while
-    every other unmapped value reached the documented default.
+    other and folds to ``_UNKNOWN_HSYS_CHAR`` (see ``_int_hsys_to_char``).
+    Letting ``chr()`` raise made one class of unknown selector fail with an
+    untyped ValueError while every other unmapped value reached the
+    documented default.
     """
     if isinstance(hsys, int):
-        try:
-            hsys_char = chr(hsys)
-        except (ValueError, OverflowError):
-            return _UNKNOWN_HSYS_CHAR
-        return _fold_hsys_case(hsys_char)
+        return _fold_hsys_case(_int_hsys_to_char(hsys))
     if isinstance(hsys, bytes):
         return _fold_hsys_case(hsys.decode("latin-1"))
     return _fold_hsys_case(str(hsys))
@@ -5212,7 +5228,7 @@ def _house_pos_pythonic(
             hsys_char = lon_or_hsys[0]
             hsys_int = ord(lon_or_hsys[0])
         elif isinstance(lon_or_hsys, int) and not isinstance(lon_or_hsys, bool):
-            hsys_char = chr(lon_or_hsys)
+            hsys_char = _int_hsys_to_char(lon_or_hsys)
             hsys_int = lon_or_hsys
         else:
             # Default to Placidus (hsys omitted in the 4-arg form)
@@ -5229,7 +5245,7 @@ def _house_pos_pythonic(
             hsys_int = ord(hsys_or_objcoord[0])
         else:
             # int case
-            hsys_char = chr(hsys_or_objcoord)
+            hsys_char = _int_hsys_to_char(hsys_or_objcoord)
             hsys_int = hsys_or_objcoord
         # lon comes from lon_or_hsys: a float, or an objcoord sequence
         # in the hsys-first calling order

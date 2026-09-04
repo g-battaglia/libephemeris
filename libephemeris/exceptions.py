@@ -323,11 +323,12 @@ class StarNotFoundError(DataNotFoundError):
 
 
 class IllegalBodyError(UnknownBodyError, ValueError):
-    """A rise/set/transit target that no active backend can place.
+    """A target body that no active backend can place.
 
-    Raised by ``rise_trans`` and ``rise_trans_true_hor`` for an unknown or
-    unsupported body id (for example a planetary moon with no registered
-    SPK). It multiply inherits :class:`UnknownBodyError` — the
+    Raised by ``rise_trans`` and ``rise_trans_true_hor``, and by the three
+    ``lun_occult_*`` entry points, for an unknown or unsupported body id
+    (for example a planetary moon with no registered SPK). It multiply
+    inherits :class:`UnknownBodyError` — the
     compatibility-contract type for an illegal body, itself an
     :class:`Error` — and the built-in :class:`ValueError`, so the single
     "illegal planet number" contract is identical on every backend and
