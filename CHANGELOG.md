@@ -26,6 +26,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "no separate contributor license agreement is required" statement no longer
   applies to contributions submitted from now on.
 
+### Fixed
+
+- `calc_airmass` now raises `InputValidationError` for a `method` it does not
+  implement instead of silently computing Kasten-Young for it (#65). The
+  accepted methods are exactly `"secant"`, `"kasten_young"` and
+  `"rozenberg"`; matching is case-sensitive.
+- `calc_contrast_threshold`, `calc_visibility_threshold` and
+  `calc_limiting_magnitude_for_sky` now raise `InputValidationError` for an
+  unknown explicit `eye_adaptation` instead of silently using the photopic
+  branch (#65). The accepted states are `"photopic"`, `"mesopic"` and
+  `"dark"`; `"scotopic"`, which the documentation used to present as a
+  returned state, is accepted as an input alias for `"dark"` and is reported
+  back as `"dark"`. `None` remains the auto-detection sentinel.
+
 ## [3.1.0] - 2026-08-11
 
 ### Changed

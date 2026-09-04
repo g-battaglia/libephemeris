@@ -25,7 +25,6 @@ import libephemeris as eph
 from libephemeris import extinction as ext
 from libephemeris.exceptions import Error, InputValidationError
 
-
 # ---------------------------------------------------------------------------
 # calc_airmass
 # ---------------------------------------------------------------------------
@@ -59,6 +58,8 @@ def test_the_three_methods_are_actually_different_models():
         0,
         1,
         [],
+        {},
+        set(),
     ],
 )
 def test_a_method_the_module_does_not_implement_is_refused(method):
@@ -153,7 +154,7 @@ def test_the_reported_state_is_the_canonical_token():
 
 @pytest.mark.unit
 # None is the documented auto-determine sentinel, not an unknown state.
-@pytest.mark.parametrize("state", ["", "nope", "Dark", "DARK", 0, 2, []])
+@pytest.mark.parametrize("state", ["", "nope", "Dark", "DARK", 0, 2, [], {}, set()])
 def test_an_unknown_eye_adaptation_is_refused(state):
     """It used to fall through to the photopic branch."""
     with pytest.raises(InputValidationError):
@@ -181,6 +182,68 @@ def test_none_still_derives_the_state_from_the_sky():
     assert ext.calc_contrast_threshold(21.5, None) == ext.calc_contrast_threshold(
         21.5, "dark"
     )
+
+
+@pytest.mark.unit
+def test_the_limiting_magnitude_helper_takes_the_alias_and_refuses_the_rest():
+    """It delegates to calc_visibility_threshold and inherits its contract."""
+    assert ext.calc_limiting_magnitude_for_sky(
+        21.5, eye_adaptation="scotopic"
+    ) == ext.calc_limiting_magnitude_for_sky(21.5, eye_adaptation="dark")
+    with pytest.raises(InputValidationError):
+        ext.calc_limiting_magnitude_for_sky(21.5, eye_adaptation="nope")
+
+
+# ---------------------------------------------------------------------------
+# normalize_eye_adaptation, called directly
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("state", ext.EYE_ADAPTATION_STATES)
+def test_a_canonical_state_normalizes_to_itself(state):
+    assert ext.normalize_eye_adaptation(state, "f") == state
+
+
+@pytest.mark.unit
+def test_scotopic_normalizes_to_dark():
+    assert ext.normalize_eye_adaptation("scotopic", "f") == "dark"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("state", [[], {}, set()])
+def test_an_unhashable_state_is_refused_not_crashed_on(state):
+    """A list, dict or set must raise the validation error, not TypeError."""
+    with pytest.raises(InputValidationError):
+        ext.normalize_eye_adaptation(state, "f")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("state", [None, 0, 1, 2.0, b"dark", ("dark",), object()])
+def test_a_non_string_state_is_refused(state):
+    """None is the callers' sentinel; the normalizer itself takes strings only."""
+    with pytest.raises(InputValidationError):
+        ext.normalize_eye_adaptation(state, "f")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "state", ["", "Dark", "SCOTOPIC", "Scotopic", " dark", "dark "]
+)
+def test_matching_is_exact_and_case_sensitive(state):
+    with pytest.raises(InputValidationError):
+        ext.normalize_eye_adaptation(state, "f")
+
+
+@pytest.mark.unit
+def test_the_message_names_the_caller_and_the_accepted_states():
+    with pytest.raises(InputValidationError) as excinfo:
+        ext.normalize_eye_adaptation("nope", "calc_contrast_threshold")
+    message = str(excinfo.value)
+    assert message.startswith("calc_contrast_threshold:")
+    for state in ext.EYE_ADAPTATION_STATES:
+        assert state in message
+    assert "scotopic" in message
 
 
 @pytest.mark.unit
