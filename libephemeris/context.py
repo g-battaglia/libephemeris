@@ -870,6 +870,13 @@ class EphemerisContext:
             reader = None
 
         if reader is not None:
+            # Model-served lunar points never raise from the reader, so the
+            # sealed range policy has to be asked for explicitly here too;
+            # the module-level entry points do the same.
+            from .planets import _LEB_MODEL_SERVED_POINTS, _raise_leb_range_miss
+
+            if ipl in _LEB_MODEL_SERVED_POINTS:
+                _raise_leb_range_miss(ipl, tjd, context_reader=_ctx_local_reader)
             try:
                 from . import fast_calc
 
