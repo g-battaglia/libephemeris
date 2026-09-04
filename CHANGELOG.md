@@ -7,23 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- SPK type 21 (JPL Horizons small-body kernels): an epoch inside the
-  kernel's usable coverage is now either served by the kernel or raises the
-  new `SPKEvaluationError`; it is no longer answered from the Keplerian
-  approximation behind the caller's back (the reader's exclusive end bound
-  and the light-time band at the segment start used to degrade silently).
-  `get_spk_coverage()` reports the usable span in TDB: the stored span minus
-  the light-time band plus the speed stencil at its start and minus the
-  stencil alone at its end; `EphemerisRangeError` is raised only outside
-  that span, where the documented fallback chain continues. The state
-  chain honours the center the kernel declares (barycenter, Sun, or a body
-  of the base ephemeris) instead of assuming the Sun, and `register_spk_body()`
-  validates the NAIF ID and the center against the kernel's segment
-  summaries. Cached-kernel discovery tolerates the light-time edge band so
-  kernels are not re-downloaded.
-
 ### Added
 
 - `SPKEvaluationError` (a `CalculationError`): a registered SPK kernel could
@@ -123,6 +106,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the window now raises `InputValidationError`; a non-finite `jd_start` or
   `jd_end` raises `EphemerisRangeError`, as `validate_jd_range` does for any
   non-finite Julian Day, where a `nan` bound previously returned empty tuples.
+- SPK type 21 (JPL Horizons small-body kernels): an epoch inside the
+  kernel's usable coverage is now either served by the kernel or raises the
+  new `SPKEvaluationError`; it is no longer answered from the Keplerian
+  approximation behind the caller's back (the reader's exclusive end bound
+  and the light-time band at the segment start used to degrade silently).
+  `get_spk_coverage()` reports the usable span in TDB: the stored span minus
+  the light-time band plus the speed stencil at its start and minus the
+  stencil alone at its end; `EphemerisRangeError` is raised only outside
+  that span, where the documented fallback chain continues. The state
+  chain honours the center the kernel declares (barycenter, Sun, or a body
+  of the base ephemeris) instead of assuming the Sun, and `register_spk_body()`
+  validates the NAIF ID and the center against the kernel's segment
+  summaries. Cached-kernel discovery tolerates the light-time edge band so
+  kernels are not re-downloaded.
 
 ## [3.1.0] - 2026-08-11
 
