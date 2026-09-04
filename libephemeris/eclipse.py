@@ -12263,7 +12263,8 @@ def _validate_path_sampling(
         )
     if step <= 0.0:
         raise InputValidationError(
-            f"{function}: step_minutes must be positive, got {step!r}"
+            f"{function}: step_minutes has to move the instant forward; "
+            f"{step!r} does not"
         )
 
     step_days = step / (24.0 * 60.0)
