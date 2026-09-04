@@ -9946,7 +9946,7 @@ def _emb_osculating_ecliptic_elements(t, jd_tt: float) -> Tuple[float, ...]:
         float(v_icrs[0]), float(v_icrs[1]), float(v_icrs[2])
     )
 
-    GM = 0.01720209895**2
+    GM = 0.01720209895**2  # Gaussian gravitational constant k^2 (IAU)
     return _orbital_elements_from_ecliptic_state(x, y, z, vx, vy, vz, GM, EARTH, jd_tt)
 
 
