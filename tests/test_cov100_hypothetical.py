@@ -54,7 +54,7 @@ def test_parse_epoch_variants(text: str, expected: tuple[float | None, bool]) ->
 
 
 def test_parse_epoch_rejects_unknown_text() -> None:
-    with pytest.raises(ValueError, match="Cannot parse"):
+    with pytest.raises(ValueError, match="cannot parse"):
         _parse_epoch_or_equinox("not-an-epoch")
 
 

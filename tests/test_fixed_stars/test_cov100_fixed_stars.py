@@ -331,10 +331,10 @@ def test_calc_position_leb_valueerror_falls_back(monkeypatch):
 
 
 def test_resolve_star_ref_empty():
-    """Empty search yields the 'star name empty' error (2520)."""
+    """Empty search yields the empty-name error."""
     star_id, error, name = fs._resolve_star_ref("   ")
     assert star_id == -1
-    assert error == "star name empty"
+    assert error == "the star name is empty"
 
 
 def test_resolve_star_ref_comma_forms():
@@ -360,7 +360,7 @@ def test_resolve_star_ref_sequential_out_of_range():
     """Out-of-range sequential number errors with the v1 message (2546)."""
     star_id, error, name = fs._resolve_star_ref("999999")
     assert star_id == -1
-    assert error == "star 999999 not found"
+    assert error == "no fixed star matches the search string '999999'"
 
 
 def test_resolve_star_ref_rejects_wildcard():
@@ -371,7 +371,7 @@ def test_resolve_star_ref_rejects_wildcard():
     for q in ("Reg%", "Sir%", "Reg%ul", "Reg%%", "Zzzzq%"):
         star_id, error, _ = fs._resolve_star_ref(q)
         assert star_id == -1
-        assert error == f"star {q} not found"
+        assert error == f"no fixed star matches the search string {q!r}"
 
 
 def test_resolve_star2_wildcard_prefix():
@@ -392,10 +392,10 @@ def test_resolve_star2_wildcard_invalid_and_no_match():
     for q in ("%Spica", "Sir%%", "Re%g"):
         entry, error = fs._resolve_star2(q)
         assert entry is None
-        assert "invalid search string" in error
+        assert "invalid wildcard in search string" in error
     entry, error = fs._resolve_star2("Zzzzq%")
     assert entry is None
-    assert error == "star search string zzzzq% did not match"
+    assert error == "no fixed star name starts with the pattern 'zzzzq%'"
 
 
 def test_resolve_star2_wildcard_empty_prefix():
@@ -734,7 +734,7 @@ def test_resolve_star2_no_bayer_word_parsing():
     """
     entry, error = fs._resolve_star2("Theta Octantis")
     assert entry is None
-    assert error == "could not find star name thetaoctantis"
+    assert error == "no fixed star matches the search string 'thetaoctantis'"
     entry, error = fs._resolve_star2(",thOct")
     assert error is None
     assert entry is not None and entry.nomenclature == "thOct"
@@ -744,14 +744,14 @@ def test_resolve_star2_no_partial_nomenclature():
     """Partial nomenclature strings do not resolve (no implicit prefix)."""
     entry, error = fs._resolve_star2("zePh")
     assert entry is None
-    assert error == "could not find star name zeph"
+    assert error == "no fixed star matches the search string 'zeph'"
 
 
 def test_resolve_star2_no_ambiguous_partial():
     """A short partial errors as unknown, never as an ambiguity report."""
     entry, error = fs._resolve_star2("ALE")
     assert entry is None
-    assert error == "could not find star name ale"
+    assert error == "no fixed star matches the search string 'ale'"
 
 
 def test_resolve_star2_alias_id_without_entry(monkeypatch):
@@ -851,7 +851,7 @@ def test_fixstar_mag_basic():
 def test_fixstar_mag_missing_magnitude(monkeypatch):
     """A resolved id with no magnitude raises Error (4547)."""
     monkeypatch.setattr(fs, "_resolve_star_id", lambda s: (77777, None, "Fake"))
-    with pytest.raises(Error, match="Magnitude not available"):
+    with pytest.raises(Error, match="no magnitude is available"):
         fs.fixstar_mag("whatever")
 
 

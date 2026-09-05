@@ -365,7 +365,9 @@ class TestCalcMinorBodyHeliocentricWithSpk:
 
     def test_invalid_body_raises_error(self):
         """Should raise ValueError for invalid body ID."""
-        with pytest.raises(ValueError, match="illegal planet number"):
+        with pytest.raises(
+            ValueError, match="has no entry in the minor-body element table"
+        ):
             calc_minor_body_heliocentric(999999, 2451545.0)
 
 

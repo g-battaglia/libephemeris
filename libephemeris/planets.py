@@ -1014,7 +1014,8 @@ def _validate_barycentric_moseph(flags: int, entry_point: str) -> None:
         from .exceptions import Error
 
         raise Error(
-            f"{entry_point}: barycentric analytical positions are not supported."
+            f"{entry_point}: the analytical (MOSEPH) model cannot supply "
+            "barycentric positions"
         )
 
 
@@ -8085,8 +8086,8 @@ _FICT_GEOCENTRIC_IDS = frozenset({WHITE_MOON, WALDEMATH})
 # makes the precession-rate term negligible, so its J2000 reduction is unaffected.
 _FICT_ECL_OF_DATE_CIRCULAR_IDS = frozenset({PROSERPINA})
 
-# Astronomical points that carry no heliocentric orbit and for which the
-# reference raises "object N not valid" from get_orbital_elements: the lunar
+# Astronomical points that carry no heliocentric orbit and that
+# get_orbital_elements therefore rejects, as the reference does: the lunar
 # nodes (10, 11), the lunar apogees (12, 13), and the interpolated lunar
 # apsides (21, 22). The Sun (0) is added by get_orbital_elements but is a
 # valid target for orbit_max_min_true_distance (its geocentric range is the
@@ -8100,29 +8101,28 @@ def _validate_orbital_object(caller: str, ipl: int, *, sun_valid: bool) -> None:
     """Reject ids that have no orbital elements, matching the reference.
 
     Compatibility contract (established by behavioral comparison of the
-    public API only, no source inspected): ``get_orbital_elements`` raises
-    ``object N not valid`` for the Sun, the lunar nodes/apogees (10-13) and
-    the interpolated apsides (21, 22), ``illegal planet number N`` for the
-    undefined block 23-39, and ``object N not valid`` for negatives.
-    ``orbit_max_min_true_distance`` shares the inner ``get_orbital_elements``
-    wording but treats the Sun as valid.
+    public API only, no source inspected): ``get_orbital_elements`` rejects
+    the Sun, the lunar nodes/apogees (10-13), the interpolated apsides
+    (21, 22) and negative ids as bodies without orbital elements, and the
+    undefined block 23-39 as ids that name no body at all.
+    ``orbit_max_min_true_distance`` shares both refusals but treats the Sun
+    as valid.
 
     Args:
         caller: Public function name to prefix the message with.
         ipl: Requested body id.
-        sun_valid: When False the Sun (id 0) is rejected as ``not valid``.
+        sun_valid: When False the Sun (id 0) is rejected as a body without
+            orbital elements.
 
     Raises:
-        Error: With the reference-format message for an id without elements.
+        Error: For an id without orbital elements.
     """
     from .exceptions import Error
 
     if ipl < 0 or ipl in _ORBITAL_INVALID_OBJECT_IDS or (ipl == SUN and not sun_valid):
-        raise Error(
-            f"{caller}: error in get_orbital_elements(): object {ipl} not valid"
-        )
+        raise Error(f"{caller}: body id {ipl} has no orbital elements")
     if 23 <= ipl <= 39:
-        raise Error(f"{caller}: illegal planet number {ipl}.")
+        raise Error(f"{caller}: body id {ipl} is not a defined body")
     if WALDEMATH < ipl < AST_OFFSET:
         # No element source exists between the last fictitious body (58) and
         # the numbered-asteroid offset: the compatibility contract raises for
@@ -8130,9 +8130,7 @@ def _validate_orbital_object(caller: str, ipl: int, *, sun_valid: bool) -> None:
         # position pipeline rejects these ids too. Without this guard the
         # element calculator leaked a zero-initialized 50-tuple that read as a
         # real orbit at 0 AU.
-        raise Error(
-            f"{caller}: error in get_orbital_elements(): object {ipl} not valid"
-        )
+        raise Error(f"{caller}: body id {ipl} has no orbital elements")
 
 
 def _nodaps_to_j2000(lon_deg: float, lat_deg: float, jd_tt: float) -> tuple:
@@ -8316,7 +8314,7 @@ def _calc_nod_aps(
     if ipl not in _PLANET_MAP and not is_minor:
         from .exceptions import Error
 
-        raise Error(f"nod_aps: nodes/apsides for body id {ipl} are not implemented.")
+        raise Error(f"nod_aps: nodes and apsides are not defined for body id {ipl}")
 
     # Speeds are near-instantaneous central differences of the independently
     # calculated positions.  Every speed slot is therefore a physical rate of
@@ -9090,14 +9088,15 @@ def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, 
           which has no meaning for orbital elements)
 
     Divergences (documented, intentional): the Sun, the lunar nodes/apogees
-    (10-13) and the interpolated apsides (21, 22) raise ``object N not valid``;
-    ids 23-39 raise ``illegal planet number``; negatives and the sourceless
-    block between the last fictitious body (58) and the numbered-asteroid
-    offset raise ``object N not valid`` (one external implementation rejects
-    the same ids). The fictitious/hypothetical bodies (40-58) are
-    reduced from the library's *own* runtime models rather than a foreign
-    element set, so implementations built on a different element source can
-    report different elements (e.g. Isis/Transpluto uses a=77.755 from the
+    (10-13) and the interpolated apsides (21, 22) raise as bodies without
+    orbital elements; ids 23-39 raise as ids that name no body; negatives
+    and the sourceless block between the last fictitious body (58) and the
+    numbered-asteroid offset raise as bodies without orbital elements (one
+    external implementation rejects the same ids). The fictitious and
+    hypothetical bodies (40-58) are reduced from the library's *own* runtime
+    models rather than a foreign element set, so implementations built on a
+    different element source can report different elements (e.g.
+    Isis/Transpluto uses a=77.755 from the
     published Landscheidt convention; the White Moon (56) and Waldemath (58)
     are geocentric circular constructions here, so their elements are
     Earth-relative). Nibiru (49) is intentionally not modeled and the
@@ -9456,13 +9455,15 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         )
 
     # Get target and center bodies. Every public caller has already passed
-    # _validate_orbital_object, so an id missing from the planet map here is
-    # an internal-routing bug: raise the same typed error instead of leaking
-    # a zero-initialized tuple that would read as a real orbit at 0 AU.
+    # _validate_orbital_object, which does not bound the id from above: an
+    # id at or beyond FIXSTAR_OFFSET reaches this point, as would an
+    # internal-routing bug. Raise the same typed error as the validator
+    # instead of leaking a zero-initialized tuple that would read as a real
+    # orbit at 0 AU.
     if ipl not in _PLANET_MAP:
         from .exceptions import Error
 
-        raise Error(f"error in get_orbital_elements(): object {ipl} not valid")
+        raise Error(f"get_orbital_elements: body id {ipl} has no orbital elements")
 
     target_name = _PLANET_MAP[ipl]
     # Represent Earth's heliocentric orbit by the Earth-Moon system barycentre,
@@ -9896,9 +9897,9 @@ def orbit_max_min_true_distance(
         - Sun returns the Earth-orbit range (aphelion/perihelion, ~1.017/0.983
           AU): the reference ignores FLG_HELCTR for the Sun and Moon (hel == geo)
           and reports the terrestrial orbit for the Sun.
-        - The lunar nodes/apogees (10-13) and interpolated apsides (21, 22)
-          raise ``object N not valid``; ids 23-39 raise ``illegal planet
-          number``; negatives raise ``object N not valid``.
+        - The lunar nodes/apogees (10-13), the interpolated apsides (21, 22)
+          and negative ids raise as bodies without orbital elements; ids
+          23-39 raise as ids that name no body.
         - The White Moon (56) and Waldemath (58) are geocentric circular
           constructions here, so max == min == true == the model radius; this
           intentionally diverges from the reference's eccentric element set.

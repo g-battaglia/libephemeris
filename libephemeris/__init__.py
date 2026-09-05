@@ -652,10 +652,14 @@ def date_conversion(
     # Validate the type before normalising: .lower() on a non-string leaked
     # AttributeError instead of this function's documented ValueError.
     if not isinstance(cal, str):
-        raise ValueError(f"calendar must be 'j' or 'g', got: {cal!r}")
+        raise ValueError(
+            f"calendar must be 'j' (Julian) or 'g' (Gregorian), got {cal!r}"
+        )
     cal_char = cal.lower()
     if cal_char not in ("j", "g"):
-        raise ValueError(f"calendar must be 'j' or 'g', got: {cal!r}")
+        raise ValueError(
+            f"calendar must be 'j' (Julian) or 'g' (Gregorian), got {cal!r}"
+        )
 
     cal_flag = JUL_CAL if cal_char == "j" else GREG_CAL
     jd = julday(year, month, day, hour, cal_flag)

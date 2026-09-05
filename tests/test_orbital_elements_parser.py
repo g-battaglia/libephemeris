@@ -939,25 +939,25 @@ class TestParseOrbitalElementsLineErrors:
     def test_too_few_fields_raises_error(self):
         """Test that lines with too few fields raise ValueError."""
         line = "J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0"  # Only 7 fields
-        with pytest.raises(ValueError, match="Expected at least 9"):
+        with pytest.raises(ValueError, match="expected at least 9"):
             _parse_orbital_elements_line(line, 1)
 
     def test_invalid_epoch_raises_error(self):
         """Test that invalid epoch raises ValueError."""
         line = "INVALID_EPOCH, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, TestBody"
-        with pytest.raises(ValueError, match="Cannot parse epoch"):
+        with pytest.raises(ValueError, match="cannot parse the epoch"):
             _parse_orbital_elements_line(line, 1)
 
     def test_jdate_as_epoch_raises_error(self):
         """Test that JDATE as epoch raises ValueError (epoch cannot be JDATE)."""
         line = "JDATE, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, TestBody"
-        with pytest.raises(ValueError, match="Epoch cannot be JDATE"):
+        with pytest.raises(ValueError, match="is JDATE"):
             _parse_orbital_elements_line(line, 1)
 
     def test_invalid_semi_axis_raises_error(self):
         """Test that invalid semi-major axis raises ValueError."""
         line = "J2000, J2000, 0.0, not_a_number, 0.1, 45.0, 30.0, 5.0, TestBody"
-        with pytest.raises(ValueError, match="Cannot parse semi-major axis"):
+        with pytest.raises(ValueError, match="cannot parse the semi-major axis"):
             _parse_orbital_elements_line(line, 1)
 
     def test_invalid_mean_anomaly_raises_error(self):

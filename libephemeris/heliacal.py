@@ -1160,7 +1160,7 @@ def _star_name_from_id(star_id: int) -> str:
     for entry in STAR_CATALOG:
         if entry.id == star_id:
             return entry.name
-    raise Error(f"Star ID {star_id} not found in catalog")
+    raise Error(f"unknown fixed star id {star_id}")
 
 
 def _altaz_from_radec(
@@ -1325,29 +1325,32 @@ def _heliacal_ut_leb(
         MORNING_LAST,
     ):
         raise Error(
-            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
-            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
+            f"invalid event type {event_type}; use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST or MORNING_LAST"
         )
     if event_type in (EVENING_FIRST, MORNING_LAST):
         if is_fixed_star(body):
             raise Error(
-                "EVENING_FIRST and MORNING_LAST are not valid for fixed stars. "
-                "For fixed stars, use HELIACAL_RISING or HELIACAL_SETTING."
+                "EVENING_FIRST and MORNING_LAST do not apply to fixed stars; "
+                "use HELIACAL_RISING or HELIACAL_SETTING"
             )
         if not is_inner_planet(body) and body != MOON:
             raise Error(
-                "EVENING_FIRST and MORNING_LAST are only valid for inner planets "
-                "(Mercury, Venus) and the Moon. For outer planets, use "
-                "HELIACAL_RISING or HELIACAL_SETTING."
+                "EVENING_FIRST and MORNING_LAST apply only to the inner planets "
+                "(Mercury, Venus) and the Moon; for the outer planets use "
+                "HELIACAL_RISING or HELIACAL_SETTING"
             )
     if body == SUN:
-        raise Error("SUN is not valid for heliacal calculations")
+        raise Error("the Sun is not a valid object for heliacal calculations")
     if body == MOON and event_type in (HELIACAL_RISING, HELIACAL_SETTING):
-        raise Error("the Moon has no heliacal rising or setting (event types 1, 2)")
+        raise Error(
+            "heliacal rising and setting (event types 1 and 2) are not defined "
+            "for the Moon"
+        )
 
     is_star = is_fixed_star(body)
     if not is_star and body not in _PLANET_MAP:
-        raise Error(f"illegal planet number {body}.")
+        raise Error(f"body id {body} is neither a planet nor a fixed star")
 
     star_name: str | None = None
     star_magnitude = 0.0
@@ -1927,13 +1930,13 @@ def _heliacal_pheno_ut_leb(
         MORNING_LAST,
     ):
         raise Error(
-            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
-            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
+            f"invalid event type {event_type}; use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST or MORNING_LAST"
         )
 
     is_star = is_fixed_star(body)
     if not is_star and body not in _PLANET_MAP:
-        raise Error(f"illegal planet number {body}.")
+        raise Error(f"body id {body} is neither a planet nor a fixed star")
 
     star_name: str | None = None
     star_magnitude = 0.0
@@ -2307,7 +2310,7 @@ def _vis_limit_mag_leb(
     )
 
     if not objname:
-        raise Error("objname cannot be empty")
+        raise Error("the object name is empty")
 
     lon = geopos[0] if len(geopos) > 0 else 0.0
     lat = geopos[1] if len(geopos) > 1 else 0.0
@@ -2376,7 +2379,7 @@ def _vis_limit_mag_leb(
 
     # The Sun has no meaningful limiting magnitude in this model.
     if not is_star_flag and body_id == SUN:
-        raise Error("it makes no sense to call vis_limit_mag() for the Sun")
+        raise Error("vis_limit_mag() is not defined for the Sun")
 
     obj_alt = 0.0
     obj_az = 0.0
@@ -2409,10 +2412,12 @@ def _vis_limit_mag_leb(
         except ValueError:
             raise
         except (KeyError, IndexError, OSError) as e:
-            raise Error(f"could not find star name {objname.lower()}: {e}") from e
+            raise Error(
+                f"no fixed star matches the name {objname.lower()!r}: {e}"
+            ) from e
     else:
         if body_id is None:
-            raise Error(f"Unknown object: {objname}")
+            raise Error(f"unknown object name {objname!r}")
 
         if body_id in _PLANET_MAP:
             az, alt_true, _ = _leb_body_altaz(
@@ -2432,7 +2437,7 @@ def _vis_limit_mag_leb(
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 0.0
         else:
-            raise Error(f"illegal planet number {body_id}.")
+            raise Error(f"body id {body_id} is neither a planet nor a fixed star")
 
     if obj_alt < 0:
         # Public result contract: the below-horizon flag uses a sentinel in
@@ -2690,8 +2695,8 @@ def _heliacal_ut_pythonic(
         MORNING_LAST,
     ):
         raise Error(
-            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
-            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
+            f"invalid event type {event_type}; use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST or MORNING_LAST"
         )
 
     # EVENING_FIRST and MORNING_LAST are only valid for inner planets
@@ -2701,28 +2706,31 @@ def _heliacal_ut_pythonic(
     if event_type in (EVENING_FIRST, MORNING_LAST):
         if is_fixed_star(body):
             raise Error(
-                "EVENING_FIRST and MORNING_LAST are not valid for fixed stars. "
-                "For fixed stars, use HELIACAL_RISING or HELIACAL_SETTING."
+                "EVENING_FIRST and MORNING_LAST do not apply to fixed stars; "
+                "use HELIACAL_RISING or HELIACAL_SETTING"
             )
         if not is_inner_planet(body) and body != MOON:
             raise Error(
-                "EVENING_FIRST and MORNING_LAST are only valid for inner planets "
-                "(Mercury, Venus) and the Moon. For outer planets, use "
-                "HELIACAL_RISING or HELIACAL_SETTING."
+                "EVENING_FIRST and MORNING_LAST apply only to the inner planets "
+                "(Mercury, Venus) and the Moon; for the outer planets use "
+                "HELIACAL_RISING or HELIACAL_SETTING"
             )
 
     # Sun and Moon are not valid for heliacal events
     if body == SUN:
-        raise Error("SUN is not valid for heliacal calculations")
+        raise Error("the Sun is not a valid object for heliacal calculations")
     if body == MOON and event_type in (HELIACAL_RISING, HELIACAL_SETTING):
-        raise Error("the Moon has no heliacal rising or setting (event types 1, 2)")
+        raise Error(
+            "heliacal rising and setting (event types 1 and 2) are not defined "
+            "for the Moon"
+        )
 
     # Check if this is a fixed star
     is_star = is_fixed_star(body)
 
     # Validate body - must be either a known planet or a fixed star
     if not is_star and body not in _PLANET_MAP:
-        raise Error(f"illegal planet number {body}.")
+        raise Error(f"body id {body} is neither a planet nor a fixed star")
 
     # Get ephemeris and timescale
     eph = get_planets()
@@ -2751,7 +2759,7 @@ def _heliacal_ut_pythonic(
                 break
 
         if star_data is None:
-            raise Error(f"Star ID {body} not found in catalog")
+            raise Error(f"unknown fixed star id {body}")
 
         # Create Skyfield Star object for position calculations
         star_object = Star(
@@ -3618,8 +3626,8 @@ def heliacal_ut(
         MORNING_LAST,
     ):
         raise Error(
-            f"Invalid event_type: {eventtype}. Use HELIACAL_RISING, "
-            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
+            f"invalid event type {eventtype}; use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST or MORNING_LAST"
         )
 
     # Parse geopos
@@ -3651,7 +3659,9 @@ def heliacal_ut(
             HELIACAL_RISING: "morning first",
             HELIACAL_SETTING: "evening last",
         }[eventtype]
-        raise Error(f"{ev_name} (event type {eventtype}) does not exist for the Moon")
+        raise Error(
+            f"the {ev_name} event (type {eventtype}) is not defined for the Moon"
+        )
 
     # Call the internal _heliacal_ut_pythonic function
     jd_event, retflag = _heliacal_ut_pythonic(
@@ -3824,9 +3834,9 @@ def _parse_object_name(
     if not isinstance(object_name, str):
         parsed_body_id = int(object_name)
         if parsed_body_id == SUN and not allow_sun:
-            raise Error("Sun is not valid for heliacal calculations")
+            raise Error("the Sun is not a valid object for heliacal calculations")
         if parsed_body_id == MOON and not allow_moon:
-            raise Error("Moon is not valid for heliacal calculations")
+            raise Error("the Moon is not a valid object for this heliacal calculation")
         return parsed_body_id
 
     # Normalize name
@@ -3853,9 +3863,9 @@ def _parse_object_name(
         # Sun is valid only for the public phenomena result when requested by
         # its wrapper.
         if body_id == SUN and not allow_sun:
-            raise Error("Sun is not valid for heliacal calculations")
+            raise Error("the Sun is not a valid object for heliacal calculations")
         if body_id == MOON and not allow_moon:
-            raise Error("Moon is not valid for heliacal calculations")
+            raise Error("the Moon is not a valid object for this heliacal calculation")
 
         return body_id
 
@@ -3866,12 +3876,12 @@ def _parse_object_name(
     if star_id is not None:
         return star_id
 
-    # Object not recognized
+    # Neither a planet nor a catalogued star.
     raise Error(
-        f"Object '{object_name}' not recognized. "
-        "Use planet names (Mercury, Venus, Mars, Jupiter, Saturn, etc.), "
-        "integer planet IDs (2-9 for Mercury-Pluto), or fixed star names "
-        "(Sirius, Regulus, Aldebaran, etc.)."
+        f"unknown object name {object_name!r}; use a planet name (Mercury, "
+        "Venus, Mars, Jupiter, Saturn, ...), an integer planet id (2-9 for "
+        "Mercury through Pluto) or a fixed star name (Sirius, Regulus, "
+        "Aldebaran, ...)"
     )
 
 
@@ -4192,8 +4202,8 @@ def _heliacal_pheno_ut_pythonic(
         MORNING_LAST,
     ):
         raise Error(
-            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
-            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
+            f"invalid event type {event_type}; use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST or MORNING_LAST"
         )
 
     # Check if this is a fixed star
@@ -4201,7 +4211,7 @@ def _heliacal_pheno_ut_pythonic(
 
     # Validate body - must be either a known planet or a fixed star
     if not is_star and body not in _PLANET_MAP:
-        raise Error(f"illegal planet number {body}.")
+        raise Error(f"body id {body} is neither a planet nor a fixed star")
 
     # Get ephemeris and timescale
     eph = get_planets()
@@ -4230,7 +4240,7 @@ def _heliacal_pheno_ut_pythonic(
                 break
 
         if star_data is None:
-            raise Error(f"Star ID {body} not found in catalog")
+            raise Error(f"unknown fixed star id {body}")
 
         # Create Skyfield Star object for position calculations
         star_object = Star(
@@ -4701,7 +4711,7 @@ def vis_limit_mag(
     from skyfield.api import wgs84
 
     if not objname:
-        raise Error("objname cannot be empty")
+        raise Error("the object name is empty")
 
     # Parse geographic position
     lon = geopos[0] if len(geopos) > 0 else 0.0
@@ -4779,7 +4789,7 @@ def vis_limit_mag(
 
     # The Sun has no meaningful limiting magnitude in this model.
     if not is_fixed_star and body_id == SUN:
-        raise Error("it makes no sense to call vis_limit_mag() for the Sun")
+        raise Error("vis_limit_mag() is not defined for the Sun")
 
     # Calculate object position and magnitude
     obj_alt = 0.0
@@ -4824,11 +4834,13 @@ def vis_limit_mag(
             raise
         except (KeyError, IndexError, OSError) as e:
             # Star not found or other error
-            raise Error(f"could not find star name {objname.lower()}: {e}") from e
+            raise Error(
+                f"no fixed star matches the name {objname.lower()!r}: {e}"
+            ) from e
     else:
         # Planet calculation
         if body_id is None:
-            raise Error(f"Unknown object: {objname}")
+            raise Error(f"unknown object name {objname!r}")
 
         # Get planet name from _PLANET_MAP
         if body_id in _PLANET_MAP:
@@ -4857,7 +4869,7 @@ def vis_limit_mag(
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 0.0  # Default bright
         else:
-            raise Error(f"illegal planet number {body_id}.")
+            raise Error(f"body id {body_id} is neither a planet nor a fixed star")
 
     # Check if object is below horizon
     if obj_alt < 0:

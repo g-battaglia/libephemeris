@@ -162,7 +162,7 @@ SOMA: int = 1
 # Mercury
 BUDHA: int = 2
 SOUMYA: int = 2
-THAMA: int = 10  # alternate Mercury name (per reference contrib)
+THAMA: int = 10  # alternate Rahu name: id 10 is the mean node, not Mercury
 # Venus
 SUKRA: int = 3
 BHARGAVA: int = 3
@@ -360,7 +360,11 @@ def antiscion(
     norm = _normalize_longitude(lon)
     ant = _normalize_longitude(180.0 - norm)
     contra = _normalize_longitude(ant + 180.0)
-    # Mirror the upstream's sign behaviour for zero entries
+    # Compatibility detail: the zero speed/latitude slots carry a negative
+    # zero except when the input sits exactly on the axis (0 or 180). The
+    # sign compares equal to 0.0 but is visible through repr() and
+    # math.copysign(), and the non-regression harness does not exercise
+    # this helper, so the sign is kept rather than proven unobservable.
     zero = -0.0 if (norm != 0.0 and norm != 180.0) else 0.0
     ant_tuple = (ant, 0.0, 0.0, zero, 0.0, 0.0)
     contra_tuple = (contra, zero, 0.0, zero, zero, 0.0)
@@ -417,7 +421,9 @@ def house_system_name(code: str) -> str:
     table, read as given (no case folding); a code the table does not list
     answers ``"Unknown"``."""
     if not isinstance(code, str):
-        raise TypeError("argument 1 must be str, not " + type(code).__name__)
+        raise TypeError(
+            f"house_system_name() expects a str code, not {type(code).__name__}"
+        )
     return _HOUSE_SYSTEM_NAMES.get(code, "Unknown")
 
 

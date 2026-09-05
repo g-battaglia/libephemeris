@@ -101,7 +101,7 @@ class TestNomenclatureCodes:
         pos, name_out, _ = swe.fixstar2_ut(f",{code}", JD_J2000)
         assert len(pos) == 6
         assert 0.0 <= pos[0] < 360.0
-        with pytest.raises(swe.Error, match="could not find star name"):
+        with pytest.raises(swe.Error, match="no fixed star matches the search string"):
             swe.fixstar2_ut(code, JD_J2000)
 
     @pytest.mark.unit

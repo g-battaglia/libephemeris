@@ -197,8 +197,7 @@ class TestOrbitMaxMinTrueDistanceInvalidObjects:
         with pytest.raises(Error) as exc:
             ephem.orbit_max_min_true_distance(2451545.0, ipl, 0)
         assert str(exc.value) == (
-            f"orbit_max_min_true_distance: error in get_orbital_elements(): "
-            f"object {ipl} not valid"
+            f"orbit_max_min_true_distance: body id {ipl} has no orbital elements"
         )
 
     @pytest.mark.unit
@@ -209,7 +208,7 @@ class TestOrbitMaxMinTrueDistanceInvalidObjects:
         with pytest.raises(Error) as exc:
             ephem.orbit_max_min_true_distance(2451545.0, ipl, 0)
         assert str(exc.value) == (
-            f"orbit_max_min_true_distance: illegal planet number {ipl}."
+            f"orbit_max_min_true_distance: body id {ipl} is not a defined body"
         )
 
     @pytest.mark.unit

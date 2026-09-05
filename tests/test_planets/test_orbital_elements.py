@@ -63,7 +63,7 @@ class TestOrbitalElementsBasic:
     @pytest.mark.unit
     def test_sun_raises_not_valid(self):
         """Sun has no heliocentric orbit: get_orbital_elements raises, matching
-        the measured reference (``object 0 not valid``) rather than returning a
+        the measured reference rather than returning a
         silent all-zeros tuple."""
         from libephemeris.exceptions import Error
 
@@ -71,22 +71,18 @@ class TestOrbitalElementsBasic:
         with pytest.raises(Error) as exc:
             ephem.get_orbital_elements(jd, SUN, 0)
         assert (
-            str(exc.value) == "get_orbital_elements: error in get_orbital_elements(): "
-            "object 0 not valid"
+            str(exc.value) == "get_orbital_elements: body id 0 has no orbital elements"
         )
 
     @pytest.mark.unit
     @pytest.mark.parametrize("ipl", [10, 11, 12, 13, 21, 22, -1, -2])
     def test_points_without_orbit_raise_not_valid(self, ipl):
         """Lunar nodes/apogees (10-13), interpolated apsides (21, 22) and
-        negatives raise ``object N not valid`` for both time scales."""
+        negatives raise as bodies without orbital elements for both time scales."""
         from libephemeris.exceptions import Error
 
         jd = 2451545.0
-        expected = (
-            f"get_orbital_elements: error in get_orbital_elements(): "
-            f"object {ipl} not valid"
-        )
+        expected = f"get_orbital_elements: body id {ipl} has no orbital elements"
         with pytest.raises(Error) as exc:
             ephem.get_orbital_elements(jd, ipl, 0)
         assert str(exc.value) == expected
@@ -100,13 +96,16 @@ class TestOrbitalElementsBasic:
     @pytest.mark.unit
     @pytest.mark.parametrize("ipl", [23, 30, 39])
     def test_undefined_block_raises_illegal_planet(self, ipl):
-        """Ids 23-39 are an undefined block: ``illegal planet number N``."""
+        """Ids 23-39 are an undefined block: they name no body at all."""
         from libephemeris.exceptions import Error
 
         jd = 2451545.0
         with pytest.raises(Error) as exc:
             ephem.get_orbital_elements(jd, ipl, 0)
-        assert str(exc.value) == f"get_orbital_elements: illegal planet number {ipl}."
+        assert (
+            str(exc.value)
+            == f"get_orbital_elements: body id {ipl} is not a defined body"
+        )
 
     @pytest.mark.unit
     @pytest.mark.parametrize("ipl", [59, 69, 99, 200, 9001, 9999])
@@ -121,7 +120,7 @@ class TestOrbitalElementsBasic:
         jd = 2451545.0
         with pytest.raises(Error) as exc:
             ephem.get_orbital_elements(jd, ipl, 0)
-        assert f"object {ipl} not valid" in str(exc.value)
+        assert f"body id {ipl} has no orbital elements" in str(exc.value)
 
     @pytest.mark.unit
     def test_asteroid_zero_raises_typed_error(self):

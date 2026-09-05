@@ -1219,7 +1219,7 @@ def _parse_epoch_or_equinox(value: str) -> Tuple[Optional[float], bool]:
         jd = float(value)
         return (jd, False)
     except ValueError:
-        raise ValueError(f"Cannot parse epoch/equinox value: '{value}'")
+        raise ValueError(f"cannot parse the epoch or equinox value {value!r}")
 
 
 def _parse_t_polynomial(expr: str) -> TPolynomial:
@@ -1249,7 +1249,7 @@ def _parse_t_polynomial(expr: str) -> TPolynomial:
         try:
             return TPolynomial(constant=float(expr), linear=0.0)
         except ValueError:
-            raise ValueError(f"Cannot parse expression as number: '{expr}'")
+            raise ValueError(f"cannot parse {expr!r} as a number")
 
     # Normalize the expression: ensure spaces around operators
     # But preserve signs as part of numbers
@@ -1382,7 +1382,7 @@ def parse_orbital_elements(filepath: Union[str, Path]) -> List[OrbitalElements]:
     # some Python versions, report an unreadable path as missing. The message
     # names what the caller actually passed rather than the resolved ".".
     if not filepath.exists() or filepath.is_dir():
-        raise FileNotFoundError(f"Orbital elements file not found: {given!r}")
+        raise FileNotFoundError(f"orbital elements file not found: {given!r}")
 
     elements: List[OrbitalElements] = []
 
@@ -1407,7 +1407,7 @@ def parse_orbital_elements(filepath: Union[str, Path]) -> List[OrbitalElements]:
                 if parsed:
                     elements.append(parsed)
             except ValueError as e:
-                raise ValueError(f"Error parsing line {line_num}: {e}") from e
+                raise ValueError(f"cannot parse line {line_num}: {e}") from e
 
     return elements
 
@@ -1441,8 +1441,8 @@ def get_bundled_fictitious_orbits_path() -> Path:
     data_path = Path(__file__).parent / "data" / "fictitious_orbits.csv"
     if not data_path.exists():
         raise FileNotFoundError(
-            f"Bundled fictitious orbits dataset not found at {data_path}. "
-            "This may indicate a packaging issue with libephemeris."
+            f"the bundled fictitious-orbits dataset is missing at {data_path}; "
+            "the package may be incomplete"
         )
     return data_path
 
@@ -1474,7 +1474,7 @@ def _parse_fictitious_orbits_csv(filepath: Union[str, Path]) -> List[OrbitalElem
     """
     filepath = Path(filepath)
     if not filepath.exists():
-        raise FileNotFoundError(f"Orbital elements file not found: {filepath}")
+        raise FileNotFoundError(f"orbital elements file not found: {filepath}")
 
     elements: List[OrbitalElements] = []
 
@@ -1492,7 +1492,7 @@ def _parse_fictitious_orbits_csv(filepath: Union[str, Path]) -> List[OrbitalElem
             # Expect at least 10 columns; 11th (source) is optional
             if len(parts) < 10:
                 raise ValueError(
-                    f"Error parsing line {line_num}: expected at least 10 "
+                    f"cannot parse line {line_num}: expected at least 10 "
                     f"comma-separated fields, got {len(parts)}"
                 )
 
@@ -1510,7 +1510,9 @@ def _parse_fictitious_orbits_csv(filepath: Union[str, Path]) -> List[OrbitalElem
 
                 epoch_jd, _ = _parse_epoch_or_equinox(epoch_str)
                 if epoch_jd is None:
-                    raise ValueError(f"Epoch cannot be JDATE: '{epoch_str}'")
+                    raise ValueError(
+                        f"the epoch {epoch_str!r} is JDATE, but a fixed epoch is required"
+                    )
 
                 equinox_jd, equinox_is_jdate = _parse_epoch_or_equinox(equinox_str)
 
@@ -1518,7 +1520,9 @@ def _parse_fictitious_orbits_csv(filepath: Union[str, Path]) -> List[OrbitalElem
                 try:
                     semi_axis = float(semi_axis_str)
                 except ValueError:
-                    raise ValueError(f"Cannot parse semi-major axis: '{semi_axis_str}'")
+                    raise ValueError(
+                        f"cannot parse the semi-major axis {semi_axis_str!r}"
+                    )
                 eccentricity = _parse_t_polynomial(eccentricity_str)
                 arg_perihelion = _parse_t_polynomial(arg_perihelion_str)
                 asc_node = _parse_t_polynomial(asc_node_str)
@@ -1528,11 +1532,11 @@ def _parse_fictitious_orbits_csv(filepath: Union[str, Path]) -> List[OrbitalElem
                     is_geocentric = bool(int(geocentric_str))
                 except ValueError:
                     raise ValueError(
-                        f"Cannot parse geocentric flag: '{geocentric_str}'"
+                        f"cannot parse the geocentric flag {geocentric_str!r}"
                     )
 
             except ValueError as exc:
-                raise ValueError(f"Error parsing line {line_num}: {exc}") from exc
+                raise ValueError(f"cannot parse line {line_num}: {exc}") from exc
 
             elements.append(
                 OrbitalElements(
@@ -1652,7 +1656,7 @@ def _parse_orbital_elements_line(line: str, line_num: int) -> Optional[OrbitalEl
 
     if len(parts) < 9:
         raise ValueError(
-            f"Expected at least 9 comma-separated fields, got {len(parts)}"
+            f"expected at least 9 comma-separated fields, got {len(parts)}"
         )
 
     # Parse the first 8 fields (they should be straightforward)
@@ -1695,7 +1699,9 @@ def _parse_orbital_elements_line(line: str, line_num: int) -> Optional[OrbitalEl
     # Parse epoch and equinox
     epoch_jd, _ = _parse_epoch_or_equinox(epoch_str)
     if epoch_jd is None:
-        raise ValueError(f"Epoch cannot be JDATE: '{epoch_str}'")
+        raise ValueError(
+            f"the epoch {epoch_str!r} is JDATE, but a fixed epoch is required"
+        )
 
     equinox_jd, equinox_is_jdate = _parse_epoch_or_equinox(equinox_str)
 
@@ -1706,7 +1712,7 @@ def _parse_orbital_elements_line(line: str, line_num: int) -> Optional[OrbitalEl
     try:
         semi_axis = float(semi_axis_str)
     except ValueError:
-        raise ValueError(f"Cannot parse semi-major axis: '{semi_axis_str}'")
+        raise ValueError(f"cannot parse the semi-major axis {semi_axis_str!r}")
 
     eccentricity = _parse_t_polynomial(eccentricity_str)
     arg_perihelion = _parse_t_polynomial(arg_perihelion_str)
@@ -2586,7 +2592,7 @@ def _calc_keplerian_position(
         Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
     """
     if ipl not in HYPOTHETICAL_ELEMENTS:
-        raise ValueError(f"Body ID {ipl} does not have Keplerian elements")
+        raise ValueError(f"body id {ipl} has no Keplerian elements")
 
     elements = HYPOTHETICAL_ELEMENTS[ipl]
 
@@ -2657,7 +2663,7 @@ def _calc_keplerian_position_raw(ipl: int, jd_tt: float) -> Tuple[float, float, 
     Calculate raw Keplerian position without velocity (helper for differentiation).
     """
     if ipl not in HYPOTHETICAL_ELEMENTS:
-        raise ValueError(f"Body ID {ipl} does not have Keplerian elements")
+        raise ValueError(f"body id {ipl} has no Keplerian elements")
 
     elements = HYPOTHETICAL_ELEMENTS[ipl]
 
@@ -2808,7 +2814,7 @@ def calc_hypothetical_position(
             closed.
     """
     if not is_hypothetical_body(ipl):
-        raise ValueError(f"Body ID {ipl} is not a hypothetical body")
+        raise ValueError(f"body id {ipl} is not a hypothetical body")
 
     if ipl in URANIAN_KEPLERIAN_ELEMENTS:
         return calc_uranian_planet(ipl, jd_tt)

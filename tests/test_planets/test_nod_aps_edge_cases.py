@@ -147,7 +147,7 @@ class TestNodApsZeroBodies:
         no nodes/apsides decomposition and raise rather than returning a
         silent zero.
         """
-        with pytest.raises(swe.Error, match="not implemented"):
+        with pytest.raises(swe.Error, match="not defined"):
             swe.nod_aps_ut(JD_J2000, MEAN_NODE, NODBIT_MEAN)
 
 

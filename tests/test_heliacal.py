@@ -225,7 +225,7 @@ class TestHeliacalValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(Error, match="Invalid event_type"):
+        with pytest.raises(Error, match="invalid event type"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -486,7 +486,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(Error, match="Invalid event_type"):
+        with pytest.raises(Error, match="invalid event type"):
             heliacal_ut(jd_start, geopos, datm, dobs, "Venus", 99)
 
     def test_swe_heliacal_ut_invalid_object_name(self):
@@ -496,7 +496,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(Error, match="not recognized"):
+        with pytest.raises(Error, match="unknown object name"):
             heliacal_ut(jd_start, geopos, datm, dobs, "InvalidPlanet", HELIACAL_RISING)
 
     def test_swe_heliacal_ut_case_insensitive(self):
@@ -968,7 +968,7 @@ class TestHeliacalPhenoValidation:
         jd = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(Error, match="not recognized"):
+        with pytest.raises(Error, match="unknown object name"):
             heliacal_pheno_ut(
                 jd,
                 geopos,
@@ -983,7 +983,7 @@ class TestHeliacalPhenoValidation:
         jd = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(Error, match="Invalid event_type"):
+        with pytest.raises(Error, match="invalid event type"):
             heliacal_pheno_ut(
                 jd,
                 geopos,

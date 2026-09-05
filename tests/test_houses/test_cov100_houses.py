@@ -1107,8 +1107,8 @@ def test_gauquelin_sector_rise_set_circumpolar_raises():
     """A circumpolar planet at high latitude raises for methods 2-5.
 
     Very high latitude makes the body circumpolar (rise_trans returns -2).
-    Matching the reference API, methods 2-5 then raise "rise or set not found"
-    rather than silently falling back to method 0.
+    Matching the reference API, methods 2-5 then raise rather than silently
+    falling back to method 0.
     """
-    with pytest.raises(ephem.Error, match="rise or set not found"):
+    with pytest.raises(ephem.Error, match="has no rise or set"):
         ephem.gauquelin_sector(JD, ephem.MARS, 2, (ROME_LON, 89.0, 0.0))

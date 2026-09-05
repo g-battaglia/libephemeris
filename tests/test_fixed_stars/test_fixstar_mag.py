@@ -111,7 +111,9 @@ class TestFixstar2Mag:
 
     def test_fixstar2_mag_no_hip_number_with_comma(self):
         """A comma form keys on the nomenclature, never on a HIP number."""
-        with pytest.raises(Error, match="could not find star name ,65474"):
+        with pytest.raises(
+            Error, match="no fixed star matches the search string ',65474'"
+        ):
             ephem.fixstar2_mag(",65474")
 
     def test_fixstar2_mag_nomenclature(self):
@@ -121,7 +123,9 @@ class TestFixstar2Mag:
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
         assert mag == pytest.approx(1.40, abs=0.01)
 
-        with pytest.raises(Error, match="could not find star name alleo"):
+        with pytest.raises(
+            Error, match="no fixed star matches the search string 'alleo'"
+        ):
             ephem.fixstar2_mag("alLeo")
 
     def test_fixstar2_mag_nomenclature_case_sensitive(self):
@@ -130,12 +134,14 @@ class TestFixstar2Mag:
         assert name1 == "Spica,alVir"
 
         for wrong_case in (",ALVIR", ",AlViR"):
-            with pytest.raises(Error, match="could not find star name"):
+            with pytest.raises(Error, match="no fixed star matches the search string"):
                 ephem.fixstar2_mag(wrong_case)
 
     def test_fixstar2_mag_no_implicit_partial_name(self):
         """A partial name errors; the explicit '%' wildcard resolves."""
-        with pytest.raises(Error, match="could not find star name reg"):
+        with pytest.raises(
+            Error, match="no fixed star matches the search string 'reg'"
+        ):
             ephem.fixstar2_mag("Reg")
 
         mag, name = ephem.fixstar2_mag("Regu%")
@@ -149,7 +155,7 @@ class TestFixstar2Mag:
 
     def test_fixstar2_mag_unknown_star(self):
         """Test handling of unknown star name."""
-        with pytest.raises(Error, match="could not find star name"):
+        with pytest.raises(Error, match="no fixed star matches the search string"):
             ephem.fixstar2_mag("UnknownStar")
 
     def test_fixstar2_mag_out_of_range_number(self):
@@ -159,7 +165,7 @@ class TestFixstar2Mag:
 
     def test_fixstar2_mag_empty_string(self):
         """Test handling of empty star name."""
-        with pytest.raises(Error, match="star name empty"):
+        with pytest.raises(Error, match="the star name is empty"):
             ephem.fixstar2_mag("")
 
     def test_fixstar2_mag_whitespace_handling(self):

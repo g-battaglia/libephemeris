@@ -2796,7 +2796,9 @@ def calc_minor_body_heliocentric(
         >>> print(f"Ceres: {lon:.4f}° lon, {lat:.4f}° lat, {dist:.4f} AU")
     """
     if body_id not in MINOR_BODY_ELEMENTS:
-        raise ValueError(f"illegal planet number {body_id}.")
+        raise ValueError(
+            f"body id {body_id} has no entry in the minor-body element table"
+        )
 
     # Try to use SPK for high precision if available
     if use_spk:

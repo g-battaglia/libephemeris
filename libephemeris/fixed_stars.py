@@ -2180,7 +2180,7 @@ def _calc_star_position_from_observer(
 ) -> Tuple[float, float, float]:
     """Calculate one fixed star from a precomputed observer position."""
     if star_id not in FIXED_STARS:
-        raise ValueError(f"could not find star name {star_id}")
+        raise ValueError(f"unknown fixed star id {star_id}")
 
     star_data = FIXED_STARS[star_id]
 
@@ -2305,7 +2305,7 @@ def _calc_star_position_leb(
         raise KeyError("No LEB reader available")
 
     if star_id not in FIXED_STARS:
-        raise ValueError(f"could not find star name {star_id}")
+        raise ValueError(f"unknown fixed star id {star_id}")
 
     star_data = FIXED_STARS[star_id]
     from .constants import EARTH, SUN
@@ -2619,7 +2619,7 @@ def calc_fixed_star_velocity(
         ValueError: If star_id not in catalog
     """
     if star_id not in FIXED_STARS:
-        raise ValueError(f"could not find star name {star_id}")
+        raise ValueError(f"unknown fixed star id {star_id}")
 
     # Half-day step for central difference. Topocentric requests need a much
     # smaller step: the observer's diurnal motion has a ~0.997-day period, so
@@ -2807,12 +2807,12 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     """
     sstar = _ref_star_key(star_name)
     if not sstar:
-        return -1, "star name empty", None
+        return -1, "the star name is empty", None
 
     # Every v1-family lookup failure uses this one message shape, echoing
     # the ORIGINAL search string (case and spacing preserved) — including
     # comma forms and out-of-range sequential numbers.
-    not_found = f"star {star_name} not found"
+    not_found = f"no fixed star matches the search string {star_name!r}"
 
     def _found(entry) -> tuple[int, None, str]:
         return entry.id, None, f"{entry.name},{entry.nomenclature}"
@@ -2939,7 +2939,7 @@ def _star_not_found(
     ran.
     """
     return StarNotFoundError(
-        error or "could not find star name",
+        error or "the fixed star could not be resolved",
         star_id=star_name,
         search_type=_star_search_type(star_name, family=family),
     )
@@ -3015,8 +3015,8 @@ def _fixstar_topo() -> tuple:
     topo = get_topo()
     if topo is None:
         raise Error(
-            "topocentric position requested (FLG_TOPOCTR) but no "
-            "geographic position set; call set_topo() first"
+            "FLG_TOPOCTR requires a geographic position: call "
+            "set_topo(lon, lat, alt) first"
         )
     return (
         topo.longitude.degrees,
@@ -3975,7 +3975,10 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     skey = _ref_star_key(star_name)
 
     if not skey:
-        return None, "star name empty"
+        return None, "the star name is empty"
+
+    def _unmatched(key: str) -> str:
+        return f"no fixed star matches the search string {key!r}"
 
     # Trailing-'%' prefix wildcard on the traditional name — a v2-family
     # feature of the reference API (its v1 family rejects wildcards; see
@@ -3986,12 +3989,15 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     # prefixes (documented in known-differences).
     if "%" in skey:
         if not skey.endswith("%") or skey.count("%") != 1:
-            return None, f"invalid search string {skey}"
+            return None, (
+                f"invalid wildcard in search string {skey!r}: only a single "
+                "trailing '%' is allowed"
+            )
         prefix = skey[:-1]
         for entry in _ref_sorted_catalog():
             if _ref_star_key(entry.name).startswith(prefix):
                 return entry, None
-        return None, f"star search string {skey} did not match"
+        return None, f"no fixed star name starts with the pattern {skey!r}"
 
     # Any comma form keys on the nomenclature after the comma; the name
     # part is ignored entirely. (The v1 family is the mirror image: it
@@ -4001,7 +4007,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         entry = _nomen_exact_entry(key)
         if entry is not None:
             return entry, None
-        return None, f"could not find star name ,{key}"
+        return None, _unmatched("," + key)
 
     # Sequential star number (leading digits; the rest is ignored).
     if skey[0].isdigit():
@@ -4016,9 +4022,12 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         # "0" is not a sequential number at all (plain not-found), while an
         # index past the catalog end gets the dedicated message.
         if star_nr < 1:
-            return None, f"could not find star name {skey}"
+            return None, _unmatched(skey)
         if star_nr > len(ordered):
-            return None, f"sequential fixed star number {star_nr} is not available"
+            return None, (
+                f"sequential fixed star number {star_nr} is beyond the end of "
+                "the catalog"
+            )
         return ordered[star_nr - 1], None
 
     # 1. Exact traditional-name match (case- and whitespace-insensitive).
@@ -4052,7 +4061,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     # No prefix, partial, nomenclature, catalog-number, Bayer-word or
     # phonetic-fuzzy tiers here: the reference v2 search errors on all of
     # those bare forms, and a lossy guess would return a wrong star.
-    return None, f"could not find star name {skey}"
+    return None, _unmatched(skey)
 
 
 def fixstar2_ut(
@@ -5416,7 +5425,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
         raise _star_not_found(star, error, family="v1")
 
     if star_id not in _STAR_MAGNITUDES:
-        raise Error(f"Magnitude not available for star ID {star_id}")
+        raise Error(f"no magnitude is available for star id {star_id}")
 
     # Build "Name,Nomenclature" format matching the reference API
     for entry in STAR_CATALOG:

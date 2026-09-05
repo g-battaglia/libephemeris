@@ -81,13 +81,17 @@ class TestFixstar2HIPNumber:
     @pytest.mark.unit
     def test_hip_with_comma(self):
         """A comma form keys on the nomenclature, never on a HIP number."""
-        with pytest.raises(swe.Error, match="could not find star name ,32349"):
+        with pytest.raises(
+            swe.Error, match="no fixed star matches the search string ',32349'"
+        ):
             swe.fixstar2_ut(",32349", JD_J2000)
 
     @pytest.mark.unit
     def test_hip_prefix(self):
         """'HIP 32349' is not a name and does not resolve."""
-        with pytest.raises(swe.Error, match="could not find star name hip32349"):
+        with pytest.raises(
+            swe.Error, match="no fixed star matches the search string 'hip32349'"
+        ):
             swe.fixstar2_ut("HIP 32349", JD_J2000)
 
 
@@ -100,7 +104,9 @@ class TestFixstar2Nomenclature:
         pos, name_out, _ = swe.fixstar2_ut(",alLeo", JD_J2000)
         assert 0.0 <= pos[0] < 360.0
         assert "Regulus" in name_out
-        with pytest.raises(swe.Error, match="could not find star name alleo"):
+        with pytest.raises(
+            swe.Error, match="no fixed star matches the search string 'alleo'"
+        ):
             swe.fixstar2_ut("alLeo", JD_J2000)
 
     @pytest.mark.unit

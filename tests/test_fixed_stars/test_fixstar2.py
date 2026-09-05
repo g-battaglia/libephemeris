@@ -56,7 +56,9 @@ class TestFixstar2TT:
 
     def test_fixstar2_no_hip_number_with_comma(self, standard_jd):
         """A comma form keys on the nomenclature, never on a HIP number."""
-        with pytest.raises(Error, match="could not find star name ,65474"):
+        with pytest.raises(
+            Error, match="no fixed star matches the search string ',65474'"
+        ):
             ephem.fixstar2(",65474", standard_jd, 0)
 
     def test_fixstar2_nomenclature(self, standard_jd):
@@ -64,7 +66,9 @@ class TestFixstar2TT:
         pos, name, retflag = ephem.fixstar2(",alLeo", standard_jd, 0)
         assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
 
-        with pytest.raises(Error, match="could not find star name alleo"):
+        with pytest.raises(
+            Error, match="no fixed star matches the search string 'alleo'"
+        ):
             ephem.fixstar2("alLeo", standard_jd, 0)
 
     def test_fixstar2_nomenclature_case_sensitive(self, standard_jd):
@@ -73,12 +77,14 @@ class TestFixstar2TT:
         assert name1 == "Spica,alVir"
 
         for wrong_case in (",ALVIR", ",AlViR"):
-            with pytest.raises(Error, match="could not find star name"):
+            with pytest.raises(Error, match="no fixed star matches the search string"):
                 ephem.fixstar2(wrong_case, standard_jd, 0)
 
     def test_fixstar2_no_implicit_partial_name(self, standard_jd):
         """A partial name errors; the explicit '%' wildcard resolves."""
-        with pytest.raises(Error, match="could not find star name reg"):
+        with pytest.raises(
+            Error, match="no fixed star matches the search string 'reg'"
+        ):
             ephem.fixstar2("Reg", standard_jd, 0)
 
         pos, name, retflag = ephem.fixstar2("Regu%", standard_jd, 0)

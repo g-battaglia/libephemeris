@@ -170,11 +170,12 @@ class TestUtcToJdLeapSecondGuards:
 
     @pytest.mark.unit
     def test_second_60_wrong_clock_time_raises(self):
-        """second=60 at a non-23:59 clock time raises the plain
-        "invalid time" Error (message parity with the reference, which
-        reserves the "(no leap second!)" suffix for the right-time
-        wrong-date case)."""
-        with pytest.raises(Error, match=r"invalid time: 12:0:60\.00"):
+        """second=60 at a non-23:59 clock time raises the plain invalid-time
+        Error; the leap-second wording is reserved for the right-time
+        wrong-date case, as in the reference."""
+        with pytest.raises(
+            Error, match=r"invalid time of day: hour=12 minute=0 second=60\.0"
+        ):
             utc_to_jd(2016, 12, 31, 12, 0, 60.0, GREG_CAL)
 
     @pytest.mark.unit

@@ -329,7 +329,7 @@ class TestCalcFixedStarPositionIntegration:
 
     def test_unknown_star_raises_error(self):
         """Test that unknown star ID raises ValueError."""
-        with pytest.raises(ValueError, match="could not find star name"):
+        with pytest.raises(ValueError, match="unknown fixed star id"):
             calc_fixed_star_position(99999, 2451545.0)
 
     def test_all_catalog_stars_work(self):

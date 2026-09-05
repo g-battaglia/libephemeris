@@ -5632,7 +5632,7 @@ def _gauquelin_sector_from_rise_set(
 
     Raises:
         Error: If the body never rises or sets at the given latitude
-            (circumpolar), matching the reference "rise or set not found".
+            (circumpolar); the reference refuses these cases as well.
     """
     from .eclipse import rise_trans
     from .constants import (
@@ -5645,13 +5645,15 @@ def _gauquelin_sector_from_rise_set(
     def _rise_set_not_found() -> Error:
         """No rise/set event exists (circumpolar / never-rises body).
 
-        Methods 2-5 are defined only from real rise/set times, so — matching
-        the reference API, which reports "rise or set not found" here rather
-        than silently substituting a different method — signal the caller with
-        a compatible error instead of falling back to the method-0 hour-angle
-        approximation.
+        Methods 2-5 are defined only from real rise/set times, so — like the
+        reference API, which refuses here rather than silently substituting
+        a different method — signal the caller with an error instead of
+        falling back to the method-0 hour-angle approximation.
         """
-        return Error(f"gauquelin_sector: rise or set not found for planet {planet}")
+        return Error(
+            f"gauquelin_sector: body {planet} has no rise or set at this "
+            "location, so methods 2-5 cannot be evaluated"
+        )
 
     # Determine rise_trans flags based on method
     rsmi_flags = 0
@@ -5854,9 +5856,8 @@ def _gauquelin_sector_pythonic(
         (str) is accepted for these methods as well as a planet id.
 
         For circumpolar objects (that never rise or set at the given
-        latitude), methods 2-5 raise an Error ("rise or set not found"),
-        matching the reference API, rather than silently falling back to
-        method 0.
+        latitude), methods 2-5 raise an Error, matching the reference API,
+        rather than silently falling back to method 0.
 
     Example:
         >>> sector = _gauquelin_sector_pythonic(2451545.0, MARS, 48.85, 2.35)

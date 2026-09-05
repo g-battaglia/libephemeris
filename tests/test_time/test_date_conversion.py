@@ -71,7 +71,7 @@ class TestSWEDateConversion:
     @pytest.mark.unit
     def test_invalid_calendar_parameter(self):
         """Invalid calendar parameter should raise ValueError."""
-        with pytest.raises(ValueError, match="calendar must be 'j' or 'g'"):
+        with pytest.raises(ValueError, match="calendar must be 'j'"):
             ephem.date_conversion(2000, 1, 1, 12.0, "x")
 
     @pytest.mark.unit
@@ -161,7 +161,7 @@ class TestCalendarConversionHelper:
     @pytest.mark.unit
     def test_invalid_calendar_parameter(self):
         """Invalid calendar parameter should raise ValueError."""
-        with pytest.raises(ValueError, match="calendar must be 'j' or 'g'"):
+        with pytest.raises(ValueError, match="calendar must be 'j'"):
             calendar_convert(2000, 1, 1, 12.0, "x")
 
     @pytest.mark.unit

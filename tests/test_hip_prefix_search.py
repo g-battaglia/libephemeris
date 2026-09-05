@@ -41,13 +41,13 @@ class TestHipPrefixRejected:
         entry, err = _resolve_star2(query)
         assert entry is None
         assert err is not None
-        assert "could not find star name" in err
+        assert "no fixed star matches the search string" in err
 
     def test_hip_prefix_error_echoes_normalized_name(self):
         """The error echoes the lowercased, space-stripped search key."""
         entry, err = _resolve_star2("HIP 49669")
         assert entry is None
-        assert err == "could not find star name hip49669"
+        assert err == "no fixed star matches the search string 'hip49669'"
 
 
 @pytest.mark.unit
@@ -57,12 +57,16 @@ class TestHipFormsViaFixstar2:
     JD = 2451545.0  # J2000.0
 
     def test_fixstar2_ut_hip_prefix_raises(self):
-        with pytest.raises(Error, match="could not find star name hip49669"):
+        with pytest.raises(
+            Error, match="no fixed star matches the search string 'hip49669'"
+        ):
             fixstar2_ut("HIP 49669", self.JD, 0)
 
     def test_fixstar2_ut_comma_number_raises(self):
         """A comma form keys on the nomenclature, never on a HIP number."""
-        with pytest.raises(Error, match="could not find star name ,65474"):
+        with pytest.raises(
+            Error, match="no fixed star matches the search string ',65474'"
+        ):
             fixstar2_ut(",65474", self.JD, 0)
 
     def test_fixstar2_ut_bare_number_is_sequential(self):

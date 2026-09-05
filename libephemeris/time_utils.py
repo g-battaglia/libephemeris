@@ -85,14 +85,16 @@ def _validate_calendar(cal: int, func_name: str) -> None:
     """Reject calendar flags other than GREG_CAL/JUL_CAL.
 
     Compatibility contract: the calendar flag is validated in every calendar
-    conversion function (e.g. ``julday: invalid calendar (99)``);
-    all five libephemeris counterparts share this guard.
+    conversion function (``julday``, ``revjul``, ``utc_to_jd``, ``jdet_to_utc``
+    and ``jdut1_to_utc`` share this guard).
 
     Raises:
         ValueError: If cal is neither GREG_CAL nor JUL_CAL.
     """
     if cal not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"{func_name}: invalid calendar ({cal})")
+        raise ValueError(
+            f"{func_name}: invalid calendar flag {cal}; use GREG_CAL (1) or JUL_CAL (0)"
+        )
 
 
 def julday(
@@ -506,10 +508,14 @@ def date_conversion(
     # Type first: normalising before validating let a non-string leak
     # AttributeError from .lower() instead of this function's own ValueError.
     if not isinstance(calendar, str):
-        raise ValueError(f"calendar must be 'j' or 'g', got: {calendar!r}")
+        raise ValueError(
+            f"calendar must be 'j' (Julian) or 'g' (Gregorian), got {calendar!r}"
+        )
     calendar = calendar.lower()
     if calendar not in ("j", "g"):
-        raise ValueError(f"calendar must be 'j' or 'g', got: {calendar!r}")
+        raise ValueError(
+            f"calendar must be 'j' (Julian) or 'g' (Gregorian), got {calendar!r}"
+        )
 
     # Determine the input calendar from the calendar DATE, not an
     # hour-inclusive JD. JD_GREGORIAN_REFORM is NOON of 1582-10-15, so an
@@ -672,7 +678,7 @@ def utc_to_jd(
     ):
         from .exceptions import Error
 
-        raise Error(f"invalid date: year = {year}, month = {month}, day = {day}")
+        raise Error(f"invalid calendar date: year={year} month={month} day={day}")
 
     # Reference-API parity: reject out-of-range clock fields (hour 24 included).
     # Seconds in [60, 61) are provisionally admitted here; the leap-second
@@ -680,7 +686,7 @@ def utc_to_jd(
     if hour < 0 or hour > 23 or minute < 0 or minute > 59 or second < 0.0:
         from .exceptions import Error
 
-        raise Error(f"invalid time: {hour}:{minute}:{second:.2f}")
+        raise Error(f"invalid time of day: hour={hour} minute={minute} second={second}")
 
     # Leap-second dates and the beginning of the UTC era are defined in the
     # Gregorian calendar.  Map a Julian-calendar label to that physical
@@ -708,9 +714,14 @@ def utc_to_jd(
         # label on a date without an IERS leap-second insertion. Pre-1972 dates
         # have no leap-second UTC and therefore fall in the former category.
         if second >= 61.0 or hour != 23 or minute != 59 or greg_year < 1972:
-            raise Error(f"invalid time: {hour}:{minute}:{second:.2f}")
+            raise Error(
+                f"invalid time of day: hour={hour} minute={minute} second={second}"
+            )
         if not _is_leap_second_date(greg_year, greg_month, greg_day):
-            raise Error(f"invalid time (no leap second!): {hour}:{minute}:{second:.2f}")
+            raise Error(
+                f"invalid time of day: hour={hour} minute={minute} second={second} "
+                "(no leap second was inserted on this date)"
+            )
 
     # Before 1972 UTC (with leap seconds) did not exist; the reference API
     # treats the input as UT1 directly: jd_ut1 is the literal calendar JD

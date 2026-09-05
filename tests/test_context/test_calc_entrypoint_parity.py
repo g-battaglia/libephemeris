@@ -169,7 +169,9 @@ def test_skyfield_mean_point_speed3_is_centered_reported_derivative(
 def test_barycentric_moseph_error_matches_reference_contract(method, body):
     """Module and context entry points reject raw BARYCTR|MOSEPH."""
     flags = le.FLG_BARYCTR | le.FLG_MOSEPH
-    message = f"{method}: barycentric analytical positions are not supported."
+    message = (
+        f"{method}: the analytical (MOSEPH) model cannot supply barycentric positions"
+    )
 
     for api in (le, le.EphemerisContext()):
         with pytest.raises(le.Error, match=re.escape(message)) as exc_info:

@@ -356,7 +356,7 @@ class TestVisLimitMagEdgeCases:
         atmo = (1013.25, 15.0, 50.0, 0.0)
         observer = (36, 1.0)
 
-        with pytest.raises(Error, match="objname cannot be empty"):
+        with pytest.raises(Error, match="the object name is empty"):
             vis_limit_mag(jd, geopos, atmo, observer, "")
 
     def test_invalid_planet_raises_error(self):
