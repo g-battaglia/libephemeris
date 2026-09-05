@@ -302,5 +302,5 @@ def test_house_system_name_unlisted_code_is_unknown(code: str) -> None:
 @pytest.mark.parametrize("code", [ord("P"), b"P", None, 1.0, ["P"]])
 def test_house_system_name_rejects_non_str(code: object) -> None:
     """A non-str argument raises ``TypeError`` naming the offending type."""
-    with pytest.raises(TypeError, match="must be str"):
+    with pytest.raises(TypeError, match="expects a str code, not"):
         contrib.house_system_name(code)  # type: ignore[arg-type]
