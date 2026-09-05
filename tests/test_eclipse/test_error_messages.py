@@ -675,7 +675,7 @@ class TestPlanetOccultGlobal:
             planet_occult_when_glob(JD, 3, 3)
 
     def test_unknown_star(self):
-        with pytest.raises(ValueError, match=r"star NoSuchStar not found"):
+        with pytest.raises(ValueError, match=r"no fixed star matches the search string 'NoSuchStar'"):
             planet_occult_when_glob(JD, 3, 0, "NoSuchStar")
 
     def test_search_exhausts_the_ephemeris(self, monkeypatch):
@@ -755,7 +755,7 @@ class TestPlanetOccultLocal:
         monkeypatch.setattr(
             eclipse, "planet_occult_when_glob", lambda *a, **k: fake_event
         )
-        with pytest.raises(ValueError, match=r"star NoSuchStar not found"):
+        with pytest.raises(ValueError, match=r"no fixed star matches the search string 'NoSuchStar'"):
             eclipse._planet_occult_when_loc_impl(
                 JD, 3, 0, "NoSuchStar", 41.9, 12.5, 0.0, 2, reader=None
             )
