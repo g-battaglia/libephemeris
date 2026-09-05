@@ -1,17 +1,17 @@
 # Independently transcribed historical hypothetical-body orbits.
 #
-# Format:
-#   name,epoch_jd,equinox,mean_anomaly,semi_axis_au,eccentricity,
-#   arg_perihelion,asc_node,inclination,geocentric,source/status
-#
 # This file is deliberately a small, reviewed data set rather than a catalogue
 # of every historical body recognised by the public API.  IDs without a fully
 # recoverable independent source remain recognised by name and number, but are
 # absent here and fail closed at calculation time.  See
 # docs/methodology/missing-hypothetical-models.md.
 #
-# The runtime does not parse the prose after the final comma; it exists so that
-# every numerical row remains auditable when this file is viewed by itself.
+# The columns are described in docs/methodology/hypothetical-bodies.md and
+# named on the header line below, which the loader requires.  Angles are
+# decimal degrees, a_au is in astronomical units, and each row fills exactly
+# one of equinox_token and equinox_jd.  The runtime does not read the trailing
+# source column, which keeps every numerical row auditable on its own.
+name,epoch_jd,equinox_token,equinox_jd,a_au,e,i_deg,node_deg,argp_deg,mean_anomaly_deg,source
 
 # ---------------------------------------------------------------------------
 # IDs 40--47: James Neely's Hamburg-school elements
@@ -34,14 +34,14 @@
 # observable.  We retain Neely's printed convention (M0=0 and the phase in
 # omega) rather than moving the same phase into M0.  The two representations
 # are mathematically identical, but the one below is a literal transcription.
-Cupido,2415020.0,J1900,163.7409,40.99837,0.00460,171.4333,129.8325,1.0833,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I
-Hades,2415020.0,J1900,27.6496,50.66744,0.00245,148.1796,161.3339,1.0500,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I
-Zeus,2415020.0,J1900,165.1232,59.21436,0.00120,299.0440,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I
-Kronos,2415020.0,J1900,169.0193,64.81690,0.00305,208.8801,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I
-Apollon,2415020.0,J1900,0.0,70.29949,0.0,138.0533,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
-Admetos,2415020.0,J1900,0.0,73.62765,0.0,351.3350,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
-Vulkanus,2415020.0,J1900,0.0,77.25568,0.0,55.8983,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
-Poseidon,2415020.0,J1900,0.0,83.66907,0.0,165.5163,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
+Cupido,2415020.0,J1900,,40.99837,0.00460,1.0833,129.8325,171.4333,163.7409,primary-transcription: Neely 1980 Matrix VII p.8 Table I
+Hades,2415020.0,J1900,,50.66744,0.00245,1.0500,161.3339,148.1796,27.6496,primary-transcription: Neely 1980 Matrix VII p.8 Table I
+Zeus,2415020.0,J1900,,59.21436,0.00120,0.0,0.0,299.0440,165.1232,primary-transcription: Neely 1980 Matrix VII p.8 Table I
+Kronos,2415020.0,J1900,,64.81690,0.00305,0.0,0.0,208.8801,169.0193,primary-transcription: Neely 1980 Matrix VII p.8 Table I
+Apollon,2415020.0,J1900,,70.29949,0.0,0.0,0.0,138.0533,0.0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
+Admetos,2415020.0,J1900,,73.62765,0.0,0.0,0.0,351.3350,0.0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
+Vulkanus,2415020.0,J1900,,77.25568,0.0,0.0,0.0,55.8983,0.0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
+Poseidon,2415020.0,J1900,,83.66907,0.0,0.0,0.0,165.5163,0.0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
 
 # ---------------------------------------------------------------------------
 # ID 50: Harrington's nominal Planet X
@@ -55,7 +55,7 @@ Poseidon,2415020.0,J1900,0.0,83.66907,0.0,165.5163,0.0,0.0,0,primary-transcripti
 # omega=208.5 deg, node=275.4 deg and i=32.4 deg.  The civil date converts to
 # JD 2374696.5, so M=0 at that epoch.  The paper does not assign a modern
 # machine frame; J2000 is an explicit LibEphemeris propagation convention.
-Harrington,2374696.5,J2000,0.0,101.2,0.411,208.5,275.4,32.4,0,primary-transcription: Harrington 1988 AJ 96 p.1478; J2000 project frame
+Harrington,2374696.5,J2000,,101.2,0.411,32.4,275.4,208.5,0.0,primary-transcription: Harrington 1988 AJ 96 p.1478; J2000 project frame
 
 # ---------------------------------------------------------------------------
 # ID 51: Le Verrier's predicted trans-Uranian planet
@@ -72,7 +72,7 @@ Harrington,2374696.5,J2000,0.0,101.2,0.411,208.5,275.4,32.4,0,primary-transcript
 # that additional published precision.  The original solution assumes the
 # ecliptic plane, hence node=i=0.  Sexagesimal angles are converted arithmetically,
 # not by treating arcminutes as decimal hundredths.
-Leverrier-Neptune,2395662.5,2395662.5,34.03222222222222,36.1539,0.10761,284.75,0.0,0.0,0,primary-transcription: Le Verrier 1846 CRAS 23 p.432 and Recherches pp.234-236
+Leverrier-Neptune,2395662.5,,2395662.5,36.1539,0.10761,0.0,0.0,284.75,34.03222222222222,primary-transcription: Le Verrier 1846 CRAS 23 p.432 and Recherches pp.234-236
 
 # ---------------------------------------------------------------------------
 # ID 52: Adams's second predicted orbit
@@ -95,7 +95,7 @@ Leverrier-Neptune,2395662.5,2395662.5,34.03222222222222,36.1539,0.10761,284.75,0
 # node or inclination, so this historical prediction is kept in the ecliptic
 # plane.  In particular, 299 deg 11 arcmin is 299.183333... deg; the former
 # 299.11 decimal was a sexagesimal-conversion error and is retired.
-Adams-Neptune,2395575.5,2395575.5,23.85,37.25,0.120615,299.18333333333334,0.0,0.0,0,primary-transcription: Adams 1846 sections 47-48 pp.25-26; corrected sexagesimal conversion
+Adams-Neptune,2395575.5,,2395575.5,37.25,0.120615,0.0,0.0,299.18333333333334,23.85,primary-transcription: Adams 1846 sections 47-48 pp.25-26; corrected sexagesimal conversion
 
 # ---------------------------------------------------------------------------
 # ID 53: Lowell's preferred 1915 Planet-X solution
@@ -112,4 +112,4 @@ Adams-Neptune,2395575.5,2395575.5,23.85,37.25,0.120615,299.18333333333334,0.0,0.
 # Lowell says the latitude perturbations did not yield a trustworthy orbital
 # plane.  His analogy-based expectation of about 10 deg inclination is not a
 # determined element, so the reproducible numerical model uses node=i=0.
-Lowell-Pluto,2396757.5,2396757.5,178.3,43.0,0.202,203.8,0.0,0.0,0,primary-transcription: Lowell 1915 pp.5,9,105; direct J1850 element convention
+Lowell-Pluto,2396757.5,,2396757.5,43.0,0.202,0.0,0.0,203.8,178.3,primary-transcription: Lowell 1915 pp.5,9,105; direct J1850 element convention

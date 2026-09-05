@@ -1439,20 +1439,139 @@ def get_bundled_fictitious_orbits_path() -> Path:
     return data_path
 
 
+# Columns of the bundled fictitious-orbits dataset, in file order.  The file
+# repeats them as its header line so that a stale layout is refused instead of
+# being read with the columns silently permuted.
+_CSV_COLUMNS = (
+    "name",
+    "epoch_jd",
+    "equinox_token",
+    "equinox_jd",
+    "a_au",
+    "e",
+    "i_deg",
+    "node_deg",
+    "argp_deg",
+    "mean_anomaly_deg",
+    "source",
+)
+
+
+def _parse_column(text: str, column: str) -> float:
+    """Read one numeric column, naming it when the text is not a number.
+
+    Args:
+        text: The column's text as written in the file.
+        column: Human-readable column name for the error message.
+
+    Returns:
+        The column value.
+
+    Raises:
+        ValueError: If the text is not a number.
+    """
+    try:
+        return float(text)
+    except ValueError:
+        raise ValueError(f"cannot parse the {column} {text!r}") from None
+
+
+def _resolve_equinox(token: str, jd_text: str) -> float:
+    """Resolve a row's disjoint equinox pair into a Julian Day TT.
+
+    A row states its equinox either as a standard name from ``_EPOCH_JD``, such
+    as ``J1900``, or, for sources whose elements are referred to their own
+    date, as an explicit Julian Day.  Exactly one of the two columns carries a
+    value.
+
+    Args:
+        token: Content of the ``equinox_token`` column, possibly empty.
+        jd_text: Content of the ``equinox_jd`` column, possibly empty.
+
+    Returns:
+        The equinox as a Julian Day TT.
+
+    Raises:
+        ValueError: If both columns are filled, both are empty, or the token
+            is not a standard epoch name.
+    """
+    if bool(token) == bool(jd_text):
+        raise ValueError(
+            "exactly one of the equinox_token and equinox_jd columns must be filled"
+        )
+    if not token:
+        return _parse_column(jd_text, "equinox Julian Day")
+    equinox_jd = _EPOCH_JD.get(token.upper())
+    if equinox_jd is None:
+        raise ValueError(f"cannot parse the equinox token {token!r}")
+    return equinox_jd
+
+
+def _parse_row(columns: List[str], line_num: int) -> OrbitalElements:
+    """Turn one data row of the fictitious-orbits dataset into elements.
+
+    Args:
+        columns: The row's fields, already stripped, in ``_CSV_COLUMNS`` order.
+        line_num: Line number of the row, quoted in error messages.
+
+    Returns:
+        The parsed :class:`OrbitalElements`.
+
+    Raises:
+        ValueError: If the row has the wrong number of columns, or a column
+            cannot be read.
+    """
+    if len(columns) != len(_CSV_COLUMNS):
+        raise ValueError(
+            f"cannot parse line {line_num}: expected {len(_CSV_COLUMNS)} "
+            f"comma-separated fields, got {len(columns)}"
+        )
+
+    # The trailing source column is prose for reviewers, not runtime data.
+    try:
+        name, epoch_text, equinox_token, equinox_text = columns[:4]
+        epoch_jd = _parse_column(epoch_text, "epoch")
+        equinox_jd = _resolve_equinox(equinox_token, equinox_text)
+        semi_axis = _parse_column(columns[4], "semi-major axis")
+        eccentricity = _parse_column(columns[5], "eccentricity")
+        inclination = _parse_column(columns[6], "inclination")
+        asc_node = _parse_column(columns[7], "ascending node")
+        arg_perihelion = _parse_column(columns[8], "argument of perihelion")
+        mean_anomaly = _parse_column(columns[9], "mean anomaly")
+    except ValueError as exc:
+        raise ValueError(f"cannot parse line {line_num}: {exc}") from exc
+
+    # Every row is a fixed-equinox heliocentric orbit stated as plain numbers,
+    # so the dataset carries neither an equinox-of-date marker, nor a
+    # geocentric flag, nor secular rates.
+    return OrbitalElements(
+        name=name,
+        epoch_jd=epoch_jd,
+        equinox_jd=equinox_jd,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(constant=mean_anomaly),
+        semi_axis=semi_axis,
+        eccentricity=TPolynomial(constant=eccentricity),
+        arg_perihelion=TPolynomial(constant=arg_perihelion),
+        asc_node=TPolynomial(constant=asc_node),
+        inclination=TPolynomial(constant=inclination),
+        line_number=line_num,
+    )
+
+
 def _parse_fictitious_orbits_csv(filepath: Union[str, Path]) -> List[OrbitalElements]:
     """
-    Parse a ``fictitious_orbits.csv``-format dataset into OrbitalElements objects.
+    Parse a ``fictitious_orbits.csv`` dataset into OrbitalElements objects.
 
-    The CSV format uses 10 or 11 columns (11th ``source`` column is optional)::
+    The file has eleven columns, named on a header line that precedes the data
+    rows::
 
-        name, epoch_jd, equinox, mean_anomaly, semi_axis_au, eccentricity,
-        arg_perihelion, asc_node, inclination, geocentric[, source]
+        name, epoch_jd, equinox_token, equinox_jd, a_au, e, i_deg, node_deg,
+        argp_deg, mean_anomaly_deg, source
 
-    This differs from the older ``.txt`` format (used by :func:`parse_orbital_elements`)
-    where ``name`` is the *last* field and there is no ``source`` column.
-
-    Lines starting with ``#`` and blank lines are ignored.  Inline ``#`` comments
-    are stripped before parsing.
+    Blank lines and lines starting with ``#`` are ignored, so the file can
+    document each transcription beside its row.  The final ``source`` column
+    runs to the end of the line and may contain commas.
 
     Args:
         filepath: Path to the CSV file.
@@ -1462,13 +1581,15 @@ def _parse_fictitious_orbits_csv(filepath: Union[str, Path]) -> List[OrbitalElem
 
     Raises:
         FileNotFoundError: If the file does not exist.
-        ValueError: If a data row cannot be parsed.
+        ValueError: If the header line is missing or a data row cannot be
+            parsed.
     """
     filepath = Path(filepath)
     if not filepath.exists():
         raise FileNotFoundError(f"orbital elements file not found: {filepath}")
 
     elements: List[OrbitalElements] = []
+    header_seen = False
 
     with filepath.open(encoding="utf-8") as fh:
         for line_num, raw in enumerate(fh, start=1):
@@ -1476,76 +1597,17 @@ def _parse_fictitious_orbits_csv(filepath: Union[str, Path]) -> List[OrbitalElem
             if not line or line.startswith("#"):
                 continue
 
-            # Remove inline comment (everything from the first '#' onward)
-            if "#" in line:
-                line = line[: line.index("#")].strip()
-
-            parts = [p.strip() for p in line.split(",")]
-            # Expect at least 10 columns; 11th (source) is optional
-            if len(parts) < 10:
-                raise ValueError(
-                    f"cannot parse line {line_num}: expected at least 10 "
-                    f"comma-separated fields, got {len(parts)}"
-                )
-
-            try:
-                name = parts[0]
-                epoch_str = parts[1]
-                equinox_str = parts[2]
-                mean_anomaly_str = parts[3]
-                semi_axis_str = parts[4]
-                eccentricity_str = parts[5]
-                arg_perihelion_str = parts[6]
-                asc_node_str = parts[7]
-                inclination_str = parts[8]
-                geocentric_str = parts[9]
-
-                epoch_jd, _ = _parse_epoch_or_equinox(epoch_str)
-                if epoch_jd is None:
+            columns = [part.strip() for part in line.split(",", len(_CSV_COLUMNS) - 1)]
+            if not header_seen:
+                if tuple(columns) != _CSV_COLUMNS:
                     raise ValueError(
-                        f"the epoch {epoch_str!r} is JDATE, but a fixed epoch is required"
+                        f"{filepath} does not start with the fictitious-orbits "
+                        "column header"
                     )
+                header_seen = True
+                continue
 
-                equinox_jd, equinox_is_jdate = _parse_epoch_or_equinox(equinox_str)
-
-                mean_anomaly = _parse_t_polynomial(mean_anomaly_str)
-                try:
-                    semi_axis = float(semi_axis_str)
-                except ValueError:
-                    raise ValueError(
-                        f"cannot parse the semi-major axis {semi_axis_str!r}"
-                    )
-                eccentricity = _parse_t_polynomial(eccentricity_str)
-                arg_perihelion = _parse_t_polynomial(arg_perihelion_str)
-                asc_node = _parse_t_polynomial(asc_node_str)
-                inclination = _parse_t_polynomial(inclination_str)
-
-                try:
-                    is_geocentric = bool(int(geocentric_str))
-                except ValueError:
-                    raise ValueError(
-                        f"cannot parse the geocentric flag {geocentric_str!r}"
-                    )
-
-            except ValueError as exc:
-                raise ValueError(f"cannot parse line {line_num}: {exc}") from exc
-
-            elements.append(
-                OrbitalElements(
-                    name=name,
-                    epoch_jd=epoch_jd,
-                    equinox_jd=equinox_jd,
-                    equinox_is_jdate=equinox_is_jdate,
-                    mean_anomaly=mean_anomaly,
-                    semi_axis=semi_axis,
-                    eccentricity=eccentricity,
-                    arg_perihelion=arg_perihelion,
-                    asc_node=asc_node,
-                    inclination=inclination,
-                    is_geocentric=is_geocentric,
-                    line_number=line_num,
-                )
-            )
+            elements.append(_parse_row(columns, line_num))
 
     return elements
 

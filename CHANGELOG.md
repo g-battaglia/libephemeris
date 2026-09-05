@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unit, not an IAU 1976 quantity), documents the 0.0001-day SPEED3 half-step
   and the SPEED3/TOPOCTR rate selection in the project's own terms, and reuses
   `_SPEED3_STEP_DAYS` at its second site. Results are bit-identical.
+- `libephemeris/data/fictitious_orbits.csv` moves to a self-describing schema:
+  a column header (`name, epoch_jd, equinox_token, equinox_jd, a_au, e, i_deg,
+  node_deg, argp_deg, mean_anomaly_deg, source`) that the loader requires, the
+  elements in the usual `a, e, i, Ω, ω, M` order, the equinox split into a
+  named token and an explicit Julian Day of which each row fills exactly one,
+  and no `geocentric` column since every row is heliocentric. Every value is
+  unchanged digit for digit and every row keeps its line, so the twelve bundled
+  bodies parse to identical `OrbitalElements` and identical positions. The
+  columns are documented in `docs/methodology/hypothetical-bodies.md`.
 
 ### Removed
 

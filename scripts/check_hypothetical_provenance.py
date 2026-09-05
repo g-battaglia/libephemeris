@@ -34,7 +34,7 @@ from libephemeris import hypothetical as hyp
 from libephemeris.exceptions import UnknownBodyError
 
 
-_CSV_SHA256 = "2113b77e586caba8932d58d4225077f6946e0a0be85b826b5d700469751d20ba"
+_CSV_SHA256 = "ea163c1111245a719021baa92beedb5ecf1ebb8f2601a46f9c66a4fc1350cad2"
 
 _REVIEWED_SOURCE_DIGESTS = {
     "Neely 1980, Matrix Magazine VII, complete 63-page scan": (
@@ -87,81 +87,57 @@ _ALL_IDS = set(range(hyp.CUPIDO, hyp.WALDEMATH + 1))
 _UNSUPPORTED = _ALL_IDS - _SUPPORTED
 
 
-# Literal CSV expectations.  Each tuple is:
-# (epoch, equinox, M, a, e, omega, node, i, geocentric).
+# Literal CSV expectations, in the dataset's own column order.  Each tuple is:
+# (epoch_jd, equinox_jd, a_au, e, i_deg, node_deg, argp_deg, mean_anomaly_deg).
 _EXPECTED_CSV_ROWS = {
     "Cupido": (
         2415020.0,
         2415020.0,
-        163.7409,
         40.99837,
         0.00460,
-        171.4333,
-        129.8325,
         1.0833,
-        False,
+        129.8325,
+        171.4333,
+        163.7409,
     ),
     "Hades": (
         2415020.0,
         2415020.0,
-        27.6496,
         50.66744,
         0.00245,
-        148.1796,
-        161.3339,
         1.0500,
-        False,
+        161.3339,
+        148.1796,
+        27.6496,
     ),
-    "Zeus": (
-        2415020.0,
-        2415020.0,
-        165.1232,
-        59.21436,
-        0.00120,
-        299.0440,
-        0.0,
-        0.0,
-        False,
-    ),
-    "Kronos": (
-        2415020.0,
-        2415020.0,
-        169.0193,
-        64.81690,
-        0.00305,
-        208.8801,
-        0.0,
-        0.0,
-        False,
-    ),
-    "Apollon": (2415020.0, 2415020.0, 0.0, 70.29949, 0.0, 138.0533, 0.0, 0.0, False),
-    "Admetos": (2415020.0, 2415020.0, 0.0, 73.62765, 0.0, 351.3350, 0.0, 0.0, False),
-    "Vulkanus": (2415020.0, 2415020.0, 0.0, 77.25568, 0.0, 55.8983, 0.0, 0.0, False),
-    "Poseidon": (2415020.0, 2415020.0, 0.0, 83.66907, 0.0, 165.5163, 0.0, 0.0, False),
-    "Harrington": (2374696.5, 2451545.0, 0.0, 101.2, 0.411, 208.5, 275.4, 32.4, False),
+    "Zeus": (2415020.0, 2415020.0, 59.21436, 0.00120, 0.0, 0.0, 299.0440, 165.1232),
+    "Kronos": (2415020.0, 2415020.0, 64.81690, 0.00305, 0.0, 0.0, 208.8801, 169.0193),
+    "Apollon": (2415020.0, 2415020.0, 70.29949, 0.0, 0.0, 0.0, 138.0533, 0.0),
+    "Admetos": (2415020.0, 2415020.0, 73.62765, 0.0, 0.0, 0.0, 351.3350, 0.0),
+    "Vulkanus": (2415020.0, 2415020.0, 77.25568, 0.0, 0.0, 0.0, 55.8983, 0.0),
+    "Poseidon": (2415020.0, 2415020.0, 83.66907, 0.0, 0.0, 0.0, 165.5163, 0.0),
+    "Harrington": (2374696.5, 2451545.0, 101.2, 0.411, 32.4, 275.4, 208.5, 0.0),
     "Leverrier-Neptune": (
         2395662.5,
         2395662.5,
-        34.0 + 1.0 / 60.0 + 56.0 / 3600.0,
         36.1539,
         0.10761,
+        0.0,
+        0.0,
         284.75,
-        0.0,
-        0.0,
-        False,
+        34.0 + 1.0 / 60.0 + 56.0 / 3600.0,
     ),
     "Adams-Neptune": (
         2395575.5,
         2395575.5,
-        23.85,
         37.25,
         0.120615,
+        0.0,
+        0.0,
         299.0 + 11.0 / 60.0,
-        0.0,
-        0.0,
-        False,
+        23.85,
     ),
-    "Lowell-Pluto": (2396757.5, 2396757.5, 178.3, 43.0, 0.202, 203.8, 0.0, 0.0, False),
+    "Lowell-Pluto": (2396757.5, 2396757.5, 43.0, 0.202, 0.0, 0.0, 203.8, 178.3),
 }
 
 
@@ -188,19 +164,18 @@ def _all_numeric_fields_are_nan(value: object) -> bool:
     )
 
 
-def _row_tuple(row: hyp.OrbitalElements) -> tuple[float | bool, ...]:
-    """Project a parsed CSV row onto the nine provenance-bearing fields."""
+def _row_tuple(row: hyp.OrbitalElements) -> tuple[float, ...]:
+    """Project a parsed CSV row onto the eight provenance-bearing columns."""
     assert row.equinox_jd is not None
     return (
         row.epoch_jd,
         row.equinox_jd,
-        row.mean_anomaly.constant,
         row.semi_axis,
         row.eccentricity.constant,
-        row.arg_perihelion.constant,
-        row.asc_node.constant,
         row.inclination.constant,
-        row.is_geocentric,
+        row.asc_node.constant,
+        row.arg_perihelion.constant,
+        row.mean_anomaly.constant,
     )
 
 
@@ -209,6 +184,19 @@ def _check_csv(problems: list[str]) -> None:
     csv_path = hyp.get_bundled_fictitious_orbits_path()
     digest = hashlib.sha256(csv_path.read_bytes()).hexdigest()
     _check(problems, digest == _CSV_SHA256, f"unexpected CSV SHA-256: {digest}")
+
+    # The first line that is neither blank nor a comment names the columns.
+    header = ""
+    for raw in csv_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line and not line.startswith("#"):
+            header = line
+            break
+    _check(
+        problems,
+        header == ",".join(hyp._CSV_COLUMNS),
+        f"unexpected CSV column header: {header!r}",
+    )
 
     rows = hyp.load_bundled_fictitious_orbits()
     _check(
@@ -230,10 +218,31 @@ def _check_csv(problems: list[str]) -> None:
         _check(
             problems,
             all(
-                a == e if isinstance(e, bool) else _close(float(a), float(e))
-                for a, e in zip(actual, expected, strict=True)
+                _close(actual_value, expected_value)
+                for actual_value, expected_value in zip(actual, expected, strict=True)
             ),
             f"unexpected {name} row: {actual!r}",
+        )
+        # The transcriptions are fixed-equinox heliocentric orbits with no
+        # secular rates; the schema has no column able to say otherwise.
+        _check(
+            problems,
+            not row.is_geocentric and not row.equinox_is_jdate,
+            f"{name} row is not a fixed-equinox heliocentric orbit",
+        )
+        _check(
+            problems,
+            all(
+                polynomial.linear == 0.0
+                for polynomial in (
+                    row.mean_anomaly,
+                    row.eccentricity,
+                    row.arg_perihelion,
+                    row.asc_node,
+                    row.inclination,
+                )
+            ),
+            f"{name} row carries a secular rate",
         )
 
 

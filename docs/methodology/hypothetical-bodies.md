@@ -33,6 +33,34 @@ Their inclusion does not assert that the proposed objects physically exist.
 form: every supported ID carries its source annotation, and Nibiru is the
 single ID without a calculation path.
 
+## Format of `libephemeris/data/fictitious_orbits.csv`
+
+The twelve transcribed rows live in a comma-separated file whose first line
+that is neither blank nor a `#` comment is the column header below. Comments
+carry each row's source record, so the data and its provenance stay side by
+side. `load_bundled_fictitious_orbits()` reads no other layout: a file that
+does not start with this header is refused.
+
+| Column | Unit | Meaning |
+|---|---|---|
+| `name` | — | Body name, as the loader reports it. |
+| `epoch_jd` | Julian Day TT | Date the elements refer to. |
+| `equinox_token` | — | Standard equinox of the angles: `J1900`, `B1950` or `J2000`. |
+| `equinox_jd` | Julian Day TT | Equinox of the angles when the source refers them to its own date. |
+| `a_au` | au | Semi-major axis. |
+| `e` | — | Eccentricity. |
+| `i_deg` | degrees | Inclination. |
+| `node_deg` | degrees | Longitude of the ascending node. |
+| `argp_deg` | degrees | Argument of perihelion. |
+| `mean_anomaly_deg` | degrees | Mean anomaly at `epoch_jd`. |
+| `source` | — | Status and page-level citation; the runtime does not read it. |
+
+Exactly one of `equinox_token` and `equinox_jd` is filled in any row. Every
+row is a heliocentric orbit about a fixed equinox with plain decimal values
+and no secular rates; the file has no column able to state anything else.
+The `source` column runs to the end of the line and may therefore contain
+commas.
+
 ## IDs 40–47: Neely's Hamburg-school elements
 
 ### Primary transcription
@@ -337,13 +365,14 @@ consulted.
 ## Custom orbits
 
 The neutral orbital-elements parser and propagator remain available for
-caller-supplied data. Callers are responsible for choosing data they are
+caller-supplied data, in the separate nine-field layout that ends each line
+with the body name. Callers are responsible for choosing data they are
 entitled to use:
 
 ```python
 import libephemeris as ephem
 
-orbits = ephem.parse_orbital_elements("/path/to/orbits.csv")
+orbits = ephem.parse_orbital_elements("/path/to/orbits.txt")
 body = ephem.get_orbital_body_by_name(orbits, "MyBody")
 if body is not None:
     position = ephem.calc_orbital_position(body, 2451545.0)

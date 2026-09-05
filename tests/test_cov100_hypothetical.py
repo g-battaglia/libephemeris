@@ -9,6 +9,7 @@ import pytest
 
 from libephemeris.exceptions import UnknownBodyError
 from libephemeris.hypothetical import (
+    _CSV_COLUMNS,
     CUPIDO,
     HARRINGTON,
     HYPOTHETICAL_ELEMENTS,
@@ -37,6 +38,9 @@ from libephemeris.hypothetical import (
 
 
 J2000 = 2451545.0
+
+# Header line every fictitious-orbits file must start with.
+CSV_HEADER = ",".join(_CSV_COLUMNS) + "\n"
 
 
 @pytest.mark.parametrize(
@@ -115,24 +119,63 @@ def test_parse_legacy_line_geocentric_marker() -> None:
     assert row.line_number == 7
 
 
+def test_parse_csv_rejects_the_retired_column_layout(tmp_path: Path) -> None:
+    path = tmp_path / "retired.csv"
+    path.write_text(
+        "Cupido,2415020.0,J1900,163.7409,40.99837,0.00460,"
+        "171.4333,129.8325,1.0833,0,transcription\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="column header"):
+        _parse_fictitious_orbits_csv(path)
+
+
 def test_parse_csv_validation(tmp_path: Path) -> None:
     path = tmp_path / "bad.csv"
-    path.write_text("too,few,columns\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="at least 10"):
+    path.write_text(CSV_HEADER + "too,few,columns\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="expected 11"):
         _parse_fictitious_orbits_csv(path)
 
     path.write_text(
-        "Synthetic,J2000,J2000,0,not-a-number,0,0,0,0,0\n",
+        CSV_HEADER + "Synthetic,not-a-date,J2000,,1,0,0,0,0,0,src\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="epoch"):
+        _parse_fictitious_orbits_csv(path)
+
+    path.write_text(
+        CSV_HEADER + "Synthetic,2451545.0,J2000,,not-a-number,0,0,0,0,0,src\n",
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="semi-major axis"):
         _parse_fictitious_orbits_csv(path)
 
     path.write_text(
-        "Synthetic,J2000,J2000,0,1,0,0,0,0,not-a-flag\n",
+        CSV_HEADER + "Synthetic,2451545.0,J2000,2451545.0,1,0,0,0,0,0,src\n",
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="geocentric flag"):
+    with pytest.raises(ValueError, match="exactly one of"):
+        _parse_fictitious_orbits_csv(path)
+
+    path.write_text(
+        CSV_HEADER + "Synthetic,2451545.0,,,1,0,0,0,0,0,src\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="exactly one of"):
+        _parse_fictitious_orbits_csv(path)
+
+    path.write_text(
+        CSV_HEADER + "Synthetic,2451545.0,J1234,,1,0,0,0,0,0,src\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="equinox token"):
+        _parse_fictitious_orbits_csv(path)
+
+    path.write_text(
+        CSV_HEADER + "Synthetic,2451545.0,,not-a-date,1,0,0,0,0,0,src\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="equinox Julian Day"):
         _parse_fictitious_orbits_csv(path)
 
 
