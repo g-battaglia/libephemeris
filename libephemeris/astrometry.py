@@ -48,13 +48,16 @@ import numpy as np
 # CONSTANTS
 # =============================================================================
 
-# Speed of light in AU/day. Adopted across the reduction pipeline (identical to
-# the NOVAS/Skyfield ``C_AUDAY`` constant) so the analytical and Skyfield
-# backends agree bit-for-bit. Basis: c = 299792458 m/s exactly (BIPM/CODATA SI)
-# with the IAU 1976 System astronomical unit (1.49597870691e11 m), for which
-# c*86400/au reproduces 173.1446326846693. (Evaluating with the IAU 2012
-# Resolution B2 au of 149597870700 m instead gives 173.14463267424, ~1e-8
-# smaller; the adopted constant above is kept for cross-backend identity.)
+# Speed of light in AU/day: the NOVAS/Skyfield ``C_AUDAY`` constant, adopted
+# across the reduction pipeline so the analytical and Skyfield backends agree
+# bit-for-bit. It is 86400 s divided by the DE405 light-time for one
+# astronomical unit, 499.0047838061 s (Standish 1998, JPL IOM 312.F-98-048;
+# NOVAS 3 ``AU_SEC``, Kaplan et al. 2011, USNO Circular 180), i.e.
+# c = 299792458 m/s with au = 1.4959787069098932e11 m. Neither
+# c*86400 / 1.49597870691e11 m (173.14463268465693) nor the IAU 2012
+# Resolution B2 au of 149597870700 m (173.14463267424, 1.0e-8 AU/day smaller)
+# reproduces this value; both are documented here only to avoid confusion.
+# ``fast_calc.C_LIGHT_AU_DAY`` is the same constant with the same note.
 C_LIGHT_AU_DAY: float = 173.1446326846693
 
 # Julian day constants
