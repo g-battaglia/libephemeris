@@ -414,7 +414,7 @@ docstring = "detailed"
 [[component]]
 id = "atmospheric-visibility"
 category = "scientific-model"
-paths = ["libephemeris/extinction.py", "libephemeris/heliacal.py", "libephemeris/schaefer.py"]
+paths = ["libephemeris/extinction.py", "libephemeris/heliacal.py"]
 scientific_content = true
 origin = "Cited observational atmosphere, extinction, twilight, and visibility models. Empirical source constants and project numerical guards are distinguished in comments."
 sources = ["SCHAEFER_VISIBILITY", "EXTINCTION", "REFRACTION"]

@@ -136,7 +136,7 @@ paths without changing that provenance boundary. Target architecture:
 ```
 extinction.py (physics source) → visibility.py NEW (vectorised VisibilityEngine)
 → heliacal_search.py NEW (single search skeleton, LEB/Skyfield PositionProvider)
-→ heliacal.py (API + dispatch) → schaefer.py (deprecated shim)
+→ heliacal.py (API + dispatch)
 ```
 
 Each phase must land with independent defining-condition and metamorphic tests:

@@ -390,8 +390,7 @@ def _vl_airmass(alt_deg: float) -> float:
     ``X = 1 / (cos z + 0.025 * exp(-11 cos z))``, valid to the horizon, from
     Rozenberg, G.V. (1966), "Twilight: A Study in Atmospheric Optics". This is
     the general sky airmass used by Schaefer's VISLIMIT model (NOT the Kasten &
-    Young relation, which appears in the standalone extinction/schaefer helper
-    modules).
+    Young relation, which appears in the standalone extinction helper module).
     """
     if alt_deg <= 0.0:
         return 40.0

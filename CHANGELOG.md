@@ -44,6 +44,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `fast_calc.py` (`_iau2006_precession_angles`, `_fw2m` and their helper
   constants); the LEB frame path uses the Vondrák 2011 precession through
   `precession_vondrak`.
+- The unused `libephemeris.schaefer` module and its coverage test. The module
+  was never imported by the library, was not part of the public API, and
+  duplicated the visibility model that `libephemeris.heliacal` carries;
+  heliacal events are unchanged.
+- The unused private lunar helpers `_calc_elp2000_node_perturbations` and
+  `_calc_jupiter_mean_longitude`, together with the Venus, Mars and Saturn
+  mean-longitude helpers that only the removed series called. The true lunar
+  node is derived from the JPL osculating state as before, so results are
+  unchanged.
 
 ## [3.2.1] - 2026-09-05
 

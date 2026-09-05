@@ -447,15 +447,14 @@ make visibility predictions model-dependent. LibEphemeris uses documented
 physical parameters rather than output-fitted seasonal or geographic terms.
 
 A few auxiliary constants in the visibility chain are declared **project
-calibrations** in `libephemeris/schaefer.py`: the humidity-based aerosol
-fallback quadratic, the water-vapour V-band coefficient, and the twilight
-phase-transition coefficients. Each is constrained by published physics
-(Koschmieder 1924 for the visibility relation, Schaefer 1990/1993 and
-Rozenberg 1966 for the twilight structure, the canonical ~6.5 mag dark-sky
-naked-eye limit) and by continuity/monotonicity requirements — none is
-recovered from another implementation's output, and the measured
-0.3–0.9 mag limiting-magnitude differences from one external implementation
-are the visible consequence of that independence.
+calibrations** in `libephemeris/extinction.py`: the humidity/altitude
+aerosol fallback, the per-band water-vapour coefficients, and the twilight
+sky-brightness anchor values at the phase boundaries. Each is constrained by
+published physics (Koschmieder 1924 for the visibility relation, Patat 2003
+and Rozenberg 1966 for the twilight structure) and by continuity/monotonicity
+requirements — none is recovered from another implementation's output, and
+the measured 0.3–0.9 mag limiting-magnitude differences from one external
+implementation are the visible consequence of that independence.
 
 ### Hypothetical bodies
 

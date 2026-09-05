@@ -534,7 +534,8 @@ Schaefer (1990) atmospheric visibility model with:
 
 1. **Atmospheric extinction**: Rayleigh scattering + aerosol + ozone + water vapor
 2. **Twilight sky brightness**: gradient model with moonlight contribution
-3. **Ptolemaic visibility thresholds**: arcus visionis values
+3. **Arcus visionis**: root-solved over the limiting-magnitude model (no
+   Ptolemaic coefficient table)
 4. **Contrast threshold**: Schaefer model with configurable observer skill levels
 
 Timing precision: <1 day for heliacal rising/setting events.

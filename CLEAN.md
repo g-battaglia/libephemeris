@@ -13,6 +13,11 @@ that followed (WS1-WS8). Grows as further dead code is identified.
   `mean_lunar_apse.py`. The rc7 analytical series and private mean baselines are
   live only for the `INTP_APOG`/`INTP_PERG` compatibility path and are pinned as
   a complete source artifact by the lunar provenance gate.
+- `_calc_elp2000_node_perturbations` (a ~930-line project-fitted node
+  perturbation series) and the private Jupiter/Venus/Mars/Saturn
+  mean-longitude helpers that only it called: never on the runtime path,
+  since `calc_true_lunar_node` reads the node from the JPL osculating state.
+  Removed after 3.2.0.
 
 ## libephemeris/houses.py
 
@@ -66,7 +71,8 @@ time.  Items the fix workstreams made live again are noted as such.
 ### libephemeris/schaefer.py
 
 - Entire module imported nowhere (heliacal.py carries its own
-  SchaeferModel); its twilight model is discontinuous.
+  SchaeferModel); its twilight model is discontinuous. Removed after
+  3.2.0 together with its branch-coverage test file.
 
 ### libephemeris/planets.py
 
