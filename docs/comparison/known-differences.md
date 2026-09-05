@@ -207,6 +207,53 @@ reference API instead exposes an exact-zero/equatorial branch discontinuity in
 LibEphemeris intentionally returns the source-defined continuous limit. This is
 covered by provenance tests rather than by preserving the reference anomaly.
 
+#### Krusinski house position at the equator {#krusinski-equator}
+
+The Krusinski–Pisa–Goelzer system (selector ``U``) divides the great circle
+through the ascendant and the zenith into twelve arcs of 30 degrees, starting
+at the ascendant and running towards the nadir, and carries the divisions to
+the ecliptic along hour circles. A body is placed by the arc of the point of
+that circle which shares its right ascension.
+
+The construction has no singularity at the equator. At geographic latitude
+zero the zenith lies on the celestial equator, the ascendant is an ordinary
+point of the eastern horizon, and the circle through the two is an ordinary
+great circle; the position varies smoothly through the configuration.
+LibEphemeris evaluates it with unit vectors and a two-argument arctangent, so
+the smoothness survives in floating point as well.
+
+A formulation that carries the same geometry through a tangent ratio instead
+loses digits as the latitude is driven towards zero — about 5e-13 relative at
+0.001°, 4e-9 at 1e-8° and 8e-6 at zero — and shows the same stiffness a
+thousandth of a degree from a pole, where the house circle is nearly an hour
+circle. Measured against a 50-digit evaluation of the construction,
+LibEphemeris stays within 8.5e-16 relative at every latitude, including
+exactly zero and ±89.999. Output at those latitudes therefore differs from
+implementations carrying the tangent form by up to 1.9e-5 of a house
+(about 5 arcseconds of house-circle arc at the equator, 1.2e-7 relative at
+±89.999); everywhere else the two agree to better than 1e-12 relative.
+
+#### Krusinski house position at the geographic poles {#krusinski-poles}
+
+At ``|latitude| = 90°`` the horizon is the celestial equator and the zenith is
+a celestial pole, so the house circle through the ascendant and the zenith is
+itself an hour circle. Every other hour circle meets it only at the two
+celestial poles, and the projection therefore sends every body to the
+quarter-turn or the three-quarter-turn mark of the scale: the position
+collapses onto the 4th or the 10th cusp exactly, according to which side of
+the ascendant the body's own hour circle falls on. Nothing in the arithmetic
+is undefined — what is lost is the ability to tell bodies apart, which is a
+property of the geometry at a pole and not of any particular formulation.
+
+That collapse is also the limit of the position as the latitude approaches the
+pole from inside, and LibEphemeris returns it for every polar chart. An
+implementation that reaches the pole through a formulation whose intermediate
+quantities cancel there can instead return chart-dependent values for a
+minority of configurations that are geometrically indistinguishable from the
+rest; such values differ from the limit by up to 3.2 houses. No exception is
+raised at a pole and no body is refused; the answer is simply the degenerate
+one the construction defines.
+
 ### Fixed stars
 
 Fixed-star astrometry uses the permissively sourced LibEphemeris catalogue,

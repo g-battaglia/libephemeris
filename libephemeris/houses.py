@@ -4629,73 +4629,113 @@ def _hpos_carter(ra: float, armc: float, eps: float, geolat: float) -> float:
     return pos_deg / 30.0 + 1.0
 
 
+_Vec3 = tuple[float, float, float]
+
+#: Half-width, in degrees of house-circle arc, of the rounding window
+#: around the ascendant that the Krusinski scale treats as arc zero.
+_HOUSE_ARC_SEAM = 1e-9
+
+
+def _cross3(a: _Vec3, b: _Vec3) -> _Vec3:
+    """Return the cross product of two equatorial direction vectors."""
+    return (
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    )
+
+
+def _dot3(a: _Vec3, b: _Vec3) -> float:
+    """Return the dot product of two equatorial direction vectors."""
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
 def _hpos_krusinski(ra: float, armc: float, eps: float, geolat: float) -> float:
     """Krusinski-Pisa-Goelzer house position.
 
-    The house plane is the great circle through the ascendant and the
-    zenith (Krusinski 1995; equivalently Pisa 1997 and Goelzer 1995, who
-    published the same construction independently). Houses divide that
-    circle into twelve equal arcs starting at the ascendant, and a body is
-    carried onto the plane along its declination circle.
+    The system divides the great circle through the ascendant and the zenith
+    into twelve arcs of 30 degrees, starting at the ascendant and running
+    towards the nadir, and carries those divisions to the ecliptic along hour
+    circles (B. Krusinski's 1995 description of his system, credited
+    independently to M. Pisa and to G. Goelzer). A body is therefore placed by
+    the arc, measured from the ascendant, of the point of that circle sharing
+    its right ascension. That is the anatomy R. W. Holden, "The Elements of
+    House Division" (1977), gives for the great-circle family — which circle is
+    divided, where the division starts, through which pencil it reaches the
+    ecliptic — with a fourth circle in place of the prime vertical of Campanus
+    or the equator of Regiomontanus, and the ordinary pencil of hour circles.
 
-    Steps, all plain plane changes and in-plane projections:
-      1. Locate the house plane: its ascending node on the equator and its
-         inclination to the equator, found by tilting the ascendant into
-         the horizon frame and reading the node/obliquity back out.
-      2. Project the ascendant onto the plane along the equator's
-         declination circles (an atan-stretch by the plane's obliquity),
-         fixing the zero point of the house scale.
-      3. Project the body the same way and take its in-plane arc from the
-         ascendant.
+    Because the projection runs along hour circles, the answer depends on the
+    body only through its right ascension; its declination cannot enter.
+
+    Args:
+        ra: Right ascension of the body in degrees.
+        armc: Right ascension of the MC of the chart in degrees.
+        eps: True obliquity of the ecliptic in degrees.
+        geolat: Geographic latitude in degrees, north positive.
+
+    Returns:
+        House position in ``[1, 13)``: the integer part names the house, the
+        fraction is the part of that house already travelled.
     """
-    gl = geolat
-    if abs(gl) < _NEAR_ZERO:
-        gl = _NEAR_ZERO if gl >= 0 else -_NEAR_ZERO
-    asc = _calc_ascendant((armc + 90.0) % 360.0, eps, gl, gl)
-    asc = _ascendant_on_eastern_horizon(asc, armc, eps, gl)
+    # The zenith is the direction whose right ascension is the ARMC and whose
+    # declination is the geographic latitude — that is what the ARMC is.
+    cos_geolat = _cos_deg(geolat)
+    zenith: _Vec3 = (
+        cos_geolat * _cos_deg(armc),
+        cos_geolat * _sin_deg(armc),
+        _sin_deg(geolat),
+    )
+    # The scale runs from the ascendant towards the nadir, so the nadir — not
+    # the zenith — is the quarter-turn mark of the circle and the second basis
+    # direction below. It puts the IC on cusp 4 and the MC on cusp 10.
+    nadir: _Vec3 = (-zenith[0], -zenith[1], -zenith[2])
 
-    # 1a. Node of the house plane on the equator.
-    node_lon, node_lat = _rotate_frame(asc, 0.0, -eps)
-    ra_east_point = (armc + 90.0) % 360.0
-    node_lon = (ra_east_point - node_lon) % 360.0
-    node_lon, node_lat = _rotate_frame(node_lon, node_lat, -(90.0 - gl))
-    tan_node = _tan_deg(node_lon)
-    if gl == 0.0:
-        stretched = 90.0 if tan_node >= 0 else -90.0
-    else:
-        stretched = _atan_deg(tan_node / _cos_deg(90.0 - gl))
-    if 90.0 < node_lon <= 270.0:
-        stretched = (stretched + 180.0) % 360.0
-    node_lon = stretched % 360.0
-    ra_node = (ra_east_point - node_lon) % 360.0
+    # The ascendant is the ecliptic point on the *eastern* horizon. The module
+    # owns both the closed-form longitude and the rising-intersection test,
+    # which inside the polar circles is what keeps the anchor off the setting
+    # point; sharing them keeps this system aligned with every other one.
+    asc_lon = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
+    asc_lon = _ascendant_on_eastern_horizon(asc_lon, armc, eps, geolat)
+    sin_asc_lon = _sin_deg(asc_lon)
+    ascendant: _Vec3 = (
+        _cos_deg(asc_lon),
+        sin_asc_lon * _cos_deg(eps),
+        sin_asc_lon * _sin_deg(eps),
+    )
 
-    # 1b. Inclination of the house plane to the equator: tilt the point
-    # 90 deg up from the node through the horizon frame and read its
-    # latitude.
-    incl_lon = (ra_east_point - ra_node) % 360.0
-    incl_lon, incl_lat = _rotate_frame(incl_lon, 0.0, -(90.0 - gl))
-    incl_lat = incl_lat + 90.0
-    incl_lon, incl_lat = _rotate_frame(incl_lon, incl_lat, 90.0 - gl)
-    plane_obliquity = incl_lat
+    # The house circle is the great circle through the ascendant and the
+    # zenith. The ascendant lies on the horizon, so it is already orthogonal
+    # to the zenith: the pair is an orthonormal basis of the circle's plane
+    # and their cross product is the pole the circle turns about.
+    house_pole = _cross3(ascendant, nadir)
 
-    # 2. Ascendant projected onto the house plane (zero of the scale).
-    asc_ra, _ = _rotate_frame(asc, 0.0, -eps)
-    asc_arc = (asc_ra - ra_node) % 360.0
-    stretched = _atan_deg(_tan_deg(asc_arc) / _cos_deg(plane_obliquity))
-    if 90.0 < asc_arc <= 270.0:
-        stretched = (stretched + 180.0) % 360.0
-    asc_arc = stretched % 360.0
+    # The body's hour circle is the great circle through the celestial poles
+    # and the body; its own pole sits on the equator a quarter turn of right
+    # ascension ahead of it. Two great circles meet in a pair of opposite
+    # directions, and the wanted one is the member of the pair that shares the
+    # body's right ascension rather than the opposite one — the single branch
+    # choice of the construction, made once here and nowhere else.
+    hour_pole: _Vec3 = (-_sin_deg(ra), _cos_deg(ra), 0.0)
+    meeting = _cross3(house_pole, hour_pole)
+    if meeting[0] * _cos_deg(ra) + meeting[1] * _sin_deg(ra) < 0.0:
+        meeting = (-meeting[0], -meeting[1], -meeting[2])
 
-    # 3. Body projected onto the house plane, measured from the ascendant.
-    body_arc = (ra - ra_node) % 360.0
-    stretched = _atan_deg(_tan_deg(body_arc) / _cos_deg(plane_obliquity))
-    if 90.0 < body_arc <= 270.0:
-        stretched = (stretched + 180.0) % 360.0
-    body_arc = stretched % 360.0
-    body_arc = (body_arc - asc_arc) % 360.0
-
-    pos_deg = (body_arc + CUSP_BOUNDARY_OFFSET) % 360.0
-    return pos_deg / 30.0 + 1.0
+    # Resolving that direction on the two basis vectors gives the arc from the
+    # ascendant over the whole turn: ascendant 0, nadir 90, descendant 180,
+    # zenith 270. At a geographic pole the house circle is itself an hour
+    # circle, every other hour circle cuts it only at the celestial poles, and
+    # this arc collapses to exactly 90 or 270 — the 4th or the 10th cusp.
+    arc = math.degrees(math.atan2(_dot3(meeting, nadir), _dot3(meeting, ascendant)))
+    # Guard the seam of the scale. The ascendant is arc zero and cusp one, and
+    # its own component along the nadir cancels to a rounding residue whose
+    # sign is arbitrary; left alone, a negative residue would wrap a body
+    # sitting on the ascendant round to just short of a full turn and report it
+    # in house 12 instead of house 1. The window is five orders of magnitude
+    # above that residue and far below any arc a chart can resolve.
+    if -_HOUSE_ARC_SEAM < arc < 0.0:
+        arc = 0.0
+    return (arc % 360.0) / 30.0 + 1.0
 
 
 def _savard_prime_vertical_arc(geolat: float, thirds: int) -> float:

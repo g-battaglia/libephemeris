@@ -711,6 +711,38 @@ def test_krusinski_via_houses():
     assert len(cusps) == 12
 
 
+@pytest.mark.parametrize("obliquity", [0.0, 5.0, 40.0, 66.0])
+@pytest.mark.parametrize("lat", [-52.0, 0.0, 12.0, 71.0])
+def test_krusinski_house_pos_holds_at_any_obliquity(obliquity, lat):
+    """The Krusinski scale stays consistent far from the present obliquity.
+
+    The house circle runs through the ascendant and the zenith and is cut
+    into twelve arcs from the ascendant towards the nadir, so three things
+    must hold whatever the tilt of the ecliptic: the system's own cusps come
+    back as the whole numbers 1..12, a culminating body sits on the tenth
+    cusp, and the answer never leaves ``[1, 13)``. Charts of date only ever
+    reach obliquities near 23.44 degrees, which leaves that axis untested.
+    """
+    armc = 250.0
+    cusps, _ = H.houses_armc(armc, lat, obliquity, b"U")
+    for index, cusp in enumerate(cusps):
+        position = ephem.house_pos(armc, lat, obliquity, b"U", cusp, 0.0)
+        assert position == pytest.approx(index + 1, abs=1e-9)
+
+    # A body culminating with the meridian is on the tenth cusp whatever its
+    # declination, because the projection runs along hour circles.
+    assert H._hpos_krusinski(armc, armc, obliquity, lat) == pytest.approx(
+        10.0, abs=1e-13
+    )
+
+    for longitude in range(0, 360, 9):
+        for ecliptic_latitude in (-30.0, 0.0, 30.0):
+            position = ephem.house_pos(
+                armc, lat, obliquity, b"U", float(longitude), ecliptic_latitude
+            )
+            assert 1.0 <= position < 13.0
+
+
 # ---------------------------------------------------------------------------
 # Sunshine arc helper degenerate side_c
 # ---------------------------------------------------------------------------
