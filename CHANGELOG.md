@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `TIDAL_WILLIAMS_BOGGS_2016` (-25.97 arcsec/cy²): the lunar-laser-ranging
+  determination of the Moon's tidal acceleration published by Williams & Boggs
+  (2016), Celest. Mech. Dyn. Astron. 126, 89-129, as a documented alternative
+  to the DE440/DE441 compatibility value accepted by `set_tid_acc()`.
+
+### Changed
+
+- `constants.py` documents the file-name constants (`EPHE_PATH`, `FNAME_*`,
+  `ASTNAMFILE`, `FICTFILE`, `STARFILE`, `STARFILE_OLD`, `SE_FNAME_DE431`) as
+  API contract names that no code path reads, and corrects the attribution of
+  `TIDAL_DE440`/`TIDAL_DE441`: the value is not printed in Park et al. (2021).
+  No constant changed value.
+
 ## [3.2.1] - 2026-09-05
 
 ### Fixed
@@ -4643,6 +4660,7 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v3.2.1...HEAD
 [3.2.1]: https://github.com/g-battaglia/libephemeris/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/g-battaglia/libephemeris/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/g-battaglia/libephemeris/compare/v3.0.0...v3.1.0

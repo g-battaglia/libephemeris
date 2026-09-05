@@ -1471,8 +1471,8 @@ SPLIT_DEG_ROUND_MIN: int = 2  # Round to minutes
 SPLIT_DEG_ROUND_DEG: int = 4  # Round to degrees
 SPLIT_DEG_ZODIACAL: int = 8  # Return raw 30-degree zodiac segment
 SPLIT_DEG_NAKSHATRA: int = 1024  # Return raw nakshatra segment number
-SPLIT_DEG_KEEP_SIGN: int = 16  # Don't round to next zodiac sign/nakshatra
-SPLIT_DEG_KEEP_DEG: int = 32  # Don't round to next degree
+SPLIT_DEG_KEEP_SIGN: int = 16  # Rounding stays inside the current sign/nakshatra
+SPLIT_DEG_KEEP_DEG: int = 32  # Rounding keeps the whole-degree part unchanged
 
 
 def _rounding_offset(roundflag: int) -> float:
@@ -1622,8 +1622,10 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
             - SPLIT_DEG_ROUND_DEG (4): Round to nearest degree
             - SPLIT_DEG_ZODIACAL (8): Return raw 30-degree zodiac segment index
             - SPLIT_DEG_NAKSHATRA (1024): Return raw nakshatra segment index
-            - SPLIT_DEG_KEEP_SIGN (16): Don't round to next zodiac sign/nakshatra
-            - SPLIT_DEG_KEEP_DEG (32): Don't round to next degree
+            - SPLIT_DEG_KEEP_SIGN (16): Rounding stays inside the current
+              sign or nakshatra
+            - SPLIT_DEG_KEEP_DEG (32): Rounding keeps the whole-degree part
+              unchanged
 
     Returns:
         Tuple of (deg, min, sec, secfr, sign) where:

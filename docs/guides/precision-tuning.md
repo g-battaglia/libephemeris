@@ -294,7 +294,17 @@ The tidal acceleration affects Delta T calculations for dates far from the prese
 | DE421 | -25.85 arcsec/cy² |
 | DE430 | -25.82 arcsec/cy² |
 | DE431 | -25.80 arcsec/cy² |
-| DE440/DE441 | -25.936 arcsec/cy² |
+| DE440/DE441 | -25.936 arcsec/cy² (compatibility value) |
+| Williams & Boggs (2016) | -25.97 arcsec/cy² (`TIDAL_WILLIAMS_BOGGS_2016`) |
+
+The DE200 to DE431 values come from the JPL ephemeris reports (Standish
+1982, 1998; Folkner et al. 2009, 2014). The DE440/DE441 figure is kept for
+API compatibility: it is not printed in the DE440/DE441 paper (Park et al.
+2021, AJ 161:105) and no primary publication reporting it has been located.
+`TIDAL_WILLIAMS_BOGGS_2016` is the published lunar-laser-ranging
+determination of the same quantity (Williams & Boggs 2016, *Secular tidal
+changes in lunar orbit and Earth rotation*, Celest. Mech. Dyn. Astron. 126,
+89–129: dn/dt = −25.97 ± 0.05 arcsec/cy²).
 
 ### Setting Tidal Acceleration
 
@@ -469,7 +479,9 @@ import libephemeris as eph
 eph.set_ephemeris_file("de441.bsp")
 
 # 2. Set matching tidal acceleration
-eph.set_tid_acc(eph.TIDAL_DE440)  # DE441 uses same as DE440
+eph.set_tid_acc(eph.TIDAL_DE440)  # DE441 shares the DE440 convention
+# or the published lunar-laser-ranging determination:
+# eph.set_tid_acc(eph.TIDAL_WILLIAMS_BOGGS_2016)
 
 # 3. Note: IERS Delta T not available before 1973
 # Skyfield model is used automatically for historical dates

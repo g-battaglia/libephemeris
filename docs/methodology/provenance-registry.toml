@@ -49,6 +49,16 @@ kind = "primary-publications-and-observed-public-data"
 citation = "Stephenson, Morrison & Hohenkerk (2016), Proc. R. Soc. A 472:20160404; Morrison et al. (2021); IERS observed Earth-orientation data"
 url = "https://doi.org/10.1098/rspa.2016.0404"
 
+[sources.JPL_TIDAL_CONVENTIONS]
+kind = "primary-publications-and-technical-reports"
+citation = "Standish (1982), JPL IOM 314.6-891 (DE200); Standish (1998), A&A 336, 381 (DE403-DE406); Folkner et al. (2009), IPN Progress Report 42-178 (DE421); Folkner et al. (2014), IPN Progress Report 42-196 (DE430/DE431); the DE440/DE441 figure is an API-compatibility value not printed in Park et al. (2021)"
+url = "https://ipnpr.jpl.nasa.gov/progress_report/42-196/196C.pdf"
+
+[sources.WILLIAMS_BOGGS_2016]
+kind = "primary-publication"
+citation = "Williams & Boggs (2016), Secular tidal changes in lunar orbit and Earth rotation, Celest. Mech. Dyn. Astron. 126, 89-129; tidal acceleration of the lunar mean longitude dn/dt = -25.97 +/- 0.05 arcsec/cy^2"
+url = "https://doi.org/10.1007/s10569-016-9702-3"
+
 [sources.MEEUS_1998]
 kind = "published-algorithm-reference"
 citation = "Meeus (1998), Astronomical Algorithms, 2nd edition"
@@ -277,8 +287,8 @@ id = "public-identifiers"
 category = "public-api"
 paths = ["libephemeris/constants.py"]
 scientific_content = false
-origin = "Public body identifiers, flags, mode identifiers, NAIF mappings, and API constants. Values used as physical constants are re-sourced at the model call site."
-sources = ["NAIF_SPK"]
+origin = "Public body identifiers, flags, mode identifiers, NAIF mappings, and API constants. Values used as physical constants are re-sourced at the model call site. The tidal-acceleration constants cite the JPL ephemeris reports and the Williams & Boggs (2016) lunar-laser-ranging determination in place; the file-name constants are API contract names that no code path reads."
+sources = ["NAIF_SPK", "JPL_TIDAL_CONVENTIONS", "WILLIAMS_BOGGS_2016"]
 documentation = ["docs/reference/flags.md", "docs/comparison/api-compatibility.md"]
 docstring = "detailed"
 

@@ -647,30 +647,29 @@ PARS_FIDEI: int = ARABIC_OFFSET + 4  # Part of Faith
 # =============================================================================
 # CALCULATION FLAGS
 # =============================================================================
-# Ephemeris selection
-FLG_JPLEPH: int = (
-    1  # Use JPL ephemeris (default: DE440 via Skyfield, range 1550-2650 CE)
-)
-FLG_SWIEPH: int = 2  # Use reference ephemeris (same as JPLEPH in libephemeris)
-FLG_MOSEPH: int = 4  # Semi-analytical ephemeris flag (accepted for API compatibility, always uses JPL)
+# Ephemeris selection. Every selector is served by the JPL kernels (DE440 by
+# default, DE441 for the extended tier, or their precomputed LEB channels).
+FLG_JPLEPH: int = 1  # Selects the JPL kernel path explicitly
+FLG_SWIEPH: int = 2  # Accepted selector, routed to the same JPL kernels
+FLG_MOSEPH: int = 4  # Accepted and echoed in the return flags; same JPL kernels
 
-# Observer location and reference frame
-FLG_HELCTR: int = 8  # Heliocentric position
-FLG_TRUEPOS: int = 16  # True geometric position (no light time)
-FLG_J2000: int = 32  # J2000.0 reference frame
-FLG_NONUT: int = 64  # No nutation
-FLG_SPEED3: int = 128  # High precision speed (3 calls)
-FLG_SPEED: int = 256  # Calculate velocity
-FLG_NOGDEFL: int = 512  # No gravitational deflection
-FLG_NOABERR: int = 1024  # No aberration
-FLG_ASTROMETRIC: int = FLG_NOABERR | FLG_NOGDEFL  # Astrometric position
-FLG_EQUATORIAL: int = 2048  # Equatorial coordinates (RA/Dec)
-FLG_XYZ: int = 4096  # Cartesian coordinates
-FLG_RADIANS: int = 8192  # Return angles in radians
-FLG_BARYCTR: int = 16384  # Barycentric position
-FLG_TOPOCTR: int = 32768  # Topocentric position (requires set_topo)
-FLG_SIDEREAL: int = 65536  # Sidereal positions
-FLG_ICRS: int = 131072  # ICRS reference frame
+# Observer location, reduction steps and output frame
+FLG_HELCTR: int = 8  # Origin moved from the Earth's centre to the Sun's centre
+FLG_TRUEPOS: int = 16  # Skip the light-time correction (geometric place)
+FLG_J2000: int = 32  # Refer the result to the J2000.0 mean equinox, not the date's
+FLG_NONUT: int = 64  # Leave nutation out: mean equinox of date
+FLG_SPEED3: int = 128  # Velocity from a centred three-point derivative; implies SPEED
+FLG_SPEED: int = 256  # Fill the three velocity components of the result
+FLG_NOGDEFL: int = 512  # Skip the light-bending term of the reduction
+FLG_NOABERR: int = 1024  # Skip the aberration term of the reduction
+FLG_ASTROMETRIC: int = FLG_NOABERR | FLG_NOGDEFL  # Light time only, nothing else
+FLG_EQUATORIAL: int = 2048  # Right ascension and declination, not ecliptic angles
+FLG_XYZ: int = 4096  # Rectangular x, y, z components instead of spherical ones
+FLG_RADIANS: int = 8192  # Angular components in radians rather than degrees
+FLG_BARYCTR: int = 16384  # Origin moved to the solar-system barycentre
+FLG_TOPOCTR: int = 32768  # Origin at the observer registered with set_topo()
+FLG_SIDEREAL: int = 65536  # Longitudes counted from the set_sid_mode() ayanamsha
+FLG_ICRS: int = 131072  # Keep the kernel's ICRS axes: no frame-bias rotation
 
 # =============================================================================
 # REFERENCE API-COMPATIBLE FLAG ALIASES (bare FLG_* names)
@@ -892,20 +891,21 @@ SPLIT_DEG_ROUND_MIN: int = 2  # Round to minutes
 SPLIT_DEG_ROUND_DEG: int = 4  # Round to degrees
 SPLIT_DEG_ZODIACAL: int = 8  # Return zodiac sign number (0-11)
 SPLIT_DEG_NAKSHATRA: int = 1024  # Return nakshatra number (0-26)
-SPLIT_DEG_KEEP_SIGN: int = 16  # Don't round to next zodiac sign/nakshatra
-SPLIT_DEG_KEEP_DEG: int = 32  # Don't round to next degree
+SPLIT_DEG_KEEP_SIGN: int = 16  # Rounding stays inside the current sign/nakshatra
+SPLIT_DEG_KEEP_DEG: int = 32  # Rounding keeps the whole-degree part unchanged
 
 # =============================================================================
 # TIDAL ACCELERATION CONSTANTS
 # =============================================================================
-# Tidal acceleration of the Moon in arcsec/century^2, for Delta T calculations.
-# Different JPL ephemeris files use different values for the tidal secular
-# acceleration of the Moon's mean longitude (arcsec/century^2). These affect
-# the polynomial extrapolation of Delta T for historical dates. Published
-# sources: Standish, JPL IOM 314.6-891 (1982) for DE200; Standish, A&A 336,
-# 381 (1998) for DE403-DE406; Folkner et al., IPN Progress Report 42-178
-# (2009) for DE421; Folkner et al., IPN Progress Report 42-196 (2014) for
-# DE430/DE431; Park et al., AJ 161:105 (2021) for DE440/DE441.
+# Tidal acceleration of the Moon's mean longitude (dn/dt, arcsec/century^2):
+# the parameter that set_tid_acc() feeds into the Delta-T extrapolation for
+# dates before 1955.0. Each JPL development ephemeris fits its own value, and
+# the names below let a caller pair Delta T with the convention of a given
+# solution. Published sources: Standish, JPL IOM 314.6-891 (1982) for DE200;
+# Standish, A&A 336, 381 (1998) for DE403-DE406; Folkner et al., IPN Progress
+# Report 42-178 (2009) for DE421; Folkner et al., IPN Progress Report 42-196
+# (2014) for DE430/DE431. The DE440/DE441 entry and the Williams & Boggs
+# determination are documented at their definitions below.
 
 TIDAL_DE200: float = -23.8946  # DE200 (Standish 1982)
 TIDAL_DE403: float = -25.580  # DE403 (Standish 1998)
@@ -916,8 +916,18 @@ TIDAL_DE421: float = -25.85  # DE421 (Folkner et al. 2009)
 TIDAL_DE422: float = -25.85  # DE422
 TIDAL_DE430: float = -25.82  # DE430 (Folkner et al. 2014)
 TIDAL_DE431: float = -25.80  # DE431 (Folkner et al. 2014)
-TIDAL_DE440: float = -25.936  # DE440 (Park et al. 2021)
-TIDAL_DE441: float = -25.936  # DE441 (latest, same as DE440)
+# -25.936 is carried as an API-compatibility value for the DE440/DE441
+# kernels. It is not printed in the DE440/DE441 paper (Park, Folkner, Williams
+# & Boggs 2021, AJ 161:105) and no primary publication reporting it has been
+# located; TIDAL_WILLIAMS_BOGGS_2016 below is the published lunar-laser-ranging
+# determination of the same quantity.
+TIDAL_DE440: float = -25.936  # DE440 (compatibility value, see above)
+TIDAL_DE441: float = -25.936  # DE441 (same convention as DE440)
+# Williams & Boggs (2016), "Secular tidal changes in lunar orbit and Earth
+# rotation", Celest. Mech. Dyn. Astron. 126, 89-129: tidal acceleration of the
+# lunar mean longitude from lunar laser ranging, dn/dt = -25.97 +/- 0.05
+# arcsec/century^2. Offered as the documented alternative to TIDAL_DE440.
+TIDAL_WILLIAMS_BOGGS_2016: float = -25.97
 # The named automatic default uses the published DE431 tidal convention (the
 # long-history JPL ephemeris, whose extended time span matches historical
 # Delta-T use). Callers that need the DE440 convention can select
@@ -1118,15 +1128,6 @@ FLG_ORBEL_AA: int = 32768
 FLG_TEST_PLMOON: int = 2228280
 FLG_TROPICAL: int = 0
 
-# Ephemeris file names
-FNAME_DE200: str = "de200.eph"
-FNAME_DE403: str = "de403.eph"
-FNAME_DE404: str = "de404.eph"
-FNAME_DE405: str = "de405.eph"
-FNAME_DE406: str = "de406.eph"
-FNAME_DFT: str = "de431.eph"
-FNAME_DFT2: str = "de406.eph"
-
 # Additional eclipse constants
 ECL_HYBRID: int = 32
 ECL_OCC_BEG_DAYLIGHT: int = 8192
@@ -1229,17 +1230,39 @@ TIDAL_MOSEPH: float = -25.58
 TIDAL_STEPHENSON_2016: float = -25.85
 TIDAL_SWIEPH: float = -25.8
 
-# File names and paths
+# -----------------------------------------------------------------------------
+# File-name and search-path constants: API contract names
+# -----------------------------------------------------------------------------
+# These fourteen names belong to the public interface that callers ported from
+# the reference API import, so name and value stay unchanged. No code path in
+# libephemeris reads any of them (a grep over ``libephemeris/`` finds each name
+# only here and in the ``__all__`` list of ``__init__.py``):
+#
+# - ``EPHE_PATH``: a search path. ``set_ephe_path()`` keeps its own state and
+#   never falls back to this string; de440.bsp/de441.bsp, LEB channels and SPK
+#   kernels are located through the download and registry code.
+# - ``FNAME_DE200`` .. ``FNAME_DE431``, ``FNAME_DFT``, ``FNAME_DFT2``: kernel
+#   file names of another packaging convention; no loader opens them.
+# - ``ASTNAMFILE``, ``FICTFILE``: asteroid-name and fictitious-element files;
+#   fictitious elements come from ``data/fictitious_orbits.csv``.
+# - ``STARFILE``, ``STARFILE_OLD``: star-catalog files; the fixed-star data is
+#   the bundled Hipparcos-based catalog built by
+#   ``scripts/build_star_catalog_v2.py``.
+# - ``SE_FNAME_DE431``: the one intentional exception to the "no SE_ prefix"
+#   naming rule, because the public interface exposes this single value under
+#   the prefixed name as well. Keep it: the API-surface test in the separate
+#   validation repository lists it in ``ALLOWED_PREFIXED_NAMES``.
 ASTNAMFILE: str = "seasnam.txt"
 EPHE_PATH: str = ".:/users/ephe2/:/users/ephe/"
 FICTFILE: str = "seorbel.txt"
+FNAME_DE200: str = "de200.eph"
+FNAME_DE403: str = "de403.eph"
+FNAME_DE404: str = "de404.eph"
+FNAME_DE405: str = "de405.eph"
+FNAME_DE406: str = "de406.eph"
 FNAME_DE431: str = "de431.eph"
-# IMPORTANT — DO NOT REMOVE during another cleanup pass.
-# The upstream reference distribution exports this single value under
-# the SE_-prefixed name, so we mirror it for 1:1 parity. This is the
-# one intentional exception to the "no SE_/SEFLG_/swe_ prefix" rule
-# and is explicitly listed in ``ALLOWED_PREFIXED_NAMES`` of the
-# API-surface parity test, which lives in the separate validation repo.
+FNAME_DFT: str = "de431.eph"
+FNAME_DFT2: str = "de406.eph"
 SE_FNAME_DE431: str = FNAME_DE431
 STARFILE: str = "sefstars.txt"
 STARFILE_OLD: str = "fixstars.cat"

@@ -2079,7 +2079,10 @@ def set_tid_acc(acc: float) -> None:
         - Common values:
           - DE421: -25.85 arcsec/cy^2
           - DE431: -25.80 arcsec/cy^2
-          - DE440/DE441: -25.936 arcsec/cy^2
+          - DE440/DE441: -25.936 arcsec/cy^2 (API-compatibility value; not
+            printed in the DE440/DE441 paper)
+          - Williams & Boggs (2016), lunar laser ranging: -25.97 arcsec/cy^2
+            (TIDAL_WILLIAMS_BOGGS_2016)
 
     Example:
         >>> from libephemeris import set_tid_acc, get_tid_acc

@@ -387,3 +387,27 @@ class TestDeltatExEphemerisFlag:
         for flag in (ephem.FLG_MOSEPH, ephem.FLG_SWIEPH, ephem.FLG_JPLEPH):
             ephem.deltat_ex(jd, flag)
             assert ephem.get_tid_acc() == -22.0
+
+
+class TestTidalWilliamsBoggs2016:
+    """The published lunar-laser-ranging tidal acceleration is exported."""
+
+    def test_value(self):
+        """Williams & Boggs (2016): dn/dt = -25.97 arcsec/cy^2."""
+        assert ephem.TIDAL_WILLIAMS_BOGGS_2016 == -25.97
+        assert isinstance(ephem.TIDAL_WILLIAMS_BOGGS_2016, float)
+
+    def test_exported(self):
+        """The name is part of both public export lists."""
+        from libephemeris import constants
+
+        assert "TIDAL_WILLIAMS_BOGGS_2016" in constants.__all__
+        assert "TIDAL_WILLIAMS_BOGGS_2016" in ephem.__all__
+
+    def test_accepted_by_set_tid_acc(self):
+        """set_tid_acc() takes the value like any other TIDAL_* constant."""
+        ephem.set_tid_acc(ephem.TIDAL_WILLIAMS_BOGGS_2016)
+        try:
+            assert ephem.get_tid_acc() == -25.97
+        finally:
+            ephem.set_tid_acc(ephem.TIDAL_AUTOMATIC)
