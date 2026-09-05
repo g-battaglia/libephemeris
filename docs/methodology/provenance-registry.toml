@@ -164,6 +164,11 @@ kind = "standards-and-primary-publications"
 citation = "ISO 2533/ICAO Doc 7488 standard atmosphere; Barrell & Sears (1939); Green (1985); Auer & Standish (2000); Bennett (1982); Saemundsson (1986); Smart (1977), ch. VI; Meeus (1998), ch. 16"
 url = "https://doi.org/10.1086/301325"
 
+[sources.HORIZON_DIP]
+kind = "standards-and-primary-publications"
+citation = "Bomford (1980), Geodesy, 4th ed., trigonometric heighting and refraction; Thom (1971), Megalithic Lunar Observatories, horizon altitudes and refraction; Schaefer & Liller (1990), PASP 102, 796; Young (2004), AJ 127, 3622; Edlen (1966), Metrologia 2, 71; Ciddor (1996), Appl. Opt. 35, 1566; American Meteorological Society (2000), Glossary of Meteorology, autoconvective lapse rate; BIPM, SI Brochure, 8th ed."
+url = "docs/comparison/known-differences.md"
+
 [sources.SCHAEFER_VISIBILITY]
 kind = "primary-publications"
 citation = "Schaefer (1990), Telescopic Limiting Magnitudes, PASP 102, 212-229; Schaefer (1993), Astronomy and the Limits of Vision"
@@ -406,8 +411,8 @@ id = "atmospheric-refraction"
 category = "scientific-model"
 paths = ["libephemeris/refraction.py"]
 scientific_content = true
-origin = "Published closed-form refraction formulas plus a project-authored numerical ray integral through the cited standard atmosphere. Quadrature and inversion tolerances are labelled project choices."
-sources = ["REFRACTION"]
+origin = "Published closed-form refraction formulas plus a project-authored numerical ray integral through the cited standard atmosphere. The dip of the sea horizon is the exact tangent geometry on the IERS equatorial radius scaled by the published coefficient of terrestrial refraction, derived from the refractivity of air, the autoconvective lapse rate and the standard atmosphere. Quadrature and inversion tolerances are labelled project choices."
+sources = ["REFRACTION", "HORIZON_DIP", "IERS_2010"]
 documentation = ["docs/methodology/algorithm-provenance.md", "docs/reference/precision.md"]
 docstring = "detailed"
 

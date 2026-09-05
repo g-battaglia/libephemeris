@@ -851,68 +851,93 @@ def calc_refraction_ref_true_to_app(
     )
 
 
+# ---------------------------------------------------------------------------
+# Dip of the sea horizon
+# ---------------------------------------------------------------------------
+# Equatorial radius of the Earth, IERS Conventions (2010), IERS Technical
+# Note 36, Table 1.1: a_E = 6378136.6 m.
+_A_EARTH: float = 6_378_136.6
+
+# Specific gas constant of dry air of the standard atmosphere
+# (ISO 2533:1975 / ICAO Doc 7488), in J/(kg*K).
+_R_DRY_AIR: float = 287.0528
+
+# Autoconvective lapse rate g/R_d: the vertical temperature gradient at which
+# air density does not depend on height (American Meteorological Society,
+# Glossary of Meteorology, 2nd ed. 2000, s.v. "autoconvective lapse rate").
+_AUTOCONVECTIVE_LAPSE: float = _G0 / _R_DRY_AIR  # [K/m]
+
+# Refractivity of standard air in the visible band (sodium-D reference
+# wavelength) at 15 degC and 1013.25 mbar, n - 1 = 2.7726e-4 (Edlen,
+# Metrologia 2, 71, 1966; Ciddor, Appl. Opt. 35, 1566, 1996), written in the
+# Gladstone-Dale form n - 1 = c * P / T.
+_AIR_REFRACTIVITY: float = 2.7726e-4
+_GLADSTONE_DALE: float = _AIR_REFRACTIVITY * _T0 / _P0  # c [K/mbar]
+
+# Scale of the coefficient of terrestrial refraction k = C * P/T^2 * (gamma+dT/dh),
+# with C = a_E * c ~ 503 for P in mbar, T in kelvin and dT/dh in K/m
+# (Bomford, Geodesy, 4th ed. 1980; Schaefer & Liller, PASP 102, 796, 1990).
+_TERRESTRIAL_REFRACTION_C: float = _A_EARTH * _GLADSTONE_DALE
+
+# Absolute temperature of 0 degC as the triple point of water, the pre-2019 SI
+# definition of the kelvin (BIPM, SI Brochure, 8th ed., 2006).
+_TRIPLE_POINT_K: float = 273.16
+
+
 def calc_dip(
     obs_alt: float,
     lapse_rate: float = 0.0065,
     atpress: float = 1013.25,
     attemp: float = 10.0,
 ) -> float:
-    """Dip of the horizon for an elevated observer.
+    """Return how far the sea horizon lies below the observer's horizontal plane.
 
-    Uses A. Thom's refraction-corrected dip: the geometric dip
-    arccos(R/(R+h)) is scaled by sqrt(1 - 1.848*k*P/(273.16+T)^2)
-    with k = (0.0342 + lapse)/(0.154*0.0238). The atmospheric scaling
-    matters: at 1000 m the dip moves by ~190" between (700 mbar, 30 degC)
-    and standard conditions.
+    The geometric dip of a sphere of radius ``a_E`` seen from a height ``h`` is
+    ``arccos(a_E / (a_E + h))``. A grazing ray is bent downwards by the vertical
+    density gradient of the air, so the visible horizon is higher than that: with
+    the coefficient of terrestrial refraction ``k`` (the ratio of the Earth's
+    curvature to the ray's), the effective-radius reduction ``a_E -> a_E/(1-k)``
+    scales the dip by ``sqrt(1-k)``.
 
-    Parameters
-    ----------
-    obs_alt : float
-        Observer altitude above sea level in metres.
-    lapse_rate : float
-        Tropospheric lapse rate in K/m.
-    atpress : float
-        Atmospheric pressure at the observer in mbar.
-    attemp : float
-        Atmospheric temperature at the observer in degrees Celsius.
+    Args:
+        obs_alt: Observer height above the sea-level surface [m].
+        lapse_rate: Vertical temperature gradient at the observer [K/m]; the
+            standard-atmosphere value 0.0065 means 6.5 K of cooling per km.
+        atpress: Air pressure at the observer [mbar]; 0 means no atmosphere.
+        attemp: Air temperature at the observer [degrees Celsius].
 
-    Returns
-    -------
-    float
-        Dip angle in degrees (negative: horizon is below the
-        geometric horizontal).
-
-    References
-    ----------
-    Thom, A. (1971), "Megalithic Lunar Observatories", Oxford, ch. 3
-    Bomford, "Geodesy" (1980), 4th ed., §2.17-2.20
+    Returns:
+        The dip in degrees, measured downwards from the horizontal plane and
+        therefore negative or zero: exactly +0.0 at or below sea level and for
+        a temperature at or below the absolute zero of the model, -0.0 when the
+        refraction reaches the curvature of the Earth (k >= 1), and a magnitude
+        that grows without bound where the atmospheric arguments make k
+        negative. No argument is rejected and none is clamped: non-finite
+        inputs propagate.
     """
-    if obs_alt <= 0:
+    # Height first: an observer at or below the sea-level surface has no dip,
+    # whatever the state of the atmosphere.
+    if obs_alt <= 0.0:
         return 0.0
-
-    # Equatorial radius for the geometric dip (the conventional choice in
-    # the dip literature; the mean radius shifts the dip ~2" at 1000 m)
-    _r_dip = 6_378_136.6
-    ratio = _r_dip / (_r_dip + obs_alt)
-    if ratio >= 1.0:
+    t_abs = _TRIPLE_POINT_K + attemp
+    if t_abs <= 0.0:
+        # At or below absolute zero the gas laws below carry no meaning.
         return 0.0
-    dip_geometric = math.degrees(math.acos(ratio))
-
-    # Refraction coefficient after Thom (1971). 0.0342 K/m is the
-    # autoconvective lapse rate g/R_specific (≈9.81/287) at which density is
-    # height-independent — the upper bound on the actual lapse rate; the
-    # 0.154 and 0.0238 factors are Thom's empirical normalisation. The
-    # lapse-rate term keeps the conventional 0.0065 K/m default consistent
-    # with the standard atmosphere used elsewhere in this module.
-    krefr = (0.0342 + lapse_rate) / (0.154 * 0.0238)
-    t_kelvin = 273.16 + attemp
-    # Non-physical temperature at or below absolute zero (attemp <= -273.16 C):
-    # there is no meaningful atmosphere, and t_kelvin**2 would divide by zero.
-    # Return zero dip, consistent with the obs_T_K <= 0 guard in the ray tracer.
-    if t_kelvin <= 0.0:
-        return 0.0
-    d = 1.0 - 1.8480 * krefr * atpress / (t_kelvin * t_kelvin)
-    if d < 0.0:
-        d = 0.0
-
-    return -dip_geometric * math.sqrt(d)
+    # k = -a_E * dn/dh, from the refractivity n - 1 = c * P / T differentiated
+    # along the hydrostatic profile dP/dh = -P * (g/R_d) / T.
+    curvature_ratio = (
+        _TERRESTRIAL_REFRACTION_C
+        * atpress
+        / (t_abs * t_abs)
+        * (_AUTOCONVECTIVE_LAPSE + lapse_rate)
+    )
+    remaining_curvature = 1.0 - curvature_ratio
+    if math.isnan(remaining_curvature):
+        return math.nan
+    if remaining_curvature > 0.0:
+        refraction_factor = math.sqrt(remaining_curvature)
+    else:
+        # The ray follows the surface or curves inside it: no visible dip.
+        refraction_factor = 0.0
+    geometric_dip = math.degrees(math.acos(_A_EARTH / (_A_EARTH + obs_alt)))
+    return -(geometric_dip * refraction_factor)

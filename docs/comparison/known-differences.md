@@ -263,6 +263,46 @@ differently, by at most the old step — orders of magnitude below one ulp of a
 Julian Day at a rise or set time, so no rise or set time moves. `refrac` and
 `refrac_extended` do not use this model and are unchanged.
 
+#### Horizon dip {#horizon-dip}
+
+The dip of the sea horizon — how far below the horizontal plane an elevated
+observer sees the horizon — is the exact tangent geometry
+`arccos(a_E / (a_E + h))` on the IERS Conventions (2010) equatorial radius
+`a_E = 6 378 136.6 m`, scaled by `sqrt(1 - k)` for the coefficient of
+terrestrial refraction
+
+    k = a_E · c · P / T² · (g/R_d + dT/dh)
+
+Every quantity in it is published: `c = (n-1)·T/P = 7.885e-5 K/mbar` from the
+refractivity of air `n - 1 = 2.7726e-4` at 15 °C and 1013.25 mbar (Edlén 1966,
+*Metrologia* 2, 71; Ciddor 1996, *Appl. Opt.* 35, 1566) in Gladstone–Dale
+form, and `g/R_d = 9.80665 / 287.0528 = 0.03416 K/m`, the autoconvective lapse
+rate of the ISO 2533/ICAO standard atmosphere. The product form is the
+effective-radius reduction of the geodetic literature (Bomford 1980,
+*Geodesy*, 4th ed.; Schaefer & Liller 1990, *PASP* 102, 796), applied to the
+horizon of an elevated observer as in Thom (1971), *Megalithic Lunar
+Observatories*.
+
+Deriving the coefficient from those published values instead of a stored
+composite makes the dip 4.3e-4 to 1.3e-3 larger in magnitude than in
+LibEphemeris 3.2 and earlier: 0.58″ at 100 m, 1.8″ at 1000 m, 3.7″ at 4000 m
+and 5.5″ at 9000 m under the standard atmosphere, and up to 10.6″ at 9000 m at
+the cold, dense, steeply stratified corner of the model's range. Sea level,
+zero pressure and the temperature and height edges are unchanged to the bit.
+Because rise and set times read the dip through the `horhgt = -100` sentinel
+and through the floor of the rise/set refraction inversion, they move too:
+0 s at sea level and up to 4.4 s near the polar circle, where a degree of
+horizon is worth over an hour. No event is gained or lost and no meridian
+transit moves.
+
+The published derivation is the closer one. Taking the refractivity of air
+from ERFA's `eraRefco` at the sodium-D reference wavelength as an independent
+oracle (dry air, 1013.25 mbar, 15 °C: 2.771965e-4) and putting it through the
+same geometry, the former dip was 1.94″ from the oracle at 1000 m and 5.82″ at
+9000 m; the derived one is 0.10″ and 0.31″. On rise and set times the former
+horizon was up to 4.6 s from the oracle across a spread of sites, elevations
+and events; the derived one stays within 0.26 s.
+
 ### Eclipses and occultations
 
 Candidate events are found from JPL Sun, Moon, Earth, and target geometry.

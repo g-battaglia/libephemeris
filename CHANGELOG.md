@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `refraction.calc_dip` derives the dip of the sea horizon entirely from
+  published quantities: the exact tangent geometry `arccos(a_E/(a_E+h))` on the
+  IERS Conventions (2010) equatorial radius, scaled by `sqrt(1-k)` with the
+  coefficient of terrestrial refraction
+  `k = a_E · c · P/T² · (g/R_d + dT/dh)`, where `c` comes from the refractivity
+  of air `n-1 = 2.7726e-4` at 15 °C and 1013.25 mbar (Edlén 1966; Ciddor 1996)
+  and `g/R_d = 9.80665/287.0528 K/m` is the autoconvective lapse rate of the
+  ISO 2533/ICAO standard atmosphere. The dip grows in magnitude by 4.3e-4 to
+  1.3e-3 relative — 0.58″ at 100 m, 1.8″ at 1000 m, 5.5″ at 9000 m under the
+  standard atmosphere — and rise and set times taken through `horhgt = -100`
+  or through an elevated observer move by up to 4.4 s near the polar circle,
+  0 s at sea level, with no event gained or lost and no transit moved. Sea
+  level, zero pressure and the model's edges are unchanged. See
+  `docs/comparison/known-differences.md#horizon-dip`.
 - `constants.py` documents the file-name constants (`EPHE_PATH`, `FNAME_*`,
   `ASTNAMFILE`, `FICTFILE`, `STARFILE`, `STARFILE_OLD`, `SE_FNAME_DE431`) as
   API contract names that no code path reads, and corrects the attribution of

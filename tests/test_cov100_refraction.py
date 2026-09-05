@@ -259,33 +259,108 @@ def test_app_to_true_degenerate_derivative(monkeypatch) -> None:
 
 
 # ---------------------------------------------------------------------------
-# calc_dip: ratio >= 1.0 (line 647) and d < 0 clamp (line 660)
+# calc_dip: the edge rules of the horizon dip
 # ---------------------------------------------------------------------------
 
 
 def test_calc_dip_nonpositive_altitude() -> None:
-    """At or below sea level the dip is zero."""
+    """At or below sea level the dip is exactly positive zero."""
     assert refr.calc_dip(0.0) == 0.0
     assert refr.calc_dip(-5.0) == 0.0
+    assert math.copysign(1.0, refr.calc_dip(0.0)) == 1.0
+    # The height decides before the atmosphere is looked at: even arguments
+    # that carry no meaning leave the sea-level answer alone.
+    assert refr.calc_dip(0.0, lapse_rate=math.inf) == 0.0
+    assert refr.calc_dip(-1000.0, atpress=math.nan, attemp=math.nan) == 0.0
 
 
 def test_calc_dip_ratio_rounds_to_one() -> None:
     """A sub-nanometre altitude rounds the radius ratio to exactly 1.0."""
-    # obs_alt > 0 passes the sea-level guard, but R/(R+h) rounds to 1.0,
-    # so the geometric dip is degenerate and the function returns 0.0.
+    # obs_alt > 0 passes the sea-level guard, but a_E/(a_E+h) rounds to 1.0,
+    # so the geometric dip is degenerate and the magnitude is zero.
     assert refr.calc_dip(1e-10) == 0.0
 
 
-def test_calc_dip_negative_discriminant_clamped() -> None:
-    """Extreme conditions drive the refraction discriminant below zero."""
-    # Huge lapse + huge pressure + very cold temperature make
-    # d = 1 - 1.848*krefr*P/T^2 < 0, which is clamped to 0 (line 660),
-    # yielding a zero-magnitude dip.
+def test_calc_dip_refraction_swallows_the_dip() -> None:
+    """When the ray curves as sharply as the Earth the dip collapses to -0.0.
+
+    The refraction factor is sqrt(1 - k) and k is not bounded above: a
+    superadiabatic lapse rate under a huge pressure takes it past 1, where the
+    factor is clamped at zero and the answer is negative zero (spec
+    ``calc_dip`` section 6, rule 6).
+    """
     d = refr.calc_dip(1000.0, lapse_rate=10.0, atpress=10_000.0, attemp=-200.0)
     assert d == 0.0
+    assert math.copysign(1.0, d) == -1.0
+
+
+def test_calc_dip_no_atmosphere_is_the_geometric_dip() -> None:
+    """Zero pressure leaves the exact tangent geometry, for any temperature."""
+    geometric = math.degrees(math.acos(refr._A_EARTH / (refr._A_EARTH + 1000.0)))
+    assert refr.calc_dip(1000.0, atpress=0.0) == -geometric
+    assert refr.calc_dip(1000.0, atpress=0.0, attemp=-40.0) == -geometric
+    assert refr.calc_dip(1000.0, atpress=0.0, lapse_rate=0.02) == -geometric
 
 
 def test_calc_dip_standard_conditions() -> None:
-    """A 1 km observer under standard conditions sees a negative dip."""
+    """A 1 km observer under standard conditions sees a negative dip.
+
+    The magnitude sits between the unrefracted geometric dip and the dip of
+    the classical navigational tables, which assume a less refractive
+    atmosphere than the pressure/temperature/lapse-rate model does.
+    """
     d = refr.calc_dip(1000.0)
-    assert d < 0.0
+    geometric = math.degrees(math.acos(refr._A_EARTH / (refr._A_EARTH + 1000.0)))
+    assert -geometric < d < 0.0
+
+
+def test_calc_dip_monotone_in_height() -> None:
+    """The magnitude never decreases as the observer climbs."""
+    previous = 0.0
+    for height in range(0, 9001, 250):
+        current = -refr.calc_dip(float(height))
+        assert current >= previous
+        previous = current
+
+
+def test_calc_dip_atmosphere_direction() -> None:
+    """Colder, denser and more stable air all dip less."""
+    warm = refr.calc_dip(1000.0, attemp=40.0)
+    cold = refr.calc_dip(1000.0, attemp=-40.0)
+    assert abs(warm) > abs(cold)
+    thin = refr.calc_dip(1000.0, atpress=900.0)
+    dense = refr.calc_dip(1000.0, atpress=1050.0)
+    assert abs(thin) > abs(dense)
+    isothermal = refr.calc_dip(1000.0, lapse_rate=0.0)
+    steep = refr.calc_dip(1000.0, lapse_rate=0.01)
+    assert abs(isothermal) > abs(steep)
+
+
+def test_calc_dip_below_absolute_zero() -> None:
+    """At or under the absolute zero of the model the answer is +0.0."""
+    assert refr.calc_dip(1000.0, attemp=-273.16) == 0.0
+    assert math.copysign(1.0, refr.calc_dip(1000.0, attemp=-273.16)) == 1.0
+    assert refr.calc_dip(1000.0, attemp=-300.0) == 0.0
+    assert refr.calc_dip(1000.0, attemp=-math.inf) == 0.0
+    # One hundredth of a degree above it the atmosphere is meaningful again:
+    # under standard pressure it makes k enormous, so the answer is the
+    # negative zero of the clamp and no longer the positive zero of the guard.
+    just_above = refr.calc_dip(1000.0, attemp=-273.15)
+    assert just_above == 0.0
+    assert math.copysign(1.0, just_above) == -1.0
+
+
+def test_calc_dip_is_not_sanitised() -> None:
+    """Nothing bounds the factor above, and non-finite inputs propagate."""
+    # A negative pressure makes k negative and the magnitude grows without
+    # limit; the value is returned as it comes out.
+    assert refr.calc_dip(1000.0, atpress=-1013.25, attemp=-273.15) < -1000.0
+    assert refr.calc_dip(1000.0, atpress=-math.inf) == -math.inf
+    assert refr.calc_dip(1000.0, atpress=math.inf) == 0.0
+    assert math.copysign(1.0, refr.calc_dip(1000.0, atpress=math.inf)) == -1.0
+    assert math.isnan(refr.calc_dip(math.nan))
+    assert math.isnan(refr.calc_dip(1000.0, atpress=math.nan))
+    assert math.isnan(refr.calc_dip(1000.0, attemp=math.nan))
+    assert math.isnan(refr.calc_dip(1000.0, lapse_rate=math.nan))
+    assert refr.calc_dip(math.inf) < 0.0
+    assert refr.calc_dip(-math.inf) == 0.0
