@@ -4643,7 +4643,6 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v3.2.1...HEAD
 [3.2.1]: https://github.com/g-battaglia/libephemeris/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/g-battaglia/libephemeris/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/g-battaglia/libephemeris/compare/v3.0.0...v3.1.0
