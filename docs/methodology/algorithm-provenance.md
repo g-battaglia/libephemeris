@@ -280,6 +280,7 @@ the human navigation layer; every row names one registry component.
 | `planetary-reduction-pipelines` | Skyfield, LEB, and Horizons apparent places | JPL states plus IAU/IERS reductions |
 | `crossing-events` | Safeguarded angular event search | Brent/Newton methods and explicit error controls |
 | `eclipse-geometry` | Global/local eclipse events and contacts | NASA canon, Meeus, JPL states, physical geometry |
+| `shadow-geometry-record` | Typed carrier of the two shadow cones, the axis offset and the shadowed body's radius | Chauvenet and Explanatory Supplement ch. 11 cone geometry, classical Besselian sign of l2 |
 | `atmospheric-refraction` | Closed-form and ray-traced refraction | Bennett/Saemundsson, ISO/ICAO, Auer/Standish |
 | `atmospheric-visibility` | Extinction, contrast/visibility, and heliacal events | Schaefer, Kasten-Young, and named atmosphere publications |
 | `fixed-star-runtime` | Catalogue lookup and three-dimensional space motion | Hipparcos/van Leeuwen/WGSN and ERFA/Vondrak |

@@ -97,6 +97,7 @@ from .exceptions import (
     UnknownBodyError,
 )
 from .planets import calc_ut
+from .shadow_geometry import ShadowGeometry
 from .state import get_calc_mode, get_timescale
 
 
@@ -906,128 +907,465 @@ def _occ_body_topo(
     return (blon.degrees % 360.0, blat.degrees, bdist.au)
 
 
-def _eclipse_where_core(
-    tjd_ut: float, flags: int = FLG_SWIEPH, body: "Union[int, str]" = SUN
-) -> Tuple[int, float, float, Tuple[float, ...]]:
-    """Shadow-axis ground geometry shared by the solar-eclipse functions.
+def _shadow_cone_half_angles(
+    source_radius_km: float, occulter_radius_km: float, separation_km: float
+) -> Tuple[float, float, float, float]:
+    """Sines and cosines of the two shadow cones' half angles.
 
-    From the geocentric apparent true-of-date equatorial vectors of Sun
-    and Moon, find where the Moon's shadow axis pierces the Earth's
-    surface at ``tjd_ut`` (or, when the axis misses the globe, the
-    surface point of maximum eclipse) and the shadow-cone cross sections
-    there. The ellipsoid is handled by stretching the z axis so the
-    Earth becomes a sphere of equatorial radius; a second pass refines
-    the stretch with the local geodetic factor at the found latitude.
+    A source sphere of radius ``R_s`` and an occulter of radius ``R_o`` whose
+    centres are ``D`` apart admit two coaxial cones of revolution about the
+    line through the centres: the *core* cone, tangent to both spheres by an
+    internal common tangent plane, with ``sin f = (R_s - R_o) / D``, and the
+    *penumbral* cone, tangent by an external one, with
+    ``sin f = (R_s + R_o) / D``. Both are elementary similar-triangle
+    results (Chauvenet, vol. I, the chapter on eclipses; Explanatory
+    Supplement, 3rd ed., ch. 11, where the same two angles appear as
+    ``tan f1`` and ``tan f2``).
+
+    For the Sun against the Moon both sines are positive and of order
+    5e-3, so both cosines sit just below unity; the factor is small but it
+    is carried, because the diameters and the tangency conditions are
+    compared against kilometre-level quantities. For a point-like source
+    the core sine turns negative: the core cone then diverges instead of
+    converging, has no apex ahead of the occulter, and coincides with the
+    occulter's own shadow.
+
+    Args:
+        source_radius_km: Radius of the light source's disc, zero for a
+            point source.
+        occulter_radius_km: Radius of the occulting body.
+        separation_km: Distance between the two centres.
 
     Returns:
-        ``(retc, lon, lat, dcore)``. ``retc`` is 0 when no eclipse is in
-        progress anywhere on Earth (lon/lat then hold the
-        closest-approach point), otherwise ECL_CENTRAL or
-        ECL_NONCENTRAL (plus ECL_PARTIAL when only the penumbra
-        touches), plus ECL_TOTAL/ECL_ANNULAR for the non-partial case.
-        ``dcore`` uses this module's 7-slot shadow-geometry layout: [0] core-shadow diameter
-        at the ground point (km; negative when the umbra reaches the
-        surface), [1] penumbra diameter there (km), [2] axis distance
-        from the geocenter (km), [3] core diameter on the fundamental
-        plane (km), [4] penumbra diameter on the fundamental plane (km),
-        [5] cos of the core-cone half angle, [6] cos of the
-        penumbra-cone half angle.
+        ``(sin_core, cos_core, sin_penumbral, cos_penumbral)``.
     """
-    from .constants import FLG_XYZ
+    sin_core = (source_radius_km - occulter_radius_km) / separation_km
+    sin_penumbral = (source_radius_km + occulter_radius_km) / separation_km
+    cos_core = math.sqrt(max(0.0, 1.0 - sin_core * sin_core))
+    cos_penumbral = math.sqrt(max(0.0, 1.0 - sin_penumbral * sin_penumbral))
+    return sin_core, cos_core, sin_penumbral, cos_penumbral
+
+
+def _core_section_diameter_km(
+    axial_km: float, sin_f: float, cos_f: float, occulter_radius_km: float
+) -> float:
+    """Signed diameter of the core cone's section at an axial distance.
+
+    A tangent line of a cone of half angle ``f`` runs at perpendicular
+    distance ``R_o`` from the occulter's centre, so at axial distance ``s``
+    from that centre the section taken perpendicular to the axis has radius
+    ``(s sin f - R_o) / cos f``. The result is negative short of the apex at
+    ``s = R_o / sin f`` -- the umbra, hence a total eclipse -- and positive
+    beyond it, where the cone has reopened as the antumbra, hence an annular
+    one. The sign is the classical sign of the Besselian element ``l2`` and
+    is the whole of the total/annular distinction the public results carry.
+
+    Args:
+        axial_km: Distance from the occulter's centre to the point of
+            evaluation, measured along the axis.
+        sin_f: Sine of the core cone's half angle.
+        cos_f: Cosine of the same half angle.
+        occulter_radius_km: Radius of the occulting body.
+
+    Returns:
+        The signed diameter, in the unit of the two lengths given.
+    """
+    return 2.0 * (axial_km * sin_f - occulter_radius_km) / cos_f
+
+
+def _penumbral_section_diameter_km(
+    axial_km: float, sin_f: float, cos_f: float, occulter_radius_km: float
+) -> float:
+    """Diameter of the penumbral cone's section at an axial distance.
+
+    The same construction as :func:`_core_section_diameter_km` for the
+    externally tangent cone, whose radius at axial distance ``s`` is
+    ``(s sin f + R_o) / cos f``. That cone diverges past the occulter, so its
+    width grows with ``s`` and is always positive.
+
+    Args:
+        axial_km: Distance from the occulter's centre to the point of
+            evaluation, measured along the axis.
+        sin_f: Sine of the penumbral cone's half angle.
+        cos_f: Cosine of the same half angle.
+        occulter_radius_km: Radius of the occulting body.
+
+    Returns:
+        The diameter, in the unit of the two lengths given.
+    """
+    return 2.0 * (axial_km * sin_f + occulter_radius_km) / cos_f
+
+
+def _axis_offset_reduced_km(
+    occulter_km: Tuple[float, float, float],
+    axis_unit: Tuple[float, float, float],
+    flattening: float,
+) -> float:
+    """Distance of the shadow axis from the centre of the reference ellipsoid.
+
+    Measured in the auxiliary frame of Chauvenet and of the Explanatory
+    Supplement (ch. 11), the one in which the polar coordinate is stretched by
+    ``1 / (1 - f)`` so that the ellipsoid becomes a sphere of the equatorial
+    radius. That reduction is what makes the equatorial radius the only figure
+    of the Earth the tangency conditions need afterwards, so the distance they
+    compare against it has to be measured in the same frame; the two agree to
+    within the flattening, and the reduced one is the larger of the two. For a
+    spherical shadowed body the frame is the ordinary one and the distinction
+    disappears.
+
+    Args:
+        occulter_km: Geocentric equatorial position of the occulter, in
+            kilometres.
+        axis_unit: Unit vector along the shadow axis.
+        flattening: Flattening of the reference ellipsoid.
+
+    Returns:
+        The perpendicular distance, in kilometres, non-negative.
+    """
+    stretch = 1.0 / (1.0 - flattening)
+    centre = (occulter_km[0], occulter_km[1], occulter_km[2] * stretch)
+    direction = (axis_unit[0], axis_unit[1], axis_unit[2] * stretch)
+    length = math.sqrt(sum(component * component for component in direction))
+    direction = (
+        direction[0] / length,
+        direction[1] / length,
+        direction[2] / length,
+    )
+    along = sum(centre[i] * direction[i] for i in range(3))
+    return math.sqrt(sum((centre[i] - along * direction[i]) ** 2 for i in range(3)))
+
+
+def _axis_ellipsoid_point_km(
+    occulter_km: Tuple[float, float, float],
+    axis_unit: Tuple[float, float, float],
+    equatorial_radius_km: float,
+    flattening: float,
+) -> Tuple[Tuple[float, float, float], bool]:
+    """Where the shadow axis meets the reference ellipsoid.
+
+    The Earth is an ellipsoid, not a sphere, and the published route to the
+    intersection is the auxiliary-frame reduction of Chauvenet and of the
+    Explanatory Supplement, ch. 11: stretch the polar coordinate by
+    ``1 / (1 - f)`` and the ellipsoid becomes a sphere of the equatorial
+    radius, while the axis -- the image of a straight line under a linear
+    map -- stays a straight line. The intersection is then the elementary
+    line-sphere problem, and the point is carried back by the inverse
+    stretch.
+
+    Of the two intersections the near one is taken, the one the shadow
+    reaches first travelling along ``axis_unit``. When the axis misses the
+    ellipsoid altogether there is no intersection and the convention is the
+    surface point in the direction in which the axis crosses the fundamental
+    plane -- the point of the limb, seen along the axis, that lies nearest
+    the axis, where the eclipsed body stands on the horizon.
+
+    Args:
+        occulter_km: Geocentric equatorial position of the occulter, in
+            kilometres.
+        axis_unit: Unit vector along the shadow axis, pointing the way the
+            shadow travels.
+        equatorial_radius_km: Equatorial radius of the reference ellipsoid.
+        flattening: Flattening of the same ellipsoid.
+
+    Returns:
+        ``(point_km, axis_meets_ellipsoid)``: the geocentric equatorial
+        position of the point, in kilometres, and whether the axis really
+        pierces the surface there.
+    """
+    stretch = 1.0 / (1.0 - flattening)
+    centre_x, centre_y, centre_z = (
+        occulter_km[0],
+        occulter_km[1],
+        occulter_km[2] * stretch,
+    )
+    dir_x, dir_y, dir_z = axis_unit[0], axis_unit[1], axis_unit[2] * stretch
+    dir_len = math.sqrt(dir_x * dir_x + dir_y * dir_y + dir_z * dir_z)
+    dir_x, dir_y, dir_z = dir_x / dir_len, dir_y / dir_len, dir_z / dir_len
+
+    along = centre_x * dir_x + centre_y * dir_y + centre_z * dir_z
+    foot_x = centre_x - along * dir_x
+    foot_y = centre_y - along * dir_y
+    foot_z = centre_z - along * dir_z
+    gap = math.sqrt(foot_x * foot_x + foot_y * foot_y + foot_z * foot_z)
+
+    if gap <= equatorial_radius_km:
+        depth = math.sqrt(equatorial_radius_km * equatorial_radius_km - gap * gap)
+        point = (
+            foot_x - depth * dir_x,
+            foot_y - depth * dir_y,
+            foot_z - depth * dir_z,
+        )
+        meets = True
+    else:
+        scale = equatorial_radius_km / gap
+        point = (foot_x * scale, foot_y * scale, foot_z * scale)
+        meets = False
+    return (point[0], point[1], point[2] * (1.0 - flattening)), meets
+
+
+def _surface_point_lonlat_deg(
+    point_km: Tuple[float, float, float], tjd_ut: float, flattening: float
+) -> Tuple[float, float]:
+    """Geographic longitude and geodetic latitude of a point on the ellipsoid.
+
+    The latitude is the geodetic one, ``tan(phi) = z / ((1 - f)**2 * rho)``
+    with ``rho`` the distance from the polar axis -- the latitude of the
+    local vertical, not the geocentric angle and not the auxiliary latitude
+    of the reduction. The longitude is the right ascension of the point less
+    Greenwich apparent sidereal time at the same instant, apparent because
+    the geometry is built from apparent places referred to the true equinox
+    of date. It is east-positive and reduced to (-180, +180], with exactly
+    -180 reported as +180.
+
+    Args:
+        point_km: Geocentric equatorial position of the point, in kilometres.
+        tjd_ut: The instant, Julian Day in UT.
+        flattening: Flattening of the reference ellipsoid.
+
+    Returns:
+        ``(longitude_deg, latitude_deg)``.
+    """
     from .time_utils import sidtime
 
-    base = _ecl_eph_flags(flags) | FLG_EQUATORIAL | FLG_XYZ
-    moon_xyz, _ = calc_ut(tjd_ut, MOON, base)
-    sun_xyz = _occ_body_geo_xyz(tjd_ut, body, base)
+    x, y, z = point_km
+    from_axis = math.hypot(x, y)
+    latitude = math.degrees(math.atan2(z, (1.0 - flattening) ** 2 * from_axis))
+    right_ascension = math.degrees(math.atan2(y, x))
+    longitude = (right_ascension - sidtime(tjd_ut) * 15.0 + 180.0) % 360.0 - 180.0
+    if longitude == -180.0:
+        longitude = 180.0
+    return longitude, latitude
 
-    rsun_au = _occ_body_radius_au(body)
-    rmoon_au = _ECL_RMOON_AU
-    dmoon_au = 2.0 * rmoon_au
-    de = _ECL_REARTH_AU
-    f = _ECL_EARTH_FLATTENING
 
-    rmt = (moon_xyz[0], moon_xyz[1], moon_xyz[2])
-    rst = (sun_xyz[0], sun_xyz[1], sun_xyz[2])
-    dsmt = math.dist(rmt, rst)
+def _cone_touches_ellipsoid(
+    axis_offset_km: float,
+    plane_diameter_km: float,
+    cos_half_angle: float,
+    equatorial_radius_km: float,
+) -> bool:
+    """Whether a shadow cone is still in contact with the reference ellipsoid.
 
-    stretch = 1.0 - f
-    for _pass in range(2):
-        rm = (rmt[0], rmt[1], rmt[2] / stretch)
-        rs = (rst[0], rst[1], rst[2] / stretch)
-        dm = math.sqrt(rm[0] ** 2 + rm[1] ** 2 + rm[2] ** 2)
-        ex, ey, ez = rm[0] - rs[0], rm[1] - rs[1], rm[2] - rs[2]
-        dsm = math.sqrt(ex * ex + ey * ey + ez * ez)
-        ex, ey, ez = ex / dsm, ey / dsm, ez / dsm
-        # Shadow-cone half angles: the core (umbra/antumbra) cone is set
-        # by the difference of the solar and lunar radii, the penumbra
-        # cone by their sum.
-        sinf1 = (rsun_au - rmoon_au) / dsm
-        cosf1 = math.sqrt(1.0 - sinf1 * sinf1)
-        sinf2 = (rsun_au + rmoon_au) / dsm
-        cosf2 = math.sqrt(1.0 - sinf2 * sinf2)
-        # Moon's distance from the fundamental plane (through the
-        # geocenter, normal to the shadow axis) and the axis offset from
-        # the geocenter.
-        s0 = -(rm[0] * ex + rm[1] * ey + rm[2] * ez)
-        r0_sq = dm * dm - s0 * s0
-        r0 = math.sqrt(r0_sq) if r0_sq > 0.0 else 0.0
-        # Core and penumbra diameters on the fundamental plane.
-        d0 = (s0 / dsm * (2.0 * rsun_au - dmoon_au) - dmoon_au) / cosf1
-        cap_d0 = (s0 / dsm * (2.0 * rsun_au + dmoon_au) + dmoon_au) / cosf2
-        # Walk from the Moon along the axis to the stretched-Earth
-        # surface; when the axis misses the globe, stop at the
-        # fundamental plane (closest-approach point).
-        disc = s0 * s0 + de * de - dm * dm
-        s_walk = s0 - (math.sqrt(disc) if disc > 0.0 else 0.0)
-        gx = rm[0] + s_walk * ex
-        gy = rm[1] + s_walk * ey
-        gz = rm[2] + s_walk * ez
-        lat_sph = math.atan2(gz, math.hypot(gx, gy))
-        if _pass == 0:
-            # Refine the stretch so the spherical latitude of the ground
-            # point comes out geodetic.
-            cl, sl = math.cos(lat_sph), math.sin(lat_sph)
-            one_f2 = (1.0 - f) ** 2
-            stretch = one_f2 / math.sqrt(cl * cl + one_f2 * sl * sl)
+    The classical tangency condition for a cone of half angle ``f`` whose
+    section on the fundamental plane has diameter ``L`` is that the axis lie
+    no farther from the centre than ``R_eq cos f + |L| / 2`` (Explanatory
+    Supplement, ch. 11; Meeus, ch. 54). The ``cos f`` factor carries the
+    depth of the tangent point along the cone, which a plain
+    circle-against-circle test on the fundamental plane omits, and the
+    ellipsoid enters through the equatorial radius, to which the
+    auxiliary-frame reduction refers it.
 
-    no_eclipse = False
-    retc = 0
-    if de * cosf1 >= r0:
-        retc |= ECL_CENTRAL
-    elif r0 <= de * cosf1 + abs(d0) / 2.0:
-        retc |= ECL_NONCENTRAL
-    elif r0 <= de * cosf2 + cap_d0 / 2.0:
-        retc |= ECL_PARTIAL | ECL_NONCENTRAL
-    else:
-        no_eclipse = True
+    Args:
+        axis_offset_km: Distance of the shadow axis from the body's centre.
+        plane_diameter_km: Diameter of the cone's section on the fundamental
+            plane, of either sign.
+        cos_half_angle: Cosine of the cone's half angle.
+        equatorial_radius_km: Equatorial radius of the reference ellipsoid.
 
-    sid_deg = sidtime(tjd_ut) * 15.0
-    lon_out = (math.degrees(math.atan2(gy, gx)) - sid_deg) % 360.0
-    if lon_out > 180.0:
-        lon_out -= 360.0
-    lat_out = math.degrees(lat_sph)
+    Returns:
+        True while the cone reaches the surface somewhere.
+    """
+    reach_km = equatorial_radius_km * cos_half_angle + abs(plane_diameter_km) / 2.0
+    return axis_offset_km <= reach_km
 
-    # Shadow diameters at the ground point, from true-frame distances.
-    g_true = (gx, gy, gz * stretch)
-    s_mg = math.dist(rmt, g_true)
-    dcore0 = (s_mg / dsmt * (2.0 * rsun_au - dmoon_au) - dmoon_au) * cosf1 * _ECL_AU_KM
-    dcore1 = (s_mg / dsmt * (2.0 * rsun_au + dmoon_au) + dmoon_au) * cosf2 * _ECL_AU_KM
-    if not no_eclipse and not (retc & ECL_PARTIAL):
-        retc |= ECL_ANNULAR if dcore0 > 0.0 else ECL_TOTAL
 
-    dcore = (
-        dcore0,
-        dcore1,
-        r0 * _ECL_AU_KM,
-        d0 * _ECL_AU_KM,
-        cap_d0 * _ECL_AU_KM,
-        cosf1,
-        cosf2,
-        0.0,
-        0.0,
-        0.0,
+def _eclipse_where_core(
+    tjd_ut: float, flags: int = FLG_SWIEPH, body: "Union[int, str]" = SUN
+) -> Tuple[int, float, float, ShadowGeometry]:
+    """Where the Moon's shadow of ``body`` falls on the Earth, and what it is.
+
+    The shadow axis is the straight line from the centre of the eclipsed body
+    through the centre of the Moon and beyond. This resolves, at one instant,
+    where that axis meets the Earth, how wide the two shadow cones are there
+    and on the fundamental plane through the geocentre, and which class of
+    event that makes: the classical Besselian construction of the Explanatory
+    Supplement to the Astronomical Almanac (3rd ed., ch. 11), of Chauvenet
+    (vol. I, the chapter on eclipses) and of Meeus (ch. 54), carried out on
+    the oblate Earth and in kilometres.
+
+    Three public answers are built on it: ``sol_eclipse_where`` publishes the
+    ground point and this return flag verbatim, ``sol_eclipse_how`` takes from
+    it the observer-independent central/non-central character and the core
+    width at the global centre point, and ``lun_occult_where`` does the same
+    with an occulted body in the Sun's place. The fundamental-plane quantities
+    of the record are in turn the raw material of every global contact time.
+
+    The class of the event follows three physical conditions and one sign,
+    and from nothing else -- in particular not from the magnitude another
+    unit computes at the reported point:
+
+    * the axis meets the ellipsoid: the event is ``ECL_CENTRAL``;
+    * it misses, but the core cone still touches the ellipsoid: the event is
+      ``ECL_NONCENTRAL``;
+    * neither, but the penumbral cone touches: the event is a penumbra-only
+      ``ECL_PARTIAL | ECL_NONCENTRAL``;
+    * none of the three: the flag is ``0``, which is a normal answer meaning
+      that no shadow of this body reaches the Earth at this instant. The
+      point and the record are still filled in, and describe the closest
+      approach.
+
+    Whenever the core shadow does reach the surface -- under the first two
+    conditions and never under the others -- one further bit comes from the
+    sign of the core diameter at the ground point: ``ECL_TOTAL`` while the
+    ground lies short of the cone's apex, ``ECL_ANNULAR`` beyond it. The
+    hybrid class is not a property of one instant and is never returned here;
+    a caller assembles it from a change of that sign along the shadow's track.
+
+    A point-like source (a fixed star, and equally an integer id the radius
+    table does not know) is a real configuration and not an edge case: the
+    two cones then open by the same angle, the two tangency conditions
+    coincide so that no penumbra-only class can arise, and the core cone
+    diverges, so its section never changes sign and the occultation is total
+    or nothing.
+
+    Args:
+        tjd_ut: The instant, Julian Day in UT.
+        flags: The request word of the public API. Only its ephemeris
+            selection bits are read: a ground point is a ground point and
+            there is nothing to project.
+        body: The eclipsed or occulted body, an integer id or a fixed-star
+            name. Defaults to the Sun.
+
+    Returns:
+        ``(retflag, longitude_deg, latitude_deg, geometry)``: the class of the
+        event as a bit set of ``ECL_CENTRAL``, ``ECL_NONCENTRAL``,
+        ``ECL_PARTIAL``, ``ECL_TOTAL`` and ``ECL_ANNULAR``; the ground point,
+        east-positive longitude in (-180, +180] and geodetic latitude; and the
+        :class:`~libephemeris.shadow_geometry.ShadowGeometry` record, whose
+        lengths are all in kilometres.
+
+    Raises:
+        EphemerisRangeError: Propagated from the layer that supplies the body
+            states, when one of them falls outside the active coverage. The
+            Moon is needed at the instant itself and the eclipsed body at the
+            light-time-retarded one, so both ends of a coverage interval
+            refuse, the boundary instants included.
+        IllegalBodyError: Propagated for an integer id the body machinery
+            rejects outright.
+        StarNotFoundError: Propagated for a star name the catalogue does not
+            resolve.
+    """
+    from .constants import FLG_XYZ
+
+    state_flags = _ecl_eph_flags(flags) | FLG_EQUATORIAL | FLG_XYZ
+    moon_state, _ = calc_ut(tjd_ut, MOON, state_flags)
+    body_state = _occ_body_geo_xyz(tjd_ut, body, state_flags)
+
+    moon_km = (
+        float(moon_state[0]) * _ECL_AU_KM,
+        float(moon_state[1]) * _ECL_AU_KM,
+        float(moon_state[2]) * _ECL_AU_KM,
     )
-    return retc, lon_out, lat_out, dcore
+    body_km = (
+        body_state[0] * _ECL_AU_KM,
+        body_state[1] * _ECL_AU_KM,
+        body_state[2] * _ECL_AU_KM,
+    )
+    moon_radius_km = _ECL_RMOON_AU * _ECL_AU_KM
+    body_radius_km = _occ_body_radius_au(body) * _ECL_AU_KM
+    earth_radius_km = _ECL_REARTH_AU * _ECL_AU_KM
+    flattening = _ECL_EARTH_FLATTENING
+
+    # The axis runs from the eclipsed body through the Moon and onward, which
+    # is the way the shadow travels.
+    span = (
+        moon_km[0] - body_km[0],
+        moon_km[1] - body_km[1],
+        moon_km[2] - body_km[2],
+    )
+    separation_km = math.sqrt(span[0] ** 2 + span[1] ** 2 + span[2] ** 2)
+    axis_unit = (
+        span[0] / separation_km,
+        span[1] / separation_km,
+        span[2] / separation_km,
+    )
+    sin_core, cos_core, sin_penumbral, cos_penumbral = _shadow_cone_half_angles(
+        body_radius_km, moon_radius_km, separation_km
+    )
+
+    # The fundamental plane passes through the geocentre perpendicular to the
+    # axis. Both axial distances below are distances, taken along the axis
+    # from the Moon's centre: while a shadow exists the Moon stands before
+    # both the plane and the ground point, and where it does not -- the Moon
+    # away from the syzygy, the line of centres pointing clear of the Earth --
+    # the cone sections describe no real shadow anyway, and the magnitude is
+    # what keeps the penumbral section a width.
+    moon_along_axis_km = (
+        moon_km[0] * axis_unit[0]
+        + moon_km[1] * axis_unit[1]
+        + moon_km[2] * axis_unit[2]
+    )
+    plane_axial_km = abs(moon_along_axis_km)
+    axis_offset_km = _axis_offset_reduced_km(moon_km, axis_unit, flattening)
+
+    surface_km, axis_meets_earth = _axis_ellipsoid_point_km(
+        moon_km, axis_unit, earth_radius_km, flattening
+    )
+    surface_axial_km = abs(
+        (surface_km[0] - moon_km[0]) * axis_unit[0]
+        + (surface_km[1] - moon_km[1]) * axis_unit[1]
+        + (surface_km[2] - moon_km[2]) * axis_unit[2]
+    )
+    longitude, latitude = _surface_point_lonlat_deg(surface_km, tjd_ut, flattening)
+
+    umbral_plane_km = _core_section_diameter_km(
+        plane_axial_km, sin_core, cos_core, moon_radius_km
+    )
+    penumbral_plane_km = _penumbral_section_diameter_km(
+        plane_axial_km, sin_penumbral, cos_penumbral, moon_radius_km
+    )
+    umbral_surface_km = _core_section_diameter_km(
+        surface_axial_km, sin_core, cos_core, moon_radius_km
+    )
+    penumbral_surface_km = _penumbral_section_diameter_km(
+        surface_axial_km, sin_penumbral, cos_penumbral, moon_radius_km
+    )
+
+    if axis_meets_earth:
+        retflag = ECL_CENTRAL
+    elif _cone_touches_ellipsoid(
+        axis_offset_km, umbral_plane_km, cos_core, earth_radius_km
+    ):
+        retflag = ECL_NONCENTRAL
+    elif _cone_touches_ellipsoid(
+        axis_offset_km, penumbral_plane_km, cos_penumbral, earth_radius_km
+    ):
+        retflag = ECL_PARTIAL | ECL_NONCENTRAL
+    else:
+        retflag = 0
+    if retflag and not (retflag & ECL_PARTIAL):
+        retflag |= ECL_TOTAL if umbral_surface_km < 0.0 else ECL_ANNULAR
+
+    geometry = ShadowGeometry(
+        axis_offset_km,
+        umbral_plane_diameter_km=umbral_plane_km,
+        penumbral_plane_diameter_km=penumbral_plane_km,
+        cos_umbral_half_angle=cos_core,
+        cos_penumbral_half_angle=cos_penumbral,
+        shadowed_radius_km=earth_radius_km,
+        shadow_misses_body=retflag == 0,
+        umbral_surface_diameter_km=umbral_surface_km,
+        penumbral_surface_diameter_km=penumbral_surface_km,
+    )
+    return retflag, longitude, latitude, geometry
+
+
+def _ground_core_diameter_km(geometry: ShadowGeometry) -> float:
+    """Core-shadow diameter at the ground point of a where-core record.
+
+    :func:`_eclipse_where_core` always resolves a point on the Earth's
+    surface, so the surface pair of the record it hands back is always set.
+    The field's own type admits ``None`` for a producer that resolves no such
+    point; this states the narrower contract once, instead of at each of the
+    five call sites that publish the number.
+
+    Args:
+        geometry: A record built by :func:`_eclipse_where_core`.
+
+    Returns:
+        The signed diameter in kilometres, negative for an umbra and positive
+        for an antumbra.
+    """
+    return cast(float, geometry.umbral_surface_diameter_km)
 
 
 def _sol_how_core(
@@ -2265,16 +2603,18 @@ def _besselian_contact_residuals(
     classification, so the contact times stay consistent with
     ``sol_eclipse_where`` at every instant.
     """
-    _rc, _lon, _lat, dc = _eclipse_where_core(jd, flags)
-    r0_km = dc[2]
-    core_diam_fp_km = dc[3]
-    pen_diam_fp_km = dc[4]
-    cos_f_core = dc[5]
-    cos_f_pen = dc[6]
-    re_km = _ECL_REARTH_AU * _ECL_AU_KM
-    pen = r0_km - (re_km * cos_f_pen + pen_diam_fp_km / 2.0)
-    umb = r0_km - (re_km * cos_f_core + abs(core_diam_fp_km) / 2.0)
-    cen = r0_km - re_km * cos_f_core
+    _rc, _lon, _lat, geometry = _eclipse_where_core(jd, flags)
+    axis_offset_km = geometry.axis_offset_km
+    re_km = geometry.shadowed_radius_km
+    pen = axis_offset_km - (
+        re_km * geometry.cos_penumbral_half_angle
+        + geometry.penumbral_plane_diameter_km / 2.0
+    )
+    umb = axis_offset_km - (
+        re_km * geometry.cos_umbral_half_angle
+        + abs(geometry.umbral_plane_diameter_km) / 2.0
+    )
+    cen = axis_offset_km - re_km * geometry.cos_umbral_half_angle
     return pen, umb, cen
 
 
@@ -2545,11 +2885,11 @@ def _is_hybrid_solar_eclipse(jd_max: float, l2: float) -> bool:
     widths = []
     for t in sample_times:
         try:
-            _rc, _lon, _lat, dcore = _eclipse_where_core(t)
+            _rc, _lon, _lat, geometry = _eclipse_where_core(t)
         except (KeyError, ValueError, ArithmeticError) as _exc:
             _reraise_if_leb_range_error(_exc)
             continue
-        widths.append(dcore[0])
+        widths.append(_ground_core_diameter_km(geometry))
     return bool(widths) and min(widths) < 0.0 < max(widths)
 
 
@@ -2566,7 +2906,7 @@ def _where_eclipse_magnitude(jd: float, flags: int = FLG_SWIEPH) -> float:
     """
 
     def _impl(*, reader):
-        _rc, wlon, wlat, _dcore = _eclipse_where_core(jd, flags)
+        _rc, wlon, wlat, _geometry = _eclipse_where_core(jd, flags)
         _rc_how, attr = _sol_how_core(jd, (wlon, wlat, 0.0), flags, reader)
         return attr[0]
 
@@ -4341,9 +4681,9 @@ def _sol_eclipse_when_loc_impl(
         # Global character at the reported maximum: the noncentral bit
         # and the core-shadow width come from the shadow-axis geometry,
         # independent of the observer.
-        rc_where, _wlon, _wlat, dcore = _eclipse_where_core(jd_local_max, flags)
+        rc_where, _wlon, _wlat, geometry = _eclipse_where_core(jd_local_max, flags)
         ecl_type |= rc_where & ECL_NONCENTRAL
-        attr_list[3] = dcore[0]
+        attr_list[3] = _ground_core_diameter_km(geometry)
 
         tret = (
             jd_local_max,  # [0] maximum eclipse (or horizon crossing)
@@ -4558,8 +4898,8 @@ def _sol_eclipse_where_impl(
         - Reference API: sol_eclipse_where()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    retflag, center_lon, center_lat, dcore = _eclipse_where_core(tjdut, flags)
-    core_shadow_km = dcore[0]
+    retflag, center_lon, center_lat, geometry = _eclipse_where_core(tjdut, flags)
+    core_shadow_km = _ground_core_diameter_km(geometry)
     _local_flag, how_attr = _sol_how_core(
         tjdut, (center_lon, center_lat, 0.0), flags, reader
     )
@@ -4684,8 +5024,10 @@ def _sol_eclipse_how_impl(
     geopos3 = (float(geopos[0]), float(geopos[1]), float(geopos[2]))
 
     local_flag, how_attr = _sol_how_core(tjdut, geopos3, flags, reader)
-    global_flag, _center_lon, _center_lat, dcore = _eclipse_where_core(tjdut, flags)
-    circumstances = _LocalCircumstances.from_how_core(how_attr, core_shadow_km=dcore[0])
+    global_flag, _center_lon, _center_lat, geometry = _eclipse_where_core(tjdut, flags)
+    circumstances = _LocalCircumstances.from_how_core(
+        how_attr, core_shadow_km=_ground_core_diameter_km(geometry)
+    )
 
     # A local phase carries the centrality of the eclipse as a whole; below
     # the apparent horizon nothing of the eclipse is observable.
@@ -6821,7 +7163,7 @@ def lun_occult_when_glob(
         # Time of maximum: deepest limb overlap (geocentric).
         tjd = _golden_min(_sep_minus_radii, tjd - 1.0, tjd + 1.0)
 
-        rc_where, _wlon, _wlat, dcore = _eclipse_where_core(tjd, flags, body)
+        rc_where, _wlon, _wlat, _geometry = _eclipse_where_core(tjd, flags, body)
         if rc_where == 0:
             if one_try:
                 tret[0] = tjd
@@ -6859,16 +7201,24 @@ def lun_occult_when_glob(
         # Phase times from the shadow geometry: occultation begin/end,
         # totality begin/end, center-line begin/end.
         def _f_outer(jd: float) -> float:
-            _rc, _lo, _la, dc = _eclipse_where_core(jd, flags, body)
-            return dc[4] / 2.0 + de_km / dc[5] - dc[2]
+            _rc, _lo, _la, geo = _eclipse_where_core(jd, flags, body)
+            return (
+                geo.penumbral_plane_diameter_km / 2.0
+                + de_km / geo.cos_umbral_half_angle
+                - geo.axis_offset_km
+            )
 
         def _f_total(jd: float) -> float:
-            _rc, _lo, _la, dc = _eclipse_where_core(jd, flags, body)
-            return abs(dc[3]) / 2.0 + de_km / dc[6] - dc[2]
+            _rc, _lo, _la, geo = _eclipse_where_core(jd, flags, body)
+            return (
+                abs(geo.umbral_plane_diameter_km) / 2.0
+                + de_km / geo.cos_penumbral_half_angle
+                - geo.axis_offset_km
+            )
 
         def _f_central(jd: float) -> float:
-            _rc, _lo, _la, dc = _eclipse_where_core(jd, flags, body)
-            return de_km / dc[6] - dc[2]
+            _rc, _lo, _la, geo = _eclipse_where_core(jd, flags, body)
+            return de_km / geo.cos_penumbral_half_angle - geo.axis_offset_km
 
         win = 2.0 / 24.0
         wide = 5.0 / 24.0
@@ -6896,13 +7246,13 @@ def lun_occult_when_glob(
         # A total occultation that loses its core shadow at begin or end
         # of totality is annular-total (only possible for the Sun).
         if retflag & ECL_TOTAL:
-            d_max = _eclipse_where_core(tret[0], flags, body)[3][0]
-            d_beg = (
-                _eclipse_where_core(tret[4], flags, body)[3][0] if tret[4] else d_max
-            )
-            d_end = (
-                _eclipse_where_core(tret[5], flags, body)[3][0] if tret[5] else d_max
-            )
+
+            def _ground_core(jd: float) -> float:
+                return _ground_core_diameter_km(_eclipse_where_core(jd, flags, body)[3])
+
+            d_max = _ground_core(tret[0])
+            d_beg = _ground_core(tret[4]) if tret[4] else d_max
+            d_end = _ground_core(tret[5]) if tret[5] else d_max
             if d_max * d_beg < 0.0 or d_max * d_end < 0.0:
                 retflag = (retflag & ~ECL_TOTAL) | ECL_ANNULAR_TOTAL
 
@@ -7173,9 +7523,9 @@ def _lun_occult_when_loc_pythonic(
         # Local circumstances at maximum; global character and core
         # width from the shadow geometry.
         _rc_how, attr_list = _sol_how_core(jd_max, geopos3, flags, reader, body)
-        rc_where, _wlon, _wlat, dcore = _eclipse_where_core(jd_max, flags, body)
+        rc_where, _wlon, _wlat, geometry = _eclipse_where_core(jd_max, flags, body)
         retflag |= rc_where & ECL_NONCENTRAL
-        attr_list[3] = dcore[0]
+        attr_list[3] = _ground_core_diameter_km(geometry)
         # The compatibility attr layout defines occultation diameter fraction
         # and obscuration as fractions, hence both are capped at unity.
         attr_list[0] = min(attr_list[0], 1.0)
@@ -7319,8 +7669,8 @@ def _lun_occult_where_pythonic(
     References:
         - Reference API: lun_occult_where()
     """
-    retflag, center_lon, center_lat, dcore = _eclipse_where_core(tjdut, flags, body)
-    core_shadow_km = dcore[0]
+    retflag, center_lon, center_lat, geometry = _eclipse_where_core(tjdut, flags, body)
+    core_shadow_km = _ground_core_diameter_km(geometry)
     _local_flag, how_attr = _sol_how_core(
         tjdut,
         (center_lon, center_lat, 0.0),

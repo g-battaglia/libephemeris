@@ -397,6 +397,16 @@ documentation = ["docs/reference/precision.md"]
 docstring = "detailed"
 
 [[component]]
+id = "shadow-geometry-record"
+category = "scientific-model"
+paths = ["libephemeris/shadow_geometry.py"]
+scientific_content = true
+origin = "Project-authored typed carrier for the classical two-cone shadow geometry of Chauvenet and of the Explanatory Supplement (ch. 11): the axis offset, the cone sections on the fundamental plane and at the shadowed body's surface, the two half-angle cosines with their sines derived, and the radius of the shadowed body, each named for its physical quantity and its unit. The module reads no ephemeris, holds no fitted number and computes no geometry of its own; the sign convention of the inner cone is the classical Besselian sign of l2 and the values are produced by libephemeris/eclipse.py from JPL-backed states."
+sources = ["ECLIPSE_GEOMETRY", "JPL_DE"]
+documentation = ["docs/reference/precision.md", "docs/comparison/known-differences.md"]
+docstring = "detailed"
+
+[[component]]
 id = "eclipse-geometry"
 category = "scientific-model"
 paths = ["libephemeris/eclipse.py"]

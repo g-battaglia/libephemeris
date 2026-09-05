@@ -34,6 +34,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enough to sample those few minutes can report a different optimum, or a
   window a few minutes wide that a coarser search passes over. See
   `docs/comparison/known-differences.md#heliacal-window`.
+- The shadow-axis ground geometry behind `sol_eclipse_where`, `sol_eclipse_how`
+  and `lun_occult_where` now reports the **exact intersection of the shadow
+  axis with the reference ellipsoid** as a geodetic point, by the
+  auxiliary-frame reduction of Chauvenet and of the *Explanatory Supplement to
+  the Astronomical Almanac*, 3rd ed., ch. 11, and hands its callers a named
+  `ShadowGeometry` record (the axis offset, the two cone sections on the
+  fundamental plane and at the ground, the two cone half-angle cosines and the
+  Earth's equatorial radius, each with its unit in its name) instead of a
+  positional tuple. The reported point moves by a median of 1.3 km and up to
+  104 km at high latitude, and it lands closer to the greatest-eclipse
+  coordinates of NASA's *Five Millennium Canon of Solar Eclipses* at every
+  eclipse checked (2015: 6.7 km → 0.42 km; 2021: 3.5 → 0.47; 2017: 2.4 → 0.04;
+  2019: 3.7 → 3.49). `attr[3]`, the core-shadow diameter at that point, follows
+  it by up to 1.0 km on a 190–240 km shadow. Because the same axis distance
+  feeds the tangency of the cones with the ellipsoid, the global contact times
+  of `sol_eclipse_when_glob`, the four `calc_eclipse_*_contact_*` accessors,
+  `calc_solar_eclipse_duration` and `lun_occult_when_glob` move by a median of
+  5.4 s and up to 160 s at grazing eclipses, always towards the tangency; no
+  contact is gained or lost. A few occultations that graze the limb change
+  class — the clearest is Mercury on 2012 Oct 17, now total rather than
+  partial, which agrees with its own magnitude at the reported point. The
+  adopted figure of the Earth is unchanged. See
+  `docs/comparison/known-differences.md#shadow-ground-point`.
 - `refraction.calc_dip` derives the dip of the sea horizon entirely from
   published quantities: the exact tangent geometry `arccos(a_E/(a_E+h))` on the
   IERS Conventions (2010) equatorial radius, scaled by `sqrt(1-k)` with the

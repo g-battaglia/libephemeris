@@ -453,6 +453,88 @@ No contact-time offset, magnitude scale, geographic correction, or event table
 is fitted from compatibility output. Differences that cannot be resolved from
 independent astronomical sources remain documented rather than calibrated away.
 
+#### Shadow ground point {#shadow-ground-point}
+
+The point `sol_eclipse_where` and `lun_occult_where` report — where the shadow
+axis, the line from the centre of the eclipsed body through the centre of the
+Moon, meets the Earth — is the **exact intersection of that axis with the
+reference ellipsoid**, reported as a geodetic latitude. The route is the
+auxiliary-frame reduction of Chauvenet (*A Manual of Spherical and Practical
+Astronomy*, vol. I, the chapter on eclipses) and of the *Explanatory Supplement
+to the Astronomical Almanac*, 3rd ed., ch. 11: in the frame whose polar
+coordinate is stretched by `1/(1-f)` the ellipsoid is a sphere of the
+equatorial radius, the intersection is the elementary line-sphere problem, and
+the parametric latitude that comes out of it is converted to the geodetic one
+by `tan φ = tan φ₁ / (1 - f)`. When the axis misses the Earth the reported
+point is the surface point nearest the axis, where the eclipsed body stands on
+the horizon. The same reduction carries the distance of the axis from the
+geocentre that the contact conditions compare against the equatorial radius.
+
+LibEphemeris 3.2 and earlier reported a point displaced from that
+intersection. Measured over the whole recorded set of `sol_eclipse_where`
+results, the displacement on the ground is
+
+| `\|latitude\|` | median | maximum |
+| --- | --- | --- |
+| 0°–15° | 0.13 km | 0.54 km |
+| 15°–30° | 0.81 km | 2.9 km |
+| 30°–45° | 2.5 km | 6.9 km |
+| 45°–60° | 3.9 km | 30.6 km |
+| 60°–75° | 7.0 km | 103.8 km |
+| 75°–90° | 2.9 km | 6.8 km |
+
+— a median of 1.3 km, with extremes of 1846″ in latitude and 6566″ in
+longitude; for `lun_occult_where`, whose grazing events cluster at high
+latitude, up to 67 km. The core-shadow diameter reported in `attr[3]` follows
+the point and moves by up to 1.0 km on a shadow 190–240 km wide (up to 4.8 km
+for an occultation, where the section is the Moon's own 3476 km silhouette).
+
+The exact intersection is the closer of the two. Against the greatest-eclipse
+coordinates of NASA's *Five Millennium Canon of Solar Eclipses*
+(NASA/TP-2006-214141), evaluated at the canon's own instants converted to UT
+with the library's Delta T:
+
+| Eclipse | 3.2 and earlier | exact intersection |
+| --- | --- | --- |
+| 2015 Mar 20, total (64.4° N) | 6.7 km | 0.42 km |
+| 2021 Jun 10, annular (80.8° N) | 3.5 km | 0.47 km |
+| 2017 Aug 21, total (37.0° N) | 2.4 km | 0.04 km |
+| 2019 Jul 2, total (17.4° S) | 3.7 km | 3.49 km |
+
+Because the same axis distance feeds the tangency conditions of the shadow
+cones with the ellipsoid, the global contact times move with it: `P1`/`P4`,
+`U1`/`U4` and the centre-line instants of `sol_eclipse_when_glob`, the four
+`calc_eclipse_*_contact_*` accessors, `calc_solar_eclipse_duration` and the
+phase times of `lun_occult_when_glob` shift by a median of 5.4 s, 12.7 s at
+the ninth decile and up to 160 s at the grazing eclipses whose contact is
+nearly tangent. The movement is towards the tangency: at the contact instants
+of 3.2 the cone still overlaps the ellipsoid by a few kilometres, so the new
+first contact is the earlier and truer one. No eclipse gains or loses a
+contact.
+
+A few grazing occultations change class, because the same axis distance decides
+whether the axis pierces the ellipsoid and whether each cone touches it. The
+clearest one is 2012 Oct 17, 02:08 UT, when the Moon's shadow of Mercury passes
+8113.1 km from the geocentre while the core cone reaches 8114.8 km: on the exact
+reduction the core shadow does touch the Earth, so `lun_occult_where` answers
+`ECL_NONCENTRAL | ECL_TOTAL` where 3.2 answered `ECL_NONCENTRAL | ECL_PARTIAL`,
+and `lun_occult_when_glob` gains the totality instants of that event. An
+independent numerical minimisation of the cone-to-ellipsoid distance puts the
+core shadow 6.7 km inside the ellipsoid there, and 3.2 itself reports a
+magnitude of 1.69 at its own reported point — a fully covered disc — so the new
+class is the consistent one. Across the recorded set the class moves in one of
+the 7316 `lun_occult_where`/`sol_eclipse_where` results, in 13 of the 14 906
+`lun_occult_when_glob` results and in 1 of the 1342 `lun_occult_when_loc`
+results, always between `ECL_PARTIAL`, `ECL_TOTAL` and the central/non-central
+pair at an event that grazes the limb; and the traced central line of two
+eclipses gains one sampled point at its ends. Every other recorded eclipse and
+occultation keeps its class.
+
+The figure of the Earth is unchanged: the IAU (1976) equatorial radius
+6378.140 km with the IERS Conventions (2010) flattening 1/298.25642, the
+values the module has always used. No reduction, scale or offset is fitted to
+any external output.
+
 ### `nod_aps*`
 
 Osculating planetary nodes and apsides come from JPL state vectors and standard
