@@ -80,7 +80,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, List, Optional, Tuple, Union, overload
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Tuple, Union, overload
 from .constants import *
 from .constants import (
     FLG_RADIANS,
@@ -93,6 +93,10 @@ from .constants import (
     FLG_TOPOCTR,
     SIDBIT_ECL_T0,
     SIDBIT_SSY_PLANE,
+    BIT_DISC_CENTER,
+    BIT_NO_REFRACTION,
+    CALC_RISE,
+    CALC_SET,
 )
 from .compat_names import HOUSE_SYSTEM_NAMES
 from .planets import calc_ut
@@ -114,6 +118,9 @@ from .house_constructions import (
 from .utils import cotrans, degnorm, difdeg2n
 from . import sidereal_longterm as _sidlt
 from .time_utils import deltat as _deltat
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 # Systems whose cusps are pinned to exact 30-degree sign boundaries, so the
@@ -1499,6 +1506,115 @@ def houses_armc_ex2(
     )
 
 
+def _houses_on_reference_plane(
+    tjdut: float,
+    lat: float,
+    hsys_char: str,
+    trop_ascmc: tuple,
+    flags: int,
+    plane_to_equator: Callable[[np.ndarray], np.ndarray],
+    zero_point: float,
+    node_reflection_epoch: float | None = None,
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Build the houses on a reference plane other than the ecliptic of date.
+
+    The fixed-epoch sidereal modes and the ``SIDBIT_ECL_T0`` /
+    ``SIDBIT_SSY_PLANE`` projections measure the zodiac on another plane
+    (the mean ecliptic of an epoch, or the invariable plane). The house
+    construction is then carried out on that plane instead of the ecliptic
+    of date, with the plane's node and inclination taking the place of the
+    equinox and the obliquity:
+
+    1. the inclination between the plane and the true equator of date is the
+       construction obliquity ``eps_p``;
+    2. the ascending node of the plane on the equator of date is the origin
+       the ARMC is re-based to (``armc_p``), so :func:`houses_armc` returns
+       cusp arcs measured from that node along the plane;
+    3. adding the node's longitude on the plane and subtracting the zero
+       point turns every arc into a sidereal longitude.
+
+    The reported ARMC slot carries the node-rebased ``armc_p`` the
+    construction runs on. Aries (``N``) cusps stay anchored at zero degrees
+    of the zodiac in use, like the general sidereal path. Both callers keep
+    ``i`` as the distinct Makransky construction: the collapse of ``i`` onto
+    ``I`` belongs to the plain ayanamsha path of :func:`houses_ex` only.
+
+    Args:
+        tjdut: Julian Day in UT1.
+        lat: Geographic latitude in degrees.
+        hsys_char: Canonical house-system character.
+        trop_ascmc: The tropical ASCMC tuple; only ``trop_ascmc[2]`` (the
+            plain apparent ARMC) is consumed, the cusps are rebuilt on the
+            plane.
+        flags: Calculation flags (ephemeris bits forwarded to the Sunshine
+            Sun fetch; FLG_RADIANS is applied by the caller).
+        plane_to_equator: Maps the precession-nutation matrix (true equator
+            of date <- ICRS) to the rotation taking plane coordinates onto
+            the true equator of date.
+        zero_point: Longitude on the plane, from the plane's own origin, of
+            the sidereal zero point.
+        node_reflection_epoch: When given (the fixed-epoch modes), the node
+            longitude is folded to (-180, 180] and its sign is taken from
+            ``t - epoch`` rather than from the geometry: inside the interval
+            where nutation puts the node on the other side of the plane's
+            origin, the anchor reflects while the ARMC does not. ``None``
+            keeps the geometric node.
+
+    Returns:
+        (cusps, ascmc) in degrees; the caller applies degnorm / FLG_RADIANS.
+    """
+    import numpy as np
+
+    from .precession_vondrak import vondrak_pn_matrix
+
+    # True equator of date <- ICRS, using the SAME Vondrak precession + IAU
+    # nutation chain as the tropical house frame (_house_armc_obliquity), so
+    # the rebased ARMC stays consistent with trop_ascmc[2].
+    jd_tt = tjdut + _deltat(tjdut)
+    dpsi, deps = get_cached_nutation(jd_tt)
+    pn_tuples, _eps_true = vondrak_pn_matrix(jd_tt, dpsi, deps)
+    m = plane_to_equator(np.array(pn_tuples))
+
+    # Inclination between the plane and the equator of date (the construction
+    # obliquity), and the ascending node of the equator of date on the plane:
+    # its longitude on the plane (lon_node) and its right ascension (ang_n).
+    z = m.T @ np.array([0.0, 0.0, 1.0])
+    eps_p = math.degrees(math.acos(max(-1.0, min(1.0, float(z[2])))))
+    n_p = np.cross(z, [0.0, 0.0, 1.0])
+    n_p /= np.linalg.norm(n_p)
+    lon_node = math.degrees(math.atan2(float(n_p[1]), float(n_p[0]))) % 360.0
+    n_eq = m @ n_p
+    ang_n = math.degrees(math.atan2(float(n_eq[1]), float(n_eq[0]))) % 360.0
+    armc_p = (trop_ascmc[2] - ang_n) % 360.0
+    if node_reflection_epoch is not None:
+        d_node = lon_node if lon_node <= 180.0 else lon_node - 360.0
+        lon_node = -abs(d_node) if jd_tt >= node_reflection_epoch else abs(d_node)
+
+    sun_dec = 0.0
+    if hsys_char in ("I", "i"):
+        sun_dec = _sunshine_sun_declination(tjdut, flags)
+
+    eng_cusps, eng_ascmc = houses_armc(
+        armc_p, lat, eps_p, ord(hsys_char), ascmc9=sun_dec
+    )
+
+    # Cusp arcs (measured from the node by houses_armc) -> plane longitude
+    # (add the node's plane longitude) -> sidereal longitude (subtract the
+    # zero point). Aries ('N') stays anchored at 0 deg of the sidereal zodiac.
+    off = lon_node - zero_point
+    if hsys_char == "N":
+        cusps = tuple(float(i * 30) for i in range(12))
+    else:
+        cusps = tuple((off + c) % 360.0 for c in eng_cusps)
+
+    ascmc_list = list(trop_ascmc)
+    for i in (0, 1, 3, 4, 5, 6, 7):
+        ascmc_list[i] = (off + eng_ascmc[i]) % 360.0
+    # ascmc[2] (ARMC) reports the node-rebased armc_p the construction runs on.
+    ascmc_list[2] = armc_p
+    return cusps, tuple(ascmc_list)
+
+
 def _houses_fixed_epoch_sidereal(
     tjdut: float,
     lat: float,
@@ -1511,88 +1627,40 @@ def _houses_fixed_epoch_sidereal(
     """Sidereal houses for the fixed-epoch modes (J2000/J1900/B1950).
 
     These modes are evaluated on the mean ecliptic of their epoch ``t0``. The
-    independent construction runs against the ascending node of that ecliptic
-    on the true equator of date — the ARMC is re-based to that node and the
-    obliquity becomes the inclination between the two planes — and the
-    resulting cusp arcs are measured from the mean equinox of t0 along the
-    t0 ecliptic.
-
-    The reported ARMC slot carries the node-rebased ``armc_p`` the
-    construction runs on (measured, like the reference, from the ascending
-    node of the t0 ecliptic on the true equator of date). ``N`` (Aries)
-    cusps stay anchored at zero degrees Aries, like the general sidereal path.
+    reference plane handed to :func:`_houses_on_reference_plane` is that
+    ecliptic, reached from the true equator of date through the transposed
+    Vondrák precession matrix of ``t0`` and the mean obliquity of ``t0``;
+    the cusp arcs are measured from the mean equinox of ``t0`` along it.
+    Modes like ``SIDM_GALALIGN_MARDYKS`` carry a constant longitude offset of
+    the ``t0`` frame (their defining ayanamsha at ``t0``): that offset is the
+    zero point. The node anchor is reflected about ``t0``; the ARMC is not.
     """
     import numpy as np
 
-    from .precession_vondrak import vondrak_pn_matrix, vondrak_precession_matrix
-    from .sidereal_epoch import FIXED_EPOCH_LON_OFFSET, FIXED_EPOCH_T0
-
     import erfa
 
-    def _rx(a: float) -> "np.ndarray":
-        c, s = math.cos(a), math.sin(a)
-        return np.array([[1.0, 0.0, 0.0], [0.0, c, s], [0.0, -s, c]])
+    from .precession_vondrak import vondrak_precession_matrix
+    from .sidereal_epoch import FIXED_EPOCH_LON_OFFSET, FIXED_EPOCH_T0, _rot_x
 
     t0 = FIXED_EPOCH_T0[sid_mode]
-    # Modes like SIDM_GALALIGN_MARDYKS carry a constant ecliptic-longitude
-    # offset of the t0 frame (their defining ayanamsha at t0): cusp arcs are
-    # measured from the offset zero point along the t0 ecliptic.
-    lon_offset = FIXED_EPOCH_LON_OFFSET.get(sid_mode, 0.0)
-    jd_tt = tjdut + _deltat(tjdut)
-    dpsi, deps = get_cached_nutation(jd_tt)
-    pn_tuples, _eps_true = vondrak_pn_matrix(jd_tt, dpsi, deps)
-    pn = np.array(pn_tuples)
     v_t0 = np.array(vondrak_precession_matrix(t0))
     eps_t0 = erfa.obl06(t0, 0.0)
 
-    # M maps mean-ecliptic-of-t0 coordinates onto the true equator of date.
-    m = pn @ v_t0.T @ _rx(-eps_t0)
-    z = m.T @ np.array([0.0, 0.0, 1.0])
-    eps_p = math.degrees(math.acos(max(-1.0, min(1.0, float(z[2])))))
-    n_t0 = np.cross(z, [0.0, 0.0, 1.0])
-    n_t0 /= np.linalg.norm(n_t0)
-    lon_node = math.degrees(math.atan2(float(n_t0[1]), float(n_t0[0]))) % 360.0
-    n_eq = m @ n_t0
-    ang_n = math.degrees(math.atan2(float(n_eq[1]), float(n_eq[0]))) % 360.0
-    armc_p = (trop_ascmc[2] - ang_n) % 360.0
-    # Compatibility contract: the anchor arc is oriented by the sign of
-    # (t - t0), not by its true sign: within the interval where nutation puts
-    # the node on the other side of the t0 equinox, the anchor reflects. The
-    # ARMC above is NOT reflected.
-    d_node = lon_node if lon_node <= 180.0 else lon_node - 360.0
-    lon_node = -abs(d_node) if jd_tt >= t0 else abs(d_node)
+    def mean_ecliptic_of_t0_to_equator(pn: np.ndarray) -> np.ndarray:
+        # mean ecliptic of t0 -> mean equator of t0 (obliquity of t0) -> ICRS
+        # (transposed precession of t0) -> true equator of date (pn).
+        return pn @ v_t0.T @ _rot_x(-eps_t0)
 
-    # Sun declination of date for the Sunshine systems. Unlike the
-    # ayanamsha-based sidereal modes, the fixed-epoch modes keep ``i`` as a
-    # distinct Makransky geometric solution, so no collapse happens here.
-    engine_hsys = hsys_char
-    ascmc9 = 0.0
-    if engine_hsys in ("I", "i"):
-        try:
-            eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
-            sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
-            ascmc9 = sun_pos[1]
-        except EphemerisRangeError:
-            ascmc9 = _sun_declination_analytic(tjdut)
-        except (IndexError, TypeError, ValueError, CalculationError):
-            ascmc9 = 0.0
-
-    eng_cusps, eng_ascmc = houses_armc(
-        armc_p, lat, eps_p, ord(engine_hsys), ascmc9=ascmc9
+    return _houses_on_reference_plane(
+        tjdut,
+        lat,
+        hsys_char,
+        trop_ascmc,
+        flags,
+        mean_ecliptic_of_t0_to_equator,
+        FIXED_EPOCH_LON_OFFSET.get(sid_mode, 0.0),
+        node_reflection_epoch=t0,
     )
-
-    if hsys_char == "N":
-        # Aries houses stay anchored at 0 deg of the zodiac in use.
-        cusps = tuple(float(i * 30) for i in range(12))
-    else:
-        cusps = tuple((lon_node - lon_offset + c) % 360.0 for c in eng_cusps)
-
-    ascmc_list = list(trop_ascmc)
-    for i in (0, 1, 3, 4, 5, 6, 7):
-        ascmc_list[i] = (lon_node - lon_offset + eng_ascmc[i]) % 360.0
-    # ascmc[2] (ARMC) reports the node-rebased armc_p (see docstring).
-    ascmc_list[2] = armc_p
-    return cusps, tuple(ascmc_list)
 
 
 def _houses_sidbit_projection(
@@ -1616,15 +1684,16 @@ def _houses_sidbit_projection(
         Souchay 2012); the zero point is the J2000 ayanamsha direction projected
         onto that plane.
 
-    Compatibility contract: the whole house construction is built ON that
-    plane rather than shifting the ecliptic-of-date cusps by a scalar ayanamsha:
-    the ARMC is re-based to the ascending node of the true equator of date on
-    the plane (so the reported ARMC itself moves -- up to ~3.9 deg for the tilted
-    invariable plane), the obliquity becomes the inclination between the two
-    planes, and the cusp arcs are then measured from the mode's sidereal zero
-    point along the plane. Hypothesis (a), projecting each ecliptic-of-date cusp
-    point-by-point, was tested and rejected -- it leaves the equatorial ARMC
-    unchanged and misplaces the invariable-plane cusps by up to several degrees.
+    The whole house construction is built ON that plane by
+    :func:`_houses_on_reference_plane` rather than shifting the
+    ecliptic-of-date cusps by a scalar ayanamsha: the ARMC is re-based to the
+    ascending node of the true equator of date on the plane (so the reported
+    ARMC itself moves -- up to ~3.9 deg for the tilted invariable plane), the
+    obliquity becomes the inclination between the two planes, and the cusp
+    arcs are measured from the mode's sidereal zero point along the plane.
+    Projecting each ecliptic-of-date cusp point by point is not equivalent:
+    it leaves the equatorial ARMC unchanged and misplaces the
+    invariable-plane cusps by up to several degrees.
 
     The projection-plane definitions and the sidereal zero point are taken from
     the SAME frame model the position path uses
@@ -1675,7 +1744,7 @@ def _houses_sidbit_projection(
 
     import erfa
 
-    from .precession_vondrak import vondrak_pn_matrix, vondrak_precession_matrix
+    from .precession_vondrak import vondrak_precession_matrix
     from .sidereal_epoch import (
         _ecliptic_of_t0_matrix,
         _invariable_plane_matrix,
@@ -1685,14 +1754,6 @@ def _houses_sidbit_projection(
     from .planets import _calc_ayanamsa
 
     _J2000 = 2451545.0
-    jd_tt = tjdut + _deltat(tjdut)
-    dpsi_rad, deps_rad = get_cached_nutation(jd_tt)
-
-    # True equator of date <- ICRS, using the SAME Vondrak precession + IAU
-    # nutation chain as the tropical house frame (_house_armc_obliquity), so the
-    # rebased ARMC stays consistent with trop_ascmc[2].
-    pn_tuples, _eps_true = vondrak_pn_matrix(jd_tt, dpsi_rad, deps_rad)
-    pn = np.array(pn_tuples)
     v_j2k = np.array(vondrak_precession_matrix(_J2000))
     eps_j2000 = erfa.obl06(_J2000, 0.0)
 
@@ -1710,58 +1771,18 @@ def _houses_sidbit_projection(
         base = _invariable_plane_matrix()
         zero_point = ssy_plane_zero_point_deg(_calc_ayanamsa(_J2000, sid_mode))
 
-    # m maps projection-plane coordinates onto the true equator of date.
-    m = pn @ v_j2k.T @ _rot_x(-eps_j2000) @ base.T
+    def plane_to_equator(pn: np.ndarray) -> np.ndarray:
+        # plane -> mean ecliptic J2000 (transposed base) -> mean equator J2000
+        # (obliquity of J2000) -> ICRS (transposed precession of J2000) -> true
+        # equator of date (pn).
+        return pn @ v_j2k.T @ _rot_x(-eps_j2000) @ base.T
 
-    # Inclination between the plane and the equator of date (the construction
-    # obliquity), and the ascending node of the equator of date on the plane.
-    z = m.T @ np.array([0.0, 0.0, 1.0])
-    eps_p = math.degrees(math.acos(max(-1.0, min(1.0, float(z[2])))))
-    n_p = np.cross(z, [0.0, 0.0, 1.0])
-    n_p /= np.linalg.norm(n_p)
-    lon_node = math.degrees(math.atan2(float(n_p[1]), float(n_p[0]))) % 360.0
-    n_eq = m @ n_p
-    ang_n = math.degrees(math.atan2(float(n_eq[1]), float(n_eq[0]))) % 360.0
-    armc_p = (trop_ascmc[2] - ang_n) % 360.0
-
-    # Sunshine ('I'/'i') Sun declination on the equator of date. The plain
-    # ayanamsha zodiac collapses 'i' onto 'I' (see houses_ex), but a SIDBIT
-    # projection does NOT (compatibility contract): 'i' keeps the
-    # Makransky construction here, which differs from 'I' above about 59
-    # degrees of latitude (78.0 deg on cusp 2 at lat 60, 100.7 deg at lat
-    # 65) and is identical below it. This function only runs with a
-    # projection bit active, so the selector passes through unchanged.
-    engine_hsys = hsys_char
-    ascmc9 = 0.0
-    if engine_hsys in ("I", "i"):
-        try:
-            eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
-            sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
-            ascmc9 = sun_pos[1]
-        except EphemerisRangeError:
-            ascmc9 = _sun_declination_analytic(tjdut)
-        except (IndexError, TypeError, ValueError, CalculationError):
-            ascmc9 = 0.0
-
-    eng_cusps, eng_ascmc = houses_armc(
-        armc_p, lat, eps_p, ord(engine_hsys), ascmc9=ascmc9
+    # 'i' keeps the Makransky construction here: it differs from 'I' above
+    # about 59 degrees of latitude (78.0 deg on cusp 2 at lat 60, 100.7 deg
+    # at lat 65) and is identical below it.
+    return _houses_on_reference_plane(
+        tjdut, lat, hsys_char, trop_ascmc, flags, plane_to_equator, zero_point
     )
-
-    # Cusp arcs (measured from the node by houses_armc) -> plane longitude
-    # (add the node's plane longitude) -> sidereal longitude (subtract the zero
-    # point). Aries ('N') stays anchored at 0 deg of the sidereal zodiac.
-    off = lon_node - zero_point
-    if hsys_char == "N":
-        cusps = tuple(float(i * 30) for i in range(12))
-    else:
-        cusps = tuple((off + c) % 360.0 for c in eng_cusps)
-
-    ascmc_list = list(trop_ascmc)
-    for i in (0, 1, 3, 4, 5, 6, 7):
-        ascmc_list[i] = (off + eng_ascmc[i]) % 360.0
-    # ascmc[2] (ARMC) reports the node-rebased armc_p the construction runs on.
-    ascmc_list[2] = armc_p
-    return cusps, tuple(ascmc_list)
 
 
 def houses_ex(
@@ -2522,38 +2543,71 @@ def _houses_koch(
     return cusps
 
 
+#: The equator points of the intermediate house circles, as right-ascension
+#: offsets east of the meridian, keyed by the cusp they define. Cusp 10 is the
+#: meridian itself (offset 0) and cusp 1 the horizon (offset 90); cusps 5, 6,
+#: 8 and 9 are the antipodes of 11, 12, 2 and 3 (:func:`_set_opposite_cusps`).
+_HOUSE_CIRCLE_OFFSETS: tuple[tuple[int, float], ...] = (
+    (11, 30.0),
+    (12, 60.0),
+    (2, 120.0),
+    (3, 150.0),
+)
+
+
+def _house_circle_rising_longitude(
+    armc: float, offset_deg: float, tan_pole: float, cos_eps: float, sin_eps: float
+) -> float:
+    """Ecliptic longitude cut by a house circle of pole height ``P``.
+
+    A great circle that crosses the equator ``offset_deg`` east of the
+    meridian and whose pole stands at height ``P`` (``tan_pole`` = tan P) is
+    the horizon of a fictitious observer: one at latitude ``P`` whose meridian
+    is turned by ``offset_deg - 90`` in right ascension. The longitude the
+    circle cuts on the ecliptic is that observer's Ascendant, the
+    horizon/ecliptic intersection formula evaluated with ``R = ARMC + offset -
+    90`` in place of the ARMC and ``P`` in place of the latitude::
+
+        tan(lambda) = cos(R) / -(sin(R) cos(eps) + tan(P) sin(eps))
+
+    Equivalently, the cusp is the ecliptic point whose oblique ascension under
+    the pole ``P`` equals ``ARMC + offset``, which is how Holden ("The
+    Elements of House Division", 1977) and Munkasey ("An Astrological House
+    Formulary") state the Regiomontanus and Topocentric cusps; for
+    ``offset_deg = 90`` and ``P = lat`` it is the Ascendant itself. The two
+    systems differ only in how they choose ``P``.
+    """
+    r_rad = math.radians((armc + offset_deg - 90.0) % 360.0)
+    num = math.cos(r_rad)
+    den = -(math.sin(r_rad) * cos_eps + tan_pole * sin_eps)
+    return math.degrees(math.atan2(num, den)) % 360.0
+
+
 def _houses_regiomontanus(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
     """
     Regiomontanus (Medieval rational) house system.
 
-    Divides the celestial equator into 12 equal 30° arcs, then projects these
-    divisions onto the ecliptic using great circles through the celestial poles.
+    Divides the celestial equator into 12 equal 30° arcs from the meridian and
+    projects the divisions onto the ecliptic along the great circles through
+    the north and south points of the horizon.
 
     Historical basis: Regiomontanus (Johannes Müller von Königsberg), "Tabulae
     directionum profectionumque" (compiled 1467; printed 1490); modern
-    description in Holden, "The Elements of House Division" (1977).
+    descriptions in Holden, "The Elements of House Division" (1977) and
+    Munkasey, "An Astrological House Formulary".
 
-    Algorithm:
-        1. Divide equator into 30° segments from MC
-        2. For each segment, calculate pole: tan(Pole) = tan(lat) * sin(H)
-        3. Project to ecliptic using spherical trigonometry
-        4. Calculate cusp longitude from pole and RAMC offset
-
-    Mathematical Formulas:
-        Hour angle offset: H = 30°, 60°, 120°, 150° for houses 11, 12, 2, 3
-
-        Pole of projection:
-            tan(P) = tan(φ) · sin(H)
-
-        Right Ascension offset:
-            R = ARMC + H - 90°
-
-        Ecliptic longitude:
-            λ = atan2(cos(R), -(sin(R)·cos(ε) + tan(P)·sin(ε)))
-
-        Opposite houses: λ_{i+6} = (λᵢ + 180°) mod 360°
+    Geometry:
+        The division point of cusp ``k`` sits on the equator ``H`` degrees
+        east of the meridian (:data:`_HOUSE_CIRCLE_OFFSETS`). The house
+        circle through it and the north and south points of the horizon has
+        its pole on the prime vertical, at height ``P`` with
+        ``tan(P) = tan(lat) · sin(H)``. The cusp is the longitude that
+        circle cuts on the ecliptic, read as the Ascendant of the fictitious
+        observer at latitude ``P`` with meridian ``ARMC + H - 90``
+        (:func:`_house_circle_rising_longitude`); the opposite cusps are the
+        antipodes.
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -2565,31 +2619,17 @@ def _houses_regiomontanus(
     Returns:
         List of 13 house cusp longitudes
     """
-
     cusps = _init_cardinal_cusps(asc, mc)
 
-    rad_lat = math.radians(lat)
-    rad_eps = math.radians(eps)
+    tan_lat = math.tan(math.radians(lat))
+    cos_eps = math.cos(math.radians(eps))
+    sin_eps = math.sin(math.radians(eps))
 
-    def calc_cusp(offset_deg):
-        h_rad = math.radians(offset_deg)
-        tan_pole = math.tan(rad_lat) * math.sin(h_rad)
-
-        # R = RAMC + offset - 90
-        r_deg = (armc + offset_deg - 90.0) % 360.0
-        r_rad = math.radians(r_deg)
-
-        # Flip signs for East intersection (Ascendant formula)
-        num = math.cos(r_rad)
-        den = -(math.sin(r_rad) * math.cos(rad_eps) + tan_pole * math.sin(rad_eps))
-
-        lon = math.degrees(math.atan2(num, den))
-        return lon % 360.0
-
-    cusps[11] = calc_cusp(30)
-    cusps[12] = calc_cusp(60)
-    cusps[2] = calc_cusp(120)
-    cusps[3] = calc_cusp(150)
+    for cusp, offset_deg in _HOUSE_CIRCLE_OFFSETS:
+        tan_pole = tan_lat * math.sin(math.radians(offset_deg))
+        cusps[cusp] = _house_circle_rising_longitude(
+            armc, offset_deg, tan_pole, cos_eps, sin_eps
+        )
 
     _set_opposite_cusps(cusps)
 
@@ -2606,8 +2646,12 @@ def _houses_campanus(
     into 12 equal 30° arcs, then projects onto the ecliptic via great circles
     through the North and South points of the horizon.
 
-    Historical basis: Campanus of Novara (13th century); modern description in
-    Holden, "The Elements of House Division" (1977).
+    Historical basis: Campanus of Novara (13th century); modern descriptions in
+    Holden, "The Elements of House Division" (1977) and Munkasey, "An
+    Astrological House Formulary". As in Regiomontanus the house circles run
+    through the north and south points of the horizon, but the division
+    points lie on the prime vertical rather than on the equator, so the pole
+    of each circle is derived below instead of from ``tan(lat) · sin(H)``.
 
     Derivation from spherical trigonometry
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2868,32 +2912,43 @@ def _houses_sripati(asc: float, mc: float) -> List[float]:
     return cusps
 
 
+#: The four quadrants of a quadrant-division wheel: the angle each starts at,
+#: the angle it ends at, and the two cusps built inside it, in order.
+_PULLEN_QUADRANTS: tuple[tuple[int, int, int, int], ...] = (
+    (10, 1, 11, 12),  # MC -> Asc: houses 11, 12
+    (1, 4, 2, 3),  # Asc -> IC: houses 2, 3
+    (4, 7, 5, 6),  # IC -> Desc: houses 5, 6
+    (7, 10, 8, 9),  # Desc -> MC: houses 8, 9
+)
+
+
 def _houses_pullen_sd(asc: float, mc: float) -> List[float]:
     """
     Pullen SD (Sinusoidal Delta) house system, also known as Neo-Porphyry.
 
-    Invented by Walter Pullen in 1994. Like Porphyry, based on ecliptic quadrant
-    divisions, but fits house widths to a sine wave pattern rather than equal
-    trisection.
+    Like Porphyry, an ecliptic division of the four quadrants between the
+    angles; but the three houses of a quadrant differ by a constant delta
+    instead of being equal, so that the house widths around the wheel follow
+    a sine wave.
 
-    Reference: Walter D. Pullen, Astrolog (open-source software) documentation,
-    "House Systems" (astrolog.org); SD introduced 1994.
+    Author definition: Walter D. Pullen, "Sinusoidal House Systems"
+    (astrolog.org/astrolog/astsine.htm), Sinusoidal Delta houses, first
+    implemented on 13 February 1994. For a quadrant of size ``q`` the three
+    widths are ``x+n, x, x+n`` and those of the opposite quadrant
+    ``x+3n, x+4n, x+3n``; the two sum constraints give ``n = (90 - q)/4``
+    and ``x = (q - 30)/2``. Written with the deviation ``d = q - 90``, the
+    side houses are ``30 + d/4`` and the middle house ``30 + d/2``, the same
+    algebra for every quadrant.
 
-    Algorithm:
-        - Ideal house size = 30°
-        - For each quadrant, compute deviation d = quadrant_size - 90°
-        - Middle house of quadrant (2nd, 5th, 8th, 11th) gets d/2 added to 30°
-        - Side houses each get d/4 added to 30°
-        - If middle house size would be negative, set to 0
-
-    House width pattern for quadrant:
-        x+n, x, x+n  where x = 30 and n = d/4
-        Middle house = x + 2n = 30 + d/2
-
-    Properties:
-        - Works at all latitudes (based on ecliptic only)
-        - Houses in larger quadrants are larger
-        - Middle house absorbs most of the size variation
+    Narrow quadrants: Pullen notes that a quadrant of 30 degrees pinches the
+    middle house to zero size and that below 30 degrees the pattern would
+    need a house of negative size; his rule is to bisect such a quadrant
+    between the two side houses and keep the middle house at zero. The rule
+    is reached in practice: inside the polar circle the Ascendant can lie
+    within 30 degrees of the Midheaven (the golden ``houses`` and
+    ``housepos`` grids reach it at high latitude, and
+    ``tests/test_houses/test_cov100_houses.py::test_pullen_sd_negative_middle``
+    exercises it directly).
 
     Args:
         asc: Ascendant longitude in degrees
@@ -2904,52 +2959,20 @@ def _houses_pullen_sd(asc: float, mc: float) -> List[float]:
     """
     cusps = _init_cardinal_cusps(asc, mc)
 
-    # Calculate quadrant sizes
-    # Quadrant 1: MC to Asc (houses 11, 12)
-    q1 = (asc - mc) % 360.0
-    # Quadrant 2: Asc to IC (houses 2, 3)
-    ic = cusps[4]
-    q2 = (ic - asc) % 360.0
-    # Quadrant 3: IC to Desc (houses 5, 6)
-    desc = cusps[7]
-    q3 = (desc - ic) % 360.0
-    # Quadrant 4: Desc to MC (houses 8, 9)
-    q4 = (mc - desc) % 360.0
-
-    def calc_house_sizes(quadrant_size: float) -> tuple:
-        """Calculate house sizes for a quadrant using sinusoidal delta."""
-        d = quadrant_size - 90.0  # deviation from ideal 90°
-        # Middle house gets d/2 added to 30°
+    def house_widths(quadrant_size: float) -> tuple[float, float]:
+        """(side, middle) house widths of a quadrant under Pullen's delta rule."""
+        d = quadrant_size - 90.0
         middle = 30.0 + d / 2.0
-        # If middle would be negative, set to 0 and redistribute
         if middle < 0:
-            middle = 0.0
-            # Remaining space divided between side houses
-            side = quadrant_size / 2.0
-        else:
-            # Side houses each get d/4 added to 30°
-            side = 30.0 + d / 4.0
-        return (side, middle, side)
+            # Pullen's narrow-quadrant rule: the middle house is pinched to
+            # zero and the quadrant bisected between the two side houses.
+            return quadrant_size / 2.0, 0.0
+        return 30.0 + d / 4.0, middle
 
-    # Quadrant 1: MC to Asc (houses 11, 12, then Asc)
-    sizes1 = calc_house_sizes(q1)
-    cusps[11] = (mc + sizes1[0]) % 360.0
-    cusps[12] = (cusps[11] + sizes1[1]) % 360.0
-
-    # Quadrant 2: Asc to IC (houses 2, 3, then IC)
-    sizes2 = calc_house_sizes(q2)
-    cusps[2] = (asc + sizes2[0]) % 360.0
-    cusps[3] = (cusps[2] + sizes2[1]) % 360.0
-
-    # Quadrant 3: IC to Desc (houses 5, 6, then Desc)
-    sizes3 = calc_house_sizes(q3)
-    cusps[5] = (ic + sizes3[0]) % 360.0
-    cusps[6] = (cusps[5] + sizes3[1]) % 360.0
-
-    # Quadrant 4: Desc to MC (houses 8, 9, then MC)
-    sizes4 = calc_house_sizes(q4)
-    cusps[8] = (desc + sizes4[0]) % 360.0
-    cusps[9] = (cusps[8] + sizes4[1]) % 360.0
+    for start, end, first, second in _PULLEN_QUADRANTS:
+        side, middle = house_widths((cusps[end] - cusps[start]) % 360.0)
+        cusps[first] = (cusps[start] + side) % 360.0
+        cusps[second] = (cusps[first] + middle) % 360.0
 
     return cusps
 
@@ -3153,37 +3176,42 @@ def _houses_alcabitius(
     return cusps
 
 
+#: Polich and Page choose the poles of the house circles by trisecting the
+#: tangent of the latitude: the circles one house from the meridian (cusps 11
+#: and 3) run under tan(P) = tan(lat)/3, those two houses away (12 and 2)
+#: under 2·tan(lat)/3, and the horizon (cusps 1 and 7) under the full tan(lat).
+_TOPOCENTRIC_POLE_FRACTIONS: dict[int, float] = {
+    11: 1.0 / 3.0,
+    12: 2.0 / 3.0,
+    2: 2.0 / 3.0,
+    3: 1.0 / 3.0,
+}
+
+
 def _houses_polich_page(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
     """
     Polich-Page (Topocentric) house system.
 
-    Developed in 1960s to account for observer's actual position on Earth's surface
-    rather than at Earth's center. Uses modified pole calculations.
+    Published by Wendel Polich and A. P. Nelson Page, "The Topocentric System
+    of Houses", Spica 3(3), 1964 (the system dates from 1961); described in
+    Holden, "The Elements of House Division" (1977) and Munkasey, "An
+    Astrological House Formulary".
 
-    Reference: Polich & Page, "The Topocentric System of Houses", Spica, 1964.
-
-    Algorithm:
-        Similar to Regiomontanus but with modified pole factors that account
-        for the topocentric (observer-centered) perspective.
-
-    Mathematical Formulas:
-        Pole factors:
-            For houses 11, 3: factor = 1/3
-            For houses 12, 2: factor = 2/3
-
-        Pole calculation (modified from Regiomontanus):
-            tan(P) = tan(φ) × factor
-
-        Hour angle offsets:
-            H = 30°, 60°, 120°, 150° for houses 11, 12, 2, 3
-
-        Right Ascension offset:
-            R = ARMC + H - 90°
-
-        Ecliptic projection:
-            λ = atan2(cos(R), -(sin(R)·cos(ε) + tan(P)·sin(ε)))
+    Geometry:
+        The house circles cross the equator ``H = 30, 60, 120, 150`` degrees
+        east of the meridian like the Regiomontanus ones
+        (:data:`_HOUSE_CIRCLE_OFFSETS`), but their poles are not derived
+        from ``H``: the authors trisect the tangent of the latitude,
+        ``tan(P) = tan(lat) · k/3`` with ``k = 1`` one house from the
+        meridian and ``k = 2`` two houses away
+        (:data:`_TOPOCENTRIC_POLE_FRACTIONS`), so the circles no longer pass
+        through the north and south points of the horizon. Each cusp is the
+        longitude its circle cuts on the ecliptic, read as the Ascendant of
+        the fictitious observer at latitude ``P`` with meridian
+        ``ARMC + H - 90`` (:func:`_house_circle_rising_longitude`); the
+        opposite cusps are the antipodes.
 
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -3195,32 +3223,17 @@ def _houses_polich_page(
     Returns:
         List of 13 house cusp longitudes
     """
-    # Polich/Page (Topocentric)
-    # Uses Pole method with tan(Pole) = tan(lat) * factor.
-    # factor = 1/3 for 11/3, 2/3 for 12/2.
-
     cusps = _init_cardinal_cusps(asc, mc)
 
-    rad_lat = math.radians(lat)
-    rad_eps = math.radians(eps)
+    tan_lat = math.tan(math.radians(lat))
+    cos_eps = math.cos(math.radians(eps))
+    sin_eps = math.sin(math.radians(eps))
 
-    def calc_cusp(offset_deg, factor):
-        tan_pole = math.tan(rad_lat) * factor
-
-        # R = RAMC + offset - 90
-        r_deg = (armc + offset_deg - 90.0) % 360.0
-        r_rad = math.radians(r_deg)
-
-        num = math.cos(r_rad)
-        den = -(math.sin(r_rad) * math.cos(rad_eps) + tan_pole * math.sin(rad_eps))
-
-        lon = math.degrees(math.atan2(num, den))
-        return lon % 360.0
-
-    cusps[11] = calc_cusp(30, 1.0 / 3.0)
-    cusps[12] = calc_cusp(60, 2.0 / 3.0)
-    cusps[2] = calc_cusp(120, 2.0 / 3.0)
-    cusps[3] = calc_cusp(150, 1.0 / 3.0)
+    for cusp, offset_deg in _HOUSE_CIRCLE_OFFSETS:
+        tan_pole = tan_lat * _TOPOCENTRIC_POLE_FRACTIONS[cusp]
+        cusps[cusp] = _house_circle_rising_longitude(
+            armc, offset_deg, tan_pole, cos_eps, sin_eps
+        )
 
     _set_opposite_cusps(cusps)
 
@@ -5600,6 +5613,23 @@ def house_pos(
     )
 
 
+#: ``gauquelin_sector`` methods 2-5 time the sector on the body's actual rising
+#: and setting; the value is the ``rise_trans`` flag set selecting which point
+#: of the disc is timed against which horizon. ``rise_trans`` defaults to the
+#: upper limb on the refracted horizon, so method 5 adds no flag.
+_GAUQUELIN_RISE_SET_FLAGS: dict[int, int] = {
+    2: BIT_DISC_CENTER | BIT_NO_REFRACTION,  # disc centre, geometric horizon
+    3: BIT_DISC_CENTER,  # disc centre, refracted horizon
+    4: BIT_NO_REFRACTION,  # upper limb, geometric horizon
+    5: 0,  # upper limb, refracted horizon
+}
+
+#: Methods 0 and 1 place the body on its semi-arcs by hour angle and
+#: declination (the 'G' house-position construction); method 1 first drops the
+#: body's ecliptic latitude, i.e. it sectors the ecliptic point of the body.
+_GAUQUELIN_DROPS_LATITUDE: dict[int, bool] = {0: False, 1: True}
+
+
 def _gauquelin_sector_from_rise_set(
     jd: float,
     planet: "int | str",
@@ -5635,12 +5665,6 @@ def _gauquelin_sector_from_rise_set(
             (circumpolar); the reference refuses these cases as well.
     """
     from .eclipse import rise_trans
-    from .constants import (
-        CALC_RISE,
-        CALC_SET,
-        BIT_DISC_CENTER,
-        BIT_NO_REFRACTION,
-    )
 
     def _rise_set_not_found() -> Error:
         """No rise/set event exists (circumpolar / never-rises body).
@@ -5656,143 +5680,64 @@ def _gauquelin_sector_from_rise_set(
         )
 
     # Determine rise_trans flags based on method
-    rsmi_flags = 0
-    if method in (2, 3):  # Disc center
-        rsmi_flags |= BIT_DISC_CENTER
-    # Methods 4, 5 use disc edge (upper limb) which is the default
+    rsmi_flags = _GAUQUELIN_RISE_SET_FLAGS[method]
 
-    if method in (2, 4):  # No refraction
-        rsmi_flags |= BIT_NO_REFRACTION
-    # Methods 3, 5 include refraction (default when flag not set)
+    def _event_after(jd_from: float, calc_flag: int) -> float:
+        """Time of the first rise (CALC_RISE) or set (CALC_SET) after jd_from."""
+        retflag, tret = rise_trans(
+            jd_from,
+            planet,
+            calc_flag | rsmi_flags,
+            [lon, lat, altitude],
+            pressure,
+            temperature,
+            flags,
+        )
+        if retflag == -2:
+            raise _rise_set_not_found()  # circumpolar: no such event
+        return tret[0]
 
-    # Strategy: Find the next rise and next set after jd, then find the
-    # previous rise and set by searching ~1.5 days before those.
-    # Compare which previous event is more recent to determine if
-    # planet is above or below horizon.
+    def _event_before(jd_next: float, calc_flag: int) -> float:
+        """The last event of that kind before ``jd``, found from the next one.
+
+        A body rises and sets about once a day, so the previous event is
+        searched from 1.5 days before the next one, and from 2.5 days before
+        it if that search still lands on or after ``jd``.
+        """
+        jd_prev = _event_after(jd_next - 1.5, calc_flag)
+        if jd_prev >= jd:
+            jd_prev = _event_after(jd_next - 2.5, calc_flag)
+            if jd_prev >= jd:
+                raise _rise_set_not_found()
+        return jd_prev
 
     try:
-        # Find next rise after jd
-        retflag, tret = rise_trans(
-            jd,
-            planet,
-            CALC_RISE | rsmi_flags,
-            [lon, lat, altitude],
-            pressure,
-            temperature,
-            flags,
-        )
-        if retflag == -2:
-            raise _rise_set_not_found()  # Circumpolar
-        jd_next_rise = tret[0]
-
-        # Find next set after jd
-        retflag, tret = rise_trans(
-            jd,
-            planet,
-            CALC_SET | rsmi_flags,
-            [lon, lat, altitude],
-            pressure,
-            temperature,
-            flags,
-        )
-        if retflag == -2:
-            raise _rise_set_not_found()  # Circumpolar
-        jd_next_set = tret[0]
-
-        # Find previous rise before jd by searching before the next rise
-        # (planets rise roughly once per day, so ~1.5 days before next rise
-        # should find the previous rise)
-        retflag, tret = rise_trans(
-            jd_next_rise - 1.5,
-            planet,
-            CALC_RISE | rsmi_flags,
-            [lon, lat, altitude],
-            pressure,
-            temperature,
-            flags,
-        )
-        if retflag == -2:
-            raise _rise_set_not_found()
-        jd_prev_rise = tret[0]
-        # Verify this rise is actually before jd
-        if jd_prev_rise >= jd:
-            # Try searching earlier
-            retflag, tret = rise_trans(
-                jd_next_rise - 2.5,
-                planet,
-                CALC_RISE | rsmi_flags,
-                [lon, lat, altitude],
-                pressure,
-                temperature,
-                flags,
-            )
-            jd_prev_rise = tret[0]
-            if retflag == -2 or jd_prev_rise >= jd:
-                raise _rise_set_not_found()
-
-        # Find previous set before jd by searching before the next set
-        retflag, tret = rise_trans(
-            jd_next_set - 1.5,
-            planet,
-            CALC_SET | rsmi_flags,
-            [lon, lat, altitude],
-            pressure,
-            temperature,
-            flags,
-        )
-        if retflag == -2:
-            raise _rise_set_not_found()
-        jd_prev_set = tret[0]
-        # Verify this set is actually before jd
-        if jd_prev_set >= jd:
-            # Try searching earlier
-            retflag, tret = rise_trans(
-                jd_next_set - 2.5,
-                planet,
-                CALC_SET | rsmi_flags,
-                [lon, lat, altitude],
-                pressure,
-                temperature,
-                flags,
-            )
-            jd_prev_set = tret[0]
-            if retflag == -2 or jd_prev_set >= jd:
-                raise _rise_set_not_found()
-
+        jd_next_rise = _event_after(jd, CALC_RISE)
+        jd_next_set = _event_after(jd, CALC_SET)
+        jd_prev_rise = _event_before(jd_next_rise, CALC_RISE)
+        jd_prev_set = _event_before(jd_next_set, CALC_SET)
     except (IndexError, TypeError, ValueError, ArithmeticError):
         raise _rise_set_not_found()
 
-    # Determine if planet is above or below horizon:
-    # If the most recent event before jd was a rise, planet is above horizon.
-    # If the most recent event before jd was a set, planet is below horizon.
+    def _sector_on_arc(arc_start: float, arc_end: float, first_sector: float) -> float:
+        """Position of ``jd`` on an arc divided into 18 equal parts of time."""
+        arc = arc_end - arc_start
+        if arc <= 0:
+            raise _rise_set_not_found()
+        fraction = (jd - arc_start) / arc
+        fraction = max(0.0, min(1.0, fraction))  # clamp for safety
+        return first_sector + fraction * 18.0
+
+    # Gauquelin's sectors (Gauquelin & Gauquelin 1957, "Méthodes pour étudier
+    # la répartition des astres dans le mouvement diurne"): the diurnal arc
+    # from rising to setting and the nocturnal arc from setting to rising are
+    # each divided into 18 equal parts, numbered from 1 at rising (10 at the
+    # upper culmination) and from 19 at setting (28 at the lower culmination).
+    # The more recent of the two last events tells which arc the body is on.
     if jd_prev_rise > jd_prev_set:
-        # Planet rose more recently than it set -> above horizon (sectors 1-18)
-        # Diurnal arc runs from jd_prev_rise to jd_next_set
-        diurnal_arc = jd_next_set - jd_prev_rise
-        if diurnal_arc <= 0:
-            raise _rise_set_not_found()
-
-        elapsed = jd - jd_prev_rise
-        fraction = elapsed / diurnal_arc
-        # Clamp fraction to [0, 1] for safety
-        fraction = max(0.0, min(1.0, fraction))
-
-        # Sector 1 is at rise, sector 10 is at MC, sector 18+ is near set
-        sector = 1.0 + fraction * 18.0
+        sector = _sector_on_arc(jd_prev_rise, jd_next_set, 1.0)
     else:
-        # Planet set more recently than it rose -> below horizon (sectors 19-36)
-        # Nocturnal arc runs from jd_prev_set to jd_next_rise
-        nocturnal_arc = jd_next_rise - jd_prev_set
-        if nocturnal_arc <= 0:
-            raise _rise_set_not_found()
-
-        elapsed = jd - jd_prev_set
-        fraction = elapsed / nocturnal_arc
-        # Clamp fraction to [0, 1] for safety
-        fraction = max(0.0, min(1.0, fraction))
-
-        # Sector 19 is at set, sector 28 is at IC, sector 36 is near next rise
-        sector = 19.0 + fraction * 18.0
+        sector = _sector_on_arc(jd_prev_set, jd_next_rise, 19.0)
 
     # Normalize to range [1, 37)
     if sector >= 37.0:
@@ -5824,6 +5769,13 @@ def _gauquelin_sector_pythonic(
     - Sector 10: Upper culmination (MC)
     - Sector 19: Setting (Descendant)
     - Sector 28: Lower culmination (IC)
+
+    Sector definition: Gauquelin & Gauquelin (1957), "Méthodes pour étudier la
+    répartition des astres dans le mouvement diurne"; the diurnal and the
+    nocturnal arc are each divided into 18 equal parts. The ``method``
+    argument selects how the arcs are measured: :data:`_GAUQUELIN_RISE_SET_FLAGS`
+    lists the methods timed on actual rise and set events and the disc/horizon
+    they use, :data:`_GAUQUELIN_DROPS_LATITUDE` the two hour-angle methods.
 
     Reference API compatible function (gauquelin_sector equivalent).
 
@@ -5863,10 +5815,9 @@ def _gauquelin_sector_pythonic(
         >>> sector = _gauquelin_sector_pythonic(2451545.0, MARS, 48.85, 2.35)
         >>> print(f"Mars is in sector {int(sector)}")
     """
-    # Methods 2-5: Use actual rise/set times. rise_trans accepts a star name
-    # (str) as well as a planet id, so _gauquelin_sector_from_rise_set handles
-    # both — no need to special-case stars here.
-    if method in (2, 3, 4, 5):
+    # Methods 2-5: actual rise/set times. rise_trans accepts a star name (str)
+    # as well as a planet id, so _gauquelin_sector_from_rise_set handles both.
+    if method in _GAUQUELIN_RISE_SET_FLAGS:
         return _gauquelin_sector_from_rise_set(
             jd, planet, lat, lon, altitude, pressure, temperature, flags, method
         )
@@ -5906,8 +5857,7 @@ def _gauquelin_sector_pythonic(
             with _state._STATE_LOCK:
                 _state._TOPO = saved_topo
 
-    # For method 1 (without latitude), ignore ecliptic latitude
-    if method == 1:
+    if _GAUQUELIN_DROPS_LATITUDE.get(method, False):
         planet_lat = 0.0
 
     # Use _house_pos_pythonic with 'G' (Gauquelin sectors) to get the sector position
