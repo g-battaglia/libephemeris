@@ -4,8 +4,9 @@
 Uses ebooklib + markdown for Kobo-compatible EPUB output with proper
 chapter splitting, NCX/NAV navigation, and XHTML-safe content.
 
-Requirements (auto-installed):
-    pip install ebooklib markdown pyyaml
+Requirements: the ``docs-epub`` extra (ebooklib, markdown, pyyaml), which is
+deliberately not part of ``dev``:
+    uv pip install -e ".[docs-epub]"
 
 Usage:
     python scripts/generate_manual_epub.py                  # Both languages
@@ -33,9 +34,13 @@ try:
     import markdown
     import yaml
     from ebooklib import epub
-except ImportError:
-    print("ERROR: Missing dependencies. Install them with:")
-    print("  pip install ebooklib markdown pyyaml")
+except ImportError as exc:
+    print(
+        f"ERROR: missing module {exc.name or exc!r}. The EPUB manual generator "
+        "needs the `docs-epub` extra, which is not part of `dev`. Install it "
+        'with:\n  uv pip install -e ".[docs-epub]"',
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

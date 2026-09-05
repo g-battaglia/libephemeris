@@ -11,15 +11,37 @@ Provenance:
 
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
 
 import click
 
+# Modules provided by the `docs-epub` extra; deliberately not part of `dev`.
+_EPUB_MODULES = ("ebooklib", "markdown", "yaml")
+_EPUB_EXTRA_HINT = (
+    "the ebooklib workflow needs the `docs-epub` extra, which is not part of "
+    '`dev`. Install it with:\n  uv pip install -e ".[docs-epub]"'
+)
+
 
 def _python(args: list[str]) -> None:
     """Run a python script."""
     sys.exit(subprocess.call([sys.executable, *args]))
+
+
+def _require_epub_extra() -> None:
+    """Stop with a clear message when the `docs-epub` extra is not installed.
+
+    Raises:
+        click.ClickException: one or more of the extra's modules cannot be
+            imported by the interpreter that would run the generator.
+    """
+    missing = [name for name in _EPUB_MODULES if importlib.util.find_spec(name) is None]
+    if missing:
+        raise click.ClickException(
+            f"missing module(s) {', '.join(missing)}: {_EPUB_EXTRA_HINT}"
+        )
 
 
 @click.group(
@@ -28,9 +50,10 @@ def _python(args: list[str]) -> None:
     help="Build the libephemeris user manual in EPUB and/or PDF format.\n\n"
     "Two workflows are available:\n\n"
     "  Pandoc workflow (build*)      Requires: pandoc + tectonic\n"
-    "  Ebooklib workflow (generate*) Requires: ebooklib + markdown (no pandoc)\n\n"
+    "  Ebooklib workflow (generate*) Requires: the docs-epub extra (no pandoc)\n\n"
     "Both produce manuals in Italian and English. The ebooklib workflow\n"
-    "generates Kobo-compatible EPUBs without external tools.\n\n"
+    "generates Kobo-compatible EPUBs without external tools; its Python\n"
+    'dependencies are not part of dev: uv pip install -e ".[docs-epub]"\n\n'
     "  leph manual build             # EPUB + PDF, both languages\n"
     "  leph manual generate-epub     # EPUB only, no pandoc needed",
 )
@@ -115,8 +138,9 @@ def generate_epub() -> None:
     """Generate all manual EPUBs (Italian + English, no pandoc required).
 
     Uses ebooklib + markdown. Kobo-compatible output.
-    Requires: pip install ebooklib markdown pyyaml
+    Requires the docs-epub extra: uv pip install -e ".[docs-epub]"
     """
+    _require_epub_extra()
     _python(["scripts/generate_manual_epub.py"])
 
 
@@ -126,6 +150,7 @@ def generate_epub() -> None:
 )
 def generate_epub_it() -> None:
     """Generate Italian manual EPUB (no pandoc required)."""
+    _require_epub_extra()
     _python(["scripts/generate_manual_epub.py", "--lang", "it"])
 
 
@@ -135,4 +160,5 @@ def generate_epub_it() -> None:
 )
 def generate_epub_en() -> None:
     """Generate English manual EPUB (no pandoc required)."""
+    _require_epub_extra()
     _python(["scripts/generate_manual_epub.py", "--lang", "en"])

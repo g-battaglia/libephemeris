@@ -13,17 +13,98 @@ process -- see [LICENSING.md](LICENSING.md) and [NOTICE.md](NOTICE.md).
 | spktype21 0.1.0 | `libephemeris/vendor/spktype21.py` | Shushi Uetsuki (whiskie14142) | MIT |
 | TASS 1.7 port | `libephemeris/moon_theories/tass17.py`, `libephemeris/moon_theories/tass17_data.py` (generated periodic-term tables) | Johannes Gajdosik's Stellarium implementation of Vienne & Duriez TASS 1.7 | MIT |
 
-Retained upstream copyright notices:
-
-- spktype21 license: Copyright (c) 2018 The Python Packaging Authority
-  ([upstream license](https://github.com/whiskie14142/spktype21/blob/master/LICENSE.txt)).
-- Stellarium TASS 1.7 implementation: Copyright (c) 2005 Johannes Gajdosik
-  ([upstream file header](https://github.com/Stellarium/stellarium/blob/master/src/core/planetsephems/tass17.c)).
-
 Each of these files carries its own `SPDX-License-Identifier` header and
 documents its upstream provenance in the module docstring. They are **not**
 covered by the project's AGPL-3.0 license, but they are all permissively
-(MIT) licensed.
+(MIT) licensed. The two entries below record, for each component, the
+retained upstream copyright notice, the license file that was consulted
+with its SHA-256 (re-check a pin with `curl -sL <url> | shasum -a 256`),
+the local modifications, and any third-party material the files carry
+beyond the upstream author's own work.
+
+### spktype21 0.1.0 (`libephemeris/vendor/spktype21.py`)
+
+- **Upstream:** `spktype21` 0.1.0 on PyPI, by Shushi Uetsuki (GitHub
+  `whiskie14142`), repository <https://github.com/whiskie14142/spktype21>.
+  The PyPI metadata declares `License :: OSI Approved :: MIT License`.
+- **License:** MIT. Retained copyright notice, as published upstream:
+  Copyright (c) 2018 The Python Packaging Authority.
+- **License file consulted (2026-09-05):**
+  <https://raw.githubusercontent.com/whiskie14142/spktype21/9b1ef79aca2e06988bb7d5a2bb10c42066fc5186/LICENSE.txt>
+  (commit `9b1ef79a` of 2018-10-15, the last change to that file; identical
+  to `master` on the date consulted).
+  SHA-256: `ec423cc5506eea1ffbfc9955c3ec8f86139996963d84ff306a5ee41eda8a4ff1`.
+- **Local modifications:** two `.item()` calls added to the
+  `daf.map_array()` results for numpy 2.x compatibility, and the vendoring
+  record in the module header. The numerical implementation is otherwise the
+  identified 0.1.0 upstream.
+- **NASA/JPL/NAIF material carried by the file.** The upstream author states
+  that the module "has been developed based on jplephem and FORTRAN source
+  of the SPICE Toolkit of NASA/JPL/NAIF", and the file reproduces comments
+  from that toolkit. Inventory (line numbers as of this revision):
+  - Module docstring, lines 20, 26, 64 and 66: the statement that the input
+    format is NASA/JPL/NAIF SPK type 21, the link to the NAIF "SPK Required
+    Reading" (`naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/req/spk.html`),
+    the sentence quoted above, and the SPICE Toolkit link
+    (`naif.jpl.nasa.gov/naif/toolkit.html`).
+  - Line 78: `MAXTRM = 25`, noted as included from `spk21.inc` of the
+    FORTRAN source `spke21.f`.
+  - Lines 256-266: the author's note that `spke21()` was translated from the
+    SPICE Toolkit FORTRAN routine `spke21.f` and then modified, with the
+    links at lines 259-260 (SPICE Toolkit for FORTRAN; SPK Required Reading,
+    C edition).
+  - Lines 269-421 (`#C` prefix): the SPICELIB header of routine `SPKE21`
+    reproduced verbatim -- `$ Abstract`; `$ Disclaimer` (lines 274-297: the
+    Caltech/JPL/NASA notice that the software was created under a U.S.
+    Government contract, is publicly available under U.S. export laws, and
+    is provided "as-is" without warranty, the recipient bearing all risk and
+    indemnifying Caltech and NASA); `$ Required_Reading`; `$ Keywords`;
+    `$ Declarations`; `$ Brief_I/O`; `$ Detailed_Input`; `$ Detailed_Output`;
+    `$ Parameters`; `$ Exceptions`; `$ Files`; `$ Particulars`; `$ Examples`;
+    `$ Restrictions`; `$ Literature_References` (line 401: NAIF Document
+    168.0, "S- and P- Kernel (SPK) Specification and User's Guide");
+    `$ Author_and_Institution` (N.J. Bachman, F.T. Krogh, W.L. Taber,
+    I.M. Underwood -- JPL); `$ Version` (SPICELIB Version 1.0.0,
+    03-FEB-2014); `$ Index_Entries`.
+  - Lines 423-575: a further 67 `#C` comment lines inside the body of
+    `spke21()`, the FORTRAN routine's own step-by-step comments carried
+    along with the translation.
+
+  The SPICE Toolkit is implemented and maintained by Caltech/JPL under
+  contract to NASA and is distributed by NAIF under the rules published at
+  <https://naif.jpl.nasa.gov/naif/rules.html>, which state that including
+  Toolkit modules "as part of a package supporting a customer-built
+  SPICE-based tool is entirely appropriate", ask that modifications be noted
+  in the header, and designate the software "Technology and Software
+  Publicly Available" for export purposes. The disclaimer is retained
+  verbatim in the file, and the module header records both the translation
+  and the local modifications.
+
+### TASS 1.7 port (`libephemeris/moon_theories/tass17.py`, `libephemeris/moon_theories/tass17_data.py`)
+
+- **Upstream:** the Stellarium implementation of the TASS 1.7 theory of the
+  Saturnian satellites, file `src/core/planetsephems/tass17.c`, by Johannes
+  Gajdosik. `tass17.py` is the Python port of the evaluation code;
+  `tass17_data.py` is the periodic-term table generated from the same C
+  file.
+- **License:** MIT, granted in the header of `tass17.c` itself (the file
+  carries its own permission notice; there is no separate license file for
+  it). Retained copyright notice: Copyright (c) 2005 Johannes Gajdosik.
+  The header states that this notice covers the author's compilation of the
+  theory into software, not the underlying work of Alain Vienne and Luc
+  Duriez.
+- **License file consulted (2026-09-05):**
+  <https://raw.githubusercontent.com/Stellarium/stellarium/eb189190cee37fdc14939c2407e4e3fd47e8b6a0/src/core/planetsephems/tass17.c>
+  (commit `eb189190` of 2026-06-20, the last change to that file; identical
+  to `master` on the date consulted). The MIT notice occupies lines 1-35.
+  SHA-256 of the whole file:
+  `bb001d2e0c2b2376c246264e3845bc59b4984b76dcde692a39a1c912bc70cbcc`.
+- **Underlying theory:** Vienne, A. & Duriez, L. (1995), A&A 297, 588-605
+  (TASS 1.6); TASS 1.7 is the later IMCCE revision distributed as Fortran
+  code and data at `ftp://ftp.imcce.fr/pub/ephem/satel/tass17/`. The
+  Stellarium header notes that its author "can neither allow nor forbid the
+  usage of the TASS 1.7 theory"; the theory itself is the published
+  scientific work of its authors.
 
 The Galilean satellite module (`libephemeris/moon_theories/galilean.py`)
 was, through v2.1.0, adapted from PyMeeus and licensed LGPL-3.0. <!-- provenance-implementation-ok --> It was

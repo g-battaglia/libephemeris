@@ -581,9 +581,7 @@ dev = [
     { name = "astroquery" },
     { name = "black" },
     { name = "build" },
-    { name = "ebooklib" },
     { name = "hypothesis" },
-    { name = "markdown" },
     { name = "mypy" },
     { name = "poethepoet" },
     { name = "pytest" },
@@ -599,6 +597,11 @@ docs = [
     { name = "myst-parser" },
     { name = "sphinx" },
     { name = "sphinx-rtd-theme" },
+]
+docs-epub = [
+    { name = "ebooklib" },
+    { name = "markdown" },
+    { name = "pyyaml" },
 ]
 nbody = [
     { name = "assist" },
@@ -621,9 +624,9 @@ requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "certifi" },
     { name = "click", specifier = ">=8.0" },
-    { name = "ebooklib", marker = "extra == 'dev'", specifier = ">=0.20" },
+    { name = "ebooklib", marker = "extra == 'docs-epub'", specifier = ">=0.20" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "markdown", marker = "extra == 'dev'", specifier = ">=3.7" },
+    { name = "markdown", marker = "extra == 'docs-epub'", specifier = ">=3.7" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "poethepoet", marker = "extra == 'dev'", specifier = ">=0.37.0,<0.38.0" },
@@ -633,6 +636,7 @@ requires-dist = [
     { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.1.1" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5.0" },
     { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "pyyaml", marker = "extra == 'docs-epub'", specifier = ">=6.0" },
     { name = "rebound", marker = "extra == 'nbody'", specifier = ">=4.4.11,<5.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.6" },
     { name = "skyfield", specifier = ">=1.54" },
@@ -643,7 +647,7 @@ requires-dist = [
     { name = "twine", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "zstandard", specifier = ">=0.22.0" },
 ]
-provides-extras = ["stars", "nbody", "all", "dev", "docs"]
+provides-extras = ["stars", "nbody", "all", "dev", "docs-epub", "docs"]
 
 [[package]]
 name = "librt"

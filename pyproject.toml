@@ -98,9 +98,16 @@ dev = [
     "spiceypy>=6.0.0",  # For generating compact planet center SPK files
     "astropy>=5.0.0",  # Cross-validation against professional astronomy standards (dev only)
     "astroquery>=0.4.7",  # Catalog-building and validation scripts
-    "ebooklib>=0.20",  # EPUB generation for manual (scripts/generate_manual_epub.py)
-    "markdown>=3.7",  # Markdown-to-HTML for EPUB manual generation
-    "pyyaml>=6.0",  # YAML metadata parsing for EPUB manual generation
+    "pyyaml>=6.0",  # tests/test_pre_commit_config.py reads the hook config
+]
+# EPUB manual generation (scripts/generate_manual_epub.py, `leph manual
+# generate-epub*`). Kept out of `dev` so a contributor install does not pull
+# ebooklib and its lxml dependency; install it on demand from a source
+# checkout with `uv pip install -e ".[docs-epub]"`.
+docs-epub = [
+    "ebooklib>=0.20",  # EPUB packaging
+    "markdown>=3.7",  # Markdown-to-HTML for the chapters
+    "pyyaml>=6.0",  # metadata.yaml parsing
 ]
 docs = [
     "sphinx>=7.0.0",

@@ -162,10 +162,21 @@ pip install libephemeris[dev]
 ```
 
 For contributors only. Includes testing tools (pytest and plugins), code
-quality (ruff, mypy), SPK generation (spiceypy), and manual building
-(ebooklib). Not needed for using the library. (Reference-comparison
-tooling lives in the separate `validation/` repository, not in any extra
-of this package.)
+quality (ruff, mypy), and SPK generation (spiceypy). Not needed for using
+the library. (Reference-comparison tooling lives in the separate
+`validation/` repository, not in any extra of this package; the EPUB manual
+tooling is the separate `docs-epub` extra below.)
+
+### `docs-epub` -- EPUB manual generation
+
+```bash
+uv pip install -e ".[docs-epub]"     # from a source checkout
+```
+
+Installs ebooklib, Markdown and PyYAML for `scripts/generate_manual_epub.py`
+(`leph manual generate-epub`, `generate-epub-it`, `generate-epub-en`). It is
+not part of `dev`: without it those commands stop with a message naming this
+extra. The pandoc workflow (`leph manual build*`) does not use it.
 
 ---
 

@@ -348,6 +348,7 @@ leph manual build-it           # Italian only
 leph manual build-en           # English only
 
 # Ebooklib workflow (no pandoc required, Kobo-compatible)
+# Needs the docs-epub extra, not part of dev: uv pip install -e ".[docs-epub]"
 leph manual generate-epub      # All EPUBs
 leph manual generate-epub-it   # Italian EPUB
 leph manual generate-epub-en   # English EPUB
