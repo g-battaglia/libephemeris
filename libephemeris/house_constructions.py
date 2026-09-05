@@ -209,6 +209,73 @@ def _semiarc_cusp_hour_angles(day_semiarc_rad: float) -> List[Tuple[int, float]]
     ]
 
 
+def _prime_vertical_arc_to_declination(
+    lat: float, sin_lat: float, thirds: int
+) -> float:
+    """Arc along the prime vertical, from the east point, to a parallel.
+
+    On the prime vertical, parametrized by the arc ``t`` from the east point
+    toward the zenith, a point has ``sin(dec) = sin(t) sin(lat)``. The
+    parallel of declination at ``thirds/3`` of the latitude is therefore
+    reached at ``sin(t) = sin(thirds * lat / 3) / sin(lat)``. On the equator
+    both sines vanish together and the ratio tends to ``thirds / 3``.
+
+    Args:
+        lat: Geographic latitude, degrees.
+        sin_lat: ``sin(lat)``, supplied by the caller.
+        thirds: 1 or 2, the fraction of the latitude span to reach.
+
+    Returns:
+        The arc ``t`` in radians, in ``[-pi/2, pi/2]``.
+    """
+    if abs(sin_lat) < 1e-10:
+        sin_arc = thirds / 3.0
+    else:
+        sin_arc = math.sin(math.radians(thirds * lat / 3.0)) / sin_lat
+    return math.asin(min(1.0, max(-1.0, sin_arc)))
+
+
+def _prime_vertical_point(
+    east: Vec3, zenith: Vec3, arc_rad: float, toward_east: bool
+) -> Vec3:
+    """Unit vector on the prime vertical at ``arc_rad`` above the horizon.
+
+    The arc is measured from the east point when ``toward_east`` is true and
+    from the west point otherwise, in both cases toward the zenith.
+    """
+    along = math.cos(arc_rad)
+    if not toward_east:
+        along = -along
+    up = math.sin(arc_rad)
+    return (
+        along * east[0] + up * zenith[0],
+        along * east[1] + up * zenith[1],
+        along * east[2] + up * zenith[2],
+    )
+
+
+#: Savard-A anchors: ``(cusp, thirds of the latitude span, on the east side)``.
+#: The parallel at two thirds anchors cusps 11 (east) and 3 (west), the one at
+#: one third anchors cusps 12 (east) and 2 (west).
+_SAVARD_ANCHORS: Tuple[Tuple[int, int, bool], ...] = (
+    (11, 2, True),
+    (3, 2, False),
+    (12, 1, True),
+    (2, 1, False),
+)
+
+#: Cusps Savard-A constructs directly and the opposite house each one is
+#: mirrored into.
+_OPPOSITE_HOUSES: Tuple[Tuple[int, int], ...] = (
+    (1, 7),
+    (10, 4),
+    (11, 5),
+    (12, 6),
+    (2, 8),
+    (3, 9),
+)
+
+
 def houses_savard_a(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
@@ -221,11 +288,8 @@ def houses_savard_a(
     circles through the north and south points of the horizon. The circle
     anchored at two thirds gives cusps 11/5, the one at one third gives
     cusps 12/6; their west-side mirror images give cusps 3/9 and 2/8.
-
-    On the prime vertical, parametrized from the east point toward the
-    zenith, a point at arc ``t`` has ``sin(dec) = sin(t) sin(lat)``, so the
-    anchor at declination ``k*lat/3`` sits at ``sin(t) = sin(k*lat/3) /
-    sin(lat)`` (limit ``k/3`` on the equator).
+    :func:`_prime_vertical_arc_to_declination` locates each anchor along the
+    prime vertical and :func:`_prime_vertical_point` turns it into a vector.
 
     Args:
         armc: Right ascension of the midheaven, degrees.
@@ -248,34 +312,25 @@ def houses_savard_a(
     )
     # At polar latitudes the dispatcher can represent the upper meridian with
     # the antipodal horizon frame.  Tie the east/west cusp numbering to the
-    # actual rising point, not to that representational choice.
-    frame_east_sign = 1.0 if _dot(east, asc_vec) >= 0.0 else -1.0
+    # actual rising point, not to that representational choice: an anchor is
+    # on the rising side when its side of the frame is the Ascendant's.
+    frame_faces_east = _dot(east, asc_vec) >= 0.0
 
     cusps = [0.0] * 13
     cusps[1] = asc
     cusps[10] = mc
     sin_lat = math.sin(lat_rad)
-    for third, cusp_east, cusp_west in ((2, 11, 3), (1, 12, 2)):
-        if abs(sin_lat) < 1e-10:
-            s = third / 3.0
-        else:
-            s = math.sin(math.radians(third * lat / 3.0)) / sin_lat
-        t = math.asin(min(1.0, max(-1.0, s)))
-        ct, st = math.cos(t), math.sin(t)
-        for east_sign, cusp in ((1.0, cusp_east), (-1.0, cusp_west)):
-            anchor = (
-                east_sign * ct * east[0] + st * zenith[0],
-                east_sign * ct * east[1] + st * zenith[1],
-                east_sign * ct * east[2] + st * zenith[2],
-            )
-            cusps[cusp] = _house_circle_lon_deg(
-                anchor,
-                north,
-                eps_rad,
-                same_side=east_sign * frame_east_sign > 0.0,
-            )
-    for src, opp in ((1, 7), (10, 4), (11, 5), (12, 6), (2, 8), (3, 9)):
-        cusps[opp] = (cusps[src] + 180.0) % 360.0
+    for cusp, thirds, toward_east in _SAVARD_ANCHORS:
+        arc = _prime_vertical_arc_to_declination(lat, sin_lat, thirds)
+        anchor = _prime_vertical_point(east, zenith, arc, toward_east)
+        cusps[cusp] = _house_circle_lon_deg(
+            anchor,
+            north,
+            eps_rad,
+            same_side=toward_east == frame_faces_east,
+        )
+    for built, opposite in _OPPOSITE_HOUSES:
+        cusps[opposite] = (cusps[built] + 180.0) % 360.0
     return cusps
 
 

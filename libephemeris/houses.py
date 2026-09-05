@@ -78,7 +78,9 @@ Provenance:
 from __future__ import annotations
 
 import math
-from typing import Any, List, Optional, Tuple, Union, overload
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Callable, List, Optional, Tuple, Union, overload
 from .constants import *
 from .constants import (
     FLG_RADIANS,
@@ -101,6 +103,7 @@ from .exceptions import (
     Error,
     PolarCircleError,
     validate_coordinates,
+    validate_latitude,
 )
 from .house_constructions import (
     apc_cusp as _apc_cusp,
@@ -162,50 +165,118 @@ def _fold_hsys_case(hsys_char: str) -> str:
     unknown-selector fallback.
 
     The selector is one byte, so the ``bytes`` entry points decode it as
-    latin-1 (byte value = code point), matching ``_hsys_code``'s
-    ``ord(hsys[0])``. Decoding as UTF-8 instead made every high byte raise
-    ``UnicodeDecodeError`` on calls the reference answers with the ordinary
-    unknown-selector fallback.
+    latin-1 (byte value = code point) in :func:`_hsys_to_char`. Decoding as
+    UTF-8 instead made every high byte raise ``UnicodeDecodeError`` on calls
+    the reference answers with the ordinary unknown-selector fallback.
     """
     # A selector is ONE character. The bytes/str entry points can hand a
-    # longer value straight here, and a lexicographic "a" <= s <= "z" test is
-    # true for any lowercase multi-character string, so ord() then raised an
-    # internal "expected a character" TypeError. Compatibility contract: a
-    # multi-character selector raises (TypeError: argument 4 must be a byte
-    # string of length 1), so raising is right — it just has to say so.
+    # longer value straight here; a multi-character selector raises
+    # (compatibility contract: TypeError, argument 4 must be a byte string of
+    # length 1), and the table lookup below is only meaningful for one
+    # character anyway.
     if len(hsys_char) != 1:
         raise TypeError(
             f"house-system identifier must be a single character, not {hsys_char!r}"
         )
-    if hsys_char in ("i", "g"):
-        return hsys_char
-    if "a" <= hsys_char <= "z":
-        return chr(ord(hsys_char) - 32)
-    return hsys_char
+    return _HSYS_CASE_FOLD.get(hsys_char, hsys_char)
 
 
-def _hsys_code(hsys: int | bytes | str) -> int:
-    """Normalize a house-system identifier to its integer character code.
+# The case-folding table behind _fold_hsys_case: the ASCII lowercase letters
+# that select like their uppercase form. 'i' and 'g' are absent on purpose
+# (see the docstring); anything not listed is returned unchanged.
+_HSYS_CASE_FOLD: dict[str, str] = {
+    lower: lower.upper()
+    for lower in "abcdefghijklmnopqrstuvwxyz"
+    if lower not in ("i", "g")
+}
 
-    Accepts the three forms the public house API accepts — an ``int`` code
-    (``ord('P')``), ``bytes`` (``b'P'``, the reference-API default form), or a
-    ``str`` (``'P'``) — and returns the integer character code so that
-    comparisons against ``ord('X')`` literals work regardless of how the caller
-    passed the system.
 
-    Args:
-        hsys: House system identifier as int, bytes, or str.
+def _hsys_to_char(hsys: int | bytes | str) -> str:
+    """Normalize a house-system selector (int code, bytes, or str) to a char.
 
-    Returns:
-        The integer character code of the (first character of the) identifier.
+    This is the single entry for the three selector forms the public house
+    API accepts: an ``int`` code (``ord('P')``), a one-byte ``bytes``
+    (``b'P'``, the reference-API default form) or a one-character ``str``.
+    An integer outside the Unicode range is an unknown selector like any
+    other and folds to ``_UNKNOWN_HSYS_CHAR`` (see ``_int_hsys_to_char``).
+    Letting ``chr()`` raise made one class of unknown selector fail with an
+    untyped ValueError while every other unmapped value reached the
+    documented default.
     """
     if isinstance(hsys, int):
-        hsys_char = _int_hsys_to_char(hsys)
-    elif isinstance(hsys, bytes):
-        hsys_char = chr(hsys[0])  # first byte == the first latin-1 character
-    else:
-        hsys_char = hsys[0]
-    return ord(_fold_hsys_case(hsys_char))
+        return _fold_hsys_case(_int_hsys_to_char(hsys))
+    if isinstance(hsys, bytes):
+        return _fold_hsys_case(hsys.decode("latin-1"))
+    return _fold_hsys_case(str(hsys))
+
+
+@dataclass(frozen=True)
+class _HouseFrame:
+    """The quantities a cusp construction reads, all in degrees.
+
+    ``armc`` and ``lat`` describe the frame the construction builds on: for
+    the systems that follow the midheaven above the horizon
+    (:attr:`_McBranch.ROTATE_FRAME`) they are the rotated ARMC and the
+    negated latitude, otherwise the original ones. ``asc`` and ``mc`` are
+    the Ascendant and the midheaven already reported in ``ascmc``;
+    ``sun_dec`` is the Sun's declination, read by the Sunshine systems only.
+    """
+
+    armc: float
+    lat: float
+    eps: float
+    asc: float
+    mc: float
+    sun_dec: float
+
+
+class _McBranch(Enum):
+    """How a house system chooses the branch of the meridian it reports as MC.
+
+    ``UPPER``: the midheaven is the upper culmination of the given ARMC.
+    ``ROTATE_FRAME``: when that midheaven is below the horizon the whole
+    frame is rotated half a turn (ARMC + 180, latitude negated) before the
+    midheaven and the intermediate cusps are built (Regiomontanus,
+    Campanus, Polich/Page, Savard-A). ``ROTATE_REPORTED``: the cusps are
+    built on the given frame and only the reported MC, with cusps 10 and 4,
+    is moved to the branch above the horizon (APC). ``FROM_CUSPS``: the
+    construction selects the branch itself and the reported MC is its cusp
+    10 (the Sunshine systems).
+    """
+
+    UPPER = "upper"
+    ROTATE_FRAME = "rotate-frame"
+    ROTATE_REPORTED = "rotate-reported"
+    FROM_CUSPS = "from-cusps"
+
+
+@dataclass(frozen=True)
+class HouseSystem:
+    """One row of the house-system registry consulted by the dispatcher.
+
+    Attributes:
+        code: The canonical selector character.
+        build_cusps: The construction; it receives a :class:`_HouseFrame`
+            and returns the 13-slot (37 for Gauquelin) cusp list with slot 0
+            unused.
+        mc_branch: Which branch of the meridian is reported as MC.
+        raises_at_pole: Whether the system is undefined inside the polar
+            circle and raises :class:`PolarCircleError` there (Placidus,
+            Koch, Gauquelin, and every selector the registry does not list,
+            which is served by the Placidus default).
+        sectors: How many cusps the public tuple carries: 12, or 36 for the
+            uppercase Gauquelin selector only.
+        reads_sun_declination: Whether the construction reads the Sun's
+            declination (the Sunshine systems), so :func:`houses` has to
+            compute it.
+    """
+
+    code: str
+    build_cusps: Callable[[_HouseFrame], List[float]]
+    mc_branch: _McBranch = _McBranch.UPPER
+    raises_at_pole: bool = False
+    sectors: int = 12
+    reads_sun_declination: bool = False
 
 
 def _house_armc_obliquity(tjdut: float) -> tuple[float, float]:
@@ -245,12 +316,20 @@ def _init_cardinal_cusps(asc: float, mc: float) -> list:
     return cusps
 
 
+# Intermediate cusps and their diametrically opposite houses: a quadrant
+# system constructs 11, 12, 2 and 3 and mirrors them into 5, 6, 8 and 9.
+_OPPOSITE_INTERMEDIATE_CUSPS: tuple[tuple[int, int], ...] = (
+    (11, 5),
+    (12, 6),
+    (2, 8),
+    (3, 9),
+)
+
+
 def _set_opposite_cusps(cusps: list) -> None:
-    """Set cusps 5,6,8,9 as 180-degree opposites of 11,12,2,3."""
-    cusps[5] = (cusps[11] + 180) % 360.0
-    cusps[6] = (cusps[12] + 180) % 360.0
-    cusps[8] = (cusps[2] + 180) % 360.0
-    cusps[9] = (cusps[3] + 180) % 360.0
+    """Fill cusps 5, 6, 8 and 9 as the opposites of 11, 12, 2 and 3."""
+    for built, opposite in _OPPOSITE_INTERMEDIATE_CUSPS:
+        cusps[opposite] = (cusps[built] + 180.0) % 360.0
 
 
 def _is_polar_circle(lat: float, eps: float) -> bool:
@@ -477,18 +556,16 @@ def _validate_cusps(cusps: list | tuple) -> tuple[bool, str | None]:
     return True, None
 
 
-_KNOWN_HSYS_CODES = set("ABCDEFGHIJKLMNOPQRSTUVWXYi")
+def _house_system(hsys_char: str) -> HouseSystem:
+    """The registry row for a folded selector character.
 
-
-def _polar_raise_applies(hsys_char: str) -> bool:
-    """Systems that raise inside the polar circle.
-
-    Placidus, Koch and Gauquelin are undefined there; an UNKNOWN house
-    code falls through the dispatch to the Placidus default and must
-    raise the same way (the reference errors for e.g. hsys 'Z' at
-    lat 80 instead of quietly computing a fallback).
+    A selector the registry does not list is served by the Placidus default,
+    which raises inside the polar circle like Placidus itself (the reference
+    errors for e.g. hsys 'Z' at latitude 80 instead of quietly computing a
+    fallback). The registry, ``_HOUSE_SYSTEMS``, closes the constructions
+    section of this module.
     """
-    return hsys_char in ("P", "K", "G") or hsys_char not in _KNOWN_HSYS_CODES
+    return _HOUSE_SYSTEMS.get(hsys_char, _DEFAULT_HOUSE_SYSTEM)
 
 
 def _raise_polar_circle_error(
@@ -742,160 +819,131 @@ def _sun_declination_analytic(tjdut: float) -> float:
     return math.degrees(math.asin(math.sin(eps) * math.sin(lon_app)))
 
 
-def houses(
-    tjdut: float, lat: float, lon: float, hsys: int = ord("P"), iflag: int = 0
-) -> tuple[tuple[float, ...], tuple[float, ...]]:
+def _mc_below_horizon(armc_deg: float, eps: float, lat: float) -> bool:
+    """Whether the midheaven of ``armc_deg`` culminates below the horizon.
+
+    The midheaven's declination follows from its right ascension (the ARMC)
+    and the obliquity; on the meridian its altitude satisfies
+    ``sin(alt) = sin(lat) sin(dec) + cos(lat) cos(dec)``. Inside the polar
+    circle the ecliptic point on the upper meridian can be below the horizon,
+    and the systems flagged in the registry then report the other branch.
     """
-    Calculate astrological house cusps and angles for a given time and location.
-
-    Reference API compatible function. Computes house divisions according to
-    the specified house system and returns both house cusps and major angles (ASCMC).
-
-    Args:
-        tjdut: Julian Day in Universal Time (UT1)
-        lat: Geographic latitude in degrees (positive North, negative South)
-        lon: Geographic longitude in degrees (positive East, negative West)
-        hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
-        iflag: Calculation flags (optional, default 0). Use FLG_MOSEPH for extended
-               date range (-3000 to +3000 CE). The ephemeris flag is propagated to
-               internal calculations (e.g., Sun position for Sunshine houses).
-
-    Returns:
-        Tuple containing:
-            - cusps: Tuple of 12 house cusp longitudes (houses 1-12) in degrees
-            - ascmc: Tuple of 8 angles: [Asc, MC, ARMC, Vertex, EquAsc, CoAsc, CoAscKoch, PolarAsc]
-
-    House Systems Supported:
-        'P' = Placidus, 'K' = Koch, 'R' = Regiomontanus, 'C' = Campanus,
-        'E'/'A' = Equal, 'W' = Whole Sign, 'O' = Porphyry, 'B' = Alcabitius,
-        'T' = Topocentric, 'M' = Morinus, 'X' = Meridian, 'H' = Horizontal,
-        'V' = Vehlow, 'G' = Gauquelin, 'U' = Krusinski, 'F' = Carter,
-        'Y' = APC, 'N' = Natural Gradient
-
-    Example:
-        >>> cusps, ascmc = houses(2451545.0, 51.5, -0.12, ord('P'))  # London, Placidus
-        >>> asc, mc = ascmc[0], ascmc[1]
-        >>> house_1_start = cusps[0]  # First house cusp
-    """
-    # Validate latitude and longitude ranges
-    validate_coordinates(lat, lon, "houses")
-
-    # 1. Sidereal time (ARMC) and true obliquity from the long-term model.
-    # ARMC = apparent sidereal time at longitude 0 + lon. Both the sidereal time
-    # and the obliquity use the Vondrák 2011 long-term realization (see
-    # sidereal_longterm), so cusps remain correct across the whole supported date
-    # range rather than diverging at remote epochs.
-    armc0_deg, eps = _house_armc_obliquity(tjdut)
-    armc_deg = (armc0_deg + lon) % 360.0
-
-    # 2. Calculate Ascendant and MC
-    # MC is intersection of Meridian and Ecliptic.
-    # tan(MC) = tan(ARMC) / cos(eps)
-    # Quadrant check needed.
-
-    # Determine if we need to flip MC (and thus ARMC) for specific systems
-    # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
-
-    hsys_char = _hsys_to_char(hsys)
-
-    # Determine if we need to flip MC (and thus ARMC) for specific systems
-    # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
-
-    armc_active = armc_deg
-
-    if hsys_char in ["R", "C", "T", "J"]:
-        # Check altitude of MC calculated from original ARMC
-        mc_dec_rad = math.atan(
-            math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
-        )
-        lat_rad = math.radians(lat)
-        sin_alt = math.sin(lat_rad) * math.sin(mc_dec_rad) + math.cos(
-            lat_rad
-        ) * math.cos(mc_dec_rad)
-
-        if sin_alt < 0:
-            armc_active = (armc_deg + 180.0) % 360.0
-
-    # 2. Calculate Ascendant and MC
-
-    # MC uses armc_active (flipped if needed)
-    mc_rad = math.atan2(
-        math.tan(math.radians(armc_active)), math.cos(math.radians(eps))
+    mc_dec_rad = math.atan(
+        math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
     )
-    mc = math.degrees(mc_rad)
-    # Adjust quadrant to match armc_active
-    if mc < 0:
-        mc += 360.0
+    lat_rad = math.radians(lat)
+    sin_alt = math.sin(lat_rad) * math.sin(mc_dec_rad) + math.cos(lat_rad) * math.cos(
+        mc_dec_rad
+    )
+    return sin_alt < 0
 
-    if 90.0 < armc_active <= 270.0:
-        # Boundary uses <= to match the canonical houses_armc() quadrant
-        # correction (keeps MC in (90, 270] when ARMC is in (90, 270]); at the
-        # exact cardinal armc==270 the < form put MC 180 deg from houses_armc).
-        if mc <= 90.0 or mc > 270.0:
-            mc += 180.0
-    elif armc_active > 270.0:
-        if mc <= 270.0:
-            mc += 180.0
-    elif armc_active <= 90.0:
-        if mc > 90.0:
-            mc += 180.0
 
-    mc = mc % 360.0
+def _rising_longitude(armc_deg: float, eps: float, lat: float) -> float:
+    """The Ascendant: the ecliptic longitude rising on the eastern horizon.
 
-    # Ascendant uses armc_deg (Original)
+    Solves the horizon/ecliptic intersection for the given ARMC, obliquity
+    and latitude, then keeps the intersection whose hour angle puts it east
+    of the meridian. When the ecliptic is tangent to the horizon (``|lat| ==
+    90 - eps`` with the equinoctial colure on the meridian) the rising point
+    degenerates and ``atan2(0, 0)`` is float noise: the Ascendant is then
+    pinned to the east point, ARMC + 90, as the reference API does.
+    """
     num = math.cos(math.radians(armc_deg))
     den = -(
         math.sin(math.radians(armc_deg)) * math.cos(math.radians(eps))
         + math.tan(math.radians(lat)) * math.sin(math.radians(eps))
     )
     if abs(num) < 1e-12 and abs(den) < 1e-12:
-        # Ecliptic exactly tangent to the horizon (|lat| == 90 - eps with the
-        # equinoctial colure on the meridian): the rising point degenerates and
-        # atan2(0, 0) is float noise. The reference API pins the ascendant to
-        # the east point, ARMC + 90.
         asc = (armc_deg + 90.0) % 360.0
     else:
-        asc_rad = math.atan2(num, den)
-        asc = math.degrees(asc_rad)
-        asc = asc % 360.0
-
-        # Ensure Ascendant is on the Eastern Horizon (Azimuth in [0, 180])
-        # We check Azimuth relative to the TRUE ARMC (armc_deg)
-
+        asc = math.degrees(math.atan2(num, den)) % 360.0
+        # Right ascension of that intersection and its hour angle from the
+        # TRUE ARMC: an hour angle in (0, 180) puts the point west of the
+        # meridian, i.e. setting, so the opposite intersection is rising.
         asc_r = math.radians(asc)
         eps_r = math.radians(eps)
-
-        # RA
-        y = math.cos(eps_r) * math.sin(asc_r)
-        x = math.cos(asc_r)
-        ra_r = math.atan2(y, x)
-        ra = math.degrees(ra_r) % 360.0
-
-        # Dec
-        dec_r = math.asin(math.sin(eps_r) * math.sin(asc_r))
-
-        # Hour Angle using TRUE ARMC
+        ra = (
+            math.degrees(math.atan2(math.cos(eps_r) * math.sin(asc_r), math.cos(asc_r)))
+            % 360.0
+        )
         h_deg = (armc_deg - ra + 360.0) % 360.0
-        h_r = math.radians(h_deg)
-
-        # Azimuth
-        # tan(Az) = sin(H) / (sin(lat)cos(H) - cos(lat)tan(Dec))
-        lat_r = math.radians(lat)
-
-        num_az = math.sin(h_r)
-        den_az = math.sin(lat_r) * math.cos(h_r) - math.cos(lat_r) * math.tan(dec_r)
-        az_r = math.atan2(num_az, den_az)
-        az = math.degrees(az_r)
-        az = (az + 180.0) % 360.0
-
-        # Check if H is West (0-180). If so, Asc is Setting (Descendant).
-        # We want Rising.
         if 0.0 < h_deg < 180.0:
             asc = (asc + 180.0) % 360.0
 
     # Ensure ASC is in [0, 360) range (handle floating-point near-360 values)
     if asc >= 360.0 or (360.0 - asc) < 1e-10:
         asc = 0.0
+    return asc
+
+
+def _sunshine_sun_declination(tjdut: float, iflag: int) -> float:
+    """The Sun's apparent declination, for the Sunshine house systems.
+
+    The ephemeris flags in ``iflag`` are forwarded to the Sun computation. A
+    date outside the loaded ephemeris falls back to the low-precision
+    analytic declination; any other failure of the Sun computation falls
+    back to zero declination, the equinox behaviour.
+    """
+    try:
+        # Extract ephemeris flags: FLG_JPLEPH=1, FLG_SWIEPH=2
+        eph_flags = iflag & (FLG_JPLEPH | FLG_SWIEPH)
+        sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
+        return sun_pos[1]  # Declination is second element in equatorial coords
+    except EphemerisRangeError:
+        return _sun_declination_analytic(tjdut)
+    except (IndexError, TypeError, ValueError, CalculationError):
+        return 0.0
+
+
+def _houses_from_armc(
+    armc_deg: float,
+    lat: float,
+    eps: float,
+    hsys_char: str,
+    sun_dec: float,
+    func_name: str,
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Cusps and angles of one house system from ARMC, latitude and obliquity.
+
+    The single dispatcher behind :func:`houses` and :func:`houses_armc`. The
+    system is looked up in the registry by its folded selector character;
+    its row says which branch of the meridian is reported as MC, whether the
+    system raises inside the polar circle and how many cusps the public
+    tuple carries.
+
+    Args:
+        armc_deg: Right ascension of the midheaven in degrees, in [0, 360).
+        lat: Geographic latitude in degrees.
+        eps: True obliquity of the ecliptic in degrees.
+        hsys_char: House-system selector, already folded by ``_hsys_to_char``.
+        sun_dec: The Sun's declination in degrees (Sunshine systems only).
+        func_name: Public entry point named in a ``PolarCircleError``.
+
+    Returns:
+        ``(cusps, ascmc)``: the 12 (36 for Gauquelin) cusp longitudes and the
+        8 angles ``[Asc, MC, ARMC, Vertex, EquAsc, CoAsc (Koch), CoAsc
+        (Munkasey), PolarAsc]``, every value in [0, 360).
+
+    Raises:
+        PolarCircleError: for a system that is undefined inside the polar
+            circle (``raises_at_pole`` in the registry).
+    """
+    system = _house_system(hsys_char)
+
+    # Frame the midheaven and the intermediate cusps are built on. The
+    # systems that follow the MC above the horizon rotate it half a turn when
+    # the upper culmination is below the horizon; the Ascendant and the other
+    # angles always use the given ARMC and latitude.
+    armc_active = armc_deg
+    calc_lat = lat
+    if system.mc_branch is _McBranch.ROTATE_FRAME and _mc_below_horizon(
+        armc_deg, eps, lat
+    ):
+        armc_active = (armc_deg + 180.0) % 360.0
+        calc_lat = -lat
+
+    mc = _armc_to_mc(armc_active, eps)
+    asc = _rising_longitude(armc_deg, eps, lat)
 
     # Vertex uses the original ARMC and the geometric equator convention in
     # _calc_vertex.
@@ -949,143 +997,191 @@ def houses(
     # Note: This is the same as coasc1 but WITHOUT the +180°
     polar_asc = _calc_ascendant(coasc_armc, eps, lat, lat)
 
-    # Build ASCMC array with 8 elements (reference API compatible)
-    ascmc = [0.0] * 8
-    ascmc[0] = asc
-    ascmc[1] = mc
-    ascmc[2] = armc_deg
-    ascmc[3] = vertex
-    ascmc[4] = equ_asc
-    ascmc[5] = co_asc_koch  # coasc1 (W. Koch) at index 5
-    ascmc[6] = co_asc  # coasc2 (M. Munkasey) at index 6
-    ascmc[7] = polar_asc
+    # ASCMC array with 8 elements (reference API compatible): Asc, MC, ARMC,
+    # Vertex, EquAsc, coasc1 (W. Koch), coasc2 (M. Munkasey), polasc.
+    ascmc = [asc, mc, armc_deg, vertex, equ_asc, co_asc_koch, co_asc, polar_asc]
 
-    # 3. House Cusps
-    # Use armc_active for house calculations
-    # If MC was flipped, we might need to flip latitude for intermediate cusps (Regiomontanus, etc.)
-    calc_lat = lat
-    if armc_active != armc_deg:
-        # MC was flipped. Flip latitude for intermediate cusp calculations.
-        calc_lat = -lat
+    # Placidus, Koch and Gauquelin - and the default an unknown selector
+    # reaches - cannot be calculated when abs(lat) + eps > 90.
+    if system.raises_at_pole and _is_polar_circle(lat, eps):
+        _raise_polar_circle_error(lat, eps, hsys_char, func_name)
 
-    # Check for polar circle condition for Placidus/Koch/Gauquelin
-    # These systems cannot be calculated when abs(lat) + eps > 90°
-    # Raise detailed PolarCircleError with useful information
-    if _polar_raise_applies(hsys_char) and _is_polar_circle(lat, eps):
-        _raise_polar_circle_error(lat, eps, hsys_char, "houses")
+    cusps = system.build_cusps(
+        _HouseFrame(armc_active, calc_lat, eps, asc, mc, sun_dec)
+    )
 
-    # Calculate Sun's declination for Sunshine houses ('I' or 'i')
-    # This is needed before the house dispatch since only houses has jd_ut
+    if system.mc_branch is _McBranch.FROM_CUSPS:
+        # The Sunshine constructions choose the meridian branch themselves;
+        # the returned MC follows their cusp 10.
+        ascmc[1] = cusps[10]
+    elif system.mc_branch is _McBranch.ROTATE_REPORTED and _mc_below_horizon(
+        armc_deg, eps, lat
+    ):
+        # APC: the parallel construction has already selected the eastern
+        # Ascendant branch, so only the meridian pair follows the MC above the
+        # horizon; rotating every cusp would undo that geometrical selection
+        # at polar latitudes.
+        ascmc[1] = (ascmc[1] + 180.0) % 360.0
+        cusps[10] = ascmc[1]
+        cusps[4] = (ascmc[1] + 180.0) % 360.0
+
+    # Slot 0 of the cusp list is unused (reference API compatible: no padding
+    # in the returned tuple). degnorm snaps the bare-%360 artifact (a
+    # tiny-negative angle wrapping to exactly 360.0) back to 0.0, keeping
+    # every output in [0, 360) like the reference API.
+    return (
+        tuple(degnorm(c) for c in cusps[1 : system.sectors + 1]),
+        tuple(degnorm(a) for a in ascmc),
+    )
+
+
+def houses(
+    tjdut: float, lat: float, lon: float, hsys: int = ord("P"), iflag: int = 0
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """
+    Calculate astrological house cusps and angles for a given time and location.
+
+    Reference API compatible function. Computes house divisions according to
+    the specified house system and returns both house cusps and major angles (ASCMC).
+
+    Args:
+        tjdut: Julian Day in Universal Time (UT1)
+        lat: Geographic latitude in degrees (positive North, negative South)
+        lon: Geographic longitude in degrees (positive East, negative West)
+        hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
+        iflag: Calculation flags (optional, default 0). Use FLG_MOSEPH for extended
+               date range (-3000 to +3000 CE). The ephemeris flag is propagated to
+               internal calculations (e.g., Sun position for Sunshine houses).
+
+    Returns:
+        Tuple containing:
+            - cusps: Tuple of 12 house cusp longitudes (houses 1-12) in degrees
+            - ascmc: Tuple of 8 angles: [Asc, MC, ARMC, Vertex, EquAsc, CoAsc, CoAscKoch, PolarAsc]
+
+    House Systems Supported:
+        'P' = Placidus, 'K' = Koch, 'R' = Regiomontanus, 'C' = Campanus,
+        'E'/'A' = Equal, 'W' = Whole Sign, 'O' = Porphyry, 'B' = Alcabitius,
+        'T' = Topocentric, 'M' = Morinus, 'X' = Meridian, 'H' = Horizontal,
+        'V' = Vehlow, 'G' = Gauquelin, 'U' = Krusinski, 'F' = Carter,
+        'Y' = APC, 'N' = Natural Gradient
+
+    Example:
+        >>> cusps, ascmc = houses(2451545.0, 51.5, -0.12, ord('P'))  # London, Placidus
+        >>> asc, mc = ascmc[0], ascmc[1]
+        >>> house_1_start = cusps[0]  # First house cusp
+    """
+    # Validate latitude and longitude ranges
+    validate_coordinates(lat, lon, "houses")
+
+    # Sidereal time (ARMC) and true obliquity from the long-term model.
+    # ARMC = apparent sidereal time at longitude 0 + lon. Both the sidereal time
+    # and the obliquity use the Vondrák 2011 long-term realization (see
+    # sidereal_longterm), so cusps remain correct across the whole supported date
+    # range rather than diverging at remote epochs.
+    armc0_deg, eps = _house_armc_obliquity(tjdut)
+    armc_deg = (armc0_deg + lon) % 360.0
+
+    hsys_char = _hsys_to_char(hsys)
+
+    # The Sun's declination is read by the Sunshine systems only, and this is
+    # the one entry point that has the date to compute it.
     sun_dec = 0.0
-    if hsys_char in ("I", "i"):
-        try:
-            # Extract ephemeris flags: FLG_JPLEPH=1, FLG_SWIEPH=2
-            eph_flags = iflag & (FLG_JPLEPH | FLG_SWIEPH)
-            sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
-            sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
-        except EphemerisRangeError:
-            # Date outside the loaded ephemeris: analytic solar declination.
-            sun_dec = _sun_declination_analytic(tjdut)
-        except (IndexError, TypeError, ValueError, CalculationError):
-            # Fallback to 0 declination (same as equinox behavior)
-            sun_dec = 0.0
+    if _house_system(hsys_char).reads_sun_declination:
+        sun_dec = _sunshine_sun_declination(tjdut, iflag)
 
-    cusps = [0.0] * 13
+    return _houses_from_armc(armc_deg, lat, eps, hsys_char, sun_dec, "houses")
 
-    if hsys_char == "P":  # Placidus
-        cusps = _houses_placidus(
-            armc_active, lat, eps, asc, mc
-        )  # Placidus fails anyway
-    elif hsys_char == "K":  # Koch
-        cusps = _houses_koch(armc_active, lat, eps, asc, mc)  # Koch fails anyway
-    elif hsys_char == "R":  # Regiomontanus
-        cusps = _houses_regiomontanus(armc_active, calc_lat, eps, asc, mc)
-    elif hsys_char == "C":  # Campanus
-        cusps = _houses_campanus(armc_active, calc_lat, eps, asc, mc)
-    elif hsys_char == "E":  # Equal (Ascendant)
-        cusps = _houses_equal(asc)
-    elif hsys_char == "A":  # Equal (MC)
-        cusps = _houses_equal(asc)  # Equal MC uses the same algorithm as Equal Asc
-    elif hsys_char == "W":  # Whole Sign
-        cusps = _houses_whole_sign(asc)
-    elif hsys_char == "O":  # Porphyry
-        cusps = _houses_porphyry(asc, mc)
-    elif hsys_char == "B":  # Alcabitius
-        cusps = _houses_alcabitius(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "T":  # Polich/Page (Topocentric)
-        cusps = _houses_polich_page(armc_active, calc_lat, eps, asc, mc)
-    elif hsys_char == "M":  # Morinus
-        cusps = _houses_morinus(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "X":  # Meridian (Axial)
-        cusps = _houses_meridian(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "V":  # Vehlow
-        cusps = _houses_vehlow(asc)
-    elif hsys_char == "H":  # Horizontal (Azimuthal)
-        cusps = _houses_horizontal(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "Y":  # APC Houses
-        cusps = _houses_apc(armc_active, lat, eps, asc, mc)
-        # APC at polar latitudes needs cusps and MC flipped if MC is below horizon
-        # (compatibility contract - different from R/C/T which flip armc_active)
-        mc_dec_rad = math.atan(
-            math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
+
+# Names used in the messages of the two *_with_fallback entry points.
+_FALLBACK_SYSTEM_NAMES: dict[str, str] = {
+    "P": "Placidus",
+    "K": "Koch",
+    "G": "Gauquelin",
+    "O": "Porphyry",
+    "E": "Equal",
+    "W": "Whole Sign",
+    "R": "Regiomontanus",
+    "C": "Campanus",
+    "T": "Topocentric",
+    "B": "Alcabitius",
+    "M": "Morinus",
+    "X": "Meridian",
+    "H": "Horizontal",
+    "V": "Vehlow",
+    "U": "Krusinski",
+    "F": "Carter",
+    "Y": "APC",
+    "N": "Natural Gradient",
+}
+
+
+def _houses_with_fallback_impl(
+    compute: Callable[[Any], tuple[tuple[float, ...], tuple[float, ...]]],
+    classify_latitude: Callable[[], dict],
+    lat: float,
+    hsys: int,
+    fallback_hsys: int,
+    validate_cusps: bool,
+) -> tuple[tuple[float, ...], tuple[float, ...], bool, str | None]:
+    """Shared body of :func:`houses_with_fallback` and its ARMC twin.
+
+    ``compute(selector)`` runs the underlying entry point for one house
+    system; ``classify_latitude()`` is the extreme-latitude classification
+    that entry point consults for its warning (:func:`get_extreme_latitude_info`
+    with the obliquity it knows). The selectors are normalised here, the
+    primary system is tried, and the fallback is used when the primary raises
+    :class:`PolarCircleError` or, if ``validate_cusps``, returns cusps that
+    fail :func:`_validate_cusps`.
+    """
+    hsys_char = _hsys_to_char(hsys)
+    fallback_char = (
+        _int_hsys_to_char(fallback_hsys)
+        if isinstance(fallback_hsys, int)
+        else fallback_hsys
+    )
+    primary_name = _FALLBACK_SYSTEM_NAMES.get(hsys_char, hsys_char)
+    fallback_name = _FALLBACK_SYSTEM_NAMES.get(fallback_char, fallback_char)
+
+    # Check for extreme latitude before calculation
+    is_extreme = _is_extreme_latitude(lat)
+
+    try:
+        cusps, ascmc = compute(hsys)
+
+        # Validate cusps if requested
+        if validate_cusps:
+            is_valid, validation_error = _validate_cusps(cusps)
+            if not is_valid:
+                # Invalid cusps detected - fall back to stable system
+                cusps, ascmc = compute(fallback_hsys)
+                warning = (
+                    f"{primary_name} house system produced invalid cusps at latitude "
+                    f"{abs(lat):.2f}° ({validation_error}). Using {fallback_name} as fallback."
+                )
+                return cusps, ascmc, True, warning
+
+        # Generate warning for extreme latitudes even if calculation succeeded
+        if is_extreme:
+            info = classify_latitude()
+            if hsys_char in info["unstable_systems"]:
+                warning = (
+                    f"{primary_name} house system may have reduced accuracy at "
+                    f"extreme latitude {abs(lat):.2f}°{info['hemisphere']}. "
+                    f"Consider using a stable system like Porphyry, Equal, or Whole Sign."
+                )
+                return cusps, ascmc, False, warning
+
+        return cusps, ascmc, False, None
+    except PolarCircleError as e:
+        # Use fallback house system
+        cusps, ascmc = compute(fallback_hsys)
+
+        warning = (
+            f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
+            f"(polar circle threshold: {e.threshold:.2f}°). "
+            f"Using {fallback_name} as fallback."
         )
-        lat_rad = math.radians(lat)
-        sin_alt = math.sin(lat_rad) * math.sin(mc_dec_rad) + math.cos(
-            lat_rad
-        ) * math.cos(mc_dec_rad)
-        if sin_alt < 0:
-            # Flip MC in ascmc
-            ascmc[1] = (ascmc[1] + 180.0) % 360.0
-            # The vector construction has already selected the eastern
-            # Ascendant branch for the APC parallel.  Only the meridian angle
-            # changes branch here; rotating every cusp would undo that
-            # geometrical selection at polar latitudes.
-            cusps[10] = ascmc[1]
-            cusps[4] = (ascmc[1] + 180.0) % 360.0
-    elif hsys_char == "F":  # Carter (Poli-Equatorial)
-        cusps = _houses_carter(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "U":  # Krusinski
-        cusps = _houses_krusinski(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "N":  # Natural Gradient
-        cusps = _houses_natural_gradient(armc_active, lat, eps, asc, mc)
-    elif hsys_char in ("G", "g"):  # Gauquelin
-        # Lowercase 'g' computes the same 36 Gauquelin sectors.
-        # Compatibility contract: 'g' is folded for the computation
-        # (house_pos and house_name treat 'g' as Gauquelin) but the RETURN
-        # SHAPE is keyed on the uppercase byte only, so 'g' yields the first
-        # 12 sectors in the ordinary 12-cusp tuple (see the shape check
-        # below).
-        cusps = _houses_gauquelin(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "S":  # Sripati
-        cusps = _houses_sripati(asc, mc)
-    elif hsys_char == "L":  # Pullen SD (Sinusoidal Delta / Neo-Porphyry)
-        cusps = _houses_pullen_sd(asc, mc)
-    elif hsys_char == "Q":  # Pullen SR (Sinusoidal Ratio)
-        cusps = _houses_pullen_sr(asc, mc)
-    elif hsys_char == "D":  # Equal from MC
-        cusps = _houses_equal_mc(asc, mc)
-    elif hsys_char == "I":  # Sunshine (Treindl)
-        cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, sun_dec)
-        # Sunshine may flip MC internally (mc_under_horizon handling).
-        # Sync ascmc[1] back from cusps[10] so the returned MC matches.
-        ascmc[1] = cusps[10]
-    elif hsys_char == "i":  # Sunshine (Makransky)
-        cusps = _houses_sunshine_makransky(armc_active, lat, eps, asc, mc, sun_dec)
-        ascmc[1] = cusps[10]
-    elif hsys_char == "J":  # Savard-A
-        cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
-    else:
-        # Default to Placidus
-        cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
-
-    # Return cusps array (reference API compatible: no padding at index 0)
-    # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses.
-    # degnorm snaps the bare-%360 artifact (a tiny-negative angle wrapping to
-    # exactly 360.0) back to 0.0, keeping every output in [0, 360) like the
-    # reference API.
-    if hsys_char == "G":
-        return tuple(degnorm(c) for c in cusps[1:37]), tuple(degnorm(a) for a in ascmc)
-    return tuple(degnorm(c) for c in cusps[1:13]), tuple(degnorm(a) for a in ascmc)
+        return cusps, ascmc, True, warning
 
 
 def houses_with_fallback(
@@ -1152,77 +1248,14 @@ def houses_with_fallback(
         get_polar_latitude_threshold: Returns the threshold for a given obliquity
         get_extreme_latitude_info: Returns detailed latitude classification information
     """
-    # House system names for error messages
-    system_names = {
-        "P": "Placidus",
-        "K": "Koch",
-        "G": "Gauquelin",
-        "O": "Porphyry",
-        "E": "Equal",
-        "W": "Whole Sign",
-        "R": "Regiomontanus",
-        "C": "Campanus",
-        "T": "Topocentric",
-        "B": "Alcabitius",
-        "M": "Morinus",
-        "X": "Meridian",
-        "H": "Horizontal",
-        "V": "Vehlow",
-        "U": "Krusinski",
-        "F": "Carter",
-        "Y": "APC",
-        "N": "Natural Gradient",
-    }
-
-    hsys_char = _hsys_to_char(hsys)
-    fallback_char = (
-        _int_hsys_to_char(fallback_hsys)
-        if isinstance(fallback_hsys, int)
-        else fallback_hsys
+    return _houses_with_fallback_impl(
+        lambda selector: houses(jd_ut, lat, lon, selector),
+        lambda: get_extreme_latitude_info(lat),
+        lat,
+        hsys,
+        fallback_hsys,
+        validate_cusps,
     )
-    primary_name = system_names.get(hsys_char, hsys_char)
-    fallback_name = system_names.get(fallback_char, fallback_char)
-
-    # Check for extreme latitude before calculation
-    is_extreme = _is_extreme_latitude(lat)
-
-    try:
-        cusps, ascmc = houses(jd_ut, lat, lon, hsys)
-
-        # Validate cusps if requested
-        if validate_cusps:
-            is_valid, validation_error = _validate_cusps(cusps)
-            if not is_valid:
-                # Invalid cusps detected - fall back to stable system
-                cusps, ascmc = houses(jd_ut, lat, lon, fallback_hsys)
-                warning = (
-                    f"{primary_name} house system produced invalid cusps at latitude "
-                    f"{abs(lat):.2f}° ({validation_error}). Using {fallback_name} as fallback."
-                )
-                return cusps, ascmc, True, warning
-
-        # Generate warning for extreme latitudes even if calculation succeeded
-        if is_extreme:
-            info = get_extreme_latitude_info(lat)
-            if hsys_char in info["unstable_systems"]:
-                warning = (
-                    f"{primary_name} house system may have reduced accuracy at "
-                    f"extreme latitude {abs(lat):.2f}°{info['hemisphere']}. "
-                    f"Consider using a stable system like Porphyry, Equal, or Whole Sign."
-                )
-                return cusps, ascmc, False, warning
-
-        return cusps, ascmc, False, None
-    except PolarCircleError as e:
-        # Use fallback house system
-        cusps, ascmc = houses(jd_ut, lat, lon, fallback_hsys)
-
-        warning = (
-            f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
-            f"(polar circle threshold: {e.threshold:.2f}°). "
-            f"Using {fallback_name} as fallback."
-        )
-        return cusps, ascmc, True, warning
 
 
 def houses_armc_with_fallback(
@@ -1265,79 +1298,16 @@ def houses_armc_with_fallback(
         houses_armc: Standard function that raises PolarCircleError at polar latitudes
         get_extreme_latitude_info: Returns detailed latitude classification information
     """
-    # House system names for error messages
-    system_names = {
-        "P": "Placidus",
-        "K": "Koch",
-        "G": "Gauquelin",
-        "O": "Porphyry",
-        "E": "Equal",
-        "W": "Whole Sign",
-        "R": "Regiomontanus",
-        "C": "Campanus",
-        "T": "Topocentric",
-        "B": "Alcabitius",
-        "M": "Morinus",
-        "X": "Meridian",
-        "H": "Horizontal",
-        "V": "Vehlow",
-        "U": "Krusinski",
-        "F": "Carter",
-        "Y": "APC",
-        "N": "Natural Gradient",
-    }
-
-    hsys_char = _hsys_to_char(hsys)
-    fallback_char = (
-        _int_hsys_to_char(fallback_hsys)
-        if isinstance(fallback_hsys, int)
-        else fallback_hsys
+    # ascmc9 (the Sun's declination) is forwarded so the Sunshine system
+    # ('I'/'i') gets it; houses_armc ignores it for every other system.
+    return _houses_with_fallback_impl(
+        lambda selector: houses_armc(armc, lat, eps, selector, ascmc9),
+        lambda: get_extreme_latitude_info(lat, eps),
+        lat,
+        hsys,
+        fallback_hsys,
+        validate_cusps,
     )
-    primary_name = system_names.get(hsys_char, hsys_char)
-    fallback_name = system_names.get(fallback_char, fallback_char)
-
-    # Check for extreme latitude before calculation
-    is_extreme = _is_extreme_latitude(lat)
-
-    try:
-        # ascmc9 (the Sun's declination) is forwarded so the Sunshine system
-        # ('I'/'i') gets it; houses_armc ignores it for every other system.
-        cusps, ascmc = houses_armc(armc, lat, eps, hsys, ascmc9)
-
-        # Validate cusps if requested
-        if validate_cusps:
-            is_valid, validation_error = _validate_cusps(cusps)
-            if not is_valid:
-                # Invalid cusps detected - fall back to stable system
-                cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys, ascmc9)
-                warning = (
-                    f"{primary_name} house system produced invalid cusps at latitude "
-                    f"{abs(lat):.2f}° ({validation_error}). Using {fallback_name} as fallback."
-                )
-                return cusps, ascmc, True, warning
-
-        # Generate warning for extreme latitudes even if calculation succeeded
-        if is_extreme:
-            info = get_extreme_latitude_info(lat, eps)
-            if hsys_char in info["unstable_systems"]:
-                warning = (
-                    f"{primary_name} house system may have reduced accuracy at "
-                    f"extreme latitude {abs(lat):.2f}°{info['hemisphere']}. "
-                    f"Consider using a stable system like Porphyry, Equal, or Whole Sign."
-                )
-                return cusps, ascmc, False, warning
-
-        return cusps, ascmc, False, None
-    except PolarCircleError as e:
-        # Use fallback house system
-        cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys, ascmc9)
-
-        warning = (
-            f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
-            f"(polar circle threshold: {e.threshold:.2f}°). "
-            f"Using {fallback_name} as fallback."
-        )
-        return cusps, ascmc, True, warning
 
 
 def houses_armc(
@@ -1378,289 +1348,16 @@ def houses_armc(
         >>> asc, mc = ascmc[0], ascmc[1]
     """
     # Validate latitude range (must be in [-90, 90])
-    from .exceptions import validate_latitude
-
     validate_latitude(lat, "houses_armc")
 
     # Normalize ARMC to 0-360
     armc_deg = armc % 360.0
 
-    # Convert house system identifier to character
     hsys_char = _hsys_to_char(hsys)
 
-    # Determine if we need to flip MC (and thus ARMC) for specific systems
-    # Regiomontanus (R), Campanus (C), Polich/Page (T) flip MC if below horizon.
-    armc_active = armc_deg
-
-    if hsys_char in ["R", "C", "T", "J"]:
-        # Check altitude of MC calculated from original ARMC
-        mc_dec_rad = math.atan(
-            math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
-        )
-        lat_rad = math.radians(lat)
-        sin_alt = math.sin(lat_rad) * math.sin(mc_dec_rad) + math.cos(
-            lat_rad
-        ) * math.cos(mc_dec_rad)
-
-        if sin_alt < 0:
-            armc_active = (armc_deg + 180.0) % 360.0
-
-    # Calculate MC from armc_active (flipped if needed)
-    mc_rad = math.atan2(
-        math.tan(math.radians(armc_active)), math.cos(math.radians(eps))
-    )
-    mc = math.degrees(mc_rad)
-    # Adjust quadrant to match armc_active
-    if mc < 0:
-        mc += 360.0
-
-    # Quadrant correction: MC should be in the same half of the ecliptic as ARMC
-    # ARMC in (90, 270] -> MC should be in (90, 270]
-    # ARMC in (270, 360] or [0, 90] -> MC should be in (270, 360] or [0, 90]
-    if 90.0 < armc_active <= 270.0:
-        if mc <= 90.0 or mc > 270.0:
-            mc += 180.0
-    elif armc_active > 270.0:
-        if mc <= 270.0:
-            mc += 180.0
-    elif armc_active <= 90.0:
-        if mc > 90.0:
-            mc += 180.0
-
-    mc = mc % 360.0
-
-    # Ascendant uses armc_deg (Original)
-    num = math.cos(math.radians(armc_deg))
-    den = -(
-        math.sin(math.radians(armc_deg)) * math.cos(math.radians(eps))
-        + math.tan(math.radians(lat)) * math.sin(math.radians(eps))
-    )
-    if abs(num) < 1e-12 and abs(den) < 1e-12:
-        # Ecliptic exactly tangent to the horizon (|lat| == 90 - eps with the
-        # equinoctial colure on the meridian): the rising point degenerates and
-        # atan2(0, 0) is float noise. The reference API pins the ascendant to
-        # the east point, ARMC + 90.
-        asc = (armc_deg + 90.0) % 360.0
-    else:
-        asc_rad = math.atan2(num, den)
-        asc = math.degrees(asc_rad)
-        asc = asc % 360.0
-
-        # Ensure Ascendant is on the Eastern Horizon (Azimuth in [0, 180])
-        # We check Azimuth relative to the TRUE ARMC (armc_deg)
-        asc_r = math.radians(asc)
-        eps_r = math.radians(eps)
-
-        # RA
-        y = math.cos(eps_r) * math.sin(asc_r)
-        x = math.cos(asc_r)
-        ra_r = math.atan2(y, x)
-        ra = math.degrees(ra_r) % 360.0
-
-        # Dec
-        dec_r = math.asin(math.sin(eps_r) * math.sin(asc_r))
-
-        # Hour Angle using TRUE ARMC
-        h_deg = (armc_deg - ra + 360.0) % 360.0
-        h_r = math.radians(h_deg)
-
-        # Azimuth
-        # tan(Az) = sin(H) / (sin(lat)cos(H) - cos(lat)tan(Dec))
-        lat_r = math.radians(lat)
-
-        num_az = math.sin(h_r)
-        den_az = math.sin(lat_r) * math.cos(h_r) - math.cos(lat_r) * math.tan(dec_r)
-        az_r = math.atan2(num_az, den_az)
-        az = math.degrees(az_r)
-        az = (az + 180.0) % 360.0
-
-        # Check if H is West (0-180). If so, Asc is Setting (Descendant).
-        # We want Rising.
-        if 0.0 < h_deg < 180.0:
-            asc = (asc + 180.0) % 360.0
-
-    # Ensure ASC is in [0, 360) range (handle floating-point near-360 values)
-    if asc >= 360.0 or (360.0 - asc) < 1e-10:
-        asc = 0.0
-
-    # Vertex uses the original ARMC and the geometric equator convention in
-    # _calc_vertex.
-    vertex = _calc_vertex(armc_deg, eps, lat)
-
-    # Equatorial Ascendant (East Point)
-    # This is the intersection of the ecliptic with the celestial equator in the east
-    # It's the ecliptic longitude where RA = ARMC + 90°
-    equ_asc_ra = (armc_deg + 90.0) % 360.0
-    # Convert RA to ecliptic longitude
-    equ_asc_ra_r = math.radians(equ_asc_ra)
-    eps_r = math.radians(eps)
-    y = math.sin(equ_asc_ra_r)
-    x = math.cos(equ_asc_ra_r) * math.cos(eps_r)
-    equ_asc = math.degrees(math.atan2(y, x)) % 360.0
-
-    # Co-Ascendant W. Koch (coasc1)
-    # coasc1 = Asc(ARMC - 90°, latitude) + 180°
-    coasc_armc = (armc_deg - 90.0) % 360.0
-    co_asc_koch = _calc_ascendant(coasc_armc, eps, lat, lat)
-
-    # Add 180° to get opposite point
-    co_asc_koch = (co_asc_koch + 180.0) % 360.0
-
-    # Co-Ascendant M. Munkasey (coasc2)
-    # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
-    # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
-    # At the exact equator the northern (+90-lat) and southern (-90-lat) pole
-    # heights give antipodal one-sided limits for coasc2 (180 vs 0).
-    # Compatibility contract: the degeneracy is resolved per house system: the horizon
-    # system 'H' takes the southern branch (coasc2 -> 0), while every other
-    # system takes the northern branch (coasc2 -> 180). Away from lat == 0 the
-    # sign of the latitude selects the branch unambiguously and the two
-    # implementations already agree.
-    coasc2_armc = (armc_deg + 90.0) % 360.0
-    if lat > 0.0 or (lat == 0.0 and hsys_char != "H"):
-        coasc2_lat = 90.0 - lat
-    else:
-        coasc2_lat = -90.0 - lat
-    co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
-
-    # Polar Ascendant M. Munkasey (polasc)
-    # polasc = Asc(ARMC - 90°, latitude)
-    # Note: This is the same as coasc1 but WITHOUT the +180°
-    polar_asc = _calc_ascendant(coasc_armc, eps, lat, lat)
-
-    # Build ASCMC array with 8 elements (reference API compatible)
-    ascmc = [0.0] * 8
-    ascmc[0] = asc
-    ascmc[1] = mc
-    ascmc[2] = armc_deg
-    ascmc[3] = vertex
-    ascmc[4] = equ_asc
-    ascmc[5] = co_asc_koch  # coasc1 (W. Koch) at index 5
-    ascmc[6] = co_asc  # coasc2 (M. Munkasey) at index 6
-    ascmc[7] = polar_asc
-
-    # House Cusps
-    # Use armc_active for house calculations
-    # If MC was flipped, we might need to flip latitude for intermediate cusps
-    calc_lat = lat
-    if armc_active != armc_deg:
-        # MC was flipped. Flip latitude for intermediate cusp calculations.
-        calc_lat = -lat
-
-    # Check for polar circle condition for Placidus/Koch/Gauquelin
-    # These systems cannot be calculated when abs(lat) + eps > 90°
-    # Raise detailed PolarCircleError with useful information
-    if _polar_raise_applies(hsys_char) and _is_polar_circle(lat, eps):
-        _raise_polar_circle_error(lat, eps, hsys_char, "houses_armc")
-
-    cusps = [0.0] * 13
-
-    if hsys_char == "P":  # Placidus
-        cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "K":  # Koch
-        cusps = _houses_koch(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "R":  # Regiomontanus
-        cusps = _houses_regiomontanus(armc_active, calc_lat, eps, asc, mc)
-    elif hsys_char == "C":  # Campanus
-        cusps = _houses_campanus(armc_active, calc_lat, eps, asc, mc)
-    elif hsys_char == "E":  # Equal (Ascendant)
-        cusps = _houses_equal(asc)
-    elif hsys_char == "A":  # Equal (MC)
-        cusps = _houses_equal(asc)  # Equal MC uses the same algorithm as Equal Asc
-    elif hsys_char == "W":  # Whole Sign
-        cusps = _houses_whole_sign(asc)
-    elif hsys_char == "O":  # Porphyry
-        cusps = _houses_porphyry(asc, mc)
-    elif hsys_char == "B":  # Alcabitius
-        cusps = _houses_alcabitius(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "T":  # Polich/Page (Topocentric)
-        cusps = _houses_polich_page(armc_active, calc_lat, eps, asc, mc)
-    elif hsys_char == "M":  # Morinus
-        cusps = _houses_morinus(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "X":  # Meridian (Axial)
-        cusps = _houses_meridian(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "V":  # Vehlow
-        cusps = _houses_vehlow(asc)
-    elif hsys_char == "H":  # Horizontal (Azimuthal)
-        cusps = _houses_horizontal(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "Y":  # APC Houses
-        cusps = _houses_apc(armc_active, lat, eps, asc, mc)
-        # APC at polar latitudes needs MC flipped in ascmc if MC is below horizon
-        # (compatibility contract - different from R/C/T which flip armc_active)
-        mc_dec_rad = math.atan(
-            math.sin(math.radians(armc_deg)) * math.tan(math.radians(eps))
-        )
-        lat_rad = math.radians(lat)
-        sin_alt = math.sin(lat_rad) * math.sin(mc_dec_rad) + math.cos(
-            lat_rad
-        ) * math.cos(mc_dec_rad)
-        if sin_alt < 0:
-            # Flip MC in ascmc
-            ascmc[1] = (ascmc[1] + 180.0) % 360.0
-            # The APC parallel is already oriented from the eastern
-            # Ascendant.  Synchronize only the meridian pair with the MC
-            # branch returned in ascmc.
-            cusps[10] = ascmc[1]
-            cusps[4] = (ascmc[1] + 180.0) % 360.0
-    elif hsys_char == "F":  # Carter (Poli-Equatorial)
-        cusps = _houses_carter(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "U":  # Krusinski
-        cusps = _houses_krusinski(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "N":  # Natural Gradient
-        cusps = _houses_natural_gradient(armc_active, lat, eps, asc, mc)
-    elif hsys_char in ("G", "g"):  # Gauquelin
-        # Lowercase 'g' computes the same 36 Gauquelin sectors.
-        # Compatibility contract: 'g' is folded for the computation
-        # (house_pos and house_name treat 'g' as Gauquelin) but the RETURN
-        # SHAPE is keyed on the uppercase byte only, so 'g' yields the first
-        # 12 sectors in the ordinary 12-cusp tuple (see the shape check
-        # below).
-        cusps = _houses_gauquelin(armc_active, lat, eps, asc, mc)
-    elif hsys_char == "S":  # Sripati
-        cusps = _houses_sripati(asc, mc)
-    elif hsys_char == "L":  # Pullen SD (Sinusoidal Delta / Neo-Porphyry)
-        cusps = _houses_pullen_sd(asc, mc)
-    elif hsys_char == "Q":  # Pullen SR (Sinusoidal Ratio)
-        cusps = _houses_pullen_sr(asc, mc)
-    elif hsys_char == "D":  # Equal from MC
-        cusps = _houses_equal_mc(asc, mc)
-    elif hsys_char == "I":  # Sunshine (Treindl)
-        # ascmc9 carries the Sun's declination (reference convention)
-        cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, ascmc9)
-        ascmc[1] = cusps[10]
-    elif hsys_char == "i":  # Sunshine (Makransky)
-        cusps = _houses_sunshine_makransky(armc_active, lat, eps, asc, mc, ascmc9)
-        ascmc[1] = cusps[10]
-    elif hsys_char == "J":  # Savard-A
-        cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
-    else:
-        # Default to Placidus
-        cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
-
-    # Return cusps array (reference API compatible: no padding at index 0)
-    # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses.
-    # degnorm snaps the bare-%360 artifact (a tiny-negative angle wrapping to
-    # exactly 360.0) back to 0.0, keeping every output in [0, 360) like the
-    # reference API.
-    if hsys_char == "G":
-        return tuple(degnorm(c) for c in cusps[1:37]), tuple(degnorm(a) for a in ascmc)
-    return tuple(degnorm(c) for c in cusps[1:13]), tuple(degnorm(a) for a in ascmc)
-
-
-def _hsys_to_char(hsys: int | bytes | str) -> str:
-    """Normalize a house-system selector (int code, bytes, or str) to a char.
-
-    An integer outside the Unicode range is an unknown selector like any
-    other and folds to ``_UNKNOWN_HSYS_CHAR`` (see ``_int_hsys_to_char``).
-    Letting ``chr()`` raise made one class of unknown selector fail with an
-    untyped ValueError while every other unmapped value reached the
-    documented default.
-    """
-    if isinstance(hsys, int):
-        return _fold_hsys_case(_int_hsys_to_char(hsys))
-    if isinstance(hsys, bytes):
-        return _fold_hsys_case(hsys.decode("latin-1"))
-    return _fold_hsys_case(str(hsys))
+    # ascmc9 carries the Sun's declination (reference convention); only the
+    # Sunshine systems read it.
+    return _houses_from_armc(armc_deg, lat, eps, hsys_char, ascmc9, "houses_armc")
 
 
 # House systems whose reference cusp SPEEDS follow a closed-form analytic rule
@@ -1764,7 +1461,7 @@ def houses_armc_ex2(
         # 'W'/'N' and 1296000 deg/day for every other system.
         if (
             sign_pinned_cusp
-            and _fold_hsys_case(chr(_hsys_code(hsys))) in _SIGN_PINNED_HSYS
+            and _hsys_to_char(hsys) in _SIGN_PINNED_HSYS
             and abs(abs(diff) - 30.0) < 1e-6
         ):
             return 0.0
@@ -2328,7 +2025,7 @@ def houses_ex2(
     _, ascmc_hminus = houses_ex(tjdut - _DT_HALF, lat, lon, hsys, _flags_deg)
     _, ascmc_hplus = houses_ex(tjdut + _DT_HALF, lat, lon, hsys, _flags_deg)
 
-    _is_sign_pinned = _fold_hsys_case(chr(_hsys_code(hsys))) in _SIGN_PINNED_HSYS
+    _is_sign_pinned = _hsys_to_char(hsys) in _SIGN_PINNED_HSYS
 
     def _rate(after: float, before: float) -> float:
         d = after - before
@@ -4551,16 +4248,127 @@ def _houses_apc(
     cusps[10] = mc
     cusps[4] = (mc + 180.0) % 360.0
 
-    # Within polar circle, handle horizon crossing
+    # Within polar circle, handle horizon crossing: when the Ascendant trails
+    # the MC the whole wheel is turned half a round (clockwise direction).
     if abs(lat) >= 90.0 - eps:
         if difdeg2n(asc, mc) < 0:
-            # Flip all cusps by 180° (clockwise direction)
-            asc = (asc + 180.0) % 360.0
-            mc = (mc + 180.0) % 360.0
             for i in range(1, 13):
                 cusps[i] = (cusps[i] + 180.0) % 360.0
 
     return cusps
+
+
+# ---------------------------------------------------------------------------
+# House-system registry
+# ---------------------------------------------------------------------------
+# One row per selector character, consulted by _houses_from_armc through
+# _house_system. The adapters below bind each construction's own argument
+# list to the _HouseFrame the dispatcher hands out.
+
+_FrameConstruction = Callable[[float, float, float, float, float], List[float]]
+
+
+def _builds_on_frame(
+    construction: _FrameConstruction,
+) -> Callable[[_HouseFrame], List[float]]:
+    """Adapt a construction taking ``(armc, lat, eps, asc, mc)``."""
+    return lambda frame: construction(
+        frame.armc, frame.lat, frame.eps, frame.asc, frame.mc
+    )
+
+
+def _builds_on_ascendant(
+    construction: Callable[[float], List[float]],
+) -> Callable[[_HouseFrame], List[float]]:
+    """Adapt a construction taking the Ascendant only."""
+    return lambda frame: construction(frame.asc)
+
+
+def _builds_on_angles(
+    construction: Callable[[float, float], List[float]],
+) -> Callable[[_HouseFrame], List[float]]:
+    """Adapt a construction taking ``(asc, mc)``."""
+    return lambda frame: construction(frame.asc, frame.mc)
+
+
+def _builds_on_frame_and_sun(
+    construction: Callable[[float, float, float, float, float, float], List[float]],
+) -> Callable[[_HouseFrame], List[float]]:
+    """Adapt a construction taking ``(armc, lat, eps, asc, mc, sun_dec)``."""
+    return lambda frame: construction(
+        frame.armc, frame.lat, frame.eps, frame.asc, frame.mc, frame.sun_dec
+    )
+
+
+#: Placidus, also the system every selector the registry does not list is
+#: served with; like Placidus it raises inside the polar circle.
+_DEFAULT_HOUSE_SYSTEM = HouseSystem(
+    "P", _builds_on_frame(_houses_placidus), raises_at_pole=True
+)
+
+_HOUSE_SYSTEMS: dict[str, HouseSystem] = {
+    system.code: system
+    for system in (
+        _DEFAULT_HOUSE_SYSTEM,
+        HouseSystem("K", _builds_on_frame(_houses_koch), raises_at_pole=True),
+        HouseSystem(
+            "R",
+            _builds_on_frame(_houses_regiomontanus),
+            mc_branch=_McBranch.ROTATE_FRAME,
+        ),
+        HouseSystem(
+            "C", _builds_on_frame(_houses_campanus), mc_branch=_McBranch.ROTATE_FRAME
+        ),
+        # 'A' is served by the same Ascendant-anchored equal wheel as 'E'.
+        HouseSystem("E", _builds_on_ascendant(_houses_equal)),
+        HouseSystem("A", _builds_on_ascendant(_houses_equal)),
+        HouseSystem("W", _builds_on_ascendant(_houses_whole_sign)),
+        HouseSystem("O", _builds_on_angles(_houses_porphyry)),
+        HouseSystem("B", _builds_on_frame(_houses_alcabitius)),
+        HouseSystem(
+            "T",
+            _builds_on_frame(_houses_polich_page),
+            mc_branch=_McBranch.ROTATE_FRAME,
+        ),
+        HouseSystem("M", _builds_on_frame(_houses_morinus)),
+        HouseSystem("X", _builds_on_frame(_houses_meridian)),
+        HouseSystem("V", _builds_on_ascendant(_houses_vehlow)),
+        HouseSystem("H", _builds_on_frame(_houses_horizontal)),
+        HouseSystem(
+            "Y", _builds_on_frame(_houses_apc), mc_branch=_McBranch.ROTATE_REPORTED
+        ),
+        HouseSystem("F", _builds_on_frame(_houses_carter)),
+        HouseSystem("U", _builds_on_frame(_houses_krusinski)),
+        HouseSystem("N", _builds_on_frame(_houses_natural_gradient)),
+        HouseSystem(
+            "G", _builds_on_frame(_houses_gauquelin), raises_at_pole=True, sectors=36
+        ),
+        # Lowercase 'g' computes the same 36 Gauquelin sectors, but the
+        # RETURN SHAPE is keyed on the uppercase byte only (compatibility
+        # contract): it yields the first 12 sectors in the ordinary 12-cusp
+        # tuple. house_pos and house_name fold it to 'G' instead.
+        HouseSystem("g", _builds_on_frame(_houses_gauquelin), raises_at_pole=True),
+        HouseSystem("S", _builds_on_angles(_houses_sripati)),
+        HouseSystem("L", _builds_on_angles(_houses_pullen_sd)),
+        HouseSystem("Q", _builds_on_angles(_houses_pullen_sr)),
+        HouseSystem("D", _builds_on_angles(_houses_equal_mc)),
+        HouseSystem(
+            "I",
+            _builds_on_frame_and_sun(_houses_sunshine),
+            mc_branch=_McBranch.FROM_CUSPS,
+            reads_sun_declination=True,
+        ),
+        HouseSystem(
+            "i",
+            _builds_on_frame_and_sun(_houses_sunshine_makransky),
+            mc_branch=_McBranch.FROM_CUSPS,
+            reads_sun_declination=True,
+        ),
+        HouseSystem(
+            "J", _builds_on_frame(_houses_savard_a), mc_branch=_McBranch.ROTATE_FRAME
+        ),
+    )
+}
 
 
 # Shared placement constants. Degenerate spherical arguments use a small
