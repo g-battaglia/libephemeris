@@ -319,7 +319,7 @@ class TestResolveStar2WithBayer:
         """
         entry, err = _resolve_star2("Omega Crucis")  # no such Bayer star
         assert entry is None
-        assert "could not find" in err.lower()
+        assert "no fixed star matches" in err.lower()
 
 
 @pytest.mark.unit

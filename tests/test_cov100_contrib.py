@@ -36,7 +36,7 @@ def test_house_system_name_non_str_raises():
     """A non-str argument raises a TypeError naming the bad type."""
     with pytest.raises(TypeError) as exc:
         contrib.house_system_name(ord("P"))  # type: ignore[arg-type]
-    assert "must be str" in str(exc.value)
+    assert "expects a str code" in str(exc.value)
     assert "int" in str(exc.value)
 
 
