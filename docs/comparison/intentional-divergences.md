@@ -39,8 +39,8 @@ fitted direct `ε_A` series tilts its of-date ecliptic away from its own pole
 by up to ~6.5″ at −3000, which surfaces as a spurious ecliptic latitude on
 the Sun of the same size. LibEphemeris does not reproduce that
 inconsistency. The two realizations agree to < 0.001″ across 1900–2100, so
-modern-era output is unaffected; the direct series remains available as
-`sidereal_longterm.mean_obliquity_series_rad`.
+modern-era output is unaffected; the direct series is not evaluated anywhere
+in the library.
 
 ## `deltat_ex` is pure
 

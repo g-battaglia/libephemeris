@@ -50,11 +50,24 @@ years**, while agreeing with IAU 2006 to **sub-milliarcsecond** near J2000.0. So
 * modern results are **unchanged** (sub-mas agreement near J2000), and
 * ancient/future results are **scientifically correct** (no polynomial blow-up).
 
-The of-date **mean obliquity** is evaluated directly from the Vondrák obliquity
-series. This single realization is shared by the house cusps **and** the
-planetary/luminary position pipeline, so the bodies and the angles in one chart
-sit in a single, self-consistent precession/obliquity frame — a chart can never
-have its Sun and its Ascendant computed in mismatched frames.
+The model is evaluated by **ERFA** (pyerfa), the IAU SOFA-derived library that
+is already a dependency of libephemeris: `erfa.ltpecl` and `erfa.ltpequ` give
+the long-term ecliptic and equator poles of date, and `erfa.ltp` the precession
+matrix built from those two poles. No coefficient table of the Vondrák model is
+kept in this repository.
+
+The of-date **mean obliquity** is the angle between those same two poles — the
+poles the precession matrix is made of — so the precession and every
+equator↔ecliptic-of-date rotation form one self-consistent frame. This single
+realization is shared by the house cusps **and** the planetary/luminary
+position pipeline (`precession_vondrak.py` takes its obliquity from here and
+its matrices from `erfa.ltp`/`erfa.ltpb`), so the bodies and the angles in one
+chart sit in a single precession/obliquity frame — a chart can never have its
+Sun and its Ascendant computed in mismatched frames.
+
+Two details of the evaluation are project choices: an infinite Julian Date is
+refused with `ValueError` (ERFA would answer NaN), while NaN propagates; and
+the poles, the obliquity and the matrix are memoised per epoch.
 
 ### Sidereal time — a geometric construction, not a divergent polynomial
 
@@ -93,10 +106,11 @@ difference is the library's own ΔT, so houses and positions share one ΔT.
   *same* obliquity realization and the *same* ΔT. Using one model for positions and
   another for houses can place a body on the wrong side of a cusp at remote epochs
   even when each piece is individually "reasonable".
-* **Verifiability.** Every coefficient comes from the cited peer-reviewed
-  papers (Vondrák 2011 + corrigendum; Simon 1994) and the IAU 2006 GMST
-  expression (Capitaine, Wallace & Chapront 2003, A&A 412, 567) — a direct,
-  auditable implementation of published physics.
+* **Verifiability.** The Vondrák 2011 model is evaluated by ERFA's
+  `ltpecl`/`ltpequ`/`ltp`, the IAU standards implementation; the remaining
+  coefficients come from the cited peer-reviewed papers (Simon 1994; the IAU
+  2006 GMST expression of Capitaine, Wallace & Chapront 2003, A&A 412, 567) —
+  a direct, auditable implementation of published physics.
 
 ## The one honest caveat: ΔT at remote epochs
 
@@ -166,6 +180,10 @@ Validation is source-based and reproducible in this repository:
 
 - `tests/test_precession_vondrak.py` checks the published Vondrák/ERFA defining
   conditions and frame consistency.
+- `tests/test_v3_vondrak_consistency.py` rebuilds the pole-angle obliquity and
+  the long-term sidereal-time branch from `erfa.ltpecl`/`erfa.ltpequ`/`erfa.ltp`
+  directly and pins the module to them, together with the domain contract
+  (infinite epoch refused, NaN propagated).
 - Sidereal and house tests verify periodicity, round trips, continuity,
   derivative consistency, finite behavior at high latitudes, and tier edges.
 - Independent DE441 state vectors and ERFA frame routines provide a second

@@ -13,6 +13,11 @@ obliquity and ~0.66° of GMST at year -3000).
 The IAU 2006 models are used here only as the pre-fix baseline: inside the modern
 window (1850-2050) the fixes are, by design, a no-op, so the modern result must
 still match them to < 1e-6.
+
+The last group pins how :mod:`libephemeris.sidereal_longterm` evaluates the
+Vondrák model: the poles from ``erfa.ltpecl``/``erfa.ltpequ`` (the of-date mean
+obliquity is the angle between them) and the precession matrix from
+``erfa.ltp``, rebuilt here from ERFA directly, without the module's helpers.
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from __future__ import annotations
 import math
 
 import erfa
+import numpy as np
 import pytest
 
 from libephemeris import sidereal_longterm as sl
@@ -206,3 +212,78 @@ def test_azalt_matches_calc_ut_frame_at_3000bce_extended():
     )
     assert abs(_wrap180(az_ecl - az_equ)) * 3600.0 < 1e-2
     assert abs(alt_ecl - alt_equ) * 3600.0 < 1e-2
+
+
+# --------------------------------------------------------------------------
+# The Vondrák model is evaluated by ERFA: poles, obliquity, precession matrix
+# --------------------------------------------------------------------------
+#: Julian Dates (TT) from the deep past to the far future, both branch
+#: boundaries of the sidereal-time model included.
+_ERFA_GRID = tuple(
+    _J2000 + (year - 2000) * 365.25
+    for year in (-13000, -8000, -3000, -1000, 0, 1000, 1850, 2000, 2050, 2500, 5000)
+) + (sl._LTERM_T0, sl._LTERM_T1, 2451545.0 + 0.25)
+
+
+def _epj(jd_tt: float) -> float:
+    """Julian epoch, written out here rather than imported from the module."""
+    return 2000.0 + (jd_tt - _J2000) / 365.25
+
+
+def _rot_x(v: np.ndarray, angle: float) -> np.ndarray:
+    """Rotate ``v`` about the x-axis by ``angle`` (radians), the module's way."""
+    c, s = math.cos(angle), math.sin(angle)
+    return np.array([v[0], v[1] * c + v[2] * s, -v[1] * s + v[2] * c])
+
+
+@pytest.mark.parametrize("jd_tt", _ERFA_GRID)
+def test_mean_obliquity_is_the_angle_between_the_erfa_poles(jd_tt):
+    """``mean_obliquity_rad`` is acos(ltpecl · ltpequ) at the same epoch."""
+    pecl = np.asarray(erfa.ltpecl(_epj(jd_tt)))
+    pequ = np.asarray(erfa.ltpequ(_epj(jd_tt)))
+    expected = math.acos(max(-1.0, min(1.0, float(np.dot(pecl, pequ)))))
+    assert abs(sl.mean_obliquity_rad(jd_tt) - expected) < 1e-15
+    assert sl.mean_obliquity_deg(jd_tt) == math.degrees(sl.mean_obliquity_rad(jd_tt))
+
+
+@pytest.mark.parametrize("jd_ut1", _ERFA_GRID)
+def test_longterm_gmst_branch_is_built_on_erfa_ltp(jd_ut1):
+    """The geometric GMST branch rebuilt from ``erfa.ltp`` matches the module.
+
+    Simon (1994) mean longitude of the Earth, light-time, J2000 ecliptic →
+    J2000 equator, ``erfa.ltp`` to the mean equator of date, back to the
+    ecliptic of date with the pole-angle obliquity, plus the UT1 hour angle.
+    """
+    jd_tt = jd_ut1 + tu.deltat(jd_ut1)
+    t = (jd_tt - _J2000) / 365250.0
+    dlon = (
+        100.46645683
+        + (1295977422.83429 * t - 2.04411 * t * t - 0.00523 * t**3) / 3600.0
+    )
+    dlon = (dlon - sl._LIGHT_TIME_DAYS * 360.0 / 365.2425) % 360.0
+    v = np.array([math.cos(math.radians(dlon)), math.sin(math.radians(dlon)), 0.0])
+    v = _rot_x(v, -sl.mean_obliquity_rad(_J2000))
+    v = np.asarray(erfa.ltp(_epj(jd_tt))) @ v
+    v = _rot_x(v, sl.mean_obliquity_rad(jd_tt))
+    lon = math.degrees(math.atan2(v[1], v[0]))
+    expected = (lon + math.fmod(jd_ut1 - 0.5, 1.0) * 360.0) % 360.0
+    got = sl._mean_sidereal_longterm_deg(jd_ut1)
+    assert abs(_wrap180(got - expected)) * 3600.0 < 1e-9
+
+
+def test_infinite_epoch_is_refused_and_nan_propagates():
+    """The domain contract of the ERFA-backed evaluators.
+
+    ``math.sin(inf)`` used to raise ``ValueError`` out of the series; ERFA
+    would answer NaN. The module keeps the refusal explicit. NaN, which the
+    series propagated, still propagates.
+    """
+    for bad in (math.inf, -math.inf):
+        with pytest.raises(ValueError):
+            sl.mean_obliquity_rad(bad)
+        with pytest.raises(ValueError):
+            sl.mean_sidereal_time_deg(bad)
+        with pytest.raises(ValueError):
+            vondrak_mean_obliquity_deg(bad)
+    assert math.isnan(sl.mean_obliquity_rad(math.nan))
+    assert math.isnan(sl.mean_obliquity_deg(math.nan))

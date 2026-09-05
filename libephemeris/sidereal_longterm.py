@@ -40,13 +40,20 @@ while agreeing with IAU 2006 to sub-milliarcsecond near J2000.0. Adopting it:
   blow-up), and
 * leaves modern results **unchanged** (sub-mas agreement near J2000.0).
 
-The precession rotation is built from the Vondrák ecliptic-pole and equator-pole
-series (``PQ*`` and ``XY*``). The public of-date mean obliquity is the angle
-between those same two poles, so the precession matrix and every
-equator/ecliptic rotation share one self-consistent frame. Vondrák 2011 also
-publishes the direct ``p_A``/``ε_A`` obliquity series, transcribed in
-``_PEPOL``/``_PEPER`` below and exposed as a reference realization
-(:func:`mean_obliquity_series_rad`).
+The model is evaluated by **ERFA** (pyerfa), the IAU SOFA-derived library that
+is already a hard dependency of this package, rather than by coefficient tables
+kept in this module:
+
+* ``erfa.ltpecl`` — the long-term ecliptic pole of date,
+* ``erfa.ltpequ`` — the long-term equator pole (CIP) of date,
+* ``erfa.ltp``    — the precession matrix built from those two poles
+  (J2000.0 mean equator/equinox → mean equator/equinox of date).
+
+The public of-date mean obliquity is the angle between those same two poles, so
+the precession matrix and every equator/ecliptic rotation share one
+self-consistent frame. :mod:`libephemeris.precession_vondrak` takes its
+of-date mean obliquity from here and its matrices from the same ERFA routines
+(``erfa.ltp``/``erfa.ltpb``), so one chart's bodies and angles sit in one frame.
 
 How sidereal time is computed (the geometric method)
 ----------------------------------------------------
@@ -77,14 +84,16 @@ model (:func:`libephemeris.time_utils.deltat`), so houses and planetary position
 use one consistent ΔT.
 
 Provenance:
-    All coefficients are transcribed from the cited peer-reviewed papers
-    (Vondrák 2011 plus corrigendum A&A 541 C1; Simon 1994) and the IAU 2006
-    GMST expression (Capitaine, Wallace & Chapront 2003, A&A 412, 567). No
-    third-party source code is used. The series and geometric construction are
-    standard published astronomy. The modern/long-term branch boundary,
-    continuity offsets, caching, and floating-point evaluation order are
-    project choices; their derivation and tests are recorded in
-    ``docs/methodology/sidereal-time-longterm.md``.
+    The Vondrák 2011 poles and precession matrix are evaluated by ERFA
+    (``erfa.ltpecl``, ``erfa.ltpequ``, ``erfa.ltp``), the IAU SOFA-derived
+    library; no coefficient of that model is kept in this module. The mean
+    longitude of the Earth is transcribed from Simon et al. (1994) and the
+    modern-window GMST from the IAU 2006 expression (Capitaine, Wallace &
+    Chapront 2003, A&A 412, 567). The geometric construction is standard
+    published astronomy. The modern/long-term branch boundary, continuity
+    offsets, the refusal of an infinite epoch, caching, and floating-point
+    evaluation order are project choices; their derivation and tests are
+    recorded in ``docs/methodology/sidereal-time-longterm.md``.
 """
 
 from __future__ import annotations
@@ -92,16 +101,14 @@ from __future__ import annotations
 import math
 from functools import lru_cache
 
+import erfa
+
 # --------------------------------------------------------------------------
 # constants
 # --------------------------------------------------------------------------
 _J2000 = 2451545.0
-_AS2R = (math.pi / 180.0) / 3600.0  # arcseconds -> radians
 _D2PI = 2.0 * math.pi
 _DEG = math.pi / 180.0
-
-# Obliquity of the ecliptic at J2000.0 (IAU 2006): 84381.406".
-_EPS0 = 84381.406 * _AS2R
 
 # Sun-Earth light-time, in days: AU / c. AU = 1.495978707e11 m (IAU 2012),
 # c = 299792458 m/s, 86400 s/day  ->  ~0.0057755183 day.
@@ -116,269 +123,45 @@ _LTERM_T1 = 2469807.5  # 1 Jan 2050
 # model changes (set_delta_t_userdef / IERS). They are only evaluated on the
 # rare long-term branch (dates outside 1850-2050).
 
-# --------------------------------------------------------------------------
-# Vondrák 2011 (A&A 534, A22; corrigendum A&A 541, C1) coefficient series.
-# Units: amplitudes/polynomial coefficients in arcseconds; the periods of the
-# periodic terms are in Julian centuries (the argument is 2*pi*T/P with T =
-# (jd_tt - J2000)/36525 in Julian centuries), not years.
-# --------------------------------------------------------------------------
-
-# General precession in longitude / obliquity — polynomial part
-# (Vondrák, Capitaine & Wallace 2011, A&A 534, A22, Table 3: p_A, epsilon_A).
-_PEPOL = (
-    (8134.017132, 84028.206305),
-    (5043.0520035, 0.3624445),
-    (-0.00710733, -0.00004039),
-    (0.000000271, -0.000000110),
-)
-# General precession / obliquity — periodic part: [period, p_cos, q_cos, p_sin, q_sin]
-# (Vondrák, Capitaine & Wallace 2011, A&A 534, A22, Table 3).
-_PEPER = (
-    (409.90, 396.15, 537.22, 402.90, 417.15, 288.92, 4043.00, 306.00, 277.00, 203.00),
-    (
-        -6908.287473,
-        -3198.706291,
-        1453.674527,
-        -857.748557,
-        1173.231614,
-        -156.981465,
-        371.836550,
-        -216.619040,
-        193.691479,
-        11.891524,
-    ),
-    (
-        753.872780,
-        -247.805823,
-        379.471484,
-        -53.880558,
-        -90.109153,
-        -353.600190,
-        -63.115353,
-        -28.248187,
-        17.703387,
-        38.911307,
-    ),
-    (
-        -2845.175469,
-        449.844989,
-        -1255.915323,
-        886.736783,
-        418.887514,
-        997.912441,
-        -240.979710,
-        76.541307,
-        -36.788069,
-        -170.964086,
-    ),
-    (
-        -1704.720302,
-        -862.308358,
-        447.832178,
-        -889.571909,
-        190.402846,
-        -56.564991,
-        -296.222622,
-        -75.859952,
-        67.473503,
-        3.014055,
-    ),
-)
-
-# Ecliptic pole P, Q — polynomial part (Vondrák et al. 2011, Table 1).
-_PQPOL = (
-    (5851.607687, -1600.886300),
-    (-0.1189000, 1.1689818),
-    (-0.00028913, -0.00000020),
-    (0.000000101, -0.000000437),
-)
-# Ecliptic pole P, Q — periodic part (Vondrák et al. 2011, Table 1). Index 6 of the q_cos row carries the
-# A&A 541, C1 (2012) corrigendum value 198.296701 (the original printing had a typo).
-_PQPER = (
-    (708.15, 2309.0, 1620.0, 492.2, 1183.0, 622.0, 882.0, 547.0),
-    (
-        -5486.751211,
-        -17.127623,
-        -617.517403,
-        413.44294,
-        78.614193,
-        -180.732815,
-        -87.676083,
-        46.140315,
-    ),
-    (
-        -684.66156,
-        2446.28388,
-        399.671049,
-        -356.652376,
-        -186.387003,
-        -316.80007,
-        198.296701,
-        101.135679,
-    ),
-    (
-        667.66673,
-        -2354.886252,
-        -428.152441,
-        376.202861,
-        184.778874,
-        335.321713,
-        -185.138669,
-        -120.97283,
-    ),
-    (
-        -5523.863691,
-        -549.74745,
-        -310.998056,
-        421.535876,
-        -36.776172,
-        -145.278396,
-        -34.74445,
-        22.885731,
-    ),
-)
-
-# Equator pole X, Y — polynomial part (Vondrák et al. 2011, Table 2).
-_XYPOL = (
-    (5453.282155, -73750.930350),
-    (0.4252841, -0.7675452),
-    (-0.00037173, -0.00018725),
-    (-0.000000152, 0.000000231),
-)
-# Equator pole X, Y — periodic part (Vondrák et al. 2011, Table 2).
-_XYPER = (
-    (
-        256.75,
-        708.15,
-        274.2,
-        241.45,
-        2309.0,
-        492.2,
-        396.1,
-        288.9,
-        231.1,
-        1610.0,
-        620.0,
-        157.87,
-        220.3,
-        1200.0,
-    ),
-    (
-        -819.940624,
-        -8444.676815,
-        2600.009459,
-        2755.17563,
-        -167.659835,
-        871.855056,
-        44.769698,
-        -512.313065,
-        -819.415595,
-        -538.071099,
-        -189.793622,
-        -402.922932,
-        179.516345,
-        -9.814756,
-    ),
-    (
-        75004.344875,
-        624.033993,
-        1251.136893,
-        -1102.212834,
-        -2660.66498,
-        699.291817,
-        153.16722,
-        -950.865637,
-        499.754645,
-        -145.18821,
-        558.116553,
-        -23.923029,
-        -165.405086,
-        9.344131,
-    ),
-    (
-        81491.287984,
-        787.163481,
-        1251.296102,
-        -1257.950837,
-        -2966.79973,
-        639.744522,
-        131.600209,
-        -445.040117,
-        584.522874,
-        -89.756563,
-        524.42963,
-        -13.549067,
-        -210.157124,
-        -44.919798,
-    ),
-    (
-        1558.515853,
-        7774.939698,
-        -2219.534038,
-        -2523.969396,
-        247.850422,
-        -846.485643,
-        -1393.124055,
-        368.526116,
-        749.045012,
-        444.704518,
-        235.934465,
-        374.049623,
-        -171.33018,
-        -22.899655,
-    ),
-)
-
 
 # --------------------------------------------------------------------------
-# Vondrák series evaluators
+# Vondrák 2011 through ERFA: poles, obliquity, precession matrix
 # --------------------------------------------------------------------------
-@lru_cache(maxsize=4096)
-def mean_obliquity_series_rad(jd_tt: float) -> float:
-    """Direct Vondrák 2011 obliquity series (``p_A``/``ε_A``) in radians.
-
-    Evaluates the published ``_PEPOL``/``_PEPER`` obliquity polynomial+periodic
-    terms directly. It tracks IAU 2006 closely near J2000 while retaining the
-    long-term validity of Vondrák's published series. It is a *separate* fit
-    from the pole series that build the precession matrix, so it is kept as a
-    reference/diagnostic value; the public pipeline uses the pole-angle
-    obliquity (:func:`mean_obliquity_rad`) for frame self-consistency.
+def _julian_epoch(jd_tt: float) -> float:
+    """Convert a Julian Date (TT) to the Julian epoch ERFA's ``ltp*`` take.
 
     Args:
         jd_tt: Julian Date in TT.
 
     Returns:
-        The of-date mean obliquity in radians (direct series).
+        The Julian epoch (2000.0 at J2000.0).
+
+    Raises:
+        ValueError: if ``jd_tt`` is infinite. An infinite epoch has no place
+            on the model's time axis; it is refused the way the transcendental
+            functions refuse it (``math.sin(inf)`` raises this same error)
+            instead of letting ERFA answer NaN silently. NaN passes through
+            and yields NaN, as every other arithmetic path here does.
     """
-    t = (jd_tt - _J2000) / 36525.0
-    q = 0.0
-    periods, _pc, q_cos, _ps, q_sin = _PEPER
-    for i in range(len(periods)):
-        a = _D2PI * t / periods[i]
-        q += math.cos(a) * q_cos[i] + math.sin(a) * q_sin[i]
-    w = 1.0
-    for poly in _PEPOL:
-        q += poly[1] * w
-        w *= t
-    return q * _AS2R
+    if math.isinf(jd_tt):
+        raise ValueError("math domain error")
+    return 2000.0 + (jd_tt - _J2000) / 365.25
 
 
 @lru_cache(maxsize=4096)
 def mean_obliquity_rad(jd_tt: float) -> float:
     """Return the public of-date mean obliquity in radians.
 
-    The canonical value is the angle between the Vondrák ecliptic-pole and
-    equator-pole series — the same two poles that build the long-term
-    precession matrix. Deriving the obliquity from those poles makes the
-    precession and every equator↔ecliptic-of-date rotation one self-consistent
-    frame: a direction lying in the mean ecliptic of date (the Sun, by
-    definition) reduces to ~0 ecliptic latitude at every epoch. Pairing the
-    pole-based precession with the separately fitted direct ``ε_A`` series
-    would tilt the of-date ecliptic away from its own pole by up to ~6.5″ at
-    −3000, surfacing as a spurious ecliptic latitude on the Sun. The two
-    realizations agree to <0.001″ across 1900–2100 (identically 0 at J2000);
-    the direct series remains available as
-    :func:`mean_obliquity_series_rad`.
+    The canonical value is the angle between the Vondrák ecliptic pole
+    (``erfa.ltpecl``) and equator pole (``erfa.ltpequ``) — the same two poles
+    ERFA builds the long-term precession matrix from. Deriving the obliquity
+    from those poles makes the precession and every equator↔ecliptic-of-date
+    rotation one self-consistent frame: a direction lying in the mean ecliptic
+    of date (the Sun, by definition) reduces to ~0 ecliptic latitude at every
+    epoch. Pairing the pole-based precession with Vondrák's separately fitted
+    direct ``ε_A`` series would instead tilt the of-date ecliptic away from
+    its own pole by up to ~6.5″ at −3000, surfacing as a spurious ecliptic
+    latitude on the Sun; that series is therefore not used anywhere here.
 
     Args:
         jd_tt: Julian Date in TT.
@@ -386,8 +169,9 @@ def mean_obliquity_rad(jd_tt: float) -> float:
     Returns:
         The of-date mean obliquity in radians.
     """
-    ex, ey, ez = _ecliptic_pole(jd_tt)
-    qx, qy, qz = _equator_pole(jd_tt)
+    epj = _julian_epoch(jd_tt)
+    ex, ey, ez = (float(c) for c in erfa.ltpecl(epj))
+    qx, qy, qz = (float(c) for c in erfa.ltpequ(epj))
     d = ex * qx + ey * qy + ez * qz
     if d > 1.0:
         d = 1.0
@@ -402,100 +186,36 @@ def mean_obliquity_deg(jd_tt: float) -> float:
 
 
 @lru_cache(maxsize=4096)
-def _ecliptic_pole(jd_tt: float) -> tuple[float, float, float]:
-    """Unit vector of the ecliptic pole at ``jd_tt`` (Vondrák 2011)."""
-    t = (jd_tt - _J2000) / 36525.0
-    p = 0.0
-    q = 0.0
-    periods, p_cos, q_cos, p_sin, q_sin = _PQPER
-    for i in range(len(periods)):
-        a = _D2PI * t / periods[i]
-        s = math.sin(a)
-        c = math.cos(a)
-        p += c * p_cos[i] + s * p_sin[i]
-        q += c * q_cos[i] + s * q_sin[i]
-    w = 1.0
-    for poly in _PQPOL:
-        p += poly[0] * w
-        q += poly[1] * w
-        w *= t
-    p *= _AS2R
-    q *= _AS2R
-    z = 1.0 - p * p - q * q
-    z = math.sqrt(z) if z > 0.0 else 0.0
-    se = math.sin(_EPS0)
-    ce = math.cos(_EPS0)
-    return (p, -q * ce - z * se, -q * se + z * ce)
+def _ltp_rows(
+    jd_tt: float,
+) -> tuple[float, float, float, float, float, float, float, float, float]:
+    """Precession matrix J2000.0 mean frame → mean equator/equinox of date.
 
-
-@lru_cache(maxsize=4096)
-def _equator_pole(jd_tt: float) -> tuple[float, float, float]:
-    """Unit vector of the equator pole (CIP) at ``jd_tt`` (Vondrák 2011)."""
-    t = (jd_tt - _J2000) / 36525.0
-    x = 0.0
-    y = 0.0
-    periods, x_cos, y_cos, x_sin, y_sin = _XYPER
-    for i in range(len(periods)):
-        a = _D2PI * t / periods[i]
-        s = math.sin(a)
-        c = math.cos(a)
-        x += c * x_cos[i] + s * x_sin[i]
-        y += c * y_cos[i] + s * y_sin[i]
-    w = 1.0
-    for poly in _XYPOL:
-        x += poly[0] * w
-        y += poly[1] * w
-        w *= t
-    x *= _AS2R
-    y *= _AS2R
-    w = x * x + y * y
-    z = math.sqrt(1.0 - w) if w < 1.0 else 0.0
-    return (x, y, z)
-
-
-def _cross(a: tuple, b: tuple) -> tuple[float, float, float]:
-    """Return the right-handed cross product of two pole/frame vectors."""
-    return (
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    )
-
-
-@lru_cache(maxsize=4096)
-def precession_matrix(jd_tt: float) -> tuple:
-    """Precession matrix: J2000 mean frame → mean equator/equinox of date.
-
-    Built from the Vondrák ecliptic-pole and equator-pole vectors. Returned as a
-    9-tuple in row-major order (r00, r01, r02, r10, r11, r12, r20, r21, r22).
-    Multiplying a J2000-equator vector ``v`` by the ROWS gives the of-date vector
-    (``v_date[i] = sum_j R[i][j] v[j]``).
+    ``erfa.ltp`` (Vondrák 2011, no ICRS frame bias), returned as a 9-tuple of
+    native floats in row-major order (r00, r01, r02, r10, r11, r12, r20, r21,
+    r22). Multiplying a J2000-equator vector ``v`` by the ROWS gives the
+    of-date vector (``v_date[i] = sum_j R[i][j] v[j]``).
 
     Args:
         jd_tt: Julian Date in TT.
     """
-    peqr = _equator_pole(jd_tt)
-    pecl = _ecliptic_pole(jd_tt)
-    v = _cross(peqr, pecl)
-    w = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
-    eqx = (v[0] / w, v[1] / w, v[2] / w)
-    mid = _cross(peqr, eqx)
+    r = erfa.ltp(_julian_epoch(jd_tt))
     return (
-        eqx[0],
-        eqx[1],
-        eqx[2],
-        mid[0],
-        mid[1],
-        mid[2],
-        peqr[0],
-        peqr[1],
-        peqr[2],
+        float(r[0][0]),
+        float(r[0][1]),
+        float(r[0][2]),
+        float(r[1][0]),
+        float(r[1][1]),
+        float(r[1][2]),
+        float(r[2][0]),
+        float(r[2][1]),
+        float(r[2][2]),
     )
 
 
 def _precess_j2000_to_date(vec: tuple, jd_tt: float) -> tuple[float, float, float]:
     """Rotate a J2000-equator vector to the mean equator of date."""
-    r = precession_matrix(jd_tt)
+    r = _ltp_rows(jd_tt)
     return (
         r[0] * vec[0] + r[1] * vec[1] + r[2] * vec[2],
         r[3] * vec[0] + r[4] * vec[1] + r[5] * vec[2],

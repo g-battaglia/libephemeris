@@ -105,8 +105,8 @@ P = erfa.ltpb(epj)      # ICRS -> mean equator/equinox of date (frame bias inclu
 `libephemeris/precession_vondrak.py` wraps these into the matrix builders used by
 every reduction path (the LEB fast path, the Skyfield reference path, and the
 ecliptic-body / SPK / fixed-star paths). The of-date mean obliquity is the
-angle between the Vondrák ecliptic-pole and equator-pole series, evaluated in
-`sidereal_longterm.mean_obliquity_rad()`. Nutation remains IAU
+angle between the Vondrák ecliptic pole (`erfa.ltpecl`) and equator pole
+(`erfa.ltpequ`), evaluated in `sidereal_longterm.mean_obliquity_rad()`. Nutation remains IAU
 2006/2000A and is layered on top of the Vondrák precession.
 
 The remaining model floor at deep-BCE dates is the underlying ephemeris generation
@@ -126,9 +126,8 @@ publishes a direct `ε_A` polynomial-plus-periodic series; it is a separate fit,
 and pairing it with the pole-based precession would tilt the of-date ecliptic
 away from its own pole by up to ~6.5″ at −3000, surfacing as a spurious
 ecliptic latitude on the Sun. The two realizations agree to <0.001″ across
-1900–2100 (identically 0 at J2000); the direct series remains available as
-`sidereal_longterm.mean_obliquity_series_rad()` for reference and model
-comparison but is not used in public coordinate reductions.
+1900–2100 (identically 0 at J2000); the direct series is not evaluated anywhere
+in the library.
 
 ### Cached Nutation
 

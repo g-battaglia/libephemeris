@@ -1,10 +1,12 @@
 """Unit tests for the Vondrák 2011 long-term precession module.
 
-The model is obtained from pyerfa/ERFA (BSD/SOFA), so these tests pin the
-*construction* of the reduction matrix (precession source, frame-bias, of-date
-obliquity, nutation layering and matrix orientation) against an independent
-ERFA-based reduction, and confirm that the modern era is unchanged versus the
-previous IAU 2006 pipeline to sub-milliarcsecond precision.
+The model is obtained from pyerfa/ERFA (BSD/SOFA) — matrices from
+``erfa.ltp``/``erfa.ltpb``, the of-date mean obliquity as the angle between
+``erfa.ltpecl`` and ``erfa.ltpequ`` — so these tests pin the *construction* of
+the reduction matrix (precession source, frame-bias, of-date obliquity,
+nutation layering and matrix orientation) against an independent ERFA-based
+reduction, and confirm that the modern era is unchanged versus the previous
+IAU 2006 pipeline to sub-milliarcsecond precision.
 """
 
 from __future__ import annotations
@@ -20,7 +22,6 @@ from libephemeris.precession_vondrak import (
     vondrak_pn_matrix,
     vondrak_precession_matrix,
 )
-from libephemeris.sidereal_longterm import mean_obliquity_series_rad
 
 _J2000 = 2451545.0
 
@@ -85,35 +86,7 @@ def test_production_obliquity_is_pole_angle(jd: float) -> None:
     ecl = erfa.ltpecl(epj)
     equ = erfa.ltpequ(epj)
     pole_angle = math.acos(max(-1.0, min(1.0, float(np.dot(equ, ecl)))))
-    assert abs(vondrak_mean_obliquity_rad(jd) - pole_angle) < 1e-12
-
-
-@pytest.mark.parametrize("jd", _JD_GRID)
-def test_direct_series_and_pole_angle_are_distinct_realizations(jd: float) -> None:
-    """The direct ε_A series remains bounded relative to the pole angle.
-
-    ``mean_obliquity_series_rad`` evaluates Vondrák's direct ``p_A``/``ε_A``
-    obliquity series. It is a separate fit from the pole series, so the two
-    differ by a smooth, bounded amount—approximately zero in the modern era and
-    about 6.5″ at −3000. Production follows the pole angle so the of-date
-    ecliptic stays consistent with the pole-based precession; the direct
-    series stays available as a reference realization.
-    """
-    epj = _julian_epoch_ref(jd)
-    ecl = erfa.ltpecl(epj)
-    equ = erfa.ltpequ(epj)
-    pole_angle = math.acos(max(-1.0, min(1.0, float(np.dot(equ, ecl)))))
-    cy = abs(jd - _J2000) / 36525.0
-    # bounded divergence: ~0 modern, growing slowly with |centuries from J2000|
-    bound = math.radians((0.001 + 0.5 * cy) / 3600.0)
-    diff = abs(mean_obliquity_series_rad(jd) - pole_angle)
-    assert diff < bound
-    # At deep-BCE epochs the separation is real and resolvable (≥1″ by −1000),
-    # while production continues to track the pole angle.
-    yr = 2000.0 + (jd - _J2000) / 365.25
-    if yr <= -1000.0:
-        assert diff > math.radians(0.5 / 3600.0)
-        assert abs(vondrak_mean_obliquity_rad(jd) - pole_angle) < 1e-12
+    assert abs(vondrak_mean_obliquity_rad(jd) - pole_angle) < 1e-15
 
 
 @pytest.mark.parametrize("jd", _JD_GRID)

@@ -270,7 +270,7 @@ For J2000 ecliptic (`FLG_J2000`), step 5 uses a fixed rotation by the J2000 obli
 
 ### Mean obliquity of the ecliptic
 
-The of-date mean obliquity uses the **Vondrák 2011** long-term obliquity series (evaluated in `libephemeris/sidereal_longterm.py`, exposed via `precession_vondrak.vondrak_mean_obliquity_rad()`) — the same long-term model as the precession above, valid over ±200,000 years. Near J2000 it matches the IAU 2006 polynomial (Capitaine et al. 2003) to sub-milliarcsecond precision:
+The of-date mean obliquity is the **Vondrák 2011** pole angle: the angle between the long-term ecliptic pole (`erfa.ltpecl()`) and equator pole (`erfa.ltpequ()`), computed in `libephemeris/sidereal_longterm.py` and exposed via `precession_vondrak.vondrak_mean_obliquity_rad()`. These are the same two poles ERFA builds the precession matrix above from, so precession and obliquity form one frame, valid over ±200,000 years. Near J2000 it matches the IAU 2006 polynomial (Capitaine et al. 2003) to sub-milliarcsecond precision:
 
 ```
 ε₀ = 84381.406" − 46.836769"·T − 0.0001831"·T² + 0.00200340"·T³
