@@ -34,9 +34,9 @@ def test_package_never_references_the_validation_tree():
 
 def test_package_never_opens_reference_data_files():
     # Reference-distribution compressed-ephemeris families must never be
-    # read by the package. (The API-compat constant FICTFILE and the
-    # backward-compat alias names are name-level API surface: they resolve
-    # to this project's own fictitious_orbits.csv, checked below.)
+    # read by the package. (The API-compat constant FICTFILE is name-level
+    # API surface: the bundled path resolves to this project's own
+    # fictitious_orbits.csv, checked below.)
     pat = re.compile(r"""['"][^'"]*(?:\.se1|sepl_|semo_|seas_)['"]""")
     hits = [p.name for p in _sources() if pat.search(p.read_text())]
     assert hits == [], f"reference data filename referenced by: {hits}"
@@ -47,7 +47,7 @@ def test_no_reference_data_file_is_shipped():
     shipped = [q.name for q in data.rglob("*") if q.is_file()]
     for name in shipped:
         assert not name.endswith(".se1") and name != "seorbel.txt", name
-    # The compat aliases must resolve to this project's own data set.
-    from libephemeris.hypothetical import get_bundled_seorbel_path
+    # The bundled path must resolve to this project's own data set.
+    from libephemeris.hypothetical import get_bundled_fictitious_orbits_path
 
-    assert get_bundled_seorbel_path().name == "fictitious_orbits.csv"
+    assert get_bundled_fictitious_orbits_path().name == "fictitious_orbits.csv"

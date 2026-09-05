@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mean-longitude helpers that only the removed series called. The true lunar
   node is derived from the JPL osculating state as before, so results are
   unchanged.
+- The alias names `parse_seorbel`, `get_bundled_seorbel_path`,
+  `load_bundled_seorbel`, `get_seorbel_body_by_name`, `calc_seorbel_position`
+  and the class alias `SeorbelElements`. The generic names are the supported
+  ones: `parse_orbital_elements`, `get_bundled_fictitious_orbits_path`,
+  `load_bundled_fictitious_orbits`, `get_orbital_body_by_name`,
+  `calc_orbital_position` and `OrbitalElements`. They are the same objects the
+  aliases pointed to; no behaviour changed.
 
 ## [3.2.1] - 2026-09-05
 

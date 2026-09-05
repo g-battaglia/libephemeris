@@ -22,8 +22,6 @@ from libephemeris.hypothetical import (
     OrbitalElements,
     get_orbital_body_by_name,
     calc_orbital_position,
-    get_bundled_seorbel_path,
-    load_bundled_seorbel,
     _parse_orbital_elements_line,
 )
 
@@ -681,26 +679,6 @@ class TestBundledFictitiousOrbits:
                 "Waldemath",
             }
         )
-
-    # --- Backward-compatibility shims ---
-
-    def test_get_bundled_seorbel_path_delegates_to_new_function(self):
-        """Test that get_bundled_seorbel_path() is a shim to the new API."""
-        new_path = get_bundled_fictitious_orbits_path()
-        compat_path = get_bundled_seorbel_path()
-        assert compat_path == new_path, (
-            "Compat shim should return the same path as the new function"
-        )
-
-    def test_load_bundled_seorbel_delegates_to_new_function(self):
-        """Test that load_bundled_seorbel() is a shim to the new API."""
-        new_elements = load_bundled_fictitious_orbits()
-        compat_elements = load_bundled_seorbel()
-        assert len(compat_elements) == len(new_elements), (
-            "Compat shim should return same number of elements"
-        )
-        for a, b in zip(compat_elements, new_elements):
-            assert a.name == b.name, "Element names should match"
 
 
 class TestParseTPolynomialEdgeCases:

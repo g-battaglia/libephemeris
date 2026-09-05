@@ -1583,44 +1583,6 @@ def load_bundled_fictitious_orbits() -> List[OrbitalElements]:
     return _parse_fictitious_orbits_csv(get_bundled_fictitious_orbits_path())
 
 
-# ---------------------------------------------------------------------------
-# Backward-compatibility shims for the old seorbel.txt-based API
-# ---------------------------------------------------------------------------
-
-
-def get_bundled_seorbel_path() -> Path:
-    """
-    Deprecated.  Returns the path to the bundled fictitious orbits dataset.
-
-    The old dataset has been retired. The clean-room Harrington dataset
-    (``data/fictitious_orbits.csv``) is returned instead. This function delegates to
-    :func:`get_bundled_fictitious_orbits_path` for backward compatibility.
-
-    Returns:
-        Path to ``data/fictitious_orbits.csv``.
-    """
-    return get_bundled_fictitious_orbits_path()
-
-
-def load_bundled_seorbel() -> List[OrbitalElements]:
-    """
-    Deprecated.  Loads the bundled fictitious orbits dataset.
-
-    The old dataset has been retired. The clean-room Harrington dataset
-    (``data/fictitious_orbits.csv``) is loaded instead. This function delegates to
-    :func:`load_bundled_fictitious_orbits` for backward compatibility.
-
-    Returns:
-        List of :class:`OrbitalElements` objects for all bundled bodies.
-    """
-    return load_bundled_fictitious_orbits()
-
-
-# Backward-compatible aliases for legacy public names
-# These aliases are maintained for backward compatibility with existing code.
-# The canonical names are the reference-independent versions used throughout this module.
-
-
 def _parse_orbital_elements_line(line: str, line_num: int) -> Optional[OrbitalElements]:
     """
     Parse a single data line from the orbital elements file.
@@ -2851,28 +2813,3 @@ def list_hypothetical_bodies() -> Dict[int, str]:
         ...     print(f"{id}: {name}")
     """
     return HYPOTHETICAL_NAMES.copy()
-
-
-# ---------------------------------------------------------------------------
-# Backward-compatible aliases (legacy public names)
-# ---------------------------------------------------------------------------
-# These aliases preserve backward compatibility for code using the old naming
-# convention. New code should use the canonical names:
-#   OrbitalElements, parse_orbital_elements, get_orbital_body_by_name,
-#   calc_orbital_position, _parse_orbital_elements_line
-# ---------------------------------------------------------------------------
-
-SeorbelElements = OrbitalElements
-"""Backward-compatible alias for :class:`OrbitalElements`."""
-
-parse_seorbel = parse_orbital_elements
-"""Backward-compatible alias for :func:`parse_orbital_elements`."""
-
-get_seorbel_body_by_name = get_orbital_body_by_name
-"""Backward-compatible alias for :func:`get_orbital_body_by_name`."""
-
-calc_seorbel_position = calc_orbital_position
-"""Backward-compatible alias for :func:`calc_orbital_position`."""
-
-_parse_seorbel_line = _parse_orbital_elements_line
-"""Backward-compatible alias for :func:`_parse_orbital_elements_line`."""

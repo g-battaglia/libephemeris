@@ -539,13 +539,6 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_orbital_position,
     get_bundled_fictitious_orbits_path,
     load_bundled_fictitious_orbits,
-    # Backward-compatible aliases (legacy reference-derived names)
-    parse_seorbel,
-    SeorbelElements,
-    get_seorbel_body_by_name,
-    calc_seorbel_position,
-    get_bundled_seorbel_path,
-    load_bundled_seorbel,
     TPolynomial,
     CUPIDO as CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
     HADES as HADES_HYPO,  # Alias to avoid conflict with constants.py
@@ -1159,13 +1152,6 @@ __all__ = [
     "calc_orbital_position",
     "get_bundled_fictitious_orbits_path",
     "load_bundled_fictitious_orbits",
-    # Backward-compatible aliases (legacy reference-derived names)
-    "parse_seorbel",
-    "SeorbelElements",
-    "get_seorbel_body_by_name",
-    "calc_seorbel_position",
-    "get_bundled_seorbel_path",
-    "load_bundled_seorbel",
     "TPolynomial",
     # Planetary moons (Galilean moons, Titan, etc.)
     "register_moon_spk",
