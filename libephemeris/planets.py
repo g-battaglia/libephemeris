@@ -454,12 +454,16 @@ def _raise_leb_model_window_miss(body_id: int, jd: float) -> None:
     start_jd, end_jd = window
     if start_jd <= jd <= end_jd:
         return
+    # Same sentence shape as the stored-channel refusal below ("... is outside
+    # active LEB coverage range [lo, hi]"): consumers recognise a coverage miss
+    # by that fragment and read the window and the requested JD out of it.
     raise EphemerisRangeError(
         message=(
             f"Body {body_id} ({_PLANET_NAMES.get(body_id, 'unnamed')}) at JD "
-            f"{jd:.6f} is outside the fitted window [{start_jd:.6f}, "
-            f"{end_jd:.6f}] of the packaged model that serves it. LEB mode "
-            "does not silently substitute a lower-precision source."
+            f"{jd:.6f} is outside active LEB coverage range [{start_jd:.6f}, "
+            f"{end_jd:.6f}], the fitted window of the packaged model that "
+            "serves it. LEB mode does not silently substitute a lower-precision "
+            "source."
         ),
         requested_jd=jd,
         start_jd=start_jd,

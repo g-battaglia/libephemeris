@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] - 2026-09-05
+
+### Fixed
+
+- The sealed-mode refusal for `INTP_APOG` / `INTP_PERG` outside the fitted
+  window of their model (introduced in 3.2.0, #62) now uses the same sentence
+  shape as every other coverage refusal: "Body N (name) at JD x is outside
+  active LEB coverage range [lo, hi], the fitted window of the packaged model
+  that serves it." Consumers that recognise a coverage miss by the
+  "LEB coverage range [lo, hi]" fragment and read the window and the
+  requested JD out of the message therefore classify this refusal like the
+  others. Type (`EphemerisRangeError`), attributes and condition are
+  unchanged.
+
 ## [3.2.0] - 2026-09-05
 
 ### Added
@@ -4629,7 +4643,7 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v3.2.0...HEAD
+[3.2.1]: https://github.com/g-battaglia/libephemeris/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/g-battaglia/libephemeris/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/g-battaglia/libephemeris/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/g-battaglia/libephemeris/compare/v3.0.0rc15...v3.0.0
