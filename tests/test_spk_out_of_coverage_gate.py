@@ -324,7 +324,13 @@ class TestStrictGateRealKernel:
         ts = get_timescale()
 
         def spk_lon(jd_tt):
-            r = spk.calc_spk_body_position(ts.tt_jd(jd_tt), CHIRON, FLG_SPEED)
+            # Outside the usable coverage the direct path raises the typed
+            # range error (the light-time band at the start is excluded from
+            # the reported coverage, never silently degraded).
+            try:
+                r = spk.calc_spk_body_position(ts.tt_jd(jd_tt), CHIRON, FLG_SPEED)
+            except EphemerisRangeError:
+                return None
             return None if r is None else r[0]
 
         def assist_lon(jd_tt):
@@ -334,9 +340,10 @@ class TestStrictGateRealKernel:
             )
             return lon
 
-        # Find the first TT epoch just inside the start border that the kernel
-        # can actually serve (light-time retardation pushes the servable edge a
-        # fraction of a day inside the raw coverage).
+        # Find the first TT epoch at or after the reported start that the
+        # kernel serves. get_spk_coverage() already reports the usable start
+        # (light-time band excluded), so this is normally the start itself;
+        # the scan only absorbs the TT/TDB offset at the boundary.
         handoff = None
         for k in range(0, 400):
             jd = start + k * 0.005
@@ -347,7 +354,9 @@ class TestStrictGateRealKernel:
                 break
         assert handoff is not None
 
-        for jd in (handoff, end):
+        # The reported end is exclusive and the sample is converted TT->TDB,
+        # so stay a hair inside it.
+        for jd in (handoff, end - 1e-6):
             s = spk_lon(jd)
             a = assist_lon(jd)
             assert s is not None

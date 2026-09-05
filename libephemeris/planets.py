@@ -249,7 +249,6 @@ from .constants import (
     SIDM_LAHIRI_ICRC,
     SIDM_USER,
     NODBIT_MEAN,
-    NODBIT_OSCU,
     NODBIT_OSCU_BAR,
     NODBIT_FOPOINT,
 )
@@ -257,7 +256,40 @@ from .constants import (
 # Persisted core identities are semantic, not a filename convention.  This is
 # intentionally body-based so a monolithic ``ephemeris_<tier>.leb`` receives
 # the same fail-closed range policy as ``<tier>_core.leb2``.
-_LEB_CORE_BODY_IDS = frozenset(range(SUN, MEAN_APOG + 1)) | {EARTH}
+_LEB_CORE_BODY_IDS = frozenset(range(SUN, MEAN_APOG + 1)) | {
+    EARTH,
+    INTP_APOG,
+    INTP_PERG,
+}
+
+# Lunar points the sealed LEB path serves from a packaged runtime model
+# rather than from a stored channel. No reader lookup fails for them, so the
+# range policy that reaches every other body through an exception never ran.
+# It fired only when the requested frame happened to need nutation, which
+# left each of these points answering outside coverage under one flag
+# combination and refusing under another:
+#
+#   MEAN_NODE / MEAN_APOG   refused of-date, answered under FLG_NONUT
+#   INTP_APOG / INTP_PERG   answered of-date, refused under FLG_NONUT
+#
+# The guard is applied explicitly instead, before the fast path, so the
+# refusal depends on the date alone.
+_LEB_MODEL_SERVED_POINTS = frozenset({MEAN_NODE, MEAN_APOG, INTP_APOG, INTP_PERG})
+
+# Model-served points whose model was fitted over a bounded interval, so the
+# model itself — not a stored channel — is what runs out.  The interpolated
+# apsides live in the ``apogee`` group, so a configuration that installs only
+# ``<tier>_core`` declares no coverage for them at all: without their own
+# window there would be nothing left to enforce, which is exactly the
+# configuration the sealed refusal was reported missing in.  The window is a
+# property of the shipped residual grids, so it applies whatever groups are
+# installed, and it intersects with any declared coverage rather than
+# replacing it.
+#
+# MEAN_NODE and MEAN_APOG are deliberately absent: their IERS 2003 Delaunay
+# series is a closed analytical expression with no fitted grid and therefore
+# no window of its own.  They keep answering to their declared coverage.
+_LEB_MODEL_WINDOW_POINTS = frozenset({INTP_APOG, INTP_PERG})
 
 # Core bodies whose only sealed source is their own stored LEB channel.  The
 # node/apsis points are excluded: the vector pipeline derives them from Moon
@@ -384,6 +416,58 @@ def _log_successful_source(
         logger.debug("body=%d jd=%.1f source=%s%s", body_id, jd, source, suffix)
 
 
+def _raise_leb_model_window_miss(body_id: int, jd: float) -> None:
+    """Fail closed outside the fitted window of the model serving ``body_id``.
+
+    The interpolated apsides never read a stored channel.  Their exact
+    inclusive bounds come from the packaged residual-grid metadata, so those
+    bounds remain enforceable when the ``apogee`` group is not installed and
+    can narrow a wider stored tier when it is installed.
+
+    ``jd`` is compared on the caller's own time scale, exactly as the stored
+    coverage check does for every other body: ``calc_ut`` passes the UT day
+    number and ``calc`` the TT one, while the window itself is a TT grid.
+    The two entry points therefore place the refusal delta-T apart — about
+    three minutes at the 1549 edge and about half an hour at the 2650 edge —
+    against a grid sampled every 2 or 10 days.  At the exact bounds both
+    entries answer; one step beyond, both refuse.  A UT request at the upper
+    bound evaluates the model delta-T past its last sample, where the residual
+    grid's one-year edge taper scales the last correction by well under 1e-4.
+
+    Args:
+        body_id: Body identifier in the public numbering.
+        jd: The requested Julian Day, on the calling entry point's time scale.
+
+    Raises:
+        EphemerisRangeError: When the point is model-served and ``jd`` falls
+            outside the window its model was fitted on.  The error carries the
+            window as ``start_jd``/``end_jd`` and no ``ephemeris_file``: no
+            file ran out.
+    """
+    if body_id not in _LEB_MODEL_WINDOW_POINTS:
+        return
+    from .lunar import _interpolated_apse_model_window
+
+    window = _interpolated_apse_model_window(body_id)
+    if window is None:
+        return
+    start_jd, end_jd = window
+    if start_jd <= jd <= end_jd:
+        return
+    raise EphemerisRangeError(
+        message=(
+            f"Body {body_id} ({_PLANET_NAMES.get(body_id, 'unnamed')}) at JD "
+            f"{jd:.6f} is outside the fitted window [{start_jd:.6f}, "
+            f"{end_jd:.6f}] of the packaged model that serves it. LEB mode "
+            "does not silently substitute a lower-precision source."
+        ),
+        requested_jd=jd,
+        start_jd=start_jd,
+        end_jd=end_jd,
+        body_id=body_id,
+    )
+
+
 def _raise_leb_range_miss(
     body_id: int, jd: float, context_reader: object | None = None
 ) -> None:
@@ -401,12 +485,17 @@ def _raise_leb_range_miss(
     keeps deciding whether the miss may fall through (it can still serve the
     state), but when it cannot, the typed error must describe the file that
     failed rather than misreport the global configuration.
+
+    A point served by a packaged model is bounded by that model's own fitted
+    window as well, which is enforced first: it is the only bound left when
+    the group that would declare coverage for the point is not installed.
     """
     from .inventory import get_body_coverage, get_reader_body_coverage
     from .state import get_calc_mode
 
     if get_calc_mode() != "leb" or body_id not in _LEB_CORE_BODY_IDS:
         return
+    _raise_leb_model_window_miss(body_id, jd)
     body_coverage = get_body_coverage(body_id, jd)
     if body_coverage is not None and body_coverage.contains(jd):
         return
@@ -1680,7 +1769,9 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         return None
     except EphemerisRangeError as e:
         # The freshly downloaded kernel does not cover the requested epoch;
-        # fall back to the Keplerian path like any other SPK miss.
+        # fall back to the Keplerian path like any other SPK miss. A kernel
+        # that fails INSIDE its usable coverage raises SPKEvaluationError,
+        # which is deliberately not caught here: it must reach the caller.
         logger.warning("Auto SPK coverage miss for body %d: %s", ipl, e)
         return None
 
@@ -2100,6 +2191,10 @@ def calc_ut(
     if planet == EARTH and (flags & FLG_TOPOCTR):
         reader = None
     if reader is not None:
+        # Model-served points never raise from the reader, so the sealed
+        # range policy has to be asked for explicitly.
+        if planet in _LEB_MODEL_SERVED_POINTS:
+            _raise_leb_range_miss(planet, tjdut)
         try:
             from . import fast_calc
 
@@ -2390,6 +2485,10 @@ def calc(
     if planet == EARTH and (flags & FLG_TOPOCTR):
         reader = None
     if reader is not None:
+        # Model-served points never raise from the reader, so the sealed
+        # range policy has to be asked for explicitly.
+        if planet in _LEB_MODEL_SERVED_POINTS:
+            _raise_leb_range_miss(planet, tjdet)
         try:
             from . import fast_calc
 
@@ -5107,7 +5206,7 @@ def _calc_body(
         from .logging_config import get_logger
 
         # First check if already registered
-        _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
+        _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt, iflag)
         auto_download_attempted = False
 
         if _spk_type21_target is None:
@@ -5120,7 +5219,7 @@ def _calc_body(
                 except (OSError, ValueError, KeyError, RuntimeError, TypeError):
                     pass
                 # Re-check after download
-                _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
+                _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt, iflag)
 
         if _spk_type21_target is not None:
             # Route through the planet pipeline below (observe/apparent)
@@ -5130,8 +5229,10 @@ def _calc_body(
             try:
                 spk_result = spk.calc_spk_body_position(t, ipl, iflag)
             except EphemerisRangeError:
-                # Outside the registered kernel's coverage — continue to
-                # the Keplerian path (documented out-of-coverage behavior).
+                # Outside the registered kernel's usable coverage — continue
+                # to the Keplerian path (documented out-of-coverage behavior).
+                # SPKEvaluationError (a failure INSIDE the usable coverage)
+                # is deliberately not caught: it propagates to the caller.
                 spk_result = None
             if spk_result is not None:
                 # _calc_type21_position performs the full frame reduction
@@ -7886,6 +7987,15 @@ def nod_aps_ut(
             - NODBIT_OSCU (2): Osculating elements (instantaneous)
             - NODBIT_OSCU_BAR (4): Barycentric osculating elements
             - NODBIT_FOPOINT (256): Include focal point
+
+            Model selection follows the reference contract and looks only at
+            the low byte of ``method``: the mean model is used when
+            ``method & 0xFF == 0`` (0, 256, 1024, ...) or when NODBIT_MEAN is
+            set (1, 3, 5, 7, 99, -1, ...); every other value with a non-zero
+            low byte (2, 4, 6, 8, 16, -2, ...) uses the osculating model.
+            NODBIT_OSCU_BAR and NODBIT_FOPOINT are read from the full integer
+            on top of that choice. Any integer is accepted; no validation is
+            performed.
         flags: Calculation flags (FLG_SPEED, etc.)
 
     Returns:
@@ -7933,7 +8043,11 @@ def nod_aps(
     Args:
         tjdet: Julian Day in Terrestrial Time (TT/ET)
         planet: Planet/body ID (SUN, MOON, etc.)
-        method: Method for node/apse calculation (NODBIT_MEAN, etc.)
+        method: Method for node/apse calculation (NODBIT_MEAN, etc.). The
+            model is chosen from the low byte of ``method`` exactly as in
+            nod_aps_ut(): mean when ``method & 0xFF == 0`` or NODBIT_MEAN is
+            set, osculating for any other non-zero low byte (so 8 and 16
+            behave like NODBIT_OSCU).
         flags: Calculation flags (default: FLG_SWIEPH | FLG_SPEED)
 
     Returns:
@@ -8260,8 +8374,10 @@ def _calc_nod_aps(
         t: Skyfield Time object
         ipl: Planet ID (MERCURY, VENUS, MARS, etc.)
         iflag: Calculation flags
-        method: Node/apse calculation method (NODBIT_MEAN, NODBIT_OSCU, etc.)
-            Currently all methods use osculating elements from JPL ephemeris.
+        method: Node/apse calculation method (NODBIT_MEAN, NODBIT_OSCU, etc.).
+            The mean model is selected when the low byte of ``method`` is zero
+            or when NODBIT_MEAN is set; any other non-zero low byte selects
+            the osculating model (see the precedence note in the body).
 
     Returns:
         Tuple of (ascending_node, descending_node, perihelion, aphelion)
@@ -8276,17 +8392,23 @@ def _calc_nod_aps(
     # membership test as _calc_orbital_elements so the two stay in lockstep.
     is_minor = ipl in _MINOR_BODY_NODAPS or (AST_OFFSET < ipl < FIXSTAR_OFFSET)
 
-    # Method-bit precedence (compatibility contract): NODBIT_MEAN wins
-    # whenever it is set, even alongside NODBIT_OSCU / NODBIT_OSCU_BAR, so
-    # methods 3/5/7 track method 1 (mean), not 2/4/6 (osculating); method 0
-    # (no bits) also defaults to mean. An osculating bit only takes effect when
-    # the mean bit is absent. The barycentric center (NODBIT_OSCU_BAR) is an
-    # independent choice that applies only on the osculating path (see bar_mode
-    # below); a body without mean elements (Pluto, minor bodies) therefore still
-    # honors OSCU_BAR under method 5/7 because it falls through to osculating.
-    prefer_mean = bool(method & NODBIT_MEAN) or not (
-        method & (NODBIT_OSCU | NODBIT_OSCU_BAR)
-    )
+    # Method-bit precedence (measured compatibility contract): the model is
+    # chosen from the low byte of ``method`` only.
+    #   * low byte == 0 (0, 256, 1024, 65536, -256, ...) -> mean (default)
+    #   * NODBIT_MEAN set (1, 3, 5, 7, 99, 257, -1, -255, ...) -> mean, even
+    #     alongside NODBIT_OSCU / NODBIT_OSCU_BAR
+    #   * any other non-zero low byte (2, 4, 6, 8, 16, 64, -2, ...) -> osculating
+    # So an unassigned low bit such as 8 or 16 selects the osculating model
+    # exactly like NODBIT_OSCU does (issue #78), while bits above the low byte
+    # never influence the model choice. NODBIT_OSCU_BAR and NODBIT_FOPOINT are
+    # read from the full integer independently of that choice (a negative
+    # value such as -1 therefore carries both): the barycentric center applies
+    # only on the osculating path (see bar_mode below), so a body without mean
+    # elements (Pluto, minor bodies) still honors OSCU_BAR under method 5/7
+    # because it falls through to osculating, and the focal point replaces
+    # the aphelion slot whenever bit 256 is set. Every integer is accepted:
+    # the contract has no validation.
+    prefer_mean = (method & 0xFF) == 0 or bool(method & NODBIT_MEAN)
 
     # Interpolated lunar apsides (INTP_APOG / INTP_PERG): the interpolated
     # point is not an orbital-element body, so it has no node/apse
@@ -9946,7 +10068,7 @@ def _emb_osculating_ecliptic_elements(t, jd_tt: float) -> Tuple[float, ...]:
         float(v_icrs[0]), float(v_icrs[1]), float(v_icrs[2])
     )
 
-    GM = 0.01720209895**2
+    GM = 0.01720209895**2  # Gaussian gravitational constant k^2 (IAU)
     return _orbital_elements_from_ecliptic_state(x, y, z, vx, vy, vz, GM, EARTH, jd_tt)
 
 

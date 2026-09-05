@@ -318,6 +318,43 @@ class TestVerifyAssistFile:
         ):
             assert ri._verify_assist_file(p) is False
 
+    def test_logical_name_drives_the_expectations(self, tmp_path):
+        """A temp download has a random name; the caller supplies the final one.
+
+        Without ``name`` nothing is expected of the temp file; with it the
+        same short payload is judged against the final file's expected size.
+        """
+        temp = tmp_path / "tmpabc123.download"
+        temp.write_bytes(b"x" * 10)
+
+        assert ri._verify_assist_file(temp) is True
+        assert ri._verify_assist_file(temp, name="linux_p1550p2650.440") is False
+
+    def test_short_known_file_is_rejected_under_its_final_name(self, tmp_path):
+        """The size threshold is the planet files' only integrity check."""
+        p = tmp_path / "linux_p1550p2650.440"
+        p.write_bytes(b"x" * 10)
+        assert ri._verify_assist_file(p) is False
+
+    def test_empty_file_fails(self, tmp_path):
+        p = tmp_path / "linux_p1550p2650.440"
+        p.write_bytes(b"")
+        assert ri._verify_assist_file(p) is False
+
+    def test_download_validator_checks_the_temp_file_under_the_final_name(
+        self, tmp_path
+    ):
+        """A short or empty payload is refused before publication."""
+        validator = ri._assist_download_validator("linux_p1550p2650.440")
+
+        short = tmp_path / "tmp123.download"
+        short.write_bytes(b"x" * 10)
+        assert validator(str(short)) is False
+
+        empty = tmp_path / "tmp456.download"
+        empty.write_bytes(b"")
+        assert validator(str(empty)) is False
+
 
 # ---------------------------------------------------------------------------
 # _create_ssl_context  (lines 273-280)
@@ -507,7 +544,7 @@ class TestDownloadAssistData:
         """Both files downloaded into an explicit target dir."""
         calls = []
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             calls.append(description)
             Path(dest).write_bytes(b"x")
 
@@ -524,7 +561,7 @@ class TestDownloadAssistData:
         """planets=False, asteroids=True downloads only one file (line 417)."""
         calls = []
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             calls.append(description)
             Path(dest).write_bytes(b"x")
 
@@ -558,11 +595,11 @@ class TestDownloadAssistData:
         assert "All files already present and verified." in out
 
     def test_redownloads_invalid_file(self, tmp_path, capsys):
-        """Existing-but-invalid file is unlinked and re-downloaded (429-434)."""
+        """An unverifiable file is replaced in place, never unlinked first."""
         planets = tmp_path / "linux_p1550p2650.440"
         planets.write_bytes(b"corrupt")
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             Path(dest).write_bytes(b"fresh")
 
         with (
@@ -585,7 +622,7 @@ class TestDownloadAssistData:
         planets.write_bytes(b"old")
         calls = []
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             calls.append(description)
             Path(dest).write_bytes(b"new")
 
@@ -624,7 +661,7 @@ class TestDownloadAssistData:
         planets = tmp_path / "linux_p1550p2650.440"
         planets.write_bytes(b"corrupt")
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             Path(dest).write_bytes(b"fresh")
 
         with (
@@ -658,7 +695,7 @@ class TestDownloadAssistData:
         """target_dir=None uses _ASSIST_DEFAULT_DIR (lines 398-399)."""
         fake_default = tmp_path / "default_assist"
 
-        def _fake_dl(url, dest, description, show_progress, quiet):
+        def _fake_dl(url, dest, description, show_progress, quiet, validator=None):
             Path(dest).write_bytes(b"x")
 
         with (

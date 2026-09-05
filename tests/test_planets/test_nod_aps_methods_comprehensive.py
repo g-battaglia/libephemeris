@@ -236,11 +236,13 @@ class TestNodApsEdgeCases:
 class TestNodApsMethodBitPrecedence:
     """Method-bit precedence (measured reference behavior).
 
-    NODBIT_MEAN wins whenever it is set, even alongside NODBIT_OSCU /
-    NODBIT_OSCU_BAR, so methods 3/5/7 track method 1 (mean) rather than the
-    osculating methods 2/4/6. Method 0 (no bits) also defaults to mean. The
-    NODBIT_OSCU_BAR barycentric center is an independent choice, applied only
-    on the osculating path, so a body without mean elements still honors it.
+    The model is chosen from the low byte of ``method`` only: mean when the
+    low byte is zero (0, 256, 1024, ...) or when NODBIT_MEAN is set (so
+    methods 3/5/7/99/-1 track method 1 rather than the osculating methods
+    2/4/6); osculating for every other non-zero low byte (2, 4, 6, 8, 16,
+    -2, ...). The NODBIT_OSCU_BAR barycentric center is an independent
+    choice, applied only on the osculating path, so a body without mean
+    elements still honors it.
     """
 
     _MEAN_BODIES = [MOON, MERCURY, VENUS, MARS, JUPITER, SATURN, NEPTUNE]
@@ -274,6 +276,91 @@ class TestNodApsMethodBitPrecedence:
         mean = swe.nod_aps_ut(JD_J2000, body, NODBIT_MEAN)
         got = swe.nod_aps_ut(JD_J2000, body, 0)
         self._assert_points_match(got, mean, f"body={body} method=0")
+
+    # Issue #78: the equivalence classes below were measured against the
+    # reference on the full 0..511 grid plus negative and wide values. The
+    # model comes from the low byte only (mean when it is zero or carries
+    # NODBIT_MEAN, osculating otherwise); NODBIT_OSCU_BAR and NODBIT_FOPOINT
+    # are read from the full integer, so a negative value such as -1 carries
+    # both. Each probe value must reproduce its canonical representative
+    # ``model | (method & (NODBIT_OSCU_BAR | NODBIT_FOPOINT))`` exactly,
+    # because it has to take the very same code path.
+    _OSCU_CLASS = [8, 16, 8 | 16, 64, -2]
+    _MEAN_CLASS = [99, -1, -255, -256, -257, 1024, 65536]
+    _CLASS_BODIES = [MOON, MARS, JUPITER]
+
+    @staticmethod
+    def _canonical(model_bit, method):
+        return model_bit | (method & (NODBIT_OSCU_BAR | NODBIT_FOPOINT))
+
+    @staticmethod
+    def _assert_all_slots_equal(got, want, ctx):
+        assert len(got) == 4, ctx
+        for slot in range(4):
+            assert len(got[slot]) == 6, f"{ctx}: slot={slot}"
+            for comp in range(6):
+                assert got[slot][comp] == pytest.approx(want[slot][comp], abs=1e-9), (
+                    f"{ctx}: slot={slot} comp={comp} {got[slot][comp]} != "
+                    f"{want[slot][comp]}"
+                )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", _CLASS_BODIES)
+    @pytest.mark.parametrize("method", _OSCU_CLASS)
+    def test_unassigned_low_bits_select_osculating(self, body, method):
+        """Methods 8, 16, 24, 64 equal method 2 and -2 equals 262, TT and UT."""
+        want = self._canonical(NODBIT_OSCU, method)
+        assert want == (NODBIT_OSCU if method > 0 else 262)
+        for fn in (swe.nod_aps, swe.nod_aps_ut):
+            oscu = fn(JD_J2000, body, want)
+            got = fn(JD_J2000, body, method)
+            self._assert_all_slots_equal(
+                got, oscu, f"{fn.__name__} body={body} method={method}"
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", _CLASS_BODIES)
+    @pytest.mark.parametrize("method", _MEAN_CLASS)
+    def test_mean_bit_or_zero_low_byte_selects_mean(self, body, method):
+        """Methods 99, 1024, 65536 equal method 1; -1/-255/-256 carry FOPOINT.
+
+        Both TT and UT entry points are checked. The negative values equal
+        NODBIT_MEAN | NODBIT_FOPOINT (plus the OSCU_BAR bit, inert on the mean
+        path), never plain method 1, because bit 256 is set in two's
+        complement; -257 has that bit clear and equals method 1.
+        """
+        want = self._canonical(NODBIT_MEAN, method)
+        assert (want & NODBIT_FOPOINT) == (
+            NODBIT_FOPOINT if method in (-1, -255, -256) else 0
+        )
+        for fn in (swe.nod_aps, swe.nod_aps_ut):
+            mean = fn(JD_J2000, body, want)
+            got = fn(JD_J2000, body, method)
+            self._assert_all_slots_equal(
+                got, mean, f"{fn.__name__} body={body} method={method}"
+            )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", _CLASS_BODIES)
+    def test_mean_and_osculating_classes_differ(self, body):
+        """Sanity: methods 8 and 2 must not coincide with method 1 by accident."""
+        mean = swe.nod_aps(JD_J2000, body, NODBIT_MEAN)
+        oscu = swe.nod_aps(JD_J2000, body, 8)
+        assert any(
+            abs(mean[slot][comp] - oscu[slot][comp]) > 1e-6
+            for slot in range(4)
+            for comp in range(3)
+        ), f"body={body}: method 8 unexpectedly equals the mean model"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", _CLASS_BODIES)
+    def test_fopoint_alone_keeps_mean_model(self, body):
+        """Method 256 (FOPOINT only, low byte zero) equals method 257 (MEAN|FOPOINT)."""
+        for fn in (swe.nod_aps, swe.nod_aps_ut):
+            want = fn(JD_J2000, body, NODBIT_MEAN | NODBIT_FOPOINT)
+            got = fn(JD_J2000, body, NODBIT_FOPOINT)
+            self._assert_all_slots_equal(got, want, f"{fn.__name__} body={body}")
+            assert fn(JD_J2000, body, NODBIT_OSCU | NODBIT_FOPOINT) != got
 
     @pytest.mark.unit
     def test_oscu_bar_wins_over_oscu_when_mean_absent(self):

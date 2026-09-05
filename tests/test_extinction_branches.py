@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from libephemeris import extinction as ext
 
 
@@ -16,11 +18,14 @@ class TestAirmass:
         am = ext.calc_airmass(30.0, method="rozenberg")
         assert am > 1.0
 
-    def test_unknown_method_defaults_to_kasten_young(self):
-        # The else branch delegates to the kasten_young computation.
-        assert ext.calc_airmass(30.0, method="not-a-real-method") == ext.calc_airmass(
-            30.0, method="kasten_young"
-        )
+    def test_unknown_method_is_refused(self):
+        # A method this module does not implement is a caller mistake, not a
+        # request for the default: computing Kasten-Young for it returned a
+        # valid-looking number from a model nobody asked for.
+        from libephemeris.exceptions import InputValidationError
+
+        with pytest.raises(InputValidationError):
+            ext.calc_airmass(30.0, method="not-a-real-method")
 
 
 class TestWavelengthBands:

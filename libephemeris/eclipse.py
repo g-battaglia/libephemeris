@@ -47,6 +47,7 @@ Provenance:
 from __future__ import annotations
 
 import contextlib
+import functools
 import math
 import re
 from typing import Callable, Iterator, Sequence, Tuple, Union, cast
@@ -87,21 +88,49 @@ from .constants import (
     ECL_3RD_VISIBLE,
     ECL_4TH_VISIBLE,
 )
-from .exceptions import Error, LEBCorruptionError, UnknownBodyError
+from .exceptions import (
+    EphemerisRangeError,
+    Error,
+    IllegalBodyError,
+    InputValidationError,
+    LEBCorruptionError,
+    UnknownBodyError,
+)
 from .planets import calc_ut
 from .state import get_calc_mode, get_timescale
 
 
-class _IllegalRiseBodyError(UnknownBodyError, ValueError):
-    """A rise/set/transit target that no active backend can place.
+# Retained as an internal alias: the class itself is public so that a
+# traceback names libephemeris.exceptions.IllegalBodyError rather than an
+# underscore-prefixed internal one.
+_IllegalRiseBodyError = IllegalBodyError
 
-    Raised for an unknown or unsupported body id passed to ``rise_trans`` /
-    ``rise_trans_true_hor`` (e.g. a planetary moon with no registered SPK).
-    It multiply inherits the typed ``UnknownBodyError`` (an ``Error``
-    subclass, the compatibility-contract class for an illegal body) AND the
-    built-in ``ValueError`` so the single "illegal planet number" contract is
-    identical on every backend and satisfies callers catching either type.
+
+def _illegal_body_contract[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    """Give a public entry point the single illegal-body error contract.
+
+    The ``lun_occult_*`` entry points document an unknown or unplaceable
+    body as raising both an ``UnknownBodyError`` and a ``ValueError``;
+    :class:`IllegalBodyError` is that type, the same one ``rise_trans``
+    raises. The body fails to resolve somewhere inside the dispatch (an
+    unknown id in calc_ut, a body absent from a sealed LEB artifact, a
+    body the active backend does not support) and surfaces there as the
+    plain ``UnknownBodyError``; the wrapper re-raises it as the contract
+    type with the same message and ``body_id``, chained to the original.
+    An error that already satisfies both contracts passes through as is,
+    and so does every other typed error (range, corruption, star lookup).
     """
+
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        try:
+            return func(*args, **kwargs)
+        except UnknownBodyError as exc:
+            if isinstance(exc, ValueError):
+                raise
+            raise IllegalBodyError(exc.message, body_id=exc.body_id) from exc
+
+    return wrapper
 
 
 _ACTIVE_LEB_READER = object()
@@ -134,8 +163,18 @@ _LEB_RANGE_MISS_RE = re.compile(
 )
 _LEB_RANGE_MISS_BODY_RE = re.compile(r"for body (?P<body>\d+)")
 _LEB_BODY_MISS_RE = re.compile(
-    r"Body (?P<body>\d+) not in (?:any )?(?:LEB file|installed LEB tier)"
+    r"Body (?P<body>-?\d+) not in (?:any )?(?:LEB file|installed LEB tier)"
 )
+
+
+def _is_leb_body_miss(exc: BaseException) -> bool:
+    """Return True when the reader reports a body absent from every tier.
+
+    Distinct from :func:`_is_leb_out_of_range`, which is about the date. A
+    body miss is a property of the request, not of the artifact's coverage
+    window, and must never reach a caller as a bare ``KeyError``.
+    """
+    return isinstance(exc, KeyError) and bool(_LEB_BODY_MISS_RE.search(str(exc)))
 
 
 def _raise_if_sealed_leb_miss(exc: BaseException) -> None:
@@ -225,7 +264,10 @@ def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
             # Sealed leb mode never returns here: the miss surfaces as the
             # documented typed error (or re-raises verbatim).
             _raise_if_sealed_leb_miss(exc)
-            if not _is_leb_out_of_range(exc):
+            # A body the installed artifact does not carry is exactly what
+            # the non-LEB retry exists for, and letting its KeyError escape
+            # put an untyped error on a public entry point.
+            if not (_is_leb_out_of_range(exc) or _is_leb_body_miss(exc)):
                 raise
     return impl(*args, reader=None, **kwargs)
 
@@ -6363,6 +6405,23 @@ def _reject_moon_self_occultation(body: "int | str") -> None:
         raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
 
 
+def _fold_pseudo_body_to_sun(body: "int | str") -> "int | str":
+    """Answer a negative body id as the Sun, as the reference does.
+
+    Negative ids are reserved for pseudo-targets such as ``ECL_NUT`` (-1),
+    which calc_ut answers with obliquity and nutation rather than a
+    position. Behavioral comparison with the reference showed each
+    lun_occult_* entry point answering every negative id exactly as it
+    answers body 0, so the fold keeps the outputs identical. Without it the
+    id reached the ephemeris reader and surfaced as a bare ``KeyError`` from
+    an internal lookup.
+    """
+    if isinstance(body, int) and body < 0:
+        return SUN
+    return body
+
+
+@_illegal_body_contract
 def lun_occult_when_glob(
     tjdut: float,
     body: "int | str",
@@ -6374,7 +6433,8 @@ def lun_occult_when_glob(
 
     Args:
         tjdut: Search start as a Julian Day in UT.
-        body: Planet identifier or fixed-star name.
+        body: Planet identifier or fixed-star name. A negative id is
+            answered as the Sun, as the reference does.
         flags: Calculation flags.
         ecltype: Requested occultation-type mask, or zero for any type.
         backwards: Search direction. Integer values may also include
@@ -6386,6 +6446,9 @@ def lun_occult_when_glob(
     Raises:
         Error: If the type filter is impossible or no event is found in the
             search window.
+        IllegalBodyError: If the body is unknown or no active backend can
+            place it; the error is both an ``UnknownBodyError`` and a
+            ``ValueError``.
 
     Notes:
         With ``ECL_ONE_TRY``, only the conjunction nearest the start is
@@ -6393,6 +6456,7 @@ def lun_occult_when_glob(
         first time slot.
     """
     _reject_moon_self_occultation(body)
+    body = _fold_pseudo_body_to_sun(body)
     from .exceptions import Error
     from .constants import ECL_ONE_TRY
 
@@ -6850,6 +6914,7 @@ def _lun_occult_when_loc_pythonic(
     )
 
 
+@_illegal_body_contract
 def lun_occult_when_loc(
     tjdut: float,
     body: "int | str",
@@ -6862,6 +6927,7 @@ def lun_occult_when_loc(
     Args:
         tjdut: Search start as a Julian Day in UT.
         body: Planet identifier, fixed-star identifier, or fixed-star name.
+            A negative id is answered as the Sun, as the reference does.
         geopos: Longitude, latitude, and altitude in metres.
         flags: Calculation flags.
         backwards: Search direction. Integer values may also include
@@ -6875,13 +6941,18 @@ def lun_occult_when_loc(
 
     Raises:
         Error: If no visible occultation is found in the search window.
-        ValueError: If the body or geographic position is invalid.
+        IllegalBodyError: If the body is unknown or no active backend can
+            place it; the error is both an ``UnknownBodyError`` and a
+            ``ValueError``.
+        ValueError: If the geographic position has fewer than three
+            elements.
 
     Notes:
         Local attributes include covered diameter/disc fractions, target
         azimuth and altitude, elongation, and the event contact times.
     """
     _reject_moon_self_occultation(body)
+    body = _fold_pseudo_body_to_sun(body)
 
     # Validate geopos
     if len(geopos) < 3:
@@ -6989,6 +7060,7 @@ def _lun_occult_where_pythonic(
 _lun_occult_where_internal = _lun_occult_where_pythonic
 
 
+@_illegal_body_contract
 def lun_occult_where(
     tjdut: float,
     body: "int | str" = 0,
@@ -7000,13 +7072,20 @@ def lun_occult_where(
 
     Args:
         tjdut: Julian Day (UT) of the moment to calculate.
-        body: Planet identifier (int) or star name (str).
+        body: Planet identifier (int) or star name (str). A negative id is
+            answered as the Sun, as the reference does.
         flags: Calculation flags (default FLG_SWIEPH).
 
     Returns:
         Tuple of (retflag, geopos, attr) matching the reference API.
+
+    Raises:
+        IllegalBodyError: If the body is unknown or no active backend can
+            place it; the error is both an ``UnknownBodyError`` and a
+            ``ValueError``.
     """
     _reject_moon_self_occultation(body)
+    body = _fold_pseudo_body_to_sun(body)
     if isinstance(body, int):
         from .fixed_stars import FIXED_STARS as _FS
         from .fixed_stars import get_canonical_star_name as _star_name_by_id
@@ -12065,9 +12144,14 @@ def get_saros_number(
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
         - van Gent, R.H. "A Catalogue of Eclipse Cycles"
     """
-    if eclipse_type.lower() not in ("solar", "lunar"):
+    # Type first: .lower() on a non-string leaked AttributeError instead of
+    # this function's own ValueError.
+    if not isinstance(eclipse_type, str) or eclipse_type.lower() not in (
+        "solar",
+        "lunar",
+    ):
         raise ValueError(
-            f"eclipse_type must be 'solar' or 'lunar', got '{eclipse_type}'"
+            f"eclipse_type must be 'solar' or 'lunar', got {eclipse_type!r}"
         )
     saros_series, _ = _get_saros_info(jd_eclipse, eclipse_type)
     return int(saros_series)
@@ -12173,13 +12257,19 @@ def get_inex_number(
         - Meeus, J. "Mathematical Astronomy Morsels"
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
     """
+    # Type first: .lower() on a non-string leaked AttributeError instead of
+    # this function's own ValueError.
+    if not isinstance(eclipse_type, str):
+        raise ValueError(
+            f"eclipse_type must be 'solar' or 'lunar', got {eclipse_type!r}"
+        )
     if eclipse_type.lower() == "solar":
         references = _SOLAR_INEX_REFERENCES
     elif eclipse_type.lower() == "lunar":
         references = _LUNAR_INEX_REFERENCES
     else:
         raise ValueError(
-            f"eclipse_type must be 'solar' or 'lunar', got '{eclipse_type}'"
+            f"eclipse_type must be 'solar' or 'lunar', got {eclipse_type!r}"
         )
 
     # Use the first reference eclipse as our anchor point
@@ -12213,6 +12303,115 @@ def get_inex_number(
     return best_match_series
 
 
+def _eclipse_sampling_step_days(
+    jd_start: float,
+    jd_end: float,
+    step_minutes: float,
+    func_name: str,
+) -> float:
+    """Validate an eclipse path sampling interval and convert it to days.
+
+    The three eclipse path samplers walk their window with the accumulator
+    loop ``while jd <= jd_end: ...; jd += step_days``. That loop terminates
+    only if every addition moves ``jd`` strictly towards ``jd_end``, which is
+    a stronger requirement than "the step is not zero":
+
+    - A zero step never moves the accumulator. ``-0.0`` counts as zero here:
+      it is not caught by a ``step_minutes < 0`` test, yet ``jd += -0.0``
+      leaves ``jd`` exactly where it was.
+    - A negative step moves the accumulator away from ``jd_end`` for ever.
+    - A ``nan`` step neither advances nor stops the walk on purpose: every
+      comparison against ``nan`` is false, so the loop leaves after a single
+      sample and hands back a silently truncated path instead of an error.
+    - An infinite step jumps straight past ``jd_end``, so nothing beyond the
+      first instant of the window is ever sampled.
+    - A *positive* step can still be absorbed by binary floating point.
+      Julian Days used here are large numbers: around JD 2.46e6 consecutive
+      doubles are about 4.7e-10 days (~40 microseconds) apart, so a step
+      below half that spacing rounds away in ``jd += step_days`` and the
+      accumulator stands still. The same stall happens when a denormal
+      ``step_minutes`` underflows to zero once divided by 1440.
+    - Non-finite window bounds break the exit test itself: a ``jd_end`` of
+      ``+inf`` is never exceeded, and ``-inf`` plus any finite step is still
+      ``-inf``. Before this guard, a ``nan`` bound made
+      ``jd <= jd_end`` false immediately and silently returned the empty result
+      reserved for "this eclipse has no central path"; it is now rejected.
+      This uses the same :class:`EphemerisRangeError` semantics as the canonical
+      ``validate_jd_range`` validator.
+
+    Only conditions that make the walk non-terminating or meaningless are
+    refused. A finite window that merely needs a very large number of
+    iterations is accepted: it does terminate, and any cap on the iteration
+    count would be an arbitrary policy that could reject a legitimate fine
+    sampling.
+
+    Args:
+        jd_start: First Julian Day (UT) of the sampling window.
+        jd_end: Last Julian Day (UT) of the sampling window.
+        step_minutes: Requested sampling interval in minutes.
+        func_name: Name of the calling public function, for error messages.
+
+    Returns:
+        The sampling interval expressed in days, guaranteed to advance the
+        accumulator at every instant the loop can visit.
+
+    Raises:
+        EphemerisRangeError: If either window bound is not finite.
+        InputValidationError: If ``step_minutes`` is not a finite positive
+            number, or if it is too small to advance a double-precision Julian
+            Day in this window.
+    """
+    if not math.isfinite(jd_start) or not math.isfinite(jd_end):
+        invalid_jd = jd_start if not math.isfinite(jd_start) else jd_end
+        raise EphemerisRangeError(
+            message=(
+                f"{func_name}: jd_start and jd_end must be finite Julian Days, got "
+                f"jd_start={jd_start!r}, jd_end={jd_end!r}"
+            ),
+            requested_jd=invalid_jd,
+        )
+
+    # Checked before the sign test: ``nan <= 0.0`` is false, so a ``nan`` step
+    # would slip through the positivity test below.
+    if not math.isfinite(step_minutes):
+        raise InputValidationError(
+            f"{func_name}: step_minutes must be a finite number of minutes, "
+            f"got {step_minutes!r}"
+        )
+
+    # ``<= 0.0`` rather than ``< 0.0``: it also refuses ``0.0`` (the reported
+    # hang) and ``-0.0``, which compares as neither negative nor greater than
+    # zero but still leaves the accumulator untouched.
+    if step_minutes <= 0.0:
+        raise InputValidationError(
+            f"{func_name}: step_minutes must be greater than zero, got {step_minutes!r}"
+        )
+
+    step_days = step_minutes / (24.0 * 60.0)
+
+    # Resolution test. The spacing between consecutive doubles grows with
+    # magnitude, so the hardest instant to advance is the one with the largest
+    # absolute value the loop can reach: it starts at ``jd_start`` and adds the
+    # step only while ``jd <= jd_end``. Requiring the step to be strictly more
+    # than half that spacing guarantees progress at every visited instant. The
+    # comparison is exact: doubling a finite double is exact, and ``spacing``
+    # is a power of two. Half the spacing exactly is refused as well, because
+    # it lands on a round-half-to-even tie that advances only from odd
+    # mantissas, i.e. from some samples of the window but not all of them.
+    pivot = max(abs(jd_start), abs(jd_end))
+    spacing = math.nextafter(pivot, math.inf) - pivot
+    if 2.0 * step_days <= spacing:
+        min_minutes = (spacing / 2.0) * (24.0 * 60.0)
+        raise InputValidationError(
+            f"{func_name}: step_minutes={step_minutes!r} cannot advance the "
+            f"sampling instant near Julian Day {pivot:.1f}, where consecutive "
+            f"double-precision values are {spacing:.3e} days apart; use a step "
+            f"larger than {min_minutes:.3e} minutes"
+        )
+
+    return step_days
+
+
 def calc_eclipse_central_line(
     jd_start: float,
     jd_end: float,
@@ -12237,6 +12436,9 @@ def calc_eclipse_central_line(
                 Should be after jd_start and during the same eclipse.
         step_minutes: Time step in minutes between calculated points (default 1.0).
                       Smaller values give a more detailed path but take longer.
+                      Must be finite and greater than zero, and large enough to
+                      move a double-precision Julian Day (about 3e-7 minutes at
+                      present-day dates).
         flags: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
@@ -12247,6 +12449,17 @@ def calc_eclipse_central_line(
 
         Points where the shadow axis doesn't intersect Earth's surface
         are omitted from the results.
+
+    Raises:
+        EphemerisRangeError: If jd_start or jd_end is not finite, the same
+            error validate_jd_range raises for any non-finite Julian Day. An
+            infinite bound would leave the sampling loop running for ever; a
+            ``nan`` bound used to return empty tuples, indistinguishable from
+            an eclipse with no central path, and is now refused.
+        InputValidationError: If step_minutes is not a finite number greater
+            than zero, or is too small to advance a double-precision Julian
+            Day in this window. Such a step would leave the sampling loop
+            running for ever.
 
     Algorithm:
         For each time step, uses sol_eclipse_where() to find the central
@@ -12294,8 +12507,12 @@ def calc_eclipse_central_line(
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
 
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
+    # Validate the sampling parameters before the walk starts: the loop
+    # below terminates only for a step that provably advances ``jd``
+    # towards ``jd_end`` (see _eclipse_sampling_step_days).
+    step_days = _eclipse_sampling_step_days(
+        jd_start, jd_end, step_minutes, "calc_eclipse_central_line"
+    )
 
     # Iterate through time range
     jd = jd_start
@@ -12350,12 +12567,25 @@ def calc_eclipse_northern_limit(
     Args:
         jd_start: First Julian Day in UT, during a central solar eclipse.
         jd_end: Last Julian Day in UT, during the same eclipse.
-        step_minutes: Sampling interval in minutes.
+        step_minutes: Sampling interval in minutes. Must be finite and
+            greater than zero, and large enough to move a double-precision
+            Julian Day (about 3e-7 minutes at present-day dates).
         flags: Calculation flags.
 
     Returns:
         Three tuples containing sample times, geodetic latitudes, and
         longitudes. Coordinates are native Python floats in degrees.
+
+    Raises:
+        EphemerisRangeError: If jd_start or jd_end is not finite, the same
+            error validate_jd_range raises for any non-finite Julian Day. An
+            infinite bound would leave the sampling loop running for ever; a
+            ``nan`` bound used to return empty tuples, indistinguishable from
+            an eclipse with no central path, and is now refused.
+        InputValidationError: If step_minutes is not a finite number greater
+            than zero, or is too small to advance a double-precision Julian
+            Day in this window. Such a step would leave the sampling loop
+            running for ever.
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -12383,8 +12613,12 @@ def calc_eclipse_northern_limit(
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
 
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
+    # Validate the sampling parameters before the walk starts: the loop
+    # below terminates only for a step that provably advances ``jd``
+    # towards ``jd_end`` (see _eclipse_sampling_step_days).
+    step_days = _eclipse_sampling_step_days(
+        jd_start, jd_end, step_minutes, "calc_eclipse_northern_limit"
+    )
 
     # Iterate through time range
     jd = jd_start
@@ -12507,12 +12741,25 @@ def calc_eclipse_southern_limit(
     Args:
         jd_start: First Julian Day in UT, during a central solar eclipse.
         jd_end: Last Julian Day in UT, during the same eclipse.
-        step_minutes: Sampling interval in minutes.
+        step_minutes: Sampling interval in minutes. Must be finite and
+            greater than zero, and large enough to move a double-precision
+            Julian Day (about 3e-7 minutes at present-day dates).
         flags: Calculation flags.
 
     Returns:
         Three tuples containing sample times, geodetic latitudes, and
         longitudes. Coordinates are native Python floats in degrees.
+
+    Raises:
+        EphemerisRangeError: If jd_start or jd_end is not finite, the same
+            error validate_jd_range raises for any non-finite Julian Day. An
+            infinite bound would leave the sampling loop running for ever; a
+            ``nan`` bound used to return empty tuples, indistinguishable from
+            an eclipse with no central path, and is now refused.
+        InputValidationError: If step_minutes is not a finite number greater
+            than zero, or is too small to advance a double-precision Julian
+            Day in this window. Such a step would leave the sampling loop
+            running for ever.
 
     Example:
         >>> from libephemeris import julday, sol_eclipse_when_glob
@@ -12540,8 +12787,12 @@ def calc_eclipse_southern_limit(
     latitudes_list: list[float] = []
     longitudes_list: list[float] = []
 
-    # Convert step to days
-    step_days = step_minutes / (24.0 * 60.0)
+    # Validate the sampling parameters before the walk starts: the loop
+    # below terminates only for a step that provably advances ``jd``
+    # towards ``jd_end`` (see _eclipse_sampling_step_days).
+    step_days = _eclipse_sampling_step_days(
+        jd_start, jd_end, step_minutes, "calc_eclipse_southern_limit"
+    )
 
     # Iterate through time range
     jd = jd_start

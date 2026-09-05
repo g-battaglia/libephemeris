@@ -558,13 +558,12 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
         if _is_valid_bsp(cache_path):
             config.spk_path = cache_path
         else:
+            # Left in place on purpose: the download below publishes
+            # atomically over it, so a failed re-download keeps whatever the
+            # user already had instead of leaving an empty cache.
             logger.warning(
                 "Cached SPK file %s is corrupted, re-downloading", cache_path
             )
-            try:
-                os.remove(cache_path)
-            except OSError:
-                pass
             force = True
 
     if force or not os.path.exists(cache_path):
@@ -1270,7 +1269,11 @@ def _find_covering_spk(
     # hash-named kernels were never detected as covering and triggered
     # redundant re-downloads. get_spk_coverage() reads the real time span from
     # the kernel, so all three schemes are handled correctly.
-    from .spk import get_spk_coverage
+    from .spk import (
+        _SPK_COVERAGE_END_TOLERANCE_DAYS,
+        _SPK_COVERAGE_START_TOLERANCE_DAYS,
+        get_spk_coverage,
+    )
 
     for filename in os.listdir(cache_dir):
         if not filename.endswith(".bsp"):
@@ -1290,8 +1293,13 @@ def _find_covering_spk(
             continue
 
         file_jd_start, file_jd_end = coverage
-        # Does this kernel actually cover the requested range?
-        if file_jd_start <= jd_start and file_jd_end >= jd_end:
+        # Does this kernel actually cover the requested range? The coverage
+        # is the usable span (its start sits one light-time inside the
+        # stored data), so compare with the documented edge tolerances.
+        if (
+            file_jd_start <= jd_start + _SPK_COVERAGE_START_TOLERANCE_DAYS
+            and file_jd_end >= jd_end - _SPK_COVERAGE_END_TOLERANCE_DAYS
+        ):
             if _is_valid_bsp(filepath):
                 return filepath
             get_logger().warning("Cached SPK file %s is corrupted, skipping", filepath)
@@ -1348,7 +1356,12 @@ def is_spk_cached(
         return False
 
     # Sanitize body_id to match filename pattern (shared writer/reader sanitizer)
-    from .spk import _sanitize_filename, get_spk_coverage
+    from .spk import (
+        _SPK_COVERAGE_END_TOLERANCE_DAYS,
+        _SPK_COVERAGE_START_TOLERANCE_DAYS,
+        _sanitize_filename,
+        get_spk_coverage,
+    )
 
     safe_body_id = _sanitize_filename(body_id)
 
@@ -1368,8 +1381,13 @@ def is_spk_cached(
             coverage = get_spk_coverage(spk_path)
             if coverage is not None:
                 file_jd_start, file_jd_end = coverage
-                # Check if this file covers our requested range
-                if file_jd_start <= jd_start and file_jd_end >= jd_end:
+                # Check if this file covers our requested range, with the
+                # same edge tolerances as _find_covering_spk (the coverage
+                # is the usable span, not the stored one).
+                if (
+                    file_jd_start <= jd_start + _SPK_COVERAGE_START_TOLERANCE_DAYS
+                    and file_jd_end >= jd_end - _SPK_COVERAGE_END_TOLERANCE_DAYS
+                ):
                     return True
         except (OSError, ValueError, KeyError, ImportError):
             # If we can't read the file, skip it and try others

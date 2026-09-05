@@ -77,6 +77,7 @@ from .exceptions import (
     # Category: Data not found errors
     DataNotFoundError,
     UnknownBodyError,
+    IllegalBodyError,
     StarNotFoundError,
     SPKNotFoundError,
     SPKRequiredError,
@@ -85,6 +86,7 @@ from .exceptions import (
     PolarCircleError,
     EphemerisRangeError,
     ConvergenceError,
+    SPKEvaluationError,
     # Category: Configuration errors
     ConfigurationError,
     NetworkSealedError,
@@ -647,6 +649,10 @@ def date_conversion(
     """
     if isinstance(cal, bytes):
         cal = cal.decode("ascii")
+    # Validate the type before normalising: .lower() on a non-string leaked
+    # AttributeError instead of this function's documented ValueError.
+    if not isinstance(cal, str):
+        raise ValueError(f"calendar must be 'j' or 'g', got: {cal!r}")
     cal_char = cal.lower()
     if cal_char not in ("j", "g"):
         raise ValueError(f"calendar must be 'j' or 'g', got: {cal!r}")
@@ -668,7 +674,7 @@ from ._dotenv import load_dotenv
 # Extended astrology helpers submodule
 from . import contrib
 
-__version__ = "3.1.0"
+__version__ = "3.2.0"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0-only"
@@ -701,6 +707,7 @@ __all__ = [
     # Exceptions - Data Not Found Category
     "DataNotFoundError",
     "UnknownBodyError",
+    "IllegalBodyError",
     "StarNotFoundError",
     "SPKNotFoundError",
     "SPKRequiredError",
@@ -709,6 +716,7 @@ __all__ = [
     "PolarCircleError",
     "EphemerisRangeError",
     "ConvergenceError",
+    "SPKEvaluationError",
     # Exceptions - Configuration Category
     "ConfigurationError",
     "NetworkSealedError",

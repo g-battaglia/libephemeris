@@ -74,7 +74,7 @@ from __future__ import annotations
 import math
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import List, Sequence, Tuple
+from typing import List, Literal, Sequence, Tuple
 
 from skyfield.api import Star
 from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
@@ -219,7 +219,7 @@ from .constants import (
 )
 from .utils import cotrans
 from .cache import get_true_obliquity, get_mean_obliquity
-from .exceptions import Error, LEBCorruptionError
+from .exceptions import Error, LEBCorruptionError, StarNotFoundError
 from .planets import _wrap_ephemeris_range_error
 
 _fixed_star_source: ContextVar[str | None] = ContextVar(
@@ -2903,6 +2903,48 @@ def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
     return _resolve_star_ref(star_name)
 
 
+def _star_search_type(star_name: str, *, family: Literal["v1", "v2"]) -> str:
+    """Classify a star search string under one resolver family's grammar.
+
+    Reported as ``StarNotFoundError.search_type`` so a caller can tell which
+    of the catalogue's search forms was attempted, rather than inferring it
+    from the message text. A percent sign selects a wildcard only in the v2
+    family; the v1 resolver treats it as part of a normal name.
+    """
+    key = _ref_star_key(star_name)
+    if not key:
+        return "empty"
+    if family == "v2" and "%" in key:
+        return "wildcard"
+    if "," in key:
+        return "nomenclature"
+    if key[0].isdigit():
+        return "sequential"
+    return "name"
+
+
+def _star_not_found(
+    star_name: str,
+    error: str | None,
+    *,
+    family: Literal["v1", "v2"],
+) -> StarNotFoundError:
+    """Build the typed error for a fixed-star lookup that resolved nothing.
+
+    Every failure mode of both star families — an unknown name, the comma
+    form, an out-of-range sequential number, a v2 wildcard that matched
+    nothing, and the empty string — is the same event and carries the same
+    type. Raising the base Error here meant the exception the hierarchy and
+    the documentation promise was never raised, so code catching it never
+    ran.
+    """
+    return StarNotFoundError(
+        error or "could not find star name",
+        star_id=star_name,
+        search_type=_star_search_type(star_name, family=family),
+    )
+
+
 def _preprocess_flags(iflag: int) -> int:
     """Preprocess calculation flags for fixed star functions.
 
@@ -3273,12 +3315,12 @@ def _fixed_epoch_star_call(
     if flexible_lookup:
         entry, error = _resolve_star2(star)
         if error or entry is None:
-            raise Error(error or "could not find star name")
+            raise _star_not_found(star, error, family="v2")
         star_id = entry.id
     else:
         star_id, error, _canonical_name = _resolve_star_id(star)
         if error:
-            raise Error(error)
+            raise _star_not_found(star, error, family="v1")
     _record_fixed_star_success(star_id, tjd, _get_fixed_star_source())
     return result
 
@@ -3377,12 +3419,12 @@ def _sidbit_star_call(
     if flexible_lookup:
         entry, error = _resolve_star2(star)
         if error or entry is None:
-            raise Error(error or "could not find star name")
+            raise _star_not_found(star, error, family="v2")
         star_id = entry.id
     else:
         star_id, error, _canonical_name = _resolve_star_id(star)
         if error:
-            raise Error(error)
+            raise _star_not_found(star, error, family="v1")
     _record_fixed_star_success(star_id, tjd, _get_fixed_star_source())
     return result
 
@@ -3407,7 +3449,8 @@ def fixstar_ut(
             - retflags: Return flags (int)
 
     Raises:
-        Error: If the star cannot be found.
+        StarNotFoundError: If the star cannot be found. This remains a subclass
+            of Error for backward-compatible exception handling.
 
     Note:
         UT (Universal Time) is converted to TT (Terrestrial Time) internally
@@ -3427,7 +3470,7 @@ def fixstar_ut(
 
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
-        raise Error(error)
+        raise _star_not_found(star, error, family="v1")
     return _fixstar_ut_by_id(star_id, canonical_name, tjdut, flags)
 
 
@@ -3565,7 +3608,7 @@ def _batch_fixstars_via_single(
                 results.append(fixstar_ut(star_name, tjdut, flags))
                 star_id, error, _canonical_name = _resolve_star_id(star_name)
                 if error:
-                    raise Error(error)
+                    raise _star_not_found(star_name, error, family="v1")
                 traces.append((star_id, _get_fixed_star_source()))
             except Error:
                 if skip_errors:
@@ -3656,7 +3699,7 @@ def batch_fixstars_ut(
         if error:
             if skip_errors:
                 continue
-            raise Error(error)
+            raise _star_not_found(star_name, error, family="v1")
         resolved.append((index, star_id, canonical_name or ""))
 
     if not resolved:
@@ -3825,7 +3868,8 @@ def fixstar(
             - retflags: Return flags (int)
 
     Raises:
-        Error: If the star cannot be found.
+        StarNotFoundError: If the star cannot be found. This remains a subclass
+            of Error for backward-compatible exception handling.
 
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
@@ -3848,7 +3892,7 @@ def fixstar(
 
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
-        raise Error(error)
+        raise _star_not_found(star, error, family="v1")
 
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
@@ -4039,7 +4083,8 @@ def fixstar2_ut(
             - retflags: Return flags (int)
 
     Raises:
-        Error: If the star cannot be found.
+        StarNotFoundError: If the star cannot be found. This remains a subclass
+            of Error for backward-compatible exception handling.
 
     Note:
         UT (Universal Time) is converted to TT (Terrestrial Time) internally
@@ -4065,7 +4110,7 @@ def fixstar2_ut(
 
     entry, error = _resolve_star2(star)
     if error or entry is None:
-        raise Error(error or "could not find star name")
+        raise _star_not_found(star, error, family="v2")
 
     from .state import get_timescale
 
@@ -4132,7 +4177,8 @@ def fixstar2(
             - retflags: Return flags (int)
 
     Raises:
-        Error: If the star cannot be found.
+        StarNotFoundError: If the star cannot be found. This remains a subclass
+            of Error for backward-compatible exception handling.
 
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T.
@@ -4172,7 +4218,7 @@ def fixstar2(
 
     entry, error = _resolve_star2(star)
     if error or entry is None:
-        raise Error(error or "could not find star name")
+        raise _star_not_found(star, error, family="v2")
 
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
@@ -5345,7 +5391,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     visibility calculations where position is not needed.
 
     Compatible with the reference API: returns (magnitude, star_name) on success,
-    raises Error if the star is not found.
+    raises StarNotFoundError if the star is not found.
 
     Args:
         star: Name of star (e.g. "Regulus", "Spica")
@@ -5357,7 +5403,9 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
               (e.g. "Regulus,alLeo")
 
     Raises:
-        Error: If the star cannot be found or magnitude is unavailable.
+        StarNotFoundError: If the star cannot be found. This remains a subclass
+            of Error for backward-compatible exception handling.
+        Error: If the star is found but its magnitude is unavailable.
 
     Example:
         >>> mag, name = fixstar_mag("Regulus")
@@ -5365,7 +5413,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     """
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
-        raise Error(error)
+        raise _star_not_found(star, error, family="v1")
 
     if star_id not in _STAR_MAGNITUDES:
         raise Error(f"Magnitude not available for star ID {star_id}")
@@ -5395,7 +5443,7 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
     visibility calculations where position is not needed.
 
     Compatible with the reference API: returns (magnitude, star_name) on success,
-    raises Error if the star is not found.
+    raises StarNotFoundError if the star is not found.
 
     Args:
         star: Star search string (name, ",nomenclature", number, "prefix%")
@@ -5407,7 +5455,8 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
               (e.g. "Regulus,alLeo")
 
     Raises:
-        Error: If the star cannot be found.
+        StarNotFoundError: If the star cannot be found. This remains a subclass
+            of Error for backward-compatible exception handling.
 
     Example:
         >>> mag, name = fixstar2_mag("Regulus")
@@ -5418,7 +5467,7 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
     """
     entry, error = _resolve_star2(star)
     if error or entry is None:
-        raise Error(error or "could not find star name")
+        raise _star_not_found(star, error, family="v2")
 
     star_name_out = _format_star_name(entry)
     return (entry.magnitude, star_name_out)

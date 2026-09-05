@@ -77,7 +77,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Optional, Tuple, List
+from typing import TYPE_CHECKING, Callable, Optional, Tuple, List
 
 if TYPE_CHECKING:
     from .minor_bodies import OrbitalElements
@@ -242,7 +242,7 @@ _ASSIST_EXPECTED_SIZES = {
 _ASSIST_MIN_SIZE_RATIO = 0.90
 
 
-def _verify_assist_file(path: Path) -> bool:
+def _verify_assist_file(path: Path, name: Optional[str] = None) -> bool:
     """Verify that an ASSIST data file looks valid.
 
     Checks that the file exists and its size is within the expected range.
@@ -250,6 +250,12 @@ def _verify_assist_file(path: Path) -> bool:
 
     Args:
         path: Path to the file to verify.
+        name: Logical filename to look the expectations up under. Defaults to
+            ``path.name``; pass the final name explicitly when verifying a
+            temporary download, whose own name carries no expectations. The
+            size threshold is the only integrity check the planet files
+            (``.440`` / ``.441``) have, so it is enforced for a fresh payload
+            as well: a truncated download must never replace a good file.
 
     Returns:
         True if the file passes verification, False otherwise.
@@ -257,18 +263,20 @@ def _verify_assist_file(path: Path) -> bool:
     if not path.exists():
         return False
 
+    logical_name = name if name is not None else path.name
+
     actual_size = path.stat().st_size
     if actual_size == 0:
         return False
 
-    expected = _ASSIST_EXPECTED_SIZES.get(path.name)
+    expected = _ASSIST_EXPECTED_SIZES.get(logical_name)
     if expected is not None:
         min_size = int(expected * _ASSIST_MIN_SIZE_RATIO)
         if actual_size < min_size:
             return False
 
     # For BSP files, try structural validation
-    if path.suffix == ".bsp":
+    if logical_name.endswith(".bsp"):
         try:
             from jplephem.spk import SPK
 
@@ -297,12 +305,38 @@ def _create_ssl_context():
         return ssl.create_default_context()
 
 
+def _assist_download_validator(name: str) -> Callable[[str], bool]:
+    """Build the pre-publication check for one ASSIST download.
+
+    The check runs on the temporary file, whose random name carries no size
+    expectation, so the final ``name`` is passed explicitly. The size
+    threshold is enforced there too: for the planet files it is the only
+    integrity check, so a short payload is rejected before publication and
+    the file already on disk survives. A legitimate upstream republication
+    that shrinks a file is installed only after ``_ASSIST_EXPECTED_SIZES``
+    is updated with it.
+
+    Args:
+        name: Final filename the download will be published under.
+
+    Returns:
+        A callable taking the temp path and returning True when the payload
+        passes the structural checks.
+    """
+
+    def _validate(temp_path: str) -> bool:
+        return _verify_assist_file(Path(temp_path), name=name)
+
+    return _validate
+
+
 def _download_single_file(
     url: str,
     dest: Path,
     description: str,
     show_progress: bool = True,
     quiet: bool = False,
+    validator: Optional[Callable[[str], bool]] = None,
 ) -> None:
     """Download a single file with progress, atomic write, and SSL support.
 
@@ -312,6 +346,13 @@ def _download_single_file(
         description: Human-readable description for progress output.
         show_progress: Whether to show a progress bar.
         quiet: Suppress all non-error output.
+        validator: Optional check applied to the *temporary* file before it
+            is published. Verifying before the atomic replace is what keeps a
+            truncated multi-hundred-megabyte download from destroying the
+            copy already on disk.
+
+    Raises:
+        ValueError: If ``validator`` rejects the downloaded payload.
     """
     import hashlib
     import tempfile
@@ -320,6 +361,7 @@ def _download_single_file(
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     temp_fd, temp_path = tempfile.mkstemp(dir=dest.parent, suffix=".download")
+    published = False
 
     try:
         from .net import Request
@@ -351,6 +393,7 @@ def _download_single_file(
             chunk_size = 256 * 1024  # 256 KB chunks for large files
 
             with os.fdopen(temp_fd, "wb") as f:
+                temp_fd = -1
                 while True:
                     chunk = response.read(chunk_size)
                     if not chunk:
@@ -363,24 +406,38 @@ def _download_single_file(
             if progress:
                 progress.close()
 
+        if validator is not None and not validator(temp_path):
+            raise ValueError(
+                f"Downloaded file {dest.name} failed verification - "
+                "corrupt or incomplete"
+            )
+
         # Atomic move to final destination (also restores 0644 permissions)
         from .download import publish_temp_file
 
         publish_temp_file(temp_path, dest)
+        published = True
 
         if not quiet:
             actual_mb = dest.stat().st_size / (1024 * 1024)
             print(f"  Done ({actual_mb:.1f} MB, sha256: {sha256.hexdigest()[:16]}...)")
 
-    except (ImportError, RuntimeError, ValueError, OSError):
-        # Clean up temp file on error.  OSError also covers the
-        # urllib.error.URLError network failures raised mid-download.
-        try:
-            if os.path.exists(temp_path):
+    # The cleanup is unconditional. Narrow except clauses would miss anything
+    # a caller-supplied validator raises (it is arbitrary code), orphaning a
+    # fully written .download file next to a multi-gigabyte data set.
+    finally:
+        if not published:
+            # The descriptor is only handed to os.fdopen once the response is
+            # open; a failure before that would otherwise leak it.
+            if temp_fd != -1:
+                try:
+                    os.close(temp_fd)
+                except OSError:
+                    pass
+            try:
                 os.unlink(temp_path)
-        except OSError:
-            pass
-        raise
+            except OSError:
+                pass
 
 
 def download_assist_data(
@@ -460,12 +517,11 @@ def download_assist_data(
                     print(f"  {description} already exists ({size_mb:.1f} MB): {dest}")
                 skipped += 1
                 continue
-            else:
-                if not quiet:
-                    print(
-                        f"  {description} exists but failed verification, re-downloading"
-                    )
-                dest.unlink()
+            elif not quiet:
+                # The existing file stays until a verified replacement is
+                # ready: these downloads are 98 MB to 2.6 GB, and unlinking
+                # first turns a failed repair into an expensive loss.
+                print(f"  {description} exists but failed verification, re-downloading")
 
         _download_single_file(
             url=url,
@@ -473,6 +529,7 @@ def download_assist_data(
             description=description,
             show_progress=show_progress,
             quiet=quiet,
+            validator=_assist_download_validator(filename),
         )
         downloaded += 1
 

@@ -81,7 +81,7 @@ When you request the position of a minor body, the library tries different metho
 
 **0. Precomputed LEB** — If a LEB binary ephemeris is loaded and contains the body, its precomputed Chebyshev polynomials are used directly (no Internet, no per-call SPK read). This is the fastest path. The data-v3 manifest contains an `{tier}_exotics.leb2` companion for every tier; inventory and routing still honor each body's actual stored interval. When absent, corrupt, or outside that interval, the chain continues according to the active mode.
 
-**1. SPK Kernel** — If a JPL binary file (SPK/BSP format) is registered for that body, it uses it. Precision: sub-arcsecond. It is the gold standard method.
+**1. SPK Kernel** — If a JPL binary file (SPK/BSP format) is registered for that body, it uses it. Precision: sub-arcsecond. It is the gold standard method. `get_spk_coverage()` returns the *usable* span of the kernel (JD, TDB): the stored span minus the light-time band at its start and the speed stencil at both ends. Inside that span the kernel either serves the epoch or raises `SPKEvaluationError`; the chain below is reached only outside it, with `EphemerisRangeError` marking the boundary.
 
 **2. Automatic SPK download** — If automatic download is enabled and the kernel is not available locally, the library downloads it from JPL Horizons. Works for all 37 bodies in the SPK map.
 
@@ -272,6 +272,7 @@ In this chapter, we learned how to work with the minor bodies of the Solar Syste
 - The library uses a **calculation chain**: SPK kernel → auto-download → strict precision check → ASSIST n-body → Keplerian fallback.
 - **SPK Kernels** are NASA binary files with precise trajectories — the gold standard for sub-arcsecond positions.
 - **Strict precision** (default) raises `SPKRequiredError` for mapped bodies without SPK, preventing silent precision loss. Disable with `set_strict_precision(False)`.
+- Inside a kernel's usable coverage a kernel failure raises `SPKEvaluationError` instead of degrading to a lower-precision source.
 - The **Keplerian fallback** works without the Internet but is only reached if strict precision is disabled or the body is not in the SPK map.
 - For bodies without a dedicated ID, use `AST_OFFSET + catalog_number`.
 

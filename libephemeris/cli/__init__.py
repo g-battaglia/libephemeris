@@ -823,6 +823,9 @@ def config() -> None:
     click.echo(_b("IERS Earth orientation data"))
     iers_auto = os.environ.get("LIBEPHEMERIS_IERS_AUTO_DOWNLOAD", "")
     iers_dt = os.environ.get("LIBEPHEMERIS_IERS_DELTA_T", "")
+    # Printed, never resolved: get_iers_cache_info() parses the cached tables
+    # and can trigger an IERS download, which has no business running inside a
+    # read-only "show me the configuration" command.
     click.echo(f"  Location: {data_dir}/iers_cache/")
     _cur = f"  [current: {iers_auto}]" if iers_auto else ""
     click.echo(f"  Env var:  {_e('LIBEPHEMERIS_IERS_AUTO_DOWNLOAD')}  (1/0){_cur}")
@@ -831,7 +834,7 @@ def config() -> None:
         f"  Env var:  {_e('LIBEPHEMERIS_IERS_DELTA_T')}  (1/0, use observed Delta T)"
         f"{_cur}"
     )
-    click.echo("  Files:    finals2000A.data, Leap_Second.dat, deltat.data")
+    click.echo("  Files:    finals2000A.data, leap_seconds.dat, deltat.data")
     click.echo()
 
     # --- Delta T model ---

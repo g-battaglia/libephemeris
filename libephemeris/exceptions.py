@@ -277,14 +277,17 @@ class UnknownBodyError(DataNotFoundError):
 class StarNotFoundError(DataNotFoundError):
     """Error raised when a fixed star is not found in the catalog.
 
-    This exception is raised when attempting to look up a fixed star by
-    name, Hipparcos number, or other identifier that is not in the star
-    catalog.
+    This exception is raised when a fixed-star lookup cannot resolve its
+    search string. It remains a subclass of :class:`Error`, so existing broad
+    exception handlers continue to catch it.
 
     Attributes:
-        message: Human-readable error message
-        star_id: The star identifier that was not found
-        search_type: The type of search performed ("name", "hip", etc.)
+        message: Human-readable error message.
+        star_id: The star search string that was not found.
+        search_type: The selected search form: ``"name"``, ``"empty"``,
+            ``"wildcard"``, ``"nomenclature"``, or ``"sequential"``.
+            ``"wildcard"`` applies only to the v2 family; the v1 family treats
+            a percent sign as part of a normal ``"name"`` search.
 
     Example:
         >>> import libephemeris as ephem
@@ -294,8 +297,8 @@ class StarNotFoundError(DataNotFoundError):
         ...     print(f"Star not found: {e.star_id}")
 
     See Also:
-        fixstar_ut: Fixed star position calculation
-        fixstar2_ut: Fixed star position with HIP identifier
+        fixstar_ut: Fixed-star position calculation with v1 search semantics.
+        fixstar2_ut: Fixed-star position calculation with v2 search semantics.
     """
 
     def __init__(
@@ -317,6 +320,32 @@ class StarNotFoundError(DataNotFoundError):
             f"StarNotFoundError({self.message!r}, "
             f"star_id={self.star_id!r}, search_type={self.search_type!r})"
         )
+
+
+class IllegalBodyError(UnknownBodyError, ValueError):
+    """A target body that no active backend can place.
+
+    Raised by ``rise_trans`` and ``rise_trans_true_hor``, and by the three
+    ``lun_occult_*`` entry points, for an unknown or unsupported body id
+    (for example a planetary moon with no registered SPK). It multiply
+    inherits :class:`UnknownBodyError` — the
+    compatibility-contract type for an illegal body, itself an
+    :class:`Error` — and the built-in :class:`ValueError`, so the single
+    "illegal planet number" contract is identical on every backend and
+    satisfies callers catching either type.
+
+    The class is public because it is what a traceback names. While it was
+    private, an ordinary failure printed an underscore-prefixed internal
+    class to the user.
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.rise_trans(2451545.0, -5, ephem.CALC_RISE, [12.0, 42.0, 0.0])
+        ... except ephem.IllegalBodyError as e:
+        ...     print(e.body_id)
+        -5
+    """
 
 
 class SPKNotFoundError(DataNotFoundError):
@@ -726,6 +755,63 @@ class ConvergenceError(CalculationError):
             f"ConvergenceError({self.message!r}, algorithm={self.algorithm!r}, "
             f"iterations={self.iterations}, max_iterations={self.max_iterations}, "
             f"tolerance={self.tolerance}, last_value={self.last_value})"
+        )
+
+
+class SPKEvaluationError(CalculationError):
+    """Error raised when a registered SPK kernel cannot serve an epoch it covers.
+
+    ``EphemerisRangeError`` reports an epoch outside a kernel's usable
+    coverage; callers may then continue with the documented lower-precision
+    chain. This error is different: the epoch lies inside the coverage the
+    kernel advertises, and the kernel still could not produce a state (an
+    unreadable record, a center missing from the base ephemeris, a reader
+    fault, a kernel that can no longer be opened). The calculation is not
+    degraded to another source; the error reaches the caller of ``calc_ut()``
+    or ``calc()``.
+
+    Attributes:
+        message: Human-readable error message
+        body_id: libephemeris body ID being calculated (if known)
+        naif_id: NAIF ID of the kernel target (if known)
+        spk_file: Path of the SPK kernel (if known)
+        requested_jd: Evaluation epoch (JD TDB) that failed (if known)
+
+    Example:
+        >>> import libephemeris as ephem
+        >>> try:
+        ...     ephem.calc_ut(jd, ephem.CHIRON, ephem.FLG_SPEED)
+        ... except ephem.SPKEvaluationError as e:
+        ...     print(f"Kernel {e.spk_file} failed at JD {e.requested_jd}")
+
+    See Also:
+        register_spk_body: Register an SPK kernel for a body
+        get_spk_coverage: Usable coverage of an SPK kernel
+    """
+
+    def __init__(
+        self,
+        message: str,
+        body_id: int | None = None,
+        naif_id: int | None = None,
+        spk_file: str | None = None,
+        requested_jd: float | None = None,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.body_id = body_id
+        self.naif_id = naif_id
+        self.spk_file = spk_file
+        self.requested_jd = requested_jd
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return (
+            f"SPKEvaluationError({self.message!r}, body_id={self.body_id}, "
+            f"naif_id={self.naif_id}, spk_file={self.spk_file!r}, "
+            f"requested_jd={self.requested_jd})"
         )
 
 

@@ -1905,8 +1905,9 @@ def reset_session() -> None:
     """Reset per-calculation state without closing files or clearing caches.
 
     Resets: topo, sidereal mode, angles cache, observer cache.
-    Keeps alive: LEB reader, Skyfield timescale, SPK kernels, LRU caches,
-    and process-level configuration (calculation mode, strict precision).
+    Keeps alive: LEB reader, Skyfield timescale, SPK kernels and body
+    registrations, LRU caches, and process-level configuration (calculation
+    mode, strict precision).
 
     Use this between independent calculations that may use different
     topo/sidereal settings. Use close() only for full teardown (e.g.

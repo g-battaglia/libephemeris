@@ -329,7 +329,7 @@ class TestEnsureSpkDownloaded:
         mock_dl.assert_not_called()
 
     def test_corrupted_cache_redownload(self, tmp_path):
-        """Corrupted cached file is removed + re-downloaded (lines 552-560)."""
+        """A corrupted cached file is re-downloaded over, in place."""
         config = spk_auto.AutoSpkConfig(
             ipl=CHIRON,
             body_id="2060",
@@ -356,8 +356,12 @@ class TestEnsureSpkDownloaded:
         assert result == cache_path
         mock_dl.assert_called_once()
 
-    def test_corrupted_cache_remove_oserror(self, tmp_path):
-        """os.remove failure on corrupted cache is swallowed (lines 558-559)."""
+    def test_corrupted_cache_is_not_removed_before_redownload(self, tmp_path):
+        """The corrupt cache is never unlinked ahead of its replacement.
+
+        Removing it first is what turned a failed re-download into data loss
+        (issue #55); the atomic publish overwrites it instead.
+        """
         config = spk_auto.AutoSpkConfig(
             ipl=CHIRON,
             body_id="2060",
@@ -374,7 +378,10 @@ class TestEnsureSpkDownloaded:
 
         with (
             patch.object(spk_auto, "_is_valid_bsp", return_value=False),
-            patch("os.remove", side_effect=OSError("locked")),
+            patch(
+                "os.remove",
+                side_effect=AssertionError("must not unlink before replacing"),
+            ),
             patch.object(
                 spk_auto, "_download_spk_astroquery", side_effect=fake_download
             ),

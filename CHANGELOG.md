@@ -5,10 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.2.0] - 2026-09-05
 
 ### Added
 
+- `SPKEvaluationError` (a `CalculationError`): a registered SPK kernel could
+  not serve an epoch inside its usable coverage.
 - Contributor governance files: `CONTRIBUTING.md` (workflow, code style,
   provenance requirements, clean-room policy, and the Contributor License
   Agreement), `AUTHORS`, `.mailmap`, and a `.clabot` configuration so the CLA
@@ -25,6 +27,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contributing section were updated accordingly; the previous
   "no separate contributor license agreement is required" statement no longer
   applies to contributions submitted from now on.
+
+### Fixed
+
+- `download_for_tier()`, `download_planet_centers()`, `download_leb2_for_tier()`,
+  `download_spk()`, `download_and_register_spk()`, `download_assist_data()`
+  and the REBOUND data download no longer remove the existing artifact before
+  its replacement is verified (#55). Every payload streams into a temporary
+  file next to the destination, the digest and the structural validator run
+  on that temporary file, and only a verified artifact is published with
+  `os.replace()`; a failed repair therefore leaves the previous file in place.
+  `download_spk()` and `download_and_register_spk()` now honour
+  `set_spk_cache_dir()` / `LIBEPHEMERIS_SPK_DIR`, the directory every
+  automatic SPK lookup consults; `libephemeris config` prints paths only
+  and no longer touches the network.
+- Fixed-star lookups now raise `StarNotFoundError` (a subclass of
+  `DataNotFoundError` and `Error`) for an unknown name, the comma form, an
+  out-of-range sequential number, a wildcard that matched nothing, and the
+  empty string, across `fixstar` / `fixstar_ut` / `fixstar2` / `fixstar2_ut`,
+  their magnitude helpers and the batch resolver (#59). The exception was
+  exported and documented but never raised. It carries the identifier and
+  the `search_type` that was attempted, classified per resolver family (a
+  `%` is a wildcard only in the v2 family). Error messages are unchanged and
+  every existing `except Error` clause keeps working.
+- Public entry points no longer let standard-library exceptions escape where
+  the typed hierarchy is the documented contract (#60):
+  `house_name`, `houses`, `houses_ex`, `houses_ex2`, `houses_armc`,
+  `houses_armc_ex2`, `house_pos` and the `fallback_hsys` parameter of the
+  fallback helpers fold an int selector that `chr()` rejects (for example
+  `-1`) to the unknown-selector default, exactly as `999` already did;
+  `parse_orbital_elements("")` and a directory path raise the documented
+  `FileNotFoundError` instead of `IsADirectoryError`, while special files
+  such as `/dev/null` still parse; `date_conversion`, `get_saros_number` and
+  `get_inex_number` raise their own `ValueError` for a non-string calendar
+  flag instead of `AttributeError`; `lun_occult_where`,
+  `lun_occult_when_glob` and `lun_occult_when_loc` no longer surface a
+  bare `KeyError` for a negative body id — it is folded to the Sun, as the
+  reference answers — and re-raise an unknown body as the new exported
+  `IllegalBodyError` (both `UnknownBodyError` and `ValueError`), which is
+  also the type `rise_trans` / `rise_trans_true_hor` raise for an illegal
+  body in place of a private class.
+- `nod_aps()` / `nod_aps_ut()`: method values whose low byte is non-zero but
+  carries neither `NODBIT_MEAN` nor `NODBIT_OSCU` / `NODBIT_OSCU_BAR` (for
+  example 8 and 16) now select the osculating model, as the reference does.
+  Model selection follows the measured contract exactly: mean when
+  `method & 0xFF == 0` or `NODBIT_MEAN` is set, osculating for every other
+  non-zero low byte. No validation is added; every integer is still accepted
+  (#78).
+
+- `calc_airmass` now raises `InputValidationError` for a `method` it does not
+  implement instead of silently computing Kasten-Young for it (#65). The
+  accepted methods are exactly `"secant"`, `"kasten_young"` and
+  `"rozenberg"`; matching is case-sensitive.
+- `calc_contrast_threshold`, `calc_visibility_threshold` and
+  `calc_limiting_magnitude_for_sky` now raise `InputValidationError` for an
+  unknown explicit `eye_adaptation` instead of silently using the photopic
+  branch (#65). The accepted states are `"photopic"`, `"mesopic"` and
+  `"dark"`; `"scotopic"`, which the documentation used to present as a
+  returned state, is accepted as an input alias for `"dark"` and is reported
+  back as `"dark"`. `None` remains the auto-detection sentinel.
+- Sealed `leb` mode now refuses the model-served lunar points (`MEAN_NODE`,
+  `MEAN_APOG`, `INTP_APOG`, `INTP_PERG`) outside coverage on the date alone,
+  whatever the frame flags; previously the refusal fired only when the
+  requested frame happened to need nutation. The interpolated apsides are
+  additionally bounded by the fitted window of their packaged model, read
+  from the residual-grid metadata (JD 2286820.5 to 2689310.5 for the apogee
+  and to 2689316.5 for the perigee, i.e. 1549-01-01 to late December 2650 in
+  TT), so the refusal also holds when only `base_core.leb2` is installed and
+  no `apogee` group declares coverage for them — the configuration in which
+  `calc_ut(625673.5, INTP_APOG)` answered while `SUN` raised. An installed
+  `apogee` group still narrows the window to its own stored interval. Inside
+  the window nothing changes; `auto`, `skyfield` and `horizons` keep the
+  documented edge taper. (#62)
+- `calc_eclipse_central_line`, `calc_eclipse_northern_limit` and
+  `calc_eclipse_southern_limit` no longer hang on a sampling step that cannot
+  move the Julian Day accumulator (issue #61). A `step_minutes` that is zero,
+  negative, non-finite, or too small to advance a double-precision Julian Day
+  in the window now raises `InputValidationError`; a non-finite `jd_start` or
+  `jd_end` raises `EphemerisRangeError`, as `validate_jd_range` does for any
+  non-finite Julian Day, where a `nan` bound previously returned empty tuples.
+- SPK type 21 (JPL Horizons small-body kernels): an epoch inside the
+  kernel's usable coverage is now either served by the kernel or raises the
+  new `SPKEvaluationError`; it is no longer answered from the Keplerian
+  approximation behind the caller's back (the reader's exclusive end bound
+  and the light-time band at the segment start used to degrade silently).
+  `get_spk_coverage()` reports the usable span in TDB: the stored span minus
+  the light-time band plus the speed stencil at its start and minus the
+  stencil alone at its end; `EphemerisRangeError` is raised only outside
+  that span, where the documented fallback chain continues. The state
+  chain honours the center the kernel declares (barycenter, Sun, or a body
+  of the base ephemeris) instead of assuming the Sun, and `register_spk_body()`
+  validates the NAIF ID and the center against the kernel's segment
+  summaries. Cached-kernel discovery tolerates the light-time edge band so
+  kernels are not re-downloaded.
 
 ## [3.1.0] - 2026-08-11
 
@@ -4534,7 +4629,9 @@ All eclipse functions now return `(retflag, ...)` as the first element to match 
 - Thread-safe `EphemerisContext` API for concurrent calculations
 - Swiss Ephemeris compatible function names, flags, and result structure
 
-[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/g-battaglia/libephemeris/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/g-battaglia/libephemeris/compare/v3.1.0...v3.2.0
+[3.1.0]: https://github.com/g-battaglia/libephemeris/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/g-battaglia/libephemeris/compare/v3.0.0rc15...v3.0.0
 [3.0.0rc14]: https://github.com/g-battaglia/libephemeris/compare/v3.0.0rc11...v3.0.0rc14
 [3.0.0rc11]: https://github.com/g-battaglia/libephemeris/releases/tag/v3.0.0rc11
