@@ -25,6 +25,8 @@ Provenance:
 
 from __future__ import annotations
 
+from math import pi as _PI
+
 # __all__ is generated dynamically at the bottom of this module to export
 # all public constants and functions while excluding private names and imports.
 
@@ -1267,15 +1269,22 @@ SE_FNAME_DE431: str = FNAME_DE431
 STARFILE: str = "sefstars.txt"
 STARFILE_OLD: str = "fixstars.cat"
 
-# Unit conversion constants.
-# AU in km: the exact IAU 2012 (Resolution B2) astronomical unit, 149597870700 m.
-AUNIT_TO_KM: float = 149597870.7
-# AU per light-year: AU / (c * Julian year), with c exact (SI) and the Julian
-# year of 365.25 d; equals the IAU 2012 au divided by 9.4607304725808e15 m.
-AUNIT_TO_LIGHTYEAR: float = 1.5812507409819728e-05
-# AU per parsec = pi / 648000, the exact IAU 2015 (Resolution B2) definition
+# Unit conversion constants, derived in one step from the defining values so
+# that each factor is the correctly rounded double of its definition.
+# Astronomical unit in metres: exact, IAU 2012 Resolution B2.
+_AU_M: float = 149597870700.0  # IAU 2012 B2
+# Speed of light in vacuum in m/s: exact, SI (CODATA).
+_C_M_S: float = 299792458.0  # SI / IAU 2012 B2
+# Julian year in seconds: 365.25 d of 86400 s (IAU 1976 System of Astronomical
+# Constants; the light-year is defined on this year).
+_JULIAN_YEAR_S: float = 365.25 * 86400.0
+# AU in km, exact.
+AUNIT_TO_KM: float = _AU_M / 1000.0
+# AU per light-year: au / (c * Julian year).
+AUNIT_TO_LIGHTYEAR: float = _AU_M / (_C_M_S * _JULIAN_YEAR_S)
+# AU per parsec: pi / 648000, from the exact IAU 2015 Resolution B2 definition
 # of the parsec (1 pc = 648000/pi au).
-AUNIT_TO_PARSEC: float = 4.848136811095274e-06
+AUNIT_TO_PARSEC: float = _PI / 648000.0
 
 # Miscellaneous
 DE_NUMBER: int = 431

@@ -466,6 +466,17 @@ are compatibility targets. They may be tested as ordinary API behavior. Numeric
 astronomical datasets and sampled result series are not API metadata and are not
 copied or persisted.
 
+#### AU conversion factors {#au-conversion-factors}
+
+`AUNIT_TO_LIGHTYEAR` and `AUNIT_TO_PARSEC` are computed in one step from their
+definitions — au / (c · Julian year) with the exact IAU 2012 astronomical unit
+and the SI speed of light, and π / 648000 from the exact IAU 2015 parsec —
+rather than stored as decimal literals. The stored literals were truncated
+copies: they differed from the correctly rounded double of the definition by
+5.9e-14 (light-year) and 1.8e-14 (parsec) in relative terms. The derived values
+are exact to double precision; no computation inside the library reads either
+factor, so positions, distances and magnitudes are unaffected.
+
 ## Validation policy
 
 Direct compatibility runs compare public return values and report pass/fail

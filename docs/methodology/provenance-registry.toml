@@ -209,6 +209,11 @@ kind = "official-public-resolution"
 citation = "IAU 2012 Resolution B2 (exact astronomical unit and retirement of the Gaussian constant from the defining constants)"
 url = "https://www.iau.org/static/resolutions/IAU2012_English.pdf"
 
+[sources.IAU_2015_B2]
+kind = "official-public-resolution"
+citation = "IAU 2015 Resolution B2 (recommended zero points for absolute and apparent bolometric magnitude; defines the parsec as exactly 648000/pi au)"
+url = "https://www.iau.org/static/resolutions/IAU2015_English.pdf"
+
 [[component]]
 id = "runtime-public-facade"
 category = "public-api"
@@ -287,8 +292,8 @@ id = "public-identifiers"
 category = "public-api"
 paths = ["libephemeris/constants.py"]
 scientific_content = false
-origin = "Public body identifiers, flags, mode identifiers, NAIF mappings, and API constants. Values used as physical constants are re-sourced at the model call site. The tidal-acceleration constants cite the JPL ephemeris reports and the Williams & Boggs (2016) lunar-laser-ranging determination in place; the file-name constants are API contract names that no code path reads."
-sources = ["NAIF_SPK", "JPL_TIDAL_CONVENTIONS", "WILLIAMS_BOGGS_2016"]
+origin = "Public body identifiers, flags, mode identifiers, NAIF mappings, and API constants. Values used as physical constants are re-sourced at the model call site. The tidal-acceleration constants cite the JPL ephemeris reports and the Williams & Boggs (2016) lunar-laser-ranging determination in place; the AU conversion factors are derived in one step from the exact IAU 2012 astronomical unit, the SI speed of light, the Julian year and the IAU 2015 parsec; the file-name constants are API contract names that no code path reads."
+sources = ["NAIF_SPK", "JPL_TIDAL_CONVENTIONS", "WILLIAMS_BOGGS_2016", "IAU_2012_B2", "IAU_2015_B2"]
 documentation = ["docs/reference/flags.md", "docs/comparison/api-compatibility.md"]
 docstring = "detailed"
 
