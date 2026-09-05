@@ -140,6 +140,21 @@ uses the Vondrák–Capitaine–Wallace 2011 model. At remote epochs, different
 published frame and Earth-rotation conventions can produce visible differences;
 LibEphemeris reports its model basis instead of fitting a correction.
 
+#### Vondrák precession through ERFA {#vondrak-erfa}
+
+The long-term precession (Vondrák, Capitaine & Wallace 2011) is evaluated by
+ERFA (`erfa.ltpecl`, `erfa.ltpequ`, `erfa.ltp`) instead of coefficient tables
+kept in `sidereal_longterm.py`. ERFA is the reference realization of that
+published model, so the of-date mean obliquity and the long-term sidereal time
+now match it exactly; the former tables deviated from it by at most 1.7e-10
+arcsec on the obliquity and 4.1e-10 arcsec on the sidereal time over
+-13000..+17000, a summation-order effect. Every function that reads the
+obliquity moves by that much or less, except three Sunshine-system charts
+(`'I'`/`'i'`, latitude 70°, at the two ends of the DE441 span) where the cusp
+geometry amplifies it to 1.4e-9 arcsec, and the cusp speeds of `houses_ex2`,
+whose one-second centered difference divides a 5e-11 arcsec movement into
+2e-6 arcsec/day: neither is visible at the 0.001 arcsec the library claims.
+
 ### Numerical derivatives
 
 Some public speeds are obtained by differentiating the independently computed
