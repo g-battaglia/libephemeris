@@ -90,14 +90,13 @@ def _yallop_visibility_code(q: float) -> float:
         F: ``q <= -0.293``           -> 6  (not visible, below Danjon limit)
 
     The public result contract places this discrete band code (not the raw
-    arcus-visionis criterion polynomial) in ``heliacal_pheno_ut`` element 18
-    (qCrit).
+    arcus-visionis criterion polynomial) in ``heliacal_pheno_ut`` element 18.
 
     Args:
-        q: Yallop q-test value (``heliacal_pheno_ut`` element 17, qYal).
+        q: Yallop q-test value (``heliacal_pheno_ut`` element 17).
 
     Returns:
-        Visibility class code 1..6, returned as a float to match the dret slot.
+        Visibility class code 1..6, returned as a float like every result slot.
     """
     if q > 0.216:
         return 1.0
@@ -284,13 +283,12 @@ class ObserverParams(NamedTuple):
 # Independent implementation of Bradley E. Schaefer's VISLIMIT algorithm
 # ("To the Visual Limits", Sky & Telescope, May 1998; "Astronomy and the
 # limits of vision", Vistas in Astronomy 36, 1993), restricted to the V
-# photometric band (0.55 um), with the atmospheric scale heights refined
-# per V. Reijs (archaeocosmology.org / ARCHAEOCOSMO): Rayleigh 8515 m,
-# aerosol 3745 m, water 3000 m. The extinction, airmass, twilight,
-# moonlight and dark-night-sky components and the contrast-threshold
-# (Hecht) magnitude conversion are exactly Schaefer's; the dark-night-sky
-# normalisation uses a published natural-sky luminance instead of a value
-# inferred from another ephemeris implementation.
+# photometric band (0.55 um). The extinction, airmass, twilight, moonlight
+# and dark-night-sky components and the contrast-threshold (Hecht)
+# magnitude conversion follow Schaefer's published algorithm. The three
+# atmospheric scale heights are parameters of this library's visibility
+# model (``_VL_SH_*`` below), and the dark-night-sky normalisation uses a
+# published natural-sky luminance (Falchi et al. 2016, see below).
 #
 # V-band VISLIMIT constants (I = 3 in Schaefer's DATA statements):
 _VL_MOI = -11.05  # extra-atmospheric reference magnitude constant
@@ -315,7 +313,12 @@ _VL_DARK_SKY_NL = (
 # (which is multiplied and then divided by it) and fixes the relative weight of
 # the scattered-light terms; the sum is divided back out to return nanoLamberts.
 _VL_MODEL_RADIANCE_PER_NL = 1.11e-15
-# Reijs refined scale heights (m)
+# Exponential scale heights (m) of the three extinction components that
+# depend on the observer's elevation h: molecular (Rayleigh) scattering,
+# aerosol scattering and water-vapour absorption. Each coefficient falls off
+# as exp(-h/H) in _vl_extinction_components(). They are parameters of this
+# library's visibility model, conserved for result stability; adopted
+# values, source not verified.
 _VL_SH_RAY = 8515.0
 _VL_SH_AER = 3745.0
 _VL_SH_WAT = 3000.0
@@ -349,10 +352,10 @@ def _vl_extinction_components(
 ) -> Tuple[float, float, float, float]:
     """Return the four V-band extinction coefficients (KR, KA, KO, KW).
 
-    Schaefer VISLIMIT extinction with Reijs scale heights and the seasonal
-    ozone term. Coefficients are per unit airmass.  Aerosol extinction varies
-    with humidity and altitude; no empirically recovered seasonal multiplier
-    is applied.
+    Schaefer VISLIMIT extinction with this library's adopted scale heights
+    (``_VL_SH_*``) and the seasonal ozone term. Coefficients are per unit
+    airmass.  Aerosol extinction varies with humidity and altitude; no
+    empirically recovered seasonal multiplier is applied.
 
     Rayleigh scattering is proportional to the molecular column mass, i.e.
     to the site pressure (Schaefer 1993): an explicit barometric pressure
@@ -1912,7 +1915,12 @@ def _heliacal_pheno_ut_leb(
     met_range: float = 0.0,
     observer: Sequence[float] = _NAKED_OBSERVER,
 ) -> tuple:
-    """LEB-backed implementation of _heliacal_pheno_ut_pythonic()."""
+    """LEB-backed twin of ``_heliacal_pheno_ut_pythonic``.
+
+    Same inputs (preceded by the LEB ``reader``) and the same 50-slot result
+    layout, documented there; positions come from the LEB reader instead of
+    the Skyfield backend.
+    """
     from .constants import (
         HELIACAL_RISING,
         HELIACAL_SETTING,
@@ -1946,43 +1954,43 @@ def _heliacal_pheno_ut_leb(
     geopos = (lon, lat, altitude)
 
     # --- positions via LEB ---
-    # Geometric (TRUEPOS-like) topocentric places drive the geometric output
-    # slots (AltO, GeoAltO, AziO, AltS, AziS and the derived arcs): the
-    # reference reports them from the astrometric direction (no aberration /
-    # light-time), matching the Skyfield pheno path. The refracted AppAltO slot
-    # keeps the apparent altitude and the arbitrated refraction model, and the
-    # visibility detector (which calls the shared _leb_body_altaz) is untouched.
-    from .utils import azalt as _azalt_hp, ECL2HOR as _ECL2HOR_hp
-    from .constants import FLG_TRUEPOS as _FLG_TRUEPOS_hp
-    from .fast_calc import _topo_ecliptic as _topo_ecliptic_hp
-    from .time_utils import deltat as _deltat_hp
+    # The geometric slots (0, 2, 3, 4, 5 and the arcs derived from them) use
+    # geometric (TRUEPOS-like) topocentric places, i.e. the astrometric
+    # direction without aberration or light-time, exactly as the Skyfield twin
+    # does. Only slot 1 starts from the apparent altitude, to which the
+    # refraction model below is applied; the visibility detector (which calls
+    # the shared _leb_body_altaz) is unaffected.
+    from .utils import azalt as _azalt, ECL2HOR as _ECL2HOR
+    from .constants import FLG_TRUEPOS as _FLG_TRUEPOS
+    from .fast_calc import _topo_ecliptic as _topo_ecliptic
+    from .time_utils import deltat as _deltat
 
-    _jd_tt_hp = jd + _deltat_hp(jd)
+    jd_tt = jd + _deltat(jd)
 
-    def _geom_topo_altaz(bid: int, star: bool) -> tuple[float, float]:
+    def _geometric_topo_altaz(body_id: int, star_flag: bool) -> tuple[float, float]:
         """Geometric topocentric (north-zero azimuth, unrefracted altitude)."""
-        if star:
-            from .fixed_stars import fixstar_ut as _fsu_hp
+        if star_flag:
+            from .fixed_stars import fixstar_ut as _fixstar_ut
 
             assert star_name is not None
-            _p, _, _ = _fsu_hp(star_name, jd, _FLG_TRUEPOS_hp)
-            _elon, _elat, _edist = _p[0], _p[1], _p[2]
+            star_pos, _, _ = _fixstar_ut(star_name, jd, _FLG_TRUEPOS)
+            ecl_lon, ecl_lat, ecl_dist = star_pos[0], star_pos[1], star_pos[2]
         else:
-            _tp = _topo_ecliptic_hp(
-                reader, _jd_tt_hp, jd, bid, geopos, iflag=_FLG_TRUEPOS_hp
+            topo_ecl = _topo_ecliptic(
+                reader, jd_tt, jd, body_id, geopos, iflag=_FLG_TRUEPOS
             )
-            _elon, _elat, _edist = _tp[0], _tp[1], _tp[2]
-        _az, _alt_true, _ = _azalt_hp(
-            jd, _ECL2HOR_hp, geopos, 0.0, 0.0, (_elon, _elat, _edist)
+            ecl_lon, ecl_lat, ecl_dist = topo_ecl[0], topo_ecl[1], topo_ecl[2]
+        az_south_zero, alt_unrefracted, _ = _azalt(
+            jd, _ECL2HOR, geopos, 0.0, 0.0, (ecl_lon, ecl_lat, ecl_dist)
         )
-        return (_az + 180.0) % 360.0, _alt_true
+        return (az_south_zero + 180.0) % 360.0, alt_unrefracted
 
-    # Sun: geometric topocentric altitude/azimuth (AltS, AziS).
-    sun_az, sun_alt_deg = _geom_topo_altaz(SUN, False)
+    # Sun: geometric topocentric altitude/azimuth (slots 4 and 5).
+    sun_az_deg, sun_alt_deg = _geometric_topo_altaz(SUN, False)
 
-    # Object apparent topocentric altitude, retained ONLY as the refracted
-    # AppAltO base (the refraction model is unchanged).
-    _body_az_app, _body_alt_app, _ = _leb_body_altaz(
+    # Object apparent topocentric altitude, used only as the base of the
+    # refracted altitude in slot 1.
+    _body_app_az_deg, body_app_alt_deg, _ = _leb_body_altaz(
         reader,
         jd,
         body,
@@ -1993,26 +2001,26 @@ def _heliacal_pheno_ut_leb(
         star_name=star_name,
     )
 
-    # Object: geometric topocentric altitude/azimuth (AltO, AziO).
-    body_az_deg, body_alt_deg = _geom_topo_altaz(body, is_star)
+    # Object: geometric topocentric altitude/azimuth (slots 0 and 3).
+    body_az_deg, body_alt_deg = _geometric_topo_altaz(body, is_star)
 
     # Atmospheric refraction from the APPARENT true altitude, in arcminutes:
     # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
     # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
     # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
-    # Below h = -1° the 0.5° fallback approximates horizon refraction. The
-    # refracted AppAltO slot stays on the apparent base and the arbitrated model.
-    if _body_alt_app > -1:
+    # Below h = -1° the 0.5° fallback approximates horizon refraction; slot 1
+    # is this refracted apparent altitude.
+    if body_app_alt_deg > -1:
         refraction = 1.02 / math.tan(
-            math.radians(_body_alt_app + 10.3 / (_body_alt_app + 5.11))
+            math.radians(body_app_alt_deg + 10.3 / (body_app_alt_deg + 5.11))
         )
         refraction /= 60.0
     else:
         refraction = 0.5
-    app_alt_deg = _body_alt_app + refraction
+    app_alt_deg = body_app_alt_deg + refraction
 
     # Get ecliptic positions for parallax and elongation calculations
-    body_ecl = _leb_ecliptic_pos(
+    body_ecliptic = _leb_ecliptic_pos(
         reader,
         jd,
         body,
@@ -2020,144 +2028,147 @@ def _heliacal_pheno_ut_leb(
         is_star=is_star,
         star_name=star_name,
     )
-    sun_ecl = _leb_ecliptic_pos(reader, jd, SUN, geopos)
+    sun_ecliptic = _leb_ecliptic_pos(reader, jd, SUN, geopos)
 
     # Geocentric altitude from equatorial coords (matching Skyfield path).
     # GAST is referenced to the true equinox of date, so the RA/Dec must be of
     # date (FLG_EQUATORIAL alone, NOT FLG_J2000) to keep the hour-angle frame
     # consistent. Mixing J2000 RA with of-date GAST injected the full
-    # J2000→date precession+nutation into the hour angle. FLG_TRUEPOS uses the
-    # astrometric (aberration/light-time-free) direction, matching the reference.
+    # J2000→date precession+nutation into the hour angle. FLG_TRUEPOS selects
+    # the astrometric (aberration- and light-time-free) direction used for the
+    # geometric slots.
     from .constants import FLG_EQUATORIAL
 
     if is_star:
         from .fixed_stars import fixstar_ut
 
         assert star_name is not None
-        _eq_pos, _, _ = fixstar_ut(
-            star_name, jd, FLG_EQUATORIAL | _FLG_TRUEPOS_hp | FLG_SPEED
+        equatorial_pos, _, _ = fixstar_ut(
+            star_name, jd, FLG_EQUATORIAL | _FLG_TRUEPOS | FLG_SPEED
         )
-        _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
+        body_ra_deg, body_dec_deg = equatorial_pos[0], equatorial_pos[1]
     else:
-        from .planets import calc_ut as _scu_hp
+        from .planets import calc_ut as _calc_ut
 
-        _eq_pos, _ = _scu_hp(jd, body, FLG_EQUATORIAL | _FLG_TRUEPOS_hp | FLG_SPEED)
-        _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
+        equatorial_pos, _ = _calc_ut(
+            jd, body, FLG_EQUATORIAL | _FLG_TRUEPOS | FLG_SPEED
+        )
+        body_ra_deg, body_dec_deg = equatorial_pos[0], equatorial_pos[1]
 
     # Use GAST to match the Skyfield path's of-date RA + t.gast
-    from .state import get_timescale as _gts_hp
+    from .state import get_timescale as _get_timescale
 
-    _ts_hp = _gts_hp()
-    _t_hp = _ts_hp.ut1_jd(jd)
-    _gast_hours = _t_hp.gast
-    _lst_hours = _gast_hours + geopos[0] / 15.0
-    _ha_deg = (_lst_hours * 15.0 - _body_ra_deg) % 360.0
-    _ha_rad = math.radians(_ha_deg)
-    _dec_rad = math.radians(_body_dec_deg)
-    _lat_rad = math.radians(geopos[1])
-    _sin_alt = math.sin(_lat_rad) * math.sin(_dec_rad) + math.cos(_lat_rad) * math.cos(
-        _dec_rad
-    ) * math.cos(_ha_rad)
-    geo_alt_deg = math.degrees(math.asin(max(-1.0, min(1.0, _sin_alt))))
+    timescale = _get_timescale()
+    time_ut1 = timescale.ut1_jd(jd)
+    gast_hours = time_ut1.gast
+    lst_hours = gast_hours + geopos[0] / 15.0
+    hour_angle_deg = (lst_hours * 15.0 - body_ra_deg) % 360.0
+    hour_angle_rad = math.radians(hour_angle_deg)
+    dec_rad = math.radians(body_dec_deg)
+    lat_rad = math.radians(geopos[1])
+    sin_geo_alt = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
+        dec_rad
+    ) * math.cos(hour_angle_rad)
+    geo_alt_deg = math.degrees(math.asin(max(-1.0, min(1.0, sin_geo_alt))))
 
     # Arcus visionis
-    tav_act = body_alt_deg - sun_alt_deg
-    arcv_act = geo_alt_deg - sun_alt_deg
+    topo_arcus_visionis = body_alt_deg - sun_alt_deg
+    geo_arcus_visionis = geo_alt_deg - sun_alt_deg
 
     # Public signed-azimuth convention: Sun minus object.
-    daz_act = sun_az - body_az_deg
-    while daz_act > 180:
-        daz_act -= 360
-    while daz_act < -180:
-        daz_act += 360
+    azimuth_diff_deg = sun_az_deg - body_az_deg
+    while azimuth_diff_deg > 180:
+        azimuth_diff_deg -= 360
+    while azimuth_diff_deg < -180:
+        azimuth_diff_deg += 360
 
     # Elongation and magnitude
     if is_star:
         elongation = angular_separation(
-            sun_ecl[0],
-            sun_ecl[1],
-            body_ecl[0],
-            body_ecl[1],
+            sun_ecliptic[0],
+            sun_ecliptic[1],
+            body_ecliptic[0],
+            body_ecliptic[1],
         )
         magnitude = star_magnitude
         phase_angle = 0.0
     else:
         try:
-            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
-            elongation = pheno[2]
-            magnitude = pheno[4]
-            phase_angle = pheno[0]
+            body_pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
+            elongation = body_pheno[2]
+            magnitude = body_pheno[4]
+            phase_angle = body_pheno[0]
         except (ValueError, TypeError, ArithmeticError):
             elongation = angular_separation(
-                sun_ecl[0],
-                sun_ecl[1],
-                body_ecl[0],
-                body_ecl[1],
+                sun_ecliptic[0],
+                sun_ecliptic[1],
+                body_ecliptic[0],
+                body_ecliptic[1],
             )
             magnitude = 0.0
             phase_angle = 0.0
 
-    # ARCLact: arc of light between the body and the Sun via the exact
+    # Arc of light (slot 9) between the body and the Sun via the exact
     # right-spherical-triangle relation cos ARCL = cos ARCV * cos DAZ.
-    arcl_act = _arc_of_light(arcv_act, daz_act)
+    arc_of_light_deg = _arc_of_light(geo_arcus_visionis, azimuth_diff_deg)
 
     (
-        _obs_age,
-        _obs_snellen,
-        _obs_bino,
-        _obs_mag,
-        _obs_aper,
-        _obs_trans,
+        observer_age,
+        snellen_ratio,
+        binocular_flag,
+        telescope_magnification,
+        aperture_mm,
+        optics_transmission,
     ) = _parse_observer_optics(observer, flags)
-    schaefer = create_schaefer_model(
+    visibility_model = create_schaefer_model(
         pressure=pressure,
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
         met_range=met_range,
-        observer_age=_obs_age,
-        snellen=_obs_snellen,
-        binocular=_obs_bino,
-        telescope_mag=_obs_mag,
-        aperture=_obs_aper,
-        transmission=_obs_trans,
+        observer_age=observer_age,
+        snellen=snellen_ratio,
+        binocular=binocular_flag,
+        telescope_mag=telescope_magnification,
+        aperture=aperture_mm,
+        transmission=optics_transmission,
         latitude=lat,
         jd=jd,
     )
-    k_act = schaefer.k_total
-    min_tav = schaefer.arcus_visionis_required(magnitude)
+    extinction_coeff = visibility_model.k_total
+    required_arcus_visionis = visibility_model.arcus_visionis_required(magnitude)
 
     # Parallax
     if is_star:
-        parallax = 0.0
+        altitude_parallax_deg = 0.0
     else:
         # Altitude parallax is the geocentric-minus-topocentric altitude, not
         # the horizontal parallax angle.
-        parallax = geo_alt_deg - body_alt_deg
+        altitude_parallax_deg = geo_alt_deg - body_alt_deg
 
     # Rise/set of the disc centers and the visibility window via the
     # shared event-time helper. Missing instants use the public sentinel.
-    _star_name_p = ""
+    catalog_star_name = ""
     if is_star:
-        from .fixed_stars import STAR_CATALOG as _SC
+        from .fixed_stars import STAR_CATALOG as _catalog
 
-        for _entry in _SC:
-            if _entry.id == body:
-                _star_name_p = _entry.name
+        for catalog_entry in _catalog:
+            if catalog_entry.id == body:
+                catalog_star_name = catalog_entry.name
                 break
     (
-        rise_o,
-        rise_s,
-        lag,
-        t_first_vr,
-        t_best_vr,
-        t_last_vr,
-        tvis_vr,
-        t_b_yallop,
+        object_rise_set_jd,
+        sun_rise_set_jd,
+        lag_days,
+        visibility_start_jd,
+        visibility_best_jd,
+        visibility_end_jd,
+        visibility_duration_days,
+        yallop_best_jd,
     ) = _pheno_rise_window(
         jd,
         body,
-        _star_name_p,
+        catalog_star_name,
         event_type,
         (lon, lat, altitude),
         (
@@ -2177,19 +2188,19 @@ def _heliacal_pheno_ut_leb(
     if is_star:
         # Fixed stars are unresolved point sources; the public illumination
         # field uses the full-illumination convention for them.
-        illumination = 100.0
+        illuminated_pct = 100.0
     elif phase_angle > 0:
-        illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
+        illuminated_pct = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
     else:
-        illumination = 0.0
+        illuminated_pct = 0.0
 
-    w_moon = 0.0
-    l_moon = 0.0
+    crescent_width_deg = 0.0
+    crescent_length_deg = 0.0
     if body == MOON:
         try:
             moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
-            illumination = moon_pheno[1] * 100.0  # [1] is illuminated fraction 0-1
-            moon_diameter = (
+            illuminated_pct = moon_pheno[1] * 100.0  # [1] is illuminated fraction 0-1
+            moon_diameter_deg = (
                 moon_pheno[3] if len(moon_pheno) > 3 and moon_pheno[3] > 0 else 0.5
             )
             # Crescent width W = SD * (1 - cos ARCL) from Bruin, F. (1977),
@@ -2199,59 +2210,66 @@ def _heliacal_pheno_ut_leb(
             # SD is the Moon's apparent semidiameter in arcmin (moon_pheno[3]
             # is the apparent diameter in degrees). Near new moon ARCL -> 0 so
             # W -> 0; near full moon ARCL -> 180 deg so W -> the disc diameter.
-            arcl_deg = moon_pheno[2]
-            sd_arcmin = moon_diameter / 2.0 * 60.0
-            w_arcmin = sd_arcmin * (1.0 - math.cos(math.radians(arcl_deg)))
-            w_moon = w_arcmin / 60.0  # stored in degrees (dret[16])
-            l_moon = math.pi * moon_diameter / 2
+            moon_arc_of_light_deg = moon_pheno[2]
+            semidiameter_arcmin = moon_diameter_deg / 2.0 * 60.0
+            crescent_width_arcmin = semidiameter_arcmin * (
+                1.0 - math.cos(math.radians(moon_arc_of_light_deg))
+            )
+            crescent_width_deg = crescent_width_arcmin / 60.0  # slot 16, degrees
+            crescent_length_deg = math.pi * moon_diameter_deg / 2
         except (ValueError, TypeError, ArithmeticError):
             pass
 
     if body == MOON:
         # Yallop q-test (Yallop, B.D. (1997), NAO Technical Note No. 69):
-        # the cubic criterion in the crescent width w (arcmin) and the
+        # the cubic criterion in the crescent width (arcmin) and the
         # q = (ARCV - criterion) / 10 statistic.
-        w = w_moon * 60.0
-        q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
-        q_yallop = (arcv_act - q_criterion) / 10.0
-        # dret[18] (qCrit) is the Yallop visibility CLASS code (1..6), not the
-        # raw arcus-visionis criterion polynomial (which stays internal above).
-        q_crit = _yallop_visibility_code(q_yallop)
+        width_arcmin = crescent_width_deg * 60.0
+        yallop_threshold = (
+            11.8371
+            - 6.3226 * width_arcmin
+            + 0.7319 * width_arcmin**2
+            - 0.1018 * width_arcmin**3
+        )
+        yallop_q = (geo_arcus_visionis - yallop_threshold) / 10.0
+        # Slot 18 carries the Yallop visibility class code (1..6), not the raw
+        # arcus-visionis criterion polynomial (which stays internal above).
+        yallop_class_code = _yallop_visibility_code(yallop_q)
     else:
-        q_yallop = 0.0
-        q_crit = 0.0
+        yallop_q = 0.0
+        yallop_class_code = 0.0
 
-    dret = [0.0] * 50
-    dret[0] = body_alt_deg
-    dret[1] = app_alt_deg
-    dret[2] = geo_alt_deg
-    dret[3] = body_az_deg
-    dret[4] = sun_alt_deg
-    dret[5] = sun_az
-    dret[6] = tav_act
-    dret[7] = arcv_act
-    dret[8] = daz_act
-    dret[9] = arcl_act
-    dret[10] = k_act
-    dret[11] = min_tav
-    dret[12] = t_first_vr
-    dret[13] = t_best_vr
-    dret[14] = t_last_vr
-    dret[15] = t_b_yallop
-    dret[16] = w_moon
-    dret[17] = q_yallop
-    dret[18] = q_crit
-    dret[19] = parallax
-    dret[20] = magnitude
-    dret[21] = rise_o
-    dret[22] = rise_s
-    dret[23] = lag
-    dret[24] = tvis_vr
-    dret[25] = l_moon
-    dret[26] = elongation
-    dret[27] = illumination
+    values = [0.0] * 50
+    values[0] = body_alt_deg
+    values[1] = app_alt_deg
+    values[2] = geo_alt_deg
+    values[3] = body_az_deg
+    values[4] = sun_alt_deg
+    values[5] = sun_az_deg
+    values[6] = topo_arcus_visionis
+    values[7] = geo_arcus_visionis
+    values[8] = azimuth_diff_deg
+    values[9] = arc_of_light_deg
+    values[10] = extinction_coeff
+    values[11] = required_arcus_visionis
+    values[12] = visibility_start_jd
+    values[13] = visibility_best_jd
+    values[14] = visibility_end_jd
+    values[15] = yallop_best_jd
+    values[16] = crescent_width_deg
+    values[17] = yallop_q
+    values[18] = yallop_class_code
+    values[19] = altitude_parallax_deg
+    values[20] = magnitude
+    values[21] = object_rise_set_jd
+    values[22] = sun_rise_set_jd
+    values[23] = lag_days
+    values[24] = visibility_duration_days
+    values[25] = crescent_length_deg
+    values[26] = elongation
+    values[27] = illuminated_pct
 
-    return tuple(dret), flags
+    return tuple(values), flags
 
 
 def _vislim_scotopic_flag(
@@ -3654,6 +3672,13 @@ def heliacal_ut(
 
     body_id = _parse_object_name(objname, allow_moon=True)
     if body_id == MOON and eventtype in (HELIACAL_RISING, HELIACAL_SETTING):
+        # Event names follow the archaeoastronomy usage in which the heliacal
+        # rising is the "morning first" and the heliacal setting the "evening
+        # last" sighting of a body in its apparition cycle: Schaefer, B.E.
+        # (1987), "Heliacal Rise Phenomena", Journal for the History of
+        # Astronomy 18, Archaeoastronomy Suppl. 11, S19-S33; Purrington, R.D.
+        # (1988), "Heliacal Rising and Setting: Quantitative Aspects", Journal
+        # for the History of Astronomy 19, Archaeoastronomy Suppl. 12, S72-S85.
         ev_name = {
             HELIACAL_RISING: "morning first",
             HELIACAL_SETTING: "evening last",
@@ -3884,6 +3909,11 @@ def _parse_object_name(
     )
 
 
+# Placeholder written to the time-valued slots of the heliacal phenomena
+# result (rise/set instants, the visibility window and its Yallop optimum)
+# when the instant does not exist or could not be located. Same value as the
+# public ``TJD_INVALID`` constant; it lies far beyond any Julian Day the
+# library can evaluate, so a slot can be tested against it directly.
 _TJD_INVALID = 99999999.0
 
 
@@ -4093,42 +4123,55 @@ def _heliacal_pheno_ut_pythonic(
             - EVENING_FIRST (3): First evening visibility (after superior conjunction)
             - MORNING_LAST (4): Last morning visibility (before superior conjunction)
         flags: Calculation flags (FLG_SWIEPH, etc.)
+        met_range: Meteorological range in km, or a total extinction
+            coefficient when 0 < value < 1; 0 selects the clear-sky default.
+        observer: Observer tuple (age, Snellen ratio, binocular flag,
+            magnification, aperture in mm, transmission); the optical values
+            are read only when ``HELFLAG_OPTICAL_PARAMS`` is set.
 
     Returns:
-        A pair ``(values, status)``. ``values`` has the following fixed layout:
+        A pair ``(values, status)``. ``values`` is a tuple of 50 floats whose
+        layout is fixed by the public compatibility contract. The populated
+        slots are, in order:
 
-        - 0 ``AltO``: object altitude at the observing site before refraction (deg).
-        - 1 ``AppAltO``: refracted object altitude seen by the observer (deg).
-        - 2 ``GeoAltO``: altitude obtained from the geocentric direction (deg).
-        - 3 ``AziO``: object azimuth (deg).
-        - 4 ``AltS`` and 5 ``AziS``: topocentric solar altitude and azimuth (deg).
-        - 6 ``TAVact``: topocentric vertical separation from the Sun (deg).
-        - 7 ``ARCVact``: geocentric vertical separation from the Sun (deg).
-        - 8 ``DAZact``: signed object-minus-Sun azimuth separation (deg).
-        - 9 ``ARCLact``: arc of light between the object and the Sun (deg),
-          from the right-spherical-triangle relation cos ARCL = cos ARCV * cos DAZ.
-        - 10 ``kact``: atmospheric extinction coefficient.
-        - 11 ``minTAV``: limiting topocentric vertical separation (deg).
-        - 12-14 ``TfirstVR``, ``TbVR``, ``TlastVR``: beginning, optimum, and
-          end of the visibility window (Julian days).
-        - 15 ``TbYallop``: Yallop optimum-visibility time (Julian day).
-        - 16 ``WMoon``: angular width of the lunar crescent (deg).
-        - 17 ``qYal``: Yallop q statistic.
-        - 18 ``qCrit``: numeric Yallop class, 1 through 6 (A through F).
-        - 19 ``ParO``: object parallax (deg).
-        - 20 ``Magn``: apparent magnitude.
-        - 21 ``RiseO`` and 22 ``RiseS``: relevant object and solar horizon
-          crossings (Julian days).
-        - 23 ``Lag``: difference ``RiseO - RiseS`` (days).
-        - 24 ``TvisVR``: duration of the visibility interval (days).
-        - 25 ``LMoon``: angular length of the lunar crescent (deg).
-        - 26-49: compatibility padding reserved for later fields.
+        - 0: topocentric altitude of the object before refraction (deg).
+        - 1: apparent altitude of the object after refraction (deg).
+        - 2: altitude of the object from its geocentric direction (deg).
+        - 3: azimuth of the object (deg, north-zero, east-positive).
+        - 4, 5: topocentric altitude and azimuth of the Sun (deg).
+        - 6: vertical separation of the object from the Sun using the
+          topocentric altitude, the topocentric arcus visionis (deg).
+        - 7: the same separation using the geocentric altitude (deg).
+        - 8: signed azimuth difference, Sun minus object, in -180..180 (deg).
+        - 9: arc of light, the great-circle distance between the object and
+          the Sun from cos ARCL = cos ARCV * cos DAZ (deg).
+        - 10: total atmospheric extinction coefficient (mag per airmass).
+        - 11: smallest vertical separation at which the object would be
+          detectable for its magnitude under the given sky (deg).
+        - 12, 13, 14: beginning, optimum and end of the visibility window
+          (Julian days, UT).
+        - 15: Yallop's best-time estimate for the lunar crescent (Julian day).
+        - 16: width of the lunar crescent (deg).
+        - 17: Yallop q statistic of the crescent.
+        - 18: Yallop visibility class as a number, 1 (A) through 6 (F).
+        - 19: altitude parallax of the object, geocentric minus topocentric
+          altitude (deg).
+        - 20: apparent visual magnitude of the object.
+        - 21, 22: rise or set instant of the object and of the Sun for the
+          requested event (Julian days, UT).
+        - 23: lag, slot 21 minus slot 22 when both exist, else 0.0 (days).
+        - 24: duration of the visibility window (days).
+        - 25: length of the lunar crescent (deg).
+        - 26: elongation of the object from the Sun (deg).
+        - 27: illuminated fraction of the disc, in percent.
+        - 28-49: reserved, always 0.0.
 
-        ``status`` contains the accepted calculation flags, or a negative error
-        indicator.
+        Time-valued slots that could not be determined hold the sentinel
+        ``TJD_INVALID`` (99999999.0). ``status`` echoes the calculation
+        flags.
 
     Raises:
-        ValueError: If invalid body ID or event_type
+        Error: If the body id or the event type is not accepted.
 
     Example:
         >>> from libephemeris import julday, _heliacal_pheno_ut_pythonic, VENUS, HELIACAL_RISING
@@ -4151,11 +4194,11 @@ def _heliacal_pheno_ut_pythonic(
     # --- LEB fast path ---
     from .state import get_leb_reader as _get_leb_reader
 
-    _leb_rdr = _get_leb_reader()
-    if _leb_rdr is not None:
+    leb_reader = _get_leb_reader()
+    if leb_reader is not None:
         try:
             return _heliacal_pheno_ut_leb(
-                _leb_rdr,
+                leb_reader,
                 jd,
                 lat,
                 lon,
@@ -4171,16 +4214,16 @@ def _heliacal_pheno_ut_pythonic(
             )
         except LEBCorruptionError:
             raise
-        except (KeyError, ValueError) as _leb_err:
+        except (KeyError, ValueError) as leb_miss:
             from .eclipse import _raise_if_sealed_leb_miss
 
             # Sealed leb mode raises the documented typed error and never
             # continues past the LEB path.
-            _raise_if_sealed_leb_miss(_leb_err)
+            _raise_if_sealed_leb_miss(leb_miss)
             # Auto mode may continue through its normal backend chain.
             from .leb_reader import log_leb_fallback
 
-            log_leb_fallback("heliacal", _leb_err)
+            log_leb_fallback("heliacal", leb_miss)
     # --- END LEB fast path ---
 
     from .constants import (
@@ -4213,15 +4256,15 @@ def _heliacal_pheno_ut_pythonic(
         raise Error(f"body id {body} is neither a planet nor a fixed star")
 
     # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
+    ephemeris = get_planets()
+    timescale = get_timescale()
 
-    sun = eph["sun"]
-    earth = eph["earth"]
+    sun = ephemeris["sun"]
+    earth = ephemeris["earth"]
 
     # Get target - either planet or star
-    target = None
-    star_object = None
+    planet_target = None
+    skyfield_star = None
     star_magnitude = 0.0
 
     if is_star:
@@ -4232,137 +4275,135 @@ def _heliacal_pheno_ut_pythonic(
         star_magnitude = _get_star_magnitude(body)
 
         # Find star data from catalog
-        star_data = None
-        for entry in STAR_CATALOG:
-            if entry.id == body:
-                star_data = entry.data
+        catalog_star = None
+        for catalog_entry in STAR_CATALOG:
+            if catalog_entry.id == body:
+                catalog_star = catalog_entry.data
                 break
 
-        if star_data is None:
+        if catalog_star is None:
             raise Error(f"unknown fixed star id {body}")
 
         # Create Skyfield Star object for position calculations
-        star_object = Star(
-            ra_hours=star_data.ra_j2000 / 15.0,
-            dec_degrees=star_data.dec_j2000,
-            ra_mas_per_year=star_data.pm_ra * 1000.0,
-            dec_mas_per_year=star_data.pm_dec * 1000.0,
+        skyfield_star = Star(
+            ra_hours=catalog_star.ra_j2000 / 15.0,
+            dec_degrees=catalog_star.dec_j2000,
+            ra_mas_per_year=catalog_star.pm_ra * 1000.0,
+            dec_mas_per_year=catalog_star.pm_dec * 1000.0,
         )
     else:
         # For planets, get the target from ephemeris
-        target_name = _PLANET_MAP[body]
+        planet_key = _PLANET_MAP[body]
         from .planets import _PLANET_FALLBACK
 
         try:
-            target = eph[target_name]
+            planet_target = ephemeris[planet_key]
         except KeyError:
-            if target_name in _PLANET_FALLBACK:
-                target = eph[_PLANET_FALLBACK[target_name]]
+            if planet_key in _PLANET_FALLBACK:
+                planet_target = ephemeris[_PLANET_FALLBACK[planet_key]]
             else:
                 raise
 
-    # Parse the observer tuple BEFORE the name is rebound to the Skyfield
-    # GeographicPosition below (the tuple parameter and the Skyfield
-    # observer share the name in this function).
+    # Parse the observer tuple into the visibility-model parameters.
     (
-        _obs_age,
-        _obs_snellen,
-        _obs_bino,
-        _obs_mag,
-        _obs_aper,
-        _obs_trans,
+        observer_age,
+        snellen_ratio,
+        binocular_flag,
+        telescope_magnification,
+        aperture_mm,
+        optics_transmission,
     ) = _parse_observer_optics(observer, flags)
-    # Keep the raw tuple too: the rise-window computation below needs it
-    # after ``observer`` is rebound.
-    _obs_raw = tuple(float(v) for v in tuple(observer)[:6])
-    _obs_tuple6 = _obs_raw + (0.0,) * (6 - len(_obs_raw))
+    # Keep the first six raw values too: the rise-window search below needs
+    # them.
+    observer_values = tuple(float(v) for v in tuple(observer)[:6])
+    observer_tuple6 = observer_values + (0.0,) * (6 - len(observer_values))
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+    # Observing site as a Skyfield geographic position
+    site = wgs84.latlon(lat, lon, altitude)
 
     # Initialize result array with 50 zeros
-    dret = [0.0] * 50
+    values = [0.0] * 50
 
     # Calculate positions at the given time
-    t = ts.ut1_jd(jd)
-    observer_at = earth + observer
+    time_ut1 = timescale.ut1_jd(jd)
+    site_at = earth + site
 
     # --- Geometric (TRUEPOS-like) places for the geometric output slots -------
-    # Compatibility contract: AltO, GeoAltO, AziO, AltS, AziS and the derived
-    # arcs come from the astrometric (aberration- and light-time-free)
-    # direction, whereas the apparent place carries the ~20" annual aberration
-    # (plus, for the fast planets, the light-time bending of the direction).
-    # Using the geometric place cuts the residual (behavioral comparison with
-    # one external implementation) from ~20-42" to the frame-model floor. Only
-    # the geometric output slots change: the refracted AppAltO slot keeps the
-    # apparent altitude and the arbitrated refraction model, and the
-    # visibility detector is untouched.
-    gast = t.gast
+    # Slots 0, 2, 3, 4, 5 and the arcs derived from them use the astrometric
+    # (aberration- and light-time-free) direction, whereas an apparent place
+    # would carry the ~20" annual aberration (plus, for the fast planets, the
+    # light-time shift of the direction). Only slot 1 starts from the apparent
+    # altitude and applies the refraction model below; the visibility detector
+    # is unaffected.
+    gast_hours = time_ut1.gast
 
-    # Sun: geometric topocentric altitude/azimuth (AltS, AziS).
-    _sun_geom = (sun - observer_at).at(t)
-    _sun_alt, _sun_az, _ = _sun_geom.altaz()
-    sun_alt_deg = _sun_alt.degrees
-    sun_az_deg = _sun_az.degrees
+    # Sun: geometric topocentric altitude/azimuth (slots 4 and 5).
+    sun_geometric = (sun - site_at).at(time_ut1)
+    sun_alt, sun_az, _ = sun_geometric.altaz()
+    sun_alt_deg = sun_alt.degrees
+    sun_az_deg = sun_az.degrees
 
-    # Object apparent topocentric altitude, retained ONLY as the base of the
-    # refracted AppAltO slot (see below); the refraction model is unchanged.
-    if is_star and star_object is not None:
-        body_app = observer_at.at(t).observe(star_object).apparent()
+    # Object apparent topocentric altitude, used only as the base of the
+    # refracted altitude in slot 1 (see below).
+    if is_star and skyfield_star is not None:
+        body_apparent = site_at.at(time_ut1).observe(skyfield_star).apparent()
     else:
-        body_app = observer_at.at(t).observe(target).apparent()
-    body_app_alt_deg = body_app.altaz()[0].degrees
+        body_apparent = site_at.at(time_ut1).observe(planet_target).apparent()
+    body_app_alt_deg = body_apparent.altaz()[0].degrees
 
-    # Object geometric topocentric altitude/azimuth (AltO, AziO) and the of-date
-    # geocentric RA/Dec for GeoAltO. A Star cannot form a geometric difference
-    # vector and altaz() rejects an astrometric position, so its of-date
-    # astrometric place is reduced by hand; a fixed star's diurnal parallax is
-    # nil, so its topocentric and geocentric altitudes coincide.
-    if is_star and star_object is not None:
-        _ra_t, _dec_t, _ = observer_at.at(t).observe(star_object).radec(epoch=t)
-        body_alt_deg, body_az_deg = _altaz_from_radec(
-            _ra_t.hours, _dec_t.degrees, lon, lat, gast
+    # Object geometric topocentric altitude/azimuth (slots 0 and 3) and the
+    # of-date geocentric RA/Dec for slot 2. A Star cannot form a geometric
+    # difference vector and altaz() rejects an astrometric position, so its
+    # of-date astrometric place is reduced by hand; a fixed star's diurnal
+    # parallax is nil, so its topocentric and geocentric altitudes coincide.
+    if is_star and skyfield_star is not None:
+        topo_ra, topo_dec, _ = (
+            site_at.at(time_ut1).observe(skyfield_star).radec(epoch=time_ut1)
         )
-        _ra_g, _dec_g, _ = earth.at(t).observe(star_object).radec(epoch=t)
-        geo_ra_hours = _ra_g.hours
-        geo_dec_deg = _dec_g.degrees
+        body_alt_deg, body_az_deg = _altaz_from_radec(
+            topo_ra.hours, topo_dec.degrees, lon, lat, gast_hours
+        )
+        geo_ra, geo_dec, _ = (
+            earth.at(time_ut1).observe(skyfield_star).radec(epoch=time_ut1)
+        )
+        geo_ra_hours = geo_ra.hours
+        geo_dec_deg = geo_dec.degrees
     else:
-        _body_geom = (target - observer_at).at(t)
-        _b_alt, _b_az, _ = _body_geom.altaz()
-        body_alt_deg = _b_alt.degrees
-        body_az_deg = _b_az.degrees
-        _ra_g, _dec_g, _ = (target - earth).at(t).radec(epoch=t)
-        geo_ra_hours = _ra_g.hours
-        geo_dec_deg = _dec_g.degrees
+        body_geometric = (planet_target - site_at).at(time_ut1)
+        body_alt, body_az, _ = body_geometric.altaz()
+        body_alt_deg = body_alt.degrees
+        body_az_deg = body_az.degrees
+        geo_ra, geo_dec, _ = (planet_target - earth).at(time_ut1).radec(epoch=time_ut1)
+        geo_ra_hours = geo_ra.hours
+        geo_dec_deg = geo_dec.degrees
 
     # Geocentric altitude via hour angle. GAST is referenced to the true equinox
     # of date, so the RA/Dec must be of date too (radec(epoch=t)); mixing a
     # J2000 RA with an of-date LST would inject the J2000->date precession+
     # nutation into the hour angle.
-    lst = gast + lon / 15.0  # Local sidereal time in hours
-    ha = (lst - geo_ra_hours) * 15.0  # Hour angle in degrees
+    lst_hours = gast_hours + lon / 15.0  # Local sidereal time in hours
+    hour_angle_deg = (lst_hours - geo_ra_hours) * 15.0  # Hour angle in degrees
     dec_rad = math.radians(geo_dec_deg)
     lat_rad = math.radians(lat)
-    ha_rad = math.radians(ha)
-    sin_alt = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
+    hour_angle_rad = math.radians(hour_angle_deg)
+    sin_geo_alt = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
         dec_rad
-    ) * math.cos(ha_rad)
-    sin_alt = max(-1.0, min(1.0, sin_alt))
-    geo_alt_deg = math.degrees(math.asin(sin_alt))
+    ) * math.cos(hour_angle_rad)
+    sin_geo_alt = max(-1.0, min(1.0, sin_geo_alt))
+    geo_alt_deg = math.degrees(math.asin(sin_geo_alt))
 
     # Apparent geocentric place kept for the fixed-star / fallback elongation
     # separation below (angular separation is aberration-insensitive).
-    if is_star and star_object is not None:
-        body_geo = earth.at(t).observe(star_object).apparent()
+    if is_star and skyfield_star is not None:
+        body_geocentric_apparent = earth.at(time_ut1).observe(skyfield_star).apparent()
     else:
-        body_geo = earth.at(t).observe(target).apparent()
+        body_geocentric_apparent = earth.at(time_ut1).observe(planet_target).apparent()
 
     # Atmospheric refraction from the APPARENT true altitude, in arcminutes:
     # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
     # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
-    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4. The
-    # refracted AppAltO slot deliberately stays on the apparent base and the
-    # arbitrated refraction model (unchanged behaviour).
+    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4. Slot 1
+    # is this refracted apparent altitude.
     if body_app_alt_deg > -1:
         refraction = 1.02 / math.tan(
             math.radians(body_app_alt_deg + 10.3 / (body_app_alt_deg + 5.11))
@@ -4376,105 +4417,116 @@ def _heliacal_pheno_ut_pythonic(
 
     # Calculate arcus visionis (altitude difference between body and Sun)
     # Topocentric arcus visionis
-    tav_act = body_alt_deg - sun_alt_deg
+    topo_arcus_visionis = body_alt_deg - sun_alt_deg
 
     # Geocentric arcus visionis
-    arcv_act = geo_alt_deg - sun_alt_deg
+    geo_arcus_visionis = geo_alt_deg - sun_alt_deg
 
     # Public signed-azimuth convention: Sun minus object.
-    daz_act = sun_az_deg - body_az_deg
+    azimuth_diff_deg = sun_az_deg - body_az_deg
     # Normalize to -180 to +180
-    while daz_act > 180:
-        daz_act -= 360
-    while daz_act < -180:
-        daz_act += 360
+    while azimuth_diff_deg > 180:
+        azimuth_diff_deg -= 360
+    while azimuth_diff_deg < -180:
+        azimuth_diff_deg += 360
 
     # Get elongation (longitude difference) from Sun
     # For fixed stars, always calculate manually since pheno_ut doesn't support them
     if is_star:
         # Calculate elongation manually for stars
-        sun_geo = earth.at(t).observe(sun).apparent()
-        elongation = body_geo.separation_from(sun_geo).degrees
+        sun_geocentric_apparent = earth.at(time_ut1).observe(sun).apparent()
+        elongation = body_geocentric_apparent.separation_from(
+            sun_geocentric_apparent
+        ).degrees
         magnitude = star_magnitude
         phase_angle = 0.0  # Stars don't have phase angle
     else:
         try:
-            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
-            elongation = pheno[2]  # Elongation
-            magnitude = pheno[4]  # Visual magnitude
-            phase_angle = pheno[0]  # Phase angle (index 0, not 1)
+            body_pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
+            elongation = body_pheno[2]  # Elongation
+            magnitude = body_pheno[4]  # Visual magnitude
+            phase_angle = body_pheno[0]  # Phase angle (index 0, not 1)
         except (ValueError, TypeError, ArithmeticError):
             # Calculate elongation manually
-            sun_geo = earth.at(t).observe(sun).apparent()
-            elongation = body_geo.separation_from(sun_geo).degrees
+            sun_geocentric_apparent = earth.at(time_ut1).observe(sun).apparent()
+            elongation = body_geocentric_apparent.separation_from(
+                sun_geocentric_apparent
+            ).degrees
             magnitude = 0.0
             phase_angle = 0.0
 
-    # ARCLact: arc of light between the body and the Sun via the exact
+    # Arc of light (slot 9) between the body and the Sun via the exact
     # right-spherical-triangle relation cos ARCL = cos ARCV * cos DAZ (ARCV
     # vertical, DAZ horizontal), not the sqrt(ARCV^2 + DAZ^2) planar form.
-    arcl_act = _arc_of_light(arcv_act, daz_act)
+    arc_of_light_deg = _arc_of_light(geo_arcus_visionis, azimuth_diff_deg)
 
-    # Use Schaefer model for extinction and arcus visionis (observer tuple
-    # already parsed above, before the name was rebound).
-    schaefer = create_schaefer_model(
+    # Schaefer model for the extinction and the required arcus visionis
+    # (observer tuple parsed above).
+    visibility_model = create_schaefer_model(
         pressure=pressure,
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
         met_range=met_range,
-        observer_age=_obs_age,
-        snellen=_obs_snellen,
-        binocular=_obs_bino,
-        telescope_mag=_obs_mag,
-        aperture=_obs_aper,
-        transmission=_obs_trans,
+        observer_age=observer_age,
+        snellen=snellen_ratio,
+        binocular=binocular_flag,
+        telescope_mag=telescope_magnification,
+        aperture=aperture_mm,
+        transmission=optics_transmission,
         latitude=lat,
         jd=jd,
     )
-    k_act = schaefer.k_total
-    min_tav = schaefer.arcus_visionis_required(magnitude)
+    extinction_coeff = visibility_model.k_total
+    required_arcus_visionis = visibility_model.arcus_visionis_required(magnitude)
 
     # Parallax of object (in degrees)
     # Fixed stars have essentially zero parallax
     if is_star:
-        parallax = 0.0
+        altitude_parallax_deg = 0.0
     else:
         # Altitude parallax is the geocentric-minus-topocentric altitude, not
         # the horizontal parallax angle.
-        parallax = geo_alt_deg - body_alt_deg
+        altitude_parallax_deg = geo_alt_deg - body_alt_deg
 
     # Rise/set of the disc centers and the visibility window use the shared
     # event-time helper and its public invalid-time sentinel.
-    _star_name = ""
+    catalog_star_name = ""
     if is_star:
-        from .fixed_stars import STAR_CATALOG as _SC
+        from .fixed_stars import STAR_CATALOG as _catalog
 
-        for _entry in _SC:
-            if _entry.id == body:
-                _star_name = _entry.name
+        for catalog_entry in _catalog:
+            if catalog_entry.id == body:
+                catalog_star_name = catalog_entry.name
                 break
-    _geopos3 = (lon, lat, altitude)
-    _atmo4 = (
+    site_geopos = (lon, lat, altitude)
+    atmosphere = (
         pressure,
         temperature,
         humidity * 100.0 if humidity <= 1.0 else humidity,
         met_range,
     )
     # The visibility threshold is observer-dependent, so its window slots use
-    # the caller's age, Snellen ratio, and optical parameters just like minTAV.
-    _obs6 = _obs_tuple6
+    # the caller's age, Snellen ratio, and optical parameters just like slot 11.
+    window_observer = observer_tuple6
     (
-        rise_o,
-        rise_s,
-        lag,
-        t_first_vr,
-        t_best_vr,
-        t_last_vr,
-        tvis_vr,
-        t_b_yallop,
+        object_rise_set_jd,
+        sun_rise_set_jd,
+        lag_days,
+        visibility_start_jd,
+        visibility_best_jd,
+        visibility_end_jd,
+        visibility_duration_days,
+        yallop_best_jd,
     ) = _pheno_rise_window(
-        jd, body, _star_name, event_type, _geopos3, _atmo4, _obs6, flags
+        jd,
+        body,
+        catalog_star_name,
+        event_type,
+        site_geopos,
+        atmosphere,
+        window_observer,
+        flags,
     )
 
     # Illumination percentage for all bodies
@@ -4482,21 +4534,21 @@ def _heliacal_pheno_ut_pythonic(
     if is_star:
         # Fixed stars are unresolved point sources; the public illumination
         # field uses the full-illumination convention for them.
-        illumination = 100.0
+        illuminated_pct = 100.0
     elif phase_angle > 0:
-        illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
+        illuminated_pct = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
     else:
-        illumination = 0.0
+        illuminated_pct = 0.0
 
     # For Moon-specific calculations
-    w_moon = 0.0  # Crescent width
-    l_moon = 0.0  # Crescent length
+    crescent_width_deg = 0.0  # Crescent width
+    crescent_length_deg = 0.0  # Crescent length
 
     if body == MOON:
         # Calculate Moon phase and crescent geometry
         try:
             moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
-            illumination = moon_pheno[1] * 100.0  # [1] = illuminated fraction 0-1
+            illuminated_pct = moon_pheno[1] * 100.0  # [1] = illuminated fraction 0-1
 
             # Crescent width W = SD * (1 - cos ARCL) from Bruin, F. (1977),
             # "The first visibility of the lunar crescent", Vistas in Astronomy
@@ -4509,14 +4561,16 @@ def _heliacal_pheno_ut_pythonic(
             # Crescent length uses the actual distance-based apparent diameter
             # from pheno_ut (varies 0.49° at apogee to 0.56° at perigee):
             # L = pi * D / 2 (semicircle approximation).
-            moon_diameter = (
+            moon_diameter_deg = (
                 moon_pheno[3] if len(moon_pheno) > 3 and moon_pheno[3] > 0 else 0.5
             )
-            arcl_deg = moon_pheno[2]
-            sd_arcmin = moon_diameter / 2.0 * 60.0
-            w_arcmin = sd_arcmin * (1.0 - math.cos(math.radians(arcl_deg)))
-            w_moon = w_arcmin / 60.0  # stored in degrees (dret[16])
-            l_moon = math.pi * moon_diameter / 2
+            moon_arc_of_light_deg = moon_pheno[2]
+            semidiameter_arcmin = moon_diameter_deg / 2.0 * 60.0
+            crescent_width_arcmin = semidiameter_arcmin * (
+                1.0 - math.cos(math.radians(moon_arc_of_light_deg))
+            )
+            crescent_width_deg = crescent_width_arcmin / 60.0  # slot 16, degrees
+            crescent_length_deg = math.pi * moon_diameter_deg / 2
         except (ValueError, TypeError, ArithmeticError):
             pass
 
@@ -4524,50 +4578,55 @@ def _heliacal_pheno_ut_pythonic(
     # Technical Note No. 69:
     # q = (ARCV - (11.8371 - 6.3226*W + 0.7319*W^2 - 0.1018*W^3)) / 10
     if body == MOON:
-        w = w_moon * 60.0  # Convert to arcminutes for formula
-        q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
-        q_yallop = (arcv_act - q_criterion) / 10.0
-        # dret[18] (qCrit) is the Yallop visibility CLASS code (1..6), not the
-        # raw arcus-visionis criterion polynomial (which stays internal above).
-        q_crit = _yallop_visibility_code(q_yallop)
+        width_arcmin = crescent_width_deg * 60.0  # Convert to arcminutes for formula
+        yallop_threshold = (
+            11.8371
+            - 6.3226 * width_arcmin
+            + 0.7319 * width_arcmin**2
+            - 0.1018 * width_arcmin**3
+        )
+        yallop_q = (geo_arcus_visionis - yallop_threshold) / 10.0
+        # Slot 18 carries the Yallop visibility class code (1..6), not the raw
+        # arcus-visionis criterion polynomial (which stays internal above).
+        yallop_class_code = _yallop_visibility_code(yallop_q)
     else:
-        q_yallop = 0.0
-        q_crit = 0.0
+        yallop_q = 0.0
+        yallop_class_code = 0.0
 
     # Fill in the result array
-    dret[0] = body_alt_deg  # AltO - topocentric altitude (unrefracted)
-    dret[1] = app_alt_deg  # AppAltO - apparent altitude (refracted)
-    dret[2] = geo_alt_deg  # GeoAltO - geocentric altitude
-    dret[3] = body_az_deg  # AziO - azimuth of object
-    dret[4] = sun_alt_deg  # AltS - topocentric altitude of Sun
-    dret[5] = sun_az_deg  # AziS - azimuth of Sun
-    dret[6] = tav_act  # TAVact - topocentric arcus visionis
-    dret[7] = arcv_act  # ARCVact - geocentric arcus visionis
-    dret[8] = daz_act  # DAZact - azimuth difference
-    dret[9] = arcl_act  # ARCLact - actual arc distance between body and Sun
-    dret[10] = k_act  # kact - extinction coefficient
-    dret[11] = min_tav  # minTAV - minimum topocentric arcus visionis
-    dret[12] = t_first_vr  # TfirstVR - first visibility time
-    dret[13] = t_best_vr  # TbVR - best visibility time
-    dret[14] = t_last_vr  # TlastVR - last visibility time
-    dret[15] = t_b_yallop  # TbYallop - best time according to Yallop
-    dret[16] = w_moon  # WMoon - crescent width
-    dret[17] = q_yallop  # qYal - Yallop q-test value
-    dret[18] = q_crit  # qCrit - Yallop visibility class code (1..6)
-    dret[19] = parallax  # ParO - parallax of object
-    dret[20] = magnitude  # Magn - magnitude
-    dret[21] = rise_o  # RiseO - rise/set time of object
-    dret[22] = rise_s  # RiseS - rise/set time of Sun
-    dret[23] = lag  # Lag - time difference
-    dret[24] = tvis_vr  # TvisVR - visibility duration
-    dret[25] = l_moon  # LMoon - crescent length
-    dret[26] = elongation  # elong - elongation from the Sun
-    dret[27] = illumination  # Illum - illumination percentage
-    # dret[28] onwards are reserved, already 0.0
+    values[0] = body_alt_deg  # topocentric altitude, unrefracted
+    values[1] = app_alt_deg  # apparent altitude, refracted
+    values[2] = geo_alt_deg  # altitude from the geocentric direction
+    values[3] = body_az_deg  # azimuth of the object
+    values[4] = sun_alt_deg  # topocentric altitude of the Sun
+    values[5] = sun_az_deg  # azimuth of the Sun
+    values[6] = topo_arcus_visionis  # object minus Sun, topocentric altitudes
+    values[7] = geo_arcus_visionis  # object minus Sun, geocentric altitude
+    values[8] = azimuth_diff_deg  # Sun minus object azimuth, signed
+    values[9] = arc_of_light_deg  # great-circle distance object-Sun
+    values[10] = extinction_coeff  # total extinction, mag per airmass
+    values[11] = required_arcus_visionis  # detection threshold on slot 6
+    values[12] = visibility_start_jd  # visibility window begins
+    values[13] = visibility_best_jd  # visibility window optimum
+    values[14] = visibility_end_jd  # visibility window ends
+    values[15] = yallop_best_jd  # Yallop best time (Moon)
+    values[16] = crescent_width_deg  # lunar crescent width
+    values[17] = yallop_q  # Yallop q statistic (Moon)
+    values[18] = yallop_class_code  # Yallop class 1..6 (Moon)
+    values[19] = altitude_parallax_deg  # geocentric minus topocentric altitude
+    values[20] = magnitude  # apparent visual magnitude
+    values[21] = object_rise_set_jd  # object rise/set for this event
+    values[22] = sun_rise_set_jd  # Sun rise/set for this event
+    values[23] = lag_days  # object minus Sun rise/set lag
+    values[24] = visibility_duration_days  # visibility window length
+    values[25] = crescent_length_deg  # lunar crescent length
+    values[26] = elongation  # elongation from the Sun
+    values[27] = illuminated_pct  # illuminated fraction, percent
+    # slots 28-49 are reserved and stay 0.0
 
     # Coerce to native Python floats: several entries (alt/az from the Skyfield
     # backend) are numpy.float64, and the public contract returns native floats.
-    return tuple(float(v) for v in dret), flags
+    return tuple(float(v) for v in values), flags
 
 
 def heliacal_pheno_ut(
@@ -4595,7 +4654,8 @@ def heliacal_pheno_ut(
         flags: Calculation flags
 
     Returns:
-        Flat tuple of 50 floats with heliacal phenomena data.
+        Flat tuple of 50 floats with heliacal phenomena data; the slot layout
+        is documented on ``_heliacal_pheno_ut_pythonic``.
     """
     # Parse geopos
     lon = geopos[0] if len(geopos) > 0 else 0.0
