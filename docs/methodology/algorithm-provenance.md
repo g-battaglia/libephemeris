@@ -271,6 +271,7 @@ the human navigation layer; every row names one registry component.
 | `production-cli-and-downloads` | CLI, wizard, hash-pinned data installation | CLI guide and asset attestations |
 | `development-cli` | Development command routing | CLI reference; explicit no-model declaration |
 | `public-identifiers` | Public IDs, flags, return masks, and NAIF mappings | Flag reference and NAIF standard |
+| `api-display-strings` | House-system, sidereal-mode, and body labels returned by the name lookups | Interface labels of the public API; explicit no-model declaration |
 | `coordinate-and-angle-utilities` | Coordinate transforms, chart angles, formatting, and refraction dispatch | Explicit equations, IERS/Meeus, house/refraction records |
 | `historical-astrology-helpers` | Lots, zodiac/nakshatra/aspect/dignity arithmetic | Historical locators plus explicit project conventions |
 | `astrometry-time-and-earth-orientation` | IAU/ERFA reductions, Vondrak precession, calendars, sidereal time, and Delta T | IERS, ERFA, Vondrak, Simon, and Earth-rotation publications |

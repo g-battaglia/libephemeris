@@ -283,6 +283,16 @@ documentation = ["docs/reference/flags.md", "docs/comparison/api-compatibility.m
 docstring = "detailed"
 
 [[component]]
+id = "api-display-strings"
+category = "public-api"
+paths = ["libephemeris/compat_names.py"]
+scientific_content = false
+origin = "Interface labels kept for compatibility with the public API: the house-system, sidereal-mode and body names that house_name, get_ayanamsa_name, get_planet_name and contrib.house_system_name return, preserved byte for byte because consumers store them. The tables hold no numerical model, coefficient, or computation."
+sources = []
+documentation = ["docs/comparison/api-compatibility.md", "docs/reference/house-systems.md", "docs/reference/ayanamsha.md"]
+docstring = "detailed"
+
+[[component]]
 id = "coordinate-and-angle-utilities"
 category = "scientific-pipeline"
 paths = ["libephemeris/angles.py", "libephemeris/utils.py"]

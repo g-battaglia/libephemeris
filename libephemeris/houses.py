@@ -92,6 +92,7 @@ from .constants import (
     SIDBIT_ECL_T0,
     SIDBIT_SSY_PLANE,
 )
+from .compat_names import HOUSE_SYSTEM_NAMES
 from .planets import calc_ut
 from .cache import get_cached_nutation
 from .exceptions import (
@@ -2446,43 +2447,27 @@ def _houses_with_context(
 def house_name(hsys: int) -> str:
     """
     Get the name of a house system.
+
+    The labels are the :data:`~libephemeris.compat_names.HOUSE_SYSTEM_NAMES`
+    table; this function only normalises the selector.
+
+    Args:
+        hsys: House-system selector as an int code (``ord("P")``), a
+            one-byte ``bytes`` or a one-character ``str``. Lowercase letters
+            are accepted like their uppercase form, except ``'i'``, which
+            is a system of its own.
+
+    Returns:
+        The house-system label, or the empty string for a selector the
+        table does not list (an int outside the ``chr()`` range included).
     """
     hsys_char = _hsys_to_char(hsys)
-
-    names = {
-        "P": "Placidus",
-        "K": "Koch",
-        "O": "Porphyry",
-        "R": "Regiomontanus",
-        "C": "Campanus",
-        "E": "equal",
-        "A": "equal",
-        "W": "equal/ whole sign",
-        "M": "Morinus",
-        "B": "Alcabitius",
-        "T": "Polich/Page",
-        "U": "Krusinski-Pisa-Goelzer",
-        "G": "Gauquelin sectors",
-        "V": "equal/Vehlow",
-        "X": "axial rotation system/Meridian houses",
-        "H": "horizon/azimut",
-        "F": "Carter poli-equ.",
-        "S": "Sripati",
-        "L": "Pullen SD",
-        "Q": "Pullen SR",
-        "N": "equal/1=Aries",
-        "Y": "APC houses",
-        "D": "equal (MC)",
-        "I": "Sunshine",
-        "i": "Sunshine/alt.",
-        "J": "Savard-A",
-    }
     # Compatibility contract: an unknown selector yields an empty
     # string, and the name lookup folds 'g' to Gauquelin (unlike the
     # houses() tuple shape, which stays 12 for the lowercase byte).
     if hsys_char == "g":
         hsys_char = "G"
-    return names.get(hsys_char, "")
+    return HOUSE_SYSTEM_NAMES.get(hsys_char, "")
 
 
 def _houses_placidus(

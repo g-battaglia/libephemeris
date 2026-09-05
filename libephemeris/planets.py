@@ -125,6 +125,7 @@ _BODY_SPEED_HALF_STEP_DAYS = 1.0 / 86400.0
 # truncation negligible, restoring reference-grade agreement.
 _ASTEROID_TRUEPOS_SPEED_HALF_STEP_DAYS = 300.0 / 86400.0
 
+from .compat_names import AYANAMSHA_NAMES, BODY_DISPLAY_NAMES
 from .constants import (
     SUN,
     MOON,
@@ -144,12 +145,6 @@ from .constants import (
     INTP_APOG,
     INTP_PERG,
     CUPIDO,
-    HADES,
-    ZEUS,
-    KRONOS,
-    APOLLON,
-    ADMETOS,
-    VULKANUS,
     POSEIDON,
     ISIS,
     AST_OFFSET,
@@ -203,17 +198,10 @@ from .constants import (
     SIDM_FAGAN_BRADLEY,
     SIDM_LAHIRI,
     SIDM_DELUCE,
-    SIDM_RAMAN,
-    SIDM_USHASHASHI,
-    SIDM_KRISHNAMURTI,
     SIDM_DJWHAL_KHUL,
-    SIDM_YUKTESHWAR,
-    SIDM_JN_BHASIN,
     SIDM_BABYL_KUGLER1,
     SIDM_BABYL_KUGLER2,
     SIDM_BABYL_KUGLER3,
-    SIDM_BABYL_HUBER,
-    SIDM_BABYL_ETPSC,
     SIDM_BABYL_BRITTON,
     SIDM_ALDEBARAN_15TAU,
     SIDM_TRUE_CITRA,
@@ -222,17 +210,6 @@ from .constants import (
     SIDM_TRUE_MULA,
     SIDM_TRUE_SHEORAN,
     SIDM_HIPPARCHOS,
-    SIDM_SASSANIAN,
-    SIDM_J2000,
-    SIDM_J1900,
-    SIDM_B1950,
-    SIDM_SURYASIDDHANTA,
-    SIDM_SURYASIDDHANTA_MSUN,
-    SIDM_ARYABHATA,
-    SIDM_ARYABHATA_MSUN,
-    SIDM_ARYABHATA_522,
-    SIDM_SS_REVATI,
-    SIDM_SS_CITRA,
     SIDM_GALCENT_0SAG,
     SIDM_GALCENT_RGILBRAND,
     SIDM_GALCENT_MULA_WILHELM,
@@ -240,13 +217,9 @@ from .constants import (
     SIDM_GALEQU_IAU1958,
     SIDM_GALEQU_TRUE,
     SIDM_GALEQU_MULA,
-    SIDM_GALEQU_FIORENZA,
     SIDM_GALALIGN_MARDYKS,
     SIDM_VALENS_MOON,
     SIDM_LAHIRI_1940,
-    SIDM_LAHIRI_VP285,
-    SIDM_KRISHNAMURTI_VP291,
-    SIDM_LAHIRI_ICRC,
     SIDM_USER,
     NODBIT_MEAN,
     NODBIT_OSCU_BAR,
@@ -459,7 +432,7 @@ def _raise_leb_model_window_miss(body_id: int, jd: float) -> None:
     # by that fragment and read the window and the requested JD out of it.
     raise EphemerisRangeError(
         message=(
-            f"Body {body_id} ({_PLANET_NAMES.get(body_id, 'unnamed')}) at JD "
+            f"Body {body_id} ({BODY_DISPLAY_NAMES.get(body_id, 'unnamed')}) at JD "
             f"{jd:.6f} is outside active LEB coverage range [{start_jd:.6f}, "
             f"{end_jd:.6f}], the fitted window of the packaged model that "
             "serves it. LEB mode does not silently substitute a lower-precision "
@@ -513,7 +486,7 @@ def _raise_leb_range_miss(
             return
         raise UnknownBodyError(
             message=(
-                f"Body {body_id} ({_PLANET_NAMES.get(body_id, 'unnamed')}) is "
+                f"Body {body_id} ({BODY_DISPLAY_NAMES.get(body_id, 'unnamed')}) is "
                 "not stored in the active LEB file. LEB mode does not silently "
                 "substitute a non-LEB source for a missing core body."
             ),
@@ -542,62 +515,6 @@ _PLANET_FALLBACK = {
     "uranus": "uranus barycenter",
     "neptune": "neptune barycenter",
     "pluto": "pluto barycenter",
-}
-
-# Planet ID to human-readable name mapping for error messages and debugging
-_PLANET_NAMES = {
-    SUN: "Sun",
-    MOON: "Moon",
-    MERCURY: "Mercury",
-    VENUS: "Venus",
-    MARS: "Mars",
-    JUPITER: "Jupiter",
-    SATURN: "Saturn",
-    URANUS: "Uranus",
-    NEPTUNE: "Neptune",
-    PLUTO: "Pluto",
-    MEAN_NODE: "mean Node",
-    TRUE_NODE: "true Node",
-    MEAN_APOG: "mean Apogee",
-    OSCU_APOG: "osc. Apogee",
-    INTP_APOG: "intp. Apogee",
-    INTP_PERG: "intp. Perigee",
-    EARTH: "Earth",
-    ISIS: "Isis-Transpluto",
-    NIBIRU: "Nibiru",
-    HARRINGTON: "Harrington",
-    # Historical trans-Uranian/trans-Neptunian predictions carry a
-    # parenthetical annotation naming the planet each prediction targeted,
-    # matching the compatibility metadata contract (Le Verrier 1846 and Adams
-    # 1845-46 for Neptune; Lowell 1915 and Pickering 1919 for Pluto).
-    NEPTUNE_LEVERRIER: "Leverrier (Neptune)",
-    NEPTUNE_ADAMS: "Adams (Neptune)",
-    PLUTO_LOWELL: "Lowell (Pluto)",
-    PLUTO_PICKERING: "Pickering (Pluto)",
-    CUPIDO: "Cupido",
-    HADES: "Hades",
-    ZEUS: "Zeus",
-    KRONOS: "Kronos",
-    APOLLON: "Apollon",
-    ADMETOS: "Admetos",
-    # "Vulcanus" is the canonical Witte-Sieggrün (Hamburg School) spelling of
-    # the seventh Uranian planet; the constant keeps its VULKANUS spelling for
-    # API compatibility while the display name matches the metadata contract.
-    VULKANUS: "Vulcanus",
-    POSEIDON: "Poseidon",
-    # Geocentric/heliocentric symbolic points the runtime models analytically
-    # (ids 55-58). They resolve to their published astrological names because
-    # calc_ut returns positions for them, so the metadata must agree.
-    VULCAN: "Vulcan",
-    WHITE_MOON: "Selena/White Moon",
-    PROSERPINA: "Proserpina",
-    WALDEMATH: "Waldemath",
-    CHIRON: "Chiron",
-    PHOLUS: "Pholus",
-    CERES: "Ceres",
-    PALLAS: "Pallas",
-    JUNO: "Juno",
-    VESTA: "Vesta",
 }
 
 
@@ -1499,8 +1416,8 @@ def get_planet_name(planet: int) -> str:
         >>> get_planet_name(4)
         'Mars'
     """
-    if planet in _PLANET_NAMES:
-        return _PLANET_NAMES[planet]
+    if planet in BODY_DISPLAY_NAMES:
+        return BODY_DISPLAY_NAMES[planet]
     if planet > AST_OFFSET:
         # Numbered minor planets: the reference resolves the built-in
         # set by asteroid number and returns an empty string for the
@@ -6081,59 +5998,13 @@ def get_ayanamsa_name(sidmode: int) -> str:
     get_ayanamsa_name(SIDBIT_ECL_T0 | SIDM_LAHIRI) == "Lahiri". Masking with
     0xFF is the compatibility contract across every combination of
     projection flags.
+
+    The labels are the :data:`~libephemeris.compat_names.AYANAMSHA_NAMES`
+    table; this function only applies the low-byte mask.
     """
-    names = {
-        SIDM_FAGAN_BRADLEY: "Fagan/Bradley",
-        SIDM_LAHIRI: "Lahiri",
-        SIDM_DELUCE: "De Luce",
-        SIDM_RAMAN: "Raman",
-        SIDM_USHASHASHI: "Usha/Shashi",
-        SIDM_KRISHNAMURTI: "Krishnamurti",
-        SIDM_DJWHAL_KHUL: "Djwhal Khul",
-        SIDM_YUKTESHWAR: "Yukteshwar",
-        SIDM_JN_BHASIN: "J.N. Bhasin",
-        SIDM_BABYL_KUGLER1: "Babylonian/Kugler 1",
-        SIDM_BABYL_KUGLER2: "Babylonian/Kugler 2",
-        SIDM_BABYL_KUGLER3: "Babylonian/Kugler 3",
-        SIDM_BABYL_HUBER: "Babylonian/Huber",
-        SIDM_BABYL_ETPSC: "Babylonian/Eta Piscium",
-        SIDM_BABYL_BRITTON: "Babylonian/Britton",
-        SIDM_ALDEBARAN_15TAU: "Babylonian/Aldebaran = 15 Tau",
-        SIDM_TRUE_CITRA: "True Citra",
-        SIDM_TRUE_REVATI: "True Revati",
-        SIDM_TRUE_PUSHYA: "True Pushya (PVRN Rao)",
-        SIDM_TRUE_MULA: "True Mula (Chandra Hari)",
-        SIDM_TRUE_SHEORAN: '"Vedic"/Sheoran',
-        SIDM_HIPPARCHOS: "Hipparchos",
-        SIDM_SASSANIAN: "Sassanian",
-        SIDM_J2000: "J2000",
-        SIDM_J1900: "J1900",
-        SIDM_B1950: "B1950",
-        SIDM_SURYASIDDHANTA: "Suryasiddhanta",
-        SIDM_SURYASIDDHANTA_MSUN: "Suryasiddhanta, mean Sun",
-        SIDM_ARYABHATA: "Aryabhata",
-        SIDM_ARYABHATA_MSUN: "Aryabhata, mean Sun",
-        SIDM_ARYABHATA_522: "Aryabhata 522",
-        SIDM_SS_REVATI: "SS Revati",
-        SIDM_SS_CITRA: "SS Citra",
-        SIDM_GALCENT_0SAG: "Galact. Center = 0 Sag",
-        SIDM_GALCENT_RGILBRAND: "Galactic Center (Gil Brand)",
-        SIDM_GALCENT_MULA_WILHELM: "Dhruva/Gal.Center/Mula (Wilhelm)",
-        SIDM_GALCENT_COCHRANE: "Cochrane (Gal.Center = 0 Cap)",
-        SIDM_GALEQU_IAU1958: "Galactic Equator (IAU1958)",
-        SIDM_GALEQU_TRUE: "Galactic Equator",
-        SIDM_GALEQU_MULA: "Galactic Equator mid-Mula",
-        SIDM_GALEQU_FIORENZA: "Galactic Equator (Fiorenza)",
-        SIDM_GALALIGN_MARDYKS: "Skydram (Mardyks)",
-        SIDM_VALENS_MOON: "Vettius Valens",
-        SIDM_LAHIRI_1940: "Lahiri 1940",
-        SIDM_LAHIRI_VP285: "Lahiri VP285",
-        SIDM_KRISHNAMURTI_VP291: "Krishnamurti-Senthilathiban",
-        SIDM_LAHIRI_ICRC: "Lahiri ICRC",
-    }
     # Strip the SIDBIT_* projection flags (all >= 256) so a mode combined with
     # ECL_T0/SSY_PLANE/ECL_DATE/... still resolves to its base name.
-    return names.get(sidmode & 0xFF, "")
+    return AYANAMSHA_NAMES.get(sidmode & 0xFF, "")
 
 
 @dataclass

@@ -29,6 +29,12 @@ Compatibility tests cover:
 `get_orbital_elements()`, `houses*()`, and `fixstar*()` entry points use the
 canonical public tuple layouts documented in the API reference.
 
+The strings the name lookups return (`house_name()`, `get_ayanamsa_name()`,
+`get_planet_name()` and `contrib.house_system_name()`) belong to the
+compatible surface as well: consumers store them in saved charts and printed
+output, so they are held as one set of tables in `libephemeris/compat_names.py`
+and returned unchanged, spelling and punctuation included.
+
 ## LibEphemeris-only extensions
 
 The following convenience/performance APIs are outside the compatible surface:

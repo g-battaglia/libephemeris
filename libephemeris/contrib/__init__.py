@@ -60,6 +60,7 @@ from .. import calc_ut as _calc_ut
 from .. import julday as _julday
 from .. import revjul as _revjul
 from .. import FLG_SPEED as _FLG_SPEED
+from ..compat_names import CONTRIB_HOUSE_SYSTEM_NAMES as _HOUSE_SYSTEM_NAMES
 
 calc_ut = _calc_ut
 julday = _julday
@@ -270,34 +271,6 @@ _NAKSHATRA_NAMES = (
     "Revathi",
 )
 
-_HOUSE_SYSTEM_NAMES = {
-    "A": "Equal",
-    "E": "Equal",
-    "B": "Alcabitius",
-    "C": "Campanus",
-    "D": "Equal MC",
-    "F": "Carter poli-equatorial",
-    "G": "Gauquelin sectors",
-    "H": "Horizontal/Azimuthal",
-    "I": "Sunshine",
-    "i": "Sunshine alternative",
-    "K": "Koch",
-    "L": "Pullen S-Delta",
-    "M": "Morinus",
-    "N": "Whole sign",
-    "O": "Porphyry",
-    "P": "Placidus",
-    "Q": "Pullen S-Ratio",
-    "R": "Regiomontanus",
-    "S": "Sripati",
-    "T": "Polich/Page (topocentric)",
-    "U": "Krusinski-Pisa-Goelzer",
-    "V": "Vehlow equal",
-    "W": "Whole sign",
-    "X": "Axial rotation/Meridian",
-    "Y": "APC",
-}
-
 # Nakshatra width in degrees (360 / 27)
 _NAKSHATRA_WIDTH: float = 360.0 / 27.0
 # Pada width (a quarter of a nakshatra)
@@ -439,7 +412,10 @@ def get_nakshatra_name(nak: int) -> str:
 def house_system_name(code: str) -> str:
     """Return the human-readable name of a house system letter code.
 
-    Accepts a single-character str (per the upstream contrib signature)."""
+    Accepts a single-character str (per the upstream contrib signature). The
+    labels are the :data:`~libephemeris.compat_names.CONTRIB_HOUSE_SYSTEM_NAMES`
+    table, read as given (no case folding); a code the table does not list
+    answers ``"Unknown"``."""
     if not isinstance(code, str):
         raise TypeError("argument 1 must be str, not " + type(code).__name__)
     return _HOUSE_SYSTEM_NAMES.get(code, "Unknown")
