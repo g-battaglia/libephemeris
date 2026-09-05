@@ -50,7 +50,7 @@ import contextlib
 import functools
 import math
 import re
-from typing import Callable, Iterator, Sequence, Tuple, Union, cast
+from typing import Callable, Iterator, NamedTuple, Sequence, Tuple, Union, cast
 
 from .constants import (
     SUN,
@@ -302,59 +302,75 @@ def _is_ephemeris_boundary(exc: BaseException) -> bool:
     return isinstance(exc, EphemerisRangeError) or _is_leb_out_of_range(exc)
 
 
+# An eclipse type filter (the public ``ifltype``/``ecltype`` argument) answers
+# two questions with two groups of bits: which centrality, and which class.
+_CENTRALITY_BITS = ECL_CENTRAL | ECL_NONCENTRAL
+_SOL_CLASS_BITS = ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
+
+# Solar type filters that describe a geometry no eclipse can have. They are
+# refused before any search starts, each with the reason given to the caller.
+_SOL_IMPOSSIBLE_FILTERS: tuple[tuple[int, str], ...] = (
+    (
+        ECL_CENTRAL | ECL_PARTIAL,
+        "The eclipse type filter asks for a central partial eclipse, which "
+        "cannot occur: a partial solar eclipse has no central line.",
+    ),
+    (
+        ECL_NONCENTRAL | ECL_ANNULAR_TOTAL,
+        "The eclipse type filter asks for a non-central hybrid (annular-total) "
+        "eclipse, which cannot occur: a hybrid eclipse always has a central "
+        "line.",
+    ),
+)
+
+
+def _is_single_bit(bits: int) -> bool:
+    """True when exactly one bit of ``bits`` is set."""
+    return bits != 0 and bits & (bits - 1) == 0
+
+
 def _sol_glob_accepts(mask: int, retflag: int) -> bool:
-    """Reference ``ifltype`` acceptance test for ``sol_eclipse_when_glob``.
+    """Decide whether a classified eclipse passes a ``sol_eclipse_when_glob`` filter.
 
-    Decides whether an eclipse whose classified type is ``retflag`` (one
-    geometry bit ECL_CENTRAL/ECL_NONCENTRAL plus one type bit
-    ECL_TOTAL/ECL_ANNULAR/ECL_PARTIAL/ECL_ANNULAR_TOTAL) satisfies the
-    caller's ``mask`` filter according to the public API's flag contract:
+    ``retflag`` is the classified type of a candidate eclipse: one
+    centrality bit (ECL_CENTRAL or ECL_NONCENTRAL) and one class bit
+    (ECL_TOTAL, ECL_ANNULAR, ECL_PARTIAL or ECL_ANNULAR_TOTAL). ``mask`` is
+    the caller's filter, read as two questions:
 
-    * ``mask == 0`` accepts any eclipse.
-    * A geometry-only mask (no type bits) never matches.
-    * The eclipse must carry one of the requested type bits.
-    * With no geometry bit requested, only a *single*-type mask matches
-      (any centrality); a geometry-only-plus-multiple-types mask never
-      matches and the search runs to the ephemeris boundary.
-    * With a geometry bit requested, the eclipse's centrality must match.
+    * which classes are wanted: the eclipse must carry one of them, so a
+      mask naming no class matches nothing;
+    * which centrality is wanted: when the mask names one, the eclipse
+      must carry it; when it names none, the mask has to be a single
+      class, accepted with either centrality (several classes and no
+      centrality match nothing, and the search runs to the ephemeris
+      boundary).
+
+    A mask of 0 accepts every eclipse.
     """
     if mask == 0:
         return True
-    geom = mask & (ECL_CENTRAL | ECL_NONCENTRAL)
-    types = mask & (ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL)
-    if types == 0:
+    wanted_classes = mask & _SOL_CLASS_BITS
+    wanted_centrality = mask & _CENTRALITY_BITS
+    if not retflag & wanted_classes:
         return False
-    if not (retflag & types):
-        return False
-    if geom == 0:
-        return bin(types).count("1") == 1
-    return bool(retflag & geom)
+    if wanted_centrality:
+        return bool(retflag & wanted_centrality)
+    return _is_single_bit(wanted_classes)
 
 
 def _sol_glob_reject_impossible(mask: int) -> None:
-    """Raise for ``sol_eclipse_when_glob`` type masks with no realisable event.
+    """Refuse a ``sol_eclipse_when_glob`` filter that no eclipse can satisfy.
 
-    Two masks describe eclipse geometries that cannot occur and the
-    reference rejects them up front rather than searching:
+    Only the six type-filter bits of ``mask`` are read; the refused
+    combinations and their reasons are :data:`_SOL_IMPOSSIBLE_FILTERS`.
 
-    * ECL_CENTRAL | ECL_PARTIAL - a partial eclipse is never central.
-    * ECL_NONCENTRAL | ECL_ANNULAR_TOTAL - a hybrid (annular-total)
-      eclipse always has a central line, so it is never non-central.
+    Raises:
+        Error: when the filter is one of the impossible combinations.
     """
-    valid = ECL_CENTRAL | ECL_NONCENTRAL | ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL
-    valid |= ECL_ANNULAR_TOTAL
-    m = mask & valid
-    if m == (ECL_CENTRAL | ECL_PARTIAL):
-        raise Error(
-            "The eclipse type filter asks for a central partial eclipse, which "
-            "cannot occur: a partial solar eclipse has no central line."
-        )
-    if m == (ECL_NONCENTRAL | ECL_ANNULAR_TOTAL):
-        raise Error(
-            "The eclipse type filter asks for a non-central hybrid (annular-total) "
-            "eclipse, which cannot occur: a hybrid eclipse always has a central "
-            "line."
-        )
+    requested = mask & (_CENTRALITY_BITS | _SOL_CLASS_BITS)
+    for impossible, why in _SOL_IMPOSSIBLE_FILTERS:
+        if requested == impossible:
+            raise Error(why)
 
 
 # Constants for eclipse calculations
@@ -494,76 +510,133 @@ _DANJON_MOON_PARALLAX_SCALE = 1.01
 # used directly by the occultation shadow-geometry phase equations.
 _EARTH_EQ_RADIUS_KM = 6378.140
 
-# --- Lunar-occultation search parameters (derived, not tuned) ---------------
-# Mean lunar sidereal motion is ~13.18 deg/day, so gap/13 is a safe
-# first-order Newton step toward the next Moon-body conjunction in ecliptic
-# longitude (slightly underestimating the rate keeps the iteration from
-# overshooting for retrograde-moving targets).
+# --- Lunar-occultation search parameters ------------------------------------
+# The six values below are this library's own choices. None is fitted to
+# anything: each is sized from the physical quantity named beside it and
+# rounded to a comfortable margin.
+#
+# The Moon's mean sidereal motion is 360 deg / 27.321662 d = 13.18 deg/day.
+# Dividing a longitude gap by 13 gives a first-order Newton step toward the
+# Moon-body conjunction that is deliberately a little short, so the
+# iteration closes in from one side and does not overshoot a target that
+# is itself moving, retrograde planets included.
 _OCC_MOON_RATE_DEG_DAY = 13.0
-# Conjunction convergence: 0.1 deg of longitude is ~11 minutes of lunar
-# motion, well inside the +/-1 day refinement window used afterwards.
+# The conjunction seek stops once the longitude gap is below 0.1 deg,
+# about 11 minutes of lunar motion: well inside the +/-1 day window the
+# callers refine afterwards.
 _OCC_CONJ_TOL_DEG = 0.1
-# Conjunctions with a fixed direction repeat every sidereal month
-# (~27.32 d): a 20-day hop from the current conjunction always lands
-# before the next one, so no candidate is ever skipped.
+# Upper bound on the Newton steps of one conjunction seek. The iteration
+# converges in a handful of steps; the bound only guards a target whose
+# longitude never settles.
+_OCC_CONJ_MAX_STEPS = 300
+# Conjunctions with the same body recur once per sidereal month (27.32 d
+# for a star, a little longer for a planet moving direct). A hop of 20
+# days from one conjunction lands past it and before the next, so stepping
+# conjunction by conjunction skips none.
 _OCC_CONJUNCTION_HOP_DAYS = 20.0
-# The Moon's ecliptic latitude stays within ~5.3 deg; adding its maximum
-# horizontal parallax (~1.0 deg), its semidiameter (~0.27 deg) and margin,
-# a star more than 7 deg from the ecliptic can never be occulted.
+# A star is beyond the Moon's reach when its ecliptic latitude exceeds the
+# largest lunar latitude (about 5.3 deg: the 5.145 deg mean inclination
+# plus perturbations) plus the largest lunar horizontal parallax (about
+# 1.0 deg) and semidiameter (about 0.28 deg), some 6.6 deg in all; 7 deg
+# is that bound with margin.
 _OCC_STAR_LAT_LIMIT_DEG = 7.0
-# At conjunction an occultation is only possible somewhere on Earth when
-# the geocentric Moon-body latitude gap is below ~2 deg (semidiameter +
-# parallax + body offset).
+# At conjunction an occultation is possible somewhere on Earth only when
+# the geocentric Moon-body latitude gap is below the lunar parallax plus
+# the two semidiameters, about 1.3 deg; 2 deg keeps every candidate and
+# rejects the rest before any refinement.
 _OCC_LAT_GATE_DEG = 2.0
+
+# The bits of an occultation type filter, by role. Annular and hybrid
+# events need a disc larger than the Moon's, which only the Sun has.
+_OCC_SOLAR_ONLY_CLASSES = ECL_ANNULAR | ECL_ANNULAR_TOTAL
+_OCC_COMMON_CLASSES = ECL_TOTAL | ECL_PARTIAL
+# Each class brings the centralities it can occur with: an umbral event
+# (total, annular, hybrid) may or may not be central, a partial event is
+# by construction never central.
+_OCC_CLASS_CENTRALITIES: tuple[tuple[int, int], ...] = (
+    (ECL_TOTAL | _OCC_SOLAR_ONLY_CLASSES, ECL_NONCENTRAL | ECL_CENTRAL),
+    (ECL_PARTIAL, ECL_NONCENTRAL),
+)
 
 
 class _OccSearchOffEphemeris(Exception):
     """Conjunction seek stepped outside the active ephemeris range."""
 
 
-def _normalize_occultation_filter(ecltype: int, body: "int | str", is_sun: bool) -> int:
-    """Expand an occultation-type filter into its full bit set.
+def _occultation_filter_objection(
+    ecltype: int, body: "int | str", is_sun: bool
+) -> "str | None":
+    """Why no occultation of ``body`` can satisfy ``ecltype``, or None.
 
-    The public ``ecltype`` argument names the wanted classes; internally the
-    search tests individual class bits, so the shorthand values must be
-    expanded: an empty filter means "everything possible for this body",
-    umbral classes imply both the central and non-central variants, and a
-    partial occultation is by construction never central. Annular classes
-    exist only when the occulted body is the Sun (only the Sun's disc can
-    exceed the Moon's); asking for them with another body is an error, and
-    a combined filter simply loses those bits.
+    Two requests are impossible: a central partial event (a partial
+    occultation or eclipse has no central line) and, for a body other than
+    the Sun, an annular event. The annular objection applies when
+    annularity is all the filter asks for, ECL_ANNULAR with any
+    centrality or ECL_ANNULAR_TOTAL alone; combined with another class the
+    solar-only bits are dropped silently instead.
+    """
+    if ecltype == ECL_PARTIAL | ECL_CENTRAL:
+        return (
+            "The occultation type filter asks for a central partial event, which "
+            "cannot occur: a partial occultation or eclipse has no central line."
+        )
+    if is_sun:
+        return None
+    classes = ecltype & ~_CENTRALITY_BITS
+    if classes == ECL_ANNULAR or ecltype == ECL_ANNULAR_TOTAL:
+        return (
+            "The occultation type filter asks for an annular event of body "
+            f"{body}, which cannot occur: only the Sun can be eclipsed "
+            "annularly."
+        )
+    return None
+
+
+def _normalize_occultation_filter(ecltype: int, body: "int | str", is_sun: bool) -> int:
+    """Expand an occultation-type filter into the full set of bits it means.
+
+    The public ``ecltype`` names the wanted classes; the search tests single
+    bits, so the filter is expanded in three steps: refuse an impossible
+    request, drop the solar-only classes (annular, hybrid) for any other
+    body and read an empty filter as "every class this body can show",
+    then let each class bring the centralities it can occur with
+    (:data:`_OCC_CLASS_CENTRALITIES`).
 
     Raises:
         Error: for the two impossible requests (central partial;
             annular-only for a non-solar body).
     """
-    from .exceptions import Error
-
+    objection = _occultation_filter_objection(ecltype, body, is_sun)
+    if objection is not None:
+        raise Error(objection)
     wanted = ecltype
-    if wanted == (ECL_PARTIAL | ECL_CENTRAL):
-        raise Error(
-            "The occultation type filter asks for a central partial event, which "
-            "cannot occur: a partial occultation or eclipse has no central line."
-        )
     if not is_sun:
-        base_classes = wanted & ~(ECL_NONCENTRAL | ECL_CENTRAL)
-        if base_classes == ECL_ANNULAR or wanted == ECL_ANNULAR_TOTAL:
-            raise Error(
-                "The occultation type filter asks for an annular event of body "
-                f"{body}, which cannot occur: only the Sun can be eclipsed "
-                "annularly."
-            )
-        if wanted & (ECL_ANNULAR | ECL_ANNULAR_TOTAL):
-            wanted &= ~(ECL_ANNULAR | ECL_ANNULAR_TOTAL)
+        wanted &= ~_OCC_SOLAR_ONLY_CLASSES
     if wanted == 0:
-        wanted = ECL_TOTAL | ECL_PARTIAL | ECL_NONCENTRAL | ECL_CENTRAL
+        wanted = _OCC_COMMON_CLASSES | _CENTRALITY_BITS
         if is_sun:
-            wanted |= ECL_ANNULAR | ECL_ANNULAR_TOTAL
-    if wanted & (ECL_TOTAL | ECL_ANNULAR | ECL_ANNULAR_TOTAL):
-        wanted |= ECL_NONCENTRAL | ECL_CENTRAL
-    if wanted & ECL_PARTIAL:
-        wanted |= ECL_NONCENTRAL
+            wanted |= _OCC_SOLAR_ONLY_CLASSES
+    for classes, centralities in _OCC_CLASS_CENTRALITIES:
+        if wanted & classes:
+            wanted |= centralities
     return wanted
+
+
+def _longitude_gap_ahead(body_lon: float, moon_lon: float, direction: int) -> float:
+    """Longitude the Moon still has to cover to reach the body, in ``direction``.
+
+    In [0, 360) for a forward search and in (-360, 0] for a backward one, so
+    the first Newton step of a conjunction seek always heads the way the
+    caller is searching.
+    """
+    gap = (body_lon - moon_lon) % 360.0
+    return gap - 360.0 if direction < 0 else gap
+
+
+def _longitude_gap_nearest(body_lon: float, moon_lon: float) -> float:
+    """Signed longitude gap from the Moon to the body, folded into (-180, 180]."""
+    gap = (body_lon - moon_lon) % 360.0
+    return gap - 360.0 if gap > 180.0 else gap
 
 
 def _seek_moon_conjunction(
@@ -576,43 +649,39 @@ def _seek_moon_conjunction(
     """Advance ``t`` to the Moon-body conjunction in ecliptic longitude.
 
     First-order Newton iteration on the longitude gap with the mean lunar
-    rate (see the derivation of the module constants above). The first
-    body evaluation doubles as the never-occultable star gate; an
-    ephemeris-range failure on that first evaluation raises
-    :class:`_OccSearchOffEphemeris` so the caller can end the search at the
-    tier boundary, while failures during the iteration itself propagate
-    unchanged (matching the long-standing public behaviour).
+    rate (see the search parameters above). The first body evaluation
+    doubles as the never-occultable star gate; an ephemeris-range failure
+    on that first evaluation raises :class:`_OccSearchOffEphemeris` so the
+    caller can end the search at the tier boundary, while failures during
+    the iteration itself propagate unchanged (the long-standing public
+    behaviour).
 
     Returns:
         (t_conj, body_ecl_lat, moon_ecl_lat) at the converged instant.
     """
-    from .exceptions import Error
-
     try:
-        blon, blat = geo_lonlat(t)
-    except Exception as _exc:
-        if _is_ephemeris_boundary(_exc):
-            raise _OccSearchOffEphemeris() from _exc
+        body_lon, body_lat = geo_lonlat(t)
+    except Exception as exc:
+        if _is_ephemeris_boundary(exc):
+            raise _OccSearchOffEphemeris() from exc
         raise
-    if star_guard is not None and abs(blat) > _OCC_STAR_LAT_LIMIT_DEG:
+    if star_guard is not None and abs(body_lat) > _OCC_STAR_LAT_LIMIT_DEG:
         raise Error(
             f"The Moon never occults the star {star_guard}: its ecliptic latitude "
-            f"of {blat:.1f} degrees is beyond the Moon's reach."
+            f"of {body_lat:.1f} degrees is beyond the Moon's reach."
         )
-    mpos, _ = calc_ut(t, MOON, eph_flags)
-    gap = (blon - mpos[0]) % 360.0
-    if direction < 0:
-        gap -= 360.0
-    steps = 0
-    while abs(gap) > _OCC_CONJ_TOL_DEG and steps < 300:
+    moon, _ = calc_ut(t, MOON, eph_flags)
+    # The first step heads the way the caller is searching; from then on
+    # each step closes the nearest remaining gap.
+    gap = _longitude_gap_ahead(body_lon, moon[0], direction)
+    for _step in range(_OCC_CONJ_MAX_STEPS):
+        if abs(gap) <= _OCC_CONJ_TOL_DEG:
+            break
         t += gap / _OCC_MOON_RATE_DEG_DAY
-        blon, blat = geo_lonlat(t)
-        mpos, _ = calc_ut(t, MOON, eph_flags)
-        gap = (blon - mpos[0]) % 360.0
-        if gap > 180.0:
-            gap -= 360.0
-        steps += 1
-    return t, blat, mpos[1]
+        body_lon, body_lat = geo_lonlat(t)
+        moon, _ = calc_ut(t, MOON, eph_flags)
+        gap = _longitude_gap_nearest(body_lon, moon[0])
+    return t, body_lat, moon[1]
 
 
 def _ecl_eph_flags(flags: int) -> int:
@@ -4298,6 +4367,109 @@ def _sol_eclipse_when_loc_impl(
     )
 
 
+# Lengths of the two fixed-layout tuples the where/how functions return.
+_WHERE_GEOPOS_SLOTS = 10
+_HOW_ATTR_SLOTS = 20
+
+
+def _shadow_center_geopos(lon: float, lat: float) -> Tuple[float, ...]:
+    """The ``geopos`` tuple of the where functions.
+
+    Longitude and latitude of the shadow-center point fill the first two
+    slots; the other eight belong to the public layout and are unused.
+    """
+    return (lon, lat) + (0.0,) * (_WHERE_GEOPOS_SLOTS - 2)
+
+
+class _LocalCircumstances(NamedTuple):
+    """The named slots of a solar-eclipse or occultation ``attr`` tuple.
+
+    Field order is slot order. :func:`_sol_how_core` fills these for one
+    place and instant except the core-shadow width, which comes from the
+    global shadow geometry; :meth:`as_attr` lays them out as the public
+    20-float ``attr``, whose nine trailing slots are unused.
+    """
+
+    magnitude: float
+    """Fraction of the solar (or body) diameter covered by the Moon."""
+    diameter_ratio: float
+    """Lunar over solar (or body) apparent diameter."""
+    obscuration: float
+    """Fraction of the solar (or body) disc covered."""
+    core_shadow_km: float
+    """Core-shadow width at the shadow-center point, negative for an umbra."""
+    azimuth: float
+    """Azimuth of the Sun (or occulted body)."""
+    true_altitude: float
+    """True altitude of the Sun (or occulted body)."""
+    apparent_altitude: float
+    """Apparent altitude of the Sun (or occulted body), with refraction."""
+    separation_deg: float
+    """Moon-body center separation in degrees."""
+    nasa_magnitude: float
+    """Magnitude for a partial phase, diameter ratio for a central one."""
+    saros_series: float
+    """Saros series number (solar eclipses only)."""
+    saros_member: float
+    """Member number within the saros series (solar eclipses only)."""
+
+    @classmethod
+    def from_how_core(
+        cls, attr: Sequence[float], core_shadow_km: float
+    ) -> _LocalCircumstances:
+        """Name the slots ``_sol_how_core`` filled and add the core-shadow width.
+
+        The core leaves the core-shadow slot for its callers; slots beyond
+        the named ones are never written and stay 0.0 in :meth:`as_attr`.
+        """
+        (
+            magnitude,
+            diameter_ratio,
+            obscuration,
+            _left_to_the_caller,
+            azimuth,
+            true_altitude,
+            apparent_altitude,
+            separation_deg,
+            nasa_magnitude,
+            saros_series,
+            saros_member,
+        ) = attr[: len(cls._fields)]
+        return cls(
+            magnitude,
+            diameter_ratio,
+            obscuration,
+            core_shadow_km,
+            azimuth,
+            true_altitude,
+            apparent_altitude,
+            separation_deg,
+            nasa_magnitude,
+            saros_series,
+            saros_member,
+        )
+
+    def without_eclipse(self) -> _LocalCircumstances:
+        """The same place and instant with no eclipse in progress.
+
+        The horizontal coordinates of the Sun and the center separation
+        describe the sky whatever happens; every eclipse quantity is 0.0.
+        """
+        return self._replace(
+            magnitude=0.0,
+            diameter_ratio=0.0,
+            obscuration=0.0,
+            core_shadow_km=0.0,
+            nasa_magnitude=0.0,
+            saros_series=0.0,
+            saros_member=0.0,
+        )
+
+    def as_attr(self) -> Tuple[float, ...]:
+        """Lay the slots out as the public 20-float ``attr`` tuple."""
+        return tuple(self) + (0.0,) * (_HOW_ATTR_SLOTS - len(self))
+
+
 def _sol_eclipse_where_pythonic(
     jd: float,
     flags: int = FLG_SWIEPH,
@@ -4387,12 +4559,16 @@ def _sol_eclipse_where_impl(
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     retflag, center_lon, center_lat, dcore = _eclipse_where_core(tjdut, flags)
-    _rc_how, attr_list = _sol_how_core(
+    core_shadow_km = dcore[0]
+    _local_flag, how_attr = _sol_how_core(
         tjdut, (center_lon, center_lat, 0.0), flags, reader
     )
-    attr_list[3] = dcore[0]
-    geopos = (center_lon, center_lat, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    return retflag, geopos, tuple(attr_list)
+    circumstances = _LocalCircumstances.from_how_core(how_attr, core_shadow_km)
+    return (
+        retflag,
+        _shadow_center_geopos(center_lon, center_lat),
+        circumstances.as_attr(),
+    )
 
 
 def _sol_eclipse_how_pythonic(
@@ -4488,8 +4664,10 @@ def _sol_eclipse_how_impl(
                 [9]: saros series number
                 [10]: saros series member number
                 [11-19]: 0.0
-              When retflag is 0, attr[0..3] and attr[8..10] are zeroed;
-              the azimuth/altitude values attr[4..7] are kept.
+              When retflag is 0 the eclipse quantities (magnitude,
+              diameter ratio, obscuration, core-shadow width, NASA
+              magnitude, saros series and member) are 0.0; the azimuth,
+              the altitudes and the center separation are kept.
 
     Note:
         The visibility gate uses the Sun's apparent altitude: at or below
@@ -4505,20 +4683,21 @@ def _sol_eclipse_how_impl(
 
     geopos3 = (float(geopos[0]), float(geopos[1]), float(geopos[2]))
 
-    retflag, attr_list = _sol_how_core(tjdut, geopos3, flags, reader)
-    rc_where, _wlon, _wlat, dcore = _eclipse_where_core(tjdut, flags)
-    if retflag:
-        retflag |= rc_where & (ECL_CENTRAL | ECL_NONCENTRAL)
-    attr_list[3] = dcore[0]
+    local_flag, how_attr = _sol_how_core(tjdut, geopos3, flags, reader)
+    global_flag, _center_lon, _center_lat, dcore = _eclipse_where_core(tjdut, flags)
+    circumstances = _LocalCircumstances.from_how_core(how_attr, core_shadow_km=dcore[0])
 
-    # Below the apparent horizon nothing of the eclipse is observable.
-    if attr_list[6] <= 0.0:
+    # A local phase carries the centrality of the eclipse as a whole; below
+    # the apparent horizon nothing of the eclipse is observable.
+    retflag = local_flag
+    if retflag:
+        retflag |= global_flag & _CENTRALITY_BITS
+    if circumstances.apparent_altitude <= 0.0:
         retflag = 0
     if retflag == 0:
-        for _i in (0, 1, 2, 3, 8, 9, 10):
-            attr_list[_i] = 0.0
+        circumstances = circumstances.without_eclipse()
 
-    return retflag, tuple(attr_list)
+    return retflag, circumstances.as_attr()
 
 
 def sol_eclipse_how_details(
@@ -7141,7 +7320,8 @@ def _lun_occult_where_pythonic(
         - Reference API: lun_occult_where()
     """
     retflag, center_lon, center_lat, dcore = _eclipse_where_core(tjdut, flags, body)
-    _rc_how, attr_list = _sol_how_core(
+    core_shadow_km = dcore[0]
+    _local_flag, how_attr = _sol_how_core(
         tjdut,
         (center_lon, center_lat, 0.0),
         flags,
@@ -7149,9 +7329,12 @@ def _lun_occult_where_pythonic(
         body,
         where_convention=True,
     )
-    attr_list[3] = dcore[0]
-    geopos = (center_lon, center_lat, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    return retflag, geopos, tuple(attr_list)
+    circumstances = _LocalCircumstances.from_how_core(how_attr, core_shadow_km)
+    return (
+        retflag,
+        _shadow_center_geopos(center_lon, center_lat),
+        circumstances.as_attr(),
+    )
 
 
 _lun_occult_where_internal = _lun_occult_where_pythonic
