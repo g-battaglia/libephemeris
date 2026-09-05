@@ -337,3 +337,37 @@ class TestSpkCacheDirIsHonoured:
         path = spk.download_spk("2060", "2020-01-01", "2025-01-01")
 
         assert os.path.dirname(path) == str(tmp_path / "data" / "spk")
+
+
+# ---------------------------------------------------------------------------
+# 3. A sealed network policy is reported as such, whatever the cache directory
+# ---------------------------------------------------------------------------
+
+
+class TestSealedPolicyBeforeCacheDirectory:
+    """download_spk() must not touch the file system before the policy gate.
+
+    Honouring set_spk_cache_dir() put the directory creation ahead of the
+    network request; with an uncreatable cache directory a sealed session
+    then reported NotADirectoryError instead of NetworkSealedError, and the
+    auto-download helpers, which swallow OSError, silently answered None.
+    """
+
+    def test_sealed_download_raises_the_typed_error_and_creates_nothing(
+        self, tmp_path, monkeypatch
+    ):
+        from libephemeris.exceptions import NetworkSealedError
+
+        bogus = tmp_path / "not-a-dir"
+        bogus.write_text("file, not a directory")
+        cache_dir = bogus / "spk"
+        from libephemeris import net
+
+        monkeypatch.setenv("LIBEPHEMERIS_SPK_DIR", str(cache_dir))
+        net.set_network_policy("sealed")
+        try:
+            with pytest.raises(NetworkSealedError, match="Horizons SPK generation"):
+                spk.download_spk("Ceres", "2000-01-01", "2000-02-01")
+        finally:
+            net.set_network_policy(None)
+        assert not cache_dir.exists()

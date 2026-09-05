@@ -68,7 +68,7 @@ from .exceptions import SPKNotFoundError
 from .exotic_bodies import EXOTIC_IDS as _EXOTIC_IDS
 from .exotic_bodies import exotic_display_name as _exotic_display_name
 from .logging_config import format_file_size, get_logger
-from .net import HTTPError, Request, URLError, open_url, urlencode
+from .net import HTTPError, Request, URLError, open_url, require_network, urlencode
 from .state import get_timescale
 
 # Vendored spktype21 for SPK type 21 support (upstream unmaintained since 2018).
@@ -495,9 +495,6 @@ def download_spk(
 
         path = os.path.join(_get_data_dir(), "spk")
 
-    # Ensure directory exists
-    os.makedirs(path, exist_ok=True)
-
     # Generate filename
     body_safe = _sanitize_filename(body)
     start_short = start.replace("-", "")[:6]  # YYYYMM
@@ -527,6 +524,14 @@ def download_spk(
 
     # Build request URL
     url = _build_horizons_url(body, start, end, center)
+
+    # The directory is created only once a download is actually going to
+    # happen: a cached kernel is answered above without touching the file
+    # system, and a sealed network policy surfaces as its typed error here
+    # rather than as an OSError from creating a cache directory that will
+    # never be written to. The purpose label is the one open_url() uses.
+    require_network(f"Horizons SPK generation for {body}")
+    os.makedirs(path, exist_ok=True)
 
     # Make request with retry
     max_retries = 2
