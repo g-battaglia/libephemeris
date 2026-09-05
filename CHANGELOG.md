@@ -46,6 +46,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged digit for digit and every row keeps its line, so the twelve bundled
   bodies parse to identical `OrbitalElements` and identical positions. The
   columns are documented in `docs/methodology/hypothetical-bodies.md`.
+- `hypothetical.py` keeps every hypothetical body in one typed table: a frozen
+  `HypotheticalBody` row per identifier 40-58, carrying the body's name, the
+  provenance of its numbers, the model that propagates it and its elements,
+  collected in `HYPOTHETICAL_BODIES`. `HYPOTHETICAL_NAMES`,
+  `HYPOTHETICAL_PROVENANCE`, `URANIAN_ELEMENTS`, `URANIAN_KEPLERIAN_ELEMENTS`,
+  the eight legacy `*_KEPLERIAN_ELEMENTS` containers, `HYPOTHETICAL_ELEMENTS`,
+  `FICTITIOUS_ORBITAL_ELEMENTS`, `VULCAN_ELEMENTS`, `WALDEMATH_ELEMENTS`,
+  `LOWELL_PLANET_X_ELEMENTS` and `PICKERING_PLANET_X_ELEMENTS` are unchanged in
+  name, type and value, and are now built from that table; the `calc_*` entry
+  points read it too, and `calc_hypothetical_position` dispatches on the row's
+  model instead of testing registry membership. No number and no public
+  behaviour changed.
 
 ### Removed
 

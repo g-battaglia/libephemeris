@@ -141,6 +141,20 @@ _EXPECTED_CSV_ROWS = {
 }
 
 
+# The mean-anomaly rates Neely prints beside those rows, in degrees per Julian
+# century.  The CSV has no column for them, so they are pinned here.
+_NEELY_PRINTED_RATE_CENTURY = {
+    "Cupido": 137.13640,
+    "Hades": 99.81803,
+    "Zeus": 79.00633,
+    "Kronos": 68.98746,
+    "Apollon": 61.0765,
+    "Admetos": 56.98245,
+    "Vulkanus": 53.015987,
+    "Poseidon": 47.03868,
+}
+
+
 def _check(problems: list[str], condition: bool, message: str) -> None:
     """Append ``message`` when a provenance invariant is false."""
     if not condition:
@@ -380,30 +394,39 @@ def _check_runtime_registries(problems: list[str]) -> None:
 
     # The primary Neely table prints rounded rates.  The runtime's standard
     # Gaussian propagation derived from a must agree within that print precision.
-    for body_id, source in hyp._NEELY_SOURCE_ROWS.items():
+    for body_id in range(hyp.CUPIDO, hyp.POSEIDON + 1):
         runtime = hyp.URANIAN_KEPLERIAN_ELEMENTS[body_id]
-        _check(problems, runtime.name == source.name, f"body {body_id}: name drift")
-        if source.e == 0.0 and source.i == 0.0:
+        _check(
+            problems,
+            runtime.name in _EXPECTED_CSV_ROWS,
+            f"body {body_id}: name drift",
+        )
+        transcription = _EXPECTED_CSV_ROWS.get(runtime.name)
+        printed_rate = _NEELY_PRINTED_RATE_CENTURY.get(runtime.name)
+        if transcription is None or printed_rate is None:
+            continue
+        _, _, src_a, src_e, src_i, src_node, src_argp, src_mean_anomaly = transcription
+        if src_e == 0.0 and src_i == 0.0:
             # Degenerate circular coplanar rows: only M+omega+node is
             # observable; the runtime stores that phase in M0 (Neely's own
             # text defines the printed value as the body's position at the
             # epoch).  The propagation is identical to the literal placement.
             expected_fields = (
-                ("a", runtime.a, source.a),
+                ("a", runtime.a, src_a),
                 ("e", runtime.e, 0.0),
                 ("i", runtime.i, 0.0),
                 ("omega", runtime.omega, 0.0),
                 ("node", runtime.Omega, 0.0),
-                ("M0", runtime.M0, source.mean_longitude),
+                ("M0", runtime.M0, (src_mean_anomaly + src_argp + src_node) % 360.0),
             )
         else:
             expected_fields = (
-                ("a", runtime.a, source.a),
-                ("e", runtime.e, source.e),
-                ("i", runtime.i, source.i),
-                ("omega", runtime.omega, source.omega),
-                ("node", runtime.Omega, source.node),
-                ("M0", runtime.M0, source.mean_anomaly),
+                ("a", runtime.a, src_a),
+                ("e", runtime.e, src_e),
+                ("i", runtime.i, src_i),
+                ("omega", runtime.omega, src_argp),
+                ("node", runtime.Omega, src_node),
+                ("M0", runtime.M0, src_mean_anomaly),
             )
         for field_name, actual, expected in expected_fields:
             _check(
@@ -411,7 +434,12 @@ def _check_runtime_registries(problems: list[str]) -> None:
                 _close(actual, expected),
                 f"body {body_id}: {field_name} differs from Neely transcription",
             )
-        rate_error = abs(runtime.n * 36525.0 - source.mean_anomaly_rate_century)
+        _check(
+            problems,
+            _close(hyp.HYPOTHETICAL_BODIES[body_id].printed_rate_century, printed_rate),
+            f"body {body_id}: printed rate differs from the Table I column",
+        )
+        rate_error = abs(runtime.n * 36525.0 - printed_rate)
         _check(
             problems,
             rate_error < 0.003,

@@ -333,6 +333,25 @@ figures found in legacy tabulations (`e = 0.1587`, `i = 2.5`) are attested
 in no primary publication — the `2.5` most plausibly conflates Waltemath's
 ~2.5 arcminute apparent *diameter* — and are deliberately not used.
 
+## The runtime table
+
+`libephemeris.hypothetical` holds one row per identifier 40–58 in
+`HYPOTHETICAL_BODIES`, a mapping from the identifier to a frozen
+`HypotheticalBody`. A row carries the body's name, its provenance category and
+source, the model that propagates it, and the elements themselves (epoch,
+equinox, `a`, `e`, `i`, argument of perihelion, node, mean anomaly, mean
+motion, plus the secular rates Vulcan needs and the mean-anomaly rate Neely
+prints). The `model` field names the propagator, because the constructions
+below are not all Keplerian orbits: `hamburg` for IDs 40–47, `classical` for
+IDs 50–54, `transpluto`, `vulcan`, `selena`, `dark-moon` and `circular` for the
+single-body models, and `unsupported` for ID 49, which is recognised by name
+and number but fails closed.
+
+The public element containers (`URANIAN_KEPLERIAN_ELEMENTS`,
+`TRANSPLUTO_KEPLERIAN_ELEMENTS`, `VULCAN_ELEMENTS`, `WALDEMATH_ELEMENTS`,
+`PICKERING_PLANET_X_ELEMENTS` and the module-level legacy tables beside them)
+are views built from those rows, so every element number is written down once.
+
 ## Shared independent orbital propagation
 
 Every supported orbital row is propagated by project-authored, source-neutral

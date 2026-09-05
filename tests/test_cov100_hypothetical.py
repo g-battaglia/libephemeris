@@ -14,9 +14,9 @@ from libephemeris.hypothetical import (
     HARRINGTON,
     HYPOTHETICAL_ELEMENTS,
     ISIS,
+    HypotheticalBody,
     OrbitalElements,
     TPolynomial,
-    UranianKeplerianElements,
     _calc_keplerian_position,
     _calc_keplerian_position_raw,
     _calc_orbital_position_raw,
@@ -216,8 +216,12 @@ def test_dispatch_calculates_reviewed_uranian_id() -> None:
 
 
 def test_synthetic_keplerian_rotation_and_precession() -> None:
-    elements = UranianKeplerianElements(
+    elements = HypotheticalBody(
+        body_id=999,
         name="Synthetic",
+        model="synthetic",
+        category="synthetic",
+        source="synthetic element set, not a published orbit",
         epoch=J2000,
         equinox_jd=2433282.42345905,
         a=4.0,
