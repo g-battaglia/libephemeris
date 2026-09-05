@@ -4515,86 +4515,168 @@ def _asc_diff_saturated(dec: float, geolat: float) -> float:
     return _asin_deg(s)
 
 
+#: Latitude at which the Topocentric family is read for a chart placed on a
+#: geographic pole. The construction has no answer exactly there: ``tan(lat)``
+#: is unbounded, every position circle whose pole share is non-zero collapses
+#: onto the celestial equator, and one circle no longer divides the sky. A
+#: thousandth of a degree inside the pole the circles are still distinct, the
+#: latitude axis stays continuous, and the answers pile up on the meridian --
+#: the limit that axis approaches.
+_TOPOCENTRIC_POLE_LIMIT = 89.999
+
+
+def _topocentric_pole_share(house_angle: float) -> float:
+    """Return Polich and Page's share of ``tan(latitude)`` at a house angle.
+
+    The pole height ``P`` of the position circle at house angle ``H`` is
+    fixed by ``tan(P) = tan(lat) * share(H)``, and the share is the
+    triangular wave through the nodes 0 on the meridian, +1 on the eastern
+    horizon, 0 on the lower meridian and -1 on the western horizon. The
+    linear interpolation puts the circles one and two houses from the
+    meridian at one third and two thirds of the tangent -- the trisected
+    tangent the system is named for (Polich & Page, "The Topocentric System
+    of Houses", 1961/1964; Holden, "The Elements of House Division", 1977).
+    Regiomontanus runs ``sin(H)`` through the same three nodes, which is why
+    the two families agree at the four angles and nowhere else.
+
+    Args:
+        house_angle: Right ascension of the circle's equator crossing,
+            measured eastwards from the ARMC, in degrees.
+
+    Returns:
+        The share of the tangent, in ``[-1, 1]``.
+    """
+    angle = house_angle % 360.0
+    share_sign = 1.0
+    if angle > 180.0:
+        # Odd about the meridian: over the western half of the wheel the
+        # fictitious observer stands in the opposite hemisphere.
+        angle -= 180.0
+        share_sign = -1.0
+    if angle > 90.0:
+        # Even about the horizon: the share climbs to the whole tangent at
+        # the horizon and falls back to zero at the next meridian.
+        angle = 180.0 - angle
+    return share_sign * angle / 90.0
+
+
 def _hpos_topocentric(
     armc: float, geolat: float, ra: float, dec: float, md_upper: float
 ) -> float:
     """Topocentric (Polich-Page) house position.
 
-    Every topocentric house circle is a position circle whose pole height
-    varies continuously across the quadrant: the *tangent* of the pole is a
-    linear share of the tangent of the geographic latitude (Polich & Page,
-    "The Topocentric System of Houses", Spica, 1964). Placement inverts
-    that one-parameter family: find the circle of the family that passes
-    through the body.
+    The system divides the sky with a family of position circles: the circle
+    at house angle ``H`` is the horizon of a fictitious observer standing at
+    the pole height ``P`` of :func:`_topocentric_pole_share`, whose meridian
+    is turned to ``ARMC + H - 90``. A body's position is the house angle of
+    the single circle of that family that passes through it, so it is the
+    root of the perpendicularity condition between the body and the pole of
+    the circle::
 
-    The inversion is a binary subdivision walk. Step ``k`` moves the trial
-    circle by ``90/2^k`` degrees of right ascension inside the quadrant
-    while re-anchoring the trial pole so its tangent keeps the linear share
-    ``tan(phi)/2^k`` — i.e. the trial always stays on the topocentric
-    family. The signed latitude of the body in the trial circle's frame
-    (obtained with the same x-axis rotation used for every plane change in
-    this module) steers each step; the walk stops once that latitude
-    vanishes to 1e-6 deg.
+        sin(dec) sin(P) - cos(dec) cos(P) sin(A - H) = 0
 
-    Quadrant symmetry reduces the search to the eastern half above the
-    horizon: a body below the horizon is replaced by its antipode, a
-    western body is mirrored through the meridian, and the found angle is
-    mapped back through the same mirrors at the end.
+    with ``A`` the body's meridian distance measured eastwards. Equivalently
+    the body's oblique ascension under the pole ``P(H)`` equals ``ARMC + H``.
+    The equation is transcendental -- a straight line in ``H`` set equal to a
+    sinusoid, so unlike Regiomontanus it collapses to no closed form -- but
+    the two circles that bound each quadrant belong to the family themselves,
+    which brackets the root in the quadrant the body occupies (Polich & Page,
+    "The Topocentric System of Houses", Spica 3(3), 1964, and their 1961
+    monograph; Holden, "The Elements of House Division", 1977, for the
+    position circles and the oblique ascension; Smart, "Textbook on Spherical
+    Astronomy", 6th ed., ch. II and VI).
+
+    Args:
+        armc: Right ascension of the medium coeli in degrees. Only its
+            distance to the body enters the construction, and the caller has
+            already reduced that into ``md_upper``.
+        geolat: Geographic latitude in degrees, positive north. Its sign is
+            carried through the tangent, so the two hemispheres are not
+            mirror images of one another.
+        ra: Right ascension of the body in degrees, likewise already reduced
+            into ``md_upper``.
+        dec: Declination of the body in degrees.
+        md_upper: Meridian distance of the body -- its right ascension minus
+            the ARMC -- in ``[-180, 180)`` degrees.
+
+    Returns:
+        The house position: the house number plus the fraction of that house
+        the body has already crossed, in ``[1, 13)``.
     """
-    trial_pole = geolat
-    if trial_pole > 89.999:
-        trial_pole = 89.999
-    if trial_pole < -89.999:
-        trial_pole = -89.999
-    upper_md = md_upper % 360.0
+    # The body's meridian distance on the same wheel as the house angle:
+    # 0 on the upper meridian, 90 on the eastern horizon, 180 on the lower.
+    east_dist = md_upper % 360.0
 
-    dec_t = dec
-    if dec_t > 90.0 - _NEAR_ZERO:
-        dec_t = 90.0 - _NEAR_ZERO
-    if dec_t < -90.0 + _NEAR_ZERO:
-        dec_t = -90.0 + _NEAR_ZERO
+    lat = max(-_TOPOCENTRIC_POLE_LIMIT, min(_TOPOCENTRIC_POLE_LIMIT, geolat))
+    tan_lat = _tan_deg(lat)
+    sin_dec = _sin_deg(dec)
+    cos_dec = _cos_deg(dec)
 
-    horizon_sign = _tan_deg(dec_t) * _tan_deg(trial_pole)
-    horizon_sign = max(-1.0, min(1.0, horizon_sign))
-    is_above_horizon = horizon_sign + _cos_deg(upper_md) >= 0
+    def circle_residual(house_angle: float) -> float:
+        """Perpendicularity of the body to the pole of one position circle.
 
-    ra_search = ra
-    if not is_above_horizon:
-        # Antipodal mirror: solve for the opposite point above the horizon.
-        ra_search = (ra_search + 180.0) % 360.0
-        dec_t = -dec_t
-        upper_md = (upper_md + 180.0) % 360.0
-    if upper_md > 180.0:
-        # Western half: mirror through the meridian into the eastern half.
-        ra_search = (armc - upper_md) % 360.0
+        Zero exactly when the body lies on the circle, and its sign tells
+        which side of the circle the body is on. Taking ``sin(P) = share / hypot(1,
+        share)`` and ``cos(P) = 1 / hypot(1, share)`` keeps the residual
+        bounded and exact for every pole height, where the classical
+        oblique-ascension form saturates its arcsine as soon as the body
+        stops rising for the fictitious observer.
+        """
+        share = tan_lat * _topocentric_pole_share(house_angle)
+        return (
+            sin_dec * share - cos_dec * _sin_deg(east_dist - house_angle)
+        ) / math.hypot(1.0, share)
 
-    tan_lat_full = _tan_deg(trial_pole)
-    trial_ra = (armc + 90.0) % 360.0
-    frame_lat = 1.0
-    subdiv = 2.0
-    steps = 0
-    while abs(frame_lat) > 0.000001 and steps < 1000:
-        if frame_lat > 0:
-            trial_pole = _atan_deg(_tan_deg(trial_pole) - tan_lat_full / subdiv)
-            trial_ra -= 90.0 / subdiv
-        else:
-            trial_pole = _atan_deg(_tan_deg(trial_pole) + tan_lat_full / subdiv)
-            trial_ra += 90.0 / subdiv
-        lon_in_circle = (ra_search - trial_ra) % 360.0
-        _, frame_lat = _rotate_frame(lon_in_circle, dec_t, 90.0 - trial_pole)
-        subdiv *= 2.0
-        steps += 1
+    # The quadrant bounds are themselves members of the family: at H = 0 and
+    # 180 the fictitious observer stands on the equator, so his horizon is
+    # the meridian, and at H = 90 and 270 he is the real observer, so it is
+    # the horizon. No body crosses one of those two circles without its house
+    # angle crossing the matching bound, so the answer lies in the quadrant
+    # the body itself occupies, and exactly one root lies there. The two
+    # residuals that decide the quadrant are the classical tests in disguise:
+    # at H = 0 the residual is -cos(dec) sin(A), negative east of the
+    # meridian, and at H = 90 it is the sine of the body's altitude,
+    # non-negative above the horizon.
+    east_of_meridian = circle_residual(0.0) <= 0.0
+    above_horizon = circle_residual(90.0) >= 0.0
+    if east_of_meridian:
+        lo = 0.0 if above_horizon else 90.0
+    else:
+        lo = 270.0 if above_horizon else 180.0
+    hi = lo + 90.0
 
-    pos_deg = (trial_ra - armc) % 360.0
-    # Undo the meridian mirror, then the antipodal mirror.
-    if upper_md > 180.0:
-        pos_deg = (-pos_deg) % 360.0
-    if not is_above_horizon:
-        pos_deg = (pos_deg + 180.0) % 360.0
-    pos_deg = (pos_deg - 90.0) % 360.0
-    # Guard the float modulo: a tiny negative argument can round up to
-    # exactly 360.0, which would yield house 13.0 (out of domain).
+    f_lo = circle_residual(lo)
+    f_hi = circle_residual(hi)
+    if f_lo == 0.0:
+        # A body sitting on one of the two bounding circles -- on the
+        # meridian or on the horizon -- is answered by that angle itself.
+        root = lo
+    elif f_hi == 0.0:
+        root = hi
+    else:
+        # The residual runs from negative at the lower bound to positive at
+        # the upper one. Halve the bracket until its ends are neighbouring
+        # binary64 angles and keep the end with the smaller residual: the
+        # answer is then the root of the equation to the precision of the
+        # arithmetic, not an iterate of the search.
+        while True:
+            mid = 0.5 * (lo + hi)
+            if mid <= lo or mid >= hi:
+                break
+            f_mid = circle_residual(mid)
+            if f_mid <= 0.0:
+                lo, f_lo = mid, f_mid
+            else:
+                hi, f_hi = mid, f_mid
+        root = lo if abs(f_lo) <= abs(f_hi) else hi
+
+    # Read the house angle off the wheel: H = 0 is the tenth cusp, H = 90 the
+    # first, and one house is 30 degrees of house angle.
+    pos_deg = (root - 90.0) % 360.0
     if pos_deg >= 360.0:
+        # A house angle a hair under 90 can round its way up to a whole turn,
+        # which would encode the non-existent house 13.0 rather than the
+        # first cusp; the interval is half-open.
         pos_deg -= 360.0
     return pos_deg / 30.0 + 1.0
 

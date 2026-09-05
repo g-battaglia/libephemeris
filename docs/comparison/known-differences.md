@@ -253,6 +253,39 @@ minority of configurations that are geometrically indistinguishable from the
 rest; such values differ from the limit by up to 3.2 houses. No exception is
 raised at a pole and no body is refused; the answer is simply the degenerate
 one the construction defines.
+#### Topocentric house position: the exact root {#topocentric-root}
+
+The Topocentric (Polich–Page) house position is the house angle of the one
+position circle of the family that passes through the body. That angle is the
+root of a transcendental equation — the trisected tangent of the geographic
+latitude is a straight line in the house angle, set equal to a sinusoid — so,
+unlike Regiomontanus, the system collapses to no closed form and the answer
+must be found numerically. LibEphemeris brackets the root in the quadrant the
+body occupies and converges to the precision of binary64: the residual of the
+defining equation at the returned angle is at the arithmetic floor, below
+1e-14 away from the geographic poles. A search halted on a fixed angular
+tolerance instead answers an iterate whose distance from the root depends on
+the schedule of the search rather than on the geometry; at the level such
+searches usually stop, that is of the order of 1e-8 of a house typically and
+about 2e-6 at worst.
+
+Two identities that are exact in the geometry are therefore exact in the
+arithmetic as well. At geographic latitude zero every pole height is zero,
+every position circle is an hour circle and the family degenerates to the
+equal division of the equator, so the Topocentric position coincides with the
+Meridian system (selector `X`) to the last bits. And a body placed on one of
+the twelve Topocentric cusps is answered with that cusp's own number to about
+1e-14 of a house, outside the polar circles, where the cusp longitude names
+the rising intersection.
+
+At the geographic poles the construction has no answer at all: the tangent of
+the latitude is unbounded, every circle whose pole share is non-zero collapses
+onto the celestial equator, and a body of zero declination lies on all of them
+at once. The family is read a thousandth of a degree inside the pole instead,
+which keeps the latitude axis continuous and finite; the answers there pile up
+on the meridian, and for a body near the equator they stay sensitive to the
+last bits of its declination, which the collapsed family amplifies by the
+tangent of that latitude.
 
 ### Fixed stars
 
