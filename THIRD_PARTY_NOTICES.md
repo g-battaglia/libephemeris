@@ -190,7 +190,7 @@ work governed by the AGPL-3.0.
   fetched at runtime.
 - `libephemeris/data/fictitious_orbits.csv`: 12 transcribed historical
   element rows. IDs 40-47 come from James Neely, "Orbital Elements for the
-  Transneptunian Planets," *Matrix Magazine* VII (1980), Table I, p. 10;
+  Transneptunian Planets," *Matrix Magazine* VII (1980), Table I, p. 8;
   ID 50 comes from Harrington (1988), *AJ* 96, p. 1478; ID 51 from
   Le Verrier (1846), *Comptes rendus* 23, p. 432 and his longer *Recherches*;
   ID 52 from Adams (1846), sections 47-48, cross-checked against Gould's 1850

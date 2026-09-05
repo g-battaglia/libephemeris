@@ -17,9 +17,9 @@ The supported set is deliberately explicit:
 * IDs 51--52 use the primary 1846 predictions of Le Verrier and Adams;
 * ID 53 uses Lowell's preferred 1915 Planet-X solution;
 * ID 54 uses Pickering's published Planet-O prediction;
-* ID 55 uses Weston's published intramercurial Vulcan convention;
+* ID 55 uses the intramercurial Vulcan convention (compatibility values);
 * ID 56 is the published uniform seven-year Selena convention; and
-* ID 57 uses the Russian-school circular Proserpina orbit.
+* ID 57 uses the circular Proserpina convention (compatibility values).
 
 * ID 58 (Waldemath) follows Sepharial's published dark-moon convention
   (Sepharial, "The Science of Foreknowledge", 1918: 177-day synodic figure
@@ -148,7 +148,7 @@ class _NeelySourceRow:
 # Primary source and transcription policy
 # ---------------------------------------
 # James Neely, "Orbital Elements for the Transneptunian Planets", Matrix
-# Magazine, issue VII (1980), pp. 6--12, Table I on p. 10.  A public scan is
+# Magazine, issue VII (1980), pp. 6--12, Table I on p. 8.  A public scan is
 # catalogued as item 18 by Alexandria iBase:
 #
 #   https://special-collections.alexandriaibase.org/items/show/18
@@ -554,13 +554,13 @@ class UranianKeplerianElements:
 class VulcanElements:
     """Public element container for the historical intramercurial Vulcan (55).
 
-    The fields describe L. H. Weston's astrological Vulcan convention (*The
-    Planet Vulcan: History, Nature, and Tables*, American Federation of
-    Astrologers): a fast intramercurial Keplerian orbit referred to the
+    The fields describe the astrological Vulcan convention as this library
+    realizes it: a fast intramercurial Keplerian orbit referred to the
     ecliptic and equinox of date, with linear secular motion of the mean
     anomaly, argument of perihelion and ascending node in Julian centuries
     from the J1900 epoch.  The perihelion and node rates are equal and
     opposite, so the longitude of perihelion ``omega + Omega`` is constant.
+    The numbers are compatibility values, primary source not verified.
     """
 
     name: str
@@ -824,17 +824,15 @@ TRANSPLUTO_KEPLERIAN_ELEMENTS = TransplutoKeplerianElements(
 # * Transpluto (48): the Sevin/Landscheidt/Hawkins trans-Plutonian orbit
 #   used by the astrological Transpluto ephemerides (a = 77.755 AU, e = 0.3,
 #   planar); see ``TRANSPLUTO_KEPLERIAN_ELEMENTS`` above for the sources.
-# * Proserpina (57): the Russian-school circular orbit as published by Velichko
-#   and Larin (2007; the Selena source cited above). This orbit is traditionally
-#   attributed to Abramov, but that attribution is a tradition claim and cannot
-#   be independently verified, so the numbers are sourced from the published
-#   Velichko/Larin elements, not from any Abramov primary text.
-#   (a = 79.22563 AU, e = i = 0), whose mean longitude at the J1900 epoch is
-#   170.73 degrees and whose rate is the standard Gaussian mean motion
+# * Proserpina (57): the circular trans-Plutonian convention of the
+#   astrological tradition.  Compatibility values, primary source not
+#   verified: a = 79.22563 AU, e = i = 0, mean longitude 170.73 degrees at
+#   the J1900 epoch, and the standard Gaussian mean motion
 #   n = 0.9856076686 / a^1.5 (~51.05 deg/Julian century, period ~705 years).
 #   The angles are referred to the ecliptic and mean equinox of date.  With
 #   e = i = 0 the perihelion and node are degenerate, so the observable phase
-#   is carried in ``M0`` (the mean longitude at epoch) with omega = Omega = 0.
+#   is carried in ``M0`` (the mean longitude at epoch) with omega = Omega = 0
+#   (a convention of this library).
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     # Transpluto is the published Hawkins/Landscheidt set defined above; the
     # exported rc7 container subclasses HypotheticalElements, so the same
@@ -895,23 +893,17 @@ PICKERING_PLANET_X_ELEMENTS = PickeringPlanetXElements(
     _K_GAUSS_DEG / 51.9**1.5,
 )
 
-# Weston's Vulcan convention (ID 55)
-# ----------------------------------
-# L. H. Weston, "The Planet Vulcan: History, Nature, Tables" (American
-# Federation of Astrologers reprint of his 1908/1920 publications), prints
-# the element table behind the astrological Vulcan tradition: semimajor axis
-# 0.13744 AU, sidereal period 18.58415 days (synodic 19.5804 days),
-# eccentricity 0.019, inclination 7.50 deg, perihelion longitude fixed at
-# 10 deg, descending node 102.92 deg at 1907-06-25 regressing about
-# -16.7 deg/year, and mean longitude 318.3869 deg at 1911 Jan 0.  The row
-# below is the equivalent J1900 linear parameterization of that table: the
-# equal and opposite perihelion/node rates (+/-1670.056 deg/Julian century)
-# keep omega + Omega = 370 deg = Weston's fixed 10-deg perihelion longitude,
-# the node value propagates to Weston's printed 1907 node within 0.03 deg,
-# and M0 + 10 deg propagates to his printed 1911 mean longitude within the
-# table's rounding.  Angles are referred to the ecliptic and equinox of
-# date; secular terms are evaluated in Julian centuries TT from J1900
-# (JD 2415020 TT).
+# Vulcan convention (ID 55)
+# -------------------------
+# The intramercurial Vulcan of the astrological tradition.  The row below is
+# a J1900 linear parameterization: a = 0.13744 AU, e = 0.019, i = 7.5 deg,
+# mean anomaly M0 + n*T, argument of perihelion omega0 + omega_rate*T and
+# ascending node Omega0 + Omega_rate*T, with T in Julian centuries TT from
+# J1900 (JD 2415020 TT) and the angles referred to the ecliptic and equinox
+# of date.  The perihelion and node rates are equal and opposite
+# (+/-1670.056 deg/Julian century), so the longitude of perihelion
+# omega + Omega stays fixed at 370 deg = 10 deg.  All of these numbers are
+# compatibility values, primary source not verified.
 VULCAN_ELEMENTS = VulcanElements(
     "Vulcan",
     2415020.0,
@@ -1002,14 +994,14 @@ WALDEMATH_ELEMENTS = WaldemathElements(
 )
 
 HYPOTHETICAL_PROVENANCE: Dict[int, Tuple[str, str]] = {
-    CUPIDO: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
-    HADES: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
-    ZEUS: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
-    KRONOS: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
-    APOLLON: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
-    ADMETOS: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
-    VULKANUS: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
-    POSEIDON: ("primary-transcription", "Neely 1980, Matrix VII, p. 10, Table I"),
+    CUPIDO: ("primary-transcription", "Neely 1980, Matrix VII, p. 8, Table I"),
+    HADES: ("primary-transcription", "Neely 1980, Matrix VII, p. 8, Table I"),
+    ZEUS: ("primary-transcription", "Neely 1980, Matrix VII, p. 8, Table I"),
+    KRONOS: ("primary-transcription", "Neely 1980, Matrix VII, p. 8, Table I"),
+    APOLLON: ("primary-transcription", "Neely 1980, Matrix VII, p. 8, Table I"),
+    ADMETOS: ("primary-transcription", "Neely 1980, Matrix VII, p. 8, Table I"),
+    VULKANUS: ("primary-transcription", "Neely 1980, Matrix VII, p. 8, Table I"),
+    POSEIDON: ("primary-transcription", "Neely 1980, Matrix VII, p. 8, Table I"),
     ISIS: (
         "published-model",
         "Sevin 1946 / Landscheidt 1972 lineage as printed in Hawkins 1978, "
@@ -1038,8 +1030,8 @@ HYPOTHETICAL_PROVENANCE: Dict[int, Tuple[str, str]] = {
     ),
     VULCAN: (
         "published-model",
-        "Weston, The Planet Vulcan (AFA; 1908/1920 tables); J1900 "
-        "parameterization consistent with Weston's printed elements",
+        "intramercurial Vulcan convention, J1900 linear parameterization: "
+        "compatibility values, primary source not verified",
     ),
     WHITE_MOON: (
         "published-model",
@@ -1049,9 +1041,9 @@ HYPOTHETICAL_PROVENANCE: Dict[int, Tuple[str, str]] = {
     ),
     PROSERPINA: (
         "published-model",
-        "Russian-school circular orbit (Velichko and Larin 2007; the Abramov "
-        "attribution is a tradition claim, not independently verified): "
-        "a=79.22563 AU, mean longitude 170.73 deg at J1900, Gaussian mean motion",
+        "circular trans-Plutonian convention: a=79.22563 AU, mean longitude "
+        "170.73 deg at J1900, Gaussian mean motion; compatibility values, "
+        "primary source not verified",
     ),
     WALDEMATH: (
         "published-model",
@@ -2088,8 +2080,9 @@ FICTITIOUS_ORBITAL_ELEMENTS = {
     #
     # The printed perihelion date 1789-08-06 is JD 2374696.5, hence M=0.
     # Harrington directly prints a, e, omega, node and inclination.  The paper
-    # does not specify a modern machine frame, so J2000 is an explicit project
-    # convention rather than a claim about wording in the source.
+    # does not state the equinox of its angles; referring them to the J2000
+    # equinox (equinox_jd below) is a convention of this library, not a
+    # statement about the source.
     HARRINGTON: OrbitalElements(
         name="Harrington",
         epoch_jd=2374696.5,
@@ -2442,10 +2435,11 @@ def _raise_unsupported_builtin_fictitious(body_id: int) -> NoReturn:
 
 
 def calc_vulcan(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
-    """Calculate Weston's intramercurial Vulcan (heliocentric, of-date).
+    """Calculate the intramercurial Vulcan (heliocentric, of-date).
 
-    Propagates the published Weston convention in ``VULCAN_ELEMENTS``: mean
-    anomaly, argument of perihelion and node move linearly in Julian
+    Propagates the Vulcan convention in ``VULCAN_ELEMENTS`` (compatibility
+    values, primary source not verified): mean anomaly, argument of
+    perihelion and node move linearly in Julian
     centuries from the J1900 epoch, and the orbit is referred to the ecliptic
     and mean equinox of date.  The returned state is geometric (no
     light-time); apparent reductions are applied by the ``calc_ut`` layer.
@@ -2470,7 +2464,7 @@ def calc_vulcan(jd_tt: float) -> Tuple[float, float, float, float, float, float]
 
 
 def _calc_vulcan_raw(jd_tt: float) -> Tuple[float, float, float]:
-    """Geometric heliocentric of-date position of Weston's Vulcan."""
+    """Geometric heliocentric of-date position of Vulcan (ID 55)."""
     elements = VULCAN_ELEMENTS
     T = (jd_tt - elements.epoch) / 36525.0
     mean_anomaly = math.radians((elements.M0 + elements.n_century * T) % 360.0)
@@ -2745,12 +2739,12 @@ def calc_waldemath_position(
 def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
     """Calculate the trans-Plutonian Proserpina (heliocentric, of-date).
 
-    The Russian-school convention (published by Velichko and Larin 2007;
-    traditionally but unverifiably attributed to Abramov) is a uniform circular
-    ecliptic orbit: a = 79.22563 AU, mean longitude 170.73 degrees at the
-    J1900 epoch, Gaussian mean motion (~51.05 deg/Julian century, period
-    ~705 years), referred to the ecliptic and mean equinox of date.  Being
-    exactly circular and planar, the latitude and the radial speed are zero.
+    The convention realized here is a uniform circular ecliptic orbit:
+    a = 79.22563 AU, mean longitude 170.73 degrees at the J1900 epoch,
+    Gaussian mean motion (~51.05 deg/Julian century, period ~705 years),
+    referred to the ecliptic and mean equinox of date.  These are
+    compatibility values, primary source not verified.  Being exactly
+    circular and planar, the latitude and the radial speed are zero.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT).

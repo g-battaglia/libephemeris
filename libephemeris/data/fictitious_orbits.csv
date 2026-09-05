@@ -18,7 +18,7 @@
 # ---------------------------------------------------------------------------
 # Primary source:
 #   James Neely, "Orbital Elements for the Transneptunian Planets",
-#   Matrix Magazine, issue VII (1980), pp. 6--12, Table I on p. 10.
+#   Matrix Magazine, issue VII (1980), pp. 6--12, Table I on p. 8.
 #   Alexandria iBase primary scan, item 18:
 #   https://special-collections.alexandriaibase.org/items/show/18
 #
@@ -34,14 +34,14 @@
 # observable.  We retain Neely's printed convention (M0=0 and the phase in
 # omega) rather than moving the same phase into M0.  The two representations
 # are mathematically identical, but the one below is a literal transcription.
-Cupido,2415020.0,J1900,163.7409,40.99837,0.00460,171.4333,129.8325,1.0833,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I
-Hades,2415020.0,J1900,27.6496,50.66744,0.00245,148.1796,161.3339,1.0500,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I
-Zeus,2415020.0,J1900,165.1232,59.21436,0.00120,299.0440,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I
-Kronos,2415020.0,J1900,169.0193,64.81690,0.00305,208.8801,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I
-Apollon,2415020.0,J1900,0.0,70.29949,0.0,138.0533,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I; circular phase convention
-Admetos,2415020.0,J1900,0.0,73.62765,0.0,351.3350,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I; circular phase convention
-Vulkanus,2415020.0,J1900,0.0,77.25568,0.0,55.8983,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I; circular phase convention
-Poseidon,2415020.0,J1900,0.0,83.66907,0.0,165.5163,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.10 Table I; circular phase convention
+Cupido,2415020.0,J1900,163.7409,40.99837,0.00460,171.4333,129.8325,1.0833,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I
+Hades,2415020.0,J1900,27.6496,50.66744,0.00245,148.1796,161.3339,1.0500,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I
+Zeus,2415020.0,J1900,165.1232,59.21436,0.00120,299.0440,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I
+Kronos,2415020.0,J1900,169.0193,64.81690,0.00305,208.8801,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I
+Apollon,2415020.0,J1900,0.0,70.29949,0.0,138.0533,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
+Admetos,2415020.0,J1900,0.0,73.62765,0.0,351.3350,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
+Vulkanus,2415020.0,J1900,0.0,77.25568,0.0,55.8983,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
+Poseidon,2415020.0,J1900,0.0,83.66907,0.0,165.5163,0.0,0.0,0,primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention
 
 # ---------------------------------------------------------------------------
 # ID 50: Harrington's nominal Planet X

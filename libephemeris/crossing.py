@@ -74,11 +74,14 @@ def _normalize_cross_target(x2cross: float, flags: int) -> Tuple[float, int]:
 # Jupiter near station can be ~0.003°/day, Saturn ~0.001°/day — both need Brent's method
 STATION_SPEED_THRESHOLD = 0.01  # degrees/day
 
-# Newton-Raphson convergence constants
-# Sub-milliarcsecond tolerance for all bodies — ensures timing precision
-# limited only by the underlying ephemeris model, not by NR convergence.
-# At Moon's ~13°/day, 0.001" ≈ 0.006ms timing; at Saturn's ~0.03°/day,
-# 0.001" ≈ 0.3ms timing. This eliminates NR-induced timing jitter.
+# Newton-Raphson convergence tolerance: a choice of this library.
+# One sub-milliarcsecond tolerance (0.001") is used for every body class so
+# that crossing times are limited by the ephemeris model rather than by the
+# root finder: at the Moon's ~13°/day, 0.001" is ~0.006 ms of time; at
+# Saturn's ~0.03°/day it is ~0.3 ms. A tighter value would only chase
+# floating-point noise in the position pipeline; a looser one would add
+# root-finder jitter to the returned instants. The three names are kept
+# separate so a body class can be retuned without touching its call sites.
 NR_TOLERANCE = 0.001 / 3600.0  # 0.001 arcsecond in degrees (all planets)
 NR_TOLERANCE_SUN = 0.001 / 3600.0  # 0.001 arcsecond in degrees (Sun)
 NR_TOLERANCE_MOON = 0.001 / 3600.0  # 0.001 arcsecond in degrees (Moon)

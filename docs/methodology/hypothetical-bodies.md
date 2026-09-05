@@ -16,7 +16,7 @@ Their inclusion does not assert that the proposed objects physically exist.
 
 | ID(s) | Bodies | Built-in status and primary source |
 |---:|---|---|
-| 40–47 | Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon | Supported; James Neely, *Matrix Magazine* VII (1980), Table I, p. 10. |
+| 40–47 | Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon | Supported; James Neely, *Matrix Magazine* VII (1980), Table I, p. 8. |
 | 48 | Transpluto / Isis | Supported; Hawkins (1976, 2nd ed. 1978), p. 79 (Sevin 1946 / Landscheidt 1972 lineage). |
 | 49 | Nibiru | Unsupported; no credible source-complete primary orbit was identified. |
 | 50 | Harrington | Supported; Harrington (1988), *AJ* 96, p. 1478. |
@@ -24,9 +24,9 @@ Their inclusion does not assert that the proposed objects physically exist.
 | 52 | Adams | Supported; Adams (1846), sections 47–48, printed pp. 25–26. |
 | 53 | Lowell | Supported; Lowell (1915), pp. 5, 9, and 105. |
 | 54 | Pickering | Supported; Pickering (1919), *Annals of Harvard College Observatory* 82, No. 3, p. 59. |
-| 55 | Vulcan | Supported; Weston (AFA reprint of the 1908/1920 tables), 1920 element table. |
+| 55 | Vulcan | Supported; J1900 linear element convention — compatibility values, primary source not verified. |
 | 56 | White Moon / Selena | Supported; Velichko and Larin (2007), pp. 17, 18, 20, 29, and 45, plus explicit LibEphemeris time/radius conventions derived from IAU standards. |
-| 57 | Proserpina | Supported; Russian-school circular convention (Globa; Timashev 1996; Velichko and Larin 2007 ephemerides). |
+| 57 | Proserpina | Supported; circular trans-Plutonian convention — compatibility values, primary source not verified. |
 | 58 | Waldemath | Supported; Sepharial, *The Science of Foreknowledge* (1918), ch. "The New Satellite — Lilith"; Waltemath 1898 via *Science* 8/189, p. 185 and Ashbrook, *Sky & Telescope* 28 (1964), p. 218. |
 
 `HYPOTHETICAL_PROVENANCE` exposes the same boundary in machine-readable
@@ -38,7 +38,7 @@ single ID without a calculation path.
 ### Primary transcription
 
 The source is James Neely, “Orbital Elements for the Transneptunian Planets,”
-*Matrix Magazine*, issue VII (1980), pp. 6–12, Table I on p. 10. A public scan
+*Matrix Magazine*, issue VII (1980), pp. 6–12, Table I on p. 8. A public scan
 is catalogued as [Alexandria iBase item 18](https://special-collections.alexandriaibase.org/items/show/18).
 The reviewed 63-page scan has SHA-256
 `f3d2e834a4a684736383ec387c9c2786064ca4668256724865da2f3d8fa03020`.
@@ -109,31 +109,23 @@ period 373.5 years, epoch 1900.0), which some historical tabulations quote.
 
 ## ID 55: Vulcan (intramercurial)
 
-The source is L. H. Weston, *The Planet Vulcan: History, Nature, Tables*
-(AFA reprint of the 1908/1920 material). Its element table gives
-`a = 0.13744 AU`, sidereal period 18.58415 days, `e = 0.019`,
-`i = 7.50 deg`, a fixed longitude of perihelion of `10 deg`, the descending
-node at `102.92 deg` on 1907-06-25 regressing 16.7 deg/year, and mean
-longitude `318.3869 deg` at 1911 January 0. LibEphemeris realizes the table
-as the equivalent linear parametrization at the J1900 epoch
-(`M = 252.8987988 + 707550.7341 T`, `omega = 322.212069 + 1670.056 T`,
-`Omega = 47.787931 - 1670.056 T`, equinox of date, `T` in Julian centuries):
-it reproduces the printed 1907 node position to 0.03 deg, the 1911 mean
-longitude to 0.6 deg, and keeps `omega + Omega` at the printed fixed
-10-degree perihelion exactly. The parametrization's decimal figures are
-derived from the table's checkpoints, not printed verbatim in the source.
+LibEphemeris realizes the astrological Vulcan as a linear parametrization at
+the J1900 epoch: `a = 0.13744 AU`, `e = 0.019`, `i = 7.5 deg`,
+`M = 252.8987988 + 707550.7341 T`, `omega = 322.212069 + 1670.056 T`,
+`Omega = 47.787931 - 1670.056 T`, equinox of date, `T` in Julian centuries
+TT from JD 2415020. The equal and opposite perihelion and node rates keep
+the longitude of perihelion `omega + Omega` fixed at 10 degrees. These
+numbers are compatibility values: the primary source is not verified, and no
+derivation from a published table is claimed.
 
 ## ID 57: Proserpina
 
-Proserpina is a hypothetical trans-Plutonian planet of the Russian
-astrological tradition (P. Globa's school; S. Timashev's 1996 tables; the
-Velichko and Larin 2007 volume prints ephemerides). The published convention
-is a circular, planar heliocentric orbit; LibEphemeris realizes it with
-`a = 79.22563 AU` (Gaussian mean motion, period ≈ 705 years), `e = i = 0`,
-mean longitude `170.73 deg` at J1900, angles on the equinox of date. The
-phase is consistent with the school's printed positions for 1900
-(geocentric ≈ 171°25′, inside the 171°05′–171°52′ scatter of the published
-tables); no primary publication fixes a sub-arcminute phase.
+Proserpina is a hypothetical trans-Plutonian planet of the astrological
+tradition. LibEphemeris realizes it as a circular, planar heliocentric orbit
+with `a = 79.22563 AU` (Gaussian mean motion, period ≈ 705 years),
+`e = i = 0`, mean longitude `170.73 deg` at J1900, angles on the equinox of
+date. These numbers are compatibility values: the primary source is not
+verified, and no derivation from a published ephemeris is claimed.
 
 ## ID 50: Harrington's nominal Planet X
 

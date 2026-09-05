@@ -34,7 +34,7 @@ from libephemeris import hypothetical as hyp
 from libephemeris.exceptions import UnknownBodyError
 
 
-_CSV_SHA256 = "7b35add4e93b5b4dd5473d0eb4bdbcb6f914e7f22e99a2e8a0b8953dd6ed4308"
+_CSV_SHA256 = "2113b77e586caba8932d58d4225077f6946e0a0be85b826b5d700469751d20ba"
 
 _REVIEWED_SOURCE_DIGESTS = {
     "Neely 1980, Matrix Magazine VII, complete 63-page scan": (

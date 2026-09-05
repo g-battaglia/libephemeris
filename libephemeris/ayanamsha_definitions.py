@@ -44,7 +44,9 @@ AYANAMSHA_DEFINING: dict[int, tuple[float, float]] = {
     # still pending acquisition (value corroborated only against secondary
     # compilations, never fitted to external output).
     4: (0.0, 1925312.0),
-    # KRISHNAMURTI: Krishnamurti Paddhati: 22°21'50" at 1900 January 0.5
+    # KRISHNAMURTI: K. S. Krishnamurti, "Krishnamurti Padhdhati" (the K.P.
+    # Reader series, Madras, 1960s): the K.P. ayanamsha is 22°21'50" at 1900
+    # January 0.5; volume/page transcription pending.
     5: (22.36388888888889, 2415020.0),
     # DJWHAL_KHUL: Bailey/Ageless Wisdom: Aquarian age (ayanamsha 30°) begins 2117
     6: (30.0, 2494279.0),
@@ -70,7 +72,9 @@ AYANAMSHA_DEFINING: dict[int, tuple[float, float]] = {
     # per the van der Waerden (1953) / Huber (1958) tabulation of the
     # Babylonian norms; Kugler primary transcription pending.
     11: (0.0, 1774464.0),
-    # BABYL_HUBER: Huber, Centaurus 5 (1958): vernal point at Babylonian Aries 4°28' in -100
+    # BABYL_HUBER: P. Huber, "Über den Nullpunkt der babylonischen Ekliptik",
+    # Centaurus 5 (1958), pp. 192-208: the vernal point stood at Babylonian
+    # Aries 4°28' in -100, i.e. ayanamsha -4°28' at that epoch.
     12: (-4.466666666666667, 1684613.0),
     # BABYL_ETPSC: eta Piscium Babylonian norm as discussed by R. Mercier
     # ("Studies in the Medieval Conception of Precession"); zero epoch
@@ -132,7 +136,9 @@ DYNAMIC_AYANAMSHA_MODES = frozenset(
 GALCENT_TARGET_LON: dict[int, float] = {
     # Galactic Center at 0° Sagittarius
     17: 240.0,
-    # Gil Brand, Himmlische Matrix: GC at the double golden section of Sagittarius, 240° + 30°/phi^4
+    # Gil Brand, Himmlische Matrix: GC at the double golden section of
+    # Sagittarius, 240° + 30°/phi^4 with phi = (1 + sqrt 5)/2; the literal is
+    # that expression evaluated in double precision (exact to the last digit).
     30: 244.37694101250946,
     # Cochrane: Galactic Center at 0° Capricorn
     40: 270.0,
@@ -163,9 +169,12 @@ SHEORAN_TARGET_LON = 103.49248263888889
 # frame mode propagated with the IAU 2006 general-precession angle.
 MARDYKS_DEFINING: tuple[float, float] = (30.0, 2451079.733114197)
 
-# Vettius Valens lunar-epoch mode: defining UT epoch and offset.
-# Offset consistent with the ~-3 deg Hellenistic sidereal norm reported
-# in the scholarship (e.g. GRBS 56 (2016) 573-575 discussion of Valens'
-# longitudes); primary transcription of Anthologiae I.18 pending.
+# Vettius Valens lunar-epoch mode (SIDM_VALENS_MOON, 42): defining pair.
+# The ayanamsha is VALENS_MOON_AYAN_T0_DEG plus the Method-B precession
+# accumulated from the defining UT epoch (see planets._calc_ayanamsa), the
+# same formula every other epoch pair uses. The epoch (JD 1775845.5 UT, about
+# 150 CE) and the offset (-2.9422 deg) are compatibility values, primary
+# source not verified: no transcription of Valens' Anthologiae backs them and
+# no derivation from it is claimed. Convention of this library.
 VALENS_MOON_T0_UT = 1775845.5
 VALENS_MOON_AYAN_T0_DEG = -2.9422

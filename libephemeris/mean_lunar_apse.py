@@ -53,6 +53,12 @@ _MEAN_LUNAR_ECCENTRICITY = 0.0549
 # 2000-82), give the mean inclination as 5.145396°. The rounded 5.145° value
 # left a constant ~1.000077 latitude-scale error (dlat up to ~1.43").
 INCLINATION_DEG = 5.145396
+# Return convention of this library for the distance slot of the mean points:
+# the mean node reports the conventional mean distance
+# (MEAN_NODE_DISTANCE_AU) with latitude exactly 0.0, and the mean apogee
+# reports the conventional apogee distance a(1+e) (MEAN_APOGEE_DISTANCE_AU).
+# Both distances are date-invariant constants, not ephemeris ranges, so the
+# radial rate of either point is zero.
 MEAN_NODE_DISTANCE_AU = _MEAN_LUNAR_DISTANCE_KM / _AU_KM
 MEAN_APOGEE_DISTANCE_AU = (
     _MEAN_LUNAR_DISTANCE_KM * (1.0 + _MEAN_LUNAR_ECCENTRICITY) / _AU_KM

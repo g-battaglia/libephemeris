@@ -1790,8 +1790,8 @@ def _calc_body_race_safe(t, planet: int, calc_iflag: int):
 # fixes the frame in which the sidereal longitude is measured, so re-projecting
 # it onto a different reference plane -- the mean ecliptic/equinox of the mode's
 # t0 (SIDBIT_ECL_T0) or the solar-system invariable plane (SIDBIT_SSY_PLANE) --
-# is not defined by the underlying model. Compatibility contract: the
-# projection is a no-op for exactly these modes (the sidereal longitude is
+# is not defined by the underlying model. Public behaviour of this library:
+# the projection is a no-op for exactly these modes (the sidereal longitude is
 # identical to the un-projected baseline), while the epoch-anchored mean modes
 # (Fagan/Bradley, Lahiri, ...) and the two live modes whose zero is not a bare
 # ecliptic-of-date star/frame direction -- Aldebaran = 15 Tau (14, an absolute
@@ -6729,19 +6729,18 @@ _ECL_T0_CLASSICAL_EPOCHS: dict[int, float] = {
 
 
 # Star / galactic-center ayanamsha modes whose sidereal zero point is anchored
-# to a live light source, so its apparent place carries both annual aberration
-# and the Sun's gravitational light deflection. The default anchor applies both
-# reductions (Bradley 1728 aberration, IAU constant kappa ~ 20.49552"; Einstein
-# 1916 deflection, up to ~1" near the annual conjunction and sign-changing
-# across it — the same reduction the fixed-star pipeline applies). Under
-# FLG_NOABERR the aberration is removed, under FLG_NOGDEFL the deflection is
-# removed, and under FLG_TRUEPOS both are (the geometric anchor); compatibility
-# contract. This deliberately EXCLUDES the fixed-catalogue Aldebaran
-# anchor (SIDM_ALDEBARAN_15TAU: by contract it carries no aberration and no
-# deflection — see the Aldebaran branch), the geometric galactic-pole
-# GALEQU modes (already aberration- and deflection-free) and the
-# precession-formula modes (Mardyks, Valens) — the compatibility contract is a
-# zero TRUEPOS/NOABERR/NOGDEFL shift for all of those.
+# to a live light source. The anchor's apparent place carries annual
+# aberration (Bradley 1728; IAU constant kappa ~ 20.49552") and the Sun's
+# gravitational light deflection (Einstein 1916; up to ~1" near the annual
+# conjunction, sign-changing across it) — the same reductions the fixed-star
+# pipeline applies. Public behaviour of this library: FLG_NOABERR removes the
+# aberration from the anchor, FLG_NOGDEFL removes the deflection, and
+# FLG_TRUEPOS removes both (the geometric anchor). The set deliberately
+# EXCLUDES the fixed-catalogue Aldebaran anchor (SIDM_ALDEBARAN_15TAU carries
+# no aberration and no deflection — see the Aldebaran branch), the geometric
+# galactic-pole GALEQU modes (already aberration- and deflection-free) and
+# the precession-formula modes (Mardyks, Valens): for all of those the three
+# flags leave the ayanamsha unchanged.
 _ABERRANT_ANCHOR_MODES = frozenset(
     {
         SIDM_TRUE_CITRA,
@@ -6809,9 +6808,9 @@ def _calc_ayanamsa(
     # fallback below.
     if sid_mode >= 0:
         sid_mode &= 0xFF
-    # The aberration-free / deflection-free anchor only applies to the live
-    # star / galactic-center modes whose reference realization removes them;
-    # every other mode is unaffected regardless of the request flags.
+    # The aberration-free / deflection-free anchor applies only to the live
+    # star / galactic-center modes listed in _ABERRANT_ANCHOR_MODES; every
+    # other mode is unaffected regardless of the request flags.
     eff_noaberr = noaberr and sid_mode in _ABERRANT_ANCHOR_MODES
     eff_nogdefl = nogdefl and sid_mode in _ABERRANT_ANCHOR_MODES
     tjd_tt = float(get_timescale().ut1_jd(tjd_ut).tt)
@@ -6943,6 +6942,14 @@ def _calc_ayanamsa(
                 geometric=True,
             )
             ascending_node = (pole_longitude + 90.0) % 360.0
+            # Sidereal longitude at which each mode holds the ascending node
+            # of the galactic equator on the ecliptic. Mode 31 uses the
+            # 0° Sagittarius anchor (240.0) for the IAU 1958 plane, whose
+            # node on the J2000 ecliptic is 270.0232°. The 239.94708 (mode
+            # 32) and 246.6137 (mode 33, near mid-Mula 246°40') anchors are
+            # compatibility values, primary source not verified: neither
+            # follows from the IAU 1958 pole geometry (see
+            # docs/reference/ayanamsha.md).
             targets = {
                 SIDM_GALEQU_IAU1958: 240.0,
                 SIDM_GALEQU_TRUE: 239.94708,
@@ -7222,9 +7229,12 @@ def get_ayanamsa(tjdet: float) -> float:
     return get_ayanamsa_ut(tjd_ut)
 
 
-# The public "calculated" retflag class drops FLG_NONUT from the extended
-# function's echo. Modes outside that class retain it. This classification is
-# independent of whether a mode has a native numerical definition.
+# Sidereal modes for which get_ayanamsa_ex[_ut] does not echo FLG_NONUT.
+# Public behaviour of this library: the live star / galactic-frame modes
+# listed here are "calculated" modes (their zero point is evaluated from a
+# catalogue direction, so the nutation toggle is not part of their echoed
+# flag word), while every other mode echoes FLG_NONUT when the request set
+# it. Membership is independent of how a mode's value is computed.
 _AYANAMSA_EX_NONUT_DROP_MODES = frozenset(
     {
         SIDM_GALCENT_0SAG,
@@ -7246,7 +7256,7 @@ _AYANAMSA_EX_NONUT_DROP_MODES = frozenset(
 def _ayanamsa_ex_retflag(flags: int, sid_mode: int) -> int:
     """Echoed return flag for get_ayanamsa_ex[_ut].
 
-    Compatibility contract: the echo carries only the resolved
+    Public behaviour of this library: the echo carries only the resolved
     ephemeris-selection bit plus (conditionally) FLG_NONUT — every other input
     bit (FLG_SPEED, FLG_SIDEREAL, spurious bits) is dropped:
 
@@ -7278,7 +7288,7 @@ def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     Calculate ayanamsa with extended flags for Ephemeris Time.
 
     Uses the sidereal mode set via set_sid_mode(). Returns the ayanamsa
-    value along with the return flags, matching the reference signature.
+    value along with the return flags (the extended-flags signature).
 
     Args:
         tjdet: Julian Day in Ephemeris Time (TT/ET)
@@ -7301,9 +7311,9 @@ def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
     ayanamsa = _calc_ayanamsa_ex_value(tjdet, sid_mode, flags)
-    # retflag echoes the input flags with FLG_SWIEPH added (reference
-    # behaviour: 0 -> 2, FLG_NONUT -> 66), except the star/galactic
-    # "calculated" modes drop FLG_NONUT (0 -> 2, FLG_NONUT -> 2).
+    # retflag carries the resolved ephemeris bit plus FLG_NONUT when set
+    # (0 -> 2, FLG_NONUT -> 66), except that the star/galactic "calculated"
+    # modes drop FLG_NONUT (0 -> 2, FLG_NONUT -> 2); see _ayanamsa_ex_retflag.
     return (_ayanamsa_ex_retflag(flags, sid_mode), float(ayanamsa))
 
 
@@ -7338,9 +7348,9 @@ def get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
     ayanamsa = _calc_ayanamsa_ex_value(tjd_tt, sid_mode, flags)
-    # retflag echoes the input flags with FLG_SWIEPH added (reference
-    # behaviour: 0 -> 2, FLG_NONUT -> 66), except the star/galactic
-    # "calculated" modes drop FLG_NONUT (0 -> 2, FLG_NONUT -> 2).
+    # retflag carries the resolved ephemeris bit plus FLG_NONUT when set
+    # (0 -> 2, FLG_NONUT -> 66), except that the star/galactic "calculated"
+    # modes drop FLG_NONUT (0 -> 2, FLG_NONUT -> 2); see _ayanamsa_ex_retflag.
     return (_ayanamsa_ex_retflag(flags, sid_mode), float(ayanamsa))
 
 
@@ -9133,9 +9143,10 @@ def get_orbital_elements_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float,
     return _calc_orbital_elements(t, ipl, iflag)
 
 
-# Semi-major-axis threshold for FLG_BARYCTR orbital elements. Compatibility
-# contract: under FLG_BARYCTR the two-body osculating fit is re-referenced
-# from the Sun to the solar-system barycentre only for orbits beyond Jupiter;
+# Semi-major-axis threshold for FLG_BARYCTR orbital elements. Public behaviour
+# of this library: under FLG_BARYCTR the two-body osculating fit is
+# re-referenced from the Sun to the solar-system barycentre only for orbits
+# beyond Jupiter;
 # Jupiter and every interior body (the terrestrial planets and the main-belt
 # asteroids Ceres/Pallas/Juno/Vesta) are unchanged. The classifier value is a
 # project choice inside the published gap between the Jupiter and Saturn
@@ -10804,7 +10815,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         )
 
     # Slot [5]: the Moon's horizontal parallax (0.0 for every other body —
-    # compatibility contract). With no observer set the slot carries the
+    # a convention of this library). With no observer set the slot carries the
     # geocentric equatorial horizontal parallax; under FLG_TOPOCTR it
     # carries the actual geocentric->topocentric parallactic displacement.
     # Neither depends on the request's FLG_TRUEPOS bit.
@@ -10905,14 +10916,12 @@ def _calc_pheno_asteroid(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 # ~1.9e13 degrees under FLG_TRUEPOS, and the nutation angles were read as a
 # longitude/latitude/distance triple).
 #
-# Compatibility contract, flag- and date-invariant: EARTH returns an
-# all-zero tuple with a fixed 180.0 in the apparent-diameter slot
-# (attr[3]), and ECL_NUT returns NaN for the phase triplet. Both are
-# protocol sentinels for bodies with no phase geometry — discrete
-# return-shape values in the same class as a retflag echo, not computed
-# quantities. The one undocumented channel (ECL_NUT's attr[3], which
-# carries no stable value externally) is deliberately reported as 0.0
-# rather than reproduced — see docs/comparison/intentional-divergences.md.
+# Public behaviour of this library, flag- and date-invariant: pheno for EARTH
+# returns an all-zero tuple with a fixed 180.0 in the apparent-diameter slot
+# (attr[3]), and for ECL_NUT returns NaN in the three phase slots. Both are
+# sentinels for bodies that have no phase geometry — discrete return-shape
+# values, not computed quantities. ECL_NUT's attr[3] is reported as 0.0
+# (see docs/comparison/intentional-divergences.md).
 _PHENO_EARTH = (0.0, 0.0, 0.0, 180.0) + (0.0,) * 16
 _PHENO_ECL_NUT = (float("nan"),) * 3 + (0.0,) * 17
 
@@ -11129,7 +11138,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     earth = planets["earth"]
     sun = planets["sun"]
 
-    # Pheno DOES honor FLG_TOPOCTR (compatibility contract): every
+    # Pheno DOES honor FLG_TOPOCTR (public behaviour of this library): every
     # distance-derived quantity (apparent diameter, phase angle, elongation,
     # magnitude) is taken from the observer's topocentric place rather than
     # the geocentre (the effect is ~arcseconds of diameter and up to ~0.4 deg
@@ -11298,7 +11307,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         # actual geocentric->topocentric parallactic displacement (the on-sky
         # angle between the geocentric-apparent and topocentric-apparent Moon
         # directions). Both are independent of the request's FLG_TRUEPOS bit
-        # (compatibility contract, same convention as the LEB path above).
+        # (a convention of this library, shared with the LEB path above).
         if iflag & FLG_TOPOCTR:
             # Both legs are the APPARENT place (even under FLG_TRUEPOS, where
             # target_pos_geo would be geometric): the topocentric parallax
