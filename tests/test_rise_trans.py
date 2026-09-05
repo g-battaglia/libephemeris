@@ -760,14 +760,14 @@ class TestRiseTransExtendedBodies:
     def test_unplaceable_body_raises_typed_error(self):
         """A body no backend can place (a planetary moon with no registered
         SPK) raises the unified illegal-body error: both an Error and a
-        ValueError carrying 'illegal planet number', identically on every
-        backend."""
+        ValueError naming the body that cannot be placed, identically on
+        every backend."""
         from libephemeris.exceptions import Error
 
         jd_start = julday(2015, 3, 20, 0)
-        with pytest.raises(Error, match="illegal planet number"):
+        with pytest.raises(Error, match="Body 9999 cannot be placed"):
             rise_trans(jd_start, 9999, CALC_RISE, self.ROME)
-        with pytest.raises(ValueError, match="illegal planet number"):
+        with pytest.raises(ValueError, match="Body 9999 cannot be placed"):
             rise_trans(jd_start, 9999, CALC_RISE, self.ROME)
 
 

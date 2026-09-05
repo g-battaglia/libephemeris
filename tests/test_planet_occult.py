@@ -64,7 +64,7 @@ class TestPlanetOccultWhenGlob:
         """Test that occulting and occulted cannot be the same."""
         jd_start = julday(2024, 1, 1, 0)
 
-        with pytest.raises(ValueError, match="cannot be the same"):
+        with pytest.raises(ValueError, match="must be different bodies"):
             planet_occult_when_glob(jd_start, VENUS, VENUS, "", FLG_SWIEPH, 0)
 
     def test_raises_error_for_invalid_occulting_planet(self):
@@ -144,7 +144,7 @@ class TestPlanetOccultWhenLoc:
         """Test that occulting and occulted cannot be the same."""
         jd_start = julday(2024, 1, 1, 0)
 
-        with pytest.raises(ValueError, match="cannot be the same"):
+        with pytest.raises(ValueError, match="must be different bodies"):
             planet_occult_when_loc(
                 jd_start, VENUS, VENUS, "", 40.0, -74.0, 0, FLG_SWIEPH
             )

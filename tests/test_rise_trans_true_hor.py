@@ -351,7 +351,7 @@ class TestRiseTransTrueHorErrors:
         """Test that invalid planet ID raises ValueError."""
         jd_start = julday(2024, 6, 21, 0)
 
-        with pytest.raises(ValueError, match="illegal planet number"):
+        with pytest.raises(ValueError, match="Body 9999 cannot be placed"):
             rise_trans_true_hor(
                 jd_start, 9999, CALC_RISE, [12.5, 41.9, 0.0], horhgt=5.0
             )

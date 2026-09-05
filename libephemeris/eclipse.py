@@ -100,12 +100,6 @@ from .planets import calc_ut
 from .state import get_calc_mode, get_timescale
 
 
-# Retained as an internal alias: the class itself is public so that a
-# traceback names libephemeris.exceptions.IllegalBodyError rather than an
-# underscore-prefixed internal one.
-_IllegalRiseBodyError = IllegalBodyError
-
-
 def _illegal_body_contract[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     """Give a public entry point the single illegal-body error contract.
 
@@ -164,6 +158,13 @@ _LEB_RANGE_MISS_RE = re.compile(
 _LEB_RANGE_MISS_BODY_RE = re.compile(r"for body (?P<body>\d+)")
 _LEB_BODY_MISS_RE = re.compile(
     r"Body (?P<body>-?\d+) not in (?:any )?(?:LEB file|installed LEB tier)"
+)
+
+# Shared wording for the observer-position argument of every entry point that
+# takes one: a sequence of geographic longitude, latitude and altitude.
+_GEOPOS_MESSAGE = (
+    "geopos must be a sequence of at least three numbers: geographic "
+    "longitude and latitude in degrees, then altitude in metres"
 )
 
 
@@ -344,9 +345,16 @@ def _sol_glob_reject_impossible(mask: int) -> None:
     valid |= ECL_ANNULAR_TOTAL
     m = mask & valid
     if m == (ECL_CENTRAL | ECL_PARTIAL):
-        raise Error("central partial eclipses do not exist")
+        raise Error(
+            "The eclipse type filter asks for a central partial eclipse, which "
+            "cannot occur: a partial solar eclipse has no central line."
+        )
     if m == (ECL_NONCENTRAL | ECL_ANNULAR_TOTAL):
-        raise Error("non-central hybrid (annular-total) eclipses do not exist")
+        raise Error(
+            "The eclipse type filter asks for a non-central hybrid (annular-total) "
+            "eclipse, which cannot occur: a hybrid eclipse always has a central "
+            "line."
+        )
 
 
 # Constants for eclipse calculations
@@ -533,11 +541,18 @@ def _normalize_occultation_filter(ecltype: int, body: "int | str", is_sun: bool)
 
     wanted = ecltype
     if wanted == (ECL_PARTIAL | ECL_CENTRAL):
-        raise Error("central partial eclipses do not exist")
+        raise Error(
+            "The occultation type filter asks for a central partial event, which "
+            "cannot occur: a partial occultation or eclipse has no central line."
+        )
     if not is_sun:
         base_classes = wanted & ~(ECL_NONCENTRAL | ECL_CENTRAL)
         if base_classes == ECL_ANNULAR or wanted == ECL_ANNULAR_TOTAL:
-            raise Error(f"annular occultations do not exist for object {body}")
+            raise Error(
+                "The occultation type filter asks for an annular event of body "
+                f"{body}, which cannot occur: only the Sun can be eclipsed "
+                "annularly."
+            )
         if wanted & (ECL_ANNULAR | ECL_ANNULAR_TOTAL):
             wanted &= ~(ECL_ANNULAR | ECL_ANNULAR_TOTAL)
     if wanted == 0:
@@ -581,7 +596,8 @@ def _seek_moon_conjunction(
         raise
     if star_guard is not None and abs(blat) > _OCC_STAR_LAT_LIMIT_DEG:
         raise Error(
-            f"occultation never occurs: star {star_guard} has ecl. lat. {blat:.1f}"
+            f"The Moon never occults the star {star_guard}: its ecliptic latitude "
+            f"of {blat:.1f} degrees is beyond the Moon's reach."
         )
     mpos, _ = calc_ut(t, MOON, eph_flags)
     gap = (blon - mpos[0]) % 360.0
@@ -637,11 +653,14 @@ def _coerce_backwards(value: "bool | int | str") -> bool:
         if text in ("forward", "forwards", "false", "0", ""):
             return False
         raise TypeError(
-            f"invalid backwards value {value!r}: expected a bool, an int, "
-            "or one of 'backward'/'backwards'/'true'/'1' (backward search) "
-            "or 'forward'/'forwards'/'false'/'0'/'' (forward search)"
+            f"{value!r} is not a valid search direction: pass a bool, an int, or "
+            "one of 'backward', 'backwards', 'true', '1' (search backward) or "
+            "'forward', 'forwards', 'false', '0', '' (search forward)."
         )
-    raise TypeError(f"backwards must be a bool, int or str, got {type(value).__name__}")
+    raise TypeError(
+        "The search direction must be a bool, an int or a str, not "
+        f"{type(value).__name__}."
+    )
 
 
 def _topo_sun_moon(
@@ -2692,7 +2711,8 @@ def sol_eclipse_max_time(
     # Validate that both lat and lon are provided or neither
     if (lat is None) != (lon is None):
         raise ValueError(
-            "Both lat and lon must be provided, or neither (for global maximum)"
+            "Pass both lat and lon for the local maximum, or neither for the "
+            "global maximum."
         )
 
     # Determine if we're calculating global or local maximum
@@ -2955,7 +2975,8 @@ def _sol_eclipse_when_glob_pythonic(
     valid_directions = ("forward", "backward", "bidirectional")
     if search_direction not in valid_directions:
         raise ValueError(
-            f"search_direction must be one of {valid_directions}, got '{search_direction}'"
+            f"search_direction must be one of {valid_directions}, not "
+            f"{search_direction!r}."
         )
 
     # Reject type masks that describe geometries which cannot occur
@@ -3059,8 +3080,8 @@ def _sol_eclipse_when_glob_pythonic(
             jd = jd_prev_new_moon - 1
 
         raise Error(
-            "No matching solar eclipse found before the ephemeris boundary "
-            f"searching back from JD {jd_start}"
+            "No matching solar eclipse was found searching backward from JD "
+            f"{jd_start} to the ephemeris boundary."
         )
 
     # Forward search (default behavior for "forward" and "bidirectional")
@@ -3128,8 +3149,8 @@ def _sol_eclipse_when_glob_pythonic(
         jd = jd_new_moon + 25  # Skip ahead ~25 days to ensure we find next New Moon
 
     raise Error(
-        "No matching solar eclipse found before the ephemeris boundary "
-        f"searching from JD {jd_start}"
+        "No matching solar eclipse was found searching forward from JD "
+        f"{jd_start} to the ephemeris boundary."
     )
 
 
@@ -3655,8 +3676,8 @@ def _sol_eclipse_when_loc_pythonic(
             global_type, global_times = _sol_eclipse_when_glob_pythonic(jd, flags)
         except (Error, RuntimeError):
             raise Error(
-                f"No solar eclipse visible from lat={lat}, lon={lon} "
-                f"within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+                f"No solar eclipse visible from latitude {lat}, longitude {lon} "
+                f"was found within {MAX_SEARCH_YEARS} years after JD {jd_start}."
             )
 
         jd_max_global = global_times[0]
@@ -3754,8 +3775,8 @@ def _sol_eclipse_when_loc_pythonic(
         jd = jd_max_global + 25  # Skip ahead to find next eclipse
 
     raise Error(
-        f"No solar eclipse visible from lat={lat}, lon={lon} "
-        f"within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+        f"No solar eclipse visible from latitude {lat}, longitude {lon} "
+        f"was found within {MAX_SEARCH_YEARS} years after JD {jd_start}."
     )
 
 
@@ -3862,7 +3883,7 @@ def _sol_eclipse_when_loc_impl(
 
     # Validate geopos
     if len(geopos) < 3:
-        raise ValueError("geopos must be a sequence of [longitude, latitude, altitude]")
+        raise ValueError(_GEOPOS_MESSAGE)
 
     # Extract geographic position (longitude first, then latitude - reference API convention)
     lon = float(geopos[0])
@@ -3999,8 +4020,9 @@ def _sol_eclipse_when_loc_impl(
                 )
         except (Error, RuntimeError):
             raise Error(
-                f"No solar eclipse visible from lon={lon}, lat={lat} "
-                f"within {MAX_SEARCH_YEARS} years of JD {tjdut}"
+                f"No solar eclipse visible from longitude {lon}, latitude {lat} "
+                f"was found within {MAX_SEARCH_YEARS} years "
+                f"{'before' if backwards else 'after'} JD {tjdut}."
             )
 
         jd_max_global = global_times[0]
@@ -4205,8 +4227,9 @@ def _sol_eclipse_when_loc_impl(
         return ecl_type, tret, tuple(attr_list)
 
     raise Error(
-        f"No solar eclipse visible from lon={lon}, lat={lat} "
-        f"within {MAX_SEARCH_YEARS} years of JD {tjdut}"
+        f"No solar eclipse visible from longitude {lon}, latitude {lat} "
+        f"was found within {MAX_SEARCH_YEARS} years "
+        f"{'before' if backwards else 'after'} JD {tjdut}."
     )
 
 
@@ -4413,7 +4436,7 @@ def _sol_eclipse_how_impl(
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     if len(geopos) < 3:
-        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+        raise ValueError(_GEOPOS_MESSAGE)
 
     geopos3 = (float(geopos[0]), float(geopos[1]), float(geopos[2]))
 
@@ -4553,7 +4576,7 @@ def _sol_eclipse_how_details_impl(
     """
     # Validate and extract geopos
     if len(geopos) < 3:
-        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+        raise ValueError(_GEOPOS_MESSAGE)
 
     lon = float(geopos[0])
     lat = float(geopos[1])
@@ -5661,7 +5684,10 @@ def _lun_eclipse_when_pythonic(
             # to the WHOLE function and turn the search-exhaustion
             # `raise Error(...)` at the bottom into an UnboundLocalError on
             # every non-annular call.
-            raise Error("annular lunar eclipses don't exist")
+            raise Error(
+                "The eclipse type filter asks for an annular lunar eclipse, which "
+                "cannot occur: only solar eclipses can be annular."
+            )
     eclipse_type = eclipse_type & ECL_ALLTYPES_LUNAR
 
     # If eclipse_type is 0, accept any type
@@ -5768,8 +5794,9 @@ def _lun_eclipse_when_pythonic(
         jd = jd_full_moon + (-25 if backwards else 25)
 
     raise Error(
-        "No matching lunar eclipse found before the ephemeris boundary "
-        f"searching from JD {jd_start}"
+        "No matching lunar eclipse was found searching "
+        f"{'backward' if backwards else 'forward'} from JD {jd_start} to the "
+        "ephemeris boundary."
     )
 
 
@@ -6006,8 +6033,9 @@ def _lun_eclipse_when_loc_pythonic(
         return retflag, tuple(tret), tuple(attr_final)
 
     raise Error(
-        f"No lunar eclipse visible from lon={lon}, lat={lat} "
-        f"within the search range of JD {jd_start}"
+        f"No lunar eclipse visible from longitude {lon}, latitude {lat} was found "
+        f"within the search range {'before' if backwards else 'after'} JD "
+        f"{jd_start}."
     )
 
 
@@ -6033,7 +6061,7 @@ def lun_eclipse_when_loc(
     """
     flags = _strip_one_try_bit(flags)
     if len(geopos) < 3:
-        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+        raise ValueError(_GEOPOS_MESSAGE)
 
     lon = float(geopos[0])
     lat = float(geopos[1])
@@ -6350,7 +6378,7 @@ def _lun_eclipse_how_impl(
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     if len(geopos) < 3:
-        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+        raise ValueError(_GEOPOS_MESSAGE)
 
     from .utils import ECL2HOR, azalt
 
@@ -6402,7 +6430,10 @@ def _reject_moon_self_occultation(body: "int | str") -> None:
     if isinstance(body, int) and body == MOON:
         from .exceptions import Error as _Error
 
-        raise _Error("lunar occultation of the Moon itself is undefined (body 1).")
+        raise _Error(
+            "A lunar occultation of the Moon itself (body 1) is undefined: the "
+            "Moon cannot occult itself."
+        )
 
 
 def _fold_pseudo_body_to_sun(body: "int | str") -> "int | str":
@@ -6654,8 +6685,8 @@ def lun_occult_when_glob(
         return retflag, tuple(tret)
 
     raise Error(
-        f"no lunar occultation of {body} found after JD {tjdut} "
-        "within the search window"
+        f"No lunar occultation of {body} was found within the search window "
+        f"{'before' if backward else 'after'} JD {tjdut}."
     )
 
 
@@ -6909,8 +6940,9 @@ def _lun_occult_when_loc_pythonic(
         return retflag, tuple(tret), tuple(attr_list)
 
     raise Error(
-        f"no observable lunar occultation of {body} found from "
-        f"lon={lon}, lat={lat} after JD {jd_start}"
+        f"No lunar occultation of {body} observable from longitude {lon}, "
+        f"latitude {lat} was found {'before' if backward else 'after'} JD "
+        f"{jd_start}."
     )
 
 
@@ -6956,7 +6988,7 @@ def lun_occult_when_loc(
 
     # Validate geopos
     if len(geopos) < 3:
-        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+        raise ValueError(_GEOPOS_MESSAGE)
 
     # Extract geographic position (reference API uses lon, lat, alt order)
     lon = geopos[0]
@@ -7716,15 +7748,13 @@ def _rise_trans_true_hor_impl(
     except TypeError:
         _n_geo = 0
     if _n_geo < 3:
-        raise ValueError("geopos must be a sequence of [longitude, latitude, altitude]")
+        raise ValueError(_GEOPOS_MESSAGE)
     try:
         lon = float(geopos[0])
         lat = float(geopos[1])
         altitude = float(geopos[2])
     except (TypeError, ValueError) as _geo_exc:
-        raise ValueError(
-            "geopos must be a sequence of [longitude, latitude, altitude]"
-        ) from _geo_exc
+        raise ValueError(_GEOPOS_MESSAGE) from _geo_exc
 
     # Map parameter names for internal use
     jd_start = tjdut
@@ -7781,10 +7811,10 @@ def _rise_trans_true_hor_impl(
                 raise
             # A target calc_ut cannot place at all (a planetary moon with no
             # registered SPK, an unknown id, ...) is illegal for rise/set. One
-            # typed error on every backend, carrying the reference's "illegal
-            # planet number" message (both an Error and a ValueError).
-            raise _IllegalRiseBodyError(
-                "illegal planet number %d." % cast(int, body),
+            # typed error on every backend (both an Error and a ValueError).
+            raise IllegalBodyError(
+                f"Body {cast(int, body)} cannot be placed by the active ephemeris, "
+                "so its rise, set and transit are undefined.",
                 body_id=cast(int, body),
             ) from _probe_exc
 
@@ -7840,17 +7870,9 @@ def _rise_trans_true_hor_impl(
             from .exceptions import Error as _Error
 
             raise _Error(
-                "rise/set/transit is undefined for body %d: it has no "
-                "apparent direction in the sky." % planet
+                f"Rise, set and transit are undefined for body {planet}: it has "
+                "no apparent direction in the sky."
             )
-        if planet not in _PLANET_MAP and not use_calc_body:
-            # Defensive only: an out-of-map body is validated up front (it sets
-            # use_calc_body, and an unplaceable id already raised the unified
-            # illegal-body error there), so this branch is unreachable in
-            # practice; keep the reference's illegal-body message regardless.
-            from .exceptions import UnknownBodyError
-
-            raise UnknownBodyError("illegal planet number %d." % planet)
 
     # atpress == 0: estimate pressure from the observer altitude with the
     # reference's barometric expression; attemp is used verbatim (0 means
@@ -8219,19 +8241,19 @@ def heliacal_ut(
         MORNING_LAST,
     ):
         raise Error(
-            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
-            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
+            f"event_type {event_type} is not a heliacal event type: use "
+            "HELIACAL_RISING, HELIACAL_SETTING, EVENING_FIRST or MORNING_LAST."
         )
 
     # Sun and Moon are not valid for heliacal events
     if body == SUN:
-        raise Error("SUN is not valid for heliacal calculations")
+        raise Error("The Sun is not a valid object for heliacal calculations.")
     if body == MOON:
-        raise Error("MOON is not valid for heliacal calculations")
+        raise Error("The Moon is not a valid object for heliacal calculations.")
 
     # Validate body
     if body not in _PLANET_MAP:
-        raise Error(f"illegal planet number {body}.")
+        raise Error(f"Body {body} is not a body heliacal calculations can place.")
 
     # Get ephemeris and timescale
     eph = get_planets()
@@ -8730,7 +8752,7 @@ def vis_limit_mag(
     from skyfield.api import wgs84
 
     if not objname:
-        raise Error("objname cannot be empty")
+        raise Error("objname must name a planet or a fixed star; it cannot be empty.")
 
     # Parse geographic position
     lon = geopos[0] if len(geopos) > 0 else 0.0
@@ -8842,13 +8864,12 @@ def vis_limit_mag(
             raise
         except (ArithmeticError, IndexError) as e:
             # Star not found or other error
-            raise Error(f"could not find star name {objname.lower()}: {e}") from e
+            raise Error(
+                f"The star name {objname.lower()!r} could not be resolved: {e}"
+            ) from e
     else:
-        # Planet calculation
-        if body_id is None:
-            raise Error(f"Unknown object: {objname}")
-
-        # Get planet name from _PLANET_MAP
+        # Planet calculation: the resolution above leaves body_id set whenever
+        # the object was not routed to the fixed-star branch.
         if body_id in _PLANET_MAP:
             target_name = _PLANET_MAP[body_id]
             target = get_planet_target(eph, target_name)
@@ -8867,7 +8888,10 @@ def vis_limit_mag(
                 _reraise_if_leb_range_error(_exc)
                 obj_mag = 0.0  # Default bright
         else:
-            raise Error(f"illegal planet number {body_id}.")
+            raise Error(
+                f"Body {body_id} is not a body the visibility limit can be "
+                "computed for."
+            )
 
     # Check if object is below horizon
     if obj_alt < 0:
@@ -13114,7 +13138,7 @@ def sol_eclipse_magnitude_at_loc(
     """
     # Validate geopos
     if len(geopos) < 3:
-        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+        raise ValueError(_GEOPOS_MESSAGE)
 
     # Extract geographic position (longitude first, then latitude - reference API convention)
     lon = float(geopos[0])
@@ -13392,7 +13416,7 @@ def sol_eclipse_obscuration_at_loc(
     """
     # Validate geopos
     if len(geopos) < 3:
-        raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
+        raise ValueError(_GEOPOS_MESSAGE)
 
     # Extract geographic position (lon first, lat second - reference API convention)
     lon = float(geopos[0])
@@ -13849,25 +13873,36 @@ def planet_occult_when_glob(
 
     if occulted_planet == 0 and not starname:
         raise ValueError(
-            "Either occulted_planet ID or starname must be specified for occultation search"
+            "Specify the occulted body: pass a non-zero occulted_planet id or a "
+            "starname."
         )
 
     # Validate occulting planet - can't be Sun or Moon (use other functions for those)
     if occulting_planet == SUN:
         raise ValueError(
-            "Sun cannot be an occulting body - use _sol_eclipse_when_glob_pythonic"
+            "The Sun cannot be the occulting body here; use sol_eclipse_when_glob "
+            "for solar eclipses."
         )
     if occulting_planet == MOON:
-        raise ValueError("Moon cannot be an occulting body - use lun_occult_when_glob")
+        raise ValueError(
+            "The Moon cannot be the occulting body here; use lun_occult_when_glob "
+            "for lunar occultations."
+        )
     if occulting_planet not in _PLANET_MAP:
-        raise ValueError(f"Invalid occulting planet ID: {occulting_planet}")
+        raise ValueError(
+            f"The occulting planet id {occulting_planet} does not denote a planet."
+        )
 
     # Validate occulted planet if specified
     if occulted_planet != 0:
         if occulted_planet not in _PLANET_MAP:
-            raise ValueError(f"Invalid occulted planet ID: {occulted_planet}")
+            raise ValueError(
+                f"The occulted planet id {occulted_planet} does not denote a planet."
+            )
         if occulted_planet == occulting_planet:
-            raise ValueError("Occulting and occulted planets cannot be the same")
+            raise ValueError(
+                "The occulting and the occulted planet must be different bodies."
+            )
 
     jd_start = tjdut
 
@@ -13881,9 +13916,6 @@ def planet_occult_when_glob(
         jd: float, planet_id: int
     ) -> Tuple[float, float, float, float]:
         """Get planet's geocentric RA, Dec, distance, and angular radius."""
-
-        if planet_id not in _PLANET_MAP:
-            raise ValueError(f"Invalid planet ID: {planet_id}")
 
         # Use calc_ut (LEB-aware) for equatorial positions
         planet_eq, _ = calc_ut(jd, planet_id, FLG_EQUATORIAL | FLG_SPEED)
@@ -14140,8 +14172,9 @@ def planet_occult_when_glob(
     occ_desc = f"planet {occulting_planet}"
 
     raise Error(
-        f"No planetary occultation of {target_desc} by {occ_desc} found within "
-        f"{MAX_SEARCH_YEARS} years of JD {jd_start}"
+        f"No planetary occultation of {target_desc} by {occ_desc} was found within "
+        f"{MAX_SEARCH_YEARS} years {'before' if direction < 0 else 'after'} JD "
+        f"{jd_start}."
     )
 
 
@@ -14261,26 +14294,35 @@ def _planet_occult_when_loc_impl(
 
     if occulted_planet == 0 and not star_name:
         raise ValueError(
-            "Either occulted_planet ID or star_name must be specified for occultation search"
+            "Specify the occulted body: pass a non-zero occulted_planet id or a "
+            "star_name."
         )
 
     # Validate planets
     if occulting_planet == SUN:
         raise ValueError(
-            "Sun cannot be an occulting body - use _sol_eclipse_when_loc_pythonic"
+            "The Sun cannot be the occulting body here; use sol_eclipse_when_loc "
+            "for solar eclipses."
         )
     if occulting_planet == MOON:
         raise ValueError(
-            "Moon cannot be an occulting body - use _lun_occult_when_loc_pythonic"
+            "The Moon cannot be the occulting body here; use lun_occult_when_loc "
+            "for lunar occultations."
         )
     if occulting_planet not in _PLANET_MAP:
-        raise ValueError(f"Invalid occulting planet ID: {occulting_planet}")
+        raise ValueError(
+            f"The occulting planet id {occulting_planet} does not denote a planet."
+        )
 
     if occulted_planet != 0:
         if occulted_planet not in _PLANET_MAP:
-            raise ValueError(f"Invalid occulted planet ID: {occulted_planet}")
+            raise ValueError(
+                f"The occulted planet id {occulted_planet} does not denote a planet."
+            )
         if occulted_planet == occulting_planet:
-            raise ValueError("Occulting and occulted planets cannot be the same")
+            raise ValueError(
+                "The occulting and the occulted planet must be different bodies."
+            )
 
     MAX_SEARCH_YEARS = 150
     MAX_GLOBAL_SEARCHES = 100
@@ -14547,7 +14589,8 @@ def _planet_occult_when_loc_impl(
 
     raise Error(
         f"No planetary occultation of {target_desc} by {occ_desc} visible from "
-        f"lat={lat}, lon={lon} found within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+        f"latitude {lat}, longitude {lon} was found within {MAX_SEARCH_YEARS} years "
+        f"after JD {jd_start}."
     )
 
 
