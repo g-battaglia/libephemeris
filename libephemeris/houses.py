@@ -4698,71 +4698,122 @@ def _hpos_krusinski(ra: float, armc: float, eps: float, geolat: float) -> float:
     return pos_deg / 30.0 + 1.0
 
 
+def _savard_prime_vertical_arc(geolat: float, thirds: int) -> float:
+    """Arc along the prime vertical from a horizon point to a parallel.
+
+    Parametrize the prime vertical by the arc ``t`` measured from the east
+    point of the horizon toward the zenith. That circle crosses the celestial
+    equator at the east point under the angle of the geographic latitude and
+    reaches the zenith, whose declination is the latitude itself, so a point
+    at arc ``t`` has ``sin(dec) = sin(t) * sin(phi)``. The parallel of
+    declination that cuts off ``thirds`` thirds of the declination gained
+    between the east point and the zenith is therefore met where
+
+        sin(t) = sin(thirds * phi / 3) / sin(phi).
+
+    On the equator numerator and denominator vanish together and the ratio
+    has the finite limit ``thirds / 3``, the value taken there. The arc
+    depends on the size of the latitude only, since both sines change sign
+    with it.
+
+    Args:
+        geolat: Geographic latitude, degrees.
+        thirds: Which parallel, 1 for one third or 2 for two thirds.
+
+    Returns:
+        The arc in degrees, strictly between 0 and 90.
+    """
+    sin_lat = _sin_deg(geolat)
+    if sin_lat == 0.0:
+        sin_arc = thirds / 3.0
+    else:
+        sin_arc = _sin_deg(thirds * geolat / 3.0) / sin_lat
+    return _asin_deg(sin_arc)
+
+
 def _hpos_savard(md_upper: float, dec: float, geolat: float) -> float:
     """Savard-A house position.
 
-    Savard's system lives on the prime vertical: the cusps sit at fixed
-    prime-vertical longitudes obtained by trisecting the latitude arc
-    (``asin(sin(phi k/3) / sin(phi))`` for k = 1, 2 — J.F. Savard's
-    published construction; the equator limit of the ratio is k/3), and a
-    body is placed by its own prime-vertical longitude. Because the cusp
-    sequence can run backwards (retrograde house order at some latitudes),
-    the placement scans the cusp list in its own running direction and
-    interpolates inside the containing house.
+    Savard-A divides the prime vertical — the great circle through the east
+    point of the horizon, the zenith, the west point and the nadir — by
+    parallels of declination instead of into equal arcs. Between the east
+    point and the zenith the declination of that circle runs from zero to the
+    geographic latitude; the parallels at one third and two thirds of that
+    span cut it, and the great circles through those crossings and the north
+    and south points of the horizon are the intermediate house circles
+    (John Savard, "Astrological House Systems",
+    http://www.quadibloc.com/other/as01.htm, the Albategnus entry; the family
+    of house circles through the horizon points is described in J. H. Holden,
+    "The Elements of House Division", L. N. Fowler & Co., 1977). The cusp side
+    of the system builds the same division.
+
+    Every house circle of the family is perpendicular to the prime vertical
+    and meets it in a single point, so a body is placed by where its own
+    circle crosses that arc: its distance from the prime vertical counts as
+    little here as ecliptic latitude counts for a whole-sign house. Referring
+    the body to the east point of the equator and tilting the frame by the
+    latitude yields that crossing, and the answer is the share of the arc
+    between the two bracketing cusps the body has already covered (the usual
+    interpolation rule for a house position, Holden 1977).
+
+    Args:
+        md_upper: Right ascension of the body less the ARMC of the chart, as
+            a signed angle in degrees; it grows eastward.
+        dec: Declination of the body, degrees.
+        geolat: Geographic latitude, degrees.
+
+    Returns:
+        The house position in ``[1, 13)``: the house number plus the fraction
+        of that house already behind the body.
     """
-    sin_lat = _sin_deg(geolat)
-    if abs(geolat) < _NEAR_ZERO:
-        third_ratio = 1.0 / 3.0
-        two_thirds_ratio = 2.0 / 3.0
-    else:
-        third_ratio = _sin_deg(geolat / 3.0) / sin_lat
-        two_thirds_ratio = _sin_deg(2.0 * geolat / 3.0) / sin_lat
-    arc_third = _asin_deg(third_ratio)
-    arc_two_thirds = _asin_deg(two_thirds_ratio)
+    # Longitude on the prime vertical, counted from the east point in the
+    # sense east point -> nadir -> west point -> zenith, which is the order
+    # the houses are numbered in. The east point lies a quarter turn east of
+    # the meridian on the equator, and tilting the equator about that point
+    # by the latitude carries it onto the prime vertical. A body exactly at
+    # one of the horizon's north/south points lies on the pole of the prime
+    # vertical and has no longitude on it; the rotation answers zero there,
+    # which puts it on the first cusp.
+    pv_lon, _ = _rotate_frame((md_upper - 90.0) % 360.0, dec, -geolat)
+    # A longitude infinitesimally below zero can round up to exactly 360.0,
+    # which is the first cusp again and not a thirteenth house.
+    pv_lon = pv_lon % 360.0
 
-    cusp_pv = [
+    # The cusps on that arc. The four angles are fixed — ascendant at the east
+    # point, IC at the nadir, descendant at the west point, MC at the zenith —
+    # and in each quadrant the two intermediate cusps stand at the arcs above,
+    # measured from whichever horizon point bounds the quadrant. Opposite
+    # cusps share a house circle, so the twelve come from two arcs.
+    first = _savard_prime_vertical_arc(geolat, 1)
+    second = _savard_prime_vertical_arc(geolat, 2)
+    cusps = (
         0.0,
-        0.0,
-        arc_third,
-        arc_two_thirds,
+        first,
+        second,
         90.0,
-        180.0 - arc_two_thirds,
-        180.0 - arc_third,
+        180.0 - second,
+        180.0 - first,
         180.0,
-        180.0 + arc_third,
-        180.0 + arc_two_thirds,
+        180.0 + first,
+        180.0 + second,
         270.0,
-        360.0 - arc_two_thirds,
-        360.0 - arc_third,
-    ]
+        360.0 - second,
+        360.0 - first,
+        360.0,
+    )
 
-    body_pv, _ = _rotate_frame((md_upper - 90.0) % 360.0, dec, -geolat)
-
-    house_idx = 1
-    span_end = 360.0
-    if difdeg2n(cusp_pv[6], cusp_pv[1]) > 0:
-        # Direct house order.
-        travelled = (body_pv - cusp_pv[1]) % 360.0
-        for house_idx in range(1, 13):
-            nxt = house_idx + 1
-            span_end = 360.0 if nxt > 12 else (cusp_pv[nxt] - cusp_pv[1]) % 360.0
-            if travelled < span_end:
-                break
-        span_start = (cusp_pv[house_idx] - cusp_pv[1]) % 360.0
-    else:
-        # Retrograde house order.
-        travelled = (cusp_pv[1] - body_pv) % 360.0
-        for house_idx in range(1, 13):
-            nxt = house_idx + 1
-            span_end = 360.0 if nxt > 12 else (cusp_pv[1] - cusp_pv[nxt]) % 360.0
-            if travelled < span_end:
-                break
-        span_start = (cusp_pv[1] - cusp_pv[house_idx]) % 360.0
-
-    span = span_end - span_start
-    if span == 0:
-        return float(house_idx)
-    return house_idx + (travelled - span_start) / span
+    # The twelve arcs are unequal away from the poles but always in
+    # increasing order, so the body's house is the one interval that brackets
+    # its longitude and the fraction is its progress across that interval.
+    # A longitude past the last intermediate cusp belongs to the twelfth.
+    house = 12
+    for candidate in range(1, 12):
+        if pv_lon < cusps[candidate]:
+            house = candidate
+            break
+    lower = cusps[house - 1]
+    upper = cusps[house]
+    return float(house) + (pv_lon - lower) / (upper - lower)
 
 
 def _hpos_sripati(lon: float, armc: float, eps: float, geolat: float) -> float:
