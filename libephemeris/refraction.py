@@ -96,6 +96,7 @@ Provenance:
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from typing import Tuple
 
 # ---------------------------------------------------------------------------
@@ -134,12 +135,6 @@ _T0: float = 288.15  # Standard temperature [K]
 
 # Conventional pressure/temperature scaling used with the independently
 # published Saemundsson and Bennett closed forms (Meeus 1998, chapter 16).
-_COMPAT_PRESSURE_REF: float = 1010.0
-_COMPAT_TEMPERATURE_NUMERATOR: float = 283.0
-_COMPAT_TEMPERATURE_OFFSET: float = 273.0
-_COMPAT_TRUE_LOW_LIMIT: float = -5.0
-_COMPAT_TRUE_BRANCH: float = 15.0
-_COMPAT_REVERSE_ZENITH_LIMIT: float = 90.0 - 1e-10
 
 
 # ---------------------------------------------------------------------------
@@ -534,87 +529,188 @@ def _trace_ray(
 
 
 # ---------------------------------------------------------------------------
-# Plain refrac() clean-room compatibility model
+# Plain refrac(): the published closed-form compatibility model
 # ---------------------------------------------------------------------------
+# The fits below are published for a standard atmosphere of 1010 mbar and
+# 10 degC; the scale factor moves them to the observer's own air.
+_FIT_PRESSURE_MBAR: float = 1010.0  # Meeus 1998, ch. 16, p. 107
+_FIT_KELVIN: float = 283.0  # 10 degC, same page
+_FIT_CELSIUS_OFFSET: float = 273.0  # the round offset that page's factor uses
 
 
 def _compat_atmosphere_scale(pressure: float, temperature_C: float) -> float:
-    """Return the conventional pressure/temperature refraction scale.
+    """Scale the published fits from their standard air to the observer's.
 
-    The explicit zero-denominator handling keeps physically invalid edge
-    inputs deterministic instead of raising Python's ``ZeroDivisionError``.
+    Args:
+        pressure: Pressure at the observer, in mbar.
+        temperature_C: Temperature at the observer, in degrees Celsius.
+
+    Returns:
+        The dimensionless factor ``P/1010 * 283/(273 + T)``: one at the
+        standard conditions of the fits, zero for zero pressure, negative
+        wherever either ratio is, and about 0.98580 at this API's defaults.
+
+    Notes:
+        The quotient is singular at exactly -273 degC. Nothing is raised
+        there: IEEE division is answered instead, an infinity carrying the
+        sign of the pressure, or not-a-number when the pressure is itself
+        zero or not-a-number. A not-a-number scale reaches the caller as an
+        unchanged altitude, through the horizon guard below.
     """
-    numerator = pressure / _COMPAT_PRESSURE_REF * _COMPAT_TEMPERATURE_NUMERATOR
-    denominator = _COMPAT_TEMPERATURE_OFFSET + temperature_C
-    if denominator != 0.0:
-        return numerator / denominator
-    if numerator == 0.0 or math.isnan(numerator):
+    kelvin = _FIT_CELSIUS_OFFSET + temperature_C
+    if kelvin == 0.0:
+        if pressure == 0.0 or math.isnan(pressure):
+            return math.nan
+        return math.copysign(math.inf, pressure)
+    return pressure / _FIT_PRESSURE_MBAR * _FIT_KELVIN / kelvin
+
+
+# Coefficients of the two horizon fits, each of the form
+# ``c / tan(alt + a / (alt + b))`` in arcminutes, stored as ``(c, a, b)``.
+_SAEMUNDSSON_ARCMIN = (1.02, 10.3, 5.11)  # Saemundsson 1986, S&T 72, 70; Meeus 16.4
+_BENNETT_ARCMIN = (1.0, 7.31, 4.4)  # Bennett 1982, J.Nav. 35, 255; Meeus 16.3
+
+
+def _cotangent_fit_arcmin(alt: float, fit: Tuple[float, float, float]) -> float:
+    """Evaluate one horizon fit at an altitude.
+
+    Args:
+        alt: Altitude in degrees, true or apparent as the fit requires,
+            positive above the horizon.
+        fit: The triple ``(c, a, b)`` of the fit.
+
+    Returns:
+        The refraction in arcminutes, positive for a positive scale, or
+        not-a-number where the fit describes nothing: at the pole of its own
+        argument, where ``alt`` cancels ``b``, and once that argument has
+        left the first quadrant, beyond which a cotangent is no longer a
+        refraction.
+    """
+    numerator, a, b = fit
+    offset = alt + b
+    if offset == 0.0:
         return math.nan
-    return math.copysign(math.inf, numerator)
+    angle = alt + a / offset
+    if not angle < 90.0:
+        return math.nan
+    return numerator / math.tan(math.radians(angle))
+
+
+def _saemundsson_deg(true_alt: float, scale: float) -> float:
+    """Refraction near the horizon, in degrees, for a true altitude."""
+    return _cotangent_fit_arcmin(true_alt, _SAEMUNDSSON_ARCMIN) * scale / 60.0
+
+
+# Two-term expansion of mean refraction in the tangent of the zenith
+# distance, in arcseconds, as ``(linear, cubic)``: Smart 1977, ch. VI, with
+# the coefficients tabulated for the standard conditions of the fits above.
+_TAN_ZENITH_ARCSEC = (58.276, 0.0824)
+
+
+def _tan_zenith_deg(true_alt: float, scale: float) -> float:
+    """Refraction away from the horizon, in degrees, for a true altitude."""
+    linear, cubic = _TAN_ZENITH_ARCSEC
+    tan_z = math.tan(math.radians(90.0 - true_alt))
+    return (linear * tan_z - cubic * tan_z * tan_z * tan_z) * scale / 3600.0
+
+
+# Which published fit answers a true altitude, tried from the top down: each
+# entry pairs the altitude in degrees above which its fit applies with the
+# fit itself. Below the last floor the horizon fit runs into the pole of its
+# own argument and there is no refraction to give.
+_FORWARD_FITS: Tuple[Tuple[float, Callable[[float, float], float]], ...] = (
+    (15.0, _tan_zenith_deg),
+    (-5.0, _saemundsson_deg),
+)
+
+
+def _forward_refraction_deg(true_alt: float, scale: float) -> float:
+    """Refraction to add to a true altitude, in degrees.
+
+    Args:
+        true_alt: True altitude in degrees.
+        scale: The atmosphere factor to apply to the fit.
+
+    Returns:
+        The signed refraction in degrees, or not-a-number below the floor of
+        every fit.
+    """
+    for floor, fit in _FORWARD_FITS:
+        if true_alt > floor:
+            return fit(true_alt, scale)
+    return math.nan
+
+
+def _above_horizon(altitude: float, correction: float) -> float:
+    """Apply a signed correction unless the result fails to clear the horizon.
+
+    Args:
+        altitude: Input altitude in degrees.
+        correction: Signed correction in degrees, positive upwards, or
+            not-a-number where no fit answered.
+
+    Returns:
+        ``altitude + correction`` when that is strictly above the horizon,
+        and otherwise the input altitude unchanged, sign of zero included.
+        A not-a-number correction takes the second branch, because that
+        comparison is never true.
+    """
+    corrected = altitude + correction
+    return corrected if corrected > 0.0 else altitude
 
 
 def calc_refrac_compat_true_to_app(
     true_alt: float, pressure: float = _P0, temperature_C: float = 15.0
 ) -> float:
-    """Return plain-API apparent altitude for a true altitude.
+    """Lift a true altitude to an apparent one with the plain closed forms.
 
-    This uses the independently published Saemundsson approximation below 15
-    degrees and the standard high-altitude tangent series above it. It is not
-    the ICAO ray tracer. Values at or below -5 degrees, and candidates that do
-    not rise strictly above zero, are returned unchanged.
+    Args:
+        true_alt: Geometric altitude above the horizon, in degrees.
+        pressure: Pressure at the observer, in mbar. Zero disables the
+            refraction; a negative value is an accepted extrapolation.
+        temperature_C: Temperature at the observer, in degrees Celsius.
+
+    Returns:
+        The apparent altitude in degrees, always a native float and never
+        smaller than the input in ordinary air. The input comes back
+        unchanged when it is not finite, when it lies at or below the floor
+        of the horizon fit, and when the lift leaves it on or below the
+        horizon.
     """
     true_alt = float(true_alt)
-    pressure = float(pressure)
-    temperature_C = float(temperature_C)
-
-    if not math.isfinite(true_alt) or true_alt <= _COMPAT_TRUE_LOW_LIMIT:
+    if not math.isfinite(true_alt):
         return true_alt
-
     scale = _compat_atmosphere_scale(pressure, temperature_C)
-    if true_alt <= _COMPAT_TRUE_BRANCH:
-        angle = true_alt + 10.3 / (true_alt + 5.11)
-        correction = 1.02 / math.tan(math.radians(angle)) * scale / 60.0
-    else:
-        tangent = math.tan(math.radians(90.0 - true_alt))
-        correction = (
-            (58.276 * tangent - 0.0824 * tangent * tangent * tangent) * scale / 3600.0
-        )
-
-    apparent_alt = true_alt + correction
-    return float(apparent_alt) if apparent_alt > 0.0 else true_alt
+    return _above_horizon(true_alt, _forward_refraction_deg(true_alt, scale))
 
 
 def calc_refrac_compat_app_to_true(
     apparent_alt: float, pressure: float = _P0, temperature_C: float = 15.0
 ) -> float:
-    """Return plain-API true altitude for an apparent altitude.
+    """Lower an apparent altitude to a true one with Bennett's closed form.
 
-    The reverse direction uses Bennett's independently published closed form
-    rather than numerically inverting :func:`calc_refrac_compat_true_to_app`.
+    A single fit covers the whole domain, so this is not the numerical
+    inverse of :func:`calc_refrac_compat_true_to_app`; the two published fits
+    close on each other only to a few arcseconds.
+
+    Args:
+        apparent_alt: Observed altitude above the horizon, in degrees.
+        pressure: Pressure at the observer, in mbar. Zero disables the
+            refraction; a negative value is an accepted extrapolation.
+        temperature_C: Temperature at the observer, in degrees Celsius.
+
+    Returns:
+        The true altitude in degrees, always a native float and never larger
+        than the input in ordinary air. The input comes back unchanged when
+        it is not finite, when Bennett's argument has left the first
+        quadrant, and when the result would not stay above the horizon.
     """
     apparent_alt = float(apparent_alt)
-    pressure = float(pressure)
-    temperature_C = float(temperature_C)
-
     if not math.isfinite(apparent_alt):
         return apparent_alt
-
-    try:
-        angle = apparent_alt + 7.31 / (apparent_alt + 4.4)
-    except ZeroDivisionError:
-        return apparent_alt
-    if not math.isfinite(angle) or angle >= _COMPAT_REVERSE_ZENITH_LIMIT:
-        return apparent_alt
-
-    tangent = math.tan(math.radians(angle))
-    if tangent == 0.0:
-        return apparent_alt
-    correction_arcmin = 1.0 / tangent
-    correction = (
-        correction_arcmin * _compat_atmosphere_scale(pressure, temperature_C) / 60.0
-    )
-    true_alt = apparent_alt - correction
-    return float(true_alt) if true_alt > 0.0 else apparent_alt
+    scale = _compat_atmosphere_scale(pressure, temperature_C)
+    refraction = _cotangent_fit_arcmin(apparent_alt, _BENNETT_ARCMIN) * scale / 60.0
+    return _above_horizon(apparent_alt, -refraction)
 
 
 # ---------------------------------------------------------------------------

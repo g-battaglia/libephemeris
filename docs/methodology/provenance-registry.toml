@@ -161,7 +161,7 @@ url = "docs/development/keplerian-improvements.md"
 
 [sources.REFRACTION]
 kind = "standards-and-primary-publications"
-citation = "ISO 2533/ICAO Doc 7488 standard atmosphere; Barrell & Sears (1939); Green (1985); Auer & Standish (2000); Bennett (1982)"
+citation = "ISO 2533/ICAO Doc 7488 standard atmosphere; Barrell & Sears (1939); Green (1985); Auer & Standish (2000); Bennett (1982); Saemundsson (1986); Smart (1977), ch. VI; Meeus (1998), ch. 16"
 url = "https://doi.org/10.1086/301325"
 
 [sources.SCHAEFER_VISIBILITY]
