@@ -358,3 +358,57 @@ def test_a_shallow_horhgt_at_sea_level_does_nothing():
     assert beyond < -5.0, (
         f"past the refraction the horizon should finally move; got {beyond:+.1f} s"
     )
+
+
+# ---------------------------------------------------------------------------
+# the refraction model's two branches
+# ---------------------------------------------------------------------------
+
+#: Atmospheres the continuity check runs under: the standard one, the library
+#: default (0 C), and two the pressure/temperature factor pulls hardest on.
+_ATMOSPHERES = [(1013.25, 15.0), (1013.25, 0.0), (950.0, -30.0), (1050.0, 45.0)]
+
+
+def test_the_sinclair_crossover_is_the_root_of_the_junction():
+    """The branch switch sits where the cotangent law equals Sinclair's fit.
+
+    ``_SINCLAIR_CROSSOVER_DEG`` is solved at import from the two published
+    formulas. The difference of the branches falls by 1.1e-11 arcminutes per
+    1e-9 degrees around the root, so a sign change across +-1e-9 degrees pins
+    the root to better than that; the transcribed value this replaced sat
+    6.7e-9 degrees below the root and fails the same check.
+    """
+    from libephemeris.eclipse import (
+        _SINCLAIR_CROSSOVER_DEG,
+        _sinclair_high_altitude_arcmin,
+        _sinclair_low_altitude_arcmin,
+        _solve_sinclair_crossover_deg,
+    )
+
+    def gap(h):
+        return _sinclair_high_altitude_arcmin(h) - _sinclair_low_altitude_arcmin(h)
+
+    h = _SINCLAIR_CROSSOVER_DEG
+    assert 17.90410464 < h < 17.90410465
+    assert gap(h - 1e-9) > 0.0 > gap(h + 1e-9)
+    assert abs(gap(h)) < 1e-14
+    assert _solve_sinclair_crossover_deg() == h, "the derivation is deterministic"
+
+
+def test_the_sinclair_refraction_has_no_step_at_the_crossover():
+    """R(h) is continuous where the model changes branch, in every atmosphere.
+
+    Adjacent doubles either side of the crossover fall on different branches;
+    their refractions may differ by rounding only (~1e-17 degrees). The
+    transcribed threshold this replaces left a 1.3e-12-degree step here.
+    """
+    from libephemeris.eclipse import _SINCLAIR_CROSSOVER_DEG, _sinclair_refraction_deg
+
+    h = _SINCLAIR_CROSSOVER_DEG
+    below, above = math.nextafter(h, 0.0), math.nextafter(h, 90.0)
+    for atpress, attemp in _ATMOSPHERES:
+        r_below = _sinclair_refraction_deg(below, atpress, attemp)
+        r_at = _sinclair_refraction_deg(h, atpress, attemp)
+        r_above = _sinclair_refraction_deg(above, atpress, attemp)
+        assert abs(r_above - r_at) < 1e-15, (atpress, attemp, r_above - r_at)
+        assert abs(r_at - r_below) < 1e-15, (atpress, attemp, r_at - r_below)

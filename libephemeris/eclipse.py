@@ -1349,6 +1349,60 @@ def _root_bisect(fn, t_lo: float, t_hi: float) -> float:
     return 0.5 * (t_lo + t_hi)
 
 
+def _sinclair_low_altitude_arcmin(h: float) -> float:
+    """Sinclair's low-altitude refraction fit, in arcminutes.
+
+    ``R = (34.46 + 4.23 h + 0.004 h^2) / (1 + 0.505 h + 0.0845 h^2)`` for an
+    apparent altitude ``h`` in degrees: the rational fit published in
+    G. G. Bennett, "The calculation of astronomical refraction in marine
+    navigation", Journal of Navigation 35 (1982), p. 256.
+    """
+    return (34.46 + 4.23 * h + 0.004 * h * h) / (1.0 + 0.505 * h + 0.0845 * h * h)
+
+
+def _sinclair_high_altitude_arcmin(h: float) -> float:
+    """First-order cotangent refraction law, in arcminutes.
+
+    ``R = 0.97 cot h`` (58.2 arcsec cot h) for an apparent altitude ``h`` in
+    degrees: the single-term high-altitude law the rise/set scheme joins to
+    Sinclair's fit above the crossover altitude.
+    """
+    return 0.97 / math.tan(math.radians(h))
+
+
+def _solve_sinclair_crossover_deg() -> float:
+    """Altitude at which the two Sinclair branches take the same value.
+
+    Solves ``0.97 cot h = (34.46 + 4.23 h + 0.004 h^2) / (1 + 0.505 h +
+    0.0845 h^2)`` for ``h`` in degrees. The difference of the two branches
+    decreases monotonically on [10, 30] degrees and changes sign exactly once
+    on (0.5, 89.5) degrees, so bisection from that bracket is safe. It stops
+    when the bracket is two adjacent doubles, which makes the result a fixed
+    IEEE-754 quantity (17.9041046451... degrees) derived from the two cited
+    formulas rather than a transcribed literal. Evaluated once, at import.
+
+    Returns:
+        The crossover altitude in degrees.
+    """
+    lo, hi = 10.0, 30.0
+    g_lo = _sinclair_high_altitude_arcmin(lo) - _sinclair_low_altitude_arcmin(lo)
+    while True:
+        mid = 0.5 * (lo + hi)
+        if mid <= lo or mid >= hi:
+            return mid
+        g_mid = _sinclair_high_altitude_arcmin(mid) - _sinclair_low_altitude_arcmin(mid)
+        if (g_mid > 0.0) == (g_lo > 0.0):
+            lo, g_lo = mid, g_mid
+        else:
+            hi = mid
+
+
+#: Apparent altitude, in degrees, above which ``_sinclair_refraction_deg``
+#: uses the cotangent law instead of Sinclair's fit: the analytic root of
+#: their junction, so the refraction is continuous there to one rounding ulp.
+_SINCLAIR_CROSSOVER_DEG = _solve_sinclair_crossover_deg()
+
+
 def _sinclair_refraction_deg(
     app_alt_deg: float, atpress: float, attemp: float
 ) -> float:
@@ -1356,21 +1410,32 @@ def _sinclair_refraction_deg(
 
     A. T. Sinclair's refraction model, as published in G. G. Bennett,
     "The calculation of astronomical refraction in marine navigation",
-    Journal of the Institute of Navigation 35 (1982), p. 256, with
-    Bennett's pressure/temperature compensation (p. 259).
+    Journal of Navigation 35 (1982), p. 256, with Bennett's
+    pressure/temperature compensation (p. 259).
 
-    The two branches join at h = 17.904104638432°: above it the high-altitude
-    asymptote 0.97/tan(h) (arcmin) applies; at or below it Sinclair's rational
-    fit (34.46 + 4.23h + 0.004h²)/(1 + 0.505h + 0.0845h²) (arcmin) applies.
-    The pressure/temperature factor (atpress-80)/930 / (1 + 8e-5·(r+39)·
-    (attemp-10)) is Bennett's compensation (p. 259), referred to 1010 mbar /
-    10 °C. Result converted arcmin -> deg.
+    Two branches, both in arcminutes of an apparent altitude ``h`` in degrees:
+    Sinclair's rational fit ``(34.46 + 4.23 h + 0.004 h^2) / (1 + 0.505 h +
+    0.0845 h^2)`` at and below the crossover altitude, the first-order
+    cotangent law ``0.97 cot h`` above it. The crossover is the root of
+    ``0.97 cot h = fit(h)``, held in ``_SINCLAIR_CROSSOVER_DEG``
+    (17.9041046451... degrees) and solved at import, so the two branches meet
+    without a step. The pressure/temperature factor ``(atpress - 80) / 930 /
+    (1 + 8e-5 (r + 39) (attemp - 10))`` is Bennett's compensation (p. 259),
+    referred to 1010 mbar / 10 C. Result converted arcmin -> deg.
+
+    Args:
+        app_alt_deg: Apparent altitude in degrees.
+        atpress: Atmospheric pressure in mbar.
+        attemp: Air temperature in degrees Celsius.
+
+    Returns:
+        Refraction in degrees.
     """
     h = app_alt_deg
-    if h > 17.904104638432:
-        r = 0.97 / math.tan(math.radians(h))
+    if h > _SINCLAIR_CROSSOVER_DEG:
+        r = _sinclair_high_altitude_arcmin(h)
     else:
-        r = (34.46 + 4.23 * h + 0.004 * h * h) / (1.0 + 0.505 * h + 0.0845 * h * h)
+        r = _sinclair_low_altitude_arcmin(h)
     r = (atpress - 80.0) / 930.0 / (1.0 + 0.00008 * (r + 39.0) * (attemp - 10.0)) * r
     return r / 60.0
 

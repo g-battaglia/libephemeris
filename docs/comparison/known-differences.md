@@ -231,6 +231,23 @@ ray tracing. Below-horizon extrapolation and atmosphere cutoffs are inherently
 conventional, so results can differ from other APIs without either result
 identifying the other's implementation.
 
+#### Sinclair refraction crossover {#sinclair-crossover}
+
+The rise/set path (`rise_trans`, `rise_trans_true_hor`) turns a true altitude
+into an apparent one with a two-branch refraction model: Sinclair's rational
+fit (34.46 + 4.23 h + 0.004 h²) / (1 + 0.505 h + 0.0845 h²) arcminutes at low
+altitude, the first-order law 0.97 cot h above it, and Bennett's (1982)
+pressure/temperature factor on both. The altitude at which the branches switch
+is the root of 0.97 cot h = fit(h), solved at import by bisection down to two
+adjacent doubles (17.90410464513974°), rather than a stored 12-digit literal.
+The stored value sat 6.7e-9° below the root, so the refraction had a step of
+1.3e-12° (4.5e-9″ in the standard atmosphere, 6.4e-9″ at 1100 mbar / −50 °C)
+at the switch; the derived root brings it down to one rounding ulp
+(1.4e-17°). Only apparent altitudes inside that 6.7e-9° band answer
+differently, by at most the old step — orders of magnitude below one ulp of a
+Julian Day at a rise or set time, so no rise or set time moves. `refrac` and
+`refrac_extended` do not use this model and are unchanged.
+
 ### Eclipses and occultations
 
 Candidate events are found from JPL Sun, Moon, Earth, and target geometry.
