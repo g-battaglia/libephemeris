@@ -741,17 +741,17 @@ def degnorm(x: float) -> float:
         0.0
     """
     # Near-zero inputs normalize to exactly 0.0 rather than wrapping to
-    # ~360: without this, degnorm(-5e-14) returned 359.99999999999994 —
-    # the same angle, but a full turn away in the reported value, which
-    # propagates into any consumer that compares or bins the result. The
-    # band sits above the roundoff floor of the modulo near zero (ulp of
-    # 360.0 is ~5.7e-14) and far below any meaningful angular resolution
-    # (1e-13 deg = 3.6e-10 arcsec). Its exact boundary — |x| < 1e-13,
-    # exclusive — is the public snap contract of this function
-    # (compatibility contract): inputs at or beyond it wrap normally, so
-    # moving the boundary changes observable output for inputs like
-    # -1e-12. The snap runs before the wrap so a tiny negative never
-    # reaches the modulo.
+    # ~360: a value like -5e-14 is the angle zero with roundoff on it, and
+    # the modulo alone would report it as 359.99999999999994 — the same
+    # direction, but a full turn away for any consumer that compares or
+    # bins the result. The width of the snap band is this library's own
+    # choice: 1e-13 deg sits above the roundoff floor of the wrap near zero
+    # (the ulp of 360.0 is ~5.7e-14) and far below any angular resolution
+    # the library reports (1e-13 deg = 3.6e-10 arcsec). The boundary is
+    # observable — |x| < 1e-13 snaps, |x| >= 1e-13 wraps normally, so an
+    # input like -1e-12 comes back as 359.999999999999 — and once chosen it
+    # is held fixed as documented behaviour of this function. The snap runs
+    # before the wrap so a tiny negative never reaches the modulo.
     if abs(x) < 1e-13:
         return 0.0
     result = x % 360.0
@@ -794,12 +794,15 @@ def radnorm(x: float) -> float:
         >>> radnorm(4 * math.pi)  # 720 degrees -> 0
         0.0
     """
-    # Same near-zero snap as degnorm with the same numeric band per unit
-    # (1e-13 rad, not the degree value converted): above the roundoff
-    # floor of the modulo near zero (ulp of 2*pi is ~8.9e-16), far below
-    # any meaningful angular resolution (1e-13 rad ~ 2e-8 arcsec). As in
-    # degnorm, the exact exclusive boundary is this function's public
-    # snap contract (compatibility contract).
+    # Same snap as degnorm, and the same figure for the band: 1e-13 rad.
+    # The choice is made per unit, not by converting the degree band (that
+    # would be 1.7e-15 rad, within a couple of ulps of the wrap's own
+    # roundoff). The band only has to clear the roundoff floor of the
+    # modulo near zero (the ulp of 2*pi is ~8.9e-16, two orders below) and
+    # stay under any angular resolution the library reports (1e-13 rad ~
+    # 2e-8 arcsec); one round figure that does both in either unit keeps
+    # the two helpers symmetric. As in degnorm the boundary is observable
+    # and is held fixed as documented behaviour of this function.
     if abs(x) < 1e-13:
         return 0.0
     result = x % TWO_PI

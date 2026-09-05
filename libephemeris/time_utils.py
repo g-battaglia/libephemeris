@@ -57,12 +57,17 @@ _TID_ACC_REFERENCE_JD = 2451545.0 - 44.5 * 365.25
 
 # IERS Conventions (2010), TN 36, Eq. 5.43: the linear rates of
 # F = L - Omega and Omega in arcsec per Julian century.  Their sum is the
-# mean lunar longitude rate.  A change dacc in lunar longitude acceleration
-# accumulates 0.5*dacc*T^2 arcsec; dividing by mean lunar motion converts the
-# phase displacement to seconds of time.  Thus the familiar ~0.91072 factor
-# is derived from IERS Conventions (2010) rather than an empirical fit.
+# rate of the Moon's mean longitude L, i.e. its mean motion.
 _IERS_F_RATE_ARCSEC_CY = 1739527262.8478
 _IERS_OMEGA_RATE_ARCSEC_CY = -6962890.5431
+_LUNAR_MEAN_MOTION_ARCSEC_DAY = (
+    _IERS_F_RATE_ARCSEC_CY + _IERS_OMEGA_RATE_ARCSEC_CY
+) / 36525.0
+# Time the Moon needs to advance one arcsecond in mean longitude (~1.82 s).
+# A displacement of the Moon's longitude by x arcsec, timed against a clock,
+# is worth x times this factor; _tid_acc_adjustment_seconds uses it to turn
+# a change of the tidal acceleration into a change of Delta T.
+_SECONDS_PER_ARCSEC_OF_LUNAR_LONGITUDE = 86400.0 / _LUNAR_MEAN_MOTION_ARCSEC_DAY
 
 # --- UTC epoch boundary (jd*_to_utc classification) ------------------------
 # JD of 1972-01-01 00:00:00 UTC, the start of leap-second UTC as defined by
@@ -297,11 +302,20 @@ def _deltat_espenak_meeus(year: float) -> float:
 def _tid_acc_adjustment_seconds(tjdut: float, tid_acc: float) -> float:
     """Delta T adjustment (seconds) for a non-default tidal acceleration.
 
-    Uses the standard conversion of a lunar secular-acceleration difference
-    into clock seconds, referred to Julian epoch 1955.5.  The conversion is
-    derived from the IERS 2010 mean-lunar-longitude rate; it is linear in
-    ``tid_acc`` and quadratic in elapsed Julian centuries.  Modern observed
-    Delta T is left unchanged from the reference epoch onward.
+    Pre-telescopic Delta T rests on timed lunar observations reduced with a
+    particular secular acceleration of the Moon.  Adopting a different
+    acceleration ``tid_acc`` moves the Moon's computed mean longitude by
+    ``0.5 * (tid_acc - TIDAL_DEFAULT) * T**2`` arcsec after ``T`` Julian
+    centuries, and the old observations are satisfied again only if the
+    clock, Delta T, absorbs the equivalent time: that displacement divided
+    by the Moon's mean motion (IERS Conventions 2010, TN 36, Eq. 5.43).
+    Espenak & Meeus (2006, Five Millennium Canon of Solar Eclipses,
+    NASA/TP-2006-214141, and the companion NASA page "Polynomial
+    Expressions for Delta T") publish the same correction for their canon
+    as ``-0.000091 (n_dotdot + 26) (year - 1955)**2`` seconds; here the
+    factor is evaluated from the IERS rates and the origin is the Julian
+    epoch 1955.5, so the two are not digit-for-digit the same.  Modern
+    observed Delta T, from that epoch onward, is left unchanged.
 
     Args:
         tjdut: Julian Day number in UT1.
@@ -313,12 +327,14 @@ def _tid_acc_adjustment_seconds(tjdut: float, tid_acc: float) -> float:
     dacc = tid_acc - TIDAL_DEFAULT
     if dacc == 0.0 or tjdut >= _TID_ACC_REFERENCE_JD:
         return 0.0
-    u = (tjdut - _TID_ACC_REFERENCE_JD) / 36525.0
-    lunar_motion_arcsec_day = (
-        _IERS_F_RATE_ARCSEC_CY + _IERS_OMEGA_RATE_ARCSEC_CY
-    ) / 36525.0
-    seconds_per_arcsec = 86400.0 / lunar_motion_arcsec_day
-    return -0.5 * seconds_per_arcsec * dacc * u * u
+    centuries = (tjdut - _TID_ACC_REFERENCE_JD) / 36525.0
+    # Seconds of Delta T per (Julian century)**2 for this acceleration
+    # difference.  The sign follows from Delta T = TT - UT: a more negative
+    # acceleration puts the computed Moon behind its former place in the
+    # distant past, the observed configuration is reached later in TT, and
+    # Delta T grows.
+    seconds_per_cy2 = -0.5 * _SECONDS_PER_ARCSEC_OF_LUNAR_LONGITUDE * dacc
+    return seconds_per_cy2 * centuries * centuries
 
 
 def _deltat_with_tid_acc(tjdut: float, tid_acc: float) -> float:
@@ -1090,12 +1106,20 @@ def time_equ(jd: float) -> float:
         >>> print(f"Equation of Time: {eot_minutes:.2f} minutes")
         Equation of Time: -3.29 minutes
     """
-    # The equation of time is derived from the relationship:
-    #   E = GAST - RA_sun + 12h - UT
-    # where GAST is Greenwich Apparent Sidereal Time (hours),
-    # RA_sun is the Sun's apparent right ascension (hours),
-    # and UT is the UT time of day (hours).
-    # The result is normalized to ±12 hours, then converted to days.
+    # Definition (Explanatory Supplement to the Astronomical Almanac, 3rd
+    # ed., Urban & Seidelmann 2013, glossary entry "equation of time"): the
+    # hour angle of the apparent Sun minus the hour angle of the fictitious
+    # mean Sun.  At Greenwich the first is GAST - RA_sun and the second is
+    # UT - 12h, both in hours, so
+    #     E = GAST - RA_sun + 12h - UT
+    # with GAST the Greenwich apparent sidereal time, RA_sun the Sun's
+    # apparent right ascension and UT the time of day.  GAST + 12h - UT is
+    # the right ascension of the fictitious mean Sun plus the equation of
+    # the equinoxes, so this is the quantity of Meeus, Astronomical
+    # Algorithms (2nd ed., 1998), Ch. 28, Eq. 28.1,
+    #     E = L0 - 0.0057183 deg - alpha + dpsi cos(eps),
+    # written through sidereal time instead of the Sun's mean longitude.
+    # The result is reduced to ±12 hours, then converted to days.
 
     # Get Sun's apparent right ascension via equatorial coordinates
     # Import here to avoid circular import
@@ -1118,6 +1142,25 @@ def time_equ(jd: float) -> float:
         e_hours += 24.0
 
     return e_hours / 24.0
+
+
+def _meridian_offset_days(longitude: float) -> float:
+    """Local mean time minus UT for a meridian, in days (360 deg = 1 day).
+
+    East longitudes are ahead of Greenwich, so the offset is positive there.
+    """
+    return longitude / 360.0
+
+
+# Upper bound on the Equation-of-Time evaluations lat_to_lmt spends inverting
+# lmt_to_lat.  Each evaluation shrinks the error of the mean-time estimate by
+# |dE/dt|, at most ~30 s/day = 3.5e-4, from a start of at most |E| ~ 16 min:
+# three evaluations leave ~5e-13 day, a thousandth of the spacing of Julian
+# Day doubles near the present (~4.7e-10 day, 40 us).  A further evaluation
+# cannot improve the answer; it can only expose the ulp-level two-cycles in
+# which the estimate may end up alternating, so the count is fixed here and
+# the last evaluation's value is the function's answer.
+_LAT_TO_LMT_MAX_EVALUATIONS = 3
 
 
 def lat_to_lmt(jd_lat: float, longitude: float) -> float:
@@ -1155,29 +1198,28 @@ def lat_to_lmt(jd_lat: float, longitude: float) -> float:
         >>> jd_lmt = lat_to_lmt(jd_lat, 12.5)
         >>> # The difference should be approximately the Equation of Time
     """
-    # Convert longitude to time offset in days (360° = 24h = 1 day)
-    # Positive longitude (East) means local time is ahead of UT
-    longitude_offset_days = longitude / 360.0
-
-    # lat_to_lmt is the exact inverse of lmt_to_lat, which maps
-    #     LAT = LMT + E(UT),   with   UT = LMT - longitude_offset
-    # Recovering LMT from LAT therefore needs the Equation of Time E evaluated
-    # at the UT of the (unknown) LMT instant, not at the UT of LAT. A single
-    # evaluation at UT ≈ LAT - offset is off by up to ~0.2s in late November,
-    # where dE/dt is steepest. Refine the UT estimate with three fixed-point
-    # iterations (E drifts <30s/day, so this converges to well under a
-    # millisecond); the results agree with reference-API output to sub-millisecond.
-    ut_est = jd_lat - longitude_offset_days
+    # lmt_to_lat maps LMT to LMT + E(UT_mean), with UT_mean = LMT - offset.
+    # Inverting it needs E at the UT of the still unknown mean-time instant;
+    # what the sundial reading gives is UT_apparent = LAT - offset, which is
+    # off by E itself (up to ~16 min, worth ~0.3 s of E where E changes
+    # fastest).  So solve the fixed-point equation
+    #     UT_mean = UT_apparent - E(UT_mean)
+    # by substitution, starting from UT_apparent and stopping as soon as an
+    # estimate reproduces itself exactly (every later evaluation would then
+    # repeat the same doubles) or at the documented evaluation bound.
+    apparent_ut = jd_lat - _meridian_offset_days(longitude)
+    mean_ut = apparent_ut
     eot = 0.0
-    for _ in range(3):
-        eot = time_equ(ut_est)
-        ut_est = jd_lat - longitude_offset_days - eot
+    for _ in range(_LAT_TO_LMT_MAX_EVALUATIONS):
+        eot = time_equ(mean_ut)
+        refined_ut = apparent_ut - eot
+        if refined_ut == mean_ut:
+            break
+        mean_ut = refined_ut
 
-    # LMT = LAT - EoT, with EoT taken at the converged UT of the LMT instant.
-    # (When the sundial is ahead, EoT is positive, so LMT is less than LAT.)
-    jd_lmt = jd_lat - eot
-
-    return jd_lmt
+    # LMT = LAT - E, with E at the mean-time instant.  A sundial that runs
+    # ahead has E > 0, so LMT is earlier than LAT.
+    return jd_lat - eot
 
 
 def lmt_to_lat(jd_lmt: float, longitude: float) -> float:
@@ -1214,23 +1256,12 @@ def lmt_to_lat(jd_lmt: float, longitude: float) -> float:
         >>> jd_lat = lmt_to_lat(jd_lmt, 12.5)
         >>> # The difference should be approximately the Equation of Time
     """
-    # Convert longitude to time offset in days (360° = 24h = 1 day)
-    # Positive longitude (East) means local time is ahead of UT
-    longitude_offset_days = longitude / 360.0
-
-    # Convert from local time to UT for EoT calculation
-    # LMT (local) = UT + longitude_offset
-    # So UT ≈ LMT - longitude_offset
-    jd_ut_approx = jd_lmt - longitude_offset_days
-
-    # Calculate the Equation of Time at this UT
-    eot = time_equ(jd_ut_approx)
-
-    # LAT = LMT + EoT
-    # (This is the inverse of LMT = LAT - EoT)
-    jd_lat = jd_lmt + eot
-
-    return jd_lat
+    # Mean solar time is uniform, so the UT of an LMT instant is exact:
+    # UT_mean = LMT - offset.  The Equation of Time read there is the amount
+    # by which a sundial on the same meridian runs ahead of the clock, and
+    # LAT = LMT + E.  (lat_to_lmt inverts this map.)
+    mean_ut = jd_lmt - _meridian_offset_days(longitude)
+    return jd_lmt + time_equ(mean_ut)
 
 
 def _sidtime_internal(
