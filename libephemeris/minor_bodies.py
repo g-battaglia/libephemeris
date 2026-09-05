@@ -109,15 +109,41 @@ from .constants import (
 GM_SUN = 0.00029591220828559  # AU^3/day^2
 
 # Reciprocal Sun/planet system-mass ratios (m_planet / m_sun).
-# Source: JPL DE440/DE441 planetary masses (Park, Folkner, Williams & Boggs
-# 2021, AJ 161, 105).
+# Jupiter: IAU 2009 System of Astronomical Constants (Luzum et al. 2011,
+# Celestial Mechanics and Dynamical Astronomy 110, 293), Sun/Jupiter =
+# 1.047348644e3; the IAU 2015 Resolution B3 nominal constants leave this ratio
+# in force. Saturn: the DE421 GM ratio 132712440040.944 / 37940585.2 (Folkner,
+# Williams & Boggs 2009, IPN Progress Report 42-178) that the IAU 2009 system
+# prints as 3.4979018e3. DE440 (Park et al. 2021, AJ 161, 105) gives 1047.34863
+# and 3497.90180 instead; the ~1e-8 relative differences are immaterial for the
+# first-order secular theory below.
 MASS_RATIO_JUPITER = 1.0 / 1047.348644  # ~9.546e-4
 MASS_RATIO_SATURN = 1.0 / 3497.901768  # ~2.858e-4
 
-# Mean orbital elements of perturbing planets (J2000.0 values), used for the
-# secular perturbation theory below. Source: Standish, "Keplerian Elements for
-# Approximate Positions of the Major Planets" (JPL, 1992/2006), consistent with
-# JPL Horizons mean elements at J2000.0.
+# Mean orbital elements of the perturbing planets at J2000.0, rounded to 3-5
+# significant figures (ample for the first-order secular theory below).
+# Provenance, checked value by value against the printed expressions:
+#   * a, e, i and node of Jupiter and Saturn, Saturn's argument of perihelion
+#     (93.056787 - 113.665524 + 360 = 339.39), a of Uranus and Neptune, and the
+#     Jupiter and Saturn mean motions (3034.9056746 and 1222.1137943 deg per
+#     Julian century at the J2000 equinox, i.e. 0.08309 and 0.03346 deg/day)
+#     are the Simon et al. (1994) A&A 282, 663 mean elements as tabulated in
+#     Meeus, Astronomical Algorithms (2nd ed., 1998), Tables 31.A and 31.B,
+#     whose J2000.0 constant terms coincide (``planetary_mean_elements.py``
+#     carries the full Table 31.A polynomials). The Uranus mean motion
+#     (0.01177) is the equinox-of-date rate of Table 31.A (429.8640561 deg/cy)
+#     and Neptune's (0.006021) is within one unit of its last digit of that
+#     rate (219.8833092 deg/cy).
+#   * The arguments of perihelion of Jupiter, Uranus and Neptune and Neptune's
+#     eccentricity follow the JPL Solar System Dynamics table "Keplerian
+#     Elements for Approximate Positions of the Major Planets" (Standish;
+#     ssd.jpl.nasa.gov/planets/approx_pos.html, 1800-2050 AD): omega = varpi -
+#     node gives 274.25, 96.94 and 273.18 from (14.72847983, 100.47390909),
+#     (170.95427630, 74.01692503) and (44.96476227, 131.78422574); Neptune
+#     e = 0.00859048.
+#   * Uranus' e = 0.0457 and i = 0.772 round to neither table (Simon:
+#     0.04629590, 0.773196; JPL: 0.04725744, 0.77263783); they are the NASA
+#     planetary fact sheet figures and are kept unchanged.
 
 # Jupiter mean elements (for secular perturbation theory)
 JUPITER_A = 5.2026  # Semi-major axis (AU)
@@ -160,12 +186,19 @@ MASS_RATIO_NEPTUNE = 1.0 / 19412  # ~5.153e-5
 
 
 # L4: Linear rates for planet orbital elements (per Julian century from J2000.0)
-# Source: Simon et al. (1994) A&A 282, 663; Standish, "Keplerian Elements for
-# Approximate Positions of the Major Planets" (JPL, 1992/2006).
 # These allow the forced eccentricity/inclination vectors to evolve with time,
 # improving accuracy over century-scale propagations.
 # Rates are in the same units as the base values (AU, dimensionless, degrees)
 # per Julian century (36525 days).
+# Provenance: the rates are approximate and only partly traceable to a printed
+# table, so they are documented rather than attributed. The eccentricity rates
+# do not reproduce Simon et al. (1994) (Meeus Table 31.A, frame independent:
+# +0.000163244, -0.000346818, -0.000027337, +0.000006408 per century for
+# Jupiter to Neptune); Saturn's coincides with the JPL 1800-2050 Keplerian
+# table (-0.00050991), as do the Saturn and Uranus inclination rates
+# (0.00193609, -0.00242939 deg/cy); the node and perihelion rates match neither
+# source. They are kept unchanged as the values this secular model has always
+# propagated with.
 
 # Jupiter element rates per century
 JUPITER_DE = -0.00036  # eccentricity rate (dimensionless/century)
@@ -197,8 +230,9 @@ def _get_planet_elements_at_time(
 ) -> list[tuple[float, float, float, float, float, float, float]]:
     """Return planet orbital elements evolved to the given Julian Day.
 
-    L4: Uses linear rates from Simon et al. (1994) to evolve planet elements
-    from their J2000.0 values to the target date. This improves the forced
+    L4: Uses the linear element rates tabulated above (see their provenance
+    note) to evolve planet elements from their J2000.0 values to the target
+    date. This improves the forced
     eccentricity/inclination vectors for century-scale propagations.
 
     Args:
@@ -1197,7 +1231,8 @@ def _calc_forced_elements(
     decomposes into forced + free components.
 
     L4: When jd_tt is provided, planet orbital elements are evolved from their
-    J2000.0 values using linear rates from Simon et al. (1994). This improves
+    J2000.0 values using the linear rates tabulated at module level (see their
+    provenance note). This improves
     the forced eccentricity/inclination vectors for century-scale propagations
     by ~10-30" over 500 years.
 
@@ -1239,7 +1274,7 @@ def _calc_forced_elements(
     References:
         Murray & Dermott "Solar System Dynamics" §7.3-7.5, eq. 7.10, 7.25-7.26
         Brouwer & Clemence "Methods of Celestial Mechanics" Ch. XVI
-        Simon et al. (1994) A&A 282, 663 (planet element rates)
+        Simon et al. (1994) A&A 282, 663 (J2000.0 planet mean elements)
     """
     a = elements.a
     e = elements.e

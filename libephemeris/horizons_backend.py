@@ -50,6 +50,13 @@ logger = logging.getLogger("libephemeris")
 
 API_URL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
+# Speed of light in AU/day for the light-time iterations below: c = 299792458
+# m/s (exact SI value, CODATA) with the IAU 2012 Resolution B2 astronomical
+# unit of 149597870700 m gives 173.14463267424, kept to the eight decimals this
+# backend has always used. (``astrometry.C_LIGHT_AU_DAY`` carries the
+# NOVAS/DE405-based 173.1446326846693 used by the Skyfield and LEB paths.)
+_C_LIGHT_AU_DAY = 173.14463267
+
 # Map libephemeris body IDs to Horizons COMMAND strings
 _HORIZONS_COMMAND: Dict[int, str] = {
     0: "10",  # Sun
@@ -525,7 +532,6 @@ def horizons_calc_ut(
     if iflag & FLG_HELCTR or iflag & FLG_BARYCTR:
         import math as _math
 
-        c_au_day = 173.14463267
         if iflag & FLG_HELCTR:
             if body_id == 0:
                 # Sun heliocentric = Sun from Sun = (0, 0, 0)
@@ -558,7 +564,7 @@ def horizons_calc_ut(
                     )
                     if dist == 0.0:
                         break
-                    lt = dist / c_au_day
+                    lt = dist / _C_LIGHT_AU_DAY
                     tgt_lt = client.fetch_state_vector(command, jd_tt - lt, "@0", "TDB")
 
                 rel_pos = (
@@ -585,7 +591,7 @@ def horizons_calc_ut(
                     relative_radial = sum(
                         direction[index] * rel_vel[index] for index in range(3)
                     )
-                    lt_rate = relative_radial / (c_au_day + target_radial)
+                    lt_rate = relative_radial / (_C_LIGHT_AU_DAY + target_radial)
                     rel_vel = (
                         tgt_lt.vx * (1.0 - lt_rate) - sun_sv.vx,
                         tgt_lt.vy * (1.0 - lt_rate) - sun_sv.vy,
@@ -602,7 +608,7 @@ def horizons_calc_ut(
         if not (iflag & FLG_TRUEPOS):
             dist = _math.sqrt(sv.x**2 + sv.y**2 + sv.z**2)
             if dist > 0.0:
-                lt = dist / c_au_day
+                lt = dist / _C_LIGHT_AU_DAY
                 sv = client.fetch_state_vector(command, jd_tt - lt, "@0", "TDB")
         # Speed slots are zero without FLG_SPEED, as in the geocentric path.
         bary_vel = sv.vel if (iflag & FLG_SPEED) else (0.0, 0.0, 0.0)
@@ -653,9 +659,8 @@ def horizons_calc_ut(
     if not (iflag & FLG_TRUEPOS):
         import math
 
-        c_au_day = 173.14463267  # speed of light in AU/day
         dist = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2)
-        lt = dist / c_au_day
+        lt = dist / _C_LIGHT_AU_DAY
 
         # Re-fetch target at retarded time
         target_lt = client.fetch_state_vector(command, jd_tt - lt, "@0", "TDB")
@@ -665,7 +670,7 @@ def horizons_calc_ut(
             target_lt.z - earth_sv.z,
         )
         dist = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2)
-        lt = dist / c_au_day
+        lt = dist / _C_LIGHT_AU_DAY
     else:
         lt = 0.0
 
@@ -702,7 +707,7 @@ def horizons_calc_ut(
     lt2 = 0.0
     if not (iflag & FLG_TRUEPOS):
         dist2 = math.sqrt(geo2[0] ** 2 + geo2[1] ** 2 + geo2[2] ** 2)
-        lt2 = dist2 / c_au_day
+        lt2 = dist2 / _C_LIGHT_AU_DAY
         target_lt2 = client.fetch_state_vector(command, jd_tt2 - lt2, "@0", "TDB")
         geo2 = (
             target_lt2.x - earth_sv2.x,
@@ -714,7 +719,7 @@ def horizons_calc_ut(
         # asymmetric (geometric vs retarded) lt between the two epochs
         # would leak a spurious velocity into the finite difference.
         dist2 = math.sqrt(geo2[0] ** 2 + geo2[1] ** 2 + geo2[2] ** 2)
-        lt2 = dist2 / c_au_day
+        lt2 = dist2 / _C_LIGHT_AU_DAY
 
     if apply_deflection:
         # Use same deflector positions (good enough for dt=1s)

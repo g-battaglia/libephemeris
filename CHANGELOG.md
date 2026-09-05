@@ -21,6 +21,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API contract names that no code path reads, and corrects the attribution of
   `TIDAL_DE440`/`TIDAL_DE441`: the value is not printed in Park et al. (2021).
   No constant changed value.
+- `minor_bodies.py` corrects the attribution of its perturbation constants:
+  `MASS_RATIO_JUPITER` (1/1047.348644) is the IAU 2009 Sun/Jupiter mass ratio
+  (Luzum et al. 2011); the J2000.0 mean elements of the perturbing planets are
+  the Simon et al. (1994) values as tabulated in Meeus (Tables 31.A/31.B), with
+  the arguments of perihelion of Jupiter, Uranus and Neptune and Neptune's
+  eccentricity taken from the JPL approximate Keplerian elements; the L4
+  element rates are documented as approximate rather than attributed.
+  `leb_vector._EMRAT` cites its DE430/DE431 origin next to the DE440 figure,
+  and `horizons_backend.py` factors its speed of light into the cited constant
+  `_C_LIGHT_AU_DAY` (IAU 2012 astronomical unit, exact SI c). No value changed.
+- `fast_calc.py` renames the private helper `_cotrans` to
+  `_rotate_spherical_about_x` with a rewritten docstring, corrects the note on
+  `C_LIGHT_AU_DAY` (86400 s over the DE405 light-time for one astronomical
+  unit, not an IAU 1976 quantity), documents the 0.0001-day SPEED3 half-step
+  and the SPEED3/TOPOCTR rate selection in the project's own terms, and reuses
+  `_SPEED3_STEP_DAYS` at its second site. Results are bit-identical.
+
+### Removed
+
+- The never-called IAU 2006 Fukushima-Williams precession block of
+  `fast_calc.py` (`_iau2006_precession_angles`, `_fw2m` and their helper
+  constants); the LEB frame path uses the Vondrák 2011 precession through
+  `precession_vondrak`.
 
 ## [3.2.1] - 2026-09-05
 

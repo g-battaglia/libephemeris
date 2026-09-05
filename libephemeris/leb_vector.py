@@ -47,6 +47,13 @@ else:
     LEBReaderLike = Any
 
 
+# Earth/Moon mass ratio used to compose the Earth-Moon barycenter from the
+# stored Earth and Moon channels. 81.3005691 is the DE430/DE431 header value
+# EMRAT = 81.30056907 (Folkner et al. 2014, IPN Progress Report 42-196)
+# rounded to seven decimals; DE440 (Park et al. 2021, AJ 161, 105) revised it
+# to 81.3005682, a 1e-8 relative change that moves the composed barycenter by
+# ~3e-13 AU. The DE430 figure is kept, as in ``lunar.GM_EARTH_MOON_AU3_DAY2``,
+# so the LEB-only vector path stays bit-identical to its recorded behaviour.
 _EMRAT = 81.3005691
 
 

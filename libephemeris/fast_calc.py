@@ -124,9 +124,14 @@ if TYPE_CHECKING:
 # CONSTANTS
 # =============================================================================
 
-# Speed of light in AU/day (NOVAS/Skyfield ``C_AUDAY``; adopted for
-# cross-backend bit-identity). c = 299792458 m/s exactly (BIPM/CODATA SI) with
-# the IAU 1976 System au (1.49597870691e11 m) reproduces 173.1446326846693.
+# Speed of light in AU/day: the NOVAS/Skyfield ``C_AUDAY`` constant, adopted so
+# the LEB and Skyfield backends agree bit-for-bit. It is 86400 s divided by
+# the DE405 light-time for one astronomical unit, 499.0047838061 s (Standish
+# 1998, JPL IOM 312.F-98-048; NOVAS 3 ``AU_SEC``, Kaplan et al. 2011, USNO
+# Circular 180), i.e. c = 299792458 m/s with au = 1.4959787069098932e11 m.
+# Neither c*86400 / 1.49597870691e11 m (173.14463268465693) nor the IAU 2012
+# Resolution B2 au of 149597870700 m (173.14463267424, 1.0e-8 AU/day smaller)
+# reproduces this value; both are documented here only to avoid confusion.
 C_LIGHT_AU_DAY = 173.1446326846693  # Speed of light in AU/day
 J2000 = 2451545.0  # J2000.0 epoch in JD
 
@@ -325,6 +330,14 @@ def _spherical_to_cartesian_with_velocity(
     return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
 
+# Half-step (days) of the three-point finite-difference rate used under
+# FLG_SPEED3: 8.64 s. A project engineering choice shared by every SPEED3
+# stencil of this module: small enough that the O(h^2) truncation term of the
+# centered difference stays near 1e-10 deg/day even for points moving at lunar
+# rates, large enough that the ~1e-13 deg rounding of the two sampled positions
+# contributes only ~5e-10 deg/day. The FLG_SPEED3 contract is that the reported
+# speed is derived from three sampled positions rather than from an analytical
+# rate.
 _SPEED3_STEP_DAYS = 0.0001
 
 
@@ -336,7 +349,7 @@ def _apply_central_speed3_stencil(
 ) -> Tuple[float, float, float, float, float, float]:
     """Rebuild SPEED3 rates with a standard centered finite difference.
 
-    The clean-room implementation uses ``(P(t+h) - P(t-h)) / (2*h)``.
+    The rate is ``(P(t+h) - P(t-h)) / (2*h)`` with ``h = _SPEED3_STEP_DAYS``.
     Longitude is unwrapped around the current position for spherical output;
     Cartesian output differentiates each axis independently.
     """
@@ -781,99 +794,9 @@ def _get_precession_matrix(
 # =============================================================================
 # PURE-LEB FRAME DATA (no Skyfield dependency)
 # =============================================================================
-# IAU 2006 Fukushima-Williams precession polynomials (IERS 2010 Table 5.1)
-# combined with LEB-stored IAU 2006/2000A nutation to build the full
-# bias-precession-nutation matrix without any Skyfield or erfa calls.
-
-_AS2R = math.pi / (180.0 * 3600.0)  # arcseconds to radians
-_J2000 = 2451545.0
-_CENTURY = 36525.0
-
-
-def _iau2006_precession_angles(
-    jd_tt: float,
-) -> Tuple[float, float, float, float]:
-    """IAU 2006 Fukushima-Williams precession angles.
-
-    Equivalent to erfa.pfw06. Returns (gamb, phib, psib, epsa) in radians.
-    """
-    T = (jd_tt - _J2000) / _CENTURY
-    gamb = (
-        -0.052928
-        + (
-            10.556378
-            + (0.4932044 + (-0.00031238 + (-0.000002788 + 0.0000000260 * T) * T) * T)
-            * T
-        )
-        * T
-    ) * _AS2R
-    phib = (
-        84381.412819
-        + (
-            -46.811016
-            + (0.0511268 + (0.00053289 + (-0.000000440 - 0.0000000176 * T) * T) * T) * T
-        )
-        * T
-    ) * _AS2R
-    psib = (
-        -0.041775
-        + (
-            5038.481484
-            + (1.5584175 + (-0.00018522 + (-0.000026452 - 0.0000000148 * T) * T) * T)
-            * T
-        )
-        * T
-    ) * _AS2R
-    epsa = (
-        84381.406
-        + (
-            -46.836769
-            + (-0.0001831 + (0.00200340 + (-0.000000576 - 0.0000000434 * T) * T) * T)
-            * T
-        )
-        * T
-    ) * _AS2R
-    return gamb, phib, psib, epsa
-
-
-def _fw2m(
-    gamb: float, phib: float, psi: float, eps: float
-) -> Tuple[Tuple[float, float, float], ...]:
-    """Fukushima-Williams angles to BPN rotation matrix.
-
-    Computes R = R1(-eps) x R3(-psi) x R1(phib) x R3(gamb).
-    Equivalent to erfa.fw2m / SOFA iauFw2m.
-    """
-    sg = math.sin(gamb)
-    cg = math.cos(gamb)
-    sp = math.sin(phib)
-    cp = math.cos(phib)
-    ss = math.sin(psi)
-    cs = math.cos(psi)
-    se = math.sin(eps)
-    ce = math.cos(eps)
-
-    # BA = R1(phib) x R3(gamb)
-    -sg * cp
-    cg * cp
-    ba20 = sg * sp
-    ba21 = -cg * sp
-
-    # CBA = R3(-psi) x BA
-    cba00 = cs * cg + ss * sg * cp
-    cba01 = cs * sg - ss * cg * cp
-    cba02 = -ss * sp
-    cba10 = ss * cg - cs * sg * cp
-    cba11 = ss * sg + cs * cg * cp
-    cba12 = cs * sp
-
-    # DCBA = R1(-eps) x CBA
-    return (
-        (cba00, cba01, cba02),
-        (ce * cba10 - se * ba20, ce * cba11 - se * ba21, ce * cba12 - se * cp),
-        (se * cba10 + ce * ba20, se * cba11 + ce * ba21, se * cba12 + ce * cp),
-    )
-
+# The LEB-stored IAU 2000A nutation angles are combined with the Vondrák 2011
+# long-term precession (``precession_vondrak``, evaluated through erfa) into the
+# full bias-precession-nutation matrix; no Skyfield call is involved.
 
 # Thread-local cache for _get_leb_frame_data (keyed by exact jd_tt float).
 # Using a plain dict + maxsize check is faster than @lru_cache for this
@@ -1041,21 +964,29 @@ def _mat3_vec3(
     )
 
 
-def _cotrans(lon: float, lat: float, eps: float) -> Tuple[float, float]:
-    """Coordinate transform between ecliptic and equatorial.
+def _rotate_spherical_about_x(
+    lon: float, lat: float, angle_deg: float
+) -> Tuple[float, float]:
+    """Rotate a direction given in spherical coordinates about the x-axis.
 
-    Negative eps: ecliptic -> equatorial.
-    Positive eps: equatorial -> ecliptic.
+    The x-axis is the shared origin of longitude of two frames that differ by
+    a tilt about it (the equinox direction for the ecliptic and equatorial
+    systems). The direction ``(lon, lat)`` is turned into a unit vector, the
+    vector is rotated about x by ``angle_deg`` and the result is expressed as
+    angles again. Callers of this module pass the negated obliquity to move
+    from ecliptic to equatorial coordinates and the obliquity itself for the
+    inverse rotation.
 
     Args:
-        lon: Longitude/RA in degrees.
-        lat: Latitude/Dec in degrees.
-        eps: Obliquity in degrees (sign determines direction).
+        lon: Longitude (or right ascension) in degrees.
+        lat: Latitude (or declination) in degrees.
+        angle_deg: Rotation angle about the x-axis in degrees.
 
     Returns:
-        (transformed_lon, transformed_lat) in degrees.
+        ``(lon, lat)`` of the rotated direction in degrees, longitude in
+        ``[0, 360)``.
     """
-    eps_rad = math.radians(-eps)  # Ecliptic-to-equatorial rotation sign.
+    eps_rad = math.radians(-angle_deg)  # sense of the rotation used below
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
 
@@ -1538,7 +1469,7 @@ def _frame_transform(
         if _icrs:
             # Bias-free: rotate the ICRS vector by the J2000 mean obliquity
             # only, leaving the pole/equinox on the ICRS realization.
-            eps_j2000 = math.radians(vondrak_mean_obliquity_deg(_J2000))
+            eps_j2000 = math.radians(vondrak_mean_obliquity_deg(J2000))
             v = _rotate_equatorial_to_ecliptic(geo[0], geo[1], geo[2], eps_j2000)
         else:
             v = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
@@ -1943,33 +1874,41 @@ def _pipeline_ecliptic(
     ) -> Tuple[float, float, float, float, float, float]:
         """Return a reported of-date state for an ecliptic-direct body.
 
-        Mean and interpolated apsides always come from the packaged clean-room
+        Mean and interpolated apsides always come from the packaged analytical
         models, never from their legacy LEB channels.  True-node and
         osculating-apogee positions retain the JPL-derived LEB path.
+
+        Rate selection: FLG_SPEED3, and FLG_SPEED combined with FLG_TOPOCTR,
+        request the three-point rate; plain FLG_SPEED requests the analytical
+        one. This is the same selection the sampled bodies below apply when
+        choosing their finite-difference half-step, so a given flag set reports
+        one kind of rate for every ecliptic-direct body. The analytical models
+        accept ``speed3`` for the shared call signature and return their
+        analytical rate either way.
         """
-        use_speed3_state = bool(iflag & FLG_SPEED3)
-        use_speed3_velocity = bool(iflag & FLG_SPEED) and (
-            use_speed3_state or bool(iflag & FLG_TOPOCTR)
+        three_point_state = bool(iflag & FLG_SPEED3)
+        three_point_rates = bool(iflag & FLG_SPEED) and (
+            three_point_state or bool(iflag & FLG_TOPOCTR)
         )
         if ipl == MEAN_NODE:
             from .lunar import calc_mean_lunar_node_state
 
             lo, la, di, dlo, dla, ddi = calc_mean_lunar_node_state(
-                jd, speed3=use_speed3_velocity
+                jd, speed3=three_point_rates
             )
         elif ipl == MEAN_APOG:
             from .lunar import calc_mean_lilith_state
 
             lo, la, di, dlo, dla, ddi = calc_mean_lilith_state(
-                jd, speed3=use_speed3_velocity
+                jd, speed3=three_point_rates
             )
         elif ipl in (INTP_APOG, INTP_PERG):
             from .lunar import calc_interpolated_apse_state
 
             lo, la, di, dlo, dla, ddi = calc_interpolated_apse_state(
-                jd, ipl, speed3=use_speed3_state
+                jd, ipl, speed3=three_point_state
             )
-            if use_speed3_velocity and not use_speed3_state:
+            if three_point_rates and not three_point_state:
                 speed3 = calc_interpolated_apse_state(jd, ipl, speed3=True)
                 dlo, dla, ddi = speed3[3:]
         else:
@@ -2007,9 +1946,7 @@ def _pipeline_ecliptic(
 
     # Velocity: the reported speed is the central difference of the reported
     # of-date position, over the SAME window the Skyfield backend uses, so the
-    # two backends agree per body:
-    #   * OscuApog's osculating curve oscillates sub-daily -> tight 0.05 d window
-    #   * every other ecliptic-direct point -> 0.5 d
+    # two backends agree per body (half-steps listed at ``_dt`` below).
     # Because _ofdate_pos already carries the distance/latitude overrides and
     # Δψ, dlon/dlat/ddist are automatically the true derivatives of the
     # reported position — including the nutation rate (matching the ±Δψ on the
@@ -2018,12 +1955,18 @@ def _pipeline_ecliptic(
     # Chebyshev derivative). At an ephemeris edge the ±dt samples may fall out
     # of range; return zero speed there, matching the Skyfield boundary path.
     if (iflag & FLG_SPEED) and not _clean_model_body:
-        # OSCU_APOG mirrors the Skyfield backend's 0.002-day half-step: the
-        # true-apogee longitude has fast structure that a 0.05-day chord
-        # misrepresents by up to ~1.4"/day (the two backends must report the
-        # same derivative of the same position channel).
+        # Half-step of the centered difference, by flag set and body:
+        #   * FLG_SPEED3, or FLG_SPEED with FLG_TOPOCTR: ``_SPEED3_STEP_DAYS``
+        #     (8.64 s), the one three-point stencil of this module, so the
+        #     rate reported here is the same kind of quantity the analytical
+        #     models report under those flags (see ``_ofdate_state``);
+        #   * OSCU_APOG: 0.002 d, mirroring the Skyfield backend: the
+        #     true-apogee longitude has fast structure that a 0.05-day chord
+        #     misrepresents by up to ~1.4"/day (the two backends must report
+        #     the same derivative of the same position channel);
+        #   * TRUE_NODE: 0.05 d; every other ecliptic-direct point: 0.5 d.
         _dt = (
-            0.0001
+            _SPEED3_STEP_DAYS
             if iflag & (FLG_SPEED3 | FLG_TOPOCTR)
             else (0.002 if ipl == OSCU_APOG else (0.05 if ipl == TRUE_NODE else 0.5))
         )
@@ -2063,7 +2006,7 @@ def _pipeline_ecliptic(
             # reported J2000 speed is then the true derivative of the reported
             # J2000 position, consistently across the two backends.
             lo_j, la_j = _precess_ecliptic(lo, la, src_epoch, J2000)
-            return _cotrans(lo_j, la_j, -eps)
+            return _rotate_spherical_about_x(lo_j, la_j, -eps)
 
         # Velocity: CENTERED difference of the mapped ecliptic path, for the
         # same reason as the sibling equatorial-of-date and J2000-ecliptic
@@ -2109,11 +2052,11 @@ def _pipeline_ecliptic(
         # centered stencil cancels it and matches the derivative of the
         # reported equatorial position.
         dt_step = 0.001  # days (half-step of the centered stencil)
-        eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)
-        eq_fwd_lon, eq_fwd_lat = _cotrans(
+        eq_now_lon, eq_now_lat = _rotate_spherical_about_x(lon, lat, -eps)
+        eq_fwd_lon, eq_fwd_lat = _rotate_spherical_about_x(
             lon + dlon * dt_step, lat + dlat * dt_step, -eps
         )
-        eq_bwd_lon, eq_bwd_lat = _cotrans(
+        eq_bwd_lon, eq_bwd_lat = _rotate_spherical_about_x(
             lon - dlon * dt_step, lat - dlat * dt_step, -eps
         )
         d_eq_lon = eq_fwd_lon - eq_bwd_lon

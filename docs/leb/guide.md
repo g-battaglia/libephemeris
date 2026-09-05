@@ -808,7 +808,7 @@ dlon -= prec_rate
 | `_apply_aberration(geo, earth_vel)` | Classical aberration formula | line 138 |
 | `_get_leb_frame_data(reader, jd_tt)` | Vondrák 2011 PN matrix + LEB nutation | fast_calc.py |
 | `_mat3_vec3(mat, vec)` | 3x3 matrix * 3-vector | line 221 |
-| `_cotrans(lon, lat, eps)` | Ecliptic <-> equatorial spherical | line 233 |
+| `_rotate_spherical_about_x(lon, lat, angle_deg)` | Rotation about the equinox axis (ecliptic <-> equatorial) | fast_calc.py |
 | `_precess_ecliptic(lon, lat, from_jd, to_jd)` | Ecliptic precession | line 270 |
 | `_apply_cob_correction(pos, ipl, jd_tt)` | Center-of-Body correction for outer planets | line 286 |
 | `_apply_gravitational_deflection(...)` | PPN gravitational deflection (Sun/Jupiter/Saturn) | line 348 |

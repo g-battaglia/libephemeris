@@ -444,10 +444,10 @@ def test_pipeline_ecliptic_eq_j2000_wrap_positive(reader, monkeypatch):
     """EQ+J2000: d_eq_lon > 180 wrap (line 1483)."""
     seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])  # eq_now, eq_fwd
 
-    def fake_cotrans(lon, lat, eps):
+    def fake_rotation(lon, lat, angle_deg):
         return next(seq)
 
-    monkeypatch.setattr(fc, "_cotrans", fake_cotrans)
+    monkeypatch.setattr(fc, "_rotate_spherical_about_x", fake_rotation)
     monkeypatch.setattr(fc, "_precess_ecliptic", lambda lo, la, a, b: (lo, la))
     res = _pipeline_ecliptic(
         reader, JD, TRUE_NODE, FLG_SPEED | FLG_EQUATORIAL | FLG_J2000
@@ -460,10 +460,10 @@ def test_pipeline_ecliptic_eq_j2000_wrap_negative(reader, monkeypatch):
     """EQ+J2000: d_eq_lon < -180 wrap (line 1485)."""
     seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
-    def fake_cotrans(lon, lat, eps):
+    def fake_rotation(lon, lat, angle_deg):
         return next(seq)
 
-    monkeypatch.setattr(fc, "_cotrans", fake_cotrans)
+    monkeypatch.setattr(fc, "_rotate_spherical_about_x", fake_rotation)
     monkeypatch.setattr(fc, "_precess_ecliptic", lambda lo, la, a, b: (lo, la))
     res = _pipeline_ecliptic(
         reader, JD, TRUE_NODE, FLG_SPEED | FLG_EQUATORIAL | FLG_J2000
@@ -476,10 +476,10 @@ def test_pipeline_ecliptic_eq_wrap_positive(reader, monkeypatch):
     """EQ of date: d_eq_lon > 180 wrap (line 1509)."""
     seq = iter([(1.0, 0.0), (359.0, 0.0), (1.0, 0.0)])
 
-    def fake_cotrans(lon, lat, eps):
+    def fake_rotation(lon, lat, angle_deg):
         return next(seq)
 
-    monkeypatch.setattr(fc, "_cotrans", fake_cotrans)
+    monkeypatch.setattr(fc, "_rotate_spherical_about_x", fake_rotation)
     res = _pipeline_ecliptic(reader, JD, TRUE_NODE, FLG_SPEED | FLG_EQUATORIAL)
     assert all(math.isfinite(v) for v in res)
 
@@ -489,10 +489,10 @@ def test_pipeline_ecliptic_eq_wrap_negative(reader, monkeypatch):
     """EQ of date: d_eq_lon < -180 wrap (line 1511)."""
     seq = iter([(359.0, 0.0), (1.0, 0.0), (359.0, 0.0)])
 
-    def fake_cotrans(lon, lat, eps):
+    def fake_rotation(lon, lat, angle_deg):
         return next(seq)
 
-    monkeypatch.setattr(fc, "_cotrans", fake_cotrans)
+    monkeypatch.setattr(fc, "_rotate_spherical_about_x", fake_rotation)
     res = _pipeline_ecliptic(reader, JD, TRUE_NODE, FLG_SPEED | FLG_EQUATORIAL)
     assert all(math.isfinite(v) for v in res)
 
