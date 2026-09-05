@@ -1030,75 +1030,78 @@ def csnorm(cs: int) -> int:
     return cs % CS360
 
 
+#: Hundredths of an arcsecond in one whole arcsecond, and half of that: the
+#: bias that turns a truncation into a rounding.
+_CS_PER_ARCSEC: int = 100
+_CS_HALF_ARCSEC: int = _CS_PER_ARCSEC // 2
+
+#: Hundredths of an arcsecond in one 30-degree sign.
+_CS_PER_SIGN: int = CS360 // 12
+
+
 def csroundsec(cs: int) -> int:
     """
-    Round a value in centiseconds to the nearest arcsecond.
+    Round an angle in centiseconds to the nearest whole arcsecond.
 
-    This function rounds a centisecond value to the nearest arcsecond,
-    returning the result still in centiseconds (i.e., rounded to the
-    nearest multiple of 100).
+    The argument is an angle counted in hundredths of an arcsecond; the answer
+    is the same angle to the nearest whole arcsecond, still counted in
+    hundredths, so it is always a multiple of 100.
+
+    Non-negative values round half up. Negative values take the same
+    half-arcsecond bias and are then truncated toward zero, so the negative
+    half of the domain rounds toward positive infinity: the function is
+    neither odd nor idempotent there. One interval is restored explicitly, so
+    that an angle at or below one whole arcsecond below zero does not collapse
+    to zero.
+
+    A rounded value is not allowed to arrive exactly on a multiple of 30
+    degrees from strictly inside the sector below it: it is held one whole
+    arcsecond short of the boundary, so that a reading stays inside the sign
+    it belongs to. The hold is a convention of this formatting surface and
+    carries no astronomical meaning.
 
     Compatible with the reference csroundsec() API.
 
     Args:
-        cs: Angle in centiseconds (1/100 arcsecond)
+        cs: Angle in centiseconds (any integer, of either direction).
 
     Returns:
-        Centisecond value rounded to the nearest arcsecond (multiple of 100)
+        The angle rounded to a whole arcsecond, in centiseconds; always a
+        multiple of 100, and never more than 149 centiseconds from ``cs``.
 
     Notes:
-        - 1 centisecond = 1/100 arcsecond
-        - The compatibility rule adds 50 centiseconds and then uses integer
-          truncation toward zero, rather than Python's floor division.
-        - A sign-boundary guard keeps a rounded display value inside its
-          original 30° zodiac sector; this is an API/display convention, not
-          an astronomical model.
+        - 1 centisecond = 1/100 arcsecond = 1/360000 degree
+        - 30° = 10,800,000 centiseconds; 360° = 129,600,000 centiseconds
 
     Examples:
-        >>> csroundsec(150)  # 1.50 arcseconds -> 2 arcseconds = 200 cs
+        >>> csroundsec(149)
+        100
+        >>> csroundsec(150)
         200
-        >>> csroundsec(149)  # 1.49 arcseconds -> 1 arcsecond = 100 cs
-        100
-        >>> csroundsec(50)   # 0.50 arcseconds -> 1 arcsecond = 100 cs
-        100
-        >>> csroundsec(100)  # 1.00 arcsecond -> 1 arcsecond = 100 cs
-        100
-        >>> csroundsec(0)    # 0 centiseconds -> 0 arcseconds
-        0
-        >>> csroundsec(-150) # -1.50 arcseconds -> -1 arcsecond = -100 cs
+        >>> csroundsec(-150)
         -100
+        >>> csroundsec(-120)  # the restored interval
+        -100
+        >>> csroundsec(10799960)  # held short of the 30° boundary
+        10799900
+        >>> csroundsec(129600000)  # already on a boundary: unchanged
+        129600000
     """
-    # Truncation-toward-zero integer division (not floor division):
-    # For cs + 50, we need truncation toward zero, not floor division
-    cs_plus_50 = cs + 50
-    if cs_plus_50 >= 0:
-        result = (cs_plus_50 // 100) * 100
+    biased = cs + _CS_HALF_ARCSEC
+    if biased >= 0:
+        rounded = biased // _CS_PER_ARCSEC * _CS_PER_ARCSEC
     else:
-        # Truncation toward zero for negative values
-        result = -((-cs_plus_50) // 100) * 100
-
-    # Boundary correction: prevent rounding up across zodiacal sign boundaries
-    # (30° = 10,800,000 cs). When a value just below a sign boundary would round
-    # up to the boundary, keep it in the current sign instead. This is
-    # mathematically correct for angular display — rounding 29°59'59.7" should
-    # yield 30°00'00" only if the value is >= the midpoint of the last bin.
-    if cs > 0 and result % 10800000 == 0 and result != 0 and cs < result:
-        return result - 100
-
-    # Apply the same sector-preserving convention on the negative side.  The
-    # explicit branch is required because Python ``//`` floors negative
-    # operands whereas this API operation is defined using truncation toward
-    # zero after the +50-centisecond bias.
-    if cs < 0:
-        if result != 0 and result % 10800000 == 0 and cs <= result - 100:
-            return result - 100
-        # The biased quotient collapses part of [-149, -100] to zero. Restore
-        # that interval to -1 arcsecond while leaving (-100, 0) at zero, which
-        # completes the stated truncation-based compatibility convention.
-        if cs <= -100 and result == 0:
-            return -100
-
-    return result
+        # Truncation toward zero: this is what makes the negative half of the
+        # domain asymmetric with the positive one.
+        rounded = -(-biased // _CS_PER_ARCSEC) * _CS_PER_ARCSEC
+    if rounded == 0:
+        # The bias swallows the last arcsecond below zero; give it back.
+        return -_CS_PER_ARCSEC if cs <= -_CS_PER_ARCSEC else 0
+    if rounded % _CS_PER_SIGN == 0 and cs < rounded:
+        # The value came from strictly inside the sector below the boundary,
+        # so it stops one whole arcsecond short of it.
+        return rounded - _CS_PER_ARCSEC
+    return rounded
 
 
 def cs2degstr(cs: int) -> str:
@@ -1478,40 +1481,107 @@ SPLIT_DEG_KEEP_SIGN: int = 16  # Rounding stays inside the current sign/nakshatr
 SPLIT_DEG_KEEP_DEG: int = 32  # Rounding keeps the whole-degree part unchanged
 
 
-def _rounding_offset(roundflag: int) -> float:
-    """Compute the rounding offset based on which rounding flag is active.
+#: Every rounding bit, coarsest first, with half of the unit it asks for in
+#: degrees. When several bits are set the coarsest one wins and the finer ones
+#: have no effect, so the first match in this order is the answer.
+_HALF_ROUNDING_UNIT: Tuple[Tuple[int, float], ...] = (
+    (SPLIT_DEG_ROUND_DEG, 0.5),
+    (SPLIT_DEG_ROUND_MIN, 0.5 / 60.0),
+    (SPLIT_DEG_ROUND_SEC, 0.5 / 3600.0),
+)
 
-    Only one rounding level applies at a time, checked in order of
-    coarseness: degrees first, then minutes, then seconds.
+#: The three rounding bits together: their presence, not their effect, decides
+#: what the sub-arcsecond field carries.
+_ROUNDING_BITS: int = SPLIT_DEG_ROUND_SEC | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_DEG
+
+#: The twelve equal arcs of the ecliptic: their width in degrees, and how many
+#: of them make one turn.
+_SIGN_SPAN_DEG: float = 30.0
+_SIGNS_PER_TURN: int = 12
+
+
+def _rounding_offset(roundflag: int) -> float:
+    """Half of the rounding unit the flag word asks for, in degrees.
+
+    Adding this to a magnitude and then truncating is the "round half up"
+    rule: a value exactly half a unit above a whole multiple goes up.
+
+    Args:
+        roundflag: The SPLIT_DEG_* flag word.
+
+    Returns:
+        0.5 degree, half an arcminute or half an arcsecond, whichever the
+        coarsest rounding bit in the word asks for, and 0.0 when the word
+        carries no rounding bit at all.
     """
-    if roundflag & SPLIT_DEG_ROUND_DEG:
-        return 0.5
-    if roundflag & SPLIT_DEG_ROUND_MIN:
-        return 0.5 / 60.0
-    if roundflag & SPLIT_DEG_ROUND_SEC:
-        return 0.5 / 3600.0
+    for bit, half_unit in _HALF_ROUNDING_UNIT:
+        if roundflag & bit:
+            return half_unit
     return 0.0
 
 
+def _rounding_is_held_back(
+    position: float,
+    offset: float,
+    roundflag: int,
+    degree_span: float,
+    division_span: float,
+) -> bool:
+    """Say whether KEEP_DEG or KEEP_SIGN cancels the rounding for this value.
+
+    Both flags act by suppressing the rounding entirely rather than by
+    clamping the answer afterwards. When both are set only the whole-degree
+    test governs.
+
+    Args:
+        position: The position about to be reported, in whatever unit the
+            caller reduces in (degrees, or arcseconds for the lunar segments).
+        offset: Half of the rounding unit, in that same unit.
+        roundflag: The SPLIT_DEG_* flag word.
+        degree_span: One whole degree, in that same unit.
+        division_span: The width of the division the position must not leave,
+            in that same unit.
+
+    Returns:
+        True when the rounding must be dropped for this value.
+    """
+    if roundflag & SPLIT_DEG_KEEP_DEG:
+        # With both flags set, the whole-degree test governs alone.
+        return int((position + offset) / degree_span) != int(position / degree_span)
+    if roundflag & SPLIT_DEG_KEEP_SIGN:
+        return int((position + offset) / division_span) != int(position / division_span)
+    return False
+
+
 def _decompose_to_dms(ddeg: float, has_rounding: bool) -> Tuple[int, int, int, float]:
-    """Break a non-negative decimal degree value into deg, min, sec, secfr.
+    """Break a non-negative angle in degrees into deg, min, sec, secfr.
 
-    Uses successive subtraction: each component is extracted as an integer
-    then removed from the running remainder before extracting the next one.
+    The plain and zodiacal splits reduce in the degree domain: each part is
+    read off the running remainder and taken out of it before the next one is
+    read, all in binary64. An angle that is an exact arcsecond count in
+    decimal can therefore still leave a sub-arcsecond residue, and how much
+    depends on the magnitude of the angle, because taking out a large
+    whole-degree part costs mantissa bits.
 
-    When *has_rounding* is ``True`` the sub-second fraction ``secfr`` is
-    set to the integer seconds value (as a float) rather than the true
-    fractional part.
+    Args:
+        ddeg: Non-negative angle in degrees. Whole degrees are not reduced
+            modulo a turn.
+        has_rounding: True when the flag word carries a rounding bit, in
+            which case everything below the requested unit is carry and the
+            sub-arcsecond field repeats the arcseconds instead.
+
+    Returns:
+        Whole degrees (unbounded), arcminutes and arcseconds in 0..59, and
+        the sub-arcsecond field: the true fraction in [0.0, 1.0), or the
+        arcseconds field as a float when a rounding bit is present.
     """
     ideg = int(ddeg)
-    ddeg = max(ddeg - ideg, 0.0)
-    imin = int(ddeg * 60.0)
-    ddeg = max(ddeg - imin / 60.0, 0.0)
-    isec = int(ddeg * 3600.0)
-    if has_rounding:
-        secfr = float(isec)
-    else:
-        secfr = max(ddeg * 3600.0 - isec, 0.0)
+    remainder = max(ddeg - ideg, 0.0)
+    imin = int(remainder * 60.0)
+    remainder = max(remainder - imin / 60.0, 0.0)
+    arcsec = remainder * 3600.0
+    isec = int(arcsec)
+    secfr = float(isec) if has_rounding else max(arcsec - isec, 0.0)
     return ideg, imin, isec, secfr
 
 
@@ -1542,180 +1612,144 @@ def _decompose_arcsec_to_dms(
 _NAK_SPAN_ARCSEC: float = 48000.0  # 360° * 3600 / 27, exact in the arcsec domain
 
 
+#: How many lunar segments make one turn.
+_NAK_PER_TURN: int = 27
+
+#: One degree counted in arcseconds, the unit the lunar segments are reduced
+#: in.
+_ARCSEC_PER_DEG: float = 3600.0
+
+
 def _split_deg_nakshatra(
     ddeg: float, roundflag: int
 ) -> Tuple[int, int, int, float, int]:
-    """Nakshatra-mode split for non-negative degree values.
+    """Split a non-negative angle against the twenty-seven lunar segments.
 
-    The ecliptic is divided into 27 equal segments (nakshatras) of 13°20'
-    each. The value is reduced into its segment in the arc-second domain, then
-    the rounding offset is applied with ``KEEP_DEG``/``KEEP_SIGN`` tested on the
-    position *within* the nakshatra (the displayed degree) — for a 13°20'
-    segment the whole-degree part of the position and of the raw longitude
-    differ, so the check must use the position, unlike the 30° zodiac path.
+    The ecliptic is divided into 27 exact equal segments of 360°/27 = 13°20',
+    and the reduction runs in the arcsecond domain, where that span is the
+    exact integer 48000. An angle that is a whole number of arcseconds
+    therefore decomposes cleanly here, where the degree-domain split of the
+    same angle would show a sub-arcsecond residue.
 
-    The index is not reduced modulo 360°: it counts nakshatras from 0 for the
-    raw longitude, so inputs beyond one turn report indices >= 27.
-    Compatibility contract: a raw index of exactly 27 (one full turn,
-    longitude in [360°, 360° + 13°20')) reports as nakshatra 0; larger
-    indices are reported unreduced.
+    Args:
+        ddeg: Non-negative angle in degrees, not reduced modulo a turn.
+        roundflag: The SPLIT_DEG_* flag word.
 
-    Because the segment is exact in arc-seconds but not in degrees, the
-    arc-second reduction here makes exact degree/minute/segment boundaries
-    display cleanly, unlike the reference's degree-domain arithmetic which can
-    render such boundaries one arc-second low. Away from boundaries the two may
-    still differ by up to one arc-second in the sub-arcsecond field (float
-    representation only); the segment index and rounded fields agree.
+    Returns:
+        The position inside the segment (degrees 0..13, arcminutes,
+        arcseconds, sub-arcsecond field) and the index of the segment. The
+        index is not reduced modulo a turn, except that an index of exactly
+        27 — a value carried through one whole turn — is reported as 0.
     """
-    has_rounding = bool(
-        roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
+    arcsec = ddeg * _ARCSEC_PER_DEG
+    index = int(arcsec / _NAK_SPAN_ARCSEC)
+    position = arcsec - index * _NAK_SPAN_ARCSEC
+    offset = _rounding_offset(roundflag) * _ARCSEC_PER_DEG
+    # The two KEEP tests read the position inside the segment, because a
+    # segment boundary falls in the middle of a degree: a rounding that leaves
+    # the whole-degree part alone can still carry into the next segment.
+    if offset and _rounding_is_held_back(
+        position, offset, roundflag, _ARCSEC_PER_DEG, _NAK_SPAN_ARCSEC
+    ):
+        offset = 0.0
+    position += offset
+    if position >= _NAK_SPAN_ARCSEC:
+        position -= _NAK_SPAN_ARCSEC
+        index += 1
+    if index == _NAK_PER_TURN:
+        index = 0
+    ideg, imin, isec, secfr = _decompose_arcsec_to_dms(
+        position, bool(roundflag & _ROUNDING_BITS)
     )
-
-    # Reduce into the current nakshatra in the exact arc-second domain. Both
-    # the segment index and the position within it come from the SAME
-    # unsnapped value: choosing the index from a copy snapped onto the
-    # integer-arcsec grid pushed a value a hair below a boundary into the
-    # next segment while leaving the position negative, which the
-    # decomposition below then clamped to zero — so 13d20' minus half a
-    # microarcsecond reported the start of the next nakshatra instead of the
-    # previous segment's final fractional second. The boundary must be
-    # resolved from the raw value at full precision (compatibility contract).
-    total_arcsec = ddeg * 3600.0
-    nak_idx = int(total_arcsec / _NAK_SPAN_ARCSEC)
-    pos_arcsec = total_arcsec - nak_idx * _NAK_SPAN_ARCSEC
-
-    # Rounding offset in arc-seconds, suppressed by KEEP_DEG (would advance the
-    # displayed whole-degree part of the position) or KEEP_SIGN (would cross
-    # into the next nakshatra).
-    off_arcsec = _rounding_offset(roundflag) * 3600.0
-    if off_arcsec > 0.0:
-        if roundflag & SPLIT_DEG_KEEP_DEG:
-            if int((pos_arcsec + off_arcsec) / 3600.0) > int(pos_arcsec / 3600.0):
-                off_arcsec = 0.0
-        elif roundflag & SPLIT_DEG_KEEP_SIGN:
-            if pos_arcsec + off_arcsec >= _NAK_SPAN_ARCSEC:
-                off_arcsec = 0.0
-    pos_arcsec += off_arcsec
-    if pos_arcsec >= _NAK_SPAN_ARCSEC:
-        pos_arcsec -= _NAK_SPAN_ARCSEC
-        nak_idx += 1
-    if nak_idx == 27:
-        nak_idx = 0
-
-    ideg, imin, isec, secfr = _decompose_arcsec_to_dms(pos_arcsec, has_rounding)
-    return (ideg, imin, isec, secfr, nak_idx)
+    return ideg, imin, isec, secfr, index
 
 
 def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, int]:
     """
-    Split a degree value into sign/nakshatra, degrees, minutes, seconds, and fraction.
+    Split an angle in decimal degrees into sexagesimal parts.
 
-    This function decomposes an ecliptic longitude (or any angle in degrees) into
-    its constituent parts: zodiac sign (or nakshatra), degrees within that sign,
-    minutes, seconds, and fraction of second.
+    The angle is reported as whole degrees, arcminutes, arcseconds and a
+    sub-arcsecond field, plus one further integer that says either which side
+    of zero the angle was on or which division of the ecliptic it fell in.
+    The flag word chooses how finely the value is rounded, against which
+    division of the circle it is reported, and whether the rounding may carry
+    across a whole degree or across the boundary of that division.
 
-    Compatible with split_deg().
+    The angle is not normalised: nothing is reduced modulo a turn, so 1080°
+    reports 1080 whole degrees. Without a division flag the magnitude is split
+    and the direction is reported separately, ``-0.0`` counting as
+    non-negative.
+
+    Rounding is half up on the magnitude, so a negative input rounds away from
+    zero. When several rounding bits are set the coarsest wins. Everything
+    below the requested unit is carry, not result: a caller asking for
+    arcminutes reads the first two fields and ignores the rest.
+
+    ZODIACAL reports the index of the 30° arc the angle falls in, counting
+    from the vernal point, and the first three fields give the position
+    inside that arc. NAKSHATRA reports the same ecliptic divided instead
+    into 27 exact equal segments of 13°20'. Neither index is reduced modulo a
+    turn, except that a raw index of exactly one whole turn — 12 signs, or 27
+    segments — is reported as 0.
+
+    A negative input with NAKSHATRA alone follows the ordinary signed split
+    and reports -1; with ZODIACAL also set it takes the zodiacal split of its
+    magnitude. With both bits set the non-negative NAKSHATRA split has
+    precedence, while a negative input takes the zodiacal one.
+
+    Compatible with the reference split_deg() API.
 
     Args:
-        degree: Position in decimal degrees (can be negative or > 360)
-        roundflag: Bit flags combination indicating how to round and format:
-            - 0: Don't round, return all components with full precision
-            - SPLIT_DEG_ROUND_SEC (1): Round to nearest second
-            - SPLIT_DEG_ROUND_MIN (2): Round to nearest minute
-            - SPLIT_DEG_ROUND_DEG (4): Round to nearest degree
-            - SPLIT_DEG_ZODIACAL (8): Return raw 30-degree zodiac segment index
-            - SPLIT_DEG_NAKSHATRA (1024): Return raw nakshatra segment index
-            - SPLIT_DEG_KEEP_SIGN (16): Rounding stays inside the current
-              sign or nakshatra
-            - SPLIT_DEG_KEEP_DEG (32): Rounding keeps the whole-degree part
-              unchanged
+        degree: Angle in decimal degrees, of either direction.
+        roundflag: Bit mask of the SPLIT_DEG_* constants. Bits outside that
+            set are ignored rather than refused.
 
     Returns:
-        Tuple of (deg, min, sec, secfr, sign) where:
-        - deg: Degrees within sign (0-29 with ZODIACAL, or 0-13 for a
-               non-negative NAKSHATRA split), otherwise total absolute degrees
-        - min: Arc minutes (0-59)
-        - sec: Arc seconds (0-59)
-        - secfr: Fraction of arc second (0.0-0.999...), or the rounded seconds
-                 value when rounding flags are used
-        - sign: Raw zodiac/nakshatra segment index, or +1/-1
-          for an ordinary positive/negative split
+        A tuple ``(degrees, minutes, seconds, fraction, sign)`` of four
+        native ints and one native float. ``minutes`` and ``seconds`` are in
+        0..59; ``fraction`` is the true fraction of an arcsecond in
+        [0.0, 1.0), or the arcseconds field repeated as a float whenever the
+        flag word carries a rounding bit; ``sign`` is +1 or -1 without a
+        division flag, and the index of the division with one.
 
-    Notes:
-        - Without ZODIACAL or NAKSHATRA flag, sign returns +1 (positive) or -1 (negative)
-        - With ZODIACAL flag: uses the absolute longitude modulo 360 degrees
-          and returns a zodiac segment index from 0 to 11.
-        - With NAKSHATRA flag, non-negative inputs are normalized modulo 360
-          degrees and split into 27 exact equal segments, indexed 0 to 26.
-        - For negative input, NAKSHATRA alone follows the ordinary signed split
-          and returns ``-1``. If ZODIACAL is also set, the zodiacal split of the
-          absolute value applies instead. For non-negative input, NAKSHATRA
-          takes precedence when both format bits are set.
-        - Rounding flags affect how values are truncated/rounded
-        - KEEP_SIGN prevents rounding from advancing to the next sign
-        - KEEP_DEG prevents rounding from advancing to the next degree
+    Raises:
+        ValueError: If ``degree`` is a NaN.
+        OverflowError: If ``degree`` is an infinity.
 
     Examples:
-        >>> split_deg(45.5, 0)  # No flags: 45deg 30min
+        >>> split_deg(45.5)
         (45, 30, 0, 0.0, 1)
-        >>> split_deg(45.5, SPLIT_DEG_ZODIACAL)  # With zodiac: 15deg 30min Taurus
-        (15, 30, 0, 0.0, 1)
-        >>> split_deg(-30.5, 0)  # Negative: sign = -1
+        >>> split_deg(-30.5)
         (30, 30, 0, 0.0, -1)
-        >>> split_deg(-30.5, SPLIT_DEG_ZODIACAL)  # Negative with zodiac: uses absolute
-        (0, 30, 0, 0.0, 1)
+        >>> split_deg(45.5, SPLIT_DEG_ZODIACAL)  # 15°30' of the second sign
+        (15, 30, 0, 0.0, 1)
+        >>> split_deg(45.0, SPLIT_DEG_NAKSHATRA)  # 5° of the fourth segment
+        (5, 0, 0, 0.0, 3)
+        >>> split_deg(10.584, SPLIT_DEG_ROUND_SEC)  # 10°35'02"
+        (10, 35, 2, 2.0, 1)
     """
-    # --- Negative handling and nakshatra dispatch ---
-    # Negative inputs never enter nakshatra mode; they are made positive
-    # and flagged with sign_out = -1.  Non-negative inputs with the
-    # NAKSHATRA flag take a dedicated path.
-    if degree < 0:
-        sign_out = -1
-        ddeg = -degree
-    elif roundflag & SPLIT_DEG_NAKSHATRA:
-        return _split_deg_nakshatra(degree, roundflag)
-    else:
-        sign_out = 1
-        ddeg = degree
-
-    # --- Rounding offset ---
-    # The offset is applied to the *full* degree value before any
-    # zodiacal division.  KEEP_DEG suppresses it when the integer
-    # degree part would change.  KEEP_SIGN suppresses it when a
-    # 30° sign boundary would be crossed.
-    has_rounding = bool(
-        roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
-    )
+    sign_out = 1 if degree >= 0.0 else -1
+    magnitude = abs(degree)
+    if roundflag & SPLIT_DEG_NAKSHATRA and sign_out > 0:
+        return _split_deg_nakshatra(magnitude, roundflag)
     offset = _rounding_offset(roundflag)
-
-    if offset > 0.0:
-        if roundflag & SPLIT_DEG_KEEP_DEG:
-            # Would the integer part of ddeg change?
-            if int(ddeg + offset) - int(ddeg) > 0:
-                offset = 0.0
-        elif roundflag & SPLIT_DEG_KEEP_SIGN:
-            # Would we cross the next 30° sign boundary?
-            if math.fmod(ddeg, 30.0) + offset >= 30.0:
-                offset = 0.0
-
-    ddeg += offset
-
-    # --- Zodiacal sign extraction (after rounding) ---
-    # The index is not reduced modulo 360°: int(ddeg / 30) counts 30° signs
-    # from 0 for the raw longitude, so inputs beyond one turn report indices
-    # >= 12. Compatibility contract: a raw index of exactly 12 (one full
-    # turn, ddeg in [360°, 390°)) reports as sign 0; larger indices are
-    # reported unreduced.
+    if offset and _rounding_is_held_back(
+        magnitude, offset, roundflag, 1.0, _SIGN_SPAN_DEG
+    ):
+        offset = 0.0
+    rounded = magnitude + offset
+    has_rounding = bool(roundflag & _ROUNDING_BITS)
     if roundflag & SPLIT_DEG_ZODIACAL:
-        sign_out = int(ddeg / 30.0)
-        ddeg = math.fmod(ddeg, 30.0)
-        if sign_out == 12:
-            sign_out = 0
-
-    # --- Decompose into deg / min / sec / secfr ---
-    ideg, imin, isec, secfr = _decompose_to_dms(ddeg, has_rounding)
-
-    return (ideg, imin, isec, secfr, sign_out)
+        index = int(rounded / _SIGN_SPAN_DEG)
+        # The position is taken out with the raw index, before a whole turn is
+        # folded back onto the first sign.
+        position = rounded - index * _SIGN_SPAN_DEG
+        ideg, imin, isec, secfr = _decompose_to_dms(position, has_rounding)
+        if index == _SIGNS_PER_TURN:
+            index = 0
+        return ideg, imin, isec, secfr, index
+    ideg, imin, isec, secfr = _decompose_to_dms(rounded, has_rounding)
+    return ideg, imin, isec, secfr, sign_out
 
 
 def calc_angles(jd_ut: float, lat: float, lon: float):
