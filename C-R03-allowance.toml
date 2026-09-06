@@ -1,0 +1,183 @@
+# Proposed entries for validation/golden/allowances.toml — ticket C-R03.
+#
+# Unit: libephemeris/heliacal.py, _pheno_rise_window — the eight window slots
+# of heliacal_pheno_ut: 21 and 22 for the two disc-centre horizon crossings,
+# 23 for the lag, 12, 13, 14 for the visibility interval, 24 for its duration
+# and 15 for the Moon's best time. Baseline v3.2.0, pass leb-base, family
+# heliacal, whose units were declared in 75da60d — slots 12, 13, 14, 15, 21,
+# 22, 23 and 24 are REL, so the ceilings below are in days. The fifteen
+# degree-valued slots this unit does not compute are left to their
+# angular ceiling, which none of these entries declares.
+#
+# Measured by replaying all 4 534 answered heliacal_pheno_ut records of the
+# baseline against the rewritten unit and comparing all fifty slots:
+#
+#   slot 21  object's crossing    0 moved   identical, 4 534 / 4 534
+#   slot 22  Sun's crossing       0 moved   identical, 4 534 / 4 534
+#   slot 23  lag                  0 moved   identical, 4 534 / 4 534
+#   slot 15  Moon's best time    88 moved   max 4.0e-5 s (one unit in the last place)
+#   slot 12  beginning          602 moved   max 1.230490 s
+#   slot 13  optimum            996 moved   max 1.219587 s, three cases excepted
+#   slot 14  end                524 moved   max 1.194884 s
+#   slot 24  duration           922 moved   max 1.793271 s
+#
+# 1 043 of the 4 534 records move in these eight slots. A further 788 move only
+# in slots this unit does not compute (0-10, 17, 19, 20, 26, 27) and are not its
+# doing: the same golden run reports 1 140 differences on vis_limit_mag and 30
+# on the two elongation helpers, all at the ulp level, from work already on the
+# branch.
+#
+# Applied to the 1 831 moved records with golden.units.compare against the
+# declared units, the three entries below account for 838 of them: 834 ordinary
+# windows under entry 1, the three optimum cells under entry 2, and the one
+# reclassified cell under entry 3.
+#
+# 983 records are left unforgiven, every one of them because an ANGULAR slot
+# moved. Entry 1 declares no angle_arcsec, so a degree-valued component that
+# moves is refused and stays with the unit that owns it. Those movements are
+# not this rewrite's: measured component by component, the largest is 6.344e-09
+# arcsec (slot 9, the arc of light), and every one of the fifteen degree-valued
+# slots stays under 1e-8 arcsec. The same measurement on vis_limit_mag, whose
+# units the family does not declare, gives 2.865e-09 arcsec on the Sun's azimuth
+# and 2.736e-13 magnitudes on the limiting magnitude itself.
+#
+# Ten further records reach entry 1 without moving any slot of this unit and are
+# forgiven by it: nine (heliacal/pheno/0002644, 0002647, 0002652, 0002654,
+# 0002655, 0002744, 0002745, 0002746, 0002747) move only slot 20 or 27 by
+# 2.2e-16 to 7.1e-15 in absolute terms, and heliacal/refusals/0000097 carries a
+# NaN in slot 10 that compares equal. None of the ten is this unit's doing; they
+# are named here so that the leak is on the record, and a cases list of the 838
+# ids would close it if the coordinator prefers that to the broad form the
+# register uses elsewhere.
+
+# --- 1. the visibility interval is converged further than the baseline's -----
+[[allowance]]
+unit = "heliacal._pheno_rise_window"
+functions = ["heliacal_pheno_ut"]
+level = 2
+relative = 8.7e-12
+absolute = 2.1e-5
+justification = """\
+The four visibility slots (12, 13, 14 and the duration in 24) are the output of \
+a search for the maximum of the visibility margin and for its two sign changes, \
+not of a closed-form solution: the margin — the limiting magnitude of \
+vis_limit_mag minus the object's magnitude — is evaluated, never inverted. The \
+rewritten unit walks the four-hour twilight bracket in half-minute steps, \
+refines the largest margin by golden section and converges each end of the \
+interval by bisection to 1e-7 days, about nine milliseconds. That is a finer \
+convergence than the recorded search reached, so the same instants come back \
+displaced by up to 1.793 s. The two horizon crossings and the lag are not \
+affected at all — slots 21, 22 and 23 are identical in every one of the 4 534 \
+answered records — and slot 15 moves by at most one unit in the last place \
+(4.0e-5 s), the re-association of four ninths of the lag. Both ceilings are the \
+measured maxima rounded up. The absolute one is the operative arm: it carries \
+the duration slot, whose value is a fraction of a day and whose relative \
+difference therefore reaches 8.6e-3 with no useful scale behind it. The \
+relative one records the precision of the six Julian Days, whose worst \
+movement, 2.076e-5 days on an epoch near 2.4e6, is 8.65e-12 of the value. No \
+angular ceiling is declared, so the degree-valued slots of the same result \
+must still be identical."""
+task = "C-R03"
+verified_by = "C-R03 implementer, 2026-09-06: one golden run of heliacal against v3.2.0 (215 469 cases, heliacal_ut and the 25 model functions identical at level 0), an independent bisection oracle on 16 windows, and a re-validation of every ceiling with golden.units.compare against the units declared in 75da60d"
+oracle_cell = """\
+The sign changes of the visibility margin as the specification defines it — the \
+limiting magnitude of vis_limit_mag minus the object's magnitude, meaningless \
+where the status is negative or the Sun is above the horizon — bisected \
+independently of the unit's own search to 1e-11 days (about one microsecond) on \
+16 recorded windows whose two limits both come from a sign change rather than \
+from a bracket edge or the object's own crossing."""
+error_before = 1.135562e-05
+error_after = 8.335337e-08
+known_difference = "known-differences.md#heliacal-window"
+
+# --- 2. three optima on the far side of a lunar horizon crossing ------------
+[[allowance]]
+unit = "heliacal._pheno_rise_window"
+functions = ["heliacal_pheno_ut"]
+cases = [
+    "heliacal/pheno/0000533",
+    "heliacal/pheno/0000985",
+    "heliacal/pheno/0001496",
+]
+level = 2
+absolute = 0.106
+justification = """\
+Arcturus and Saturn at last evening visibility and Vega at first morning \
+visibility, all at the 45 N anchor site. The sky-brightness model behind \
+vis_limit_mag is discontinuous where the Moon crosses the horizon: the \
+scattered-moonlight term is carried while the Moon is up and dropped once it is \
+down, so the limiting magnitude steps by a few tenths of a magnitude at moonrise \
+and at moonset. In each of these three brackets that step falls inside the \
+twilight, and the largest margin — which is what the optimum answers — is the \
+one next to the discontinuity rather than the smooth maximum elsewhere in the \
+bracket. The margin was evaluated independently of the unit's own search, on a \
+uniform four-second grid across the whole bracket, and in all three cases the \
+answered optimum is above the recorded value AND above the four-second grid \
+maximum, the golden section landing between two grid nodes: Arcturus 2.488559 \
+against 2.479985 recorded and 2.488324 on the grid; Saturn 2.214931 against \
+2.090175 and 2.213105; Vega 4.495014 against 4.225923 and 4.494301. The new \
+answer is therefore the true argmax of the same published model, and the \
+recorded one is not: it is a local maximum on the other side of the step, short \
+of the true one by 0.009, 0.125 and 0.269 magnitudes. Slot 13 moves by \
+177.6 s, 900.7 s and 9 090.3 s respectively, and slots 12, 14 and 24 stay within \
+the ceiling of entry 1 because both maxima lie inside the same positive run of \
+the margin. The ceiling is the largest of the three displacements rounded up, \
+declared absolutely because the duration slot has no useful relative scale."""
+task = "C-R03"
+verified_by = "C-R03 implementer, 2026-09-06: the margin evaluated on a uniform four-second grid across each of the three brackets (3 601 samples), independently of the unit's search, confirms the answered optimum as the argmax; ceiling re-validated with golden.units.compare against the units declared in 75da60d"
+oracle_cell = """\
+The visibility margin of the specification, evaluated on a uniform four-second \
+grid across each whole twilight bracket. Global maxima: Arcturus 2.488324 at \
+2426643.745324916, Saturn 2.213105 at 2456528.841842338, Vega 4.494301 at \
+2486409.115232982. The errors below are the shortfall in magnitudes of each \
+candidate optimum against that maximum."""
+error_before = 0.268378
+error_after = 0.0
+known_difference = "known-differences.md#heliacal-window"
+
+# --- 3. one window the baseline's search stepped over ----------------------
+[[allowance]]
+unit = "heliacal._pheno_rise_window"
+functions = ["heliacal_pheno_ut"]
+cases = ["heliacal/pheno/0001749"]
+level = "reclassified"
+justification = """\
+Elnath, last evening visibility, 45 N, JD 2496368.5. The answer of this one cell \
+changes in kind, not in size: the baseline holds the invalid-time sentinel in \
+all four visibility slots, and the rewritten unit answers a window. The star \
+sets 4.15 h before the Sun and rises again 3.33 h after sunset, inside the \
+evening twilight bracket, and between that rise and the moonrise six minutes \
+later the visibility margin is positive, reaching +1.07 magnitudes. The window \
+therefore exists in the model; the recorded search steps over it because at its \
+cadence it falls between two samples. This unit walks the bracket in 480 steps \
+of 30 s, which puts twelve samples inside the 6.281 minutes. Once the window is \
+found the rest follows the ordinary rules: the beginning is the first sign \
+change, the optimum is the largest margin, and the end is pulled back to the \
+star's own set at 2496368.575509389, which lies before the bracket, so the \
+interval is reported inverted with a duration of -0.323498091 days — the same \
+shape as the 95 inverted windows the baseline itself holds. No tolerance is \
+declared and none would mean anything: a sentinel and an instant do not differ \
+by a quantity. This is the only cell of the 4 534 answered records whose answer \
+changes in kind."""
+task = "C-R03"
+verified_by = "C-R03 implementer, 2026-09-06: both ends of the window located by an independent bisection of the margin to 1e-11 days and identified as sign changes; coordinator ruled on 2026-09-06 that a found window is registered as a reclassified cell, not reproduced by coarsening the cadence"
+oracle_cell = """\
+The visibility margin of the specification — the limiting magnitude of \
+vis_limit_mag minus the object's magnitude — bisected to 1e-11 days either side \
+of the answered optimum, independently of the unit's own search. Its positive \
+run is 2496368.899007446 to 2496368.903369461, 6.281 minutes wide, and both \
+ends are sign changes. At the opening the margin passes through zero smoothly \
+as the star climbs through the detection threshold: -0.000311 one \
+ten-thousandth of a day before, +0.000311 after, with the star at 2.299 deg and \
+the Sun at -35.32 deg. At the closing it steps from +1.073560 to -1.875134 as \
+the Moon rises through the horizon, -0.000 deg to +0.002 deg, the \
+scattered-moonlight term of the sky-brightness model switching on. The unit \
+answers 2496368.899007481 for the beginning, 3.0 ms from the first sign change, \
+and 2496368.903369435 for the optimum, 2.2 ms from the second — the margin \
+climbs monotonically to the moonrise, so its largest value is the last positive \
+instant. The errors below are in days: the whole width of the run the baseline \
+reports as absent, against the distance of the answered limits from its two \
+ends."""
+error_before = 0.004362
+error_after = 3.5e-8
+known_difference = "known-differences.md#heliacal-window"

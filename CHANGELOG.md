@@ -16,6 +16,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `heliacal_pheno_ut` states the heliacal window from its definition. The two
+  horizon crossings that frame the requested event are the disc centres of the
+  object and of the Sun (slots 21 and 22) and their difference is the lag
+  (slot 23); the visibility interval (slots 12-14, duration in slot 24) is the
+  part of the four-hour twilight bracket adjoining the Sun's crossing in which
+  the limiting magnitude of `vis_limit_mag` is fainter than the object's
+  magnitude; and the Moon's best time (slot 15) is four ninths of the lag after
+  the Sun's crossing (Bruin 1977, Vistas in Astronomy 21, 331-358; Yallop 1997,
+  NAO Technical Note No. 69). The twilight is now walked in half-minute steps
+  and the optimum and the two ends of the interval are converged to about a
+  tenth of a second, which moves the four window slots by up to 1.8 s. The two
+  crossings, the lag, the Moon's best time and the shape of the answer — which
+  slots hold the invalid-time sentinel, which duration is exactly zero, which
+  windows are reported inverted — are unchanged, except where the
+  sky-brightness model steps at a horizon crossing of the Moon: a search fine
+  enough to sample those few minutes can report a different optimum, or a
+  window a few minutes wide that a coarser search passes over. See
+  `docs/comparison/known-differences.md#heliacal-window`.
 - `refraction.calc_dip` derives the dip of the sea horizon entirely from
   published quantities: the exact tangent geometry `arccos(a_E/(a_E+h))` on the
   IERS Conventions (2010) equatorial radius, scaled by `sqrt(1-k)` with the

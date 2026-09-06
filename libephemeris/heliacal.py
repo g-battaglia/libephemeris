@@ -50,7 +50,7 @@ Provenance:
 from __future__ import annotations
 
 import math
-from typing import Tuple, NamedTuple, Optional, Sequence
+from typing import Callable, Tuple, NamedTuple, Optional, Sequence, Union
 
 import numpy as np
 
@@ -3942,6 +3942,273 @@ _PHENO_BODY_NAMES = {
 }
 
 
+# ---------------------------------------------------------------------------
+# The window a heliacal sighting happens in
+# ---------------------------------------------------------------------------
+
+#: How far before the instant a caller asks about a horizon crossing may still
+#: be the one that date is about, in days. The reach backwards is not
+#: cosmetic: the instant is routinely a civil midnight, and the evening event
+#: that belongs to that date begins before it.
+_PHENO_CROSSING_REACH = 4.0 / 24.0
+
+#: Width, in days, of the twilight a sighting can happen in, measured from the
+#: Sun's crossing: backwards for a morning event, forwards for an evening one.
+_PHENO_TWILIGHT_WIDTH = 4.0 / 24.0
+
+#: The event types framed by a rise (first and last morning visibility). The
+#: other two, 2 and 3, are framed by a set.
+_PHENO_MORNING_EVENTS = frozenset((1, 4))
+
+#: The event types that describe an apparition on the far side of a
+#: conjunction (first evening and last morning visibility).
+_PHENO_FAR_SIDE_EVENTS = frozenset((3, 4))
+
+#: The objects whose apparition on the far side of a conjunction still carries
+#: a visibility interval. For anything else those two event types answer no
+#: interval and an exactly zero duration.
+_PHENO_FAR_SIDE_OBJECTS = frozenset((MOON, MERCURY, VENUS))
+
+#: Fraction of the lag, after the Sun's crossing, at which the lunar crescent
+#: is classically best looked for. Bruin, F. (1977), "The First Visibility of
+#: the Lunar Crescent", Vistas in Astronomy 21, 331-358, derives the optimum
+#: from the competition between the fading twilight and the sinking crescent;
+#: Yallop, B.D. (1997), NAO Technical Note No. 69, states it as four ninths.
+_PHENO_BEST_TIME_FRACTION = 4.0 / 9.0
+
+#: Number of equal steps the twilight is first walked in. This library's own
+#: choice, not a published quantity: half a minute is finer than the narrowest
+#: interval the visibility model produces, so a window cannot fall whole
+#: between two samples of the scan.
+_PHENO_SCAN_STEPS = 480
+
+#: Width in days below which a bracketed instant is converged, about nine
+#: milliseconds. Also this library's own choice: it is far below the
+#: minute-scale uncertainty of the visibility model that furnishes the margin.
+_PHENO_SEARCH_TOL = 1.0e-7
+
+
+def _pheno_event_is_morning(event_type: int) -> bool:
+    """Say whether an event type is framed by a rise rather than by a set.
+
+    Args:
+        event_type: Heliacal event type, 1 to 4.
+
+    Returns:
+        True when the two horizon crossings of the event are rises.
+    """
+    return event_type in _PHENO_MORNING_EVENTS
+
+
+def _pheno_horizon_crossing(
+    jd_from: float,
+    target: Union[int, str],
+    morning: bool,
+    geopos3: tuple,
+    eph_flags: int,
+) -> float:
+    """Locate a disc-centre horizon crossing at or after an instant.
+
+    Args:
+        jd_from: Earliest Julian Day (UT) the crossing may fall on.
+        target: Numeric body id, or the catalogue name of a fixed star.
+        morning: True for a rise, False for a set.
+        geopos3: Longitude and latitude in degrees, height above sea level in
+            metres.
+        eph_flags: Ephemeris-selection bits only.
+
+    Returns:
+        The Julian Day (UT) of the crossing, or the invalid-time sentinel when
+        the object never crosses the horizon at this site - it is either
+        circumpolar or permanently below it. The two cases are not
+        distinguished.
+    """
+    from .constants import BIT_DISC_CENTER, CALC_RISE, CALC_SET
+    from .eclipse import rise_trans
+
+    rsmi = (CALC_RISE if morning else CALC_SET) | BIT_DISC_CENTER
+    # The crossings are geometry: the caller's atmosphere is deliberately not
+    # passed on, so the rise/set path applies its own default for the site.
+    status, tret = rise_trans(jd_from, target, rsmi, geopos3, flags=eph_flags)
+    if status < 0 or not tret or tret[0] <= 0.0:
+        return _TJD_INVALID
+    return float(tret[0])
+
+
+def _pheno_visibility_margin(
+    tjd: float,
+    objname: str,
+    geopos3: tuple,
+    atmo4: tuple,
+    obs6: tuple,
+    flags: int,
+) -> float:
+    """Measure how far the object is from being hidden by the sky, in magnitudes.
+
+    Args:
+        tjd: Instant as a Julian Day in UT.
+        objname: Planet or catalogue star name the limiting-magnitude entry
+            point accepts.
+        geopos3: Longitude and latitude in degrees, height above sea level in
+            metres.
+        atmo4: Pressure in hPa, temperature in Celsius, relative humidity in
+            percent, meteorological range or total extinction.
+        obs6: Age in years, Snellen ratio, binocular flag, magnification,
+            aperture in millimetres, transmission.
+        flags: The caller's whole flags word - the visibility options live in
+            it and the margin is meant to feel them.
+
+    Returns:
+        The limiting magnitude of the sky at the object's place, extinction
+        already folded in, minus the object's own magnitude, so positive
+        exactly where the object can be seen. Negative infinity where the
+        margin has no meaning: the limiting magnitude reports a failure, which
+        is what it does for an object below the horizon, or the Sun is above
+        the horizon - a heliacal sighting is a twilight phenomenon, and a
+        bright object otherwise registers a second, daytime maximum that has
+        nothing to do with the event.
+    """
+    status, detail = vis_limit_mag(tjd, geopos3, atmo4, obs6, objname, flags)
+    if status < 0 or detail[3] > 0.0:
+        return -math.inf
+    return float(detail[0]) - float(detail[7])
+
+
+def _pheno_brightest_instant(
+    margin: Callable[[float], float],
+    lo: float,
+    hi: float,
+    tol: float,
+) -> float:
+    """Locate the largest margin inside a bracket by golden-section search.
+
+    Args:
+        margin: The visibility margin as a function of a Julian Day in UT.
+        lo: Lower end of the bracket, a Julian Day in UT.
+        hi: Upper end of the bracket, a Julian Day in UT.
+        tol: Width in days below which the bracket is small enough.
+
+    Returns:
+        A Julian Day (UT) strictly inside the bracket, at or next to the
+        largest margin the bracket holds.
+    """
+    ratio = (math.sqrt(5.0) - 1.0) / 2.0
+    left, right = lo, hi
+    inner_lo = right - (right - left) * ratio
+    inner_hi = left + (right - left) * ratio
+    value_lo = margin(inner_lo)
+    value_hi = margin(inner_hi)
+    while right - left > tol:
+        if value_lo >= value_hi:
+            right, inner_hi, value_hi = inner_hi, inner_lo, value_lo
+            inner_lo = right - (right - left) * ratio
+            value_lo = margin(inner_lo)
+        else:
+            left, inner_lo, value_lo = inner_lo, inner_hi, value_hi
+            inner_hi = left + (right - left) * ratio
+            value_hi = margin(inner_hi)
+    return inner_lo if value_lo >= value_hi else inner_hi
+
+
+def _pheno_margin_edge(
+    margin: Callable[[float], float],
+    inside: float,
+    outside: float,
+    tol: float,
+) -> float:
+    """Bisect the instant at which the margin ceases to be positive.
+
+    Args:
+        margin: The visibility margin as a function of a Julian Day in UT.
+        inside: An instant whose margin is positive.
+        outside: An instant on the other side of the sign change, whose margin
+            is not.
+        tol: Width in days below which the bracket is small enough.
+
+    Returns:
+        The last Julian Day (UT) on the ``inside`` side that still carries a
+        positive margin.
+    """
+    while abs(outside - inside) > tol:
+        middle = 0.5 * (inside + outside)
+        if margin(middle) > 0.0:
+            inside = middle
+        else:
+            outside = middle
+    return inside
+
+
+def _pheno_visibility_interval(
+    margin: Callable[[float], float],
+    first: float,
+    last: float,
+) -> Tuple[float, float, float]:
+    """Cut out the interval in which the sky can show the object.
+
+    The twilight is walked on a uniform grid, the largest margin is refined
+    inside the cell that holds it, and the two sign changes next to that
+    optimum are bisected. Only those two bound the interval: a margin that
+    goes positive again elsewhere in the twilight is another apparition, not
+    this one.
+
+    Args:
+        margin: The visibility margin as a function of a Julian Day in UT.
+        first: Earlier end of the twilight bracket, a Julian Day in UT.
+        last: Later end of the twilight bracket, a Julian Day in UT.
+
+    Returns:
+        Beginning, optimum and end as Julian Days in UT, or three invalid-time
+        sentinels when the margin is never positive anywhere in the bracket.
+    """
+    steps = _PHENO_SCAN_STEPS
+    tol = _PHENO_SEARCH_TOL
+    samples = [first + (last - first) * (index / steps) for index in range(steps)]
+    samples.append(last)
+    values = [margin(instant) for instant in samples]
+    peak = max(range(len(samples)), key=values.__getitem__)
+
+    cell_lo = samples[peak - 1] if peak > 0 else samples[peak]
+    cell_hi = samples[peak + 1] if peak + 1 < len(samples) else samples[peak]
+    optimum, best = samples[peak], values[peak]
+    if cell_hi > cell_lo:
+        refined = _pheno_brightest_instant(margin, cell_lo, cell_hi, tol)
+        refined_margin = margin(refined)
+        if refined_margin > best:
+            optimum, best = refined, refined_margin
+    if best <= 0.0:
+        return _TJD_INVALID, _TJD_INVALID, _TJD_INVALID
+
+    if values[peak] > 0.0:
+        # The scan already stands inside the interval: walk out along it.
+        low = peak
+        while low > 0 and values[low - 1] > 0.0:
+            low -= 1
+        high = peak
+        while high + 1 < len(samples) and values[high + 1] > 0.0:
+            high += 1
+        inner_lo, inner_hi = samples[low], samples[high]
+        outer_lo = samples[low - 1] if low > 0 else None
+        outer_hi = samples[high + 1] if high + 1 < len(samples) else None
+    else:
+        # The whole interval lies between two samples of the scan.
+        inner_lo = inner_hi = optimum
+        outer_lo, outer_hi = cell_lo, cell_hi
+
+    # A limit that is not bounded by a sign change is bounded by the twilight
+    # itself, and lands exactly on the edge of the bracket.
+    begin = (
+        inner_lo
+        if outer_lo is None
+        else _pheno_margin_edge(margin, inner_lo, outer_lo, tol)
+    )
+    end = (
+        inner_hi
+        if outer_hi is None
+        else _pheno_margin_edge(margin, inner_hi, outer_hi, tol)
+    )
+    return begin, optimum, end
+
+
 def _pheno_rise_window(
     jd: float,
     body: int,
@@ -3952,140 +4219,154 @@ def _pheno_rise_window(
     obs6: tuple,
     flags: int,
 ) -> Tuple[float, float, float, float, float, float, float, float]:
-    """Rise/set and visibility-window instants for heliacal_pheno_ut.
+    """Place the heliacal event of one date, at one site, in time.
 
-    The Sun's and the object's disc-center rise (event types 1/4) or set
-    (2/3) are searched from four hours before ``jd``;
-    the first/optimum/last visibility instants come from the visibility
-    margin scanned on the night side of the Sun's event, and the
-    public invalid-time sentinel marks instants that do not exist. Returns
-    (rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop).
+    A heliacal event is an interval, not an instant: it is bounded at one end
+    by the object clearing the horizon or going down, and at the other by the
+    Sun making the sky too bright to show it. This locates the two horizon
+    crossings that frame the requested kind of event and the part of the
+    twilight between them in which the object is actually above the detection
+    threshold of the sky.
+
+    Args:
+        jd: The instant the caller asked about, a Julian Day in UT.
+        body: Numeric body id; not the object when ``star_name`` is given.
+        star_name: Catalogue name of a fixed star, empty for anything else.
+        event_type: 1 to 4. Types 1 and 4 are framed by a rise, 2 and 3 by a
+            set.
+        geopos3: Longitude and latitude in degrees, height above sea level in
+            metres.
+        atmo4: Pressure in hPa, temperature in Celsius, relative humidity in
+            percent, meteorological range or total extinction.
+        obs6: Age in years, Snellen ratio, binocular flag, magnification,
+            aperture in millimetres, transmission.
+        flags: The caller's whole flags word.
+
+    Returns:
+        Eight floats: the object's horizon crossing, the Sun's, the lag
+        between them in days, the beginning, optimum and end of the visibility
+        interval, its duration in days, and the Moon's best time. Every
+        instant that does not exist answers the invalid-time sentinel; the lag
+        is exactly zero when either crossing is missing, and the duration is
+        exactly zero when the event type carries no interval for this object.
     """
-    from .constants import (
-        BIT_DISC_CENTER,
-        CALC_RISE,
-        CALC_SET,
-        FLG_JPLEPH,
-        FLG_MOSEPH,
-    )
-    from .eclipse import rise_trans
-
-    eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)
-    rs = CALC_RISE if event_type in (1, 4) else CALC_SET
+    morning = _pheno_event_is_morning(event_type)
+    # HELFLAG_* options share bit positions with the calculation flags, so the
+    # crossings see the ephemeris selection and nothing else: a visibility
+    # option must never be able to move a rise time.
+    eph_flags = _heliacal_eph_flags(flags)
     is_star = bool(star_name)
+    target: Union[int, str] = star_name if is_star else body
 
-    rc_s, tr_s = rise_trans(
-        jd - 4.0 / 24.0, SUN, rs | BIT_DISC_CENTER, geopos3, 0.0, 0.0, eph_flags
+    # The crossing this date is about is the first of the requested kind that
+    # is not more than four hours earlier than the instant asked about.
+    search_from = jd - _PHENO_CROSSING_REACH
+    object_crossing = _pheno_horizon_crossing(
+        search_from, target, morning, geopos3, eph_flags
     )
-    rise_s = tr_s[0] if rc_s == 0 else _TJD_INVALID
-    target = star_name if is_star else body
-    rc_o, tr_o = rise_trans(
-        jd - 4.0 / 24.0, target, rs | BIT_DISC_CENTER, geopos3, 0.0, 0.0, eph_flags
+    sun_crossing = _pheno_horizon_crossing(
+        search_from, SUN, morning, geopos3, eph_flags
     )
-    norise = rc_o != 0
-    rise_o = tr_o[0] if rc_o == 0 else _TJD_INVALID
 
-    lag = 0.0 if (norise or rc_s != 0) else rise_o - rise_s
-    tb_yallop = _TJD_INVALID
-    if not is_star and body == MOON and not norise and rc_s == 0:
-        tb_yallop = (rise_o * 4.0 + rise_s * 5.0) / 9.0
+    # The lag is the object's crossing minus the Sun's, so it is negative when
+    # the object crosses first. Where one of them does not exist there is no
+    # difference to take and the lag is exactly zero rather than a difference
+    # against a sentinel.
+    both_crossings = _TJD_INVALID not in (object_crossing, sun_crossing)
+    lag = object_crossing - sun_crossing if both_crossings else 0.0
 
-    t_first = _TJD_INVALID
-    t_best = _TJD_INVALID
-    t_last = _TJD_INVALID
-    tvis = _TJD_INVALID
+    best_time = (
+        sun_crossing + lag * _PHENO_BEST_TIME_FRACTION
+        if both_crossings and not is_star and body == MOON
+        else _TJD_INVALID
+    )
+    absent = _TJD_INVALID
 
-    # Acronychal event types carry a visibility window only for the Moon and
-    # inner planets under the public result contract.
-    if event_type in (3, 4) and (is_star or body not in (1, 2, 3)):
-        return rise_o, rise_s, lag, t_first, t_best, t_last, 0.0, tb_yallop
-    if rc_s != 0:
-        return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
+    # An apparition on the far side of a conjunction is an observable event
+    # only for the Moon and the two inner planets. For every other object the
+    # interval does not exist and the duration says so with an exact zero,
+    # which is what tells this case apart from the other empty answers. The
+    # rule holds even where the Sun does not cross the horizon at all.
+    if event_type in _PHENO_FAR_SIDE_EVENTS and (
+        is_star or body not in _PHENO_FAR_SIDE_OBJECTS
+    ):
+        return (
+            object_crossing,
+            sun_crossing,
+            lag,
+            absent,
+            absent,
+            absent,
+            0.0,
+            best_time,
+        )
 
-    objname = star_name if is_star else _PHENO_BODY_NAMES.get(body)
-    if objname is None:
-        return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
+    # The Sun is not an object this sky can be asked to show, and without the
+    # Sun's crossing there is no twilight to place a sighting in.
+    if (not is_star and body == SUN) or sun_crossing == _TJD_INVALID:
+        return (
+            object_crossing,
+            sun_crossing,
+            lag,
+            absent,
+            absent,
+            absent,
+            absent,
+            best_time,
+        )
 
-    def _margin(t: float) -> float:
-        # dret[0] already includes extinction to the object, so the margin is
-        # limiting magnitude minus catalog magnitude.
-        # Reject a Sun above the horizon: the visibility window is a
-        # twilight phenomenon and must not follow a daytime maximum.
-        retval, dret_v = vis_limit_mag(t, geopos3, atmo4, obs6, objname, flags)
-        if retval < 0 or dret_v[3] >= 0.0:
-            return -99.0
-        return dret_v[0] - dret_v[7]
-
-    win = 4.0 / 24.0
-    if rs == CALC_RISE:
-        lo, hi = rise_s - win, rise_s
+    if morning:
+        first, last = sun_crossing - _PHENO_TWILIGHT_WIDTH, sun_crossing
     else:
-        lo, hi = rise_s, rise_s + win
+        first, last = sun_crossing, sun_crossing + _PHENO_TWILIGHT_WIDTH
 
-    # The visibility margin is not unimodal over the 4-hour bracket: it is
-    # a narrow positive spike anchored at the twilight edge sitting on a
-    # flat -99 plateau (Sun above horizon / object invisible), so a bare
-    # golden-section search whose first probes land on the plateau slides
-    # to the wrong edge and misses a real window. Locate the spike with a
-    # coarse grid first (5-minute steps across the bracket), then refine
-    # the best sample with a golden-section pass confined to its
-    # neighbouring samples, where the margin IS unimodal.
-    n_grid = 48
-    step = (hi - lo) / n_grid
-    best_i, best_m = 0, -1e99
-    for i in range(n_grid + 1):
-        m_i = _margin(lo + i * step)
-        if m_i > best_m:
-            best_i, best_m = i, m_i
-    g_lo = lo + max(best_i - 1, 0) * step
-    g_hi = lo + min(best_i + 1, n_grid) * step
+    objname = star_name if is_star else _PHENO_BODY_NAMES.get(body, str(body))
+    seen: dict = {}
 
-    phi = (1.0 + math.sqrt(5.0)) / 2.0
-    a = g_hi - (g_hi - g_lo) / phi
-    b = g_lo + (g_hi - g_lo) / phi
-    fa, fb = _margin(a), _margin(b)
-    for _ in range(22):
-        if fa > fb:
-            g_hi, b, fb = b, a, fa
-            a = g_hi - (g_hi - g_lo) / phi
-            fa = _margin(a)
+    def margin(instant: float) -> float:
+        """Return the visibility margin, computing each instant only once."""
+        value = seen.get(instant)
+        if value is None:
+            value = _pheno_visibility_margin(
+                instant, objname, geopos3, atmo4, obs6, flags
+            )
+            seen[instant] = value
+        return value
+
+    begin, optimum, end = _pheno_visibility_interval(margin, first, last)
+    if begin == _TJD_INVALID:
+        return (
+            object_crossing,
+            sun_crossing,
+            lag,
+            absent,
+            absent,
+            absent,
+            absent,
+            best_time,
+        )
+
+    # The interval may not run while the object is on the wrong side of the
+    # horizon, so a morning beginning is pushed to the object's rise and an
+    # evening end pulled back to its set. When that crossing lies outside the
+    # twilight altogether the limits come out in the wrong order and the
+    # duration negative: that is the answer, not a fault to repair.
+    if object_crossing != _TJD_INVALID:
+        if morning:
+            begin = max(begin, object_crossing)
         else:
-            g_lo, a, fa = a, b, fb
-            b = g_lo + (g_hi - g_lo) / phi
-            fb = _margin(b)
-        if g_hi - g_lo < 3e-5:
-            break
-    t_peak = 0.5 * (g_lo + g_hi)
-    m_peak = _margin(t_peak)
-    if m_peak <= 0.0:
-        return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
-    t_best = t_peak
+            end = min(end, object_crossing)
 
-    def _cross(t_in: float, t_out: float) -> float:
-        # If the object remains visible at a scan boundary, that boundary
-        # itself bounds the finite search window.
-        if _margin(t_out) > 0.0:
-            return t_out
-        for _ in range(22):
-            mid = 0.5 * (t_in + t_out)
-            if _margin(mid) > 0.0:
-                t_in = mid
-            else:
-                t_out = mid
-            if abs(t_out - t_in) < 3e-5:
-                break
-        return 0.5 * (t_in + t_out)
-
-    t_first = _cross(t_peak, lo)
-    t_last = _cross(t_peak, hi)
-    if not norise:
-        if rs == CALC_RISE and t_first != _TJD_INVALID:
-            t_first = max(t_first, rise_o)
-        elif rs == CALC_SET and t_last != _TJD_INVALID:
-            t_last = min(t_last, rise_o)
-    if t_first != _TJD_INVALID and t_last != _TJD_INVALID:
-        tvis = t_last - t_first
-    return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
+    return (
+        object_crossing,
+        sun_crossing,
+        lag,
+        begin,
+        optimum,
+        end,
+        end - begin,
+        best_time,
+    )
 
 
 def _heliacal_pheno_ut_pythonic(

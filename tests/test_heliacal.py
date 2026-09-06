@@ -1705,3 +1705,187 @@ class TestPhenoWindowSpikeAtEdge:
         assert d[14] < 99999998.0, "TlastVR missing"
         assert 0.0 < d[24] < 4.0 / 24.0
         assert d[12] < d[13] < d[14]
+
+
+@pytest.mark.unit
+class TestPhenoRiseWindowContract:
+    """The eight window slots of ``heliacal_pheno_ut`` and the rules behind them.
+
+    Slots 21, 22 and 23 are the two horizon crossings that frame the requested
+    event and the lag between them; slots 12, 13, 14 and 24 are the visibility
+    interval inside the twilight and its duration; slot 15 is the Moon's best
+    time. The first group is geometry, the second depends on the atmosphere,
+    the observer and the object's magnitude, and the two must not leak into
+    each other.
+    """
+
+    SITE = (12.5, 41.9, 0.0)
+    ATMO = (1013.25, 15.0, 40.0, 0.0)
+    OBSERVER = (36.0, 1.0, 0.0, 0.0, 0.0, 0.0)
+    POLE = (0.0, 90.0, 0.0)
+
+    def _pheno(
+        self, jd, target, event, site=None, atmo=None, observer=None, flags=None
+    ):
+        import libephemeris as le
+
+        return le.heliacal_pheno_ut(
+            jd,
+            self.SITE if site is None else site,
+            self.ATMO if atmo is None else atmo,
+            self.OBSERVER if observer is None else observer,
+            target,
+            event,
+            le.FLG_SWIEPH if flags is None else flags,
+        )
+
+    def test_crossings_are_the_disc_centre_rise_and_set(self):
+        """Slots 21 and 22 are the disc-centre crossings of the rise/set path."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 8, 17, 0.0)
+        window = self._pheno(jd, "Sirius", le.HELIACAL_RISING)
+        search_from = jd - 4.0 / 24.0
+        rsmi = le.CALC_RISE | le.BIT_DISC_CENTER
+        _, star = le.rise_trans(
+            search_from, "Sirius", rsmi, self.SITE, flags=le.FLG_SWIEPH
+        )
+        _, sun = le.rise_trans(
+            search_from, le.SUN, rsmi, self.SITE, flags=le.FLG_SWIEPH
+        )
+        assert window[21] == star[0]
+        assert window[22] == sun[0]
+        assert window[23] == window[21] - window[22]
+
+    def test_crossings_ignore_the_atmosphere_while_the_window_feels_it(self):
+        """The caller's weather reaches the visibility slots and nothing else."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 8, 17, 0.0)
+        thin = self._pheno(
+            jd, "Sirius", le.HELIACAL_RISING, atmo=(900.0, -10.0, 20.0, 0.0)
+        )
+        thick = self._pheno(
+            jd, "Sirius", le.HELIACAL_RISING, atmo=(1050.0, 35.0, 80.0, 0.0)
+        )
+        assert thin[21] == thick[21]
+        assert thin[22] == thick[22]
+        assert thin[23] == thick[23]
+        assert any(thin[i] != thick[i] for i in (12, 13, 14, 24))
+
+    def test_a_visibility_option_cannot_move_a_crossing(self):
+        """HELFLAG_* bits share positions with FLG_*: they must be masked off."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 8, 17, 0.0)
+        plain = self._pheno(jd, "Sirius", le.HELIACAL_RISING, flags=le.FLG_SWIEPH)
+        dark = self._pheno(
+            jd,
+            "Sirius",
+            le.HELIACAL_RISING,
+            flags=le.FLG_SWIEPH | le.HELFLAG_VISLIM_DARK,
+        )
+        assert plain[21] == dark[21]
+        assert plain[22] == dark[22]
+        assert plain[23] == dark[23]
+
+    def test_the_two_morning_events_share_their_crossings(self):
+        """Types 1 and 4 are framed by a rise, types 2 and 3 by a set."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 8, 17, 0.0)
+        first_morning = self._pheno(jd, "Venus", le.HELIACAL_RISING)
+        last_morning = self._pheno(jd, "Venus", le.MORNING_LAST)
+        first_evening = self._pheno(jd, "Venus", le.EVENING_FIRST)
+        last_evening = self._pheno(jd, "Venus", le.HELIACAL_SETTING)
+        for slot in (21, 22, 23):
+            assert first_morning[slot] == last_morning[slot]
+            assert first_evening[slot] == last_evening[slot]
+        assert first_morning[22] != last_evening[22]
+
+    def test_a_missing_crossing_answers_the_sentinel_and_a_zero_lag(self):
+        """At the pole neither the Sun nor a star crosses: the lag is exactly 0."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 6, 21, 0.0)
+        window = self._pheno(jd, "Sirius", le.HELIACAL_RISING, site=self.POLE)
+        assert window[21] == le.TJD_INVALID
+        assert window[22] == le.TJD_INVALID
+        assert window[23] == 0.0
+        assert window[12] == le.TJD_INVALID
+        assert window[13] == le.TJD_INVALID
+        assert window[14] == le.TJD_INVALID
+        assert window[24] == le.TJD_INVALID
+
+    def test_far_side_events_answer_an_exactly_zero_duration(self):
+        """Types 3 and 4 carry an interval only for the Moon, Mercury and Venus."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 8, 17, 0.0)
+        for target in ("Mars", "Jupiter", "Sirius"):
+            for event in (le.EVENING_FIRST, le.MORNING_LAST):
+                window = self._pheno(jd, target, event)
+                assert window[12] == le.TJD_INVALID, (target, event)
+                assert window[13] == le.TJD_INVALID, (target, event)
+                assert window[14] == le.TJD_INVALID, (target, event)
+                assert window[24] == 0.0, (target, event)
+
+    def test_the_zero_duration_wins_over_a_missing_solar_crossing(self):
+        """The event-type rule is answered even where the Sun never rises."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 6, 21, 0.0)
+        window = self._pheno(jd, "Mars", le.EVENING_FIRST, site=self.POLE)
+        assert window[22] == le.TJD_INVALID
+        assert window[24] == 0.0
+
+    def test_the_sun_is_not_an_object_this_sky_can_show(self):
+        """The Sun gets both crossings, a zero lag and no visibility interval."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 8, 17, 0.0)
+        morning = self._pheno(jd, "Sun", le.HELIACAL_RISING)
+        assert morning[21] == morning[22]
+        assert morning[23] == 0.0
+        for slot in (12, 13, 14, 24, 15):
+            assert morning[slot] == le.TJD_INVALID
+        evening_far = self._pheno(jd, "Sun", le.EVENING_FIRST)
+        assert evening_far[24] == 0.0
+
+    def test_the_moon_best_time_is_four_ninths_of_the_lag(self):
+        """Bruin (1977) and Yallop (1997): the crescent optimum inside the lag."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 8, 17, 0.0)
+        window = self._pheno(jd, "Moon", le.HELIACAL_RISING)
+        assert window[21] != le.TJD_INVALID
+        assert window[22] != le.TJD_INVALID
+        assert window[15] == pytest.approx(
+            window[22] + window[23] * (4.0 / 9.0), abs=1e-9
+        )
+        star = self._pheno(jd, "Sirius", le.HELIACAL_RISING)
+        assert star[15] == le.TJD_INVALID
+
+    def test_the_window_lives_inside_the_four_hour_twilight_bracket(self):
+        """A morning interval lies in the four hours before the Sun's rise."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 8, 17, 0.0)
+        window = self._pheno(jd, "Sirius", le.HELIACAL_RISING)
+        assert window[12] != le.TJD_INVALID
+        sunrise = window[22]
+        assert sunrise - 4.0 / 24.0 <= window[12] <= sunrise
+        assert sunrise - 4.0 / 24.0 <= window[13] <= sunrise
+        assert sunrise - 4.0 / 24.0 <= window[14] <= sunrise
+        assert window[24] == window[14] - window[12]
+
+    def test_an_interval_cut_by_the_object_crossing_is_reported_inverted(self):
+        """The end is pulled back to a set that lies before the twilight."""
+        import libephemeris as le
+
+        jd = le.julday(2024, 1, 15, 0.0)
+        window = self._pheno(jd, "Pollux", le.HELIACAL_SETTING)
+        assert window[14] == window[21]
+        assert window[14] < window[12]
+        assert window[24] < 0.0
+        assert window[24] == window[14] - window[12]

@@ -655,6 +655,44 @@ copies: they differed from the correctly rounded double of the definition by
 are exact to double precision; no computation inside the library reads either
 factor, so positions, distances and magnitudes are unaffected.
 
+### Heliacal phenomena
+
+#### Heliacal visibility window {#heliacal-window}
+
+`heliacal_pheno_ut` answers, in slots 12, 13 and 14 with the duration in slot
+24, the interval of the requested date in which the sky can actually show the
+object: the part of the four hours of twilight adjoining the Sun's rise or set
+where the limiting magnitude of `vis_limit_mag` — atmospheric extinction,
+twilight brightness, scattered moonlight and the observer's eye already folded
+in — is fainter than the object's own magnitude. That condition is not solved
+in closed form. The margin between the two magnitudes is evaluated, so the
+three instants are the output of a search: LibEphemeris walks the twilight in
+half-minute steps, refines the largest margin by golden section, and converges
+each end of the interval by bisection to about a tenth of a second. Two
+consequences are worth knowing.
+
+The instants are reproducible only to the convergence of that search. An
+implementation that stops its own search earlier answers the same interval
+displaced by a second or two. That is far inside the uncertainty of the
+underlying visibility model: a tenth of a magnitude near the detection limit
+is minutes of twilight, so the interval is physically meaningful to minutes
+and numerically determined to a fraction of a second.
+
+The sky-brightness model is discontinuous where the Moon crosses the horizon.
+The scattered-moonlight term is carried while the Moon is up and dropped once
+it is down, so the limiting magnitude steps by a few tenths of a magnitude at
+moonrise and at moonset. A search fine enough to sample those few minutes
+reports what the model says there — an optimum that falls next to the step
+rather than in the darkest part of the twilight, or a window a few minutes wide
+that opens when the object rises and closes again when the Moon does. Both are
+answers of the visibility model rather than of the window search: the optimum
+next to the step really is where the limiting magnitude of `vis_limit_mag` is
+furthest above the object, by a few hundredths to a quarter of a magnitude, and
+the narrow window really is bounded by two sign changes of the margin. A coarser
+search steps over them. Callers who need a window that is robust against that
+step can compare the optimum with `vis_limit_mag` at the Moon's own rise and
+set.
+
 ## Validation policy
 
 Direct compatibility runs compare public return values and report pass/fail
