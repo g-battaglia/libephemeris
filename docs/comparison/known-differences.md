@@ -155,6 +155,33 @@ geometry amplifies it to 1.4e-9 arcsec, and the cusp speeds of `houses_ex2`,
 whose one-second centered difference divides a 5e-11 arcsec movement into
 2e-6 arcsec/day: neither is visible at the 0.001 arcsec the library claims.
 
+#### Sidereal time built from the definition {#sidereal-time-definition}
+
+Greenwich mean sidereal time is the IAU 2006 expression in the era that
+expression was fitted for, and the hour angle of the mean equinox of date --
+Vondrák precession, the Simon et al. (1994) mean longitude of the Earth
+retarded by the light time for unit distance, and UT1 -- everywhere else, the
+two joined at the ends of the interval over which the international expression
+is adopted.
+
+Away from that interval the answer therefore carries the last places of an
+accumulated mean longitude: an angle of 3e4 degrees a century out and 5e6
+degrees at the ends of the DE441 span, whose last representable place is
+already 1.3e-8 arcsec and 3.3e-6 arcsec respectively. Two evaluations of the
+same published expressions that differ only in the order of their sums can
+land on adjacent representable numbers there, and the difference is that whole
+last place, not a fraction of it: the difference is below one representable
+step of the accumulated mean longitude, which is the arithmetic floor of the
+construction rather than a loss of precision within it. Evaluated with 50
+significant digits at the epochs where this happens, the exact value falls
+between the two, so the two implementations sit on opposite sides of it at a
+distance of that same one step, both within 5.2e-8 arcsec of it, and neither is
+the more nearly correct one in any sense the models support: the mean
+longitude's own coefficients are published to fewer digits than that, and the
+ΔT the epoch is placed with is uncertain by seconds at those dates. Nothing at this level is visible at the 0.001 arcsec the library claims,
+and nothing at this level survives into the era of real use, where the answer
+is the IAU 2006 expression itself.
+
 ### Numerical derivatives
 
 Some public speeds are obtained by differentiating the independently computed
