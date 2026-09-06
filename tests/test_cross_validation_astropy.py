@@ -57,28 +57,30 @@ pytestmark = pytest.mark.skipif(not HAS_ASTROPY, reason="astropy not installed")
 
 
 # ============================================================================
-# IAU 2015 Body Radii (Resolution B3)
+# IAU body radii
 # ============================================================================
 
-# Body radii used by libephemeris (matching the reference ephemeris conventions).
-# These may differ slightly from IAU 2015 nominal values — the reference ephemeris uses
-# NASA fact sheet / mean volumetric radius values in some cases.
-IAU_EQUATORIAL_RADII_KM = {
-    SUN: 696000.0,  # NASA fact sheet (IAU 2015 nominal: 695700.0)
-    MERCURY: 2439.4,  # Mean radius (IAU 2015 equatorial: 2439.7)
+# The published mean radii libephemeris computes apparent diameters from:
+# the IAU Working Group on Cartographic Coordinates and Rotational Elements
+# (Archinal et al. 2018, Celest. Mech. Dyn. Astron. 130:22) for the planets
+# and the Moon, and the nominal solar radius of IAU 2015 Resolution B3 for
+# the Sun.
+IAU_MEAN_RADII_KM = {
+    SUN: 695700.0,  # IAU 2015 Resolution B3 nominal solar radius
+    MERCURY: 2439.4,
     VENUS: 6051.8,
-    MARS: 3389.5,  # Mean volumetric radius (IAU 2015 equatorial: 3396.2)
-    JUPITER: 69911.0,  # Mean volumetric radius (IAU 2015 equatorial: 71492.0)
-    SATURN: 58232.0,  # Mean volumetric radius (IAU 2015 equatorial: 60268.0)
-    URANUS: 25362.0,  # Mean volumetric radius (IAU 2015 equatorial: 25559.0)
-    NEPTUNE: 24622.0,  # Mean volumetric radius (IAU 2015 equatorial: 24764.0)
-    PLUTO: 1188.3,  # Mean radius (Stern et al. 2015, New Horizons)
-    MOON: 1737.5,  # Mean radius (IAU 2015: 1737.4)
+    MARS: 3389.50,
+    JUPITER: 69911.0,
+    SATURN: 58232.0,
+    URANUS: 25362.0,
+    NEPTUNE: 24622.0,
+    PLUTO: 1188.3,
+    MOON: 1737.4,
 }
 
 
 class TestIAUBodyRadii:
-    """Verify libephemeris body radii match IAU 2015 official values."""
+    """Verify libephemeris body radii match the published IAU values."""
 
     @pytest.mark.parametrize(
         "body_id,name",
@@ -95,14 +97,20 @@ class TestIAUBodyRadii:
             (PLUTO, "Pluto"),
         ],
     )
-    def test_body_radius_matches_iau_2015(self, body_id, name):
-        """Body radius must match IAU 2015 equatorial value exactly."""
+    def test_body_radius_matches_iau(self, body_id, name):
+        """Body radius must be the published IAU mean radius exactly.
+
+        The Sun (695700 km) and the Moon (1737.4 km) were the two entries
+        that carried a different number before: the table now holds the IAU
+        WGCCRE mean radii and the IAU 2015 nominal solar radius, which is
+        what an apparent diameter needs.
+        """
         from libephemeris.planets import _BODY_RADIUS_KM
 
-        expected = IAU_EQUATORIAL_RADII_KM[body_id]
+        expected = IAU_MEAN_RADII_KM[body_id]
         actual = _BODY_RADIUS_KM[body_id]
         assert actual == expected, (
-            f"{name}: radius {actual} km != IAU 2015 value {expected} km"
+            f"{name}: radius {actual} km != the IAU value {expected} km"
         )
 
 
@@ -115,18 +123,16 @@ class TestAstropySolarConstants:
     """Cross-validate solar constants against astropy."""
 
     def test_solar_radius_matches_astropy(self):
-        """Our solar radius should be close to astropy's IAU 2015 nominal value.
+        """Our solar radius is astropy's IAU 2015 nominal value.
 
-        Note: We use 696000.0 km (NASA fact sheet, matching the reference ephemeris) while
-        astropy uses the IAU 2015 nominal value of 695700.0 km. The ~300 km
-        difference is a known convention difference.
+        Both are the nominal solar radius of IAU 2015 Resolution B3,
+        6.957e8 m, so the two agree to the metre.
         """
         from libephemeris.planets import _BODY_RADIUS_KM
 
         astropy_solar_r_km = const.R_sun.to(u.km).value
         our_solar_r = _BODY_RADIUS_KM[SUN]
-        # Allow 400 km tolerance for NASA vs IAU 2015 convention difference
-        assert abs(our_solar_r - astropy_solar_r_km) < 400.0, (
+        assert abs(our_solar_r - astropy_solar_r_km) < 1e-3, (
             f"Solar radius: ours={our_solar_r} km, astropy={astropy_solar_r_km} km"
         )
 

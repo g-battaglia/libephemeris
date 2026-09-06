@@ -10326,24 +10326,28 @@ def _calc_nod_aps_osculating(
 # PLANETARY PHENOMENA: Phase, Elongation, Magnitude
 # =============================================================================
 
-# Physical radii of celestial bodies in kilometers
-# Sources: NASA Planetary Fact Sheet volumetric mean radii
-# For gas/ice giants (Jupiter, Saturn, Uranus, Neptune), volumetric mean radii
-# are used rather than equatorial radii, as these better represent the
-# sphere-equivalent size for apparent diameter calculations. This matches
-# the convention used by standard ephemeris implementations.
-# Reference: https://nssdc.gsfc.nasa.gov/planetary/factsheet/
+# Physical mean radii of the Sun, the Moon and the eight planets, in
+# kilometres. A mean radius is the radius of the sphere of the same volume,
+# which is the size an apparent diameter asks for.
+# Planets and Moon: mean radii of the IAU Working Group on Cartographic
+# Coordinates and Rotational Elements, Archinal et al. 2018, Celest. Mech.
+# Dyn. Astron. 130:22.
+# Sun: nominal solar radius of IAU 2015 Resolution B3, 6.957e8 m
+# (Prša et al. 2016, AJ 152:41).
+# Every radius the phenomena code uses is here: the lookups below read the
+# table, and the only literal left is the 1000 km stand-in for a body that
+# has no entry.
 _BODY_RADIUS_KM = {
-    SUN: 696000.0,  # Solar radius (NASA fact sheet)
-    MOON: 1737.5,  # Lunar mean radius (NASA fact sheet)
-    MERCURY: 2439.4,  # Mercury volumetric mean radius
-    VENUS: 6051.8,  # Venus volumetric mean radius
-    MARS: 3389.5,  # Mars volumetric mean radius
-    JUPITER: 69911.0,  # Jupiter volumetric mean radius
-    SATURN: 58232.0,  # Saturn volumetric mean radius (disk only, excludes rings)
-    URANUS: 25362.0,  # Uranus volumetric mean radius
-    NEPTUNE: 24622.0,  # Neptune volumetric mean radius
-    PLUTO: 1188.3,  # Pluto mean radius
+    SUN: 695700.0,
+    MOON: 1737.4,
+    MERCURY: 2439.4,
+    VENUS: 6051.8,
+    MARS: 3389.50,
+    JUPITER: 69911.0,
+    SATURN: 58232.0,  # the disc alone, the rings excluded
+    URANUS: 25362.0,
+    NEPTUNE: 24622.0,
+    PLUTO: 1188.3,
 }
 
 # Asteroid photometric data for pheno: IAU H-G system (H absolute magnitude,
@@ -10678,7 +10682,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         sun_pos, _ = _leb_calc(tjd_ut, SUN, base_flags)
         sun_dist_au = float(sun_pos[2])
 
-        sun_radius_km = _BODY_RADIUS_KM.get(SUN, 695700.0)
+        sun_radius_km = _BODY_RADIUS_KM[SUN]
         diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
         magnitude = (
             -26.86 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.86
@@ -11181,7 +11185,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
         # Apparent diameter of Sun based on physical radius
         sun_dist_au = float(sun_dist.au)
-        sun_radius_km = _BODY_RADIUS_KM.get(SUN, 695700.0)
+        sun_radius_km = _BODY_RADIUS_KM[SUN]
         diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
 
         # Sun magnitude (V(1,0) = -26.86 at 1 AU, Mallama & Hilton 2018)
@@ -11294,7 +11298,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
 
         # Moon's apparent diameter based on physical radius
-        moon_radius_km = _BODY_RADIUS_KM.get(MOON, 1737.4)
+        moon_radius_km = _BODY_RADIUS_KM[MOON]
         diameter = _calc_apparent_diameter(moon_radius_km, r_moon)
 
         # Moon's magnitude using piecewise Allen/Samaha photometric model

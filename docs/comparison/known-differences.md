@@ -607,6 +607,30 @@ Photometric conventions are empirical and can differ between almanacs. Such
 differences are reported as model choices, not used to reverse-engineer a
 reference curve.
 
+#### Body radii {#body-radii}
+
+Apparent diameters come from one table of published mean radii: the values of
+the IAU Working Group on Cartographic Coordinates and Rotational Elements for
+the planets and the Moon (Archinal et al. 2018, *Celest. Mech. Dyn. Astron.*
+130:22) and the nominal solar radius of IAU 2015 Resolution B3 for the Sun. Two
+entries moved onto those published values: the Sun from 696 000 km to
+695 700 km and the Moon from 1737.5 km to 1737.4 km. Measured against the
+diameter 2·asin(R/d) built from the published radius and the light-time
+corrected geocentric distance read straight from DE440, the worst error over
+1900-2100 falls from 0.834″ to 0.007″ for the Sun and from 0.108″ to 0.008″ for
+the Moon; what is left is the small-angle approximation the diameter formula
+uses, not the radius. No other radius changed, and no distance, magnitude or
+phase quantity is affected.
+
+The public surface this reaches is the apparent diameter of `pheno` and
+`pheno_ut` — up to 0.84″ on the Sun and 0.12″ on the Moon, both far inside the
+45″ envelope these functions are compared under — and, through the Moon's
+semidiameter, the crescent width, crescent length and Yallop *q* statistic of
+`heliacal_pheno_ut`. Eclipse and occultation geometry keeps its own constants:
+those follow the classical eclipse-prediction conventions (the adopted lunar
+radius ratio k, the almanac solar radius) rather than the physical mean radius,
+so contact times, magnitudes and obscurations are unchanged.
+
 ### Orbital elements
 
 Osculating elements are derived from the active JPL state and standard

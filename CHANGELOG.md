@@ -71,6 +71,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0 s at sea level, with no event gained or lost and no transit moved. Sea
   level, zero pressure and the model's edges are unchanged. See
   `docs/comparison/known-differences.md#horizon-dip`.
+- `planets.py` computes apparent diameters from the published IAU mean radii:
+  the Sun is the IAU 2015 Resolution B3 nominal solar radius (696000 -> 695700
+  km) and the Moon the IAU WGCCRE mean radius (1737.5 -> 1737.4 km, Archinal
+  et al. 2018, Celest. Mech. Dyn. Astron. 130:22); the eight planets already
+  carried those values. Against the diameter built from the published radius
+  and the DE440 geocentric distance, the worst error over 1900-2100 drops from
+  0.834" to 0.007" for the Sun and from 0.108" to 0.008" for the Moon. The
+  apparent diameter of `pheno`/`pheno_ut` moves by up to 0.84" (Sun) and 0.12"
+  (Moon), and with it the Moon's crescent width, crescent length and Yallop q
+  statistic in `heliacal_pheno_ut`; see
+  `docs/comparison/known-differences.md#body-radii`. The eclipse and
+  occultation geometry of `eclipse.py` is unchanged: its planet radii already
+  matched the IAU values, and its solar radius, lunar radius ratio and Earth
+  flattening keep the classical eclipse-prediction conventions, now cited
+  precisely (the flattening is the IERS numerical standard 1/298.25642).
 - `constants.py` documents the file-name constants (`EPHE_PATH`, `FNAME_*`,
   `ASTNAMFILE`, `FICTFILE`, `STARFILE`, `STARFILE_OLD`, `SE_FNAME_DE431`) as
   API contract names that no code path reads, and corrects the attribution of

@@ -443,10 +443,11 @@ _WHEN_LOC_EPOCH_WINDOW = 0.35  # days (~8.4 h)
 # 1 AU in km (IAU 2012 definition)
 _AU_KM = 149597870.7
 
-# Physical equatorial radii of planets in km, used for dynamic angular
-# disc-size computation. Sources: IAU volumetric mean radii (Archinal et
-# al.; IAU 2015 nominal values, NASA Planetary Fact Sheet). Disc sizes
-# computed from these radii follow the independent physical disc geometry.
+# Mean radii of the planets in km: the angular size of the disc an
+# occultation covers or clears. A mean radius is the radius of the sphere of
+# the same volume, the size an apparent disc asks for. Values from the IAU
+# Working Group on Cartographic Coordinates and Rotational Elements,
+# Archinal et al. 2018, Celest. Mech. Dyn. Astron. 130:22.
 _PLANET_RADIUS_KM = {
     MERCURY: 2439.4,
     VENUS: 6051.8,
@@ -458,9 +459,10 @@ _PLANET_RADIUS_KM = {
     PLUTO: 1188.3,
 }
 
-# Bodies beyond the classical planets with a finite apparent disc. Diameters
-# are from the NASA JPL Small-Body Database (queried 2026-07-13), divided by
-# two to obtain radii.
+# Bodies beyond the classical planets with a finite apparent disc. The Earth
+# is the IAU mean radius (Archinal et al. 2018, as above); the minor bodies
+# are the NASA JPL Small-Body Database diameters (queried 2026-07-13),
+# divided by two to obtain radii.
 _EXTRA_BODY_RADIUS_KM = {
     CHIRON: 83.0,
     PHOLUS: 95.0,
@@ -474,12 +476,17 @@ _EXTRA_BODY_RADIUS_KM = {
 
 # Eclipse-geometry physical constants. Values are public reference data:
 # IAU / Astronomical Almanac solar diameter 1,392,000 km, lunar mean
-# diameter 3,476.3 km, Earth equatorial radius 6,378.140 km, the DE431
-# astronomical-unit convention, and the AA 2006 K6 Earth flattening.
+# diameter 3,476.3 km, Earth equatorial radius 6,378.140 km and the DE431
+# astronomical-unit convention.
 _ECL_AU_KM = 149597870.700
 _ECL_RSUN_AU = 696000.0 / _ECL_AU_KM
 _ECL_RMOON_AU = 1738.15 / _ECL_AU_KM
 _ECL_REARTH_AU = 6378.140 / _ECL_AU_KM
+# Earth flattening: the IERS numerical standard 1/f = 298.25642 (IERS
+# Conventions (2010), Technical Note 36, Table 1.1). WGS84 describes the
+# same ellipsoid with 1/f = 298.257223563; the two differ by 8e-7 in
+# relative terms, about 2 cm on the polar radius, so the choice is invisible
+# in an eclipse contact time and the IERS value is kept.
 _ECL_EARTH_FLATTENING = 1.0 / 298.25642
 
 # Inner-contact ("umbral") lunar radius.  Classical eclipse practice adopts
