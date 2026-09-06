@@ -88,6 +88,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mean-longitude helpers that only the removed series called. The true lunar
   node is derived from the JPL osculating state as before, so results are
   unchanged.
+- The unreachable module-level copies of `heliacal_ut` and `vis_limit_mag` in
+  `eclipse.py`, with their nested helpers, and the unused private lunar helper
+  `_calc_lunar_fundamental_arguments`. The public `heliacal_ut`,
+  `heliacal_pheno_ut` and `vis_limit_mag` are and were served by
+  `libephemeris.heliacal`; the removed copies were reachable only as attributes
+  of the `eclipse` module and no code path called them, so no result changed.
 - The alias names `parse_seorbel`, `get_bundled_seorbel_path`,
   `load_bundled_seorbel`, `get_seorbel_body_by_name`, `calc_seorbel_position`
   and the class alias `SeorbelElements`. The generic names are the supported
