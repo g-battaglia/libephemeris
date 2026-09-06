@@ -512,6 +512,32 @@ _ECL_RMOON_INNER_AU = 0.272281 * 6378.140 / _ECL_AU_KM
 # factor, it increases the Moon's equatorial horizontal parallax term by one
 # percent while leaving the solar semidiameter and solar-parallax terms
 # geometric.  See Espenak & Meeus, NASA/TP-2009-214173, Eqs. 1-5 and 1-6.
+#
+# The Earth's shadow is not the geometric cone of two spheres: the atmosphere
+# absorbs and refracts the grazing sunlight, so both shadows reach the Moon
+# wider than geometry alone would make them.  Danjon's account of that excess
+# is a shell of opaque air around the Earth, an *absolute* addition to both
+# cones rather than a proportional one, hence modelled by enlarging the
+# Earth's radius -- equivalently the Moon's parallax -- by the thickness of
+# the shell, about one part in 85; the published factor is
+# 1.01 = 1 + 1/85 - 1/594, the second term reducing the equatorial radius to
+# latitude 45 degrees for the oblateness (Danjon, A., 1951, L'Astronomie 65,
+# 51-53; adopted by the Connaissance des Temps since 1951 and by Meeus &
+# Mucke, Canon of Lunar Eclipses, 1979).
+#
+# The competing convention is Chauvenet's, which enlarges the two finished
+# shadow radii by one fiftieth (A Manual of Spherical and Practical
+# Astronomy, vol. I, the chapter on eclipses; the rule of the Astronomical
+# Almanac).  The two disagree by about 0.006 of umbral and 0.026 of penumbral
+# magnitude -- enough to move an eclipse across the total/partial and the
+# partial/penumbral boundary -- so the choice is part of the answer and not a
+# detail of it.  Note that the fixed constants of Meeus ch. 54 carry
+# Chauvenet's enlargement, not this one.
+#
+# Applied to the Earth's radius where it enters the *sections* of the two
+# cones, and nowhere else: the half-angles of the cones stay geometric, the
+# Sun's radius and the Moon's are untouched, and no further oblateness factor
+# is applied.
 _DANJON_MOON_PARALLAX_SCALE = 1.01
 
 # Earth equatorial radius in km (IAU 1976 system, Astronomical Almanac),
@@ -1781,7 +1807,239 @@ def _sol_how_core(
 def _lun_how_core(
     tjd_ut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[int, list, Tuple[float, ...]]:
-    raise NotImplementedError("independent rewrite of _lun_how_core pending")
+    """What the Earth's shadow is doing to the Moon at one instant.
+
+    The Sun and the Earth are two spheres, the Sun the larger, so past the
+    Earth they define two coaxial cones of revolution: the umbral one,
+    tangent internally to both and converging to an apex some 1.4 million
+    kilometres away, and the penumbral one, tangent externally and diverging.
+    A lunar eclipse is the Moon crossing the sections those cones cut on the
+    plane through its own centre perpendicular to the shadow axis, and every
+    number this unit answers is a statement about that crossing: which of the
+    two sections the Moon's disc reaches, how far each shadow's edge has
+    passed its limb, and how far the Moon stands from the point opposite the
+    Sun (Explanatory Supplement to the Astronomical Almanac, 3rd ed., 2013,
+    ch. 11 "Eclipses of the Sun and Moon"; Chauvenet, vol. I, the chapter on
+    eclipses; Meeus 1998, ch. 54).
+
+    The geometry is **observer-independent**: a lunar eclipse is the same
+    physical event for everyone who can see the Moon at all, so nothing here
+    reads a geographic position and the three horizon slots are left for the
+    caller to fill. Only the ephemeris-selection bits of ``flags`` are used,
+    for the same reason: no projection or reduction bit can change where the
+    Moon stands inside the Earth's shadow.
+
+    Both places are geocentric *apparent* places -- light-time, aberration
+    and deflection included -- referred to the equator and equinox of date
+    and taken as rectangular coordinates in astronomical units, from one
+    position source so that the two are mutually consistent (Explanatory
+    Supplement, ch. 3 "Apparent Place", ch. 7).
+
+    Four steps:
+
+    * **the axis and the plane.** The shadow axis is the line through the
+      centres of the Sun and the Earth, prolonged beyond the Earth; in
+      geocentric coordinates its direction is the reverse of the direction to
+      the Sun. The Moon's place resolves along it into an axial distance
+      ``z`` -- how far beyond the Earth's centre the Moon's fundamental
+      plane lies -- and a perpendicular offset ``m``, the classical Besselian
+      ``sqrt(x**2 + y**2)`` of the shadow scheme carried in a linear unit
+      instead of in Earth radii. Divided by the Earth's equatorial radius,
+      ``m`` is the gamma the eclipse canons publish. It is a distance and
+      carries no sign: which side of the axis the Moon passes changes nothing
+      this unit answers.
+    * **the two cone sections.** A cone of half-angle ``f`` tangent to the
+      Earth cuts the fundamental plane in a circle of radius
+      ``E / cos f -/+ z tan f``, the ``cos f`` widening the tangent circle of
+      the sphere into the perpendicular section through its centre and the
+      term in ``z`` carrying the section forward along the axis: converging
+      for the umbra, diverging for the penumbra. ``E`` is the Earth's radius
+      after the atmospheric enlargement of Danjon's convention
+      (``_DANJON_MOON_PARALLAX_SCALE``), and only there; the
+      half-angles themselves stay geometric. Both sections are exact plane
+      sections rather than sums of small angles -- the angular form of the
+      canon's equations is the same geometry only to first order, and the
+      difference is measurable in the magnitude.
+    * **the two magnitudes**, each the fraction of the Moon's *diameter*
+      that one shadow covers: how far that shadow's edge has passed the
+      Moon's near limb, divided by the Moon's diameter (Five Millennium
+      Canon, sec. 1.2.7; Meeus ch. 54). Both are ratios of distances and
+      neither is an obscured area; both exceed one when the Moon lies wholly
+      inside the shadow, and the numerator turns negative when the Moon
+      stands clear of it.
+    * **the phase**, from where the Moon's disc lies with respect to the two
+      sections: wholly inside the umbral one (total), meeting it without
+      lying inside it (partial), missing it but meeting the penumbral one
+      (penumbral), or clear of both (no eclipse). The Moon's radius enters
+      each condition divided by that cone's cosine, the same projection of a
+      sphere's radius onto the plane perpendicular to the axis that widens
+      the sections above, and the same one the downstream contact search
+      uses. The four cases are disjoint and exhaustive, and no tolerance is
+      allowed anywhere near their boundaries: the global search rejects a
+      lunation on the penumbral condition alone.
+
+    Two published-behaviour contracts the geometry does not itself imply: the
+    umbral magnitude of a penumbral eclipse is reported as exactly ``0.0``
+    where the canon reports the negative distance of the Moon's limb from
+    the umbra (docs/comparison/known-differences.md), and the distance from
+    opposition is filled only while an eclipse is in progress -- the array
+    says "no eclipse" by leaving that channel empty rather than by reporting
+    a large angle.
+
+    Args:
+        tjd_ut: The instant, Julian Day in UT.
+        flags: The request word of the public entry points. Only its
+            ephemeris-selection bits are read.
+
+    Returns:
+        ``(retflag, attr, geometry)``.
+
+        ``retflag`` carries exactly one of ``ECL_TOTAL``, ``ECL_PARTIAL`` and
+        ``ECL_PENUMBRAL``, or ``0`` when the Moon is clear of the penumbra.
+        Never a visibility bit: whether the Moon is above a horizon is the
+        caller's question.
+
+        ``attr`` is the mutable 20-float compatibility layout, of which this
+        unit fills six slots: [0] umbral magnitude, ``0.0`` unless the Moon
+        reaches the umbra; [1] penumbral magnitude, negative when the Moon
+        stands clear of the penumbra; [7] the Moon's distance from
+        opposition in degrees, ``0.0`` when there is no eclipse; [8] the
+        umbral magnitude again, the channel the compatibility surface
+        publishes; [9] and [10] the Saros series and member, filled whatever
+        the phase, both carrying the no-match sentinel when no series
+        matches. Slots [4] to [6] are the caller's horizon reduction and
+        [2], [3] and [11] to [19] are reserved and stay ``0.0``.
+
+        ``geometry`` is the shadow at the Moon, in astronomical units, as
+        ``(axis offset, umbral section diameter, penumbral section diameter,
+        umbral cosine, penumbral cosine)``. The umbral diameter is a positive
+        width: the Moon never reaches the umbral cone's apex, so the
+        antumbral branch of the solar side does not arise here. The contact
+        search downstream forms its three immersion residuals from exactly
+        these five numbers and reads only their signs.
+
+    Raises:
+        EphemerisRangeError: Propagated from the layer that supplies the two
+            positions, when either falls outside the active coverage. The
+            guard fires on the light-time-retarded instant, so a request at
+            the very edge of an interval can be refused.
+
+    References:
+        Espenak, F. & Meeus, J. (2009). Five Millennium Canon of Lunar
+        Eclipses: -1999 to +3000. NASA/TP-2009-214173, sec. 1.2.6 (gamma),
+        sec. 1.2.7 (eclipse magnitude) and sec. 1.5 (enlargement of Earth's
+        shadows).
+        Explanatory Supplement to the Astronomical Almanac, 3rd ed., Urban &
+        Seidelmann (eds.), 2013: ch. 3, ch. 7 and ch. 11.
+        Chauvenet, W. A Manual of Spherical and Practical Astronomy, vol. I
+        (1891 ed.), the chapter on eclipses.
+        Meeus, J. (1998). Astronomical Algorithms, 2nd ed., ch. 54. Note that
+        the fixed constants of that chapter carry Chauvenet's enlargement,
+        not the one used here.
+    """
+    from .constants import FLG_XYZ
+
+    state_flags = _ecl_eph_flags(flags) | FLG_EQUATORIAL | FLG_XYZ
+    moon_state, _ = calc_ut(tjd_ut, MOON, state_flags)
+    sun_state, _ = calc_ut(tjd_ut, SUN, state_flags)
+    moon_au = (
+        float(moon_state[0]),
+        float(moon_state[1]),
+        float(moon_state[2]),
+    )
+    sun_au = (
+        float(sun_state[0]),
+        float(sun_state[1]),
+        float(sun_state[2]),
+    )
+
+    sun_distance = math.sqrt(
+        sun_au[0] * sun_au[0] + sun_au[1] * sun_au[1] + sun_au[2] * sun_au[2]
+    )
+    moon_distance = math.sqrt(
+        moon_au[0] * moon_au[0] + moon_au[1] * moon_au[1] + moon_au[2] * moon_au[2]
+    )
+
+    # The shadow axis points away from the Sun, so its unit vector is the
+    # reverse of the geocentric direction to the Sun. Resolving the Moon
+    # along it and across it gives the two scalars the whole construction is
+    # made of: how far down the shadow the Moon's fundamental plane lies, and
+    # how far from the axis the Moon's centre passes.
+    axis_unit = (
+        -sun_au[0] / sun_distance,
+        -sun_au[1] / sun_distance,
+        -sun_au[2] / sun_distance,
+    )
+    axial_au = (
+        moon_au[0] * axis_unit[0]
+        + moon_au[1] * axis_unit[1]
+        + moon_au[2] * axis_unit[2]
+    )
+    axis_offset_au = math.sqrt(
+        max(0.0, moon_distance * moon_distance - axial_au * axial_au)
+    )
+
+    (
+        sin_umbral,
+        cos_umbral,
+        sin_penumbral,
+        cos_penumbral,
+    ) = _shadow_cone_half_angles(_ECL_RSUN_AU, _ECL_REARTH_AU, sun_distance)
+
+    # The atmosphere enlarges the Earth, not the cones' opening: the
+    # half-angles above come from the geometric radius, the sections below
+    # from the enlarged one.
+    enlarged_earth_au = _DANJON_MOON_PARALLAX_SCALE * _ECL_REARTH_AU
+    umbral_radius_au = (enlarged_earth_au - axial_au * sin_umbral) / cos_umbral
+    penumbral_radius_au = (enlarged_earth_au + axial_au * sin_penumbral) / cos_penumbral
+
+    # Each magnitude is a depth of immersion divided by the Moon's diameter:
+    # zero when the shadow's edge touches the limb, one when it reaches the
+    # centre, two when it has crossed the whole disc.
+    lunar_diameter_au = 2.0 * _ECL_RMOON_AU
+    umbral_magnitude = (
+        umbral_radius_au + _ECL_RMOON_AU - axis_offset_au
+    ) / lunar_diameter_au
+    penumbral_magnitude = (
+        penumbral_radius_au + _ECL_RMOON_AU - axis_offset_au
+    ) / lunar_diameter_au
+
+    # The Moon's radius seen on the plane perpendicular to the axis, once per
+    # cone: the same projection that widened the sections themselves.
+    moon_on_umbral_au = _ECL_RMOON_AU / cos_umbral
+    moon_on_penumbral_au = _ECL_RMOON_AU / cos_penumbral
+    if axis_offset_au + moon_on_umbral_au <= umbral_radius_au:
+        retflag = ECL_TOTAL
+    elif axis_offset_au - moon_on_umbral_au <= umbral_radius_au:
+        retflag = ECL_PARTIAL
+    elif axis_offset_au - moon_on_penumbral_au <= penumbral_radius_au:
+        retflag = ECL_PENUMBRAL
+    else:
+        retflag = 0
+
+    attr = [0.0] * _HOW_ATTR_SLOTS
+    if retflag & (ECL_TOTAL | ECL_PARTIAL):
+        attr[0] = float(umbral_magnitude)
+    attr[1] = float(penumbral_magnitude)
+    if retflag:
+        # The angle at the Earth's centre between the two apparent places is
+        # the elongation; what is wanted is its supplement, the Moon's
+        # distance from the point exactly opposite the Sun.
+        cos_elongation = (
+            moon_au[0] * sun_au[0] + moon_au[1] * sun_au[1] + moon_au[2] * sun_au[2]
+        ) / (sun_distance * moon_distance)
+        attr[7] = 180.0 - math.degrees(math.acos(max(-1.0, min(1.0, cos_elongation))))
+    attr[8] = attr[0]
+    attr[9], attr[10] = _get_saros_info(tjd_ut, "lunar")
+
+    geometry = (
+        axis_offset_au,
+        2.0 * umbral_radius_au,
+        2.0 * penumbral_radius_au,
+        cos_umbral,
+        cos_penumbral,
+    )
+    return retflag, attr, geometry
 
 
 def _lun_eclipse_max_time(jd_approx: float, flags: int = FLG_SWIEPH) -> float:
