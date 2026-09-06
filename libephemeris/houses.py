@@ -4401,118 +4401,196 @@ CUSP_BOUNDARY_OFFSET = 0.0
 
 
 def _sin_deg(x: float) -> float:
-    """Return the sine of an angle supplied in degrees."""
+    """Sine of an angle given in degrees."""
     return math.sin(math.radians(x))
 
 
 def _cos_deg(x: float) -> float:
-    """Return the cosine of an angle supplied in degrees."""
+    """Cosine of an angle given in degrees."""
     return math.cos(math.radians(x))
 
 
 def _tan_deg(x: float) -> float:
-    """Return the tangent of an angle supplied in degrees."""
+    """Tangent of an angle given in degrees."""
     return math.tan(math.radians(x))
 
 
 def _atan_deg(x: float) -> float:
-    """Return the principal arctangent in degrees."""
+    """Principal arctangent of a ratio, in degrees, in ``(-90, 90)``."""
     return math.degrees(math.atan(x))
 
 
 def _asin_deg(x: float) -> float:
-    """Return arcsine in degrees after a roundoff-only unit-domain clamp."""
+    """Arcsine of a ratio, in degrees, in ``[-90, 90]``; saturating."""
     return math.degrees(math.asin(max(-1.0, min(1.0, x))))
 
 
 def _acos_deg(x: float) -> float:
-    """Return arccosine in degrees after a roundoff-only unit-domain clamp."""
+    """Arccosine of a ratio, in degrees, in ``[0, 180]``; saturating."""
     return math.degrees(math.acos(max(-1.0, min(1.0, x))))
 
 
 def _rotate_frame(lon: float, lat: float, tilt_deg: float) -> Tuple[float, float]:
-    """Tilt a spherical position into a frame rotated about the x-axis.
+    """Rotate a direction into a frame tilted about the origin of longitudes.
 
-    Thin wrapper over :func:`libephemeris.utils.cotrans` (this project's
-    public coordinate-rotation primitive) for callers that carry no radial
-    component. A positive ``tilt_deg`` rotates by the textbook x-axis
-    rotation used throughout spherical astronomy for plane changes —
-    ecliptic/equator, equator/horizon, equator/prime-vertical (Meeus,
-    'Astronomical Algorithms', 2nd ed., Ch. 13; Montenbruck & Pfleger,
-    'Astronomy on the Personal Computer', par. 1.3).
+    The direction is taken as a unit vector, its first component -- the one on
+    the axis through longitude zero -- is held fixed, and the other two are
+    turned through ``tilt_deg`` in the right-handed sense. A tilt of ``+eps``
+    therefore carries an equatorial place ``(ra, dec)`` to the ecliptic place
+    ``(lon, lat)`` and a tilt of ``-eps`` carries it back, which is the
+    textbook convention (Meeus, *Astronomical Algorithms*, 2nd ed., ch. 13;
+    Montenbruck & Pfleger, *Astronomy on the Personal Computer*, 4th ed., the
+    chapter on coordinate systems). With the tilt set to the geographic
+    latitude the same rotation carries the equator, referred to the east point
+    of the horizon, onto the prime vertical, which is the circle the Campanus
+    and Savard constructions divide.
+
+    Args:
+        lon: Longitude in the source frame, degrees.
+        lat: Latitude in the source frame, degrees.
+        tilt_deg: Tilt of the target frame, degrees.
 
     Returns:
-        ``(lon_out, lat_out)`` in degrees, longitude normalized to
-        ``[0, 360)``.
+        ``(longitude, latitude)`` in the tilted frame, degrees, with the
+        longitude in [0, 360) and the latitude in [-90, 90].
     """
-    lon_out, lat_out, _ = cotrans((lon, lat, 1.0), tilt_deg)
-    return lon_out, lat_out
+    cos_lat = _cos_deg(lat)
+    x = cos_lat * _cos_deg(lon)
+    y = cos_lat * _sin_deg(lon)
+    z = _sin_deg(lat)
+
+    cos_tilt = _cos_deg(tilt_deg)
+    sin_tilt = _sin_deg(tilt_deg)
+    y_rot = y * cos_tilt + z * sin_tilt
+    z_rot = z * cos_tilt - y * sin_tilt
+
+    return math.degrees(math.atan2(y_rot, x)) % 360.0, _asin_deg(z_rot)
 
 
 def _ascendant_on_eastern_horizon(
     asc: float, armc: float, eps: float, geolat: float
 ) -> float:
-    """Return the ascendant longitude anchored to the rising intersection.
+    """Keep the horizon/ecliptic intersection that is *rising*.
 
-    The horizon and the ecliptic intersect in two opposite points; the
-    ascendant is by definition the *eastern* (rising) one. The closed-form
-    ecliptic-longitude expression for the ascendant silently picks the
-    intersection nearer the meridian, which inside the polar circles can be
-    the setting point — a six-house (180 deg) error for every equal-style
-    system anchored to the ascendant.
+    The ecliptic and the horizon are great circles, so they meet in two
+    opposite points; the Ascendant is by definition the eastern one, the
+    degree coming up over the horizon (Holden, *The Elements of House
+    Division*, L. N. Fowler & Co., 1977; Munkasey, *An Astrological House
+    Formulary*, 2nd ed., 1990). The closed form that produced ``asc`` picks
+    its branch from the signs of the horizon equation, not from the horizon,
+    so it hands over the setting point for part of every day inside a polar
+    circle -- and taking that one displaces every Ascendant-anchored system by
+    exactly six houses.
 
-    Geometric test: the MC degree of the ecliptic has declination
-    ``delta_mc = atan(sin ARMC * tan eps)`` (the standard declination of an
-    ecliptic point expressed through its right ascension). Its meridian
-    altitude is ``90 - phi + delta_mc`` in the northern hemisphere and
-    ``-(-90 - phi + delta_mc)`` in the southern one; when that altitude
-    goes negative the MC has sunk below the horizon and the two
-    horizon-ecliptic intersections have swapped roles, so the raw
-    ascendant must be flipped to the opposite point.
+    The quantity that separates the two is the altitude of the culminating
+    degree, the midheaven itself. Its declination follows from the ARMC and
+    the obliquity as ``tan(dec) = tan(eps) sin(armc)``, and on the meridian
+    ``sin(altitude) = sin(lat) sin(dec) + cos(lat) cos(dec)``. Dividing by
+    ``cos(dec)``, strictly positive because ``|dec| < 90`` for every finite
+    obliquity, leaves ``cos(lat) + sin(lat) tan(eps) sin(armc)`` with the same
+    sign. While the culminating degree is on or above the horizon the
+    candidate is already the rising point; when it is below -- which can only
+    happen inside a polar circle -- the rising point is the opposite
+    longitude. One test, one substitution, the same statement in both
+    hemispheres.
+
+    The boundary is closed: the culminating degree exactly on the horizon
+    counts as above it, so the candidate is kept. That configuration is a
+    genuine tie -- a geographic pole with the ARMC at exactly half a turn puts
+    an equinox on the horizon and neither intersection is rising -- and
+    keeping the candidate is the branch the cusp-side Ascendant takes there,
+    so the two agree instead of answering half a turn apart. The tie is never
+    reached exactly, because ``cos(90)`` and ``sin(180)`` are two binary64
+    residues rather than two zeros and the sum compares them; no threshold is
+    written here to paper over that. It resolves the stated way for every
+    obliquity a chart can carry, and takes the other branch at the south pole
+    only past an obliquity of 26.565 degrees, where ``tan(eps)`` passes one
+    half. Both are pinned in tests/test_houses/test_house_helpers.py.
 
     Args:
-        asc: Ascendant longitude from the closed-form expression (degrees).
-        armc: Right ascension of the MC (degrees).
-        eps: True obliquity of the ecliptic (degrees).
-        geolat: Geographic latitude (degrees).
+        asc: Candidate Ascendant longitude in degrees, from the closed form.
+        armc: Right ascension of the meridian in degrees.
+        eps: True obliquity of date in degrees.
+        geolat: Geographic latitude in degrees, north positive.
 
     Returns:
-        The ascendant longitude on the eastern horizon (degrees).
+        The rising intersection's ecliptic longitude in degrees, in [0, 360).
     """
-    delta_mc = _atan_deg(_sin_deg(armc) * _tan_deg(eps))
-    if geolat >= 0 and 90.0 - geolat + delta_mc < 0.0:
-        asc = (asc + 180.0) % 360.0
-    if geolat < 0 and -90.0 - geolat + delta_mc > 0.0:
-        asc = (asc + 180.0) % 360.0
-    return asc
+    culminating_slope = _sin_deg(geolat) * _tan_deg(eps) * _sin_deg(armc)
+    culminating_altitude = _cos_deg(geolat) + culminating_slope
+    if culminating_altitude >= 0.0:
+        return asc
+    return (asc + 180.0) % 360.0
 
 
 def _above_horizon_test(dec: float, geolat: float, merid_dist: float) -> float:
-    """Signed above-horizon indicator for a body at hour-angle distance.
+    """A quantity whose sign says whether a body is above the horizon.
 
-    From the standard altitude formula ``sin h = sin(phi) sin(delta) +
-    cos(phi) cos(delta) cos(H)``: dividing through by ``cos(phi) cos(delta)``
-    (positive for |phi|, |delta| < 90) leaves the sign of the altitude in
-    ``tan(phi) tan(delta) + cos(H)``. Non-negative means the body sits on or
-    above the horizon.
+    The astronomical triangle gives the altitude of a body from its
+    declination, the observer's latitude and its hour angle (Smart, *Textbook
+    on Spherical Astronomy*, 6th ed., Cambridge University Press, 1977, the
+    chapter on the celestial sphere; Meeus ch. 13)::
+
+        sin(alt) = sin(lat) sin(dec) + cos(lat) cos(dec) cos(M)
+
+    The factor ``cos(lat) cos(dec)`` is strictly positive for ``|lat| < 90``
+    and ``|dec| < 90``, so dividing it out changes no sign and leaves the
+    bounded quantity returned here. That form is the one that survives high
+    latitude: it needs no arccosine, and it stays exact for a circumpolar
+    body, for which the arc from the meridian to the rising point does not
+    exist at all.
+
+    The value is not an altitude and only its sign is meaningful. Callers read
+    it as ``>= 0`` -- a body exactly on the horizon counts as above -- which is
+    what lets the two branches of a semi-arc construction meet without a gap
+    at the rising and the setting points. Where the divisor vanishes the sign
+    stops meaning what it says: at ``|lat| == 90`` the horizon is the
+    celestial equator and at ``|dec| == 90`` the body sits at a celestial
+    pole, and in both the exact answer is the sign of ``sin(lat) sin(dec)``.
+    The callers that can reach those configurations own that decision.
+
+    Args:
+        dec: Declination of the body in degrees.
+        geolat: Geographic latitude in degrees, north positive.
+        merid_dist: Arc from the upper meridian to the body, degrees, measured
+            towards increasing right ascension. Only its cosine enters, so the
+            sign convention against the classical hour angle is immaterial.
+
+    Returns:
+        ``tan(lat) tan(dec) + cos(M)``: non-negative above the horizon,
+        negative below it.
     """
-    return _tan_deg(dec) * _tan_deg(geolat) + _cos_deg(merid_dist)
+    return _tan_deg(geolat) * _tan_deg(dec) + _cos_deg(merid_dist)
 
 
 def _asc_diff_saturated(dec: float, geolat: float) -> float:
-    """Ascensional difference, saturated at the circumpolar limit.
+    """Ascensional difference, saturating where the body never rises or sets.
 
-    ``AD = asin(tan(phi) tan(delta))`` (the classic rising-time correction,
-    Meeus Ch. 15). Where the argument exceeds unit magnitude the body never
-    crosses the horizon at this latitude; the difference saturates at
-    +/-90 deg, which turns the corresponding semi-arc into 180 or 0 deg.
+    The arc by which a body's rising runs ahead of, or behind, the equinoctial
+    six hours is the difference between its oblique and its right ascension,
+    and follows from the altitude relation of :func:`_above_horizon_test` set
+    to zero (Smart 1977, the chapter on the celestial sphere; Meeus ch. 15,
+    which gives the same relation as the hour angle of rising; Holden 1977 for
+    its use by the house systems)::
+
+        AD = arcsin(tan(lat) tan(dec))
+
+    The semi-diurnal arc is ``90 + AD`` and the semi-nocturnal one ``90 - AD``.
+    When ``|tan(lat) tan(dec)| > 1`` the body never crosses the horizon at
+    that latitude, and the arcsine taken at the nearer end of its domain
+    answers ``+90`` for a circumpolar body and ``-90`` for one that never
+    rises -- turning the semi-diurnal arc into a whole 180 degrees or into
+    nothing at all, which is exactly the right geometry. The saturation is
+    therefore the arcsine's own domain and this unit has no case of its own.
+
+    Args:
+        dec: Declination of the body in degrees.
+        geolat: Geographic latitude in degrees, north positive.
+
+    Returns:
+        The ascensional difference in degrees, in [-90, 90].
     """
-    s = _tan_deg(dec) * _tan_deg(geolat)
-    if s >= 1.0:
-        return 90.0
-    if s <= -1.0:
-        return -90.0
-    return _asin_deg(s)
+    return _asin_deg(_tan_deg(geolat) * _tan_deg(dec))
 
 
 #: Latitude at which the Topocentric family is read for a chart placed on a
@@ -5832,22 +5910,34 @@ def _house_pos_pythonic(
 
 
 def _armc_to_mc(armc: float, eps: float) -> float:
-    """Convert ARMC to MC longitude."""
-    mc_rad = math.atan2(math.tan(math.radians(armc)), math.cos(math.radians(eps)))
-    mc = math.degrees(mc_rad)
-    if mc < 0:
-        mc += 360.0
-    if 90.0 < armc <= 270.0:
-        # Match the canonical houses_armc() quadrant correction (<= boundary).
-        if mc <= 90.0 or mc > 270.0:
-            mc += 180.0
-    elif armc > 270.0:
-        if mc <= 270.0:
-            mc += 180.0
-    elif armc <= 90.0:
-        if mc > 90.0:
-            mc += 180.0
-    return mc % 360.0
+    """The midheaven: the degree of the ecliptic whose right ascension is the ARMC.
+
+    For an ecliptic point at longitude ``lon`` the equatorial place follows
+    from the obliquity (Meeus, *Astronomical Algorithms*, 2nd ed., ch. 13)::
+
+        cos(dec) cos(ra) = cos(lon)
+        cos(dec) sin(ra) = sin(lon) cos(eps)
+        sin(dec)         = sin(lon) sin(eps)
+
+    Setting ``ra`` to the ARMC and inverting gives the culminating longitude
+    as the angle whose cosine is proportional to ``cos(armc) cos(eps)`` and
+    whose sine is proportional to ``sin(armc)``, with a positive factor: the
+    quadrant is carried by the two components rather than by a cascade of
+    cases. At zero obliquity the midheaven is the ARMC itself, and below a
+    right angle the two stay in the same quadrant, so the midheaven never
+    crosses a cardinal point of the ecliptic without the ARMC crossing the
+    matching cardinal point of the equator.
+
+    Args:
+        armc: Right ascension of the meridian in degrees.
+        eps: True obliquity of date in degrees.
+
+    Returns:
+        The midheaven's ecliptic longitude in degrees, in [0, 360).
+    """
+    return (
+        math.degrees(math.atan2(_sin_deg(armc), _cos_deg(armc) * _cos_deg(eps))) % 360.0
+    )
 
 
 @overload
