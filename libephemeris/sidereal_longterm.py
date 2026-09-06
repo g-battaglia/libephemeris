@@ -55,45 +55,62 @@ self-consistent frame. :mod:`libephemeris.precession_vondrak` takes its
 of-date mean obliquity from here and its matrices from the same ERFA routines
 (``erfa.ltp``/``erfa.ltpb``), so one chart's bodies and angles sit in one frame.
 
-How sidereal time is computed (the geometric method)
-----------------------------------------------------
-Sidereal time is the hour angle of the equinox, i.e. Earth-Rotation-Angle plus
-the accumulated precession in right ascension. Evaluating the *precession-in-RA*
-as a polynomial diverges at remote epochs for the same reason as above. We avoid
-that entirely by a **geometric** construction valid everywhere:
+How sidereal time is computed
+----------------------------
+Greenwich mean sidereal time is the hour angle, at the Greenwich meridian, of
+the **mean equinox of date** — the ascending intersection of the mean equator
+of date with the mean ecliptic of date. Three things are needed to place it:
+where the equinox of date lies, where the Sun's mean place lies, and how far
+the Earth has turned. What holds here is:
 
-1. take the mean longitude of the Earth from the published secular expression of
-   Simon, J.L. et al. (1994), "Numerical expressions for precession formulae and
-   mean elements for the Moon and the planets", A&A 282, 663;
-2. correct it for Sun-Earth light-time;
-3. form the corresponding unit direction on the ecliptic of J2000.0, rotate it to
-   the J2000.0 equator, **precess it to the date with the Vondrák matrix**, and
-   read off its ecliptic longitude of date;
-4. add the equation of the equinoxes (nutation in longitude x cos eps) and the UT1
-   hour angle.
+* **In the era the international expression was fitted for**, the answer *is*
+  the IAU 2006 Greenwich mean sidereal time — the Earth Rotation Angle of
+  Capitaine, Guinot & McCarthy (2000), a strictly linear function of UT1, plus
+  the precession-in-right-ascension polynomial of Capitaine, Wallace &
+  Chapront (2003). That polynomial is a truncated series fitted near J2000.0:
+  excellent for a few centuries, divergent outside its fit interval, by degrees
+  at the ends of the DE441 span.
+* **Everywhere**, the answer follows the definition, evaluated from quantities
+  that are themselves valid over the whole span: the equinox of date comes from
+  the Vondrák 2011 long-term precession as ERFA realizes it, the Sun's mean
+  place from the secular mean longitude of the Earth of Simon et al. (1994)
+  retarded by the Sun–Earth light time, and the Earth's rotation from UT1. No
+  polynomial in right ascension is summed, so nothing diverges.
+* **The two descriptions are one curve.** They are tied together at the ends of
+  the interval over which the international expression is adopted, and away
+  from that interval the answer is carried by the definition alone. Inside the
+  interval the answer is the IAU 2006 value itself; across the whole span the
+  value advances with the sidereal rotation of every interval, without a step,
+  a kink, or a reversal.
+* **The scales are the standard ones.** Sidereal time is an angle of the
+  rotating Earth, so its argument is UT1; precession and obliquity are
+  dynamical, so they are functions of TT. The two are joined by the library's
+  own ΔT, read live, so that one chart's angles and bodies share one ΔT. At
+  remote epochs the answer is correspondingly sensitive to ΔT: that sensitivity
+  is physical.
+* **No ephemeris is consulted**, so there is no supported range and no coverage
+  refusal: every finite Julian Day is answered with a number in ``[0, 360)``.
+  An infinite epoch is refused, and NaN propagates.
 
-Because step 3 transforms a *physical direction* through the long-term precession
-matrix (instead of summing a divergent RA polynomial), the result is stable over
-the whole supported range. For the modern window 1850-2050 the well-established
-IAU 2006 GMST polynomial is used directly (it is most precise there), with tiny
-continuity offsets so the two branches join smoothly.
-
-Time scales: precession and obliquity use **TT**; the Earth-rotation hour angle
-uses **UT1**. The TT↔UT1 difference (ΔT) is obtained from the library's own ΔT
-model (:func:`libephemeris.time_utils.deltat`), so houses and planetary positions
-use one consistent ΔT.
+Apparent sidereal time is the hour angle of the *true* equinox of date: the
+mean value plus the equation of the equinoxes, the classical projection of the
+nutation in longitude on the equator, with the nutation supplied by the caller
+so that one chart's angles and bodies share one nutation model.
 
 Provenance:
     The Vondrák 2011 poles and precession matrix are evaluated by ERFA
     (``erfa.ltpecl``, ``erfa.ltpequ``, ``erfa.ltp``), the IAU SOFA-derived
-    library; no coefficient of that model is kept in this module. The mean
-    longitude of the Earth is transcribed from Simon et al. (1994) and the
-    modern-window GMST from the IAU 2006 expression (Capitaine, Wallace &
-    Chapront 2003, A&A 412, 567). The geometric construction is standard
-    published astronomy. The modern/long-term branch boundary, continuity
-    offsets, the refusal of an infinite epoch, caching, and floating-point
-    evaluation order are project choices; their derivation and tests are
-    recorded in ``docs/methodology/sidereal-time-longterm.md``.
+    library; no coefficient of that model is kept in this module. The Earth
+    Rotation Angle constants are those of Capitaine, Guinot & McCarthy (2000)
+    as adopted in the IERS Conventions (2010), eq. 5.15; the precession in
+    right ascension is the series of Capitaine, Wallace & Chapront (2003),
+    A&A 412, 567; the mean longitude of the Earth is transcribed from Simon
+    et al. (1994), A&A 282, 663; the light time for unit distance is the IAU
+    (2009) value. The construction from those ingredients is standard published
+    astronomy. The interval over which the international expression is adopted,
+    the refusal of an infinite epoch, caching, and floating-point evaluation
+    order are project choices; their derivation and tests are recorded in
+    ``docs/methodology/sidereal-time-longterm.md``.
 """
 
 from __future__ import annotations
@@ -109,19 +126,6 @@ import erfa
 _J2000 = 2451545.0
 _D2PI = 2.0 * math.pi
 _DEG = math.pi / 180.0
-
-# Sun-Earth light-time, in days: AU / c. AU = 1.495978707e11 m (IAU 2012),
-# c = 299792458 m/s, 86400 s/day  ->  ~0.0057755183 day.
-_LIGHT_TIME_DAYS = 1.495978707e11 / 299792458.0 / 86400.0
-
-# Modern window where the IAU 2006 GMST polynomial branch is used directly.
-_LTERM_T0 = 2396758.5  # 1 Jan 1850
-_LTERM_T1 = 2469807.5  # 1 Jan 2050
-# Continuity offsets that join the long-term branch onto the modern polynomial
-# branch at the two boundaries are computed at runtime from the live ΔT model
-# (see _lterm_offset below), not hardcoded — so they never go stale when the ΔT
-# model changes (set_delta_t_userdef / IERS). They are only evaluated on the
-# rare long-term branch (dates outside 1850-2050).
 
 
 # --------------------------------------------------------------------------
@@ -245,117 +249,286 @@ def _deltat_days(jd_ut1: float) -> float:
     return deltat(jd_ut1)
 
 
-def _gmst_iau2006_deg(jd_ut1: float, jd_tt: float) -> float:
-    """Greenwich Mean Sidereal Time (deg) via the IAU 2006 expression.
+# --------------------------------------------------------------------------
+# the international expression, and the era it was fitted for
+# --------------------------------------------------------------------------
+#: Earth Rotation Angle at J2000.0 and its rate, in turns and turns per day of
+#: UT1. Capitaine, Guinot & McCarthy (2000), A&A 355, 398, as adopted in the
+#: IERS Conventions (2010), eq. 5.15.
+_ERA_TURNS_AT_J2000 = 0.7790572732640
+_ERA_TURNS_PER_UT1_DAY = 1.00273781191135448
 
-    GMST = ERA(UT1) + p(T), with the precession-in-RA polynomial p(T) of
-    Capitaine, Wallace & Chapront (2003), A&A 412, 567. The Earth Rotation
-    Angle ERA(UT1) uses the constants of Capitaine, Guinot & McCarthy (2000),
-    A&A 355, 398 (IERS Conventions 2010, eq. 5.15). Used in the modern window
-    where it is most precise.
-    """
-    du = jd_ut1 - _J2000
-    # ERA(UT1): Capitaine, Guinot & McCarthy (2000), A&A 355, 398;
-    # IERS Conventions 2010, eq. 5.15.
-    era = _D2PI * (0.7790572732640 + 1.00273781191135448 * du)
-    t = (jd_tt - _J2000) / 36525.0
-    p = 0.014506 + t * (
-        4612.156534
-        + t * (1.3915817 + t * (-0.00000044 + t * (-0.000029956 + t * -0.0000000368)))
-    )
-    return math.degrees(era) + p / 3600.0
+#: Precession accumulated in right ascension since J2000.0, in arcseconds, as
+#: coefficients of a polynomial in Julian centuries of TT. Capitaine, Wallace &
+#: Chapront (2003), "Expressions for IAU 2000 precession quantities",
+#: A&A 412, 567 — the series the IAU 2006 sidereal time is built on.
+_PRECESSION_IN_RA_ARCSEC = (
+    0.014506,
+    4612.156534,
+    1.3915817,
+    -0.00000044,
+    -0.000029956,
+    -0.0000000368,
+)
 
+#: Days in a Julian century and in a Julian millennium.
+_JULIAN_CENTURY_DAYS = 36525.0
+_JULIAN_MILLENNIUM_DAYS = 365250.0
 
-def _mean_sidereal_longterm_deg(jd_ut1: float) -> float:
-    """Greenwich mean sidereal time (deg) via the long-term geometric method."""
-    jd_tt = jd_ut1 + _deltat_days(jd_ut1)
-    t = (jd_tt - _J2000) / 365250.0  # Julian millennia (TT)
-    t2 = t * t
-    t3 = t * t2
-    # Simon et al. 1994 mean longitude of the Earth (degrees).
-    dlon = 100.46645683 + (1295977422.83429 * t - 2.04411 * t2 - 0.00523 * t3) / 3600.0
-    # Sun-Earth light-time correction.
-    dlon = (dlon - _LIGHT_TIME_DAYS * 360.0 / 365.2425) % 360.0
-    # Ecliptic-of-J2000 unit direction, then to the J2000 equator.
-    rad = dlon * _DEG
-    vec = (math.cos(rad), math.sin(rad), 0.0)
-    # _J2000 (2451545.0) is already the J2000.0 TT epoch and mean_obliquity_rad
-    # takes TT, so it is passed directly — adding ΔT would double-count the
-    # UT→TT offset (the eps_date term below correctly uses jd_tt as-is).
-    eps_j2000 = mean_obliquity_rad(_J2000)
-    vec = _rot_x(vec, -eps_j2000)
-    # Precess to the mean equator of date, then back to the ecliptic of date.
-    vec = _precess_j2000_to_date(vec, jd_tt)
-    eps_date = mean_obliquity_rad(jd_tt)
-    vec = _rot_x(vec, eps_date)
-    lon = math.degrees(math.atan2(vec[1], vec[0]))
-    # UT1 hour angle.
-    dhour = math.fmod(jd_ut1 - 0.5, 1.0) * 360.0
-    return (lon + dhour) % 360.0
+#: Ends of the interval over which the IAU 2006 expression is adopted as the
+#: realization of the definition: 1850 Jan 1.0 and 2050 Jan 1.0 as Julian Days.
+#: The polynomial of ``_PRECESSION_IN_RA_ARCSEC`` is a truncated fit around
+#: J2000.0; two centuries centred on the fit is where it is the best available
+#: realization, and the definition of :func:`_mean_sidereal_longterm_deg`
+#: carries the answer away from it.
+_ADOPTION_FIRST_JD = 2396758.5
+_ADOPTION_LAST_JD = 2469807.5
 
 
-def _lterm_offset(boundary_jd: float) -> float:
-    """Continuity offset (deg) joining the long-term branch to the modern one.
+def _earth_rotation_angle_deg(jd_ut1: float) -> float:
+    """Earth Rotation Angle at ``jd_ut1``, in degrees, not reduced to a turn.
 
-    Equals (long-term branch - modern branch) evaluated at ``boundary_jd``, so
-    the piecewise GMST is continuous there. Computed from the live delta-T model
-    rather than hardcoded, so it can never drift out of sync when the delta-T
-    model changes. Only called on the long-term branch (rare), so the extra cost
-    is negligible.
+    The rotation angle of the Earth about the Celestial Intermediate Pole is a
+    strictly linear function of UT1; the accumulated angle is returned as it
+    stands, because the caller reduces the total.
 
     Args:
-        boundary_jd: Julian Day (UT1) of the branch boundary (1 Jan 1850 or
-            1 Jan 2050).
+        jd_ut1: Julian Date on the UT1 scale.
 
     Returns:
-        Continuity offset in degrees, reduced to (-180, 180] to absorb any
-        0/360 wrap between the two branches.
+        The accumulated Earth Rotation Angle in degrees.
     """
-    jd_tt = boundary_jd + _deltat_days(boundary_jd)
-    diff = _mean_sidereal_longterm_deg(boundary_jd) - (
-        _gmst_iau2006_deg(boundary_jd, jd_tt) % 360.0
-    )
-    return (diff + 180.0) % 360.0 - 180.0
+    turns = _ERA_TURNS_AT_J2000 + _ERA_TURNS_PER_UT1_DAY * (jd_ut1 - _J2000)
+    return math.degrees(_D2PI * turns)
+
+
+def _precession_in_right_ascension_deg(jd_tt: float) -> float:
+    """Precession accumulated in right ascension since J2000.0, in degrees.
+
+    Args:
+        jd_tt: Julian Date in TT (precession is a dynamical quantity).
+
+    Returns:
+        The accumulated precession in right ascension, in degrees.
+    """
+    t = (jd_tt - _J2000) / _JULIAN_CENTURY_DAYS
+    a0, a1, a2, a3, a4, a5 = _PRECESSION_IN_RA_ARCSEC
+    return (a0 + t * (a1 + t * (a2 + t * (a3 + t * (a4 + t * a5))))) / 3600.0
+
+
+def _gmst_iau2006_deg(jd_ut1: float, jd_tt: float) -> float:
+    """Greenwich mean sidereal time from the IAU 2006 expression, in degrees.
+
+    The rotation term is a function of UT1 and the precession term a function
+    of TT, which is why both scales are arguments.
+
+    Args:
+        jd_ut1: Julian Date on the UT1 scale.
+        jd_tt: the same instant on the TT scale.
+
+    Returns:
+        Greenwich mean sidereal time in degrees, reduced to ``[0, 360)``.
+    """
+    return (
+        _earth_rotation_angle_deg(jd_ut1) + _precession_in_right_ascension_deg(jd_tt)
+    ) % 360.0
+
+
+# --------------------------------------------------------------------------
+# the definition, valid over the whole span
+# --------------------------------------------------------------------------
+#: Mean longitude of the Earth referred to the mean dynamical ecliptic and
+#: equinox of J2000.0: the epoch value in degrees and the secular terms in
+#: arcseconds per Julian millennium of TT. Simon, J. L., Bretagnon, P.,
+#: Chapront, J., Chapront-Touzé, M., Francou, G. & Laskar, J. (1994),
+#: "Numerical expressions for precession formulae and mean elements for the
+#: Moon and the planets", A&A 282, 663.
+_EARTH_MEAN_LONGITUDE_DEG = 100.46645683
+_EARTH_MEAN_LONGITUDE_ARCSEC = (1295977422.83429, -2.04411, -0.00523)
+
+#: Light time for unit distance, tau_A = 499.004 783 8061 s, in days. IAU (2009)
+#: system of astronomical constants; Luzum et al. (2011), CMDA 110, 293.
+_LIGHT_TIME_FOR_UNIT_DISTANCE_DAYS = 499.0047838061 / 86400.0
+
+#: The Sun's mean motion in longitude, at which the light time above is turned
+#: into an angle: one revolution per mean year of the Gregorian calendar. Which
+#: mean year is a convention, and the convention cannot matter here: reckoning
+#: the same light time at the sidereal rate of the mean longitude below, or at
+#: the mean tropical year, moves the sidereal time by 1e-7 to 4e-7 arcsec at
+#: the ends of the span and by less than that everywhere else -- four orders of
+#: magnitude below the 0.001 arcsec the library claims, and below the last
+#: representable place of the accumulated longitude it is subtracted from.
+_SUN_MEAN_MOTION_DEG_PER_DAY = 360.0 / 365.2425
+
+#: The angle by which light travel time retards the Sun's mean place: about
+#: 20.49 arcseconds. A geometric direction would leave the equinox that far
+#: away, ten orders of magnitude outside the precision claimed here.
+_LIGHT_TIME_RETARDATION_DEG = (
+    _SUN_MEAN_MOTION_DEG_PER_DAY * _LIGHT_TIME_FOR_UNIT_DISTANCE_DAYS
+)
+
+
+def _sun_apparent_mean_longitude_deg(jd_tt: float) -> float:
+    """Apparent mean longitude of the Sun in the J2000.0 mean ecliptic.
+
+    The Sun's mean place is the Earth's mean longitude turned by half a circle
+    and retarded by the Sun–Earth light time; the secular expression is valid
+    over the whole span the ephemeris covers.
+
+    Args:
+        jd_tt: Julian Date in TT.
+
+    Returns:
+        The longitude in degrees, reduced to ``[0, 360)``, referred to the mean
+        dynamical ecliptic and equinox of J2000.0.
+    """
+    t = (jd_tt - _J2000) / _JULIAN_MILLENNIUM_DAYS
+    c1, c2, c3 = _EARTH_MEAN_LONGITUDE_ARCSEC
+    earth = _EARTH_MEAN_LONGITUDE_DEG + (c1 * t + c2 * t * t + c3 * t**3) / 3600.0
+    return (earth - _LIGHT_TIME_RETARDATION_DEG + 180.0) % 360.0
+
+
+def _ecliptic_longitude_of_date_deg(longitude_j2000_deg: float, jd_tt: float) -> float:
+    """Carry a J2000.0 ecliptic longitude to the mean ecliptic of date.
+
+    The direction is taken to the J2000.0 equator with the obliquity of that
+    epoch, precessed with the Vondrák long-term matrix, and read back on the
+    ecliptic of date with the obliquity of date. Both obliquities are the angle
+    between the same pair of poles the matrix is built from, so the equinox,
+    the equator and the ecliptic of date are one frame.
+
+    Args:
+        longitude_j2000_deg: ecliptic longitude in the J2000.0 mean frame.
+        jd_tt: Julian Date in TT of the frame to carry it to.
+
+    Returns:
+        The ecliptic longitude of date in degrees, in ``(-180, 180]``.
+    """
+    longitude = math.radians(longitude_j2000_deg)
+    on_j2000_ecliptic = (math.cos(longitude), math.sin(longitude), 0.0)
+    on_j2000_equator = _rot_x(on_j2000_ecliptic, -mean_obliquity_rad(_J2000))
+    on_equator_of_date = _precess_j2000_to_date(on_j2000_equator, jd_tt)
+    on_ecliptic_of_date = _rot_x(on_equator_of_date, mean_obliquity_rad(jd_tt))
+    return math.degrees(math.atan2(on_ecliptic_of_date[1], on_ecliptic_of_date[0]))
+
+
+def _mean_sidereal_longterm_deg(jd_ut1: float, jd_tt: float) -> float:
+    """Greenwich hour angle of the mean equinox of date, from the definition.
+
+    Sidereal time is the hour angle of the equinox, which is the hour angle of
+    the mean Sun plus the mean Sun's right ascension; the fictitious mean Sun
+    runs on the equator with the right ascension the true Sun has as a mean
+    longitude, so the second term is the Sun's mean place carried to the
+    ecliptic of date. Universal Time gives the first term: it is mean solar
+    time at Greenwich, so the mean Sun's hour angle is the UT1 time of day less
+    twelve hours. Nothing here is a polynomial fitted near J2000.0, so the
+    construction holds over the whole span of the ephemeris.
+
+    Args:
+        jd_ut1: Julian Date on the UT1 scale.
+        jd_tt: the same instant on the TT scale. It is an argument rather than
+            a lookup so that the caller reads ΔT once, and nothing here is
+            memoised on a UT1 epoch: a session that changes the ΔT model, or
+            supplies its own value, changes the sidereal time with it.
+
+    Returns:
+        The hour angle in degrees, reduced to ``[0, 360)``.
+
+    Raises:
+        ValueError: if ``jd_ut1`` is infinite; an infinite epoch has no place
+            on the time axis of a rotating Earth. NaN propagates instead.
+    """
+    hour_angle_of_mean_sun = math.fmod(jd_ut1 + 0.5, 1.0) * 360.0 - 180.0
+    mean_sun = _sun_apparent_mean_longitude_deg(jd_tt)
+    return (
+        hour_angle_of_mean_sun + _ecliptic_longitude_of_date_deg(mean_sun, jd_tt)
+    ) % 360.0
+
+
+# --------------------------------------------------------------------------
+# one curve over the whole span
+# --------------------------------------------------------------------------
+def _adoption_epoch(jd_ut1: float) -> float:
+    """The epoch at which the international expression is read for ``jd_ut1``.
+
+    Inside the interval where the IAU 2006 expression is adopted this is the
+    epoch itself, so the answer is that expression; outside it, it is the end
+    of the interval the epoch lies beyond, so the definition carries the answer
+    on from the last place the expression is read. NaN passes through.
+
+    Args:
+        jd_ut1: Julian Date on the UT1 scale.
+
+    Returns:
+        The epoch to read the international expression at.
+    """
+    if jd_ut1 < _ADOPTION_FIRST_JD:
+        return _ADOPTION_FIRST_JD
+    if jd_ut1 > _ADOPTION_LAST_JD:
+        return _ADOPTION_LAST_JD
+    return jd_ut1
+
+
+def _to_signed_turn_deg(delta_deg: float) -> float:
+    """Reduce an angular difference in degrees to ``(-180, 180]``."""
+    reduced = delta_deg % 360.0
+    return reduced - 360.0 if reduced > 180.0 else reduced
 
 
 def mean_sidereal_time_deg(jd_ut1: float) -> float:
-    """Greenwich Mean Sidereal Time at ``jd_ut1`` in degrees [0, 360).
+    """Greenwich mean sidereal time in degrees for a Julian Day in UT1.
 
-    Piecewise: the IAU 2006 polynomial in 1850-2050 (most precise there), the
-    long-term geometric method outside it (correct over the whole supported
-    range), joined with small continuity offsets.
+    The answer is the IAU 2006 expression read at the adoption epoch, advanced
+    by the sidereal rotation the definition puts between that epoch and the
+    date. In the era the expression was fitted for the two epochs coincide and
+    the answer is the expression itself; away from it the advance comes
+    entirely from the long-term construction, which is what keeps the curve
+    continuous and free of the polynomial's divergence.
+
+    Args:
+        jd_ut1: Julian Date on the UT1 scale. Any finite value is answered,
+            inside or outside the range of any ephemeris.
+
+    Returns:
+        Greenwich mean sidereal time in degrees, reduced to ``[0, 360)``.
+
+    Raises:
+        ValueError: if ``jd_ut1`` is infinite. NaN propagates and yields NaN.
     """
-    if _LTERM_T0 < jd_ut1 < _LTERM_T1:
-        jd_tt = jd_ut1 + _deltat_days(jd_ut1)
-        return _gmst_iau2006_deg(jd_ut1, jd_tt) % 360.0
-    g = _mean_sidereal_longterm_deg(jd_ut1)
-    if jd_ut1 <= _LTERM_T0:
-        g -= _lterm_offset(_LTERM_T0)
-    else:
-        g -= _lterm_offset(_LTERM_T1)
-    return g % 360.0
+    epoch = _adoption_epoch(jd_ut1)
+    epoch_tt = epoch + _deltat_days(epoch)
+    at_epoch = _mean_sidereal_longterm_deg(epoch, epoch_tt)
+    at_date = _mean_sidereal_longterm_deg(jd_ut1, jd_ut1 + _deltat_days(jd_ut1))
+    advance = _to_signed_turn_deg(at_date - at_epoch)
+    return (_gmst_iau2006_deg(epoch, epoch_tt) + advance) % 360.0
 
 
 def apparent_sidereal_time_deg(
     jd_ut1: float, longitude: float = 0.0, *, dpsi_deg: float, eps_true_deg: float
 ) -> float:
-    """Local Apparent Sidereal Time at ``jd_ut1`` in degrees [0, 360).
+    """Local apparent sidereal time in degrees, the ARMC of the house engine.
 
-    This is the ARMC used by house systems when ``longitude`` is the observer's
-    geographic longitude. Apparent = mean + equation of the equinoxes
-    (``dpsi · cos ε_true``), with nutation supplied by the caller so that the
-    library's tuned nutation series is reused unchanged.
+    Apparent sidereal time is the hour angle of the *true* equinox of date: the
+    mean value plus the equation of the equinoxes, the nutation in longitude
+    projected on the equator. The nutation pair is supplied by the caller, so
+    one chart's angles and bodies share one nutation model, and the
+    complementary terms of the IAU 2000 equation of the equinoxes are not
+    applied here. East longitude enters as a plain additive angle, so the
+    answer at longitude zero is the Greenwich value.
 
     Args:
-        jd_ut1: Julian Date in UT1.
-        longitude: Geographic longitude in degrees (East positive). Default 0
-            gives Greenwich apparent sidereal time (= ARMC at longitude 0).
-        dpsi_deg: Nutation in longitude (degrees).
-        eps_true_deg: True obliquity of date (degrees).
+        jd_ut1: Julian Date on the UT1 scale.
+        longitude: geographic longitude in degrees, East positive.
+        dpsi_deg: nutation in longitude at the same instant, in degrees.
+        eps_true_deg: true obliquity of the ecliptic of date, in degrees.
 
     Returns:
-        Local apparent sidereal time in degrees [0, 360).
+        Local apparent sidereal time in degrees, reduced to ``[0, 360)``.
+
+    Raises:
+        ValueError: if ``jd_ut1`` is infinite. NaN propagates and yields NaN.
     """
-    gmst = mean_sidereal_time_deg(jd_ut1)
-    eoe = dpsi_deg * math.cos(math.radians(eps_true_deg))
-    return (gmst + eoe + longitude) % 360.0
+    equation_of_the_equinoxes = dpsi_deg * math.cos(math.radians(eps_true_deg))
+    return (
+        mean_sidereal_time_deg(jd_ut1) + equation_of_the_equinoxes + longitude
+    ) % 360.0

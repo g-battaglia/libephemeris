@@ -285,14 +285,22 @@ where T is Julian centuries from J2000.0.
 
 ### Sidereal time
 
-Houses require Greenwich Apparent Sidereal Time (GAST). LibEphemeris uses **Skyfield's `t.gast`**, which implements the IAU SOFA algorithm:
+Houses require Greenwich Apparent Sidereal Time (GAST). LibEphemeris takes it
+from its own long-term model (`sidereal_longterm.apparent_sidereal_time_deg()`,
+see [sidereal-time-longterm.md](../methodology/sidereal-time-longterm.md)):
 
-1. Earth Rotation Angle (ERA) from UT1 (IERS 2003 conventions)
-2. Greenwich Mean Sidereal Time (GMST) via ERA + equation of origins
-3. Equation of equinoxes: Δψ · cos(ε) (nutation in RA from IAU 2006/2000A)
-4. GAST = GMST + equation of equinoxes
+1. Greenwich Mean Sidereal Time: the IAU 2006 expression — Earth Rotation Angle
+   from UT1 plus the precession in right ascension — in the era that expression
+   was fitted for, and the long-term geometric construction (Vondrák 2011
+   precession, Simon 1994 mean longitude of the Earth) outside it, joined so
+   that the two form one continuous curve
+2. Equation of equinoxes: Δψ · cos(ε) with the library's own IAU 2006/2000A
+   nutation, the same one the planetary positions use
+3. GAST = GMST + equation of equinoxes
 
-Precision: ~0.001 seconds of time (~0.015 arcseconds in hour angle).
+Precision: sub-milliarcsecond agreement with the IAU 2006 sidereal time in the
+modern era, and no polynomial divergence at remote epochs, where an IAU-2006
+sidereal time is wrong by degrees. Only the ΔT model choice remains (§ Delta T).
 
 ### True obliquity
 

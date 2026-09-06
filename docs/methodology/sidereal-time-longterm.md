@@ -71,26 +71,45 @@ the poles, the obliquity and the matrix are memoised per epoch.
 
 ### Sidereal time — a geometric construction, not a divergent polynomial
 
-Sidereal time is the Earth-Rotation-Angle plus the accumulated precession in
-right ascension. Evaluating the precession-in-RA as a polynomial diverges at
-remote epochs for the same reason as above. We avoid that entirely with a
-**geometric** construction that is stable everywhere:
+Greenwich mean sidereal time is the hour angle of the **mean equinox of date**.
+Written the modern way it is the Earth Rotation Angle plus the accumulated
+precession in right ascension — and that second term, evaluated as a polynomial
+fitted near J2000.0, diverges at remote epochs for the same reason as above.
+We avoid that by going back to the definition, which needs only quantities that
+are valid over the whole span:
 
-1. take the mean longitude of the Earth from the published secular expression of
-   Simon, J.L. et al. (1994), *Numerical expressions for precession formulae and
-   mean elements for the Moon and the planets*, A&A **282**, 663;
-2. correct it for Sun–Earth light-time;
-3. form the corresponding unit direction on the ecliptic of J2000.0, rotate it to
-   the J2000.0 equator, **precess it to the date with the Vondrák matrix**, and
-   read off its ecliptic longitude of date;
-4. add the equation of the equinoxes (nutation in longitude × cos ε) and the UT1
-   hour angle.
+1. **where the Sun's mean place is** — the mean longitude of the Earth from the
+   published secular expression of Simon, J.L. et al. (1994), *Numerical
+   expressions for precession formulae and mean elements for the Moon and the
+   planets*, A&A **282**, 663, turned by half a circle and retarded by the
+   Sun–Earth light time (the light time for unit distance of the IAU (2009)
+   system of constants), which is an apparent, not a geometric, direction;
+2. **where the equinox of date is** — the direction of (1) is carried from the
+   J2000.0 frame to the mean ecliptic and equinox of date **through the Vondrák
+   precession matrix**, with the of-date mean obliquity that belongs to the same
+   pair of poles the matrix is built from;
+3. **how far the Earth has turned** — Universal Time is mean solar time at
+   Greenwich, so the hour angle of the mean Sun is the UT1 time of day less
+   twelve hours; sidereal time is that hour angle plus the mean Sun's right
+   ascension, which the fictitious mean Sun carries as the longitude from (2).
 
-Because step 3 transforms a *physical direction* through the long-term precession
+Because step 2 transforms a *physical direction* through the long-term precession
 matrix instead of summing a divergent RA polynomial, the result is stable over
-the whole supported range. In the modern window 1850–2050 the well-established
-IAU 2006 GMST polynomial is used directly (most precise there), with tiny
-continuity offsets so the two branches join smoothly.
+the whole supported range.
+
+In the era the international expression was fitted for — a two-century interval
+around J2000.0 — that expression is the best available realization of the same
+definition, so the answer is read from it there: the IAU 2006 GMST, the Earth
+Rotation Angle of Capitaine, Guinot & McCarthy (2000) plus the precession in
+right ascension of Capitaine, Wallace & Chapront (2003). Away from that interval
+the construction above carries the answer on from the last epoch at which the
+expression is read, so the two descriptions are one continuous, steadily
+advancing curve with no step and no kink where one gives way to the other.
+
+Apparent sidereal time is the mean value plus the equation of the equinoxes,
+the nutation in longitude projected on the equator (Δψ · cos ε), with the
+nutation supplied by the caller so that a chart's angles and bodies share one
+nutation model.
 
 Time scales follow the standard convention: precession and obliquity are
 evaluated at **TT**; the Earth-rotation hour angle uses **UT1**; the TT↔UT1

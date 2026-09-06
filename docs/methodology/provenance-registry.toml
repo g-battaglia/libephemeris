@@ -345,7 +345,7 @@ paths = [
   "libephemeris/time_utils.py",
 ]
 scientific_content = true
-origin = "IAU/IERS/ERFA reductions, Vondrak long-term precession, Simon secular expressions, published calendar algorithms, and observed IERS data. Project blend boundaries and caches are explicit."
+origin = "IAU/IERS/ERFA reductions, Vondrak long-term precession, Simon secular expressions, the IAU (2009) light time for unit distance, published calendar algorithms, and observed IERS data. The interval over which the IAU 2006 sidereal-time expression is adopted, and the caches, are project choices and are explicit."
 sources = ["IERS_2010", "ERFA", "VONDRAK_2011", "SIMON_1994", "DELTA_T", "MEEUS_1998"]
 documentation = ["docs/methodology/pyerfa-integration.md", "docs/methodology/sidereal-time-longterm.md", "docs/methodology/delta-t.md"]
 docstring = "detailed"

@@ -15,9 +15,11 @@ window (1850-2050) the fixes are, by design, a no-op, so the modern result must
 still match them to < 1e-6.
 
 The last group pins how :mod:`libephemeris.sidereal_longterm` evaluates the
-Vondrák model: the poles from ``erfa.ltpecl``/``erfa.ltpequ`` (the of-date mean
-obliquity is the angle between them) and the precession matrix from
-``erfa.ltp``, rebuilt here from ERFA directly, without the module's helpers.
+Vondrák model — the poles from ``erfa.ltpecl``/``erfa.ltpequ``, the of-date mean
+obliquity being the angle between them, rebuilt here from ERFA directly — and
+the properties the sidereal time has to have as a curve: one continuous,
+steadily advancing turn of the Earth over the whole span, on the IAU 2006
+expression in the era that expression was fitted for and off it outside.
 """
 
 from __future__ import annotations
@@ -217,12 +219,18 @@ def test_azalt_matches_calc_ut_frame_at_3000bce_extended():
 # --------------------------------------------------------------------------
 # The Vondrák model is evaluated by ERFA: poles, obliquity, precession matrix
 # --------------------------------------------------------------------------
-#: Julian Dates (TT) from the deep past to the far future, both branch
-#: boundaries of the sidereal-time model included.
+#: The two epochs where the sidereal time is tied to the IAU 2006 expression,
+#: 1850 Jan 1.0 and 2050 Jan 1.0, written out rather than imported so that the
+#: tests below depend on behaviour and not on the module's internals.
+_ADOPTION_FIRST = 2396758.5
+_ADOPTION_LAST = 2469807.5
+
+#: Julian Dates (TT) from the deep past to the far future, both ends of the
+#: adoption interval included.
 _ERFA_GRID = tuple(
     _J2000 + (year - 2000) * 365.25
     for year in (-13000, -8000, -3000, -1000, 0, 1000, 1850, 2000, 2050, 2500, 5000)
-) + (sl._LTERM_T0, sl._LTERM_T1, 2451545.0 + 0.25)
+) + (_ADOPTION_FIRST, _ADOPTION_LAST, 2451545.0 + 0.25)
 
 
 def _epj(jd_tt: float) -> float:
@@ -246,29 +254,114 @@ def test_mean_obliquity_is_the_angle_between_the_erfa_poles(jd_tt):
     assert sl.mean_obliquity_deg(jd_tt) == math.degrees(sl.mean_obliquity_rad(jd_tt))
 
 
-@pytest.mark.parametrize("jd_ut1", _ERFA_GRID)
-def test_longterm_gmst_branch_is_built_on_erfa_ltp(jd_ut1):
-    """The geometric GMST branch rebuilt from ``erfa.ltp`` matches the module.
-
-    Simon (1994) mean longitude of the Earth, light-time, J2000 ecliptic →
-    J2000 equator, ``erfa.ltp`` to the mean equator of date, back to the
-    ecliptic of date with the pole-angle obliquity, plus the UT1 hour angle.
-    """
+def _gmst_iau2006_deg(jd_ut1: float) -> float:
+    """The IAU 2006 Greenwich mean sidereal time, through ERFA, in degrees."""
     jd_tt = jd_ut1 + tu.deltat(jd_ut1)
-    t = (jd_tt - _J2000) / 365250.0
-    dlon = (
-        100.46645683
-        + (1295977422.83429 * t - 2.04411 * t * t - 0.00523 * t**3) / 3600.0
+    return math.degrees(erfa.gmst06(jd_ut1, 0.0, jd_tt, 0.0))
+
+
+@pytest.mark.parametrize(
+    "jd_ut1", (_ADOPTION_FIRST, 2415020.0, _J2000, 2440000.5, _ADOPTION_LAST)
+)
+def test_modern_era_is_the_iau_2006_expression(jd_ut1):
+    """In the era it was fitted for, the answer is the IAU 2006 GMST.
+
+    The two evaluations are of one expression, so what is left between them is
+    the rounding of that expression, not a difference of model.
+    """
+    got = sl.mean_sidereal_time_deg(jd_ut1)
+    assert abs(_wrap180(got - _gmst_iau2006_deg(jd_ut1))) * 3600.0 < 1e-4
+
+
+@pytest.mark.parametrize(
+    ("jd_ut1", "floor_deg"),
+    (
+        (_J2000 - 4000 * 365.25, 0.05),
+        (_J2000 - 8000 * 365.25, 1.0),
+        (_J2000 + 8000 * 365.25, 1.0),
+    ),
+)
+def test_remote_epochs_leave_the_fitted_polynomial(jd_ut1, floor_deg):
+    """Outside its fit interval the polynomial diverges and is not followed.
+
+    The precession in right ascension is a truncated series around J2000.0; a
+    sidereal time that stayed on it would be wrong by degrees at the ends of
+    the span, and every house cusp with it.
+    """
+    departure = abs(
+        _wrap180(sl.mean_sidereal_time_deg(jd_ut1) - _gmst_iau2006_deg(jd_ut1))
     )
-    dlon = (dlon - sl._LIGHT_TIME_DAYS * 360.0 / 365.2425) % 360.0
-    v = np.array([math.cos(math.radians(dlon)), math.sin(math.radians(dlon)), 0.0])
-    v = _rot_x(v, -sl.mean_obliquity_rad(_J2000))
-    v = np.asarray(erfa.ltp(_epj(jd_tt))) @ v
-    v = _rot_x(v, sl.mean_obliquity_rad(jd_tt))
-    lon = math.degrees(math.atan2(v[1], v[0]))
-    expected = (lon + math.fmod(jd_ut1 - 0.5, 1.0) * 360.0) % 360.0
-    got = sl._mean_sidereal_longterm_deg(jd_ut1)
-    assert abs(_wrap180(got - expected)) * 3600.0 < 1e-9
+    assert departure > floor_deg
+
+
+@pytest.mark.parametrize("epoch", (_ADOPTION_FIRST, _ADOPTION_LAST))
+def test_the_curve_has_no_step_at_the_adoption_epochs(epoch):
+    """One curve, not two: the sidereal time does not jump where the
+    description of it changes.
+
+    Sampled at half-day steps on the far side of an adoption epoch, the value
+    detrended by the sidereal rate lies on a straight line; extrapolating that
+    line across the epoch reproduces the value there. A step would show up as
+    a constant offset between the extrapolation and the value, and the
+    curvature of the real curve over one day is orders of magnitude smaller
+    than the steps this rules out.
+    """
+    rate = 360.98564736629  # degrees of sidereal time per day, near enough to detrend
+
+    def detrended(jd: float) -> float:
+        return _wrap180(sl.mean_sidereal_time_deg(jd) - rate * (jd - epoch))
+
+    outside = -1.0 if epoch == _ADOPTION_FIRST else 1.0
+    a = detrended(epoch + 3.0 * outside)
+    b = detrended(epoch + 2.0 * outside)
+    c = detrended(epoch + 1.0 * outside)
+    quadratic = 3.0 * c - 3.0 * b + a  # extrapolated one step further
+    assert abs(_wrap180(quadratic - detrended(epoch))) * 3600.0 < 1e-3
+
+
+def test_the_sidereal_time_advances_over_the_whole_span():
+    """Every step forward in time is a step forward in sidereal time.
+
+    Walked from the first day of the DE441 kernel to its last, the value
+    advances by the sidereal rotation of each interval: never a reversal, and a
+    rate that stays within a few arcseconds a day of its J2000.0 value even at
+    the ends, where the drift of ΔT and the change of the precession rate are
+    real and large.
+    """
+    step = 40.0
+    previous = None
+    worst = 0.0
+    jd = _J2000 - 13000 * 365.25
+    last = _J2000 + 15000 * 365.25
+    while jd <= last:
+        value = sl.mean_sidereal_time_deg(jd)
+        if previous is not None:
+            advance = (value - previous) % 360.0
+            expected = (360.98564736629 * step) % 360.0
+            worst = max(worst, abs(_wrap180(advance - expected)) / step)
+        previous = value
+        jd += step
+    assert worst * 3600.0 < 10.0
+
+
+def test_the_apparent_seam_is_the_mean_one_plus_the_equation_of_the_equinoxes():
+    """Nothing but the equation of the equinoxes and the longitude is added."""
+    jd = 2451545.0
+    dpsi, eps = 0.0047, 23.442600000000002
+    mean = sl.mean_sidereal_time_deg(jd)
+    for longitude in (-180.0, -37.5, 0.0, 37.5, 180.0):
+        expected = (mean + dpsi * math.cos(math.radians(eps)) + longitude) % 360.0
+        got = sl.apparent_sidereal_time_deg(
+            jd, longitude, dpsi_deg=dpsi, eps_true_deg=eps
+        )
+        assert got == expected
+
+
+def test_every_finite_epoch_is_answered():
+    """No supported range and no coverage refusal: the unit is a model."""
+    for jd in (-1e9, 0.0, 1e9, 1e12):
+        value = sl.mean_sidereal_time_deg(jd)
+        assert 0.0 <= value < 360.0
 
 
 def test_infinite_epoch_is_refused_and_nan_propagates():
@@ -287,3 +380,10 @@ def test_infinite_epoch_is_refused_and_nan_propagates():
             vondrak_mean_obliquity_deg(bad)
     assert math.isnan(sl.mean_obliquity_rad(math.nan))
     assert math.isnan(sl.mean_obliquity_deg(math.nan))
+    assert math.isnan(sl.mean_sidereal_time_deg(math.nan))
+    assert math.isnan(
+        sl.apparent_sidereal_time_deg(math.nan, dpsi_deg=0.0, eps_true_deg=23.44)
+    )
+    for bad in (math.inf, -math.inf):
+        with pytest.raises(ValueError):
+            sl.apparent_sidereal_time_deg(bad, dpsi_deg=0.0, eps_true_deg=23.44)
