@@ -1050,12 +1050,12 @@ def test_house_pos_default_fallback_zero_width(monkeypatch):
     """A zero-width house in the fallback path is handled (5209-5217)."""
 
     # Force coincident cusps so a house has zero width.
-    def fake_armc(armc, lat, obliquity, hsys):
+    def fake_armc(armc, lat, eps, hsys_char, sun_dec, func_name):
         cusps = tuple([10.0] * 12)  # all identical -> zero-width houses
         ascmc = tuple([0.0] * 8)
         return cusps, ascmc
 
-    monkeypatch.setattr(H, "houses_armc", fake_armc)
+    monkeypatch.setattr(H, "_houses_from_armc", fake_armc)
     # Body exactly on the coincident cusp -> returns that house.
     pos_on = H._house_pos_pythonic(200.0, ROME_LAT, EPS, ord("L"), 10.0, 0.0)
     assert pos_on == pytest.approx(1.0)
@@ -1067,12 +1067,12 @@ def test_house_pos_default_fallback_zero_width(monkeypatch):
 def test_house_pos_alcabitius_zero_interval(monkeypatch):
     """Alcabitius with coincident cusp RAs uses the 30 deg interval default."""
 
-    def fake_armc(armc, lat, obliquity, hsys):
+    def fake_armc(armc, lat, eps, hsys_char, sun_dec, func_name):
         cusps = tuple([10.0] * 12)
         ascmc = tuple([0.0] * 8)
         return cusps, ascmc
 
-    monkeypatch.setattr(H, "houses_armc", fake_armc)
+    monkeypatch.setattr(H, "_houses_from_armc", fake_armc)
     pos = H._house_pos_pythonic(200.0, ROME_LAT, EPS, ord("B"), 11.0, 0.0)
     assert 1.0 <= pos < 13.0
 

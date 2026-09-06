@@ -5090,6 +5090,401 @@ def _hpos_sunshine_apc(
     return pos_deg / 30.0 + 1.0
 
 
+# --- House position: the arc each system divides ---------------------------
+# `house_pos` answers one question -- how far through which house a body sits
+# -- and every system answers it on a different arc: a share of the body's own
+# semi-diurnal arc in one, a share of a great circle through two fixed points
+# of the horizon in another, a share of a 30-degree step of ecliptic longitude
+# in a third. The helpers below name those arcs one at a time; the dispatcher
+# that follows routes a selector to the right one.
+
+
+def _house_pos_arc(arc_deg: float, sectors: int = 12) -> float:
+    """Read a house position off the arc the system divides.
+
+    Args:
+        arc_deg: Angle from the cusp that opens the first house to the body,
+            in degrees of the divided circle, counted in the direction the
+            houses are numbered.
+        sectors: Number of equal houses on that circle -- twelve everywhere
+            except the Gauquelin sectors, which carry thirty-six.
+
+    Returns:
+        The house number plus the fraction of that house already behind the
+        body. The interval is half-open, so a body exactly on the first cusp
+        is ``1.0`` and never ``13.0``: Python's modulo answers a full turn for
+        an angle a hair below zero, which is the first cusp reached from the
+        other side, and that is folded back onto zero.
+    """
+    arc = arc_deg % 360.0
+    if arc >= 360.0:
+        arc = 0.0
+    return arc / (360.0 / sectors) + 1.0
+
+
+def _house_pos_half_open(pos: float, sectors: int = 12) -> float:
+    """Keep a house position inside its half-open interval.
+
+    The interval is ``[1, 13)``, or ``[1, 37)`` for the Gauquelin sectors, for
+    every system alike: the first cusp belongs to the house it opens, so a
+    body on it is ``1.0``. A construction that reads its answer off a modulo
+    can land on the upper end instead, which names that same point from
+    outside the interval; this brings it back.
+    """
+    top = sectors + 1.0
+    return pos - sectors if pos >= top else pos
+
+
+def _house_pos_equatorial(
+    lon: float, lat_body: float, eps: float
+) -> Tuple[float, float]:
+    """Carry a body's ecliptic place onto the equatorial sphere.
+
+    The rotation about the equinox line through the obliquity (Meeus,
+    'Astronomical Algorithms', 2nd ed., ch. 13). At an ecliptic pole the
+    tangent of the ecliptic latitude is unbounded and the two-argument
+    arctangent carries that to the right answer on its own: a body at
+    ``beta = +90`` sits at right ascension 270 and declination ``90 - eps``.
+
+    Args:
+        lon: Ecliptic longitude of the body in degrees.
+        lat_body: Ecliptic latitude of the body in degrees.
+        eps: True obliquity of the ecliptic in degrees.
+
+    Returns:
+        ``(right ascension, declination)`` in degrees, the first in
+        ``[0, 360)``.
+    """
+    sin_dec = _sin_deg(lat_body) * _cos_deg(eps) + _cos_deg(lat_body) * _sin_deg(
+        lon
+    ) * _sin_deg(eps)
+    dec = _asin_deg(sin_dec)
+    ra = (
+        math.degrees(
+            math.atan2(
+                _sin_deg(lon) * _cos_deg(eps) - _tan_deg(lat_body) * _sin_deg(eps),
+                _cos_deg(lon),
+            )
+        )
+        % 360.0
+    )
+    return ra, dec
+
+
+def _meridian_distance(ra: float, armc: float) -> float:
+    """Signed arc from the upper meridian to the body, in ``(-180, 180]``.
+
+    Positive in the half of the sky the body has not yet culminated in. The
+    hour angle is its negative.
+    """
+    md = (ra - armc) % 360.0
+    return md - 360.0 if md > 180.0 else md
+
+
+def _meridian_distance_lower(ra: float, armc: float) -> float:
+    """Signed arc from the lower meridian to the body, in ``(-180, 180]``."""
+    md = (ra - armc - 180.0) % 360.0
+    return md - 360.0 if md > 180.0 else md
+
+
+def _eastern_ascendant(armc: float, eps: float, geolat: float) -> float:
+    """The ecliptic degree rising on the eastern horizon, in degrees.
+
+    The horizon and the ecliptic meet in two opposite points; the systems
+    anchored on the ascendant need the rising one at every latitude, because
+    inside the polar circle the closed form can return the setting point and
+    that would move every answer by six houses.
+    """
+    asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
+    return _ascendant_on_eastern_horizon(asc, armc, eps, geolat)
+
+
+def _asc_diff_at_pole(dec: float, geolat: float) -> float:
+    """Ascensional difference, with a geographic pole taken exactly.
+
+    ``AD = asin(tan dec tan lat)`` is the arc by which a body's rising runs
+    ahead of or behind the equinoctial six hours. At a geographic pole the
+    tangent of the latitude is unbounded, so every body off the celestial
+    equator is circumpolar and that arc is a full quarter turn; the binary
+    tangent of 90 degrees is large but finite and would answer an ordinary
+    angle in its place. A body on the celestial equator carries no such
+    offset at any latitude and keeps an ascensional difference of zero.
+    """
+    if abs(geolat) == 90.0 and dec != 0.0:
+        return 90.0 if _sin_deg(geolat) * _sin_deg(dec) >= 0.0 else -90.0
+    return _asc_diff_saturated(dec, geolat)
+
+
+def _hpos_placidus(ra: float, armc: float, dec: float, geolat: float) -> float:
+    """Placidus house position: the share of the body's own semi-arc.
+
+    Placidus cuts each of a body's semi-arcs into three. The semi-diurnal arc
+    runs from rising to upper culmination and the semi-nocturnal one from
+    lower culmination to rising; both follow from the ascensional difference
+    ``AD = asin(tan dec tan lat)``, which is how much earlier or later than
+    the equinoctial six hours the body crosses the horizon (Holden, "The
+    Elements of House Division", 1977; the same relation underlies the
+    classical oblique ascension). The semi-diurnal arc is ``90 + AD`` and the
+    semi-nocturnal one ``90 - AD``.
+
+    Above the horizon the distance from the upper meridian, taken as a share
+    of the semi-diurnal arc, puts the tenth cusp on the culmination, the first
+    on the rising point and the seventh on the setting point. Below it, the
+    distance from the lower meridian on the semi-nocturnal arc puts the fourth
+    cusp on the lower culmination. The two rules meet on the horizon by
+    construction, so the answer is continuous through rising and setting, and
+    it is at least 7 exactly while the body is above the horizon.
+
+    Args:
+        ra: Right ascension of the body in degrees.
+        armc: Right ascension of the medium coeli in degrees.
+        dec: Declination of the body in degrees.
+        geolat: Geographic latitude in degrees, north positive.
+
+    Returns:
+        House position in ``[1, 13)``.
+    """
+    md_upper = _meridian_distance(ra, armc)
+    if abs(geolat) == 90.0:
+        # At a geographic pole the horizon is the celestial equator: a body
+        # keeps the altitude its declination gives it, no hour angle enters,
+        # and it neither rises nor sets. Both semi-arcs then open out to the
+        # whole daily circle, and the body stays in the half of the house
+        # circle its own hemisphere occupies.
+        above_horizon = _sin_deg(geolat) * _sin_deg(dec) >= 0.0
+        asc_diff = 90.0 if above_horizon else -90.0
+    else:
+        asc_diff = _asc_diff_saturated(dec, geolat)
+        above_horizon = _above_horizon_test(dec, geolat, md_upper) >= 0.0
+    if above_horizon:
+        share = md_upper / (90.0 + asc_diff)
+        return _house_pos_arc((share + 3.0) * 90.0)
+    share = _meridian_distance_lower(ra, armc) / (90.0 - asc_diff)
+    return _house_pos_arc((share + 1.0) * 90.0)
+
+
+def _hpos_gauquelin(placidus_pos: float) -> float:
+    """The Gauquelin sector of a body, from its Placidus house position.
+
+    The thirty-six sectors cut the same two semi-arcs as Placidus into
+    eighteen parts each instead of six, and number them in the direction of
+    the diurnal motion from the rising point (Gauquelin, "Cosmic Influences on
+    Human Behavior", 1973). Sector and house position are therefore one
+    quantity in two coordinates, and taking one from the other is what keeps
+    them from ever disagreeing.
+    """
+    return _house_pos_arc(360.0 - 30.0 * (placidus_pos - 1.0), 36)
+
+
+def _hpos_koch(
+    md_upper: float, dec: float, geolat: float, eps: float, armc: float
+) -> float:
+    """Koch house position: the share of the midheaven's own semi-diurnal arc.
+
+    The birthplace houses are the ecliptic degrees that stood on the ascendant
+    of the observer's own latitude at instants separated by equal shares of
+    the midheaven degree's semi-diurnal arc (Koch and Knappich,
+    "Regiomontanus und das Häusersystem des Geburtsortes", 1960; described in
+    English in Holden 1977). A body is placed by the share of that arc which
+    separates its own rising from the midheaven's, counted in the direction of
+    the pair of quadrants the body occupies -- eastward before culmination,
+    westward after -- so that the four angles fall on the four quadrant
+    boundaries.
+
+    Two ascensional differences enter, the body's own and the midheaven's, and
+    both saturate at the circumpolar limit. The saturations are not symmetric.
+    An argument at or above ``+1`` says the degree never sets: the midheaven's
+    semi-arc is then the largest possible one, 180 degrees, and bodies are
+    placed normally. An argument at or below ``-1`` says it never rises: there
+    is no diurnal arc, no share of it exists, and the system has no houses at
+    all for that frame. Treating both as a refusal would refuse about one
+    placed answer in six.
+
+    Args:
+        md_upper: Signed arc from the upper meridian to the body, degrees.
+        dec: Declination of the body in degrees.
+        geolat: Geographic latitude in degrees.
+        eps: True obliquity of the ecliptic in degrees.
+        armc: Right ascension of the medium coeli in degrees.
+
+    Returns:
+        House position in ``[1, 13)``, or ``0.0`` where the birthplace circles
+        do not reach the body: either the midheaven's degree never rises, or
+        the body falls outside the two quadrants the construction spans.
+    """
+    asc_diff = _asc_diff_at_pole(dec, geolat)
+    # The midheaven's right ascension is the ARMC, so its declination follows
+    # from the obliquity alone and its ascensional difference from the same
+    # relation as the body's.
+    mc_sine = _tan_deg(eps) * _tan_deg(geolat) * _sin_deg(armc)
+    if mc_sine >= 1.0:
+        mc_asc_diff = 90.0
+    elif mc_sine <= -1.0:
+        mc_asc_diff = -90.0
+    else:
+        mc_asc_diff = _asin_deg(mc_sine)
+    mc_semi_arc = 90.0 + mc_asc_diff
+    if mc_semi_arc <= 0.0:
+        return 0.0
+    if md_upper >= 0.0:
+        share = (md_upper - asc_diff + mc_asc_diff) / mc_semi_arc
+        quadrant_pair = (share - 1.0) * 90.0
+    else:
+        share = (md_upper + 180.0 + asc_diff + mc_asc_diff) / mc_semi_arc
+        quadrant_pair = (share + 1.0) * 90.0
+    if share < 0.0 or share > 2.0:
+        return 0.0
+    return _house_pos_arc(quadrant_pair)
+
+
+def _hpos_regiomontanus(md_upper: float, dec: float, geolat: float) -> float:
+    """Regiomontanus house position: the point of the equator the body cuts.
+
+    The system divides the celestial equator into twelve 30-degree arcs from
+    the ARMC and draws each house circle through the resulting equator point
+    and the north and south points of the horizon (Holden 1977; North,
+    "Horoscopes and History", 1986, on the modus rationalis). A body is
+    therefore placed at the equator point cut by the great circle through it
+    and those two horizon points::
+
+        tan x = -(tan lat tan dec + cos M) / sin M
+
+    with ``x`` measured so that the upper meridian is the tenth cusp and the
+    lower the fourth.
+
+    On a meridian the closed form is indeterminate and the geometry answers
+    instead: the body is on the tenth cusp or the fourth according to whether
+    the meridian point it occupies is above or below the horizon. Inside the
+    polar circle the upper meridian point can itself be below the horizon, and
+    the two assignments exchange.
+
+    At a geographic pole the north and south points of the horizon are not
+    distinguishable, every house circle is the same circle, and the
+    construction collapses onto that same pair of cusps for any body off the
+    celestial equator. A body on the equator lies on the horizon itself, where
+    the collapse does not happen: there the unbounded tangent of the latitude
+    multiplies a vanishing one, the product is zero and the closed form is
+    finite and exact.
+    """
+    if abs(geolat) == 90.0 and dec != 0.0:
+        return 10.0 if _sin_deg(geolat) * _sin_deg(dec) >= 0.0 else 4.0
+    sin_md = _sin_deg(md_upper)
+    horizon_side = _tan_deg(geolat) * _tan_deg(dec) + _cos_deg(md_upper)
+    if sin_md == 0.0:
+        equator_arc = 270.0 if horizon_side >= 0.0 else 90.0
+    else:
+        equator_arc = _atan_deg(-horizon_side / sin_md) % 360.0
+        if md_upper < 0.0:
+            equator_arc += 180.0
+    return _house_pos_arc(equator_arc)
+
+
+def _hpos_campanus(md_upper: float, dec: float, geolat: float) -> float:
+    """Campanus house position: the body's longitude on the prime vertical.
+
+    Campanus divides the prime vertical -- the great circle through the zenith
+    and the east and west points of the horizon -- into twelve 30-degree arcs
+    and draws the house circles through the north and south points of the
+    horizon (Holden 1977; North 1986, which traces the construction to
+    Campanus of Novara). The prime vertical and the equator share the east and
+    west points and meet there at the geographic latitude, so one rotation
+    about that shared axis carries the body's equatorial place, referred to
+    the east point, onto the frame the system divides; its longitude there is
+    the answer.
+    """
+    prime_vertical_lon, _ = _rotate_frame(md_upper - 90.0, dec, -geolat)
+    return _house_pos_arc(prime_vertical_lon)
+
+
+def _hpos_morinus(lon: float, armc: float, eps: float) -> float:
+    """Morinus house position: the equator point on the body's own meridian.
+
+    Morinus divides the equator into twelve equal arcs from the east point and
+    projects them onto the ecliptic along circles of ecliptic longitude, not
+    along hour circles (Holden 1977). The house circles are therefore circles
+    of ecliptic longitude, and a body is carried to the equator along the
+    circle of its own longitude: the answer is the right ascension of the
+    equator point whose ecliptic longitude is the body's, measured from the
+    east point of the equator at ``ARMC + 90``. The body's ecliptic latitude
+    cannot enter, because sliding a body along its own longitude circle does
+    not move that meeting point.
+    """
+    equator_ra = (
+        math.degrees(math.atan2(_sin_deg(lon), _cos_deg(lon) * _cos_deg(eps))) % 360.0
+    )
+    return _house_pos_arc(equator_ra - armc - 90.0)
+
+
+def _hpos_between_cusps(
+    cusps: Union[Tuple[float, ...], List[float]], value: float
+) -> float:
+    """Place a value between the two cusps that bracket it.
+
+    The general rule for a system whose houses are arcs of the circle the
+    cusps are given on: find the pair the value falls between and report the
+    share of the way across. A house of zero width -- coincident cusps do
+    occur at extreme latitudes -- can hold only a value exactly on it, and
+    must not be read as a house of ordinary width.
+
+    Args:
+        cusps: Cusp positions in degrees, in the order the houses are
+            numbered; twelve of them, or thirty-six for a sector system.
+        value: The angle to place, in degrees on the same circle.
+
+    Returns:
+        House position in ``[1, 13)``: the cusp's own number for a value on a
+        cusp, and the number plus the fraction traversed otherwise.
+    """
+    count = len(cusps)
+    for index in range(count):
+        start = cusps[index]
+        width = (cusps[(index + 1) % count] - start) % 360.0
+        offset = (value - start) % 360.0
+        if width == 0.0:
+            if offset == 0.0:
+                return float(index + 1)
+            continue
+        if offset < width:
+            return (index + 1) + offset / width
+    return 1.0
+
+
+def _house_pos_place(
+    hsys_or_objcoord: Union[int, bytes, str, Tuple[float, float]],
+    lon_or_hsys: Optional[Union[float, bytes, str]],
+    lat_body: float,
+) -> Tuple[Any, float, float]:
+    """Resolve the two calling conventions onto one internal question.
+
+    The five-argument form carries the body's place as a sequence in the
+    fourth slot and the selector in the fifth; the six-argument form carries
+    the selector in the fourth and the coordinates as two floats after it, and
+    also accepts the sequence there, in which case the sixth argument is
+    ignored. A sequence of length one means the body's ecliptic latitude is
+    zero, and an omitted selector selects Placidus.
+
+    Returns:
+        ``(selector, ecliptic longitude, ecliptic latitude)``.
+    """
+    if isinstance(hsys_or_objcoord, (tuple, list)):
+        lon, body_lat = _objcoord_place(hsys_or_objcoord)
+        hsys = "P" if lon_or_hsys is None else lon_or_hsys
+        return hsys, lon, body_lat
+    if isinstance(lon_or_hsys, (tuple, list)):
+        lon, body_lat = _objcoord_place(lon_or_hsys)
+        return hsys_or_objcoord, lon, body_lat
+    lon = 0.0 if lon_or_hsys is None else float(lon_or_hsys)  # type: ignore[arg-type]
+    return hsys_or_objcoord, lon, float(lat_body)
+
+
+def _objcoord_place(
+    objcoord: Union[Tuple[float, ...], List[float]],
+) -> Tuple[float, float]:
+    """Ecliptic longitude and latitude from a one- or two-element sequence."""
+    lon = float(objcoord[0])
+    return lon, float(objcoord[1]) if len(objcoord) > 1 else 0.0
+
+
 @overload
 def _house_pos_pythonic(
     armc: float,
@@ -5142,538 +5537,161 @@ def _house_pos_pythonic(
     lon_or_hsys: Optional[Union[float, bytes, str]] = None,
     lat_body: float = 0.0,
 ) -> float:
-    """
-    Determine in which house a celestial body is located.
+    """Locate a body in the houses of one system, as a house plus a fraction.
 
-    Returns a decimal value where the integer part is the house number (1-12)
-    and the decimal part indicates the position within the house
-    (0.0 = start of cusp, 0.999... = end of house, just before next cusp).
+    The integer part of the answer is the house the body is in and the
+    fractional part is how much of that house it has already traversed, as a
+    fraction of that house's own width: a body on the cusp that opens the
+    fifth house is ``5.0``, one halfway to the sixth is ``5.5``. The houses are
+    numbered from the ascendant against the diurnal motion, so a fixed body's
+    position falls as the ARMC advances; the Gauquelin sectors are numbered
+    the other way and start at the rising point.
 
-    This function supports two calling conventions:
+    This is not "build the cusps, then see which pair the body falls between".
+    For most systems the body's declination enters, so two bodies on the same
+    ecliptic degree at different ecliptic latitudes are placed differently;
+    only the systems whose houses are arcs of the ecliptic reduce to a
+    comparison against the cusps.
 
-    1. Reference API compatible (5 args):
-       _house_pos_pythonic(armc, lat, obliquity, objcoord, hsys)
-       where objcoord is a tuple (lon, lat_body) and hsys is bytes/str
-
-    2. Extended signature (6 args):
-       _house_pos_pythonic(armc, lat, obliquity, hsys, lon, lat_body)
-       where hsys is int/bytes/str and lon/lat_body are separate floats
+    Both calling conventions of the public API are accepted; they resolve to
+    the same internal question and therefore answer identically. The selector
+    is matched case-insensitively except for lowercase ``i``, which is the
+    second Sunshine variant and not an alias of ``I``.
 
     Args:
-        armc: Right Ascension of Medium Coeli (ARMC) in degrees (0-360)
-        lat: Geographic latitude in degrees (positive North, negative South)
-        obliquity: True obliquity of the ecliptic in degrees
-        hsys_or_objcoord: Either house system (int/bytes/str) or objcoord tuple (lon, lat)
-        lon_or_hsys: Either body longitude (float) or house system (bytes/str)
-        lat_body: Ecliptic latitude of the body in degrees (only for 6-arg form)
+        armc: Right ascension of the medium coeli in degrees; normalized here.
+        lat: Geographic latitude in degrees, north positive.
+        obliquity: True obliquity of the ecliptic in degrees.
+        hsys_or_objcoord: The house-system selector, or the body's ecliptic
+            place as a one- or two-element sequence in the five-argument form.
+        lon_or_hsys: The body's ecliptic longitude, or the selector in the
+            five-argument form. Omitted, it selects Placidus with the body on
+            0 degrees.
+        lat_body: The body's ecliptic latitude in degrees, when the
+            coordinates arrive as two floats.
 
     Returns:
-        Decimal value where:
-            - Integer part (1-12): House number
-            - Decimal part (0.0-0.999...): Position within house
+        The house position in ``[1, 13)``, or the sector position in
+        ``[1, 37)`` for the Gauquelin sectors. Koch answers ``0.0`` where the
+        birthplace circles do not reach the body: that is the one value
+        outside the interval, and it means "no position here".
 
-    Example:
-        >>> # Sun at 15° Aries, Placidus houses, Rome (5-arg reference API form)
-        >>> pos = _house_pos_pythonic(292.957, 41.9, 23.4393, (15.0, 0.0), b'P')
-        >>> # Or 6-arg extended form:
-        >>> pos = _house_pos_pythonic(292.957, 41.9, 23.4393, ord('P'), 15.0, 0.0)
-        >>> house = int(pos)  # House number (e.g., 10)
-        >>> position = pos - house  # Position within house (e.g., 0.5 = halfway)
+    Raises:
+        PolarCircleError: from building the cusps of a system that is
+            undefined inside the polar circle, which an unrecognized selector
+            reaches through the default quadrant system.
+        ZeroDivisionError: from the Sunshine and APC constructions at a
+            geographic pole.
     """
-    _NEAR_ZERO = 1e-10
-    CUSP_BOUNDARY_OFFSET = 0.0
-
-    # Declare typed local variables for proper type narrowing
-    lon: float
-    hsys_char: str
-    hsys_int: int
-
-    # Detect which calling convention is used.  objcoord may be any
-    # sequence (lists are accepted as well as tuples).
-    if isinstance(hsys_or_objcoord, (tuple, list)):
-        # 5-arg reference API form: (armc, lat, obliquity, objcoord, hsys)
-        objcoord = hsys_or_objcoord
-        lon = objcoord[0]
-        lat_body = objcoord[1] if len(objcoord) > 1 else 0.0
-        # hsys comes from lon_or_hsys (bytes/str/int), default to b"P".
-        # An int is a character code (the same convention as
-        # houses(..., hsys=ord('P')) and the 6-arg form below); silently
-        # falling back to Placidus here used to discard the requested
-        # system for every int caller.
-        if isinstance(lon_or_hsys, bytes):
-            hsys_char = chr(lon_or_hsys[0])
-            hsys_int = lon_or_hsys[0]
-        elif isinstance(lon_or_hsys, str):
-            hsys_char = lon_or_hsys[0]
-            hsys_int = ord(lon_or_hsys[0])
-        elif isinstance(lon_or_hsys, int) and not isinstance(lon_or_hsys, bool):
-            hsys_char = _int_hsys_to_char(lon_or_hsys)
-            hsys_int = lon_or_hsys
-        else:
-            # Default to Placidus (hsys omitted in the 4-arg form)
-            hsys_char = "P"
-            hsys_int = ord("P")
-    else:
-        # 6-arg form: (armc, lat, obliquity, hsys, lon, lat_body)
-        # hsys comes from hsys_or_objcoord (int/bytes/str)
-        if isinstance(hsys_or_objcoord, bytes):
-            hsys_char = chr(hsys_or_objcoord[0])
-            hsys_int = hsys_or_objcoord[0]
-        elif isinstance(hsys_or_objcoord, str):
-            hsys_char = hsys_or_objcoord[0]
-            hsys_int = ord(hsys_or_objcoord[0])
-        else:
-            # int case
-            hsys_char = _int_hsys_to_char(hsys_or_objcoord)
-            hsys_int = hsys_or_objcoord
-        # lon comes from lon_or_hsys: a float, or an objcoord sequence
-        # in the hsys-first calling order
-        if isinstance(lon_or_hsys, (tuple, list)):
-            lon = float(lon_or_hsys[0])
-            if len(lon_or_hsys) > 1:
-                lat_body = float(lon_or_hsys[1])
-        else:
-            lon = float(lon_or_hsys) if lon_or_hsys is not None else 0.0
-
-    # Case-fold the selector like every other entry point ('k' == 'K',
-    # lowercase 'i' stays the distinct Sunshine-alternative system).
-    # house_pos folds 'g' fully (compatibility contract): Gauquelin
-    # SECTOR positions (1-36) are returned for the lowercase selector too —
-    # only the houses() tuple shape is keyed on the uppercase byte.
-    hsys_char = _fold_hsys_case(hsys_char)
+    hsys, lon, body_lat = _house_pos_place(hsys_or_objcoord, lon_or_hsys, lat_body)
+    hsys_char = _hsys_to_char(hsys)
     if hsys_char == "g":
+        # Lowercase 'g' selects the Gauquelin sectors here. The cusp entry
+        # points leave it unfolded because folding it would change the shape
+        # of what they return, twelve cusps against thirty-six sectors; this
+        # entry point answers one number either way.
         hsys_char = "G"
-    hsys_int = ord(hsys_char[0]) if hsys_char else hsys_int
 
-    # Normalize angular inputs
-    armc %= 360.0
-    lon = lon % 360.0
-    eps = obliquity
-    geolat = lat
+    armc_deg = armc % 360.0
+    geolat = float(lat)
+    eps = float(obliquity)
+    lon_deg = lon % 360.0
 
-    # Convert ecliptic coordinates to equatorial via _rotate_spherical_x_axis rotation
-    # (rotation around x-axis by obliquity angle)
-    # This is crucial for proper house position when body has non-zero latitude
-    lon_rad = math.radians(lon)
-    lat_body_rad = math.radians(lat_body)
-    eps_rad = math.radians(eps)
+    # The body as a point of the equatorial sphere, and its distance from the
+    # meridian: the common first step of every construction below except the
+    # purely zodiacal ones, which read a longitude and nothing else.
+    ra, dec = _house_pos_equatorial(lon_deg, body_lat, eps)
+    md_upper = _meridian_distance(ra, armc_deg)
 
-    # Ecliptic to equatorial transformation
-    # RA: tan(RA) = (sin(lon)*cos(eps) - tan(lat)*sin(eps)) / cos(lon)
-    # Dec: sin(Dec) = sin(lat)*cos(eps) + cos(lat)*sin(lon)*sin(eps)
-    sin_lon = math.sin(lon_rad)
-    cos_lon = math.cos(lon_rad)
-    sin_lat = math.sin(lat_body_rad)
-    cos_lat = math.cos(lat_body_rad)
-    sin_eps = math.sin(eps_rad)
-    cos_eps = math.cos(eps_rad)
+    # Placidus and the Gauquelin sectors: shares of the body's own semi-arcs.
+    if hsys_char in ("P", "G"):
+        placidus = _hpos_placidus(ra, armc_deg, dec, geolat)
+        return _hpos_gauquelin(placidus) if hsys_char == "G" else placidus
 
-    # Right Ascension
-    y_ra = sin_lon * cos_eps - math.tan(lat_body_rad) * sin_eps
-    x_ra = cos_lon
-    ra = math.degrees(math.atan2(y_ra, x_ra)) % 360.0
+    # Koch: a share of the midheaven's semi-diurnal arc.
+    if hsys_char == "K":
+        return _hpos_koch(md_upper, dec, geolat, eps, armc_deg)
 
-    # Declination
-    sin_dec = sin_lat * cos_eps + cos_lat * sin_lon * sin_eps
-    if sin_dec > 1.0:
-        sin_dec = 1.0
-    if sin_dec < -1.0:
-        sin_dec = -1.0
-    dec = math.degrees(math.asin(sin_dec))
+    # Regiomontanus: the equator divided from the ARMC, house circles through
+    # the north and south points of the horizon.
+    if hsys_char == "R":
+        return _hpos_regiomontanus(md_upper, dec, geolat)
 
-    # Signed meridian distances of the body, in (-180, 180]:
-    #   md_upper — RA distance from the upper meridian (culmination, RA = ARMC)
-    #   md_lower — RA distance from the lower meridian (anti-culmination)
-    md_upper = (ra - armc) % 360.0
-    if md_upper >= 180:
-        md_upper -= 360.0
-    md_lower = (md_upper + 180.0) % 360.0
-    if md_lower >= 180:
-        md_lower -= 360.0
+    # Campanus: the prime vertical divided from the east point.
+    if hsys_char == "C":
+        return _hpos_campanus(md_upper, dec, geolat)
 
-    # Handle different house systems
-    if hsys_char == "P" or hsys_char == "G":
-        # Placidus / Gauquelin house position.
-        # The Placidus position of a body is the fraction of its own
-        # semi-arc already traversed, mapped onto a 360° house circle
-        # (Holden, 'The Elements of House Division', 1977):
-        #
-        #   above horizon: position = (md_upper / day_semi_arc + 3) * 90°
-        #   below horizon: position = (md_lower / night_semi_arc + 1) * 90°
-
-        if 90.0 - abs(dec) <= abs(geolat):
-            # Circumpolar body: it never rises or sets, so no semi-arcs
-            # exist.  A never-rising body is placed in the nocturnal half
-            # by its half-weighted distance from lower culmination; a
-            # never-setting body in the diurnal half from upper culmination.
-            if dec * geolat < 0:
-                pos_deg = (90.0 + md_lower / 2.0) % 360.0
-            else:
-                pos_deg = (270.0 + md_upper / 2.0) % 360.0
-        else:
-            # Ascensional difference of the body: sin(AD) = tan δ · tan φ
-            sin_ad = math.tan(math.radians(dec)) * math.tan(math.radians(geolat))
-            if abs(sin_ad) > 1.0:
-                sin_ad = 1.0 if sin_ad > 0 else -1.0
-            asc_diff = math.degrees(math.asin(sin_ad))
-
-            # Above-horizon test.  The altitude h of the body satisfies
-            #   sin h = sin φ sin δ + cos φ cos δ cos H;
-            # dividing by cos φ cos δ (> 0) gives the equivalent sign test
-            #   tan φ tan δ + cos H  =  sin(AD) + cos H  >=  0.
-            horizon_test = sin_ad + math.cos(math.radians(md_upper))
-            above_horizon = horizon_test >= 0
-
-            day_semi_arc = 90.0 + asc_diff
-            night_semi_arc = 90.0 - asc_diff
-
-            if above_horizon:
-                pos_deg = (md_upper / day_semi_arc + 3.0) * 90.0
-            else:
-                pos_deg = (md_lower / night_semi_arc + 1.0) * 90.0
-
-            # Add small offset for cusp precision
-            pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
-
-        if hsys_char == "G":
-            # Gauquelin sectors run clockwise. Wrap after reversing so a
-            # pos_deg of 0 gives sector 1.0 instead of 37.0 (out of domain).
-            pos_deg = (360.0 - pos_deg) % 360.0
-            hpos = pos_deg / 10.0 + 1.0
-        else:
-            hpos = pos_deg / 30.0 + 1.0
-
-        return hpos
-
-    elif hsys_char == "R":
-        # Regiomontanus house position.
-        #
-        # Regiomontanus divides the celestial equator into equal arcs by
-        # position circles through the North and South points of the
-        # horizon; a body's position is the equator point cut by its own
-        # position circle.  Intersecting the plane of the circle through
-        # the horizon N/S points and the body (meridian distance M,
-        # declination δ) with the equator gives the closed form
-        #
-        #   tan x = -(tan φ tan δ + cos M) / sin M
-        #
-        # measured so that x = 270° on the upper meridian (M = 0) and
-        # x = 90° on the lower (|M| = 180°) — those two degenerate cases
-        # are handled directly.
-        # Degenerate meridian cases: the equator intersection is 270
-        # (house 10 side) or 90 (house 4 side) according to whether the
-        # meridian point is above or below the horizon — at polar
-        # latitudes the upper-meridian point can be below it (altitude
-        # 90 - |lat - dec| < 0 ⟺ tan(lat) tan(dec) < -1) and the limit
-        # of the closed form lands on the opposite branch.
-        _tt = math.tan(math.radians(geolat)) * math.tan(math.radians(dec))
-        if abs(md_upper) < _NEAR_ZERO:
-            pos_deg = 270.0 if _tt > -1.0 else 90.0
-        elif 180.0 - abs(md_upper) < _NEAR_ZERO:
-            pos_deg = 90.0 if _tt < 1.0 else 270.0
-        else:
-            if 90.0 - abs(geolat) < _NEAR_ZERO:
-                geolat = 90.0 - _NEAR_ZERO if geolat > 0 else -90.0 + _NEAR_ZERO
-            if 90.0 - abs(dec) < _NEAR_ZERO:
-                dec = 90.0 - _NEAR_ZERO if dec > 0 else -90.0 + _NEAR_ZERO
-
-            pole_term = math.tan(math.radians(geolat)) * math.tan(
-                math.radians(dec)
-            ) + math.cos(math.radians(md_upper))
-            pos_deg = math.degrees(
-                math.atan(-pole_term / math.sin(math.radians(md_upper)))
-            )
-            if md_upper < 0:
-                pos_deg += 180.0
-            pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
-
-        # Python's float modulo can round a value infinitesimally below zero
-        # to exactly 360.0.  The angles are identical geometrically, but the
-        # latter would encode the nonexistent decimal house 13.0 rather than
-        # the first cusp.  Keep the public house-position interval half-open.
-        if pos_deg >= 360.0:
-            pos_deg -= 360.0
-
-        hpos = pos_deg / 30.0 + 1.0
-        return hpos
-
-    elif hsys_char == "C":
-        # Campanus house position.
-        # The Campanus system divides the prime vertical into 12 equal
-        # 30° arcs.  A body's position follows from rotating its
-        # equatorial coordinates into the frame whose fundamental plane
-        # is the prime vertical (pole = horizon North point):
-        #
-        # 1. Express the body as (meridian distance - 90°, declination),
-        #    i.e. longitude measured from the east point of the equator.
-        # 2. Rotate about the shared x-axis (the east point) by -latitude,
-        #    which carries the equator onto the prime vertical.
-        # 3. The longitude in the rotated frame is the Campanus position.
-        #
-        # Reference: Meeus, 'Astronomical Algorithms' 2nd ed., Ch. 13;
-        # Montenbruck & Pfleger, par. 1.3 (x-axis rotation matrix).
-
-        ha_east = md_upper - 90.0
-
-        ha_east_rad = math.radians(ha_east)
-        dec_rad = math.radians(dec)
-        rot_angle = math.radians(-geolat)
-
-        cos_rot = math.cos(rot_angle)
-        sin_rot = math.sin(rot_angle)
-        cos_ha = math.cos(ha_east_rad)
-        sin_ha = math.sin(ha_east_rad)
-        cos_dec = math.cos(dec_rad)
-        sin_dec_b = math.sin(dec_rad)
-
-        # Convert to Cartesian
-        vec_x = cos_dec * cos_ha
-        vec_y = cos_dec * sin_ha
-        vec_z = sin_dec_b
-
-        # Rotation around x-axis:
-        #   x' = x;  y' = y cos θ + z sin θ;  z' = -y sin θ + z cos θ
-        rot_x = vec_x
-        rot_y = vec_y * cos_rot + vec_z * sin_rot
-
-        # Convert back to spherical (longitude only needed)
-        pos_deg = math.degrees(math.atan2(rot_y, rot_x))
-        pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
-        hpos = pos_deg / 30.0 + 1.0
-        return hpos
-
-    elif hsys_char in ["E", "A", "W", "V", "D", "N"]:
-        # Equal-based systems - simple longitude-based calculation
-        asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
-        mc = _armc_to_mc(armc, eps)
-        # Keep the ascendant on the eastern horizon. Without this correction
-        # the raw ecliptic-longitude ascendant lands on the western half
-        # beyond the polar circle, giving a six-house error for E/A/W/V.
-        asc = _ascendant_on_eastern_horizon(asc, armc, eps, geolat)
-
-        if hsys_char == "D":
-            pos_deg = (lon - mc - 90.0) % 360.0
-        elif hsys_char == "V":
-            pos_deg = (lon - asc + 15.0) % 360.0
-        elif hsys_char == "W":
-            pos_deg = (lon - asc + (asc % 30.0)) % 360.0
-        elif hsys_char == "N":
-            pos_deg = lon
-        else:
-            pos_deg = (lon - asc) % 360.0
-
-        pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
-        hpos = pos_deg / 30.0 + 1.0
-        return hpos
-
-    elif hsys_char == "X":
-        # Meridian (axial rotation)
-        hpos = ((md_upper - 90.0) % 360.0) / 30.0 + 1.0
-        return hpos
-
-    elif hsys_char == "M":
-        # Morinus
-        # Project the ecliptic longitude onto the equatorial frame via:
-        # tan(ra_equiv) = tan(λ) / cos(ε)
-        # atan2(sin(λ), cos(λ)·cos(ε)) gives the RA-equivalent in [-180, 180],
-        # then % 360 maps to [0, 360).
-        a = lon
-        if abs(a - 90.0) > _NEAR_ZERO and abs(a - 270.0) > _NEAR_ZERO:
-            hpos_deg = (
-                math.degrees(
-                    math.atan2(
-                        math.sin(math.radians(a)), math.cos(math.radians(a)) * cos_eps
-                    )
-                )
-                % 360.0
-            )
-        else:
-            hpos_deg = 90.0 if abs(a - 90.0) <= _NEAR_ZERO else 270.0
-        hpos_deg = (hpos_deg - armc - 90.0) % 360.0
-        hpos = hpos_deg / 30.0 + 1.0
-        return hpos
-
-    elif hsys_char == "K":
-        # Koch (Birthplace / GOH) house position.
-        # The Koch system defines every house circle by the *birthplace
-        # horizon*: each cusp rises after the MC by an equal share of the
-        # MC degree's own semi-arc.  A body's position is therefore the
-        # share of the MC's semi-arc that has elapsed between the body's
-        # rising (its meridian distance corrected by its own ascensional
-        # difference) and the MC's rising (corrected by the MC's AD):
-        #
-        #   ad_body      = arcsin(tan φ · tan δ_body)
-        #   ad_mc        = arcsin(tan ε · tan φ · sin ARMC)
-        #                  (δ_MC from sin δ = sin ε · sin λ_MC, folded into
-        #                   one expression via the MC's RA = ARMC)
-        #   mc_semi_arc  = 90° + ad_mc
-        #
-        #   east  (md_upper >= 0): fraction = (md_upper - ad_body + ad_mc)
-        #                                       / mc_semi_arc
-        #                          position = (fraction - 1) · 90°
-        #   west  (md_upper <  0): fraction = (md_upper + 180 + ad_body
-        #                                       + ad_mc) / mc_semi_arc
-        #                          position = (fraction + 1) · 90°
-        #
-        # Bodies whose fraction falls outside [0, 2] never cross the
-        # birthplace horizon inside this quadrant pair — the Koch position
-        # is undefined and 0.0 is returned (matching the reference API).
-
-        tan_eps = math.tan(math.radians(eps))
-
-        invalid = False
-
-        # Body's ascensional difference, saturated at ±90° for declinations
-        # that never rise / never set at this latitude.
-        if 90.0 - geolat < dec or -90.0 - geolat > dec:
-            ad_body = 90.0
-        elif geolat - 90.0 > dec or geolat + 90.0 < dec:
-            ad_body = -90.0
-        else:
-            ad_arg = math.tan(math.radians(geolat)) * math.tan(math.radians(dec))
-            ad_arg = max(-1.0, min(1.0, ad_arg))
-            ad_body = math.degrees(math.asin(ad_arg))
-            if abs(ad_body) < 1e-12:
-                # An ascensional difference of ~1e-15 deg is float noise
-                # from a declination that is physically zero (body on
-                # the equinoctial points); its sign must not decide the
-                # validity boundary below.
-                ad_body = 0.0
-
-        # MC's ascensional difference
-        ad_mc_arg = (
-            tan_eps * math.tan(math.radians(geolat)) * math.sin(math.radians(armc))
+    # Alcabitius: cusps equally spaced in right ascension inside each
+    # quadrant, so the body is placed by its own right ascension between the
+    # right ascensions of the two cusps that bracket it.
+    if hsys_char == "B":
+        cusps, _ = _houses_from_armc(armc_deg, geolat, eps, "B", 0.0, "houses_armc")
+        return _hpos_between_cusps(
+            [_ecliptic_to_ra_simple(cusp, eps) for cusp in cusps], ra
         )
-        if abs(ad_mc_arg) > 1.0:
-            ad_mc_arg = 1.0 if ad_mc_arg > 0 else -1.0
-        ad_mc = math.degrees(math.asin(ad_mc_arg))
-        if abs(ad_mc) < 1e-12:
-            # Same noise floor as ad_body: sin(180 deg) = 1.2e-16 makes
-            # the MC's AD ~1e-15 deg at cardinal ARMC; physically zero.
-            ad_mc = 0.0
 
-        # MC's semi-arc
-        mc_semi_arc = 90.0 + ad_mc
-        if mc_semi_arc == 0.0:
-            invalid = True
+    # Morinus: the equator divided from the east point, projected along
+    # circles of ecliptic longitude.
+    if hsys_char == "M":
+        return _hpos_morinus(lon_deg, armc_deg, eps)
 
-        pos_deg = 0.0
-        if not invalid and abs(mc_semi_arc) > 0:
-            # The valid fraction range is the closed interval [0, 2]: both
-            # endpoints are reached by real bodies.  A body exactly on the
-            # meridian can land infinitesimally outside an endpoint because of
-            # binary64 roundoff. Accept a small numerical tolerance and clamp
-            # back into the geometrically valid interval; fractions genuinely
-            # outside it remain undefined.
-            _FRACTION_TOL = 1e-9
-            if md_upper >= 0:  # east
-                arc_fraction = (md_upper - ad_body + ad_mc) / mc_semi_arc
-            else:  # west
-                md_from_lower = md_upper + 180.0
-                arc_fraction = (md_from_lower + ad_body + ad_mc) / mc_semi_arc
-            if arc_fraction < -_FRACTION_TOL or arc_fraction > 2.0 + _FRACTION_TOL:
-                invalid = True
-            else:
-                arc_fraction = min(max(arc_fraction, 0.0), 2.0)
-                if md_upper >= 0:  # east
-                    pos_deg = (arc_fraction - 1.0) * 90.0
-                else:  # west
-                    pos_deg = (arc_fraction + 1.0) * 90.0
+    # Meridian: the equator divided from the east point, projected along hour
+    # circles, so the body's own right ascension answers directly.
+    if hsys_char == "X":
+        return _house_pos_arc(md_upper - 90.0)
 
-        if invalid:
-            # Koch position undefined in the circumpolar area — return 0.0
-            # matching the reference API behavior
-            return 0.0
-        else:
-            pos_deg = pos_deg % 360.0
-            pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
-            hpos = pos_deg / 30.0 + 1.0
-            return hpos
+    # The ecliptic family: twelve 30-degree arcs of the ecliptic itself,
+    # differing only in where the first cut falls. The body's ecliptic
+    # latitude plays no part in any of them.
+    if hsys_char == "N":
+        # From 0 Aries, so the houses coincide with the signs.
+        return _house_pos_arc(lon_deg)
+    if hsys_char == "D":
+        # From 90 degrees before the midheaven, so the midheaven opens the
+        # tenth house.
+        return _house_pos_arc(lon_deg - _armc_to_mc(armc_deg, eps) - 90.0)
+    if hsys_char in ("A", "E", "V", "W"):
+        asc = _eastern_ascendant(armc_deg, eps, geolat)
+        if hsys_char == "V":
+            # Vehlow: half a house earlier, so the ascendant sits in the
+            # middle of the first house.
+            return _house_pos_arc(lon_deg - asc + 15.0)
+        if hsys_char == "W":
+            # Whole sign: from the start of the ascendant's own sign, which
+            # is the equal-house offset carried back by the ascendant's place
+            # within that sign.
+            return _house_pos_arc(lon_deg - asc + asc % 30.0)
+        # Equal, from the ascendant itself ('A' is an alias of 'E').
+        return _house_pos_arc(lon_deg - asc)
 
-    elif hsys_char == "T":
-        return _hpos_topocentric(armc, geolat, ra, dec, md_upper)
+    # The constructions with a helper of their own.
+    if hsys_char == "T":
+        return _house_pos_half_open(
+            _hpos_topocentric(armc_deg, geolat, ra, dec, md_upper)
+        )
+    if hsys_char == "J":
+        return _house_pos_half_open(_hpos_savard(md_upper, dec, geolat))
+    if hsys_char == "U":
+        return _house_pos_half_open(_hpos_krusinski(ra, armc_deg, eps, geolat))
+    if hsys_char in ("I", "i", "Y"):
+        return _house_pos_half_open(
+            _hpos_sunshine_apc(hsys_char, armc_deg, geolat, dec, md_upper, eps)
+        )
+    if hsys_char == "H":
+        return _house_pos_half_open(_hpos_horizon(md_upper, dec, geolat))
+    if hsys_char == "F":
+        return _house_pos_half_open(_hpos_carter(ra, armc_deg, eps, geolat))
+    if hsys_char == "S":
+        return _house_pos_half_open(_hpos_sripati(lon_deg, armc_deg, eps, geolat))
 
-    elif hsys_char == "B":
-        # Alcabitius house position.
-        # Alcabitius cusps are equally spaced in RA within each quadrant.
-        # For _house_pos_pythonic, we interpolate the body's RA between the cusp RAs.
-        cusps, _ = houses_armc(armc, lat, obliquity, hsys_int)
-
-        # Convert cusp ecliptic longitudes to RA
-        cusp_ras = []
-        for c in cusps:
-            c_r = math.radians(c)
-            y_c = math.sin(c_r) * cos_eps
-            x_c = math.cos(c_r)
-            cusp_ras.append(math.degrees(math.atan2(y_c, x_c)) % 360.0)
-
-        # Find which RA interval contains the body's RA
-        for i in range(12):
-            ra_start = cusp_ras[i]
-            ra_end = cusp_ras[(i + 1) % 12]
-
-            diff_to_body = (ra - ra_start + 360.0) % 360.0
-            interval_size = (ra_end - ra_start + 360.0) % 360.0
-
-            if interval_size < 0.0001:
-                interval_size = 30.0
-
-            if diff_to_body < interval_size:
-                house_num = i + 1
-                fraction = diff_to_body / interval_size
-                fraction = max(0.0, min(fraction, 0.9999999999))
-                return float(house_num) + fraction
-
-        return 1.0
-
-    elif hsys_char == "H":
-        return _hpos_horizon(md_upper, dec, geolat)
-
-    elif hsys_char == "F":
-        return _hpos_carter(ra, armc, eps, geolat)
-
-    elif hsys_char == "U":
-        return _hpos_krusinski(ra, armc, eps, geolat)
-
-    elif hsys_char == "J":
-        return _hpos_savard(md_upper, dec, geolat)
-
-    elif hsys_char == "S":
-        return _hpos_sripati(lon, armc, eps, geolat)
-
-    elif hsys_char in ("I", "i", "Y"):
-        return _hpos_sunshine_apc(hsys_char, armc, geolat, dec, md_upper, eps)
-
-    # Default fallback: use cusp-based method (ecliptic longitude interpolation)
-    # This applies to O, L, Q, and any other system whose reference house
-    # position is a simple distance-from-cusp / house-size interpolation.
-    cusps, ascmc = houses_armc(armc, lat, obliquity, hsys_int)
-
-    # Find the house containing this longitude
-    for i in range(12):
-        cusp_start = cusps[i]
-        cusp_end = cusps[(i + 1) % 12]
-
-        diff_to_body = (lon - cusp_start + 360.0) % 360.0
-        house_size = (cusp_end - cusp_start + 360.0) % 360.0
-
-        if house_size < 1e-9:
-            # Zero-width house (coincident cusps happen at extreme
-            # latitudes, e.g. Pullen SD at lat 89 collapses houses 2-3).
-            # A body can only be "in" it when it sits exactly on the
-            # cusp; treating the empty house as 30 deg wide used to
-            # swallow a whole sign of sky into it.
-            if diff_to_body < 1e-9:
-                return float(i + 1)
-            continue
-
-        if diff_to_body < house_size:
-            house_num = i + 1
-            fraction = diff_to_body / house_size
-            fraction = max(0.0, min(fraction, 0.9999999999))
-            return float(house_num) + fraction
-
-    return 1.0
+    # Porphyry, the two Pullen systems and every unrecognized selector: build
+    # the cusps of the requested system for this frame and report the body's
+    # share of the way across the pair that brackets it. An unrecognized
+    # selector reaches the cusps of the default quadrant system, and with them
+    # its refusal inside the polar circle, which travels to the caller
+    # unchanged.
+    cusps, _ = _houses_from_armc(armc_deg, geolat, eps, hsys_char, 0.0, "houses_armc")
+    return _hpos_between_cusps(cusps, lon_deg)
 
 
 def _armc_to_mc(armc: float, eps: float) -> float:

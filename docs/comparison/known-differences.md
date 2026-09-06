@@ -314,6 +314,38 @@ on the meridian, and for a body near the equator they stay sensitive to the
 last bits of its declination, which the collapsed family amplifies by the
 tangent of that latitude.
 
+#### Regiomontanus house position at the geographic poles {#regiomontanus-poles}
+
+Regiomontanus (selector `R`) divides the celestial equator into twelve
+30-degree arcs from the ARMC and draws each house circle through the resulting
+equator point and the north and south points of the horizon. A body is placed
+at the equator point cut by the great circle through it and those two horizon
+points, which in closed form is
+`tan x = -(tan(latitude) tan(declination) + cos M) / sin M` with `M` the
+body's meridian distance.
+
+At `|latitude| = 90°` the horizon is the celestial equator and its north and
+south points are no longer distinguishable, so every house circle of the
+pencil is the same circle and the construction has nothing left to divide.
+Any body off the celestial equator is then carried onto the meridian pair: the
+tangent of the latitude is unbounded, the first term of the numerator swamps
+the second, and the position is the 10th cusp for a body above the horizon and
+the 4th for a body below it. LibEphemeris returns those two values exactly,
+which is also the limit of the position as the latitude approaches the pole
+from inside.
+
+A body *on* the celestial equator is the exception. It lies on the horizon
+itself, the unbounded tangent multiplies a vanishing one, and the closed form
+stays finite: the position is the body's own meridian distance carried a
+quarter turn, and no collapse happens. LibEphemeris evaluates it as such.
+
+An implementation that reaches the pole by clamping the geographic latitude a
+small distance short of it — a tenth of a nanodegree, say — instead answers
+the collapsed cases a few parts in 1e-12 away from the cusp, and the
+equinoctial ones up to 5.8 houses away, because there the clamp is the only
+thing the answer depends on. Away from the poles the two agree to better than
+1e-12 relative.
+
 ### Fixed stars
 
 Fixed-star astrometry uses the permissively sourced LibEphemeris catalogue,
