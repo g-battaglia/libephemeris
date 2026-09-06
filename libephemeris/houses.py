@@ -4682,33 +4682,113 @@ def _hpos_topocentric(
 
 
 def _hpos_horizon(md_upper: float, dec: float, geolat: float) -> float:
-    """Horizon / azimuthal house position.
+    """Horizontal house position: the body's own azimuth, and nothing else.
 
-    The azimuthal system divides the horizon itself into twelve 30-degree
-    houses, so a body is placed by its true azimuth, not by any ecliptic
-    coordinate. Tilting the equatorial position (hour angle measured from
-    the east point, declination) onto the horizon plane by the observer's
-    co-latitude yields that azimuthal longitude directly — the same plane
-    change as every other frame rotation in this module.
+    The horizontal system divides the horizon itself into twelve equal arcs
+    of 30 degrees and carries each division up to the ecliptic along the
+    vertical circle -- the great circle through the zenith and the nadir --
+    that passes through it (Holden, "The Elements of House Division", 1977,
+    ch. 10). The vertical circles are what the houses cut, so a body is
+    placed by its azimuth alone: sliding it up or down its own vertical
+    circle changes its altitude and leaves its house untouched.
+
+    The azimuth comes off the astronomical triangle in the ordinary sense,
+    measured at the zenith from the north point of the horizon towards the
+    east point (Meeus, "Astronomical Algorithms", 2nd ed., ch. 13; Smart,
+    "Textbook on Spherical Astronomy", ch. 3)::
+
+        cos h sin A = -cos dec sin Hour
+        cos h cos A =  sin dec cos phi - cos dec cos Hour sin phi
+
+    with the hour angle the negative of the distance from the upper meridian.
+    The common factor ``cos h`` divides out of the two-argument arctangent,
+    which is why the altitude never reaches the answer.
+
+    The count then runs from the east point of the horizon towards the north
+    point -- the opposite way round from the sense in which azimuth increases
+    -- so the arc that names the house is ``90 - A``. The four cardinal
+    points of the horizon are therefore cusps at every latitude: the east
+    point opens the first house, the north point is the fourth cusp, the west
+    point the seventh and the south point the tenth, in the southern
+    hemisphere exactly as in the northern. That rigid anchoring to the
+    horizon, rather than to the meridian, is what makes the system azimuthal.
+
+    A geographic pole needs no separate branch. The horizon there is the
+    celestial equator, the vertical circles are the hour circles, and the
+    expression above degenerates on its own to an azimuth of ``180 - md`` at
+    the north pole and ``md`` at the south, so the two poles answer the two
+    mirror images of the same arc.
+
+    At the zenith and at the nadir the body has no azimuth at all: every
+    vertical circle passes through both points, so no house contains it
+    rather than another. The arithmetic still returns a number and raises
+    nothing; the number is arbitrary. This form answers ``4.0`` at the zenith,
+    where both components vanish and the arctangent reads the north point,
+    and ``1.0`` at the nadir, where the binary sine of half a turn leaves a
+    positive trace on the east-west component and the arctangent reads the
+    east point.
+
+    Args:
+        md_upper: Signed arc from the upper meridian to the body, in degrees
+            in ``(-180, 180]``; the hour angle is its negative.
+        dec: Declination of the body in degrees.
+        geolat: Geographic latitude in degrees, north positive.
+
+    Returns:
+        House position in ``[1, 13)``.
     """
-    az_lon, _ = _rotate_frame((md_upper - 90.0) % 360.0, dec, 90.0 - geolat)
-    pos_deg = (az_lon + CUSP_BOUNDARY_OFFSET) % 360.0
-    return pos_deg / 30.0 + 1.0
+    cos_dec = _cos_deg(dec)
+    east_west = cos_dec * _sin_deg(md_upper)
+    # The northward component splits into the part of the body that lies
+    # along the celestial pole and the part that lies in the equatorial plane
+    # on the meridian side; the geographic latitude decides how much of each
+    # the horizon's north direction sees.
+    along_pole = _sin_deg(dec) * _cos_deg(geolat)
+    along_equator = cos_dec * _cos_deg(md_upper) * _sin_deg(geolat)
+    azimuth = math.degrees(math.atan2(east_west, along_pole - along_equator))
+    return _house_pos_arc(90.0 - azimuth)
 
 
 def _hpos_carter(ra: float, armc: float, eps: float, geolat: float) -> float:
-    """Carter "Poli-Equatorial" house position.
+    """Carter poli-equatorial house position: the body's right ascension.
 
     Carter's system divides the celestial equator into twelve equal arcs of
-    right ascension anchored at the right ascension of the ascendant
-    (C.E.O. Carter, "Essays on the Foundations of Astrology"). The body's
-    placement is simply its RA distance from the ascendant's RA.
+    30 degrees of right ascension, starting at the right ascension of the
+    ascendant, and carries each division to the ecliptic along its own hour
+    circle -- the great circle through the celestial poles (Munkasey, "An
+    Astrological House Formulary", 2nd ed., 1990, which carries the
+    poli-equatorial construction alongside the rest of the family; Holden
+    1977 for the anatomy of the family). The projection runs along hour
+    circles, so two bodies on one hour circle share a house position whatever
+    their distance from the equator: the declination cannot enter.
+
+    The origin is the ascendant carried to the equator: the ecliptic point on
+    the eastern horizon, taken at ecliptic latitude zero, and read as a right
+    ascension. The eastern test in that definition is not decoration. Inside
+    the polar circles the intersection of the ecliptic with the horizon that
+    lies nearer the meridian can be the setting point, and taking it would
+    put every body six houses out; the module's own ascendant already applies
+    the test, and using it is what keeps this system and the others anchored
+    on the ascendant from drifting apart.
+
+    The scale runs in the direction of increasing right ascension, which is
+    the direction the diurnal motion carries the sky past a fixed body, so a
+    fixed body's position falls as the chart advances. Its cusps are the
+    ascendant at 1 and the descendant at 7; the meridian is not a cusp of
+    this system, and the MC and the IC move freely across the scale, always
+    six houses apart.
+
+    Args:
+        ra: Right ascension of the body in degrees.
+        armc: Right ascension of the medium coeli in degrees.
+        eps: True obliquity of the ecliptic in degrees.
+        geolat: Geographic latitude in degrees, north positive.
+
+    Returns:
+        House position in ``[1, 13)``.
     """
-    asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
-    asc = _ascendant_on_eastern_horizon(asc, armc, eps, geolat)
-    asc_ra, _ = _rotate_frame(asc, 0.0, -eps)
-    pos_deg = (ra - asc_ra) % 360.0
-    return pos_deg / 30.0 + 1.0
+    asc = _eastern_ascendant(armc, eps, geolat)
+    return _house_pos_arc(ra - _ecliptic_to_ra_simple(asc, eps))
 
 
 _Vec3 = tuple[float, float, float]
@@ -4939,35 +5019,46 @@ def _hpos_savard(md_upper: float, dec: float, geolat: float) -> float:
 
 
 def _hpos_sripati(lon: float, armc: float, eps: float, geolat: float) -> float:
-    """Sripati house position.
+    """Sripati house position: the Porphyry position, half a house on.
 
-    Sripati houses are the classical Porphyry trisection of the ecliptic
-    quadrants with every cusp pulled back so it lies at the *midpoint* of
-    the Porphyry house — equivalently, the Porphyry placement advanced by
-    half a house (standard Hindu-astrology construction; see e.g.
-    B.V. Raman, "A Manual of Hindu Astrology").
+    Sripati is the Porphyry trisection of the ecliptic quadrants with the
+    whole cusp ring pulled back by half a house, so that every Sripati cusp
+    falls at the midpoint of a Porphyry house. The Porphyry quadrants are the
+    arcs of the ecliptic between the ascendant, the IC, the descendant and
+    the MC, each cut into three equal parts and numbered from the ascendant
+    in the direction of increasing longitude (Porphyry of Tyre; North,
+    "Horoscopes and History", 1986, for the medieval transmission). The
+    midpoint shift is the construction conventionally called the Sripati
+    bhava method; ``docs/reference/house-systems.md`` is this project's own
+    statement of it.
 
-    The final half-house shift is wrapped continuously across house 12.
+    The system divides the ecliptic itself, so the body is already on the
+    circle the houses cut and nothing carries it there: the answer is a
+    function of the ecliptic longitude alone, and the body's ecliptic
+    latitude is exactly absent from it. The obliquity and the geographic
+    latitude enter only through the two quadrant boundaries, the ascendant
+    and the MC, which are built from them.
+
+    Because every cusp sits half a house behind its Porphyry counterpart, the
+    four angles land in the middle of their houses instead of on their cusps:
+    the ascendant answers 1.5, the IC 4.5, the descendant 7.5 and the MC
+    10.5.
+
+    Args:
+        lon: Ecliptic longitude of the body in degrees.
+        armc: Right ascension of the medium coeli in degrees.
+        eps: True obliquity of the ecliptic in degrees.
+        geolat: Geographic latitude in degrees, north positive.
+
+    Returns:
+        House position in ``[1, 13)``.
     """
-    asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
-    mc = _armc_to_mc(armc, eps)
-    asc = _ascendant_on_eastern_horizon(asc, armc, eps, geolat)
-
-    arc_from_asc = (lon - asc) % 360.0
-    arc_from_asc = (arc_from_asc + CUSP_BOUNDARY_OFFSET) % 360.0
-    if arc_from_asc < 180.0:
-        hpos = 1.0
-    else:
-        hpos = 7.0
-        arc_from_asc -= 180.0
-    quadrant = difdeg2n(asc, mc)
-    if arc_from_asc < 180.0 - quadrant:
-        hpos += arc_from_asc * 3.0 / (180.0 - quadrant)
-    else:
-        hpos += 3.0 + (arc_from_asc - 180.0 + quadrant) * 3.0 / quadrant
-    hpos += 0.5
-
-    return (hpos - 1.0) % 12.0 + 1.0
+    cusps, _ = _houses_from_armc(armc, geolat, eps, "O", 0.0, "houses_armc")
+    porphyry = _hpos_between_cusps(cusps, lon)
+    # Half a house forward on a twelve-house ring, taken round the circle so
+    # that the last half of the twelfth Porphyry house opens the first
+    # Sripati one.
+    return ((porphyry - 1.0 + 0.5) % 12.0) + 1.0
 
 
 def _hpos_sunshine_apc(
