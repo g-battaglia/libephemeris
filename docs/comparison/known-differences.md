@@ -346,6 +346,60 @@ equinoctial ones up to 5.8 houses away, because there the clamp is the only
 thing the answer depends on. Away from the poles the two agree to better than
 1e-12 relative.
 
+#### APC house position at the equator {#apc-equator}
+
+The APC system (selector `Y`) divides the parallel of declination through the
+ascendant — six equal parts above the horizon and six below — and carries the
+division points to the body along the house circles through the north and
+south points of the horizon, the same pencil Regiomontanus divides on the
+celestial equator. The Sunshine systems (`I` and `i`) divide that pencil on
+the Sun's parallel; `house_pos` is handed no Sun, so its Sunshine reference
+parallel is the equator and its answer is the Regiomontanus one.
+
+At geographic latitude zero the house circles are the hour circles. Every one
+of them meets every parallel of declination at the same meridian distance, so
+the reference parallel cannot matter and the APC position is the Regiomontanus
+position exactly. The construction stays smooth a thousandth of a degree
+either side of that latitude, where the correction is genuinely non-zero but
+small — at most 3.0e-6 of a house.
+
+A formulation that carries the correction through a difference of two nearly
+equal quantities loses digits there instead, and lands up to 2.8e-8 of a house
+from its own definition at the equator and 2.9e-8 at ±0.001°. Measured against
+a 50-digit evaluation of the construction, LibEphemeris stays within 7e-16
+relative on all three latitude rows. Output at them therefore differs from
+implementations carrying that formulation by up to 1.7e-8 relative; at every
+other latitude the two agree to better than 1e-12.
+
+#### APC house position where the pencil is narrow {#apc-narrow-pencil}
+
+The pencil of house circles is anchored on the two points where the meridian
+cuts the horizon, at declination `90° - |latitude|`. As a chart approaches a
+geographic pole those anchors close on the celestial equator, and the
+ascendant's parallel — which is a parallel through a point of the horizon and
+so can never pass them — is squeezed with them: its two semi-arcs part into a
+long one and a short one, and at ±89.999° the shorter falls to a few
+thousandths of a degree. A quarter of the house scale is divided into that
+short arc, so the answer carries whatever precision the reference declination
+was found with multiplied by `90 / semi-arc`.
+
+LibEphemeris expresses the pencil through its anchor declination, whose
+tangent keeps all of its digits where the pencil is narrow — a tangent taken a
+thousandth of a degree from a right angle has already lost three of them.
+Against a 50-digit evaluation the position stays within 1.3e-12 relative at
+±89.999° and 1.1e-16 at ±89°, the residue being the double-precision
+declination of the ascendant amplified by the narrowness. A formulation that
+reads the same geometry through the tangent of the latitude differs by up to
+4.9e-10 relative, 4.7e-9 of a house, on those rows.
+
+At the pole itself the anchors have merged into the two equator points of the
+meridian: every great circle through them crosses the equator in that same
+pair of points, the position circle no longer tells one body from another, and
+the construction has nothing left to divide. All three selectors raise
+`ZeroDivisionError` at `|latitude| = 90°`, and only there; a thousandth of a
+degree inside the pole they answer the 10th cusp above the horizon and the 4th
+below it to seven decimal places, which is the limit the scale collapses onto.
+
 ### Fixed stars
 
 Fixed-star astrometry uses the permissively sourced LibEphemeris catalogue,

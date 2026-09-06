@@ -5069,116 +5069,162 @@ def _hpos_sunshine_apc(
     md_upper: float,
     eps: float,
 ) -> float:
-    """Sunshine ('I'/'i') and APC ('Y') house positions.
+    """Sunshine and APC house position: a share of a parallel's semi-arc.
 
-    Both systems divide the diurnal and nocturnal arcs of a *reference
-    declination* into six equal parts along the equator and place the body
-    by proportional membership of those arcs:
+    The three selectors are one construction with one free parameter. All of
+    them cut a parallel of declination into six equal parts above the horizon
+    and six below, and carry the division points to the body along the pencil
+    of great circles through the north and south points of the horizon -- the
+    house circles of the *modus rationalis* (Holden, "The Elements of House
+    Division", 1977; North, "Horoscopes and History", 1986). They differ only
+    in which parallel is cut:
 
-      * Sunshine (Makransky, "Primary Directions"): the reference
-        declination is the Sun's. ``house_pos()`` receives no Sun context,
-        so the reference declination falls back to 0 by definition of this
-        context-free entry point.
-      * APC (Knegt): the reference declination is the ascendant's.
+    * Sunshine (``I``, and the alternative solution ``i``) cuts the Sun's,
+      following Bob Makransky's published description: the Sun's diurnal arc
+      is divided into six parts for the houses above the horizon and its
+      nocturnal arc into six for those beneath it, the division points
+      projected onto the ecliptic with house circles "which pass through the
+      north and south points on the horizon".
+    * APC (``Y``) cuts the Ascendant's. Ingmar de Boer, "APC Houses" (after
+      L. Knegt and the Werkgemeenschap van Astrologen): the Ascendant
+      Parallel Circle "is then divided in six equal parts under, and six
+      equal parts above the horizon", and the division points are carried to
+      the ecliptic through planes of oblique ascension, two of which are the
+      horizon and the meridian themselves.
 
-    Construction: start from the body's Regiomontanus position (the pole
-    of its position circle on the celestial equator), split the sphere at
-    the horizon of the reference declination, and rescale the arc between
-    meridian and horizon by the reference semi-arc (diurnal above the
-    horizon, nocturnal below). The spherical triangle between the meridian,
-    the position circle and the reference-declination parallel supplies
-    the offset that maps the body's position-circle angle onto the
-    reference parallel before rescaling.
+    Regiomontanus is the fourth member of the same family, the one that cuts
+    the celestial equator. This entry point is handed a chart frame and a
+    body and no Sun, so the Sunshine reference parallel falls back to that
+    equator: both its semi-arcs are then a quarter turn, the arc that carries
+    the equator crossing onto the reference parallel is identically zero, and
+    the two Sunshine selectors answer the Regiomontanus question exactly.
+    They share its helper for that reason. Their *cusps* part company with
+    Regiomontanus, and with each other, because the cusp entry points are
+    given the Sun's declination; none of that reaches a caller who asks only
+    where a body sits.
+
+    The construction, in the equatorial frame of date:
+        The pencil is anchored on the two points where the meridian cuts
+        the horizon, at declination ``90 - |latitude|``; the observer enters
+        the construction only through the cotangent of that co-latitude,
+        signed by the hemisphere, which is the tangent of the latitude. A
+        body's position circle -- the member of the pencil through it -- cuts
+        the equator at the meridian distance ``h`` given by
+        ``cot h = (cos m + tan(latitude) tan dec) / sin m``. Following that circle onto the reference parallel adds an
+        arc ``sin(carry) = sin(AD) sin(h)``, where ``AD`` is the ascensional
+        difference of the reference parallel,
+        ``sin AD = tan(dec_ref) tan(latitude)``: the horizon is the member of the pencil with
+        ``sin h = 1``, so it carries the whole of ``AD``, the meridian with
+        ``sin h = 0`` carries none of it, and every other member carries its
+        own share. The parallel's semi-arcs are ``90 +- AD`` (Meeus,
+        "Astronomical Algorithms", 2nd ed., ch. 15), each cut into three
+        houses, counted from the tenth cusp for a body above the horizon and
+        from the fourth for one below -- the lower half read on the body's
+        antipode against the mirrored parallel, whose diurnal semi-arc is
+        the nocturnal semi-arc of the original.
+
+    Args:
+        hsys_char: Case-resolved selector, ``I``, ``i`` or ``Y``.
+        armc: Right ascension of the midheaven in degrees.
+        geolat: Geographic latitude in degrees, north positive.
+        dec: Declination of the body in degrees.
+        md_upper: Meridian distance of the body from the upper meridian in
+            ``(-180, 180]``, east positive.
+        eps: True obliquity of the ecliptic in degrees.
+
+    Returns:
+        The house position, three houses to a semi-arc. The value is in
+        ``[1, 13]`` and the caller folds the closed upper end back onto the
+        first cusp.
+
+    Raises:
+        ZeroDivisionError: at a geographic pole, where the pencil has no
+            anchors of its own.
     """
-    gl = geolat
-    if gl > 90.0 - CUSP_BOUNDARY_OFFSET:
-        gl = 90.0 - CUSP_BOUNDARY_OFFSET
-    if gl < -90.0 + CUSP_BOUNDARY_OFFSET:
-        gl = -90.0 + CUSP_BOUNDARY_OFFSET
+    # The pencil is anchored on the two points where the meridian cuts the
+    # horizon, at declination ``90 - |latitude|``, and the observer reaches
+    # every step below through that co-latitude alone: its cotangent is the
+    # tangent of the latitude. It is written this way round for two reasons.
+    # A tangent taken a thousandth of a degree from a right angle has lost
+    # three of its digits while the cotangent of the thousandth of a degree
+    # has lost none, and where the pencil is narrow those digits are read
+    # against a semi-arc that can itself be a few thousandths of a degree
+    # wide, so the loss is multiplied on the way into the answer.
+    #
+    # And at a geographic pole the two anchors have merged into the equator
+    # points of the meridian: the horizon is the celestial equator, every
+    # great circle through the anchors crosses it in that same pair of points,
+    # and the position circle has stopped telling one body from another. The
+    # cotangent of an anchor declination that has gone is the division by zero
+    # that degeneracy is, and the answer is a refusal rather than the tenth or
+    # fourth cusp the construction leans towards on either side of the pole.
+    anchor_dec = 90.0 - abs(geolat)
+    hemisphere = 1.0 if geolat >= 0.0 else -1.0
+    lat_tangent = hemisphere / _tan_deg(anchor_dec)
 
     if hsys_char == "Y":
-        asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
-        asc = _ascendant_on_eastern_horizon(asc, armc, eps, geolat)
-        _, ref_dec = _rotate_frame(asc, 0.0, -eps)
+        # The Ascendant's own parallel. The eastern-horizon test is part of
+        # the definition: inside the polar circles the closed-form ascendant
+        # can name the setting intersection, which would put the reference
+        # parallel on the far side of the equator and every body several
+        # houses out.
+        _, dec_ref = _house_pos_equatorial(
+            _eastern_ascendant(armc, eps, geolat), 0.0, eps
+        )
     else:
-        ref_dec = 0.0
+        dec_ref = 0.0
 
-    dec_b = dec
-    if 90.0 - abs(dec_b) < _NEAR_ZERO:
-        dec_b = 90.0 - _NEAR_ZERO if dec_b > 0 else -90.0 + _NEAR_ZERO
+    if dec_ref == 0.0:
+        # A reference parallel lying on the equator has quarter-turn
+        # semi-arcs and a carrying arc that vanishes identically, which is
+        # the Regiomontanus division of this same pencil. Both Sunshine
+        # selectors reach this line, and so does the APC wherever the
+        # Ascendant sits on the equator -- at the ARMC that puts it on the
+        # spring equinox, three quarters of a turn.
+        return _hpos_regiomontanus(md_upper, dec, geolat)
 
-    merid_dist = md_upper
-    sin_md = _sin_deg(merid_dist)
-    if sin_md == 0.0:
-        sin_md = 1e-300
+    # The ascensional difference of the reference parallel: the same arc as
+    # _asc_diff_saturated, and the arc the horizon -- the member of the pencil
+    # with sin h = 1 -- carries onto that parallel.
+    #
+    # The Ascendant is a point of the horizon, so its declination never
+    # passes the anchor's and the ratio never passes one: the reference
+    # parallel of the APC is not circumpolar and its two semi-arcs do not
+    # close. The ratio reaches one only where the Ascendant sits on an anchor
+    # itself -- the parallel is then tangent to the horizon, one semi-arc has
+    # gone and the construction has nothing left to divide, which is left
+    # undefined here as it is in the frame where the ecliptic lies along the
+    # horizon and there is no Ascendant at all.
+    asc_diff = _asin_deg(_tan_deg(dec_ref) * lat_tangent)
 
-    # Regiomontanus position of the body (pole of its position circle).
-    alt_sign = _tan_deg(gl) * _tan_deg(dec_b) + _cos_deg(merid_dist)
-    circle_arc = _atan_deg(-alt_sign / sin_md) % 360.0
-    if merid_dist < 0:
-        circle_arc += 180.0
-    circle_arc = circle_arc % 360.0
-
-    is_above_horizon = _above_horizon_test(dec_b, gl, merid_dist) >= 0
-
-    # Angle between the celestial pole and the horizon along the meridian,
-    # then the body's position-circle angle from the lower meridian.
-    pole_arc = 90.0 - gl if gl >= 0 else 90.0 + gl
-    from_lower_meridian = (circle_arc - 270.0) % 360.0
-    is_western_half = False
-    if from_lower_meridian > 180.0:
-        is_western_half = True
-        from_lower_meridian = 360.0 - from_lower_meridian
-
-    # Semi-arcs of the reference declination.
-    ref_ad = _asc_diff_saturated(ref_dec, gl)
-    diurnal_arc = 90.0 + ref_ad
-    nocturnal_arc = 90.0 - ref_ad
-
-    if diurnal_arc == 0 and is_above_horizon:
-        circle_arc = 270.0
-    elif nocturnal_arc == 0 and not is_above_horizon:
-        circle_arc = 90.0
+    # Sign of the altitude of the body, and with it the half of the sky whose
+    # semi-arc is divided (the indicator of _above_horizon_test, on the same
+    # anchor tangent as the rest).
+    #
+    # A body exactly on an anchor lies on every member of the pencil at once
+    # and so has no position circle: both arguments of the arctangent below
+    # vanish with it, and the answer is whichever cusp the residue of that
+    # vanishing lands on -- the tenth or the fourth at the anchor on the upper
+    # meridian, the first at the one on the lower. The three selectors need
+    # not agree with each other or with Regiomontanus there, and no reading is
+    # the right one: the configuration has no house position to be read.
+    horizon_side = _tan_deg(dec) * lat_tangent + _cos_deg(md_upper)
+    if horizon_side >= 0.0:
+        # Above: the equator crossing of the position circle, on the body's
+        # own side of the meridian, against the diurnal semi-arc.
+        crossing = math.degrees(math.atan2(_sin_deg(md_upper), horizon_side))
+        semiarc, carry, base = 90.0 + asc_diff, asc_diff, 10.0
     else:
-        semi_arc = diurnal_arc
-        ref_dec_side = ref_dec
-        if not is_above_horizon:
-            # Nocturnal side: mirror the reference parallel and the angle.
-            ref_dec_side = -ref_dec_side
-            semi_arc = nocturnal_arc
-            from_lower_meridian = 180.0 - from_lower_meridian
-            is_western_half = not is_western_half
-        # Spherical triangle meridian / position circle / reference
-        # parallel: side between pole and body direction, angle at the
-        # body, and the offset carrying the position-circle angle onto the
-        # reference parallel.
-        side_a = _acos_deg(_cos_deg(pole_arc) * _cos_deg(from_lower_meridian))
-        if side_a < _NEAR_ZERO:
-            side_a = _NEAR_ZERO
-        sin_psi = _sin_deg(pole_arc) / _sin_deg(side_a)
-        sin_psi = max(-1.0, min(1.0, sin_psi))
-        ratio = _sin_deg(ref_dec_side) / sin_psi
-        if ratio > 1:
-            ratio = 90.0 - _NEAR_ZERO
-        elif ratio < -1:
-            ratio = -(90.0 - _NEAR_ZERO)
-        else:
-            ratio = _asin_deg(ratio)
-        offset = _acos_deg(_cos_deg(ratio) / _cos_deg(ref_dec_side))
-        if ref_dec_side < 0:
-            offset = -offset
-        if gl < 0:
-            offset = -offset
-        from_lower_meridian += offset
-        if is_western_half:
-            circle_arc = 270.0 - (from_lower_meridian / semi_arc) * 90.0
-        else:
-            circle_arc = 270.0 + (from_lower_meridian / semi_arc) * 90.0
-        if not is_above_horizon:
-            circle_arc = (circle_arc + 180.0) % 360.0
+        # Below: the same construction on the body's antipode -- the same
+        # position circle, its other equator crossing -- against the mirrored
+        # parallel. Negating both arguments of the arctangent takes the
+        # antipode without subtracting half a turn from an arc that is itself
+        # a hair from half a turn.
+        crossing = math.degrees(math.atan2(-_sin_deg(md_upper), -horizon_side))
+        semiarc, carry, base = 90.0 - asc_diff, -asc_diff, 4.0
 
-    pos_deg = (circle_arc + CUSP_BOUNDARY_OFFSET) % 360.0
-    return pos_deg / 30.0 + 1.0
+    carried = crossing + _asin_deg(_sin_deg(carry) * _sin_deg(crossing))
+    return base + 3.0 * carried / semiarc
 
 
 # --- House position: the arc each system divides ---------------------------
