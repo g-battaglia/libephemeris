@@ -2055,54 +2055,7 @@ def _lun_how_core(
 
 
 def _lun_eclipse_max_time(jd_approx: float, flags: int = FLG_SWIEPH) -> float:
-    """Time of maximum lunar eclipse near ``jd_approx``.
-
-    The maximum is the deepest immersion of the Moon in the Earth's
-    shadow. Seen from the Moon at a full moon, the Earth stands almost
-    exactly in front of the Sun, so the immersion is deepest where the
-    selenocentric angle between the solar and terrestrial limbs - the
-    center separation less both apparent radii - is smallest.
-    """
-    from .constants import FLG_XYZ
-
-    base = _ecl_eph_flags(flags) | FLG_EQUATORIAL | FLG_XYZ
-
-    def _depth(jd: float) -> float:
-        moon_xyz, _ = calc_ut(jd, MOON, base)
-        sun_xyz, _ = calc_ut(jd, SUN, base)
-        sx = sun_xyz[0] - moon_xyz[0]
-        sy = sun_xyz[1] - moon_xyz[1]
-        sz = sun_xyz[2] - moon_xyz[2]
-        gx, gy, gz = -moon_xyz[0], -moon_xyz[1], -moon_xyz[2]
-        ds = math.sqrt(sx * sx + sy * sy + sz * sz)
-        dm = math.sqrt(gx * gx + gy * gy + gz * gz)
-        cosang = (sx * gx + sy * gy + sz * gz) / (ds * dm)
-        ang = math.degrees(math.acos(max(-1.0, min(1.0, cosang))))
-        rearth = math.degrees(math.asin(_ECL_REARTH_AU / dm))
-        rsun = math.degrees(math.asin(_ECL_RSUN_AU / ds))
-        return ang - (rearth + rsun)
-
-    phi = (1.0 + math.sqrt(5.0)) / 2.0
-    jd_low = jd_approx - 0.3
-    jd_high = jd_approx + 0.3
-    jd_a = jd_high - (jd_high - jd_low) / phi
-    jd_b = jd_low + (jd_high - jd_low) / phi
-    f_a = _depth(jd_a)
-    f_b = _depth(jd_b)
-    for _ in range(60):
-        if f_a < f_b:
-            jd_high = jd_b
-            jd_b, f_b = jd_a, f_a
-            jd_a = jd_high - (jd_high - jd_low) / phi
-            f_a = _depth(jd_a)
-        else:
-            jd_low = jd_a
-            jd_a, f_a = jd_b, f_b
-            jd_b = jd_low + (jd_high - jd_low) / phi
-            f_b = _depth(jd_b)
-        if jd_high - jd_low < 1e-7:
-            break
-    return (jd_low + jd_high) / 2.0
+    raise NotImplementedError
 
 
 def _lun_eclipse_phase_times(
