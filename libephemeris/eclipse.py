@@ -1957,10 +1957,6 @@ def _lun_how_core(
     sun_distance = math.sqrt(
         sun_au[0] * sun_au[0] + sun_au[1] * sun_au[1] + sun_au[2] * sun_au[2]
     )
-    moon_distance = math.sqrt(
-        moon_au[0] * moon_au[0] + moon_au[1] * moon_au[1] + moon_au[2] * moon_au[2]
-    )
-
     # The shadow axis points away from the Sun, so its unit vector is the
     # reverse of the geocentric direction to the Sun. Resolving the Moon
     # along it and across it gives the two scalars the whole construction is
@@ -2028,13 +2024,18 @@ def _lun_how_core(
         attr[0] = float(umbral_magnitude)
     attr[1] = float(penumbral_magnitude)
     if retflag:
-        # The angle at the Earth's centre between the two apparent places is
-        # the elongation; what is wanted is its supplement, the Moon's
-        # distance from the point exactly opposite the Sun.
-        cos_elongation = (
+        # Angolo fra Luna e direzione antisolare: prodotto vettoriale e
+        # scalare forniscono seno e coseno con la stessa scala. atan2 evita
+        # l’arccoseno vicino a -1 e la sottrazione finale da 180°.
+        cross_norm = math.hypot(
+            moon_au[1] * sun_au[2] - moon_au[2] * sun_au[1],
+            moon_au[2] * sun_au[0] - moon_au[0] * sun_au[2],
+            moon_au[0] * sun_au[1] - moon_au[1] * sun_au[0],
+        )
+        opposite_dot = -(
             moon_au[0] * sun_au[0] + moon_au[1] * sun_au[1] + moon_au[2] * sun_au[2]
-        ) / (sun_distance * moon_distance)
-        attr[7] = 180.0 - math.degrees(math.acos(max(-1.0, min(1.0, cos_elongation))))
+        )
+        attr[7] = math.degrees(math.atan2(cross_norm, opposite_dot))
     attr[8] = attr[0]
     attr[9], attr[10] = _get_saros_info(tjd_ut, "lunar")
 
