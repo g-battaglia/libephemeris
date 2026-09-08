@@ -34,11 +34,14 @@ from libephemeris.exceptions import UnknownBodyError
 from libephemeris.fast_calc import fast_calc_tt, fast_calc_ut
 from libephemeris.leb_reader import open_leb
 
-LEB_BASE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "data",
-    "leb",
-    "ephemeris_base.leb",
+LEB_BASE_PATH = os.environ.get(
+    "LIBEPHEMERIS_TEST_LEB_FILE",
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "data",
+        "leb",
+        "ephemeris_base.leb",
+    ),
 )
 
 SKIP_NO_LEB = pytest.mark.skipif(
