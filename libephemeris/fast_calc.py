@@ -1378,15 +1378,25 @@ def _eval_body_center_state(
     ipl: int,
     jd_tt: float,
     is_system_bary: bool,
+    *,
+    epoch_offset: float = 0.0,
 ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
     """Evaluate the requested body center and its barycentric state.
 
-    LEB records for outer planets can store a system barycentre. When a JPL
-    planet-center segment covers the epoch, add that segment's position and a
-    centered derivative of the same offset. Otherwise retain the system
-    barycentre as an explicit data-availability fallback.
+    The LEB polynomial accepts a two-part epoch so a light-time residual below
+    one absolute-JD ULP reaches both position and derivative evaluation. The
+    optional planet-center source still accepts one float only; therefore its
+    existing path remains explicitly limited to the rounded ``jd_tt`` epoch.
     """
-    pos, vel = reader.eval_body(ipl, jd_tt)
+    if epoch_offset == 0.0:
+        pos, vel = reader.eval_body(ipl, jd_tt)
+    else:
+        split_eval = getattr(reader, "_eval_body_split", None)
+        if not callable(split_eval):
+            raise TypeError(
+                "Pipeline-A light-time requires a canonical LEB split-epoch reader"
+            )
+        pos, vel = split_eval(ipl, jd_tt, epoch_offset)
     if not is_system_bary:
         return pos, vel
 
@@ -1593,8 +1603,14 @@ def _pipeline_icrs(
             if dist == 0.0:
                 break
             lt = dist / C_LIGHT_AU_DAY
+            rounded_jd = jd_tt - lt
+            epoch_offset = math.fsum((jd_tt, -lt, -rounded_jd))
             retarded_pos, retarded_vel = _eval_body_center_state(
-                reader, ipl, jd_tt - lt, is_system_bary
+                reader,
+                ipl,
+                rounded_jd,
+                is_system_bary,
+                epoch_offset=epoch_offset,
             )
             geo = _vec3_sub(retarded_pos, observer)
 

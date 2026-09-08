@@ -20,11 +20,13 @@ Provenance:
 from __future__ import annotations
 
 import glob
+import math
 import os
 from contextlib import suppress
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from .leb_format import StarEntry
+from .leb_reader import _split_epoch_compare
 
 # Filename group suffixes recognized by the composite heuristics
 # ({tier}_{group} naming). ``uranians`` is legacy-only: pre-3.1.0 installs
@@ -310,6 +312,14 @@ class CompositeLEBReader:
             raise KeyError(f"Body {body_id} not in any LEB file")
         return self._body_map[body_id].eval_body(body_id, jd)
 
+    def _eval_body_split(
+        self, body_id: int, jd: float, offset: float
+    ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+        """Dispatch a two-part epoch without collapsing its residual."""
+        if body_id not in self._body_map:
+            raise KeyError(f"Body {body_id} not in any LEB file")
+        return self._body_map[body_id]._eval_body_split(body_id, jd, offset)
+
     def has_nutation(self) -> bool:
         """Return True if any constituent LEB file contains nutation data."""
         return self._nutation_reader is not None
@@ -450,6 +460,21 @@ class TieredLEBReader:
             return None
         return (float(bounds[0]), float(bounds[1]))
 
+    def _selected_body_reader_split(
+        self, body_id: int, jd: float, offset: float
+    ) -> Optional[Any]:
+        """Return the highest-priority reader covering a two-part epoch."""
+        if not math.isfinite(offset):
+            raise ValueError(f"LEB evaluation offset must be finite, got {offset}")
+        for _tier, reader in self._body_candidates.get(body_id, ()):
+            bounds = self._bounds(reader, body_id)
+            if bounds is not None and (
+                _split_epoch_compare(jd, offset, bounds[0]) >= 0
+                and _split_epoch_compare(jd, offset, bounds[1]) <= 0
+            ):
+                return reader
+        return None
+
     def selected_body_reader(self, body_id: int, jd: float) -> Optional[Any]:
         """Return the highest-priority concrete reader covering ``jd``."""
         for _tier, reader in self._body_candidates.get(body_id, ()):
@@ -500,11 +525,24 @@ class TieredLEBReader:
             raise KeyError(f"Body {body_id} not in any installed LEB tier")
         selected = self.selected_body_reader(body_id, jd)
         if selected is None:
-            # Preserve the established range-miss exception type.  The sealed
-            # dispatcher decides whether this body is core (fail closed) or a
-            # curated companion with an allowed local model.
+            # Preserve the established range-miss exception type. The sealed
+            # dispatcher decides whether this body has another declared path.
             selected = candidates[0][1]
         return selected.eval_body(body_id, jd)
+
+    def _eval_body_split(
+        self, body_id: int, jd: float, offset: float
+    ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+        """Select a tier and evaluate an uncollapsed two-part epoch."""
+        candidates = self._body_candidates.get(body_id)
+        if not candidates:
+            raise KeyError(f"Body {body_id} not in any installed LEB tier")
+        selected = self._selected_body_reader_split(body_id, jd, offset)
+        if selected is None:
+            # Deliberately invoke the preferred reader so its normal range
+            # exception reaches the sealed dispatcher; do not switch paths.
+            selected = candidates[0][1]
+        return selected._eval_body_split(body_id, jd, offset)
 
     def _select_aux_reader(self, jd: float, capability: str) -> Optional[Any]:
         for tier_reader in self._tier_readers.values():
