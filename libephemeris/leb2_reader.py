@@ -25,6 +25,7 @@ Provenance:
 
 from __future__ import annotations
 
+import math
 import mmap
 import os
 import struct
@@ -72,7 +73,12 @@ from .leb_format import (
     _madvise_dontneed,
 )
 from .exceptions import LEBCorruptionError
-from .leb_reader import _clenshaw, _clenshaw_with_derivative
+from .leb_reader import (
+    _clenshaw,
+    _clenshaw_with_derivative,
+    _split_epoch_compare,
+    _split_interval_index,
+)
 
 
 class LEB2Reader:
@@ -114,7 +120,7 @@ class LEB2Reader:
         ] = {}  # v2: body_id -> list of ChunkEntry
         self._chunked: bool = False  # True for v2 chunked format
         self._eval_cache: Dict[
-            Tuple[int, float],
+            Tuple[int, float, float],
             Tuple[Tuple[float, float, float], Tuple[float, float, float]],
         ] = {}
 
@@ -241,14 +247,21 @@ class LEB2Reader:
             chunks.append(chunk)
         return chunks
 
-    def _find_chunk(self, body_id: int, jd: float) -> int:
-        """Find the chunk index containing jd via binary search."""
+    def _find_chunk(self, body_id: int, jd: float, offset: float = 0.0) -> int:
+        """Find the chunk containing the unevaluated epoch ``jd + offset``."""
         chunks = self._chunk_index[body_id]
-        # Binary search: chunks are sorted by jd_start
+        # Boundaries belong to the chunk on the right. Compare a local
+        # two-part difference so a sub-ULP residual is not rounded away.
         lo, hi = 0, len(chunks) - 1
         while lo < hi:
             mid = (lo + hi) // 2
-            if jd >= chunks[mid].jd_end:
+            if offset == 0.0:
+                at_or_after_end = jd >= chunks[mid].jd_end
+            else:
+                at_or_after_end = (
+                    _split_epoch_compare(jd, offset, chunks[mid].jd_end) >= 0
+                )
+            if at_or_after_end:
                 lo = mid + 1
             else:
                 hi = mid
@@ -448,7 +461,18 @@ class LEB2Reader:
     def eval_body(
         self, body_id: int, jd: float
     ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
-        """Evaluate a body's position and velocity at a given Julian Day.
+        """Evaluate a body's position and velocity at a given Julian Day."""
+        return self._eval_body_split(body_id, jd, 0.0)
+
+    def _eval_body_split(
+        self, body_id: int, jd: float, offset: float
+    ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+        """Evaluate a body at the unevaluated epoch ``jd + offset``.
+
+        Args:
+            body_id: libephemeris body constant.
+            jd: Main Julian Day part in TT.
+            offset: Finite day offset kept separate from ``jd``.
 
         Raises:
             KeyError: If body_id is not in this .leb2 file.
@@ -462,8 +486,11 @@ class LEB2Reader:
         if self._mm is None:
             raise ValueError("LEB2 reader is closed")
 
-        # Check eval cache
-        _cache_key = (body_id, jd)
+        if not math.isfinite(offset):
+            raise ValueError(f"LEB2 evaluation offset must be finite, got {offset}")
+
+        # The split residual is part of the epoch and therefore of the cache key.
+        _cache_key = (body_id, jd, offset)
         cached = self._eval_cache.get(_cache_key)
         if cached is not None:
             return cached
@@ -473,10 +500,21 @@ class LEB2Reader:
 
         body = self._bodies[body_id]
 
-        if jd < body.jd_start or jd > body.jd_end:
+        if offset == 0.0:
+            from_start = jd - body.jd_start
+            from_end = jd - body.jd_end
+        else:
+            from_start = _split_epoch_compare(jd, offset, body.jd_start)
+            from_end = _split_epoch_compare(jd, offset, body.jd_end)
+        if from_start < 0.0 or from_end > 0.0:
+            if offset == 0.0:
+                raise ValueError(
+                    f"JD {jd} outside range [{body.jd_start}, {body.jd_end}] "
+                    f"for body {body_id}"
+                )
             raise ValueError(
-                f"JD {jd} outside range [{body.jd_start}, {body.jd_end}] "
-                f"for body {body_id}"
+                f"JD {jd} + {offset} outside range "
+                f"[{body.jd_start}, {body.jd_end}] for body {body_id}"
             )
 
         # Corrupted-header guard (zero interval / empty segment table).
@@ -489,9 +527,20 @@ class LEB2Reader:
                 f"{body.interval_days}, segment_count={body.segment_count}"
             )
 
-        # Global segment index
-        seg_idx = int((jd - body.jd_start) / body.interval_days)
-        seg_idx = max(0, min(seg_idx, body.segment_count - 1))
+        if offset == 0.0:
+            # Preserve the established public scalar path exactly.
+            seg_idx = int((jd - body.jd_start) / body.interval_days)
+            seg_idx = max(0, min(seg_idx, body.segment_count - 1))
+        else:
+            # Split epochs use robust local boundary correction and the
+            # right-side convention.
+            seg_idx = _split_interval_index(
+                jd,
+                offset,
+                body.jd_start,
+                body.interval_days,
+                body.segment_count,
+            )
 
         # Get coefficients — chunked (v2) or monolithic (v1)
         if self._chunked:
@@ -500,7 +549,10 @@ class LEB2Reader:
                 raise ValueError(
                     f"Corrupted LEB2 file: empty chunk index for body {body_id}"
                 )
-            chunk_idx = self._find_chunk(body_id, jd)
+            if offset == 0.0:
+                chunk_idx = self._find_chunk(body_id, jd)
+            else:
+                chunk_idx = self._find_chunk(body_id, jd, offset)
             chunk = chunks[chunk_idx]
             # The jd binary search compares against stored (write-time
             # rounded) chunk boundaries; in the half-ulp window where they
@@ -543,10 +595,16 @@ class LEB2Reader:
             byte_offset = seg_idx * n_coeffs * 8
             coeffs = struct.unpack_from(f"<{n_coeffs}d", body_data, byte_offset)
 
-        # Compute tau
+        # Posizione e derivata usano lo stesso tau e il centro arrotondato del
+        # runtime precedente. Il residuo si aggiunge prima della normalizzazione,
+        # senza reinterpretare i coefficienti su una griglia razionale esatta.
+        # Si conserva il clamp preesistente agli estremi dell’intervallo chiuso.
         seg_start = body.jd_start + seg_idx * body.interval_days
         seg_mid = seg_start + 0.5 * body.interval_days
-        tau = 2.0 * (jd - seg_mid) / body.interval_days
+        if offset == 0.0:
+            tau = 2.0 * (jd - seg_mid) / body.interval_days
+        else:
+            tau = 2.0 * math.fsum((jd, -seg_mid, offset)) / body.interval_days
         if tau > 1.0:
             tau = 1.0
         elif tau < -1.0:
