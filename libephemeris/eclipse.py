@@ -1806,7 +1806,7 @@ def _sol_how_core(
 
 def _lun_how_core(
     tjd_ut: float, flags: int = FLG_SWIEPH
-) -> Tuple[int, list, Tuple[float, ...]]:
+) -> Tuple[int, list, ShadowGeometry]:
     """What the Earth's shadow is doing to the Moon at one instant.
 
     The Sun and the Earth are two spheres, the Sun the larger, so past the
@@ -1910,13 +1910,14 @@ def _lun_how_core(
         matches. Slots [4] to [6] are the caller's horizon reduction and
         [2], [3] and [11] to [19] are reserved and stay ``0.0``.
 
-        ``geometry`` is the shadow at the Moon, in astronomical units, as
-        ``(axis offset, umbral section diameter, penumbral section diameter,
-        umbral cosine, penumbral cosine)``. The umbral diameter is a positive
-        width: the Moon never reaches the umbral cone's apex, so the
-        antumbral branch of the solar side does not arise here. The contact
-        search downstream forms its three immersion residuals from exactly
-        these five numbers and reads only their signs.
+        ``geometry`` is a :class:`ShadowGeometry` in kilometres. Its inner
+        cone diameter follows the record's signed convention: negative before
+        the apex (the umbra proper), positive beyond it (the antumbra). The
+        ordinary lunar-eclipse domain lies before the apex, so consumers obtain
+        its oriented positive umbral half-width as
+        ``-geometry.umbral_plane_diameter_km / 2.0``; they do not use ``abs``,
+        which would hide an antumbral state. Both surface fields are unset
+        because this producer resolves no point on the Moon's surface.
 
     Raises:
         EphemerisRangeError: Propagated from the layer that supplies the two
@@ -2032,12 +2033,17 @@ def _lun_how_core(
     attr[8] = attr[0]
     attr[9], attr[10] = _get_saros_info(tjd_ut, "lunar")
 
-    geometry = (
-        axis_offset_au,
-        2.0 * umbral_radius_au,
-        2.0 * penumbral_radius_au,
-        cos_umbral,
-        cos_penumbral,
+    # Il record usa chilometri e diametro interno negativo prima dell’apice.
+    # La conversione riguarda solo il trasporto della geometria: magnitudini
+    # pubbliche e classificazione conservano il calcolo precedente in AU.
+    geometry = ShadowGeometry(
+        float(axis_offset_au * _ECL_AU_KM),
+        umbral_plane_diameter_km=float(-2.0 * umbral_radius_au * _ECL_AU_KM),
+        penumbral_plane_diameter_km=float(2.0 * penumbral_radius_au * _ECL_AU_KM),
+        cos_umbral_half_angle=float(cos_umbral),
+        cos_penumbral_half_angle=float(cos_penumbral),
+        shadowed_radius_km=float(_ECL_RMOON_AU * _ECL_AU_KM),
+        shadow_misses_body=bool(retflag == 0),
     )
     return retflag, attr, geometry
 
@@ -2103,19 +2109,30 @@ def _lun_eclipse_phase_times(
     umbral/partial contact (tret[2]/[3]) and total immersion
     (tret[4]/[5]).
     """
-    rmoon_au = _ECL_RMOON_AU
 
     def _f_pen(jd: float) -> float:
-        _rc, _a, dc = _lun_how_core(jd, flags)
-        return dc[2] / 2.0 + rmoon_au / dc[4] - dc[0]
+        _rc, _a, geometry = _lun_how_core(jd, flags)
+        return (
+            geometry.penumbral_plane_diameter_km / 2.0
+            + geometry.shadowed_radius_km / geometry.cos_penumbral_half_angle
+            - geometry.axis_offset_km
+        )
 
     def _f_par(jd: float) -> float:
-        _rc, _a, dc = _lun_how_core(jd, flags)
-        return dc[1] / 2.0 + rmoon_au / dc[3] - dc[0]
+        _rc, _a, geometry = _lun_how_core(jd, flags)
+        return (
+            -geometry.umbral_plane_diameter_km / 2.0
+            + geometry.shadowed_radius_km / geometry.cos_umbral_half_angle
+            - geometry.axis_offset_km
+        )
 
     def _f_tot(jd: float) -> float:
-        _rc, _a, dc = _lun_how_core(jd, flags)
-        return dc[1] / 2.0 - rmoon_au / dc[3] - dc[0]
+        _rc, _a, geometry = _lun_how_core(jd, flags)
+        return (
+            -geometry.umbral_plane_diameter_km / 2.0
+            - geometry.shadowed_radius_km / geometry.cos_umbral_half_angle
+            - geometry.axis_offset_km
+        )
 
     tret = [0.0] * 10
     tret[0] = jd_max
