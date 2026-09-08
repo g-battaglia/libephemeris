@@ -1976,8 +1976,13 @@ def _lun_how_core(
         + moon_au[1] * axis_unit[1]
         + moon_au[2] * axis_unit[2]
     )
-    axis_offset_au = math.sqrt(
-        max(0.0, moon_distance * moon_distance - axial_au * axial_au)
+    # Proiezione ortogonale sul piano fondamentale (Explanatory Supplement,
+    # 3ª ed., cap. 11): la norma evita la sottrazione di quadrati quasi uguali
+    # quando il centro lunare è vicino all’asse dell’ombra.
+    axis_offset_au = math.hypot(
+        moon_au[0] - axial_au * axis_unit[0],
+        moon_au[1] - axial_au * axis_unit[1],
+        moon_au[2] - axial_au * axis_unit[2],
     )
 
     (
