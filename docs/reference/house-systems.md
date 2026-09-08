@@ -781,13 +781,18 @@ page-level transcription from Sripati.
 
 ```
 1. Compute Porphyry cusps P₁..P₁₂
-2. Sripati cusp Sᵢ = midpoint(Pᵢ, Pᵢ₊₁)
+2. Sᵢ = [Pᵢ₋₁ + ((Pᵢ − Pᵢ₋₁) mod 360°) / 2] mod 360°
+   Indici ciclici: P₀ = P₁₂.
 ```
 
 **Properties:** Works at all latitudes, same computational simplicity as Porphyry.
-For public-API compatibility, `house_pos()` collapses the Sripati wrap interval
-above house number 12 to exactly `1.0`; this includes house 12 and the first
-half of house 1. The cusp-12 boundary itself remains `12.0`.
+La cuspide Sripati è quindi il punto medio dell’arco orientato dalla cuspide
+Porphyry precedente a quella corrente. `house_pos()` avanza la posizione
+Porphyry di mezza casa sulla sequenza ciclica delle dodici case:
+`((p − 1 + 0.5) mod 12) + 1`, dove `p` è la posizione Porphyry. Il risultato
+rimane nell’intervallo `[1, 13)`, senza collassare la dodicesima casa a `1.0`.
+L’Ascendente, il Fondo Cielo, il Discendente e il Medio Cielo hanno rispettivamente
+posizione `1.5`, `4.5`, `7.5` e `10.5`.
 
 ---
 
