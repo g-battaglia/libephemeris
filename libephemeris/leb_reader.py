@@ -21,6 +21,7 @@ Provenance:
 
 from __future__ import annotations
 
+import math
 import mmap
 import os
 import struct
@@ -144,6 +145,51 @@ def _clenshaw_derivative(coeffs: tuple, tau: float) -> float:
     return _clenshaw(_deriv_coeffs(coeffs), tau)
 
 
+def _split_epoch_delta_parts(
+    jd: float,
+    offset: float,
+    origin: float,
+    interval_days: float = 0.0,
+    interval_index: int = 0,
+) -> Tuple[int, int]:
+    """Return the exact dyadic value of an epoch minus a grid point.
+
+    Every finite binary64 value is an integer divided by a power of two. Using
+    that representation keeps the sign even when a correctly rounded float sum
+    would land on zero, and keeps ``interval_index * interval_days`` exact.
+    """
+    terms = [(jd, 1), (offset, 1), (origin, -1)]
+    if interval_index:
+        terms.append((interval_days, -interval_index))
+    ratios = [(value.as_integer_ratio(), multiplier) for value, multiplier in terms]
+    denominator = max(ratio[1] for ratio, _multiplier in ratios)
+    numerator = sum(
+        multiplier * ratio[0] * (denominator // ratio[1])
+        for ratio, multiplier in ratios
+    )
+    return numerator, denominator
+
+
+def _split_epoch_compare(jd: float, offset: float, boundary: float) -> int:
+    """Compare an uncollapsed epoch with one stored boundary exactly."""
+    numerator, _denominator = _split_epoch_delta_parts(jd, offset, boundary)
+    return (numerator > 0) - (numerator < 0)
+
+
+def _split_interval_index(
+    jd: float,
+    offset: float,
+    jd_start: float,
+    interval_days: float,
+    interval_count: int,
+) -> int:
+    """Locate a regular interval from the exact local dyadic quotient."""
+    local_num, local_den = _split_epoch_delta_parts(jd, offset, jd_start)
+    interval_num, interval_den = interval_days.as_integer_ratio()
+    index = (local_num * interval_den) // (local_den * interval_num)
+    return max(0, min(index, interval_count - 1))
+
+
 def _clenshaw_with_derivative(coeffs: tuple, tau: float) -> Tuple[float, float]:
     """Evaluate Chebyshev series and its derivative simultaneously at tau.
 
@@ -201,7 +247,7 @@ class LEBReader:
             self._file.close()
             raise
         self._eval_cache: Dict[
-            Tuple[int, float],
+            Tuple[int, float, float],
             Tuple[Tuple[float, float, float], Tuple[float, float, float]],
         ] = {}
 
@@ -368,11 +414,18 @@ class LEBReader:
     def eval_body(
         self, body_id: int, jd: float
     ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
-        """Evaluate a body's position and velocity at a given Julian Day.
+        """Evaluate a body's position and velocity at a given Julian Day."""
+        return self._eval_body_split(body_id, jd, 0.0)
+
+    def _eval_body_split(
+        self, body_id: int, jd: float, offset: float
+    ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+        """Evaluate a body at the unevaluated epoch ``jd + offset``.
 
         Args:
             body_id: libephemeris body constant (e.g., SUN=0, MOON=1).
-            jd: Julian Day in TT (Terrestrial Time).
+            jd: Main Julian Day part in TT (Terrestrial Time).
+            offset: Finite day offset kept separate from ``jd``.
 
         Returns:
             ((pos_0, pos_1, pos_2), (vel_0, vel_1, vel_2))
@@ -401,11 +454,13 @@ class LEBReader:
         # reading a closed mmap through this local raises ValueError (caught).
         mm = self._mm
 
-        # Check instance-level eval cache first.  During a multi-body chart
-        # calculation at the same jd_tt the observer (Earth) and gravitational
-        # deflectors (Sun, Jupiter, Saturn) are re-evaluated for every planet.
-        # Caching avoids ~40 redundant Chebyshev evaluations per chart.
-        _cache_key = (body_id, jd)
+        if not math.isfinite(offset):
+            raise ValueError(f"LEB evaluation offset must be finite, got {offset}")
+
+        # Check instance-level eval cache first. During a multi-body chart
+        # calculation at the same epoch, repeated evaluations share all three
+        # epoch parts. Keeping the residual in the key prevents sub-ULP aliases.
+        _cache_key = (body_id, jd, offset)
         cached = self._eval_cache.get(_cache_key)
         if cached is not None:
             return cached
@@ -415,11 +470,23 @@ class LEBReader:
 
         body = self._bodies[body_id]
 
-        # Check range
-        if jd < body.jd_start or jd > body.jd_end:
+        # Keep the public zero-offset path byte-for-byte equivalent to its
+        # original scalar arithmetic; only split epochs use accurate summation.
+        if offset == 0.0:
+            from_start = jd - body.jd_start
+            from_end = jd - body.jd_end
+        else:
+            from_start = _split_epoch_compare(jd, offset, body.jd_start)
+            from_end = _split_epoch_compare(jd, offset, body.jd_end)
+        if from_start < 0.0 or from_end > 0.0:
+            if offset == 0.0:
+                raise ValueError(
+                    f"JD {jd} outside range [{body.jd_start}, {body.jd_end}] "
+                    f"for body {body_id}"
+                )
             raise ValueError(
-                f"JD {jd} outside range [{body.jd_start}, {body.jd_end}] "
-                f"for body {body_id}"
+                f"JD {jd} + {offset} outside range "
+                f"[{body.jd_start}, {body.jd_end}] for body {body_id}"
             )
 
         # Corrupted-header guard: a zero interval or empty segment table
@@ -430,14 +497,31 @@ class LEBReader:
                 f"{body.interval_days}, segment_count={body.segment_count}"
             )
 
-        # O(1) segment lookup
-        seg_idx = int((jd - body.jd_start) / body.interval_days)
-        seg_idx = max(0, min(seg_idx, body.segment_count - 1))
+        if offset == 0.0:
+            # Preserve the established public scalar path exactly.
+            seg_idx = int((jd - body.jd_start) / body.interval_days)
+            seg_idx = max(0, min(seg_idx, body.segment_count - 1))
+        else:
+            # O(1) lookup followed by robust local boundary correction. Internal
+            # boundaries select the segment on the right; the file end clamps.
+            seg_idx = _split_interval_index(
+                jd,
+                offset,
+                body.jd_start,
+                body.interval_days,
+                body.segment_count,
+            )
 
-        # Compute tau (map jd to [-1, 1] within segment)
+        # Posizione e derivata usano lo stesso tau e il centro arrotondato del
+        # runtime precedente. Il residuo si aggiunge prima della normalizzazione,
+        # senza reinterpretare i coefficienti su una griglia razionale esatta.
+        # Si conserva il clamp preesistente agli estremi dell’intervallo chiuso.
         seg_start = body.jd_start + seg_idx * body.interval_days
         seg_mid = seg_start + 0.5 * body.interval_days
-        tau = 2.0 * (jd - seg_mid) / body.interval_days
+        if offset == 0.0:
+            tau = 2.0 * (jd - seg_mid) / body.interval_days
+        else:
+            tau = 2.0 * math.fsum((jd, -seg_mid, offset)) / body.interval_days
 
         # Clamp tau to [-1, 1] for safety
         if tau > 1.0:
