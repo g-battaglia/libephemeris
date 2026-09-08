@@ -589,6 +589,27 @@ The figure of the Earth is unchanged: the IAU (1976) equatorial radius
 values the module has always used. No reduction, scale or offset is fitted to
 any external output.
 
+#### Umbral magnitude of a penumbral lunar eclipse {#lunar-penumbral-umbral-magnitude}
+
+For a penumbral lunar eclipse `lun_eclipse_how`, `lun_eclipse_when_loc` and
+`lun_eclipse_umbral_magnitude` report an umbral magnitude of exactly `0.0`.
+
+The eclipse magnitude is the fraction of the Moon's diameter immersed in one
+of the Earth's two shadows, and it is a *signed* depth of immersion: zero when
+that shadow's edge touches the Moon's limb, one when it reaches the centre,
+and negative while the Moon is still clear of it. Espenak & Meeus publish the
+negative value for a penumbral eclipse and read it as "a measure of the
+distance of the Moon's limb to the edge of the umbral shadow in units of the
+Moon's diameter" (*Five Millennium Canon of Lunar Eclipses*,
+NASA/TP-2009-214173, sec. 1.2.7).
+
+The compatibility surface publishes `0.0` there instead, on every entry point
+that carries the umbral channel, and LibEphemeris keeps that contract. The
+information the canon carries in the negative number — how far the Moon's limb
+stayed from the umbra — is therefore not available through this surface. The
+penumbral magnitude beside it is reported as the definition gives it,
+including the negative value at an instant with no eclipse at all.
+
 ### `nod_aps*`
 
 Osculating planetary nodes and apsides come from JPL state vectors and standard
