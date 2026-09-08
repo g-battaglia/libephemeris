@@ -1549,6 +1549,8 @@ def _rounding_is_held_back(
         # With both flags set, the whole-degree test governs alone.
         return int((position + offset) / degree_span) != int(position / degree_span)
     if roundflag & SPLIT_DEG_KEEP_SIGN:
+        if math.isinf(position):
+            raise ValueError("math domain error")
         return int((position + offset) / division_span) != int(position / division_span)
     return False
 
