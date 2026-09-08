@@ -1375,6 +1375,244 @@ def _ground_core_diameter_km(geometry: ShadowGeometry) -> float:
     return cast(float, geometry.umbral_surface_diameter_km)
 
 
+# Air temperature the local circumstances are reduced at, in degrees Celsius.
+# It is the standard condition of the horizon fits in libephemeris.refraction
+# (Meeus 1998, ch. 16), so the horizon refraction below needs no temperature
+# correction at sea level.
+_HOW_TEMPERATURE_C = 10.0
+
+# Vertical temperature gradient of the ISO 2533 troposphere, in K per metre:
+# 6.5 K of cooling per kilometre. It enters the coefficient of terrestrial
+# refraction that lightens the dip of the horizon.
+_HOW_LAPSE_RATE_K_PER_M = 0.0065
+
+
+def _how_pressure_mbar(height_m: float) -> float:
+    """Air pressure at the observer's height, in mbar.
+
+    The standard-atmosphere barometric profile of ISO 2533:1975 / ICAO
+    Doc 7488, evaluated by :mod:`libephemeris.refraction`: 1013.25 mbar at
+    sea level, 88.7 percent of that at 1000 m.
+
+    Args:
+        height_m: Observer height above the reference ellipsoid, in metres.
+
+    Returns:
+        The pressure in mbar.
+    """
+    from .refraction import _icao_pressure
+
+    return float(_icao_pressure(height_m))
+
+
+def _horizon_refraction_deg(pressure_mbar: float, temperature_c: float) -> float:
+    """Contribution (a) of the visibility allowance: refraction at the horizon.
+
+    A ray reaching the observer horizontally has crossed the whole thickness
+    of the atmosphere and is lifted by it, so a body whose true altitude is
+    minus this angle still appears on the horizon. Bennett's closed form
+    ``1 / tan(h + 7.31 / (h + 4.4))`` in arcminutes (Bennett, G. G., 1982,
+    "The Calculation of Astronomical Refraction in Marine Navigation",
+    Journal of Navigation 35, 255-259; Meeus 1998, formula 16.3) is
+    evaluated at zero apparent altitude and scaled from the 1010 mbar / 10 C
+    air of the fit to the observer's own by the pressure/temperature factor
+    of the same chapter.
+
+    Magnitude: 34.48 arcminutes at the conditions of the fit, 0.5765 degrees
+    at 1013.25 mbar and 10 C. It is the only contribution that survives at
+    sea level, and it weakens with the pressure - about four arcminutes less
+    at 1000 m, where the observer stands above a ninth of the atmosphere.
+
+    Args:
+        pressure_mbar: Air pressure at the observer, in mbar.
+        temperature_c: Air temperature at the observer, in degrees Celsius.
+
+    Returns:
+        The refraction in degrees, positive.
+    """
+    from .refraction import (
+        _BENNETT_ARCMIN,
+        _compat_atmosphere_scale,
+        _cotangent_fit_arcmin,
+    )
+
+    arcmin = _cotangent_fit_arcmin(0.0, _BENNETT_ARCMIN)
+    return arcmin * _compat_atmosphere_scale(pressure_mbar, temperature_c) / 60.0
+
+
+def _geometric_horizon_dip_deg(height_m: float) -> float:
+    """Contribution (b) of the visibility allowance: the dip of the horizon.
+
+    An observer standing ``h`` above a sphere of radius ``a_E`` sees its
+    tangent point ``arccos(a_E / (a_E + h))`` below the horizontal plane, so
+    a body that much lower than the plane is still clear of the ground. The
+    radius is the IERS equatorial radius, 6378136.6 m (IERS Conventions
+    (2010), Technical Note 36, Table 1.1); the exact arc cosine is kept
+    rather than its square-root approximation (Bomford, G., Geodesy, 4th ed.,
+    Oxford University Press, 1980, on trigonometric heighting), the two
+    differing by 0.24 arcsec at 1 km.
+
+    Magnitude: 1.925 arcminutes per square root of a metre - 1.9' at 1 m,
+    19.3' at 100 m, 60.9' at 1000 m, 121.7' at 4000 m. Nothing at all at or
+    below sea level, which is where the whole recorded grid stands.
+
+    Args:
+        height_m: Observer height above the reference ellipsoid, in metres.
+
+    Returns:
+        The dip in degrees, positive downwards from the horizontal plane and
+        zero at or below sea level.
+    """
+    from .refraction import _A_EARTH
+
+    if height_m <= 0.0:
+        return 0.0
+    return math.degrees(math.acos(_A_EARTH / (_A_EARTH + height_m)))
+
+
+def _dip_refraction_deg(
+    height_m: float, pressure_mbar: float, temperature_c: float
+) -> float:
+    """Contribution (c) of the visibility allowance: the dip's own refraction.
+
+    The grazing sight line to the horizon is itself bent downwards by the
+    vertical density gradient of the air, which raises the visible horizon
+    above the geometric one and so takes part of contribution (b) back. With
+    the coefficient of terrestrial refraction ``k``, the effective-radius
+    reduction ``a_E -> a_E / (1 - k)`` scales the dip by ``sqrt(1 - k)``
+    (Bomford, Geodesy, 4th ed., 1980); ``k`` itself is derived from the
+    refractivity of air, hydrostatic equilibrium and the autoconvective lapse
+    rate by :func:`libephemeris.refraction.calc_dip`, which is called here
+    rather than repeated.
+
+    Magnitude: negative, and about a tenth of (b) - roughly -0.27
+    arcminutes per square root of a metre at the standard atmosphere, where
+    ``k`` comes out at 0.258. Zero at or below sea level.
+
+    Args:
+        height_m: Observer height above the reference ellipsoid, in metres.
+        pressure_mbar: Air pressure at the observer, in mbar.
+        temperature_c: Air temperature at the observer, in degrees Celsius.
+
+    Returns:
+        The correction in degrees, negative above sea level.
+    """
+    from .refraction import calc_dip
+
+    if height_m <= 0.0:
+        return 0.0
+    refracted_dip = -calc_dip(
+        height_m, _HOW_LAPSE_RATE_K_PER_M, pressure_mbar, temperature_c
+    )
+    return refracted_dip - _geometric_horizon_dip_deg(height_m)
+
+
+def _visibility_allowance_deg(
+    height_m: float, pressure_mbar: float, temperature_c: float
+) -> float:
+    """How far below the horizontal plane a body may still be seen, in degrees.
+
+    The sum of the three contributions above, each with its own source and
+    its own dependence on the observer's height: the astronomical refraction
+    at the horizon, the geometric dip and the refraction of the dip. At sea
+    level only the first survives and the sum is 0.5765 degrees; at 1000 m it
+    is 1.402 degrees.
+
+    Args:
+        height_m: Observer height above the reference ellipsoid, in metres.
+        pressure_mbar: Air pressure at the observer, in mbar.
+        temperature_c: Air temperature at the observer, in degrees Celsius.
+
+    Returns:
+        The allowance in degrees, positive.
+    """
+    return (
+        _horizon_refraction_deg(pressure_mbar, temperature_c)
+        + _geometric_horizon_dip_deg(height_m)
+        + _dip_refraction_deg(height_m, pressure_mbar, temperature_c)
+    )
+
+
+def _overlap_area_fraction(r_body: float, r_moon: float, separation: float) -> float:
+    """Fraction of the body's disc the Moon's disc covers, limbs crossing.
+
+    The common area of two circles of radii ``r_body`` and ``r_moon`` whose
+    centres stand ``separation`` apart is the sum of the two circular
+    segments cut off by their common chord,
+
+        A = r_moon^2 (a - sin a cos a) + r_body^2 (b - sin b cos b),
+
+    with ``cos a`` and ``cos b`` the law-of-cosines half-angles at the two
+    centres; the fraction is ``A / (pi r_body^2)``. Both cosines are clamped
+    into [-1, 1] before the arc cosine, because rounding pushes them a few
+    units in the last place outside it near contact. Exactly concentric
+    discs are reachable here only with equal radii, where the covered area
+    is the whole of the smaller disc.
+
+    Args:
+        r_body: Apparent radius of the occulted body, in degrees.
+        r_moon: Apparent radius of the Moon, in degrees.
+        separation: Distance between the two centres, in degrees.
+
+    Returns:
+        The covered fraction of the body's disc area.
+    """
+    ratio = r_moon / r_body
+    if separation == 0.0:
+        return ratio * ratio
+    cos_a = (separation * separation + r_moon * r_moon - r_body * r_body) / (
+        2.0 * separation * r_moon
+    )
+    cos_b = (separation * separation + r_body * r_body - r_moon * r_moon) / (
+        2.0 * separation * r_body
+    )
+    half_a = math.acos(max(-1.0, min(1.0, cos_a)))
+    half_b = math.acos(max(-1.0, min(1.0, cos_b)))
+    area = r_moon * r_moon * (half_a - math.sin(half_a) * math.cos(half_a)) + (
+        r_body * r_body * (half_b - math.sin(half_b) * math.cos(half_b))
+    )
+    return area / (math.pi * r_body * r_body)
+
+
+def _how_target_and_moon(
+    tjd_ut: float,
+    geopos: "Sequence[float]",
+    flags: int,
+    reader,
+    body: "Union[int, str]",
+) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+    """Topocentric apparent places of the occulted body and of the Moon.
+
+    Both are ecliptic longitude, latitude and distance referred to the true
+    ecliptic and equinox of date, with light-time, aberration and
+    gravitational deflection included (Explanatory Supplement to the
+    Astronomical Almanac, 3rd ed., ch. 3 and ch. 7). A fixed star is placed
+    geocentrically, its diurnal parallax lying orders of magnitude below
+    anything measured here.
+
+    The Moon always comes from the Sun-and-Moon pair, whatever it occults, so
+    that the two discs of a solar eclipse are mutually consistent and the
+    occulting body of an occultation is the same Moon the eclipse path uses.
+    Two consequences follow from the pair: an instant at which the ephemeris
+    cannot place the Sun is refused whatever the target, and a target other
+    than the Sun costs one further place.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time.
+        geopos: Observer longitude, latitude and height.
+        flags: Ephemeris selector word.
+        reader: Binary-ephemeris reader, or None for the Skyfield path.
+        body: The occulted body.
+
+    Returns:
+        The pair (body place, Moon place), distances in AU.
+    """
+    sun, moon = _topo_sun_moon(tjd_ut, geopos, reader)
+    if body == SUN:
+        return sun, moon
+    return _occ_body_topo(tjd_ut, body, geopos, flags, reader), moon
+
+
 def _sol_how_core(
     tjd_ut: float,
     geopos: "Sequence[float]",
@@ -1383,121 +1621,161 @@ def _sol_how_core(
     body: "Union[int, str]" = SUN,
     where_convention: bool = False,
 ) -> Tuple[int, list]:
-    """Local circumstances of a solar eclipse (reference ``attr`` layout).
+    """Local circumstances of a solar eclipse or a lunar occultation.
 
-    Returns ``(retc, attr)`` where ``attr`` is a 20-float list and
-    ``retc`` carries the local phase (ECL_TOTAL/ECL_ANNULAR/ECL_PARTIAL,
-    0 = no eclipse in progress at this place and time) plus ECL_VISIBLE
-    when part of the eclipsed Sun can stand above the local horizon
-    allowing for refraction and the observer's horizon dip.
+    What an observer at one place sees of the Moon crossing the Sun - or any
+    other target - at one instant: how much of the disc is covered, how far
+    apart the two centres stand, where the target is in that observer's sky
+    and whether any part of it can be above the horizon at all.
 
-    attr: [0] magnitude as diameter fraction (negative when the limbs do
-    not yet overlap), [1] lunar/solar diameter ratio, [2] obscuration.
-    For a solar eclipse the obscuration follows the compatibility
-    contract: the disc-area ratio (r_moon/r_sun)**2 while one disc lies
-    inside the other, so it exceeds 1 during totality (Moon larger) and is
-    (r_moon/r_sun)**2 < 1 during annularity; the partial phase reports the
-    two-disc lens-overlap fraction. For an occultation the obscuration is
-    the covered fraction of the body, bounded at 1.0 on the how/when_loc
-    path — but the WHERE path reports the uncapped disc-area ratio for
-    planet targets (compatibility contract; ``where_convention``),
-    while star targets stay at 1.0 on every path.
-    [3] 0 (callers fill the core-shadow width), [4] azimuth of the Sun,
-    [5] true altitude, [6] apparent altitude, [7] Moon-Sun center
-    separation in degrees, [8] NASA magnitude, [9]/[10] saros series and
-    member.
+    The geometry is elementary and entirely on the two topocentric apparent
+    places. With ``r_b`` the target's apparent radius, ``r_m`` the Moon's and
+    ``d`` the separation of the centres, the three classical configurations
+    are disjoint: the Moon's disc contains the target's when ``d < r_m - r_b``
+    (total), the target's contains the Moon's when ``d < r_b - r_m``
+    (annular), the limbs cross while ``d < r_b + r_m`` (partial), and beyond
+    that the discs are apart. The magnitude ``(r_b + r_m - d) / (2 r_b)`` is
+    the covered fraction of the diameter, one at internal contact and
+    negative once the discs separate; the obscuration is the covered fraction
+    of the area, the lens of two circles while the limbs cross and the square
+    of the diameter ratio once one disc is inside the other, where it exceeds
+    one during totality and stays below it during annularity. The azimuth and
+    the two altitudes are the ordinary reduction of the target's place to the
+    observer's horizon.
+
+    The core-shadow slot is not observer business and is left at zero for the
+    callers to fill from the shadow-axis geometry; the nine trailing slots of
+    the compatibility layout are unused and stay at zero.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time.
+        geopos: Observer geographic longitude (East positive), latitude
+            (North positive) and height above the reference ellipsoid in
+            metres.
+        flags: Ephemeris selector word.
+        reader: Binary-ephemeris reader, or None for the Skyfield path.
+        body: Occulted body: a planet or minor-body identifier, a fixed-star
+            name, or the Sun, which is the default. A negative identifier is
+            answered as the Sun.
+        where_convention: True on the shadow-centre entry points, where the
+            covered fractions of a non-solar target are reported as the
+            geometry gives them however large; False on the per-observer
+            entry points, where they are fractions and stop at one.
+
+    Returns:
+        The pair (word, attr). ``word`` carries at most one of ECL_TOTAL,
+        ECL_ANNULAR and ECL_PARTIAL, zero when the discs do not overlap, plus
+        ECL_VISIBLE when a phase stands above the observer's horizon. ``attr``
+        is the 20-float compatibility layout: [0] magnitude, [1] ratio of the
+        Moon's apparent diameter to the target's, [2] obscuration, [3] the
+        core-shadow width the caller fills, [4] azimuth measured from the
+        south westwards, [5] true altitude, [6] apparent altitude, [7]
+        centre separation, [8] the magnitude the eclipse canons publish, [9]
+        and [10] the Saros series and member, [11] to [19] unused.
+
+    References:
+        Explanatory Supplement to the Astronomical Almanac, 3rd ed., Urban &
+        Seidelmann (eds.), 2013: ch. 3 (apparent place), ch. 7 (coordinate
+        systems, semidiameter, the horizontal reduction), ch. 11 (eclipses,
+        magnitude and obscuration).
+        Meeus, J., Astronomical Algorithms, 2nd ed., 1998: ch. 13, ch. 16,
+        ch. 54.
+        Chauvenet, W., A Manual of Spherical and Practical Astronomy, vol. I,
+        1863, the chapter on eclipses: the magnitude in digits of the
+        diameter.
+        Bennett (1982), Bomford (1980), IERS Conventions (2010) and
+        ISO 2533:1975 for the three contributions of the visibility
+        allowance; see the helpers above.
     """
     from .utils import ECL2HOR, angular_separation, azalt
 
-    _sun_unused, moon_p = _topo_sun_moon(tjd_ut, geopos, reader)
-    sun_p = (
-        _sun_unused
-        if (not isinstance(body, str) and body == SUN)
-        else _occ_body_topo(tjd_ut, body, geopos, flags, reader)
-    )
-    body_radius_au = _occ_body_radius_au(body)
-    rsun = (
-        math.degrees(math.asin(body_radius_au / sun_p[2]))
-        if body_radius_au > 0.0
-        else 0.0
-    )
-    rmoon = math.degrees(math.asin(_ECL_RMOON_AU / moon_p[2]))
-    dctr = angular_separation(sun_p[0], sun_p[1], moon_p[0], moon_p[1])
+    if isinstance(body, int) and body < 0:
+        # A negative identifier is not an error here: it names the Sun.
+        body = SUN
 
-    if dctr < rsun - rmoon:
-        retc = ECL_ANNULAR
-    elif dctr < abs(rsun - rmoon):
-        retc = ECL_TOTAL
-    elif dctr < rsun + rmoon:
-        retc = ECL_PARTIAL
+    lon, lat, height = float(geopos[0]), float(geopos[1]), float(geopos[2])
+    geopos3 = (lon, lat, height)
+    is_sun = body == SUN
+
+    target, moon = _how_target_and_moon(tjd_ut, geopos3, flags, reader, body)
+    r_body = math.degrees(math.asin(_occ_body_radius_au(body) / target[2]))
+    r_moon = math.degrees(math.asin(_ECL_RMOON_AU / moon[2]))
+    separation = angular_separation(target[0], target[1], moon[0], moon[1])
+
+    # A point source has no disc to cover: its magnitude and obscuration are
+    # the protocol values consumers branch on, whatever the separation.
+    point_source = r_body == 0.0
+    if point_source:
+        magnitude = 1.0
+        diameter_ratio = 0.0
     else:
-        retc = 0
+        magnitude = (r_body + r_moon - separation) / (2.0 * r_body)
+        diameter_ratio = r_moon / r_body
 
-    attr = [0.0] * 20
-    attr[1] = rmoon / rsun if rsun > 0.0 else 0.0
-    attr[0] = (rsun + rmoon - dctr) / (2.0 * rsun) if rsun > 0.0 else 1.0
-    # Compatibility contract: a solar eclipse (Sun as the "occulted" body)
-    # reports the disc-area ratio while one disc lies inside the other, so
-    # obscuration exceeds 1 during totality; an occultation of a finite
-    # body caps the covered fraction at 1.0.
-    _is_solar = (not isinstance(body, str)) and body == SUN
-    if retc == 0:
-        # No eclipse at this place and time. Compatibility contract: this
-        # entry point reports a fixed no-event sentinel of 1.0 in the
-        # obscuration slot — a protocol value in the same class as a
-        # retflag echo or a -99999999.0 sentinel, not an area ratio. It
-        # reads oddly for a channel documented as "fraction of the Sun's
-        # disc covered", but consumers branch on it; sol_eclipse_how()
-        # zeroes its whole attr array on retflag==0 and is unaffected.
-        attr[2] = 1.0
-    elif rsun <= 0.0:
-        attr[2] = 1.0
-    elif retc in (ECL_TOTAL, ECL_ANNULAR):
-        # One disc lies entirely within the other. The disc-area ratio is
-        # (rmoon/rsun)**2 — > 1 during totality (larger Moon), < 1 during
-        # annularity (a ring of Sun remains). For a solar eclipse the
-        # reference returns this ratio uncapped; an occultation caps the
-        # covered fraction of the body at 1.0.
-        ratio_sq = (rmoon / rsun) ** 2
-        _uncap = _is_solar or (where_convention and rsun > 0.0)
-        attr[2] = ratio_sq if _uncap else min(1.0, ratio_sq)
-    elif dctr <= 0.0:
-        # Exactly concentric discs in the partial branch are reachable only at
-        # the annular/total boundary (rsun == rmoon); the overlap is the whole
-        # smaller disc. Guards the lens-area 1/dctr singularity below.
-        ratio_sq = (rmoon / rsun) ** 2
-        _uncap = _is_solar or (where_convention and rsun > 0.0)
-        attr[2] = ratio_sq if _uncap else min(1.0, ratio_sq)
+    if separation < r_moon - r_body:
+        phase = ECL_TOTAL
+    elif separation < r_body - r_moon:
+        phase = ECL_ANNULAR
+    elif separation < r_body + r_moon:
+        phase = ECL_PARTIAL
     else:
-        # Standard two-disc overlap (lens) area as a fraction of the
-        # solar disc.
-        a = (dctr * dctr + rmoon * rmoon - rsun * rsun) / (2.0 * dctr * rmoon)
-        b = (dctr * dctr + rsun * rsun - rmoon * rmoon) / (2.0 * dctr * rsun)
-        a = math.acos(max(-1.0, min(1.0, a)))
-        b = math.acos(max(-1.0, min(1.0, b)))
-        seg_moon = (a - math.sin(a) * math.cos(a)) * rmoon * rmoon
-        seg_sun = (b - math.sin(b) * math.cos(b)) * rsun * rsun
-        attr[2] = (seg_moon + seg_sun) / math.pi / (rsun * rsun)
-    attr[7] = dctr
+        phase = 0
 
-    geopos3 = (float(geopos[0]), float(geopos[1]), float(geopos[2]))
-    az, true_alt, app_alt = azalt(tjd_ut, ECL2HOR, geopos3, 0.0, 10.0, sun_p)
-    attr[4] = az
-    attr[5] = true_alt
-    attr[6] = app_alt
-    # Lowest apparent altitude at which part of the Sun can still be
-    # seen: horizon refraction (34.4556') plus horizon dip and
-    # observer-to-horizon refraction, both growing with the square root
-    # of the observer's height.
-    hmin_appr = -(34.4556 + 2.12 * math.sqrt(max(0.0, geopos3[2]))) / 60.0
-    if retc and true_alt + rsun + abs(hmin_appr) >= 0.0:
-        retc |= ECL_VISIBLE
-    if not isinstance(body, str) and body == SUN:
-        attr[8] = attr[1] if retc & (ECL_TOTAL | ECL_ANNULAR) else attr[0]
+    if point_source:
+        obscuration = 1.0
+    elif phase == ECL_PARTIAL:
+        obscuration = _overlap_area_fraction(r_body, r_moon, separation)
+    elif phase:
+        # One disc wholly inside the other: the covered area is the whole of
+        # the smaller disc, so the fraction is the square of the ratio.
+        obscuration = diameter_ratio * diameter_ratio
+    else:
+        # Discs apart: the slot carries the protocol value, not an area.
+        obscuration = 1.0
+
+    if not is_sun and not where_convention:
+        magnitude = min(magnitude, 1.0)
+        obscuration = min(obscuration, 1.0)
+
+    pressure = _how_pressure_mbar(height)
+    azimuth, true_altitude, apparent_altitude = azalt(
+        tjd_ut,
+        ECL2HOR,
+        geopos3,
+        pressure,
+        _HOW_TEMPERATURE_C,
+        (target[0], target[1], target[2]),
+    )
+
+    # The eclipse canons publish the diameter ratio for a central phase and
+    # the magnitude otherwise; the Saros series belongs to the Sun alone.
+    if is_sun:
+        canon_magnitude = (
+            diameter_ratio if phase in (ECL_TOTAL, ECL_ANNULAR) else magnitude
+        )
         saros_series, saros_member = _get_saros_info(tjd_ut, "solar")
-        attr[9] = saros_series
-        attr[10] = saros_member
-    return retc, attr
+    else:
+        canon_magnitude = 0.0
+        saros_series, saros_member = 0.0, 0.0
+
+    # A limb still counts when the centre is already down, and the horizon
+    # itself lets through everything above minus the allowance.
+    allowance = _visibility_allowance_deg(height, pressure, _HOW_TEMPERATURE_C)
+    if phase and true_altitude + r_body + allowance > 0.0:
+        phase |= ECL_VISIBLE
+
+    attr = [0.0] * _HOW_ATTR_SLOTS
+    attr[0] = float(magnitude)
+    attr[1] = float(diameter_ratio)
+    attr[2] = float(obscuration)
+    attr[4] = float(azimuth)
+    attr[5] = float(true_altitude)
+    attr[6] = float(apparent_altitude)
+    attr[7] = float(separation)
+    attr[8] = float(canon_magnitude)
+    attr[9] = float(saros_series)
+    attr[10] = float(saros_member)
+    return phase, attr
 
 
 def _lun_how_core(
