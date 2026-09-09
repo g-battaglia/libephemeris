@@ -123,13 +123,16 @@ def test_how_pythonic_draws_type_and_magnitude_from_core(year, month, kind):
     core's geocentric classification.
     """
     jd_max = _find_max(year, month)
-    retc_core, attr_core, _dc = _lun_how_core(jd_max, FLG_SWIEPH)
+    from libephemeris.shadow_geometry import ShadowGeometry
+
+    retc_core, attr_core, geometry = _lun_how_core(jd_max, FLG_SWIEPH)
+    assert isinstance(geometry, ShadowGeometry)
+    geometry.validate()
     rc_py, attr_py = _lun_eclipse_how_pythonic(jd_max, 41.9, 12.5)
 
-    assert attr_py[0] == pytest.approx(attr_core[0], abs=1e-12)  # umbral mag
-    assert attr_py[1] == pytest.approx(attr_core[1], abs=1e-12)  # penumbral mag
-    assert attr_py[8] == pytest.approx(attr_core[8], abs=1e-12)  # == attr[0]
-    assert attr_py[7] == pytest.approx(attr_core[7], abs=1e-12)  # dist. from opp.
+    # Il wrapper riusa questi valori: il contratto richiede identità esatta.
+    for index in (0, 1, 7, 8):
+        assert attr_py[index] == attr_core[index]
 
     type_mask = ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL
     assert (rc_py & type_mask) == retc_core, (
