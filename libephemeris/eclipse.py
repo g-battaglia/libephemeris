@@ -482,8 +482,8 @@ _ECL_AU_KM = 149597870.700
 _ECL_RSUN_AU = 696000.0 / _ECL_AU_KM
 _ECL_RMOON_AU = 1738.15 / _ECL_AU_KM
 _ECL_REARTH_AU = 6378.140 / _ECL_AU_KM
-# Convenzione API: il sentinel dell’orizzonte marino resta 0,36 arcsec sopra
-# il dip, evitando l’uguaglianza con il limite di applicazione della rifrazione.
+# API convention: the sea-horizon sentinel remains 0.36 arcsec above the dip,
+# avoiding equality with the refraction model's applicability boundary.
 _SEA_HORIZON_CLEARANCE_DEG = 0.0001
 # Earth flattening: the IERS numerical standard 1/f = 298.25642 (IERS
 # Conventions (2010), Technical Note 36, Table 1.1). WGS84 describes the
@@ -1914,157 +1914,167 @@ def _lun_how_core(
 
 
 def _lun_eclipse_max_time(jd_approx: float, flags: int = FLG_SWIEPH) -> float:
-    """Trova la massima sovrapposizione apparente vicino al plenilunio.
+    """Find the greatest apparent overlap near the full moon.
 
-    Usa gli stati cartesiani geocentrici apparenti predefiniti e considera gli
-    estremi della finestra chiusa di 0,3 giorni. Propaga gli errori di copertura
-    e solleva ``ConvergenceError`` se non distingue un massimo unico.
+    Use the default apparent geocentric Cartesian states and include both
+    endpoints of the closed 0.3-day window.
+
+    Args:
+        jd_approx: Approximate full-moon instant, Julian Day in UT.
+        flags: Ephemeris-selection flags.
+
+    Returns:
+        The unique instant of greatest apparent overlap, Julian Day in UT.
+
+    Raises:
+        ValueError: If ``jd_approx`` is not finite.
+        ConvergenceError: If no unique maximum can be distinguished.
+        EphemerisRangeError: Propagated when a required state is out of range.
     """
     from .constants import FLG_XYZ
     from .exceptions import ConvergenceError
 
     if not math.isfinite(jd_approx):
-        raise ValueError("Il seme del massimo lunare deve essere finito")
+        raise ValueError("The lunar-maximum seed must be finite")
 
-    # Si ottimizza lo scarto dal seme; l'obiettivo viene comunque valutato
-    # all'istante UT rappresentabile richiesto al servizio degli stati.
-    limite_sinistro = -0.3
-    limite_destro = 0.3
-    segmenti = 24
-    passo = (limite_destro - limite_sinistro) / segmenti
-    tolleranza_tempo = 5.0e-10
-    massimo_iterazioni = 64
-    flags_stato = _ecl_eph_flags(flags) | FLG_EQUATORIAL | FLG_XYZ
-    valori: dict[float, float] = {}
+    # Optimize an offset from the seed while evaluating the objective at the
+    # representable UT instant requested from the state provider.
+    left_limit = -0.3
+    right_limit = 0.3
+    segment_count = 24
+    step = (right_limit - left_limit) / segment_count
+    time_tolerance = 5.0e-10
+    max_iterations = 64
+    state_flags = _ecl_eph_flags(flags) | FLG_EQUATORIAL | FLG_XYZ
+    values: dict[float, float] = {}
 
-    def _sovrapposizione(scarto: float) -> float:
-        istante = float(jd_approx + scarto)
-        if istante in valori:
-            return valori[istante]
+    def _overlap(offset: float) -> float:
+        instant = float(jd_approx + offset)
+        if instant in values:
+            return values[instant]
 
-        luna, _ = calc_ut(istante, MOON, flags_stato)
-        sole, _ = calc_ut(istante, SUN, flags_stato)
-        terra = (-float(luna[0]), -float(luna[1]), -float(luna[2]))
-        sole_da_luna = (
-            float(sole[0]) - float(luna[0]),
-            float(sole[1]) - float(luna[1]),
-            float(sole[2]) - float(luna[2]),
+        moon, _ = calc_ut(instant, MOON, state_flags)
+        sun, _ = calc_ut(instant, SUN, state_flags)
+        earth = (-float(moon[0]), -float(moon[1]), -float(moon[2]))
+        sun_from_moon = (
+            float(sun[0]) - float(moon[0]),
+            float(sun[1]) - float(moon[1]),
+            float(sun[2]) - float(moon[2]),
         )
-        distanza_terra = math.hypot(*terra)
-        distanza_sole = math.hypot(*sole_da_luna)
-        prodotto = sum(a * b for a, b in zip(terra, sole_da_luna))
-        vettoriale = (
-            terra[1] * sole_da_luna[2] - terra[2] * sole_da_luna[1],
-            terra[2] * sole_da_luna[0] - terra[0] * sole_da_luna[2],
-            terra[0] * sole_da_luna[1] - terra[1] * sole_da_luna[0],
+        earth_distance = math.hypot(*earth)
+        sun_distance = math.hypot(*sun_from_moon)
+        dot_product = sum(a * b for a, b in zip(earth, sun_from_moon))
+        cross_product = (
+            earth[1] * sun_from_moon[2] - earth[2] * sun_from_moon[1],
+            earth[2] * sun_from_moon[0] - earth[0] * sun_from_moon[2],
+            earth[0] * sun_from_moon[1] - earth[1] * sun_from_moon[0],
         )
-        separazione = math.atan2(math.hypot(*vettoriale), prodotto)
-        valore = (
-            math.asin(_ECL_REARTH_AU / distanza_terra)
-            + math.asin(_ECL_RSUN_AU / distanza_sole)
-            - separazione
+        separation = math.atan2(math.hypot(*cross_product), dot_product)
+        value = (
+            math.asin(_ECL_REARTH_AU / earth_distance)
+            + math.asin(_ECL_RSUN_AU / sun_distance)
+            - separation
         )
-        risultato = float(valore)
-        valori[istante] = risultato
-        return risultato
+        result = float(value)
+        values[instant] = result
+        return result
 
-    def _massimo_limitato(sinistra: float, destra: float) -> tuple[float, float]:
-        """Raffina un massimo unimodale entro una parentesi campionata."""
-        if sinistra == destra:
-            return sinistra, _sovrapposizione(sinistra)
+    def _bounded_maximum(left: float, right: float) -> tuple[float, float]:
+        """Refine a unimodal maximum within a sampled bracket."""
+        if left == right:
+            return left, _overlap(left)
 
-        estremo_sinistro = sinistra
-        estremo_destro = destra
-        valore_estremo_sinistro = _sovrapposizione(estremo_sinistro)
-        valore_estremo_destro = _sovrapposizione(estremo_destro)
-        rapporto = (math.sqrt(5.0) - 1.0) / 2.0
-        c = destra - rapporto * (destra - sinistra)
-        d = sinistra + rapporto * (destra - sinistra)
-        fc = _sovrapposizione(c)
-        fd = _sovrapposizione(d)
-        for _ in range(massimo_iterazioni):
-            if destra - sinistra <= tolleranza_tempo:
+        left_endpoint = left
+        right_endpoint = right
+        left_endpoint_value = _overlap(left_endpoint)
+        right_endpoint_value = _overlap(right_endpoint)
+        ratio = (math.sqrt(5.0) - 1.0) / 2.0
+        c = right - ratio * (right - left)
+        d = left + ratio * (right - left)
+        fc = _overlap(c)
+        fd = _overlap(d)
+        for _ in range(max_iterations):
+            if right - left <= time_tolerance:
                 break
             if fc < fd:
-                sinistra = c
+                left = c
                 c, fc = d, fd
-                d = sinistra + rapporto * (destra - sinistra)
-                fd = _sovrapposizione(d)
+                d = left + ratio * (right - left)
+                fd = _overlap(d)
             else:
-                destra = d
+                right = d
                 d, fd = c, fc
-                c = destra - rapporto * (destra - sinistra)
-                fc = _sovrapposizione(c)
+                c = right - ratio * (right - left)
+                fc = _overlap(c)
 
-        candidati = (
-            (sinistra, _sovrapposizione(sinistra)),
+        candidates = (
+            (left, _overlap(left)),
             (c, fc),
-            ((sinistra + destra) / 2.0, _sovrapposizione((sinistra + destra) / 2.0)),
+            ((left + right) / 2.0, _overlap((left + right) / 2.0)),
             (d, fd),
-            (destra, _sovrapposizione(destra)),
+            (right, _overlap(right)),
         )
-        migliore = max(candidati, key=lambda elemento: elemento[1])
-        risoluzione = 64.0 * math.ulp(migliore[1])
-        if valore_estremo_sinistro >= migliore[1] - risoluzione:
-            return estremo_sinistro, valore_estremo_sinistro
-        if valore_estremo_destro >= migliore[1] - risoluzione:
-            return estremo_destro, valore_estremo_destro
-        return migliore
+        best = max(candidates, key=lambda item: item[1])
+        resolution = 64.0 * math.ulp(best[1])
+        if left_endpoint_value >= best[1] - resolution:
+            return left_endpoint, left_endpoint_value
+        if right_endpoint_value >= best[1] - resolution:
+            return right_endpoint, right_endpoint_value
+        return best
 
-    scarti = [limite_sinistro + indice * passo for indice in range(segmenti + 1)]
-    campioni = [_sovrapposizione(scarto) for scarto in scarti]
-    if max(campioni) == min(campioni):
+    offsets = [left_limit + index * step for index in range(segment_count + 1)]
+    samples = [_overlap(offset) for offset in offsets]
+    if max(samples) == min(samples):
         raise ConvergenceError(
-            "Il massimo dell'eclissi lunare non è unico nella finestra",
-            algorithm="ricerca aurea deterministica",
+            "The lunar-eclipse maximum is not unique within the search window",
+            algorithm="deterministic golden-section search",
         )
 
-    # Un massimo campionato possiede una sola regione: il campione stesso e i
-    # vicini disponibili. Così un massimo presso il bordo non viene raffinato
-    # anche da una seconda parentesi di bordo. Soltanto indici massimi adiacenti
-    # (un unico pianoro nella griglia) condividono una regione; una valle
-    # campionata mantiene invece separati due massimi distinti.
-    indici_picco: list[int] = []
-    for indice, corrente in enumerate(campioni):
-        precedente = campioni[indice - 1] if indice else -math.inf
-        successivo = campioni[indice + 1] if indice < segmenti else -math.inf
-        if corrente >= precedente and corrente >= successivo:
-            indici_picco.append(indice)
+    # A sampled maximum owns one region: the sample and its available neighbors.
+    # A boundary maximum is therefore not refined through a second edge bracket.
+    # Only adjacent maximum indices, representing one sampled plateau, share a
+    # region; a sampled valley keeps two distinct maxima separate.
+    peak_indices: list[int] = []
+    for index, current in enumerate(samples):
+        previous = samples[index - 1] if index else -math.inf
+        following = samples[index + 1] if index < segment_count else -math.inf
+        if current >= previous and current >= following:
+            peak_indices.append(index)
 
-    regioni: list[tuple[int, int]] = []
-    inizio = fine = indici_picco[0]
-    for indice in indici_picco[1:]:
-        if indice == fine + 1:
-            fine = indice
+    regions: list[tuple[int, int]] = []
+    start = end = peak_indices[0]
+    for index in peak_indices[1:]:
+        if index == end + 1:
+            end = index
         else:
-            regioni.append((inizio, fine))
-            inizio = fine = indice
-    regioni.append((inizio, fine))
+            regions.append((start, end))
+            start = end = index
+    regions.append((start, end))
 
-    candidati = [
-        _massimo_limitato(
-            scarti[max(0, inizio - 1)],
-            scarti[min(segmenti, fine + 1)],
+    candidates = [
+        _bounded_maximum(
+            offsets[max(0, start - 1)],
+            offsets[min(segment_count, end + 1)],
         )
-        for inizio, fine in regioni
+        for start, end in regions
     ]
-    valore_massimo = max(valore for _scarto, valore in candidati)
-    risoluzione_valore = 64.0 * math.ulp(valore_massimo)
-    migliori = [
-        (scarto, valore)
-        for scarto, valore in candidati
-        if valore_massimo - valore <= risoluzione_valore
+    maximum_value = max(value for _offset, value in candidates)
+    value_resolution = 64.0 * math.ulp(maximum_value)
+    best_candidates = [
+        (offset, value)
+        for offset, value in candidates
+        if maximum_value - value <= value_resolution
     ]
-    if len(migliori) != 1:
+    if len(best_candidates) != 1:
         raise ConvergenceError(
-            "Il massimo dell'eclissi lunare non è unico nella finestra",
-            algorithm="ricerca aurea deterministica",
-            iterations=massimo_iterazioni,
-            max_iterations=massimo_iterazioni,
-            tolerance=tolleranza_tempo,
+            "The lunar-eclipse maximum is not unique within the search window",
+            algorithm="deterministic golden-section search",
+            iterations=max_iterations,
+            max_iterations=max_iterations,
+            tolerance=time_tolerance,
         )
 
-    return float(jd_approx + migliori[0][0])
+    return float(jd_approx + best_candidates[0][0])
 
 
 def _lun_eclipse_phase_times(

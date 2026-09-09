@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""La derivata usa la distanza fra le epoche effettivamente valutate."""
+"""Derivatives use the spacing between the epochs actually evaluated."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def test_velocity_wraps_longitude_in_both_directions(monkeypatch, direction):
         SimpleNamespace(tt=epoch), C.CHIRON, C.FLG_HELCTR | C.FLG_SPEED, None
     )
     span = (epoch + 1.0 / 86400.0) - (epoch - 1.0 / 86400.0)
-    # Limite del roundoff nel riporto di un giro completo, non dati di baseline.
+    # This bounds roundoff while unwrapping a full turn, not baseline data.
     assert abs(result[3] - direction) <= 2.0 * math.ulp(360.0 / span)
     assert result[:3] == (0.0, 0.0, 1.0)
     assert result[4:] == (0.0, 0.0)

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Verifica il cambio di segno fisico ai lati dei contatti lunari."""
+"""Check the physical sign change on either side of lunar contacts."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from libephemeris.constants import ECL_PARTIAL, ECL_PENUMBRAL, ECL_TOTAL
     ],
 )
 def test_contact_residuals_change_sign(jd_max, expected_class):
-    """Ingresso e uscita attraversano il bordo orientato del cono pertinente."""
+    """Ingress and egress cross the oriented boundary of the relevant cone."""
     word, _attr, _geometry = eclipse._lun_how_core(jd_max)
     assert word == expected_class
     contacts = eclipse._lun_eclipse_phase_times(jd_max, word)
@@ -45,8 +45,8 @@ def test_contact_residuals_change_sign(jd_max, expected_class):
                 limb = -limb
         return half_width + limb - geometry.axis_offset_km
 
-    # Campionamento temporale, non tolleranza sui risultati: i due lati
-    # distano 0,1 secondi dal contatto e richiedono disuguaglianze strette.
+    # This is temporal sampling, not an output tolerance: both probes are
+    # 0.1 seconds from the contact and require strict inequalities.
     step = 0.1 / 86400.0
     for ingress, egress, phase in pairs:
         assert contacts[ingress] < jd_max < contacts[egress]

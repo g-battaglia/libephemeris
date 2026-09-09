@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Soluzione analitica del tempo di luce per un moto rettilineo uniforme."""
+"""Analytical light-time solution for uniform rectilinear motion."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from libephemeris.constants import EARTH, FLG_NOABERR, FLG_NOGDEFL, SUN
 @pytest.mark.parametrize("jd", [2415020.0, 2451545.0, 2490000.125])
 @pytest.mark.parametrize("speed", [-0.01, 0.01])
 def test_affine_light_time_position_and_velocity(monkeypatch, jd, speed):
-    """r(t-lt)=r(t)/(1+v/c) per osservatore fermo e moto radiale."""
+    """r(t-lt)=r(t)/(1+v/c) for a stationary observer and radial motion."""
     distance = 0.00257
 
     class Reader:
@@ -33,7 +33,7 @@ def test_affine_light_time_position_and_velocity(monkeypatch, jd, speed):
             dt = math.fsum((epoch, -jd, offset))
             return (distance + speed * dt, 0.0, 0.0), (speed, 0.0, 0.0)
 
-    # Isola il tempo di luce senza trasformazioni di frame o riduzioni ottiche.
+    # Isolate light time from frame transformations and optical reductions.
     monkeypatch.setattr(fc, "_frame_transform", lambda vector, *_args: vector)
     position = fc._pipeline_icrs(
         Reader(), jd, SUN, FLG_NOABERR | FLG_NOGDEFL, want_xyz=True
@@ -49,13 +49,13 @@ def test_affine_light_time_position_and_velocity(monkeypatch, jd, speed):
     ratio = speed / fc.C_LIGHT_AU_DAY
     expected_position = distance / (1.0 + ratio)
     expected_speed = speed / (1.0 + ratio)
-    # Tre iterazioni di punto fisso: resto geometrico noto, non soglia fittata.
+    # Three fixed-point iterations: a known geometric remainder, not a fitted limit.
     position_bound = distance * abs(ratio) ** 4 / (1.0 - abs(ratio))
     position_bound += 8.0 * math.ulp(distance)
     assert abs(position[0] - expected_position) <= position_bound
     assert position[1:] == (0.0, 0.0)
     assert state[:3] == position
-    # La velocità pubblicata attraversa uno stencil: includerne il roundoff.
+    # The published velocity passes through a stencil, so include its roundoff.
     speed_bound = 8.0 * math.ulp(distance) / fc._VEL_H
     assert abs(state[3] - expected_speed) <= speed_bound
     assert state[4:] == (0.0, 0.0)

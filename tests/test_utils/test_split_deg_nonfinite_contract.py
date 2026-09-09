@@ -1,4 +1,4 @@
-"""Contratto delle eccezioni per gli angoli non finiti e i flag di rounding."""
+"""Exception contract for nonfinite angles and rounding flags."""
 
 from __future__ import annotations
 

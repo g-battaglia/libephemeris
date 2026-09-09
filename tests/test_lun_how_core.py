@@ -284,7 +284,7 @@ class TestGeometryAndDefinitions:
         "jd", [TOTAL_MAX, PARTIAL_MAX, PENUMBRAL_MAX, NO_ECLIPSE, NO_ECLIPSE_AWAY]
     )
     def test_carrier_conversion_leaves_public_values_exact(self, jd, monkeypatch):
-        """La scala modifica solo le lunghezze del record, non gli output."""
+        """Scaling changes only record lengths, not public outputs."""
         from libephemeris import eclipse
 
         word, attr, geometry = _lun_how_core(jd)
@@ -311,12 +311,12 @@ class TestGeometryAndDefinitions:
 
     @pytest.mark.parametrize("jd", [TOTAL_MAX, PARTIAL_MAX, PENUMBRAL_MAX])
     def test_the_magnitudes_are_the_ratios_of_distances(self, jd, monkeypatch):
-        """Isola la formula dal roundoff della conversione del record.
+        """Isolate the formula from record-conversion roundoff.
 
-        Il fattore unitario è solo un’iniezione nel test: consente di verificare
-        esattamente il rapporto e il segno, senza ricostruire valori in AU da
-        chilometri già arrotondati. I test del record verificano separatamente
-        la conversione reale; il replay PRE/POST verifica gli output pubblici.
+        The unit scale is only a test injection: it checks the ratio and sign
+        exactly without reconstructing AU values from already rounded
+        kilometres. Record tests check the real conversion separately; the
+        PRE/POST replay checks public outputs.
         """
         from libephemeris import eclipse
 

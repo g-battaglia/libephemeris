@@ -3478,8 +3478,8 @@ def _calc_keplerian_fallback(t, ipl: int, iflag: int, planets):
         dt = 1.0 / 86400.0
         jd_prev = jd_tt - dt
         jd_next = jd_tt + dt
-        # Il rapporto incrementale usa le epoche rappresentabili valutate,
-        # non il passo nominale prima dell’arrotondamento del Julian Day.
+        # The difference quotient uses the representable epochs actually
+        # evaluated, not the nominal step before Julian Day rounding.
         span = jd_next - jd_prev
         lon_prev, lat_prev, dist_prev = _keplerian_position_at(
             jd_prev, ipl, iflag, planets

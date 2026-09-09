@@ -595,10 +595,10 @@ class LEB2Reader:
             byte_offset = seg_idx * n_coeffs * 8
             coeffs = struct.unpack_from(f"<{n_coeffs}d", body_data, byte_offset)
 
-        # Posizione e derivata usano lo stesso tau e il centro arrotondato del
-        # runtime precedente. Il residuo si aggiunge prima della normalizzazione,
-        # senza reinterpretare i coefficienti su una griglia razionale esatta.
-        # Si conserva il clamp preesistente agli estremi dell’intervallo chiuso.
+        # Position and derivative use the same tau and the rounded segment
+        # centre used previously at runtime. Add the residual before
+        # normalization without reinterpreting coefficients on an exact rational
+        # grid. Preserve the existing clamp at the closed interval boundaries.
         seg_start = body.jd_start + seg_idx * body.interval_days
         seg_mid = seg_start + 0.5 * body.interval_days
         if offset == 0.0:

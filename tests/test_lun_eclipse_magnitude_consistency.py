@@ -130,7 +130,7 @@ def test_how_pythonic_draws_type_and_magnitude_from_core(year, month, kind):
     geometry.validate()
     rc_py, attr_py = _lun_eclipse_how_pythonic(jd_max, 41.9, 12.5)
 
-    # Il wrapper riusa questi valori: il contratto richiede identità esatta.
+    # The wrapper reuses these values; the contract requires exact identity.
     for index in (0, 1, 7, 8):
         assert attr_py[index] == attr_core[index]
 

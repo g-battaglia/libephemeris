@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Distanza dall’asse con stati sintetici rappresentabili esattamente."""
+"""Axis distance from exactly representable synthetic states."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from libephemeris.constants import MOON, SUN
 @pytest.mark.parametrize("axis", [0, 1, 2])
 @pytest.mark.parametrize("offset", [0.0, 2.0**-40, -(2.0**-40), 2.0**-20])
 def test_small_perpendicular_distance_is_not_lost(monkeypatch, axis, offset):
-    """La distanza da un asse cartesiano è il modulo dell’unica componente."""
+    """Distance from a Cartesian axis is the magnitude of the sole component."""
     sun = [0.0, 0.0, 0.0]
     moon = [0.0, 0.0, 0.0]
     sun[axis] = -1.0
@@ -37,7 +37,7 @@ def test_small_perpendicular_distance_is_not_lost(monkeypatch, axis, offset):
 @pytest.mark.parametrize("axis", [0, 1, 2])
 @pytest.mark.parametrize("offset", [0.0, 2.0**-40, -(2.0**-40), 2.0**-20])
 def test_small_opposition_angle_is_not_lost(monkeypatch, axis, offset):
-    """Il triangolo rettangolo sintetico determina l’angolo senza arccoseno."""
+    """The synthetic right triangle determines the angle without arccos."""
     sun = [0.0, 0.0, 0.0]
     moon = [0.0, 0.0, 0.0]
     axial_distance = 2.0**-9

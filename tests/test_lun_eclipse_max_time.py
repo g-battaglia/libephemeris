@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Prove sintetiche del raffinamento del massimo di eclissi lunare."""
+"""Synthetic tests for lunar-eclipse maximum refinement."""
 
 from __future__ import annotations
 
@@ -14,178 +14,178 @@ from libephemeris.constants import MOON, SUN
 from libephemeris.exceptions import ConvergenceError, EphemerisRangeError
 
 
-def _installa_stati_sintetici(
+def _install_synthetic_states(
     monkeypatch: pytest.MonkeyPatch,
-    seme: float,
-    angolo: Callable[[float], float],
-    distanza_sole: Callable[[float], float] = lambda _t: 1.0,
+    seed: float,
+    angle: Callable[[float], float],
+    sun_distance: Callable[[float], float] = lambda _t: 1.0,
 ) -> list[tuple[float, int, int]]:
-    """Installa stati apparenti coerenti e restituisce il registro chiamate."""
-    chiamate: list[tuple[float, int, int]] = []
-    distanza_luna = 0.00257
+    """Installa stati apparenti coerenti e restituisce il registro calls."""
+    calls: list[tuple[float, int, int]] = []
+    moon_distance = 0.00257
 
-    def calc_ut_finto(t: float, corpo: int, flags: int):
-        chiamate.append((t, corpo, flags))
-        if corpo == MOON:
-            posizione = (distanza_luna, 0.0, 0.0)
-        elif corpo == SUN:
-            alfa = angolo(t - seme)
-            raggio = distanza_sole(t - seme)
-            posizione = (
-                distanza_luna - raggio * math.cos(alfa),
-                raggio * math.sin(alfa),
+    def fake_calc_ut(t: float, body: int, flags: int):
+        calls.append((t, body, flags))
+        if body == MOON:
+            position = (moon_distance, 0.0, 0.0)
+        elif body == SUN:
+            alpha = angle(t - seed)
+            radius = sun_distance(t - seed)
+            position = (
+                moon_distance - radius * math.cos(alpha),
+                radius * math.sin(alpha),
                 0.0,
             )
-        else:  # pragma: no cover - rende esplicito il contratto del doppio stato
-            raise AssertionError(f"corpo inatteso: {corpo}")
-        return ((*posizione, 0.0, 0.0, 0.0), flags)
+        else:  # pragma: no cover - make the two-state contract explicit
+            raise AssertionError(f"unexpected body: {body}")
+        return ((*position, 0.0, 0.0, 0.0), flags)
 
-    monkeypatch.setattr(eclipse, "calc_ut", calc_ut_finto)
-    return chiamate
+    monkeypatch.setattr(eclipse, "calc_ut", fake_calc_ut)
+    return calls
 
 
-def test_massimizza_la_sovrapposizione_apparente_nella_finestra_del_seme(
+def test_maximizes_apparent_overlap_within_seed_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Il raggio solare variabile sposta il massimo dal minimo angolare."""
-    seme = 2460000.0
-    curvatura = 0.1
-    pendenza_distanza = -0.5
-    chiamate = _installa_stati_sintetici(
+    """A varying solar radius moves the maximum away from minimum separation."""
+    seed = 2460000.0
+    curvature = 0.1
+    distance_slope = -0.5
+    calls = _install_synthetic_states(
         monkeypatch,
-        seme,
-        lambda dt: curvatura * dt * dt,
-        lambda dt: 1.0 + pendenza_distanza * dt,
+        seed,
+        lambda dt: curvature * dt * dt,
+        lambda dt: 1.0 + distance_slope * dt,
     )
 
-    ottenuto = eclipse._lun_eclipse_max_time(seme, FLG_MOSEPH | FLG_SPEED)
+    actual = eclipse._lun_eclipse_max_time(seed, FLG_MOSEPH | FLG_SPEED)
 
-    # L'obiettivo pubblicato deve crescere fino al risultato e decrescere dopo;
-    # ciò dimostra anche lo spostamento rispetto al minimo angolare posto al seme.
-    assert isinstance(ottenuto, float)
-    assert ottenuto > seme + 0.01
-    valori = []
-    for scarto in (-1.0e-5, 0.0, 1.0e-5):
-        dt = ottenuto + scarto - seme
-        distanza = 1.0 + pendenza_distanza * dt
-        valori.append(math.asin(eclipse._ECL_RSUN_AU / distanza) - curvatura * dt * dt)
-    assert valori[1] > valori[0]
-    assert valori[1] > valori[2]
-    assert chiamate
-    assert all(seme - 0.3 <= t <= seme + 0.3 for t, _corpo, _flags in chiamate)
-    assert {corpo for _t, corpo, _flags in chiamate} == {MOON, SUN}
-    flags_stato = FLG_MOSEPH | FLG_EQUATORIAL | FLG_XYZ
-    assert all(flags == flags_stato for _t, _corpo, flags in chiamate)
+    # The published objective must rise toward the result and fall after it;
+    # this also demonstrates displacement from minimum separation at the seed.
+    assert isinstance(actual, float)
+    assert actual > seed + 0.01
+    values = []
+    for offset in (-1.0e-5, 0.0, 1.0e-5):
+        dt = actual + offset - seed
+        distance = 1.0 + distance_slope * dt
+        values.append(math.asin(eclipse._ECL_RSUN_AU / distance) - curvature * dt * dt)
+    assert values[1] > values[0]
+    assert values[1] > values[2]
+    assert calls
+    assert all(seed - 0.3 <= t <= seed + 0.3 for t, _corpo, _flags in calls)
+    assert {body for _t, body, _flags in calls} == {MOON, SUN}
+    state_flags = FLG_MOSEPH | FLG_EQUATORIAL | FLG_XYZ
+    assert all(flags == state_flags for _t, _corpo, flags in calls)
 
 
-@pytest.mark.parametrize("scarto", [-0.3, 0.3])
-def test_include_entrambi_gli_estremi_della_finestra_chiusa(
-    monkeypatch: pytest.MonkeyPatch, scarto: float
+@pytest.mark.parametrize("offset", [-0.3, 0.3])
+def test_includes_both_closed_window_endpoints(
+    monkeypatch: pytest.MonkeyPatch, offset: float
 ) -> None:
-    """Un massimo unico posto a un estremo viene restituito esattamente."""
-    seme = 2460100.0
-    estremo = seme + scarto
-    _installa_stati_sintetici(
+    """A unique maximum at either endpoint is returned exactly."""
+    seed = 2460100.0
+    endpoint = seed + offset
+    _install_synthetic_states(
         monkeypatch,
-        seme,
-        lambda dt: 0.4 * abs((seme + dt) - estremo),
+        seed,
+        lambda dt: 0.4 * abs((seed + dt) - endpoint),
     )
 
-    ottenuto = eclipse._lun_eclipse_max_time(seme)
+    actual = eclipse._lun_eclipse_max_time(seed)
 
-    assert ottenuto == estremo
+    assert actual == endpoint
 
 
-@pytest.mark.parametrize("obiettivo", [-0.295, 0.295])
-@pytest.mark.parametrize("esponente", [1, 2])
-def test_trova_un_massimo_nel_segmento_adiacente_a_un_estremo(
-    monkeypatch: pytest.MonkeyPatch, obiettivo: float, esponente: int
+@pytest.mark.parametrize("target", [-0.295, 0.295])
+@pytest.mark.parametrize("exponent", [1, 2])
+def test_finds_maximum_in_segment_adjacent_to_endpoint(
+    monkeypatch: pytest.MonkeyPatch, target: float, exponent: int
 ) -> None:
-    """Il primo e l'ultimo segmento non vengono scambiati per gli estremi."""
-    seme = 2460000.0
-    _installa_stati_sintetici(
+    """The first and last segments are not mistaken for the endpoints."""
+    seed = 2460000.0
+    _install_synthetic_states(
         monkeypatch,
-        seme,
-        lambda dt: 0.4 * abs(dt - obiettivo) ** esponente,
+        seed,
+        lambda dt: 0.4 * abs(dt - target) ** exponent,
     )
 
-    ottenuto = eclipse._lun_eclipse_max_time(seme)
+    actual = eclipse._lun_eclipse_max_time(seed)
 
-    assert ottenuto == pytest.approx(seme + obiettivo, abs=2.0e-8)
+    assert actual == pytest.approx(seed + target, abs=2.0e-8)
 
 
 @pytest.mark.parametrize(
-    "obiettivo",
+    "target",
     [
-        segno * (0.275 + indice * 1.0e-9)
-        for segno in (-1.0, 1.0)
-        for indice in range(-20, 21)
+        sign * (0.275 + index * 1.0e-9)
+        for sign in (-1.0, 1.0)
+        for index in range(-20, 21)
     ],
 )
-def test_non_duplica_il_picco_unico_nella_transizione_del_bordo(
-    monkeypatch: pytest.MonkeyPatch, obiettivo: float
+def test_does_not_duplicate_unique_peak_at_boundary_transition(
+    monkeypatch: pytest.MonkeyPatch, target: float
 ) -> None:
-    """Le regioni interna e di bordo descrivono una sola regione candidata."""
-    seme = 2460000.0
-    _installa_stati_sintetici(
+    """Interior and boundary brackets describe one candidate region."""
+    seed = 2460000.0
+    _install_synthetic_states(
         monkeypatch,
-        seme,
-        lambda dt: math.hypot(1.0e-5, 0.01 * (dt - obiettivo)),
+        seed,
+        lambda dt: math.hypot(1.0e-5, 0.01 * (dt - target)),
     )
 
-    ottenuto = eclipse._lun_eclipse_max_time(seme)
+    actual = eclipse._lun_eclipse_max_time(seed)
 
-    assert ottenuto == pytest.approx(seme + obiettivo, abs=2.0e-9)
+    assert actual == pytest.approx(seed + target, abs=2.0e-9)
 
 
-def test_rifiuta_due_massimi_separati(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Una valle campionata conserva due regioni di massimo indipendenti."""
-    seme = 2460000.0
-    _installa_stati_sintetici(
+def test_rejects_two_separate_maxima(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A sampled valley preserves two independent maximum regions."""
+    seed = 2460000.0
+    _install_synthetic_states(
         monkeypatch,
-        seme,
+        seed,
         lambda dt: 0.2 * min(abs(dt + 0.1), abs(dt - 0.1)),
     )
 
-    with pytest.raises(ConvergenceError, match="non è unico"):
-        eclipse._lun_eclipse_max_time(seme)
+    with pytest.raises(ConvergenceError, match="not unique"):
+        eclipse._lun_eclipse_max_time(seed)
 
 
-def test_propaga_la_mancanza_di_copertura_a_un_estremo(
+def test_propagates_missing_coverage_at_endpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """La copertura richiesta comprende l'intera finestra, estremi inclusi."""
-    seme = 2460200.0
-    limite = seme - 0.3
-    errore = EphemerisRangeError("copertura sintetica assente", requested_jd=limite)
+    """Required coverage spans the complete window, endpoints included."""
+    seed = 2460200.0
+    limit = seed - 0.3
+    error = EphemerisRangeError("synthetic coverage unavailable", requested_jd=limit)
 
-    def calc_ut_finto(t: float, corpo: int, flags: int):
-        if t == limite and corpo == SUN:
-            raise errore
-        if corpo == MOON:
-            posizione = (0.00257, 0.0, 0.0)
+    def fake_calc_ut(t: float, body: int, flags: int):
+        if t == limit and body == SUN:
+            raise error
+        if body == MOON:
+            position = (0.00257, 0.0, 0.0)
         else:
-            posizione = (-0.99743, t - seme, 0.0)
-        return ((*posizione, 0.0, 0.0, 0.0), flags)
+            position = (-0.99743, t - seed, 0.0)
+        return ((*position, 0.0, 0.0, 0.0), flags)
 
-    monkeypatch.setattr(eclipse, "calc_ut", calc_ut_finto)
+    monkeypatch.setattr(eclipse, "calc_ut", fake_calc_ut)
 
-    with pytest.raises(EphemerisRangeError) as catturato:
-        eclipse._lun_eclipse_max_time(seme)
+    with pytest.raises(EphemerisRangeError) as caught:
+        eclipse._lun_eclipse_max_time(seed)
 
-    assert catturato.value is errore
+    assert caught.value is error
 
 
-def test_rifiuta_massimo_non_unico_e_semi_non_finiti(
+def test_rejects_nonunique_maximum_and_nonfinite_seeds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Un obiettivo costante non autorizza la scelta di un istante arbitrario."""
-    seme = 2460300.0
-    _installa_stati_sintetici(monkeypatch, seme, lambda _dt: 0.0)
+    """A constant objective does not permit choosing an arbitrary instant."""
+    seed = 2460300.0
+    _install_synthetic_states(monkeypatch, seed, lambda _dt: 0.0)
 
-    with pytest.raises(ConvergenceError, match="non è unico"):
-        eclipse._lun_eclipse_max_time(seme)
+    with pytest.raises(ConvergenceError, match="not unique"):
+        eclipse._lun_eclipse_max_time(seed)
 
-    for seme_non_finito in (math.nan, math.inf, -math.inf):
-        with pytest.raises(ValueError, match="finito"):
-            eclipse._lun_eclipse_max_time(seme_non_finito)
+    for nonfinite_seed in (math.nan, math.inf, -math.inf):
+        with pytest.raises(ValueError, match="finite"):
+            eclipse._lun_eclipse_max_time(nonfinite_seed)

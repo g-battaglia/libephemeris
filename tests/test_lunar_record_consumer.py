@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Verifica i residui lunari effettivi con geometrie sintetiche esatte."""
+"""Check actual lunar residuals with exact synthetic geometries."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from libephemeris.shadow_geometry import ShadowGeometry
 def test_phase_search_uses_signed_record_fields(
     monkeypatch, offset, inner_diameter, expected
 ):
-    """Esercita i residui reali con ombra, asse vicino e antombra sintetici."""
+    """Exercise real residuals with synthetic umbra, near-axis, and antumbra."""
     geometry = ShadowGeometry(
         offset,
         umbral_plane_diameter_km=inner_diameter,
