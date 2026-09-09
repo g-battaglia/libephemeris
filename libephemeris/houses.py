@@ -115,7 +115,7 @@ from .house_constructions import (
     houses_savard_a as _houses_savard_a,
     houses_sunshine_makransky as _houses_sunshine_makransky,
 )
-from .utils import cotrans, degnorm, difdeg2n
+from .utils import degnorm, difdeg2n
 from . import sidereal_longterm as _sidlt
 from .time_utils import deltat as _deltat
 
@@ -3819,244 +3819,221 @@ def _sunshine_arc_to_ecliptic(
     sin_obliquity: float,
     cos_obliquity: float,
 ) -> float:
-    """
-    Map one trisected semi-arc offset to an ecliptic longitude.
+    """Project one signed Sunshine semi-arc division onto the ecliptic.
 
-    The Sunshine system divides the Sun's diurnal and nocturnal semi-arcs into
-    thirds.  For each trisection point, this function uses spherical triangle
-    geometry to find the corresponding ecliptic cusp (Makransky 1988,
-    "Primary Directions").
-
-    Steps:
-        1. Convert the RA-arc offset to a great-circle arc length (xhs).
-        2. Solve the spherical triangle {pole, arc midpoint, horizon point}
-           via the spherical law of cosines to find side c.
-        3. Apply the spherical law of sines to get the zenith distance (zd).
-        4. Derive the equatorial RA intersection and the pole height of the
-           house circle.
-        5. Project to the ecliptic via the rising-point formula.
+    The selected point on the Sun's declination parallel and the north-south
+    horizon axis determine a great-circle house plane. This function solves
+    the corresponding oriented spherical triangle and returns its ecliptic
+    intersection.
 
     Args:
-        arc_offset_ra: RA offset along the semi-arc (degrees).
-        is_diurnal: True for diurnal semi-arc cusps (houses 8-12 side),
-                    False for nocturnal semi-arc cusps (houses 2-6 side).
-        armc: Right Ascension of the Midheaven (degrees).
-        lat: Geographic latitude (degrees).
-        sun_dec: Sun's declination (degrees).
-        sin_lat: sin(φ) — pre-computed for speed.
-        cos_lat: cos(φ) — pre-computed for speed.
-        cos_sun_dec: cos(δ☉) — pre-computed for speed.
-        tan_sun_dec: tan(δ☉) — pre-computed for speed.
-        sin_obliquity: sin(ε) — pre-computed for speed.
-        cos_obliquity: cos(ε) — pre-computed for speed.
+        arc_offset_ra: Signed right-ascension offset from the relevant meridian.
+        is_diurnal: Whether the division belongs to the diurnal semi-arc.
+        armc: Right ascension of the upper meridian, in degrees.
+        lat: Geographic latitude, in degrees.
+        sun_dec: Solar declination, in degrees.
+        sin_lat: Sine of ``lat``.
+        cos_lat: Cosine of ``lat``.
+        cos_sun_dec: Cosine of ``sun_dec``.
+        tan_sun_dec: Tangent of ``sun_dec``.
+        sin_obliquity: Sine of the ecliptic obliquity.
+        cos_obliquity: Cosine of the ecliptic obliquity.
 
     Returns:
-        Ecliptic longitude of the cusp (degrees, 0-360).
+        Ecliptic longitude in the half-open interval ``[0, 360)``.
+
+    Raises:
+        ValueError: If an input is non-finite, outside its domain, or its
+            precomputed trigonometric value is inconsistent.
+        CalculationError: If the requested spherical construction is not
+            uniquely realizable.
     """
-    # Step 1: great-circle arc subtended by the RA offset on the Sun's parallel
-    # xhs = 2 · arcsin(cos(δ☉) · sin(arc_offset / 2))
-    great_circle_arc = 2.0 * math.degrees(
-        math.asin(cos_sun_dec * math.sin(math.radians(arc_offset_ra / 2.0)))
+    values = (
+        arc_offset_ra,
+        armc,
+        lat,
+        sun_dec,
+        sin_lat,
+        cos_lat,
+        cos_sun_dec,
+        tan_sun_dec,
+        sin_obliquity,
+        cos_obliquity,
     )
-
-    # Step 2a: interior angle α at the pole of the spherical triangle
-    # cos(α) = tan(δ☉) · tan(great_circle_arc / 2)
-    cos_alpha = max(
-        -1.0, min(1.0, tan_sun_dec * math.tan(math.radians(great_circle_arc / 2.0)))
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("Sunshine geometry requires finite inputs")
+    if not -90.0 <= lat <= 90.0:
+        raise ValueError("Sunshine latitude must be in [-90, 90] degrees")
+    if not -90.0 < sun_dec < 90.0:
+        raise ValueError("Sunshine solar declination must be in (-90, 90) degrees")
+    expected = (
+        math.sin(math.radians(lat)),
+        math.cos(math.radians(lat)),
+        math.cos(math.radians(sun_dec)),
+        math.tan(math.radians(sun_dec)),
     )
-    alpha = math.degrees(math.acos(cos_alpha))
+    supplied = (sin_lat, cos_lat, cos_sun_dec, tan_sun_dec)
+    if supplied != expected:
+        raise ValueError("Sunshine trigonometric precomputations are inconsistent")
+    obliquity_norm = sin_obliquity * sin_obliquity + cos_obliquity * cos_obliquity
+    if (
+        sin_obliquity < 0.0
+        or cos_obliquity <= 0.0
+        or abs(obliquity_norm - 1.0) > 4.0 * math.ulp(1.0)
+    ):
+        raise ValueError("Sunshine obliquity precomputations are inconsistent")
 
-    # Step 2b: triangle side and opening angle differ for diurnal vs nocturnal arc
-    if is_diurnal:
-        # Diurnal arc: triangle opening angle is supplement of α
-        triangle_angle = 180.0 - alpha
-        triangle_side = 90.0 - lat + sun_dec
+    offset = math.radians(arc_offset_ra)
+    separation = 2.0 * math.asin(cos_sun_dec * math.sin(offset / 2.0))
+    if separation == 0.0:
+        zenith_distance = 0.0
     else:
-        # Nocturnal arc: triangle opening angle equals α
-        triangle_angle = alpha
-        triangle_side = 90.0 - lat - sun_dec
-
-    # Step 2c: third side c via spherical law of cosines
-    cos_c = math.cos(math.radians(great_circle_arc)) * math.cos(
-        math.radians(triangle_side)
-    ) + math.sin(math.radians(great_circle_arc)) * math.sin(
-        math.radians(triangle_side)
-    ) * math.cos(math.radians(triangle_angle))
-    cos_c = max(-1.0, min(1.0, cos_c))
-    side_c = math.degrees(math.acos(cos_c))
-
-    # Step 3: zenith distance via spherical law of sines
-    if side_c < 1e-6:
-        zenith_dist = 0.0
-    else:
-        sin_zd = max(
-            -1.0,
-            min(
-                1.0,
-                math.sin(math.radians(great_circle_arc))
-                * math.sin(math.radians(triangle_angle))
-                / math.sin(math.radians(side_c)),
-            ),
+        angle_argument = tan_sun_dec * math.tan(separation / 2.0)
+        if not -1.0 <= angle_argument <= 1.0:
+            raise CalculationError("Sunshine spherical triangle is not realizable")
+        base_angle = math.acos(angle_argument)
+        triangle_angle = math.pi - base_angle if is_diurnal else base_angle
+        side = math.radians(
+            90.0 - lat + sun_dec if is_diurnal else 90.0 - lat - sun_dec
         )
-        zenith_dist = math.degrees(math.asin(sin_zd))
+        third_side_argument = math.cos(separation) * math.cos(side) + math.sin(
+            separation
+        ) * math.sin(side) * math.cos(triangle_angle)
+        if not -1.0 <= third_side_argument <= 1.0:
+            raise CalculationError("Sunshine spherical triangle is not realizable")
+        third_side = math.acos(third_side_argument)
+        denominator = math.sin(third_side)
+        if denominator == 0.0:
+            raise CalculationError("Sunshine spherical triangle has no unique angle")
+        sine_zenith = math.sin(separation) * math.sin(triangle_angle) / denominator
+        if not -1.0 <= sine_zenith <= 1.0:
+            raise CalculationError("Sunshine spherical triangle is not realizable")
+        zenith_distance = math.atan2(
+            sine_zenith, math.sqrt(1.0 - sine_zenith * sine_zenith)
+        )
 
-    # Step 4: equatorial RA of the house-circle / equator intersection
-    equator_ra_offset = math.degrees(
-        math.atan(cos_lat * math.tan(math.radians(zenith_dist)))
+    meridian_offset = math.atan2(
+        cos_lat * math.sin(zenith_distance), math.cos(zenith_distance)
     )
-
-    # Pole height of the house circle
-    pole_height = math.degrees(math.asin(math.sin(math.radians(zenith_dist)) * sin_lat))
-
-    # Step 5: sign/direction convention and final RA
+    pole_height = math.asin(math.sin(zenith_distance) * sin_lat)
     if is_diurnal:
-        ra_intersection = (armc + equator_ra_offset) % 360.0
+        right_ascension = math.radians(armc) + meridian_offset
     else:
+        right_ascension = math.radians(armc + 180.0) + meridian_offset
         pole_height = -pole_height
-        ra_intersection = (equator_ra_offset + armc + 180.0) % 360.0
 
-    # Project equatorial intersection onto the ecliptic
     return _ra_to_ecliptic_longitude(
-        ra_intersection, pole_height, sin_obliquity, cos_obliquity
+        math.degrees(right_ascension),
+        math.degrees(pole_height),
+        sin_obliquity,
+        cos_obliquity,
     )
 
 
 def _houses_sunshine(
     armc: float, lat: float, eps: float, asc: float, mc: float, sun_dec: float
 ) -> List[float]:
-    """
-    Sunshine/Treindl numerical solution (code ``I``) of Makransky's system.
-
-    Bob Makransky's public Sunshine definition divides the diurnal and
-    nocturnal arcs of the Sun, then carries the division anchors to the
-    ecliptic through the horizon north/south house circles. Code ``I`` denotes
-    this project's documented Treindl-style numerical realization; code ``i``
-    is the separately implemented Makransky upper/lower-meridian construction
-    in ``house_constructions.py``. The exact source/status boundary is recorded
-    in ``docs/reference/house-systems.md``.
-
-    Note: Cusps 11, 12, 2, 3 are NOT in exact opposition to cusps 5, 6, 8, 9.
-
-    Algorithm:
-        1. Compute the Sun's ascensional difference (AD) from its declination
-           and the geographic latitude.
-        2. Derive the diurnal semi-arc (DSA = 90° + AD) and the nocturnal
-           semi-arc (NSA = 90° − AD); trisect each to get RA offsets.
-        3. For nocturnal cusps (2, 3, 5, 6) call _sunshine_arc_to_ecliptic()
-           with is_diurnal=False.
-        4. For diurnal cusps (8, 9, 11, 12) call _sunshine_arc_to_ecliptic()
-           with is_diurnal=True.
-        5. If the MC is below the horizon, reflect all intermediate cusps by
-           180°.
+    """Construct the twelve Sunshine/Treindl house cusps.
 
     Args:
-        armc: Right Ascension of the Midheaven (RAMC) in degrees
-        lat: Geographic latitude in degrees
-        eps: True obliquity of ecliptic in degrees
-        asc: Ascendant longitude in degrees
-        mc: Midheaven longitude in degrees
-        sun_dec: Sun's declination in degrees
+        armc: Right ascension of the upper meridian, in degrees.
+        lat: Geographic latitude, in degrees.
+        eps: Ecliptic obliquity, in degrees.
+        asc: Supplied Ascendant anchor, in degrees.
+        mc: Supplied Midheaven anchor, in degrees.
+        sun_dec: Solar declination, in degrees.
 
     Returns:
-        List of 13 house cusp longitudes
-    """
-    NEAR_ZERO = 1e-10
+        Mutable 13-element cusp list with index zero unused.
 
-    # Detect MC-below-horizon condition.
-    # mcdec = declination of the MC, derived from ARMC and obliquity.
-    # When |lat - mcdec| > 90°, the MC is below the horizon.
-    mcdec = math.degrees(
-        math.atan(math.sin(math.radians(armc)) * math.tan(math.radians(eps)))
+    Raises:
+        ValueError: If an input is non-finite or outside its domain.
+        PolarCircleError: If ``lat`` is exactly a geographic pole.
+        CalculationError: If an intermediate cusp is not uniquely defined.
+    """
+    if not all(math.isfinite(value) for value in (armc, lat, eps, asc, mc, sun_dec)):
+        raise ValueError("Sunshine construction requires finite angles")
+    if not -90.0 <= lat <= 90.0:
+        raise ValueError("Sunshine latitude must be in [-90, 90] degrees")
+    if not 0.0 <= eps < 90.0:
+        raise ValueError("Sunshine obliquity must be in [0, 90) degrees")
+    if not -90.0 < sun_dec < 90.0:
+        raise ValueError("Sunshine solar declination must be in (-90, 90) degrees")
+    if abs(lat) == 90.0:
+        raise PolarCircleError(
+            "Sunshine house circles are not uniquely oriented at a geographic pole",
+            latitude=lat,
+            threshold=90.0,
+            obliquity=eps,
+            house_system="I",
+        )
+
+    latitude = math.radians(lat)
+    declination = math.radians(sun_dec)
+    obliquity = math.radians(eps)
+    sin_lat = math.sin(latitude)
+    cos_lat = math.cos(latitude)
+    cos_sun_dec = math.cos(declination)
+    tan_sun_dec = math.tan(declination)
+    sin_obliquity = math.sin(obliquity)
+    cos_obliquity = math.cos(obliquity)
+
+    path_product = math.tan(latitude) * tan_sun_dec
+    if path_product >= 1.0:
+        diurnal_semi_arc = 180.0
+        nocturnal_semi_arc = 0.0
+    elif path_product <= -1.0:
+        diurnal_semi_arc = 0.0
+        nocturnal_semi_arc = 180.0
+    else:
+        ascensional_difference = math.degrees(math.asin(path_product))
+        diurnal_semi_arc = 90.0 + ascensional_difference
+        nocturnal_semi_arc = 90.0 - ascensional_difference
+
+    meridian_declination = math.atan2(
+        math.sin(math.radians(armc)) * sin_obliquity, cos_obliquity
     )
-    mc_under_horizon = abs(lat - mcdec) > 90
+    upper_meridian_below_horizon = math.cos(latitude - meridian_declination) < 0.0
 
     cusps = [0.0] * 13
+    cusps[1] = float(asc % 360.0)
+    cusps[7] = float((asc + 180.0) % 360.0)
+    cusp_ten = mc + 180.0 if upper_meridian_below_horizon else mc
+    cusps[10] = float(cusp_ten % 360.0)
+    cusps[4] = float((cusp_ten + 180.0) % 360.0)
 
-    # When MC is below the horizon, flip MC and IC by 180° to keep MC
-    # above the horizon (analogous to Regiomontanus polar handling).
-    # The ASC is already hemisphere-corrected by the dispatch.
-    if mc_under_horizon:
-        mc = (mc + 180.0) % 360.0
-
-    cusps[1] = asc
-    cusps[10] = mc
-    cusps[4] = (mc + 180.0) % 360.0
-    cusps[7] = (asc + 180.0) % 360.0
-
-    # Ascensional difference: sin(AD) = tan(δ☉) · tan(φ)
-    ad_arg = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
-    if ad_arg >= 1.0:
-        ascensional_diff = 90.0 - NEAR_ZERO
-    elif ad_arg <= -1.0:
-        ascensional_diff = -90.0 + NEAR_ZERO
-    else:
-        ascensional_diff = math.degrees(math.asin(ad_arg))
-
-    nocturnal_semi_arc = 90.0 - ascensional_diff  # NSA
-    diurnal_semi_arc = 90.0 + ascensional_diff  # DSA
-
-    # Pre-compute repeated trig quantities
-    sin_lat = math.sin(math.radians(lat))
-    cos_lat = math.cos(math.radians(lat))
-    cos_sun_dec = math.cos(math.radians(sun_dec))
-    tan_sun_dec = math.tan(math.radians(sun_dec))
-    sin_obliquity = math.sin(math.radians(eps))
-    cos_obliquity = math.cos(math.radians(eps))
-
-    # RA offsets along each semi-arc (positive = toward MC, negative = toward IC)
-    # NSA offsets (nocturnal cusps 2, 3, 5, 6)
-    nsa_third = nocturnal_semi_arc / 3.0
-    nsa_offsets = {
-        2: -2.0 * nsa_third,
-        3: -1.0 * nsa_third,
-        5: 1.0 * nsa_third,
-        6: 2.0 * nsa_third,
+    common = {
+        "armc": armc,
+        "lat": lat,
+        "sun_dec": sun_dec,
+        "sin_lat": sin_lat,
+        "cos_lat": cos_lat,
+        "cos_sun_dec": cos_sun_dec,
+        "tan_sun_dec": tan_sun_dec,
+        "sin_obliquity": sin_obliquity,
+        "cos_obliquity": cos_obliquity,
     }
-    # DSA offsets (diurnal cusps 8, 9, 11, 12)
-    dsa_third = diurnal_semi_arc / 3.0
-    dsa_offsets = {
-        8: -2.0 * dsa_third,
-        9: -1.0 * dsa_third,
-        11: 1.0 * dsa_third,
-        12: 2.0 * dsa_third,
-    }
+    for step in (1, 2):
+        nocturnal_offset = step * nocturnal_semi_arc / 3.0
+        diurnal_offset = step * diurnal_semi_arc / 3.0
+        for house_index, signed_offset in (
+            (4 + step, nocturnal_offset),
+            (4 - step, -nocturnal_offset),
+        ):
+            cusps[house_index] = _sunshine_arc_to_ecliptic(
+                signed_offset, False, **common
+            )
+        for house_index, signed_offset in (
+            (10 + step, diurnal_offset),
+            (10 - step, -diurnal_offset),
+        ):
+            cusps[house_index] = _sunshine_arc_to_ecliptic(
+                signed_offset, True, **common
+            )
 
-    # Shared kwargs for the geometric helper
-    _common = dict(
-        armc=armc,
-        lat=lat,
-        sun_dec=sun_dec,
-        sin_lat=sin_lat,
-        cos_lat=cos_lat,
-        cos_sun_dec=cos_sun_dec,
-        tan_sun_dec=tan_sun_dec,
-        sin_obliquity=sin_obliquity,
-        cos_obliquity=cos_obliquity,
-    )
-
-    # --- Nocturnal semi-arc cusps (below the horizon arc) ---
-    for house_index, ra_offset in nsa_offsets.items():
-        cusps[house_index] = _sunshine_arc_to_ecliptic(
-            arc_offset_ra=ra_offset,
-            is_diurnal=False,
-            **_common,
-        )
-
-    # --- Diurnal semi-arc cusps (above the horizon arc) ---
-    for house_index, ra_offset in dsa_offsets.items():
-        cusps[house_index] = _sunshine_arc_to_ecliptic(
-            arc_offset_ra=ra_offset,
-            is_diurnal=True,
-            **_common,
-        )
-
-    # When MC is below the horizon, shift all intermediate cusps by 180°.
-    # This keeps the MC above the horizon, consistent with the polar-circle
-    # handling used for Regiomontanus and Campanus systems.
-    if mc_under_horizon:
-        for i in (2, 3, 5, 6, 8, 9, 11, 12):
-            cusps[i] = (cusps[i] + 180.0) % 360.0
-
+    if upper_meridian_below_horizon:
+        for house_index in (2, 3, 5, 6, 8, 9, 11, 12):
+            cusps[house_index] = float((cusps[house_index] + 180.0) % 360.0)
     return cusps
 
 
