@@ -612,24 +612,33 @@ The 4--24" differences for planets arise from the different underlying ephemeris
 
 ### Visual Magnitude
 
-LibEphemeris uses **Mallama & Hilton (2018)** formulas for all planets, published in *The Astronomical Journal* and adopted by the Astronomical Almanac. These are the current standard for planetary magnitude computation.
+LibEphemeris uses the Johnson V formulae of **Mallama & Hilton (2018)**
+for Mercury through Neptune. The paper was published in *Astronomy and
+Computing* 25, 10–24 and supplies the planet-specific equations and their
+observational domains. The solar zero point is Willmer's (2018) Johnson V
+Vega-system value.
 
-| Body | Formula | Reference | Max diff (measured) |
-|------|---------|-----------|---------------------|
-| Sun | V(1,0) = -26.86 at 1 AU | Mallama & Hilton 2018 | 0.0000 mag |
-| Moon | V = -12.73 + 0.026\|alpha\| + 4e-9\|alpha\|^4 | Astronomical Almanac, Allen's Astrophysical Quantities | 0.03 mag (normal), 0.2 mag (thin crescent) |
-| Mercury | 6th-order polynomial in alpha | Mallama & Hilton 2018 | 0.001 mag |
-| Venus | Piecewise polynomial | Mallama & Hilton 2018 | 0.0002 mag |
-| Mars | Piecewise polynomial | Mallama & Hilton 2018 | 0.0001 mag |
-| Jupiter | Quadratic in alpha | Mallama & Hilton 2018 | 0.0001 mag |
-| Saturn | Ring-corrected (Meeus geometry) | Mallama & Hilton 2018 | 0.002 mag |
-| Uranus | Linear phase coefficient | Mallama & Hilton 2018 | 0.009 mag |
-| Neptune | Secular V(1,0) variation | Lockwood & Thompson 1991, Sromovsky et al. 2003 | 0.0000 mag |
-| Pluto | Linear phase coefficient | Mallama & Hilton 2018 | 0.04 mag |
+| Body | Formula | Reference |
+|------|---------|-----------|
+| Sun | V(d) = -26.76 + 5 log10(d) | Willmer 2018, Table 3 |
+| Moon | Independent lunar photometric model | See lunar methodology |
+| Mercury | 6th-order phase polynomial | Mallama & Hilton 2018, Eq. 2 |
+| Venus | Piecewise phase polynomial | Mallama & Hilton 2018, Eqs. 3–4 |
+| Mars | Piecewise mean phase surface | Mallama & Hilton 2018, Eqs. 6–7 |
+| Jupiter | Quadratic phase law | Mallama & Hilton 2018, Eq. 8 |
+| Saturn | Planet-and-rings law with geometric-mean opening | Mallama & Hilton 2018, Eq. 10; WGCCRE 2015 pole |
+| Uranus | Phase and two-sub-latitude law | Mallama & Hilton 2018, Eq. 15; WGCCRE 2015 pole |
+| Neptune | Secular V(1,0) variation | Mallama & Hilton 2018, Eq. 16 |
+| Pluto | Linear phase coefficient | Mallama & Hilton 2018 |
 
 #### Neptune secular brightness variation
 
-Neptune's albedo has been increasing since the 1980s due to seasonal atmospheric changes over its 165-year orbital period. LibEphemeris models this with a secular V(1,0) that transitions linearly from -6.89 (pre-1980) to -7.00 (by J2000.0), matching observational data from Lockwood & Thompson (1991) and Sromovsky et al. (2003). This produces exact magnitude agreement across all epochs.
+Neptune's intrinsic brightness changed markedly during the observed twentieth
+century. The adopted Eq. 16 is constant at `-6.89` before 1980, changes by
+`-0.0054` magnitude/year from 1980 through 2000, and is constant at `-7.00`
+after 2000. Calendar fractions use the proleptic Gregorian year rather than a
+fixed 365.25-day approximation. The equation is phase-independent over the
+Earth-visible domain.
 
 #### Moon thin crescent limitation
 

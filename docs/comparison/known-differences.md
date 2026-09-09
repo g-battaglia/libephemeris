@@ -682,6 +682,34 @@ Photometric conventions are empirical and can differ between almanacs. Such
 differences are reported as model choices, not used to reverse-engineer a
 reference curve.
 
+#### Planetary magnitude models {#planetary-magnitude-models}
+
+The visual-magnitude channel uses Johnson V models from published photometry.
+Mercury through Neptune follow Mallama and Hilton (2018). Saturn uses their
+planet-and-rings equation with the published effective opening: the geometric
+mean of the signed sub-observer and sub-solar latitudes when both see the same
+ring face, and zero when they see opposite faces. The latitudes are measured
+from the WGCCRE 2015 Saturn pole. Uranus likewise uses the WGCCRE pole and
+converts both sub-latitudes separately to planetographic latitude. Neptune uses
+the paper's three-interval secular model and its `-0.0054` magnitude/year
+coefficient from 1980 through 2000, with a proleptic-Gregorian fractional year.
+
+The Sun uses Willmer's (2018) Johnson V Vega-system magnitude, `-26.76` at one
+astronomical unit. The prior `-26.86` value had no verified source, so this
+moves every solar magnitude by exactly `+0.10` magnitude. Across the complete
+recorded base-tier phenomena grid, the corresponding largest movements are
+`0.0439` magnitude for Saturn, `0.00174` for Uranus, and `0.001993` for Neptune.
+Only magnitude slot 4 changes; phase angle, illuminated fraction, elongation,
+diameter, result shape, and error behavior do not. The public Neptune path
+continues to return a value when its computed phase slightly exceeds the
+paper's rounded Earth-visible limit because the adopted secular equation is
+phase-independent; the direct internal model evaluator still enforces its
+stated domain.
+
+These are differences between published photometric realizations. The
+registered ceilings come from source-model uncertainty or an exact replacement
+of an unsupported zero point, never from fitting these measured differences.
+
 #### Body radii {#body-radii}
 
 Apparent diameters come from one table of published mean radii: the values of

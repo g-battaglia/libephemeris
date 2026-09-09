@@ -71,6 +71,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0 s at sea level, with no event gained or lost and no transit moved. Sea
   level, zero pressure and the model's edges are unchanged. See
   `docs/comparison/known-differences.md#horizon-dip`.
+- `pheno` and `pheno_ut` now use published Johnson V photometry throughout:
+  Mallama and Hilton (2018) for Mercury through Neptune, including the
+  geometric-mean Saturn ring opening from independently derived WGCCRE pole
+  geometry, consistent WGCCRE frame geometry for Uranus, and Neptune's
+  published `-0.0054` magnitude/year secular law with exact Gregorian year
+  fractions; and Willmer (2018) for the Sun's `-26.76` magnitude at one AU.
+  Only magnitude slot 4 changes: by exactly +0.10 magnitude for the Sun and by
+  at most 0.0439, 0.00174, and 0.001993 magnitude for Saturn, Uranus, and
+  Neptune on the recorded base-tier grid. See
+  `docs/comparison/known-differences.md#planetary-magnitude-models`.
 - `planets.py` computes apparent diameters from the published IAU mean radii:
   the Sun is the IAU 2015 Resolution B3 nominal solar radius (696000 -> 695700
   km) and the Moon the IAU WGCCRE mean radius (1737.5 -> 1737.4 km, Archinal
