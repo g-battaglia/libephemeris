@@ -3476,20 +3476,25 @@ def _calc_keplerian_fallback(t, ipl: int, iflag: int, planets):
     speed_dist = 0.0
     if iflag & FLG_SPEED:
         dt = 1.0 / 86400.0
+        jd_prev = jd_tt - dt
+        jd_next = jd_tt + dt
+        # Il rapporto incrementale usa le epoche rappresentabili valutate,
+        # non il passo nominale prima dell’arrotondamento del Julian Day.
+        span = jd_next - jd_prev
         lon_prev, lat_prev, dist_prev = _keplerian_position_at(
-            jd_tt - dt, ipl, iflag, planets
+            jd_prev, ipl, iflag, planets
         )
         lon_next, lat_next, dist_next = _keplerian_position_at(
-            jd_tt + dt, ipl, iflag, planets
+            jd_next, ipl, iflag, planets
         )
-        speed_lon = (lon_next - lon_prev) / (2.0 * dt)
-        speed_lat = (lat_next - lat_prev) / (2.0 * dt)
-        speed_dist = (dist_next - dist_prev) / (2.0 * dt)
+        speed_lon = (lon_next - lon_prev) / span
+        speed_lat = (lat_next - lat_prev) / span
+        speed_dist = (dist_next - dist_prev) / span
 
-        if speed_lon > 180.0 / (2.0 * dt):
-            speed_lon -= 360.0 / (2.0 * dt)
-        if speed_lon < -180.0 / (2.0 * dt):
-            speed_lon += 360.0 / (2.0 * dt)
+        if speed_lon > 180.0 / span:
+            speed_lon -= 360.0 / span
+        if speed_lon < -180.0 / span:
+            speed_lon += 360.0 / span
 
     if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
         lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
