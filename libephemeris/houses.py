@@ -707,95 +707,91 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
 def _ra_to_ecliptic_longitude(
     ra_deg: float, pole_height_deg: float, sin_obliquity: float, cos_obliquity: float
 ) -> float:
-    """
-    Convert right ascension to ecliptic longitude via spherical trigonometry.
+    """Convert an equatorial right ascension to ecliptic longitude.
 
-    Given a right ascension and pole height, computes the corresponding ecliptic
-    longitude using the standard spherical trigonometric relation:
-
-        tan(λ) = sin(α) / (cos(ε)·cos(α) - sin(ε)·tan(φ))
-
-    where α is the right ascension, ε is the obliquity, and φ is the pole height.
-    Uses atan2 for unambiguous quadrant determination.
-
-    Reference: Smart, "Textbook on Spherical Astronomy", Ch. 3;
-               Meeus, "Astronomical Algorithms", Ch. 13
+    The conversion uses the oriented, homogeneous pair for the intersection of
+    the horizon and ecliptic.  Exact pole heights and an exactly null pair have
+    deterministic conventions so that no numerical threshold changes the
+    geometry of nearby inputs.
 
     Args:
-        ra_deg: Right ascension in degrees
-        pole_height_deg: Pole height (geographic latitude for ascendant) in degrees
-        sin_obliquity: Pre-computed sin(obliquity)
-        cos_obliquity: Pre-computed cos(obliquity)
+        ra_deg: Right ascension of the point, in degrees.
+        pole_height_deg: Height of the celestial pole, in degrees.
+        sin_obliquity: Sine of the ecliptic obliquity.
+        cos_obliquity: Cosine of the ecliptic obliquity.
 
     Returns:
-        Ecliptic longitude in degrees [0, 360)
+        Ecliptic longitude in the half-open interval ``[0, 360)``.
     """
-    _NEAR_ZERO = 1e-10
-
-    # Polar degenerate cases
-    if abs(90.0 - pole_height_deg) < _NEAR_ZERO:
+    if pole_height_deg == 90.0:
         return 180.0
-    if abs(90.0 + pole_height_deg) < _NEAR_ZERO:
+    if pole_height_deg == -90.0:
         return 0.0
 
-    ra_rad = math.radians(ra_deg % 360.0)
-    tan_pole = math.tan(math.radians(pole_height_deg))
+    ra_normalized = ra_deg % 360.0
+    cardinal_ra = {
+        0.0: (0.0, 1.0),
+        90.0: (1.0, 0.0),
+        180.0: (0.0, -1.0),
+        270.0: (-1.0, 0.0),
+    }.get(ra_normalized)
+    if cardinal_ra is None:
+        alpha = math.radians(ra_normalized)
+        sin_alpha = math.sin(alpha)
+        cos_alpha = math.cos(alpha)
+    else:
+        sin_alpha, cos_alpha = cardinal_ra
 
-    sin_ra = math.sin(ra_rad)
-    cos_ra = math.cos(ra_rad)
+    pole = math.radians(pole_height_deg)
+    cos_pole = math.cos(pole)
+    sin_pole = math.sin(pole)
 
-    # Standard spherical trigonometry formula
-    numerator = sin_ra
-    denominator = cos_obliquity * cos_ra - sin_obliquity * tan_pole
+    y = sin_alpha * cos_pole
+    x = cos_obliquity * cos_alpha * cos_pole - sin_obliquity * sin_pole
+    if x == 0.0 and y == 0.0:
+        return float(ra_deg % 360.0)
 
-    # 0/0 singularity (e.g. the CoAsc Munkasey path at |lat| == eps with
-    # ra == 180): atan2 of the rounding noise is meaningless. Use the
-    # continuous right-ascension limit.
-    if abs(numerator) < 1e-12 and abs(denominator) < 1e-12:
-        return ra_deg % 360.0
-
-    # atan2 handles all quadrants correctly
-    longitude = math.degrees(math.atan2(numerator, denominator)) % 360.0
-
-    # Snap cardinal points to exact values (avoid floating-point drift)
-    for cardinal in (90.0, 180.0, 270.0):
-        if abs(longitude - cardinal) < _NEAR_ZERO:
-            return cardinal
-    if abs(longitude - 360.0) < _NEAR_ZERO or abs(longitude) < _NEAR_ZERO:
-        return 0.0
-
-    return longitude
+    result = math.degrees(math.atan2(y, x)) % 360.0
+    if y == 0.0:
+        if x > 0.0:
+            return 0.0
+        if x < 0.0:
+            return 180.0
+    return float(result)
 
 
 def _calc_ascendant(
     armc_deg: float, eps: float, lat: float, pole_height: float
 ) -> float:
-    """
-    Calculate ecliptic longitude from ARMC and pole height.
+    """Convert the supplied ascension to the corresponding ecliptic longitude.
 
-    Wrapper around _ra_to_ecliptic_longitude that accepts obliquity in degrees
-    and computes the trigonometric values internally.
-
-    Based on standard spherical trigonometry:
-        tan(λ) = sin(α) / (cos(ε)·cos(α) - sin(ε)·tan(φ))
-
-    Reference: Smart, "Textbook on Spherical Astronomy";
-               Meeus, "Astronomical Algorithms"
+    ``lat`` remains in the signature for API compatibility but is intentionally
+    not part of this spherical transformation.  The caller supplies the
+    desired ascension directly; this wrapper does not add a quarter-turn.
 
     Args:
-        armc_deg: Right Ascension of MC in degrees
-        eps: True obliquity of ecliptic in degrees
-        lat: Geographic latitude (unused, kept for call-site compatibility)
-        pole_height: Pole height (latitude parameter) in degrees
+        armc_deg: Right ascension supplied to the transformation, in degrees.
+        eps: True obliquity, in degrees.
+        lat: Geographic latitude, retained for compatibility and ignored.
+        pole_height: Height of the celestial pole, in degrees.
 
     Returns:
-        Ecliptic longitude in degrees (0-360)
+        Ecliptic longitude in the half-open interval ``[0, 360)``.
     """
-    sin_obliquity = math.sin(math.radians(eps))
-    cos_obliquity = math.cos(math.radians(eps))
-    return _ra_to_ecliptic_longitude(
-        armc_deg, pole_height, sin_obliquity, cos_obliquity
-    )
+    del lat
+    eps_normalized = eps % 360.0
+    cardinal_eps = {
+        0.0: (0.0, 1.0),
+        90.0: (1.0, 0.0),
+        180.0: (0.0, -1.0),
+        270.0: (-1.0, 0.0),
+    }.get(eps_normalized)
+    if cardinal_eps is None:
+        eps_rad = math.radians(eps)
+        sin_eps, cos_eps = math.sin(eps_rad), math.cos(eps_rad)
+    else:
+        sin_eps, cos_eps = cardinal_eps
+    return _ra_to_ecliptic_longitude(armc_deg % 360.0, pole_height, sin_eps, cos_eps)
 
 
 def _sun_declination_analytic(tjdut: float) -> float:

@@ -216,6 +216,83 @@ class TestCoordinateConversions:
             assert 0 <= lon < 360, f"λ {lon} out of range for α={ra}"
 
 
+class TestEclipticConversionHelpers:
+    """Targeted checks for the spherical ecliptic conversion helpers."""
+
+    @pytest.mark.unit
+    def test_ordinary_input_uses_oriented_pair(self):
+        from libephemeris.houses import _ra_to_ecliptic_longitude
+
+        ra = 37.0
+        pole = -12.0
+        eps = math.radians(23.4)
+        expected = (
+            math.degrees(
+                math.atan2(
+                    math.sin(math.radians(ra)) * math.cos(math.radians(pole)),
+                    math.cos(eps)
+                    * math.cos(math.radians(ra))
+                    * math.cos(math.radians(pole))
+                    - math.sin(eps) * math.sin(math.radians(pole)),
+                )
+            )
+            % 360.0
+        )
+        assert _ra_to_ecliptic_longitude(
+            ra, pole, math.sin(eps), math.cos(eps)
+        ) == pytest.approx(expected)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("ra", [0.0, 90.0, 180.0, 270.0, 359.0])
+    def test_exact_poles_have_defined_limits(self, ra):
+        from libephemeris.houses import _ra_to_ecliptic_longitude
+
+        sin_eps = math.sin(math.radians(23.4))
+        cos_eps = math.cos(math.radians(23.4))
+        assert _ra_to_ecliptic_longitude(ra, 90.0, sin_eps, cos_eps) == 180.0
+        assert _ra_to_ecliptic_longitude(ra, -90.0, sin_eps, cos_eps) == 0.0
+
+    @pytest.mark.unit
+    def test_near_poles_are_not_snapped(self):
+        from libephemeris.houses import _ra_to_ecliptic_longitude
+
+        sin_eps = math.sin(math.radians(23.4))
+        cos_eps = math.cos(math.radians(23.4))
+        north = _ra_to_ecliptic_longitude(90.0, 89.999, sin_eps, cos_eps)
+        south = _ra_to_ecliptic_longitude(90.0, -89.999, sin_eps, cos_eps)
+        assert north != 180.0
+        assert south != 0.0
+
+    @pytest.mark.unit
+    def test_exact_null_pair_returns_ra_convention(self):
+        from libephemeris.houses import _ra_to_ecliptic_longitude
+
+        assert _ra_to_ecliptic_longitude(0.0, 0.0, 0.0, 0.0) == 0.0
+
+    @pytest.mark.unit
+    def test_zero_and_ninety_obliquity(self):
+        from libephemeris.houses import _ra_to_ecliptic_longitude
+
+        zero_result = _ra_to_ecliptic_longitude(725.0, 0.0, 0.0, 1.0)
+        assert zero_result == pytest.approx(5.0)
+        result = _ra_to_ecliptic_longitude(45.0, 0.0, 1.0, 0.0)
+        assert result == pytest.approx(90.0)
+
+    @pytest.mark.unit
+    def test_wrapper_ignores_latitude_and_does_not_add_quarter_turn(self):
+        from libephemeris.houses import _calc_ascendant, _ra_to_ecliptic_longitude
+
+        eps = 23.4
+        expected = _ra_to_ecliptic_longitude(
+            30.0,
+            -20.0,
+            math.sin(math.radians(eps)),
+            math.cos(math.radians(eps)),
+        )
+        assert _calc_ascendant(30.0, eps, -45.0, -20.0) == pytest.approx(expected)
+        assert _calc_ascendant(30.0, eps, 45.0, -20.0) == pytest.approx(expected)
+
+
 class TestPolarLatitudeDocumentation:
     """Tests verifying polar latitude documentation."""
 
