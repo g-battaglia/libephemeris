@@ -13605,8 +13605,8 @@ def _lun_eclipse_umbral_magnitude_pythonic(
         >>> print(f"Umbral magnitude: {umbral_mag:.4f}")
 
         >>> # Check magnitude at a random time (no eclipse)
-        >>> jd_no_eclipse = julday(2022, 6, 1, 12.0)
-        >>> mag = _lun_eclipse_umbral_magnitude_pythonic(jd_no_eclipse)
+        >>> jd_clear_of_eclipse = julday(2022, 6, 1, 12.0)
+        >>> mag = _lun_eclipse_umbral_magnitude_pythonic(jd_clear_of_eclipse)
         >>> print(f"Magnitude: {mag:.4f}")  # Will be 0.0
 
     References:
@@ -13723,8 +13723,8 @@ def _lun_eclipse_penumbral_magnitude_pythonic(
         >>> print(f"Penumbral magnitude: {penumbral_mag:.4f}")
 
         >>> # Check magnitude at a random time (no eclipse)
-        >>> jd_no_eclipse = julday(2022, 6, 1, 12.0)
-        >>> mag = _lun_eclipse_penumbral_magnitude_pythonic(jd_no_eclipse)
+        >>> jd_clear_of_eclipse = julday(2022, 6, 1, 12.0)
+        >>> mag = _lun_eclipse_penumbral_magnitude_pythonic(jd_clear_of_eclipse)
         >>> print(f"Magnitude: {mag:.4f}")  # Will be 0.0
 
     References:
@@ -13846,8 +13846,8 @@ def _lun_eclipse_gamma_pythonic(
         >>> print(f"Gamma: {gamma:.4f}")
 
         >>> # Check gamma at a random time (far from eclipse)
-        >>> jd_no_eclipse = julday(2022, 6, 1, 12.0)
-        >>> gamma = _lun_eclipse_gamma_pythonic(jd_no_eclipse)
+        >>> jd_clear_of_eclipse = julday(2022, 6, 1, 12.0)
+        >>> gamma = _lun_eclipse_gamma_pythonic(jd_clear_of_eclipse)
         >>> print(f"Gamma: {gamma:.4f}")  # Will be large (no eclipse)
 
     References:
