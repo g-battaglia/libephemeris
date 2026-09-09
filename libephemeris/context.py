@@ -51,7 +51,7 @@ from .net import PolicyAwareLoader as Loader
 from .exceptions import LEBCorruptionError
 
 if TYPE_CHECKING:
-    from .leb_composite import CompositeLEBReader
+    from .leb_composite import CompositeLEBReader, TieredLEBReader
     from .leb2_reader import LEB2Reader
     from .leb_reader import LEBReader
 
@@ -853,8 +853,11 @@ class EphemerisContext:
         from . import state
 
         mode = state.get_calc_mode()
-        reader = self.get_leb_reader() if mode in ("auto", "leb") else None
-        _ctx_local_reader = reader
+        context_reader = self.get_leb_reader() if mode in ("auto", "leb") else None
+        _ctx_local_reader = context_reader
+        reader: LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader | None = (
+            context_reader
+        )
         if reader is None:
             # Fall back to global reader if context has no .leb
             reader = state.get_leb_reader()

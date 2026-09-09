@@ -17,7 +17,7 @@ Provenance:
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Callable, Protocol
 
 import numpy as np
 from skyfield.vectorlib import VectorFunction
@@ -37,14 +37,18 @@ from .constants import (
 )
 from .exceptions import EphemerisRangeError, LEBCorruptionError, UnknownBodyError
 
-if TYPE_CHECKING:
-    from .leb2_reader import LEB2Reader
-    from .leb_composite import CompositeLEBReader, TieredLEBReader
-    from .leb_reader import LEBReader
+Vector3 = tuple[float, float, float]
+LEBState = tuple[Vector3, Vector3]
 
-    LEBReaderLike = LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader
-else:
-    LEBReaderLike = Any
+
+class LEBReaderLike(Protocol):
+    """Reader operations required by the Skyfield vector adapter."""
+
+    def has_body(self, body_id: int) -> bool:
+        """Return whether a stored channel is available."""
+
+    def eval_body(self, body_id: int, jd: float) -> LEBState:
+        """Evaluate one stored body state."""
 
 
 # Earth/Moon mass ratio used to compose the Earth-Moon barycenter from the
@@ -73,9 +77,7 @@ def _serving_path(
     return str(path) if path is not None else None
 
 
-def _eval_reader_body(
-    reader: LEBReaderLike, body_id: int, jd_tt: float
-) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+def _eval_reader_body(reader: LEBReaderLike, body_id: int, jd_tt: float) -> LEBState:
     """Evaluate one LEB state and turn a stored-range miss into a public error."""
     try:
         return reader.eval_body(body_id, jd_tt)
@@ -111,9 +113,7 @@ class _LEBVectorTarget(VectorFunction):
         self,
         ephemeris: "LEBVectorEphemeris",
         target: int,
-        evaluator: Callable[
-            [float], tuple[tuple[float, float, float], tuple[float, float, float]]
-        ],
+        evaluator: Callable[[float], LEBState],
         name: str,
     ) -> None:
         self.ephemeris = ephemeris
@@ -243,16 +243,17 @@ class LEBVectorEphemeris:
         earth_pos, earth_vel = _eval_reader_body(self.reader, EARTH, jd_tt)
         moon_pos, moon_vel = _eval_reader_body(self.reader, MOON, jd_tt)
         weight = 1.0 / (_EMRAT + 1.0)
-        return (
-            tuple(
-                earth_pos[index] + (moon_pos[index] - earth_pos[index]) * weight
-                for index in range(3)
-            ),
-            tuple(
-                earth_vel[index] + (moon_vel[index] - earth_vel[index]) * weight
-                for index in range(3)
-            ),
+        position: Vector3 = (
+            earth_pos[0] + (moon_pos[0] - earth_pos[0]) * weight,
+            earth_pos[1] + (moon_pos[1] - earth_pos[1]) * weight,
+            earth_pos[2] + (moon_pos[2] - earth_pos[2]) * weight,
         )
+        velocity: Vector3 = (
+            earth_vel[0] + (moon_vel[0] - earth_vel[0]) * weight,
+            earth_vel[1] + (moon_vel[1] - earth_vel[1]) * weight,
+            earth_vel[2] + (moon_vel[2] - earth_vel[2]) * weight,
+        )
+        return position, velocity
 
     @staticmethod
     def _key(key: str | int) -> str | int:
