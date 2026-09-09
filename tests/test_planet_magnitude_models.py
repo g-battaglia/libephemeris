@@ -17,6 +17,7 @@ from libephemeris.constants import (
 )
 from libephemeris.exceptions import InputValidationError, UnknownBodyError
 from libephemeris.planets import (
+    _calc_neptune_magnitude,
     _calc_planet_magnitude,
     _direction_to_icrs,
     _pole_vector,
@@ -155,6 +156,14 @@ def test_neptune_calendar_year_boundaries(year: int, expected: float) -> None:
     jd = julday(year, 1, 1, 0.0)
     assert _calc_planet_magnitude(NEPTUNE, 1.0, 1.0, 0.0, tjd=jd) == pytest.approx(
         expected
+    )
+
+
+def test_neptune_public_helper_accepts_large_geocentric_phase_independently() -> None:
+    """The public-backend helper does not require the rounded phase domain."""
+    assert _calc_neptune_magnitude(1.0, 1.0, julday(1979, 1, 1)) == -6.89
+    assert _calc_neptune_magnitude(2.0, 1.0, julday(1979, 1, 1)) == pytest.approx(
+        -6.89 + 5.0 * math.log10(2.0)
     )
 
 

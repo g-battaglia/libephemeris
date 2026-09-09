@@ -10815,17 +10815,20 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
 
         tjd = tjd_ut + deltat(tjd_ut)
 
-        magnitude = _calc_planet_magnitude(
-            ipl,
-            helio_dist,
-            geo_dist,
-            phase_angle,
-            geo_lon,
-            geo_lat,
-            helio_lon,
-            helio_lat,
-            tjd,
-        )
+        if ipl == NEPTUNE:
+            magnitude = _calc_neptune_magnitude(helio_dist, geo_dist, tjd)
+        else:
+            magnitude = _calc_planet_magnitude(
+                ipl,
+                helio_dist,
+                geo_dist,
+                phase_angle,
+                geo_lon,
+                geo_lat,
+                helio_lon,
+                helio_lat,
+                tjd,
+            )
 
     # Slot [5]: the Moon's horizontal parallax (0.0 for every other body —
     # a convention of this library). With no observer set the slot carries the
@@ -11439,17 +11442,20 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
             helio_lon = 0.0
             helio_lat = 0.0
 
-    magnitude = _calc_planet_magnitude(
-        ipl,
-        target_helio_dist,
-        target_geo_dist,
-        phase_angle,
-        geo_lon,
-        geo_lat,
-        helio_lon,
-        helio_lat,
-        tjd,
-    )
+    if ipl == NEPTUNE:
+        magnitude = _calc_neptune_magnitude(target_helio_dist, target_geo_dist, tjd)
+    else:
+        magnitude = _calc_planet_magnitude(
+            ipl,
+            target_helio_dist,
+            target_geo_dist,
+            phase_angle,
+            geo_lon,
+            geo_lat,
+            helio_lon,
+            helio_lat,
+            tjd,
+        )
 
     # Return tuple with at least 20 elements (reference-API compatibility)
     attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
@@ -11566,6 +11572,23 @@ def _sun_magnitude(distance_au: object) -> float:
     if distance <= 0.0:
         raise InputValidationError("observer-Sun distance must be positive")
     return float(-26.76 + 5.0 * math.log10(distance))
+
+
+def _calc_neptune_magnitude(helio_dist: object, geo_dist: object, tjd: object) -> float:
+    """Return Neptune's phase-independent geocentric Eq. 16 magnitude."""
+    r = _validate_magnitude_real(helio_dist, "Sun-body distance")
+    d = _validate_magnitude_real(geo_dist, "observer-body distance")
+    jd = _validate_magnitude_real(tjd, "TT Julian day")
+    if r <= 0.0 or d <= 0.0:
+        raise InputValidationError("planet distances must be positive")
+    year = _gregorian_year_fraction(jd)
+    if year < 1980.0:
+        absolute = -6.89
+    elif year <= 2000.0:
+        absolute = -6.89 - 0.0054 * (year - 1980.0)
+    else:
+        absolute = -7.00
+    return float(5.0 * math.log10(r * d) + absolute)
 
 
 def _gregorian_year_fraction(jd_tt: float) -> float:
@@ -11718,15 +11741,7 @@ def _calc_planet_magnitude(
             raise InputValidationError(
                 "Neptune phase angle must not exceed 1.9 degrees"
             )
-        jd = _validate_magnitude_real(tjd, "TT Julian day")
-        year = _gregorian_year_fraction(jd)
-        if year < 1980.0:
-            absolute = -6.89
-        elif year <= 2000.0:
-            absolute = -6.89 - 0.0054 * (year - 1980.0)
-        else:
-            absolute = -7.00
-        return float(distance + absolute)
+        return _calc_neptune_magnitude(r, d, tjd)
     # Pluto's existing published phase-only surface is retained unchanged.
     return float(distance - 1.024 + 0.0362 * alpha)
 
