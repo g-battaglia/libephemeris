@@ -44,7 +44,9 @@ def _magnitude(body: int, phase: float, **kwargs: float) -> float:
         (NEPTUNE, 0.0, -7.0),
     ],
 )
-def test_published_zero_phase_constants(body: int, phase: float, expected: float) -> None:
+def test_published_zero_phase_constants(
+    body: int, phase: float, expected: float
+) -> None:
     """Each direct law reproduces its printed zero-phase constant."""
     assert _magnitude(body, phase) == expected
 
@@ -52,9 +54,15 @@ def test_published_zero_phase_constants(body: int, phase: float, expected: float
 def test_distance_law_is_exactly_inverse_square() -> None:
     """Doubling either distance adds the common published distance modulus."""
     shift = 5.0 * math.log10(2.0)
-    for body, phase in ((MERCURY, 20.0), (VENUS, 20.0), (MARS, 20.0),
-                        (JUPITER, 5.0), (SATURN, 1.0), (URANUS, 20.0),
-                        (NEPTUNE, 1.0)):
+    for body, phase in (
+        (MERCURY, 20.0),
+        (VENUS, 20.0),
+        (MARS, 20.0),
+        (JUPITER, 5.0),
+        (SATURN, 1.0),
+        (URANUS, 20.0),
+        (NEPTUNE, 1.0),
+    ):
         kwargs = {
             "geo_lon": 0.0,
             "geo_lat": 0.0,
@@ -69,8 +77,11 @@ def test_distance_law_is_exactly_inverse_square() -> None:
 def test_venus_and_mars_use_first_equation_at_break() -> None:
     """Exact branch boundaries belong to the lower-phase published equations."""
     assert _magnitude(VENUS, 163.7) == pytest.approx(
-        -4.384 - 1.044e-3 * 163.7 + 3.687e-4 * 163.7**2
-        - 2.814e-6 * 163.7**3 + 8.938e-9 * 163.7**4
+        -4.384
+        - 1.044e-3 * 163.7
+        + 3.687e-4 * 163.7**2
+        - 2.814e-6 * 163.7**3
+        + 8.938e-9 * 163.7**4
     )
     assert _magnitude(MARS, 50.0) == pytest.approx(
         -1.601 + 0.02267 * 50.0 - 0.0001302 * 50.0**2
@@ -102,8 +113,10 @@ def test_saturn_same_faces_use_geometric_mean_and_mirror_invariance() -> None:
     pole = _pole_vector(40.589, 83.537)
     earth, sun = _sub_latitudes(pole, 0.0, 0.0, 0.0, 0.0, J2000)
     beta = math.degrees(math.sqrt(abs(earth * sun)))
-    expected = -8.914 - 1.825 * math.sin(math.radians(beta)) - 0.378 * math.sin(
-        math.radians(beta)
+    expected = (
+        -8.914
+        - 1.825 * math.sin(math.radians(beta))
+        - 0.378 * math.sin(math.radians(beta))
     )
     assert first == pytest.approx(expected)
     assert mirrored == pytest.approx(first)
@@ -183,8 +196,12 @@ def test_direct_model_rejects_invalid_inputs_and_unknown_body() -> None:
     """Invalid types, non-finite values, distances, and body IDs are typed errors."""
     with pytest.raises(UnknownBodyError):
         _calc_planet_magnitude(999, 1.0, 1.0, 0.0)
-    for args in (("1", 1.0, 1.0, 0.0), (MERCURY, 0.0, 1.0, 0.0),
-                 (MERCURY, 1.0, -1.0, 0.0), (MERCURY, 1.0, 1.0, float("nan"))):
+    for args in (
+        ("1", 1.0, 1.0, 0.0),
+        (MERCURY, 0.0, 1.0, 0.0),
+        (MERCURY, 1.0, -1.0, 0.0),
+        (MERCURY, 1.0, 1.0, float("nan")),
+    ):
         with pytest.raises(InputValidationError):
             _calc_planet_magnitude(*args)
     with pytest.raises(InputValidationError):

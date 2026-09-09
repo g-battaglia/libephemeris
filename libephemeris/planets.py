@@ -11477,7 +11477,9 @@ def _validate_direction(
     return lon, lat
 
 
-def _direction_to_icrs(longitude: float, latitude: float, jd_tt: float) -> tuple[float, float, float]:
+def _direction_to_icrs(
+    longitude: float, latitude: float, jd_tt: float
+) -> tuple[float, float, float]:
     """Convert an ecliptic-of-date unit direction to ICRS/J2000."""
     lon = math.radians(longitude)
     lat = math.radians(latitude)
@@ -11527,9 +11529,7 @@ def _sub_latitudes(
     observer_lat = math.asin(
         max(-1.0, min(1.0, -sum(p * u for p, u in zip(pole, observer))))
     )
-    sun_lat = math.asin(
-        max(-1.0, min(1.0, -sum(p * u for p, u in zip(pole, sun))))
-    )
+    sun_lat = math.asin(max(-1.0, min(1.0, -sum(p * u for p, u in zip(pole, sun)))))
     return observer_lat, sun_lat
 
 
@@ -11547,9 +11547,7 @@ def _uranus_photometric_latitude(
     )
 
     def _graphic(latitude: float) -> float:
-        return math.degrees(
-            math.atan2(math.tan(latitude), _URANUS_ONE_MINUS_F_SQ)
-        )
+        return math.degrees(math.atan2(math.tan(latitude), _URANUS_ONE_MINUS_F_SQ))
 
     return (abs(_graphic(earth_lat)) + abs(_graphic(sun_lat))) / 2.0
 
@@ -11617,8 +11615,15 @@ def _calc_planet_magnitude(
 
     if ipl == MERCURY:
         phase_term = _horner(
-            (-0.613, 6.3280e-2, -1.6336e-3, 3.3644e-5,
-             -3.4265e-7, 1.6893e-9, -3.0334e-12),
+            (
+                -0.613,
+                6.3280e-2,
+                -1.6336e-3,
+                3.3644e-5,
+                -3.4265e-7,
+                1.6893e-9,
+                -3.0334e-12,
+            ),
             alpha,
         )
         return float(distance + phase_term)
@@ -11658,17 +11663,32 @@ def _calc_planet_magnitude(
         )
         jd = _validate_magnitude_real(tjd, "TT Julian day")
         earth_beta, sun_beta = _sub_latitudes(
-            _pole_vector(40.589 - 0.036 * ((jd - _J2000) / 36525.0),
-                         83.537 - 0.004 * ((jd - _J2000) / 36525.0)),
-            lon_e, lat_e, lon_s, lat_s, jd,
+            _pole_vector(
+                40.589 - 0.036 * ((jd - _J2000) / 36525.0),
+                83.537 - 0.004 * ((jd - _J2000) / 36525.0),
+            ),
+            lon_e,
+            lat_e,
+            lon_s,
+            lat_s,
+            jd,
         )
-        beta = math.sqrt(abs(earth_beta * sun_beta)) if earth_beta * sun_beta > 0.0 else 0.0
+        beta = (
+            math.sqrt(abs(earth_beta * sun_beta))
+            if earth_beta * sun_beta > 0.0
+            else 0.0
+        )
         beta_deg = math.degrees(beta)
         if beta_deg >= 27.0:
             raise InputValidationError("Saturn ring opening must be below 27 degrees")
         sine = math.sin(math.radians(beta_deg))
-        return float(distance - 8.914 - 1.825 * sine + 0.026 * alpha
-                     - 0.378 * sine * math.exp(-2.25 * alpha))
+        return float(
+            distance
+            - 8.914
+            - 1.825 * sine
+            + 0.026 * alpha
+            - 0.378 * sine * math.exp(-2.25 * alpha)
+        )
     if ipl == URANUS:
         if alpha > 154.0:
             raise InputValidationError("Uranus phase angle must not exceed 154 degrees")
@@ -11686,11 +11706,18 @@ def _calc_planet_magnitude(
         )
         jd = _validate_magnitude_real(tjd, "TT Julian day")
         phi_prime = _uranus_photometric_latitude(lon_e, lat_e, lon_s, lat_s, jd)
-        return float(distance - 7.110 - 8.4e-4 * phi_prime
-                     + 6.587e-3 * alpha + 1.045e-4 * alpha * alpha)
+        return float(
+            distance
+            - 7.110
+            - 8.4e-4 * phi_prime
+            + 6.587e-3 * alpha
+            + 1.045e-4 * alpha * alpha
+        )
     if ipl == NEPTUNE:
         if alpha > 1.9:
-            raise InputValidationError("Neptune phase angle must not exceed 1.9 degrees")
+            raise InputValidationError(
+                "Neptune phase angle must not exceed 1.9 degrees"
+            )
         jd = _validate_magnitude_real(tjd, "TT Julian day")
         year = _gregorian_year_fraction(jd)
         if year < 1980.0:
@@ -11702,7 +11729,6 @@ def _calc_planet_magnitude(
         return float(distance + absolute)
     # Pluto's existing published phase-only surface is retained unchanged.
     return float(distance - 1.024 + 0.0362 * alpha)
-
 
 
 # Aliases for reference API compatibility
