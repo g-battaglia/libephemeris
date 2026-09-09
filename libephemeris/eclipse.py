@@ -482,6 +482,9 @@ _ECL_AU_KM = 149597870.700
 _ECL_RSUN_AU = 696000.0 / _ECL_AU_KM
 _ECL_RMOON_AU = 1738.15 / _ECL_AU_KM
 _ECL_REARTH_AU = 6378.140 / _ECL_AU_KM
+# Convenzione API: il sentinel dell’orizzonte marino resta 0,36 arcsec sopra
+# il dip, evitando l’uguaglianza con il limite di applicazione della rifrazione.
+_SEA_HORIZON_CLEARANCE_DEG = 0.0001
 # Earth flattening: the IERS numerical standard 1/f = 298.25642 (IERS
 # Conventions (2010), Technical Note 36, Table 1.1). WGS84 describes the
 # same ellipsoid with 1/f = 298.257223563; the two differ by 8e-7 in
@@ -9064,7 +9067,7 @@ def _rise_trans_true_hor_impl(
     if horizon_alt == -100.0:
         from .refraction import calc_dip
 
-        horizon_alt = 0.0001 + calc_dip(
+        horizon_alt = _SEA_HORIZON_CLEARANCE_DEG + calc_dip(
             max(altitude, 0.0), atpress=pressure, attemp=temperature
         )
 
