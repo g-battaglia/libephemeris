@@ -6751,7 +6751,7 @@ def _lun_eclipse_when_pythonic(
         # Refine the time of maximum eclipse: deepest immersion of the Moon
         # in the Earth's shadow, then classify from the shadow geometry.
         jd_max = _lun_eclipse_max_time(jd_full_moon, flags)
-        retc, _attr_max, _dcore_max = _lun_how_core(jd_max, flags)
+        retc, _attr_max, _geometry = _lun_how_core(jd_max, flags)
         if retc == 0:
             return None
 
@@ -7273,7 +7273,7 @@ def _lun_eclipse_how_pythonic(
     # _calculate_lunar_eclipse_type_and_magnitude(), whose divergent 1/85
     # atmospheric enlargement + small-angle approximation disagreed with the
     # canonical model by up to ~0.011 in magnitude.
-    retc_core, attr_core, _dcore = _lun_how_core(jd, flags)
+    retc_core, attr_core, _geometry = _lun_how_core(jd, flags)
     umbral_mag = attr_core[0]
     penumbral_mag = attr_core[1]
 
@@ -7413,7 +7413,7 @@ def _lun_eclipse_how_impl(
 
     geopos3 = (float(geopos[0]), float(geopos[1]), float(geopos[2]))
 
-    retc, attr, _dcore = _lun_how_core(tjdut, flags)
+    retc, attr, _geometry = _lun_how_core(tjdut, flags)
 
     _sun_p, moon_p = _topo_sun_moon(tjdut, geopos3, reader)
     az, true_alt, app_alt = azalt(tjdut, ECL2HOR, geopos3, 0.0, 10.0, moon_p)
@@ -13623,7 +13623,7 @@ def _lun_eclipse_umbral_magnitude_pythonic(
     # _calculate_lunar_eclipse_type_and_magnitude() uses a different
     # small-angle approximation of the same Danjon family, so it can disagree
     # slightly with lun_eclipse_how().
-    _retc, attr, _dcore = _lun_how_core(jd, flags)
+    _retc, attr, _geometry = _lun_how_core(jd, flags)
     return max(0.0, attr[0])
 
 
@@ -13739,7 +13739,7 @@ def _lun_eclipse_penumbral_magnitude_pythonic(
     # umbral variant for the rationale behind retiring
     # _calculate_lunar_eclipse_type_and_magnitude() from this path (divergent
     # 1/85 enlargement + small-angle approximation).
-    _retc, attr, _dcore = _lun_how_core(jd, flags)
+    _retc, attr, _geometry = _lun_how_core(jd, flags)
     return max(0.0, attr[1])
 
 
