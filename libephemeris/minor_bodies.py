@@ -1490,8 +1490,8 @@ def apply_secular_perturbations(
     dt = jd_tt - elements.epoch  # Time since epoch in days
 
     if not include_perturbations:
-        # La disattivazione è esplicita: una finestra temporale introdurrebbe
-        # un salto nella propagazione secolare ai suoi estremi.
+        # Disabling the rates is explicit: an implicit time window would
+        # introduce a discontinuity at each boundary.
         M = (elements.M0 + elements.n * dt) % 360.0
         return elements.omega, elements.Omega, M, elements.n, elements.e, elements.i
 

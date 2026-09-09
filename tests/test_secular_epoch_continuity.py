@@ -61,7 +61,7 @@ def test_explicitly_disabled_rates_preserve_unperturbed_motion(
     constant_rates, offset, monkeypatch
 ):
     def unexpected_rates(*args, **kwargs):
-        pytest.fail("La modalità senza perturbazioni non deve calcolare i tassi")
+        pytest.fail("Disabled perturbations must not evaluate secular rates")
 
     monkeypatch.setattr(mb, "calc_secular_perturbation_rates", unexpected_rates)
     elements = constant_rates
