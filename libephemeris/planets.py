@@ -62,6 +62,7 @@ from contextlib import contextmanager as _contextmanager
 from contextvars import ContextVar
 from functools import lru_cache
 from collections.abc import Iterator
+from numbers import Real
 
 import math
 import warnings
@@ -101,7 +102,12 @@ from .ayanamsha_definitions import (
     VALENS_MOON_T0_UT,
 )
 
-from .exceptions import EphemerisRangeError, LEBCorruptionError, UnknownBodyError
+from .exceptions import (
+    EphemerisRangeError,
+    InputValidationError,
+    LEBCorruptionError,
+    UnknownBodyError,
+)
 
 if TYPE_CHECKING:
     pass
@@ -10689,9 +10695,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
 
         sun_radius_km = _BODY_RADIUS_KM[SUN]
         diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
-        magnitude = (
-            -26.86 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.86
-        )
+        magnitude = _sun_magnitude(sun_dist_au)
 
         # Phase quantities are inapplicable to the self-luminous Sun: the
         # phase triplet (angle, fraction, elongation) reports 0.0.
@@ -11193,10 +11197,8 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         sun_radius_km = _BODY_RADIUS_KM[SUN]
         diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
 
-        # Sun magnitude (V(1,0) = -26.86 at 1 AU, Mallama & Hilton 2018)
-        magnitude = (
-            -26.86 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.86
-        )
+        # Sun magnitude uses the published Johnson-V value at 1 AU.
+        magnitude = _sun_magnitude(sun_dist_au)
 
         attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
         return attr
@@ -11454,64 +11456,129 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     return attr
 
 
+def _validate_magnitude_real(value: object, name: str) -> float:
+    """Return a finite real magnitude input, or reject it before arithmetic."""
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise InputValidationError(f"{name} must be a finite real number")
+    result = float(value)
+    if not math.isfinite(result):
+        raise InputValidationError(f"{name} must be a finite real number")
+    return result
+
+
+def _validate_direction(
+    longitude: object, latitude: object, longitude_name: str, latitude_name: str
+) -> tuple[float, float]:
+    """Validate one ecliptic direction used by the ring/latitude models."""
+    lon = _validate_magnitude_real(longitude, longitude_name)
+    lat = _validate_magnitude_real(latitude, latitude_name)
+    if not -90.0 <= lat <= 90.0:
+        raise InputValidationError(f"{latitude_name} must be in [-90, 90] degrees")
+    return lon, lat
+
+
+def _direction_to_icrs(longitude: float, latitude: float, jd_tt: float) -> tuple[float, float, float]:
+    """Convert an ecliptic-of-date unit direction to ICRS/J2000."""
+    lon = math.radians(longitude)
+    lat = math.radians(latitude)
+    ecliptic = (
+        math.cos(lat) * math.cos(lon),
+        math.cos(lat) * math.sin(lon),
+        math.sin(lat),
+    )
+    dpsi, deps = erfa.nut06a(_J2000, jd_tt - _J2000)
+    true_obliquity = erfa.obl06(_J2000, jd_tt - _J2000) + deps
+    cos_eps = math.cos(true_obliquity)
+    sin_eps = math.sin(true_obliquity)
+    equatorial = (
+        ecliptic[0],
+        ecliptic[1] * cos_eps - ecliptic[2] * sin_eps,
+        ecliptic[1] * sin_eps + ecliptic[2] * cos_eps,
+    )
+    # pnm06a maps ICRS to true equator of date; its transpose is the inverse.
+    pnm = erfa.pnm06a(_J2000, jd_tt - _J2000)
+    return (
+        sum(float(pnm[row][0]) * equatorial[row] for row in range(3)),
+        sum(float(pnm[row][1]) * equatorial[row] for row in range(3)),
+        sum(float(pnm[row][2]) * equatorial[row] for row in range(3)),
+    )
+
+
+def _pole_vector(ra_deg: float, dec_deg: float) -> tuple[float, float, float]:
+    """Build an ICRS unit vector from equatorial pole coordinates."""
+    ra = math.radians(ra_deg)
+    dec = math.radians(dec_deg)
+    cos_dec = math.cos(dec)
+    return (cos_dec * math.cos(ra), cos_dec * math.sin(ra), math.sin(dec))
+
+
+def _sub_latitudes(
+    pole: tuple[float, float, float],
+    geo_lon: float,
+    geo_lat: float,
+    helio_lon: float,
+    helio_lat: float,
+    jd_tt: float,
+) -> tuple[float, float]:
+    """Return signed body-to-observer and body-to-Sun pole latitudes."""
+    observer = _direction_to_icrs(geo_lon, geo_lat, jd_tt)
+    sun = _direction_to_icrs(helio_lon, helio_lat, jd_tt)
+    # Inputs point observer→body and Sun→body; the required vectors are antipodes.
+    observer_lat = math.asin(
+        max(-1.0, min(1.0, -sum(p * u for p, u in zip(pole, observer))))
+    )
+    sun_lat = math.asin(
+        max(-1.0, min(1.0, -sum(p * u for p, u in zip(pole, sun))))
+    )
+    return observer_lat, sun_lat
+
+
 def _uranus_photometric_latitude(
-    geo_lon: float, geo_lat: float, helio_lon: float, helio_lat: float
+    geo_lon: float,
+    geo_lat: float,
+    helio_lon: float,
+    helio_lat: float,
+    tjd: float = _J2000,
 ) -> float:
-    """Photometric latitude phi' of Uranus for Mallama & Hilton (2018).
-
-    phi' is the average of the absolute planetographic sub-Earth and sub-solar
-    latitudes (Mallama & Hilton 2018, "Computing Apparent Planetary Magnitudes
-    for The Astronomical Almanac"). Each planetocentric latitude is the angle
-    between Uranus' IAU rotational pole and the Uranus->Earth / Uranus->Sun
-    direction, then converted to planetographic latitude via Eq. 13
-    (tan phi' = tan phi / (1 - f)^2).
-
-    The IAU J2000 pole vector is dotted against apparent ecliptic-of-date
-    directions; the resulting frame mixing shifts phi' by <=0.7 deg near the
-    span extremes, i.e. <=0.6 mmag through the -8.4e-4 mag/deg coefficient,
-    which is far below the model's structural agreement with any reference.
-
-    Args:
-        geo_lon: Geocentric apparent ecliptic longitude of Uranus (degrees).
-        geo_lat: Geocentric apparent ecliptic latitude of Uranus (degrees).
-        helio_lon: Heliocentric ecliptic longitude of Uranus (degrees).
-        helio_lat: Heliocentric ecliptic latitude of Uranus (degrees).
-
-    Returns:
-        Photometric latitude phi' in degrees (>= 0).
-    """
-    # Uranus north-pole unit vector: equatorial J2000 -> J2000 ecliptic.
-    eps = math.radians(23.43929111)  # J2000 mean obliquity (IAU 2006)
-    cos_d = math.cos(_URANUS_POLE_DEC)
-    pe = (
-        cos_d * math.cos(_URANUS_POLE_RA),
-        cos_d * math.sin(_URANUS_POLE_RA),
-        math.sin(_URANUS_POLE_DEC),
-    )
-    pole = (
-        pe[0],
-        pe[1] * math.cos(eps) + pe[2] * math.sin(eps),
-        -pe[1] * math.sin(eps) + pe[2] * math.cos(eps),
+    """Return Uranus' mean absolute planetographic sub-latitude in degrees."""
+    pole = _pole_vector(257.311, -15.175)
+    earth_lat, sun_lat = _sub_latitudes(
+        pole, geo_lon, geo_lat, helio_lon, helio_lat, tjd
     )
 
-    def _sub_latitude(lon_deg: float, lat_deg: float) -> float:
-        # Direction Uranus->observer is the antipode of observer->Uranus.
-        lon = math.radians(lon_deg)
-        lat = math.radians(lat_deg)
-        d = (
-            -math.cos(lat) * math.cos(lon),
-            -math.cos(lat) * math.sin(lon),
-            -math.sin(lat),
+    def _graphic(latitude: float) -> float:
+        return math.degrees(
+            math.atan2(math.tan(latitude), _URANUS_ONE_MINUS_F_SQ)
         )
-        sin_phi = max(-1.0, min(1.0, d[0] * pole[0] + d[1] * pole[1] + d[2] * pole[2]))
-        phi_centric = math.asin(sin_phi)
-        # Eq. 13: planetocentric -> planetographic latitude.
-        phi_graphic = math.atan2(math.tan(phi_centric), _URANUS_ONE_MINUS_F_SQ)
-        return abs(math.degrees(phi_graphic))
 
-    phi_earth = _sub_latitude(geo_lon, geo_lat)
-    phi_sun = _sub_latitude(helio_lon, helio_lat)
-    return (phi_earth + phi_sun) / 2.0
+    return (abs(_graphic(earth_lat)) + abs(_graphic(sun_lat))) / 2.0
+
+
+def _horner(coefficients: tuple[float, ...], value: float) -> float:
+    """Evaluate a polynomial with coefficients ordered from constant upward."""
+    result = 0.0
+    for coefficient in reversed(coefficients):
+        result = result * value + coefficient
+    return result
+
+
+def _sun_magnitude(distance_au: object) -> float:
+    """Return the published apparent Johnson-V magnitude of the Sun."""
+    distance = _validate_magnitude_real(distance_au, "observer-Sun distance")
+    if distance <= 0.0:
+        raise InputValidationError("observer-Sun distance must be positive")
+    return float(-26.76 + 5.0 * math.log10(distance))
+
+
+def _gregorian_year_fraction(jd_tt: float) -> float:
+    """Convert a TT Julian day to a proleptic-Gregorian decimal year."""
+    from .constants import GREG_CAL
+    from .time_utils import julday, revjul
+
+    year, _, _, _ = revjul(jd_tt, GREG_CAL)
+    start = julday(year, 1, 1, 0.0, GREG_CAL)
+    following = julday(year + 1, 1, 1, 0.0, GREG_CAL)
+    return float(year) + (jd_tt - start) / (following - start)
 
 
 def _calc_planet_magnitude(
@@ -11525,192 +11592,117 @@ def _calc_planet_magnitude(
     helio_lat: float = 0.0,
     tjd: float = 0.0,
 ) -> float:
+    """Calculate apparent Johnson-V magnitude from published planet laws.
+
+    ``helio_dist`` and ``geo_dist`` are Sun-to-body and observer-to-body
+    distances in AU.  ``phase_angle`` is the Sun-body-observer angle in
+    degrees.  The four direction arguments are ecliptic-of-date directions
+    from observer/Sun to the body, and ``tjd`` is the TT Julian day.
     """
-    Calculate visual magnitude of a planet.
+    if isinstance(ipl, bool) or not isinstance(ipl, int):
+        raise InputValidationError("body must be an integer planet identifier")
+    supported = {MERCURY, VENUS, MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO}
+    if ipl not in supported:
+        raise UnknownBodyError(f"unknown planet body id {ipl}", body_id=ipl)
 
-    Uses Mallama 2018 formulas for Mercury, Venus, Mars, Jupiter, Saturn
-    for reference-API compatibility. These formulas are from:
-    A. Mallama, J. Hilton, "Computing Apparent Planetary Magnitudes for
-    The Astronomical Almanac" (2018).
+    r = _validate_magnitude_real(helio_dist, "Sun-body distance")
+    d = _validate_magnitude_real(geo_dist, "observer-body distance")
+    alpha = _validate_magnitude_real(phase_angle, "phase angle")
+    if r <= 0.0 or d <= 0.0:
+        raise InputValidationError("planet distances must be positive")
+    if not 0.0 <= alpha <= 180.0:
+        raise InputValidationError("phase angle must be in [0, 180] degrees")
 
-    Args:
-        ipl: Planet ID
-        helio_dist: Heliocentric distance in AU
-        geo_dist: Geocentric distance in AU
-        phase_angle: Phase angle in degrees
-        geo_lon: Geocentric ecliptic longitude in degrees (for Saturn)
-        geo_lat: Geocentric ecliptic latitude in degrees (for Saturn)
-        helio_lon: Heliocentric ecliptic longitude in degrees (for Saturn)
-        helio_lat: Heliocentric ecliptic latitude in degrees (for Saturn)
-        tjd: Julian day (for Saturn ring tilt calculation)
+    distance = 5.0 * math.log10(r * d)
 
-    Returns:
-        Visual magnitude (smaller = brighter)
-    """
-    # Distance factor: 5 * log10(r * d)
-    if helio_dist > 0 and geo_dist > 0:
-        dist_factor = 5.0 * math.log10(helio_dist * geo_dist)
-    else:
-        dist_factor = 0.0
-
-    a = phase_angle  # Phase angle in degrees
-
-    # Mercury - Mallama 2018, 6th order polynomial
     if ipl == MERCURY:
-        a2 = a * a
-        a3 = a2 * a
-        a4 = a3 * a
-        a5 = a4 * a
-        a6 = a5 * a
-        magnitude = (
-            -0.613
-            + a * 6.3280e-02
-            - a2 * 1.6336e-03
-            + a3 * 3.3644e-05
-            - a4 * 3.4265e-07
-            + a5 * 1.6893e-09
-            - a6 * 3.0334e-12
+        phase_term = _horner(
+            (-0.613, 6.3280e-2, -1.6336e-3, 3.3644e-5,
+             -3.4265e-7, 1.6893e-9, -3.0334e-12),
+            alpha,
         )
-        magnitude += dist_factor
-        return magnitude
-
-    # Venus - Mallama 2018, piecewise polynomial
+        return float(distance + phase_term)
     if ipl == VENUS:
-        a2 = a * a
-        a3 = a2 * a
-        a4 = a3 * a
-        if a <= 163.7:
-            magnitude = (
-                -4.384
-                - a * 1.044e-03
-                + a2 * 3.687e-04
-                - a3 * 2.814e-06
-                + a4 * 8.938e-09
+        if alpha <= 163.7:
+            phase_term = _horner(
+                (-4.384, -1.044e-3, 3.687e-4, -2.814e-6, 8.938e-9),
+                alpha,
             )
         else:
-            magnitude = 236.05828 - a * 2.81914e00 + a2 * 8.39034e-03
-        magnitude += dist_factor
-        return magnitude
-
-    # Mars - Mallama 2018, piecewise polynomial
+            phase_term = _horner((236.05828, -2.81914, 8.39034e-3), alpha)
+        return float(distance + phase_term)
     if ipl == MARS:
-        a2 = a * a
-        if a <= 50.0:
-            magnitude = -1.601 + a * 0.02267 - a2 * 0.0001302
+        if alpha <= 50.0:
+            phase_term = _horner((-1.601, 0.02267, -0.0001302), alpha)
         else:
-            magnitude = -0.367 - a * 0.02573 + a2 * 0.0003445
-        magnitude += dist_factor
-        return magnitude
-
-    # Jupiter - Mallama 2018
+            phase_term = _horner((-0.367, -0.02573, 0.0003445), alpha)
+        return float(distance + phase_term)
     if ipl == JUPITER:
-        a2 = a * a
-        magnitude = -9.395 - a * 3.7e-04 + a2 * 6.16e-04
-        magnitude += dist_factor
-        return magnitude
-
-    # Saturn - Mallama 2018 with ring tilt from Meeus
+        if alpha > 12.0:
+            raise InputValidationError("Jupiter phase angle must not exceed 12 degrees")
+        return float(distance + _horner((-9.395, -3.7e-4, 6.16e-4), alpha))
     if ipl == SATURN:
-        # Ring tilt calculation from Meeus, p. 301ff
-        # T is centuries from J2000
-        T = (tjd - _J2000) / 36525.0
-
-        # Ring plane inclination and ascending node
-        incl = math.radians(28.075216 - 0.012998 * T + 0.000004 * T * T)
-        omega = math.radians(169.508470 + 1.394681 * T + 0.000412 * T * T)
-
-        # sinB is the sine of the ring tilt angle as seen from Earth/Sun
-        # B is the "mean tilt of the ring plane to the Earth and Sun"
-        # From Meeus formulae for ring visibility
-
-        # Geocentric position contribution
-        sin_B = math.sin(incl) * math.cos(math.radians(geo_lat)) * math.sin(
-            math.radians(geo_lon) - omega
-        ) - math.cos(incl) * math.sin(math.radians(geo_lat))
-
-        # Heliocentric position contribution
-        sin_B2 = math.sin(incl) * math.cos(math.radians(helio_lat)) * math.sin(
-            math.radians(helio_lon) - omega
-        ) - math.cos(incl) * math.sin(math.radians(helio_lat))
-
-        # Mean of the two tilt angles
-        sin_B = abs(math.sin((math.asin(sin_B) + math.asin(sin_B2)) / 2.0))
-
-        # Mallama 2018 formula for Saturn with ring contribution
-        magnitude = (
-            -8.914 - 1.825 * sin_B + 0.026 * a - 0.378 * sin_B * math.exp(-2.25 * a)
+        if alpha >= 6.5:
+            raise InputValidationError("Saturn phase angle must be below 6.5 degrees")
+        lon_e, lat_e = _validate_direction(
+            geo_lon,
+            geo_lat,
+            "observer ecliptic longitude",
+            "observer ecliptic latitude",
         )
-        magnitude += dist_factor
-        return magnitude
-
-    # Pluto - Mallama & Hilton 2018 formula
-    # From "Computing Apparent Planetary Magnitudes for The Astronomical Almanac"
-    # V(1,0) = -1.024 ± 0.003 mag (absolute magnitude at r=d=1 AU, α=0°)
-    # Phase coefficient β = 0.0362 ± 0.0004 mag/degree
-    # Formula: V = V(1,0) + 5*log10(r*d) + β*α
-    # Note: Pluto also has a rotational light curve amplitude of ~±0.15 mag
-    # with period 6.3872 days, but this requires sub-observer longitude data.
-    if ipl == PLUTO:
-        V0 = -1.024  # Absolute magnitude V(1,0)
-        beta = 0.0362  # Phase coefficient in mag/degree
-        phase_correction = beta * a  # Linear phase correction
-        magnitude = V0 + dist_factor + phase_correction
-        return magnitude
-
-    # Uranus - Mallama & Hilton (2018) complete photometric law (Eq. 15)
-    # From "Computing Apparent Planetary Magnitudes for The Astronomical Almanac"
-    # (Astronomy and Computing 25, 2018, 10-24; arXiv:1808.01973), which folds
-    # the sub-observer-latitude brightness variation and the phase-angle
-    # dependence into:
-    #     V = 5*log10(r*d) - 7.110 - 8.4e-4*phi' + 6.587e-3*a + 1.045e-4*a^2
-    # where phi' is the photometric latitude (average of the absolute
-    # planetographic sub-Earth and sub-solar latitudes; Eq. 14 gives the
-    # phase-free geocentric form). Uranus brightens as a pole turns toward the
-    # observer because its polar regions are depleted in light-absorbing
-    # methane (Schmude et al. 2015). Valid to a = 154 deg; geocentric a <= 3.1
-    # deg. The residual model divergence versus the reference API is documented
-    # in docs/comparison/intentional-divergences.md ("Outer-planet visual
-    # magnitude photometry").
+        lon_s, lat_s = _validate_direction(
+            helio_lon,
+            helio_lat,
+            "Sun ecliptic longitude",
+            "Sun ecliptic latitude",
+        )
+        jd = _validate_magnitude_real(tjd, "TT Julian day")
+        earth_beta, sun_beta = _sub_latitudes(
+            _pole_vector(40.589 - 0.036 * ((jd - _J2000) / 36525.0),
+                         83.537 - 0.004 * ((jd - _J2000) / 36525.0)),
+            lon_e, lat_e, lon_s, lat_s, jd,
+        )
+        beta = math.sqrt(abs(earth_beta * sun_beta)) if earth_beta * sun_beta > 0.0 else 0.0
+        beta_deg = math.degrees(beta)
+        if beta_deg >= 27.0:
+            raise InputValidationError("Saturn ring opening must be below 27 degrees")
+        sine = math.sin(math.radians(beta_deg))
+        return float(distance - 8.914 - 1.825 * sine + 0.026 * alpha
+                     - 0.378 * sine * math.exp(-2.25 * alpha))
     if ipl == URANUS:
-        phi_prime = _uranus_photometric_latitude(geo_lon, geo_lat, helio_lon, helio_lat)
-        magnitude = (
-            dist_factor
-            - 7.110
-            - 8.4e-04 * phi_prime
-            + 6.587e-03 * a
-            + 1.045e-04 * a * a
+        if alpha > 154.0:
+            raise InputValidationError("Uranus phase angle must not exceed 154 degrees")
+        lon_e, lat_e = _validate_direction(
+            geo_lon,
+            geo_lat,
+            "observer ecliptic longitude",
+            "observer ecliptic latitude",
         )
-        return magnitude
-
-    # Neptune - secular brightness variation
-    # Neptune's albedo has been increasing since ~1980 due to seasonal changes
-    # over its 165-year orbital period. The absolute magnitude V(1,0) transitions
-    # linearly from -6.89 (pre-1980) to -7.00 (by J2000.0).
-    # Reference: Lockwood & Thompson (1991), Sromovsky et al. (2003)
+        lon_s, lat_s = _validate_direction(
+            helio_lon,
+            helio_lat,
+            "Sun ecliptic longitude",
+            "Sun ecliptic latitude",
+        )
+        jd = _validate_magnitude_real(tjd, "TT Julian day")
+        phi_prime = _uranus_photometric_latitude(lon_e, lat_e, lon_s, lat_s, jd)
+        return float(distance - 7.110 - 8.4e-4 * phi_prime
+                     + 6.587e-3 * alpha + 1.045e-4 * alpha * alpha)
     if ipl == NEPTUNE:
-        year = 2000.0 + (tjd - _J2000) / 365.25
-        if year >= 2000.0:
-            V0 = -7.00
-        elif year <= 1980.0:
-            V0 = -6.89
+        if alpha > 1.9:
+            raise InputValidationError("Neptune phase angle must not exceed 1.9 degrees")
+        jd = _validate_magnitude_real(tjd, "TT Julian day")
+        year = _gregorian_year_fraction(jd)
+        if year < 1980.0:
+            absolute = -6.89
+        elif year <= 2000.0:
+            absolute = -6.89 - 0.0054 * (year - 1980.0)
         else:
-            # Linear interpolation: -6.89 at 1980 to -7.00 at 2000
-            V0 = -6.89 + (year - 1980.0) * (-0.11 / 20.0)
-        magnitude = V0 + dist_factor
-        return magnitude
+            absolute = -7.00
+        return float(distance + absolute)
+    # Pluto's existing published phase-only surface is retained unchanged.
+    return float(distance - 1.024 + 0.0362 * alpha)
 
-    # Outer planets using simplified formula
-    if ipl in _PLANET_MAG_PARAMS:
-        V0, B1, B2, B3 = _PLANET_MAG_PARAMS[ipl]
-        phase_factor = B1 * a + B2 * a**2 + B3 * a**3
-        magnitude = V0 + dist_factor + phase_factor
-        return magnitude
-
-    # Unknown planet - return approximate magnitude
-    H = 10.0  # Assumed absolute magnitude
-    if helio_dist > 0 and geo_dist > 0:
-        return H + 5.0 * math.log10(helio_dist * geo_dist)
-    return H
 
 
 # Aliases for reference API compatibility
