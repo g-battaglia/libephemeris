@@ -68,7 +68,7 @@ from __future__ import annotations
 import math
 from typing import List, Sequence, Tuple
 
-from .exceptions import PolarCircleError
+from .exceptions import CalculationError, PolarCircleError
 
 Vec3 = Tuple[float, float, float]
 
@@ -443,247 +443,170 @@ def _makransky_ecliptic_cut(
 
 
 def _makransky_intermediate_cusp(
-    index: int,
-    offset_deg: float,
-    armc_deg: float,
+    division_ra_deg: float,
+    working_armc_deg: float,
     lat_deg: float,
     sun_dec_deg: float,
     eps_rad: float,
 ) -> float:
-    """Compute one non-angular Sunshine cusp from Makransky's construction.
-
-    Provenance and derivation
-    -------------------------
-    The implementation is a direct re-expression of Bob Makransky's own
-    published spherical-trigonometry derivation, not of another ephemeris:
-
-    * M. J. Makransky, *Primary Directions: A Primer of Calculation* (1988),
-      pp. 36--39: definitions and derivation of meridian distance, zenith
-      distance, pole, ascensional difference ``Q`` and ``W``;
-    * M. J. Makransky, "The Solar House System" (November 1990; printed in
-      *Mercury Hour*, April 1991), pp. 145--148, especially the cusp algorithm
-      on pp. 147--148.
-
-    Author-distributed scans preserved by the Internet Archive:
-
-    * ``primarydirections_1.pdf`` (book pp. 1--48), capture 2016-03-08,
-      SHA-256 ``7e8e6c078ae63888605a0377eac187efd5b111a470925cd1944cbd180f04973c``;
-    * ``primarydirections_3.pdf`` (including pp. 145--148), same capture,
-      SHA-256 ``bd0056bf966f307c3752eb2b177136f78378b88382b166df707a0172e94976d8``.
-
-    The stable capture prefix is
-    ``https://web.archive.org/web/20160308075443id_/http://dearbrutus.com/``.
-    The scans are cited as evidence only and are not distributed by this
-    project.
-
-    Makransky defines every division point by an RA offset ``X`` from the
-    upper meridian (day arc) or lower meridian (night arc). His general
-    derivation defines meridian distance as the acute distance to the nearer
-    upper or lower meridian and states its upper/lower character separately
-    (pp. 15, 37--39). Ordinarily ``MD = |X|``. When a two-thirds division lies
-    beyond the east/west hour circle, ``|X| > 90 degrees``; changing to the
-    nearer meridian produces the complementary distance ``180 - |X|`` and:
-
-    1. changes whether the point is referred to the upper or lower meridian;
-    2. measures the acute prime-vertical arc from the 90-degree boundary,
-       giving ``|A + F - 90 degrees|``; and
-    3. reverses the sign used to form ``W = RA +/- Q``.
-
-    These are the standard spherical-coordinate continuation of the printed
-    acute-triangle algorithm across the east/west hour circle; Figure IV-4
-    fixes the relevant quadrants. At exactly ``MD = 90 degrees`` the separate
-    limiting formula printed on pp. 38 and 147 is used.
+    """Project one solar-parallel division through the horizon axis.
 
     Args:
-        index: Cusp number, one of 2, 3, 5, 6, 8, 9, 11 or 12.
-        offset_deg: Published RA offset ``X`` from the relevant meridian.
-        armc_deg: Working right ascension of the upper meridian.  For southern
-            latitudes the caller has already substituted RAIC, as instructed
-            on p. 148.
+        division_ra_deg: Right ascension of the selected division point.
+        working_armc_deg: Upper-meridian right ascension of the working frame.
         lat_deg: Signed geographic latitude.
         sun_dec_deg: Signed solar declination.
-        eps_rad: Obliquity of the ecliptic, in radians.
+        eps_rad: Obliquity in radians.
 
     Returns:
-        Ecliptic cusp longitude in degrees in ``[0, 360)``.
+        The oriented ecliptic intersection in degrees, normalized to
+        ``[0, 360)``.
+
+    Raises:
+        CalculationError: If the house and ecliptic planes coincide without a
+            unique oriented projective limit.
     """
-    nocturnal = index in (2, 3, 5, 6)
-    eastern_family = index in (2, 3, 11, 12)
+    armc_rad = math.radians(working_armc_deg)
+    latitude_rad = math.radians(lat_deg)
+    division_ra_rad = math.radians(division_ra_deg)
+    declination_rad = math.radians(sun_dec_deg)
+    _zenith, _east, north = _horizon_frame(armc_rad, latitude_rad)
+    ecliptic_normal = (0.0, -math.sin(eps_rad), math.cos(eps_rad))
 
-    # Page 147 measures night-arc offsets from RAIC and day-arc offsets from
-    # RAMC.  Keeping that distinction explicit makes the formula auditable.
-    ra_deg = (armc_deg + (180.0 if nocturnal else 0.0) + offset_deg) % 360.0
+    cos_declination = math.cos(declination_rad)
+    division = _unit_radec(division_ra_rad, declination_rad)
+    # t increases with apparent motion, hence RA is division_ra - t.
+    first_derivative = (
+        cos_declination * math.sin(division_ra_rad),
+        -cos_declination * math.cos(division_ra_rad),
+        0.0,
+    )
+    second_derivative = (
+        -cos_declination * math.cos(division_ra_rad),
+        -cos_declination * math.sin(division_ra_rad),
+        0.0,
+    )
+    third_derivative = tuple(-value for value in first_derivative)
+    fourth_derivative = tuple(-value for value in second_derivative)
+    division_derivatives = (
+        division,
+        first_derivative,
+        second_derivative,
+        third_derivative,
+        fourth_derivative,
+    )
+    intersections = tuple(
+        _cross(ecliptic_normal, _cross(north, derivative))
+        for derivative in division_derivatives
+    )
 
-    raw_md = abs(offset_deg)
-    beyond_east_west = raw_md > 90.0
-    md_deg = 180.0 - raw_md if beyond_east_west else raw_md
+    selected = next(
+        (vector for vector in intersections if _dot(vector, vector) != 0.0),
+        None,
+    )
+    if selected is None:
+        raise CalculationError("Makransky house and ecliptic planes coincide")
 
-    # A day-arc point starts as an upper-meridian distance (UMD), while a
-    # night-arc point starts as a lower-meridian distance (LMD).  Passing the
-    # east/west hour circle swaps those roles (Makransky fig. IV-4).
-    is_upper_distance = (not nocturnal) != beyond_east_west
-    abs_lat_deg = abs(lat_deg)
-    lat_rad = math.radians(lat_deg)
-    abs_lat_rad = math.radians(abs_lat_deg)
-    dec_rad = math.radians(sun_dec_deg)
-    md_rad = math.radians(md_deg)
-
-    if abs(md_deg - 90.0) < 1e-12:
-        # Makransky's explicit limiting expression for a point on the hour
-        # circle through the east and west horizon points (pp. 38 and 147).
-        zenith_distance = 90.0 - math.degrees(
-            math.atan(math.sin(abs_lat_rad) * math.tan(dec_rad))
-        )
-    else:
-        # A and B are the two right-spherical-triangle angles on pp. 37--38.
-        angle_a = math.degrees(math.atan(math.cos(lat_rad) * math.tan(md_rad)))
-        angle_b = math.degrees(math.atan(math.tan(abs_lat_rad) * math.cos(md_rad)))
-
-        # Makransky's four printed C rules collapse to one sign decision:
-        # subtract |DEC| exactly when latitude/declination have the same sign
-        # and MD is upper, or have opposite signs and MD is lower.
-        same_declination_hemisphere = (sun_dec_deg >= 0.0) == (lat_deg >= 0.0)
-        c_sign = -1.0 if same_declination_hemisphere == is_upper_distance else 1.0
-        triangle_c = angle_b + c_sign * abs(sun_dec_deg)
-        angle_f = math.degrees(
-            math.atan(
-                math.sin(abs_lat_rad)
-                * math.sin(md_rad)
-                * math.tan(math.radians(triangle_c))
+    # Derivatives of dot(Q(t), S(t)) at t=0. The first nonzero derivative
+    # determines the sign immediately after the exact division in increasing
+    # apparent motion, including a zero raw intersection.
+    selector_derivatives = []
+    for order in range(5):
+        selector_derivatives.append(
+            math.fsum(
+                math.comb(order, left_order)
+                * _dot(
+                    intersections[left_order],
+                    division_derivatives[order - left_order],
+                )
+                for left_order in range(order + 1)
             )
         )
-        zenith_distance = angle_a + angle_f
-
-        # For |X| > 90 degrees, A+F is measured past the east/west hour
-        # circle.  The acute arc used by the pole formula is its distance from
-        # that boundary, not the unreduced angle.
-        if beyond_east_west:
-            zenith_distance = abs(zenith_distance - 90.0)
-
-    # Formula IV-2 and IV-1 (p. 39).  Clamps only absorb round-off at the
-    # mathematical [-1, 1] limits; circumpolar input was rejected by caller.
-    pole_argument = math.sin(lat_rad) * math.sin(math.radians(zenith_distance))
-    pole_deg = math.degrees(math.asin(max(-1.0, min(1.0, pole_argument))))
-    q_argument = math.tan(dec_rad) * math.tan(math.radians(pole_deg))
-    q_deg = math.degrees(math.asin(max(-1.0, min(1.0, q_argument))))
-
-    # Formula IV-3 uses RA-Q for the eastern cusp family and RA+Q for the
-    # western family.  Beyond the east/west hour circle the celestial
-    # quadrant is exchanged, so the sign reverses while the cusp-number
-    # family (and therefore the final ecliptic branch) does not.
-    q_sign = -1.0 if eastern_family else 1.0
-    if beyond_east_west:
-        q_sign = -q_sign
-    w_deg = (ra_deg + q_sign * q_deg) % 360.0
-    return _makransky_ecliptic_cut(
-        w_deg,
-        pole_deg,
-        eps_rad,
-        eastern_family=eastern_family,
-    )
+    selector = next((value for value in selector_derivatives if value != 0.0), None)
+    if selector is None:
+        raise CalculationError("Makransky cusp has no unique oriented limit")
+    if selector < 0.0:
+        selected = tuple(-value for value in selected)  # type: ignore[assignment]
+    return _ecliptic_lon_deg(selected, eps_rad)
 
 
 def houses_sunshine_makransky(
     armc: float, lat: float, eps: float, asc: float, mc: float, sun_dec: float
 ) -> List[float]:
-    """Sunshine house cusps after Makransky (system letter ``i``).
-
-    The Sun's diurnal arc is divided into six equal parts and its nocturnal
-    arc into six equal parts; the division points, taken on the Sun's
-    parallel of declination, are carried to the ecliptic along house circles
-    through the north and south points of the horizon. The horizon and the
-    meridian are themselves house circles, so cusps 1, 4, 7 and 10 are the
-    four angles. Opposite intermediate cusps are generally not opposite in
-    longitude because the diurnal and nocturnal semi-arcs differ.
+    """Construct Makransky's twelve Sunshine house cusps.
 
     Args:
-        armc: Right ascension of the midheaven, degrees.
-        lat: Geographic latitude, degrees.
-        eps: True obliquity, degrees.
-        asc: Ascendant longitude, degrees (cusp 1).
-        mc: Midheaven longitude, degrees (cusp 10).
-        sun_dec: Declination of the Sun, degrees.
+        armc: Right ascension of the upper meridian, in degrees.
+        lat: Signed geographic latitude, in degrees.
+        eps: Obliquity, in degrees.
+        asc: Supplied Ascendant anchor, in degrees.
+        mc: Supplied Midheaven anchor, in degrees.
+        sun_dec: Solar declination, in degrees.
 
     Returns:
-        Thirteen floats; index 0 unused, 1-12 are the cusp longitudes.
+        A mutable 13-element list with index zero unused.
 
     Raises:
-        PolarCircleError: If the Sun is circumpolar at the given latitude,
-            leaving no sunrise or sunset to divide the day by.
+        ValueError: If numeric inputs are non-finite or outside their domains.
+        PolarCircleError: If the observer is at a geographic pole or the Sun is
+            circumpolar.
+        CalculationError: If a cusp plane has no unique oriented intersection.
     """
-    # Two regular limiting cases deserve an explicit note because they are
-    # easy to turn accidentally into quadrant special cases:
-    #
-    # * DEC = 0: the solar parallel is the celestial equator.  Makransky's
-    #   ascensional difference is exactly zero, hence NSA = DSA = 90 degrees
-    #   and both halves are trisected at 30/60 degrees.  In the subsequent
-    #   right-spherical triangles, Q tends continuously to zero.  Nothing in
-    #   the published construction changes cusp family or ecliptic branch as
-    #   DEC crosses zero.
-    # * LAT = 0: the zenith is on the celestial equator.  The pole of each
-    #   house circle is zero, so the construction is independent of solar
-    #   declination and reduces to carrying the twelve 30-degree RA divisions
-    #   to the ecliptic.  The unequal longitude gaps are solely the ordinary
-    #   RA-to-ecliptic projection caused by obliquity.
-    #
-    # Consequently exact zero is evaluated by the same equations as nearby
-    # values.  Do not branch on ``sun_dec == 0`` or on the sign bit of a
-    # floating-point zero: either would introduce a non-geometric 180-degree
-    # jump at the equinox.  Source-neutral regression tests below the public
-    # API verify both limits and the cyclic ordering of all twelve cusps.
-    tan_product = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
-    if abs(tan_product) >= 1.0:
+    values = (armc, lat, eps, asc, mc, sun_dec)
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("Makransky construction requires finite angles")
+    if not -90.0 <= lat <= 90.0:
+        raise ValueError("Makransky latitude must be in [-90, 90] degrees")
+    if not 0.0 <= eps < 90.0:
+        raise ValueError("Makransky obliquity must be in [0, 90) degrees")
+    if not -90.0 < sun_dec < 90.0:
+        raise ValueError("Makransky solar declination must be in (-90, 90) degrees")
+    if abs(lat) == 90.0:
+        raise PolarCircleError(
+            "Makransky horizon axis is undefined at a geographic pole",
+            latitude=lat,
+            house_system="i",
+        )
+
+    tangent_product = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
+    if abs(tangent_product) >= 1.0:
         raise PolarCircleError(
             f"Sunshine houses undefined: the Sun (declination {sun_dec:.4f}) "
             f"is circumpolar at latitude {lat:.4f}",
             latitude=lat,
             house_system="i",
         )
-    # Makransky p. 147: AD = asin(tan(DEC) tan(LAT)), then
-    # NSA = 90 - AD and DSA = 90 + AD.  The circumpolar guard above ensures
-    # the asin argument is strictly inside its domain.
-    ascensional_difference = math.degrees(math.asin(tan_product))
-    nocturnal_semiarc = 90.0 - ascensional_difference
-    diurnal_semiarc = 90.0 + ascensional_difference
-    night_third = nocturnal_semiarc / 3.0
-    day_third = diurnal_semiarc / 3.0
+    ascensional_difference = math.degrees(math.asin(tangent_product))
+    night_third = (90.0 - ascensional_difference) / 3.0
+    day_third = (90.0 + ascensional_difference) / 3.0
 
-    # Page 148 instructs southern latitudes to use RAIC in place of RAMC and
-    # rotate the resulting non-angular cusps by 180 degrees.  This is an exact
-    # coordinate transformation; the angular cusps supplied by the dispatcher
-    # are already hemisphere-correct and therefore are not rotated here.
     southern = lat < 0.0
-    working_armc = (armc + 180.0) % 360.0 if southern else armc
+    working_armc = armc + (180.0 if southern else 0.0)
+    lower_meridian = working_armc + 180.0
     output_rotation = 180.0 if southern else 0.0
     eps_rad = math.radians(eps)
 
     cusps = [0.0] * 13
-    cusps[1] = asc
-    cusps[7] = (asc + 180.0) % 360.0
-    cusps[10] = mc
-    cusps[4] = (mc + 180.0) % 360.0
-    # Exact offset table printed on p. 147.  It contains the eight
-    # intermediate cusps only; the four angles were assigned above.
-    offsets = (
-        (2, -2.0 * night_third),
-        (3, -night_third),
-        (5, night_third),
-        (6, 2.0 * night_third),
-        (8, -2.0 * day_third),
-        (9, -day_third),
-        (11, day_third),
-        (12, 2.0 * day_third),
-    )
-    for cusp, offset in offsets:
-        longitude = _makransky_intermediate_cusp(
-            cusp,
-            offset,
-            working_armc,
-            lat,
-            sun_dec,
-            eps_rad,
-        )
-        cusps[cusp] = (longitude + output_rotation) % 360.0
+    cusps[1] = float(asc % 360.0)
+    cusps[4] = float((mc + 180.0) % 360.0)
+    cusps[7] = float((asc + 180.0) % 360.0)
+    cusps[10] = float(mc % 360.0)
+
+    for step in (1, 2):
+        for cusp, meridian, displacement in (
+            (4 - step, lower_meridian, -step * night_third),
+            (4 + step, lower_meridian, step * night_third),
+            (10 - step, working_armc, -step * day_third),
+            (10 + step, working_armc, step * day_third),
+        ):
+            longitude = _makransky_intermediate_cusp(
+                meridian + displacement,
+                working_armc,
+                lat,
+                sun_dec,
+                eps_rad,
+            )
+            cusps[cusp] = float((longitude + output_rotation) % 360.0)
     return cusps
 
 
