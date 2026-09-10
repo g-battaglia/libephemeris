@@ -103,6 +103,7 @@ from .ayanamsha_definitions import (
 )
 
 from .exceptions import (
+    CalculationError,
     EphemerisRangeError,
     InputValidationError,
     LEBCorruptionError,
@@ -10597,266 +10598,249 @@ def _calc_moon_magnitude(
 
 
 def _moon_horizontal_parallax_deg(geo_dist_geometric_au: float) -> float:
-    """Equatorial horizontal parallax of the Moon for pheno slot [5].
-
-    Pheno attribute [5] carries the Moon's geocentric equatorial horizontal
-    parallax (0.0 for every other body — compatibility contract). The
-    convention is the textbook relation
-
-        sin(pi) = R_eq / d
-
-    with R_eq the Earth equatorial radius (6378.1366 km, IAU/IERS 2003) and d
-    the *geometric* geocentric distance (light-time removed), independent of the
-    request's FLG_TRUEPOS bit. See the Explanatory Supplement to the
-    Astronomical Almanac and Meeus, Astronomical Algorithms, ch. 40.
+    """Return lunar equatorial horizontal parallax from geometric distance.
 
     Args:
-        geo_dist_geometric_au: Geometric geocentric Moon distance in AU.
+        geo_dist_geometric_au: Positive finite Earth-Moon centre distance in AU.
 
     Returns:
-        Equatorial horizontal parallax in degrees (0.0 if the distance is
-        non-positive).
+        Equatorial horizontal parallax in degrees.
+
+    Raises:
+        InputValidationError: If the distance is not finite and positive, or
+            places the Moon's centre inside the adopted equatorial Earth radius.
     """
-    d_km = geo_dist_geometric_au * _AU_KM
-    if d_km <= 0.0:
-        return 0.0
-    return math.degrees(math.asin(_EARTH_EQ_RADIUS_KM / d_km))
+    distance = _validate_magnitude_real(
+        geo_dist_geometric_au, "geometric geocentric Moon distance"
+    )
+    distance_km = distance * _AU_KM
+    if distance_km <= 0.0:
+        raise InputValidationError(
+            "geometric geocentric Moon distance must be positive"
+        )
+    ratio = _EARTH_EQ_RADIUS_KM / distance_km
+    if ratio > 1.0:
+        raise InputValidationError(
+            "geometric geocentric Moon distance must exceed the Earth radius"
+        )
+    return float(math.degrees(math.asin(ratio)))
+
+
+def _vector_norm(vector) -> float:
+    """Return the Euclidean norm of a three-component vector."""
+    return float(math.sqrt(sum(float(value) ** 2 for value in vector)))
+
+
+def _vector_angle_deg(left, right, name: str) -> float:
+    """Return the stable unsigned angle between two Cartesian vectors."""
+    lx, ly, lz = (float(value) for value in left)
+    rx, ry, rz = (float(value) for value in right)
+    left_norm = math.sqrt(lx * lx + ly * ly + lz * lz)
+    right_norm = math.sqrt(rx * rx + ry * ry + rz * rz)
+    if not (
+        left_norm > 0.0
+        and right_norm > 0.0
+        and math.isfinite(left_norm)
+        and math.isfinite(right_norm)
+    ):
+        raise CalculationError(f"{name} requires finite non-zero vectors")
+    cross_x = ly * rz - lz * ry
+    cross_y = lz * rx - lx * rz
+    cross_z = lx * ry - ly * rx
+    cross_norm = math.sqrt(cross_x * cross_x + cross_y * cross_y + cross_z * cross_z)
+    dot = lx * rx + ly * ry + lz * rz
+    return float(math.degrees(math.atan2(cross_norm, dot)))
+
+
+def _phenomena_geometry(body_vector, sun_vector) -> tuple[float, float, float]:
+    """Return phase angle, illuminated fraction and elongation from ``P,S``."""
+    p = tuple(float(value) for value in body_vector)
+    s = tuple(float(value) for value in sun_vector)
+    body_to_observer = tuple(-value for value in p)
+    body_to_sun = tuple(sun - body for sun, body in zip(s, p))
+    phase_angle = _vector_angle_deg(body_to_observer, body_to_sun, "phase geometry")
+    elongation = _vector_angle_deg(p, s, "elongation geometry")
+    phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
+    return float(phase_angle), float(phase), float(elongation)
+
+
+def _spherical_vector(position) -> tuple[float, float, float]:
+    """Convert a longitude/latitude/distance position to Cartesian form."""
+    longitude = math.radians(float(position[0]))
+    latitude = math.radians(float(position[1]))
+    distance = float(position[2])
+    cos_latitude = math.cos(latitude)
+    return (
+        distance * cos_latitude * math.cos(longitude),
+        distance * cos_latitude * math.sin(longitude),
+        distance * math.sin(latitude),
+    )
+
+
+def _leb_is_system_barycenter(reader, body_id: int) -> bool:
+    """Whether a stored LEB body needs the runtime centre correction."""
+    from . import fast_calc
+
+    return (
+        reader.has_body(body_id)
+        and reader._bodies[body_id].coord_type == fast_calc.COORD_ICRS_BARY_SYSTEM
+    )
+
+
+def _leb_geometric_body_state(reader, body_id: int, jd_tt: float):
+    """Return a simultaneous geometric barycentric LEB body-centre state."""
+    from . import fast_calc
+
+    return fast_calc._eval_body_center_state(
+        reader,
+        body_id,
+        jd_tt,
+        is_system_bary=_leb_is_system_barycenter(reader, body_id),
+    )[0]
+
+
+def _leb_photometric_distance(reader, body_id: int, jd_tt: float) -> float:
+    """Return simultaneous geometric Sun-body distance from stored states."""
+    body = _leb_geometric_body_state(reader, body_id, jd_tt)
+    sun = _leb_geometric_body_state(reader, SUN, jd_tt)
+    return _vector_norm(tuple(a - b for a, b in zip(body, sun)))
+
+
+def _leb_observer_vector(
+    reader, tjd_ut: float, body_id: int, iflag: int, *, topocentric: bool
+):
+    """Return the LEB observer-to-body vector in ICRS Cartesian coordinates."""
+    from . import fast_calc
+    from .time_utils import deltat
+
+    jd_tt = tjd_ut + deltat(tjd_ut)
+    topo_offset = None
+    if topocentric:
+        observer = get_topo()
+        if observer is None:
+            from .exceptions import ConfigurationError
+
+            raise ConfigurationError("set_topo() must be called before FLG_TOPOCTR")
+        geopos = (
+            float(observer.longitude.degrees),
+            float(observer.latitude.degrees),
+            float(observer.elevation.m),
+        )
+        topo_offset = fast_calc._topocentric_offset(geopos, jd_tt, tjd_ut, reader)
+    vector_flags = (iflag & FLG_TRUEPOS) | FLG_EQUATORIAL | FLG_J2000 | FLG_ICRS
+    result = fast_calc._pipeline_icrs(
+        reader,
+        jd_tt,
+        body_id,
+        vector_flags,
+        is_system_bary=_leb_is_system_barycenter(reader, body_id),
+        topo_offset=topo_offset,
+        want_xyz=True,
+    )
+    return tuple(float(value) for value in result[:3])
 
 
 def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
-    """Compute planetary phenomena using the LEB fast path.
-
-    Calls ``fast_calc.fast_calc_ut`` directly to obtain positions without
-    loading the Skyfield DE kernel.  The results are numerically equivalent
-    to ``_calc_pheno`` for all bodies
-    supported by the LEB reader.
-
-    Args:
-        tjd_ut: Julian Day in Universal Time (UT1).
-        ipl: Planet/body ID (SUN, MOON, MERCURY, etc.).
-        iflag: Calculation flags.
-
-    Returns:
-        Tuple of 20 floats (matching the reference API).
-
-    Raises:
-        KeyError: If the body is not available in the LEB reader.
-        ValueError: If the date is outside the LEB coverage.
-    """
+    """Compute phenomena from the sealed LEB position pipeline."""
     from . import fast_calc
     from .state import get_leb_reader
-    from .utils import angular_separation
 
-    # Built-in asteroids requested via the AST_OFFSET + number alias resolve to
-    # their dedicated id (AST_OFFSET + 4 -> Vesta, AST_OFFSET + 5145 -> Pholus),
-    # exactly as calc_ut serves the position, so their pheno matches the
-    # built-in id. Registry-served numbered asteroids keep their own id.
-    ipl = _remap_ast_offset(ipl)
-
+    body_id = _remap_ast_offset(ipl)
     reader = get_leb_reader()
     if reader is None:
-        raise KeyError("No LEB reader available for _calc_pheno_leb")
+        raise KeyError("No LEB reader is configured")
+    if body_id not in _PLANET_MAP and body_id not in _ASTEROID_HG:
+        return _pheno_positional(tjd_ut, body_id, iflag)
 
-    def _leb_calc(jd, body, flags):
-        """Call fast_calc directly — no Skyfield fallback."""
-        return fast_calc.fast_calc_ut(reader, jd, body, flags)
+    flags = iflag & ~FLG_HELCTR
+    state_flags = flags & (FLG_TRUEPOS | FLG_TOPOCTR)
+    topocentric = bool(state_flags & FLG_TOPOCTR)
+    body_vector = _leb_observer_vector(
+        reader, tjd_ut, body_id, state_flags, topocentric=topocentric
+    )
+    sun_vector = _leb_observer_vector(
+        reader, tjd_ut, SUN, state_flags, topocentric=topocentric
+    )
+    body_distance = _vector_norm(body_vector)
 
-    # Preserve FLG_TRUEPOS to match _calc_pheno() which uses geometric
-    # positions when TRUEPOS is set, and FLG_TOPOCTR so the observer's
-    # topocentric place drives every distance-derived quantity (the reference
-    # honors FLG_TOPOCTR in pheno). NOABERR/NOGDEFL are NOT propagated because
-    # their semantics differ between fast_calc and Skyfield.
-    base_flags = FLG_SPEED | (iflag & (FLG_TRUEPOS | FLG_TOPOCTR))
-
-    # Unsupported bodies (nodes, apogees, etc.) — match _calc_pheno() behavior
-    _PHENO_SUPPORTED = {
-        SUN,
-        MOON,
-        MERCURY,
-        VENUS,
-        MARS,
-        JUPITER,
-        SATURN,
-        URANUS,
-        NEPTUNE,
-        PLUTO,
-    }
-    if ipl not in _PHENO_SUPPORTED and ipl not in _ASTEROID_HG:
-        # Point and model bodies without a physical disc: the compatibility
-        # contract fills the geometric phase triplet from their positions.
-        return _pheno_positional(tjd_ut, ipl, iflag)
-
-    # ------------------------------------------------------------------
-    # Special case: Sun
-    # ------------------------------------------------------------------
-    if ipl == SUN:
-        sun_pos, _ = _leb_calc(tjd_ut, SUN, base_flags)
-        sun_dist_au = float(sun_pos[2])
-
-        sun_radius_km = _BODY_RADIUS_KM[SUN]
-        diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
-        magnitude = _sun_magnitude(sun_dist_au)
-
-        # Phase quantities are inapplicable to the self-luminous Sun: the
-        # phase triplet (angle, fraction, elongation) reports 0.0.
+    if body_id == SUN:
+        diameter = _calc_apparent_diameter(_BODY_RADIUS_KM[SUN], body_distance)
+        magnitude = _sun_magnitude(body_distance)
         return (0.0, 0.0, 0.0, diameter, magnitude) + (0.0,) * 15
 
-    # ------------------------------------------------------------------
-    # Geocentric ecliptic positions of target and Sun
-    # ------------------------------------------------------------------
-    target_pos, _ = _leb_calc(tjd_ut, ipl, base_flags)
-    sun_pos, _ = _leb_calc(tjd_ut, SUN, base_flags)
+    phase_angle, phase, elongation = _phenomena_geometry(body_vector, sun_vector)
+    body_position, _ = fast_calc.fast_calc_ut(reader, tjd_ut, body_id, state_flags)
+    from .time_utils import deltat
 
-    target_lon = float(target_pos[0])
-    target_lat = float(target_pos[1])
-    geo_dist = float(target_pos[2])
-
-    sun_lon = float(sun_pos[0])
-    sun_lat = float(sun_pos[1])
-    sun_dist = float(sun_pos[2])  # Earth-Sun distance in AU
-
-    # ------------------------------------------------------------------
-    # Elongation (angular separation on the ecliptic sphere)
-    # ------------------------------------------------------------------
-    elongation = angular_separation(target_lon, target_lat, sun_lon, sun_lat)
-
-    # ------------------------------------------------------------------
-    # Heliocentric distance of the target
-    # ------------------------------------------------------------------
-    helio_pos, _ = _leb_calc(tjd_ut, ipl, (base_flags & ~FLG_TOPOCTR) | FLG_HELCTR)
-    helio_dist = float(helio_pos[2])
-
-    # ------------------------------------------------------------------
-    # Phase angle
-    # ------------------------------------------------------------------
-    # Phase angle from the apparent geocentric triangle: both the body→Earth
-    # and body→Sun legs come from the apparent geocentric Sun and body vectors
-    # (geometric under FLG_TRUEPOS). This mirrors the Skyfield _calc_pheno()
-    # composition exactly, so the two backends agree to <0.01"; see the note
-    # there and docs/comparison/intentional-divergences.md for why the
-    # reference's own (unpublished) composition is not tracked.
-    try:
-        # body→Earth: antipode of the body's apparent ecliptic direction
-        _lat_r = math.radians(target_lat)
-        _lon_r = math.radians(target_lon)
-        be = (
-            -math.cos(_lat_r) * math.cos(_lon_r),
-            -math.cos(_lat_r) * math.sin(_lon_r),
-            -math.sin(_lat_r),
+    jd_tt = tjd_ut + deltat(tjd_ut)
+    illumination_distance = _leb_photometric_distance(reader, body_id, jd_tt)
+    body_radius: float | None
+    if body_id in _ASTEROID_DIAMETER_KM:
+        body_radius = _ASTEROID_DIAMETER_KM[body_id] / 2.0
+    else:
+        body_radius = _BODY_RADIUS_KM.get(body_id)
+    diameter = (
+        _calc_apparent_diameter(body_radius, body_distance)
+        if body_radius is not None
+        else 0.0
+    )
+    if body_id == MOON:
+        magnitude = _calc_moon_magnitude(
+            phase_angle, body_distance, illumination_distance
         )
-        # Sun−body from the spherical outputs (apparent, or geometric under
-        # FLG_TRUEPOS, since target_pos/sun_pos honour the flag above)
-        _slat = math.radians(sun_lat)
-        _slon = math.radians(sun_lon)
-        s_vec = (
-            sun_dist * math.cos(_slat) * math.cos(_slon),
-            sun_dist * math.cos(_slat) * math.sin(_slon),
-            sun_dist * math.sin(_slat),
+    elif body_id in _ASTEROID_HG:
+        magnitude = _asteroid_hg_magnitude(
+            body_id, phase_angle, illumination_distance, body_distance
         )
-        b_vec = (
-            -geo_dist * be[0],
-            -geo_dist * be[1],
-            -geo_dist * be[2],
+    else:
+        geocentric = body_position
+        heliocentric, _ = fast_calc.fast_calc_ut(
+            reader, tjd_ut, body_id, FLG_HELCTR | FLG_TRUEPOS
         )
-        bs = (
-            s_vec[0] - b_vec[0],
-            s_vec[1] - b_vec[1],
-            s_vec[2] - b_vec[2],
-        )
-        dot = bs[0] * be[0] + bs[1] * be[1] + bs[2] * be[2]
-        mag_bs = math.sqrt(bs[0] ** 2 + bs[1] ** 2 + bs[2] ** 2)
-        mag_be = math.sqrt(be[0] ** 2 + be[1] ** 2 + be[2] ** 2)
-        if mag_bs > 0 and mag_be > 0:
-            cos_pa = max(-1.0, min(1.0, dot / (mag_bs * mag_be)))
-            phase_angle = math.degrees(math.acos(cos_pa))
-        else:
-            phase_angle = 0.0
-    except (KeyError, ValueError):
-        # Fallback: scalar law-of-cosines (sufficient for planets)
-        if geo_dist > 0 and helio_dist > 0:
-            cos_pa = (geo_dist**2 + helio_dist**2 - sun_dist**2) / (
-                2.0 * geo_dist * helio_dist
+        if body_id == NEPTUNE:
+            magnitude = _calc_neptune_magnitude(
+                illumination_distance, body_distance, jd_tt
             )
-            cos_pa = max(-1.0, min(1.0, cos_pa))
-            phase_angle = math.degrees(math.acos(cos_pa))
-        else:
-            phase_angle = 0.0
-
-    # ------------------------------------------------------------------
-    # Phase (illuminated fraction)
-    # ------------------------------------------------------------------
-    phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
-
-    # ------------------------------------------------------------------
-    # Apparent diameter
-    # ------------------------------------------------------------------
-    if ipl in _ASTEROID_DIAMETER_KM:
-        body_radius_km = _ASTEROID_DIAMETER_KM[ipl] / 2.0
-    else:
-        body_radius_km = _BODY_RADIUS_KM.get(ipl, 1000.0)
-    diameter = _calc_apparent_diameter(body_radius_km, geo_dist)
-
-    # ------------------------------------------------------------------
-    # Visual magnitude
-    # ------------------------------------------------------------------
-    if ipl == MOON:
-        magnitude = _calc_moon_magnitude(phase_angle, geo_dist, helio_dist)
-    elif ipl in _ASTEROID_HG:
-        magnitude = _asteroid_hg_magnitude(ipl, phase_angle, helio_dist, geo_dist)
-    else:
-        # For Saturn we need ecliptic coordinates for ring tilt
-        geo_lon = float(target_pos[0])
-        geo_lat = float(target_pos[1])
-        helio_lon = float(helio_pos[0])
-        helio_lat = float(helio_pos[1])
-
-        # TT approximation for Saturn ring / Neptune secular brightness
-        from .time_utils import deltat
-
-        tjd = tjd_ut + deltat(tjd_ut)
-
-        if ipl == NEPTUNE:
-            magnitude = _calc_neptune_magnitude(helio_dist, geo_dist, tjd)
         else:
             magnitude = _calc_planet_magnitude(
-                ipl,
-                helio_dist,
-                geo_dist,
+                body_id,
+                illumination_distance,
+                body_distance,
                 phase_angle,
-                geo_lon,
-                geo_lat,
-                helio_lon,
-                helio_lat,
-                tjd,
+                float(geocentric[0]),
+                float(geocentric[1]),
+                float(heliocentric[0]),
+                float(heliocentric[1]),
+                jd_tt,
             )
 
-    # Slot [5]: the Moon's horizontal parallax (0.0 for every other body —
-    # a convention of this library). With no observer set the slot carries the
-    # geocentric equatorial horizontal parallax; under FLG_TOPOCTR it
-    # carries the actual geocentric->topocentric parallactic displacement.
-    # Neither depends on the request's FLG_TRUEPOS bit.
-    slot5 = 0.0
-    if ipl == MOON:
-        if iflag & FLG_TOPOCTR:
-            geo_app, _ = _leb_calc(
-                tjd_ut, MOON, base_flags & ~(FLG_TOPOCTR | FLG_TRUEPOS)
+    parallax = 0.0
+    if body_id == MOON:
+        if flags & FLG_TOPOCTR:
+            geocentric = _leb_observer_vector(
+                reader, tjd_ut, MOON, 0, topocentric=False
             )
-            topo_app, _ = _leb_calc(
-                tjd_ut, MOON, (base_flags | FLG_TOPOCTR) & ~FLG_TRUEPOS
+            topocentric_vector = _leb_observer_vector(
+                reader, tjd_ut, MOON, 0, topocentric=True
             )
-            slot5 = angular_separation(
-                float(geo_app[0]),
-                float(geo_app[1]),
-                float(topo_app[0]),
-                float(topo_app[1]),
+            parallax = _vector_angle_deg(
+                geocentric, topocentric_vector, "topocentric lunar parallax"
             )
         else:
-            geom_pos, _ = _leb_calc(
-                tjd_ut, MOON, (base_flags & ~FLG_TOPOCTR) | FLG_TRUEPOS
+            moon_state = _leb_geometric_body_state(reader, MOON, jd_tt)
+            earth_state = _leb_geometric_body_state(reader, EARTH, jd_tt)
+            distance = _vector_norm(
+                tuple(moon - earth for moon, earth in zip(moon_state, earth_state))
             )
-            slot5 = _moon_horizontal_parallax_deg(float(geom_pos[2]))
-
-    return (phase_angle, phase, elongation, diameter, magnitude, slot5) + (0.0,) * 14
+            parallax = _moon_horizontal_parallax_deg(distance)
+    return (
+        phase_angle,
+        phase,
+        elongation,
+        diameter,
+        float(magnitude),
+        float(parallax),
+    ) + (0.0,) * 14
 
 
 def _calc_pheno_asteroid(t, ipl: int, iflag: int) -> Tuple[float, ...]:
@@ -11117,349 +11101,140 @@ def _pheno_positional(jd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     return (phase_angle, phase, elongation) + (0.0,) * 17
 
 
+def _direct_pheno_target(planets, body_id: int):
+    """Resolve a physical body target from the active direct ephemeris."""
+    if body_id == MOON:
+        return planets["moon"]
+    target_name = _PLANET_MAP.get(body_id)
+    if target_name is None:
+        raise UnknownBodyError(f"unknown body id {body_id}", body_id=body_id)
+    return get_planet_target(planets, target_name)
+
+
+def _direct_observer(t, planets, topocentric: bool):
+    """Return the geocentric or configured topocentric Skyfield observer."""
+    earth = planets["earth"]
+    if not topocentric:
+        return earth
+    geographic = get_topo()
+    if geographic is None:
+        from .exceptions import ConfigurationError
+
+        raise ConfigurationError(
+            "FLG_TOPOCTR requires a geographic position: call "
+            "set_topo(lon, lat, alt) first",
+            missing_config="observer_location",
+            suggestion="Call set_topo(lon, lat, alt) first",
+        )
+    return earth + geographic
+
+
+def _direct_observer_vector(t, observer, target, geometric: bool):
+    """Return one observer-centred direct-ephemeris vector in AU."""
+    if geometric:
+        position = (target - observer).at(t)
+    else:
+        from .cache import get_cached_observer_at
+
+        position = get_cached_observer_at(observer, t).observe(target).apparent()
+    return tuple(float(value) for value in position.position.au), position
+
+
+def _direct_photometric_vector(t, target, sun):
+    """Return the simultaneous geometric Sun-to-body vector in AU."""
+    from skyfield.positionlib import ICRF
+
+    target_state = target.at(t)
+    sun_state = sun.at(t)
+    position = target_state.position.au - sun_state.position.au
+    velocity = target_state.velocity.au_per_d - sun_state.velocity.au_per_d
+    place = ICRF(position, velocity, t=t, center=10, target=target_state.target)
+    return tuple(float(value) for value in position), place
+
+
 def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
-    """
-    Internal function to compute planetary phenomena.
-
-    Calculates:
-    1. Phase angle: angle Sun-Planet-Earth (for inner planets) or Earth-Planet-Sun (for outer)
-    2. Phase: illuminated fraction using (1 + cos(phase_angle)) / 2
-    3. Elongation: angular separation between planet and Sun as seen from Earth
-    4. Apparent diameter: angular size of planet's disc
-    5. Visual magnitude: brightness using empirical formulas
-
-    Args:
-        t: Skyfield Time object
-        ipl: Planet/body ID
-        iflag: Calculation flags
-
-    Returns:
-        Tuple of 20 floats (bare tuple, matching the reference API).
-    """
-
-    from .cache import get_cached_observer_at
+    """Compute phenomena from direct-ephemeris observer and body states."""
+    body_id = _remap_ast_offset(ipl)
+    flags = iflag & ~FLG_HELCTR
+    if body_id not in _PLANET_MAP:
+        if body_id in _ASTEROID_HG:
+            return _calc_pheno_asteroid(t, body_id, flags)
+        return _pheno_positional(float(t.ut1), body_id, flags)
 
     planets = _get_computation_ephemeris()
-
-    # Built-in asteroids requested via the AST_OFFSET + number alias resolve to
-    # their dedicated id (AST_OFFSET + 4 -> Vesta, AST_OFFSET + 5145 -> Pholus),
-    # matching calc_ut's position aliasing and the built-in id's pheno.
-    # Registry-served numbered asteroids keep their own id.
-    ipl = _remap_ast_offset(ipl)
-
-    # Compatibility contract: pheno ignores FLG_HELCTR — every quantity is
-    # Earth-based regardless of the observer flag.
-    iflag &= ~FLG_HELCTR
-
     earth = planets["earth"]
     sun = planets["sun"]
+    target = _direct_pheno_target(planets, body_id)
+    topocentric = bool(flags & FLG_TOPOCTR)
+    observer = _direct_observer(t, planets, topocentric)
+    geometric = bool(flags & FLG_TRUEPOS)
+    body_vector, body_place = _direct_observer_vector(t, observer, target, geometric)
+    body_distance = _vector_norm(body_vector)
 
-    # Pheno DOES honor FLG_TOPOCTR (public behaviour of this library): every
-    # distance-derived quantity (apparent diameter, phase angle, elongation,
-    # magnitude) is taken from the observer's topocentric place rather than
-    # the geocentre (the effect is ~arcseconds of diameter and up to ~0.4 deg
-    # of phase angle for the Moon, sub-milli for the far planets). Build the
-    # topocentric observer once and use it for both the target and Sun legs.
-    if iflag & FLG_TOPOCTR:
-        observer_topo = get_topo()
-        if observer_topo is None:
-            from .exceptions import ConfigurationError
+    if body_id == SUN:
+        diameter = _calc_apparent_diameter(_BODY_RADIUS_KM[SUN], body_distance)
+        magnitude = _sun_magnitude(body_distance)
+        return (0.0, 0.0, 0.0, diameter, magnitude) + (0.0,) * 15
 
-            raise ConfigurationError(
-                "FLG_TOPOCTR requires a geographic position: call "
-                "set_topo(lon, lat, alt) first",
-                missing_config="observer_location",
-                suggestion="Call set_topo(lon, lat, alt) first",
-            )
-        observer = earth + observer_topo
+    sun_vector, _ = _direct_observer_vector(t, observer, sun, geometric)
+    phase_angle, phase, elongation = _phenomena_geometry(body_vector, sun_vector)
+    illumination_vector, illumination_place = _direct_photometric_vector(t, target, sun)
+    illumination_distance = _vector_norm(illumination_vector)
+    radius = _BODY_RADIUS_KM.get(body_id)
+    diameter = (
+        _calc_apparent_diameter(radius, body_distance) if radius is not None else 0.0
+    )
+
+    if body_id == MOON:
+        magnitude = _calc_moon_magnitude(
+            phase_angle, body_distance, illumination_distance
+        )
+    elif body_id == NEPTUNE:
+        magnitude = _calc_neptune_magnitude(
+            illumination_distance, body_distance, float(t.tt)
+        )
     else:
-        observer = earth
-
-    # Initialize return values
-    phase_angle = 0.0
-    phase = 1.0
-    elongation = 0.0
-    diameter = 0.0
-    magnitude = 0.0
-
-    # Special case: Sun
-    if ipl == SUN:
-        # Phase quantities are inapplicable to the self-luminous Sun: every
-        # slot of the phase triplet reports 0.0 (phase angle, illuminated
-        # fraction, elongation).
-        # Get Sun distance from the (possibly topocentric) observer.
-        sun_pos = get_cached_observer_at(observer, t).observe(sun).apparent()
-        _, _, sun_dist = sun_pos.radec()
-
-        phase_angle = 0.0
-        phase = 0.0
-        elongation = 0.0
-
-        # Apparent diameter of Sun based on physical radius
-        sun_dist_au = float(sun_dist.au)
-        sun_radius_km = _BODY_RADIUS_KM[SUN]
-        diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
-
-        # Sun magnitude uses the published Johnson-V value at 1 AU.
-        magnitude = _sun_magnitude(sun_dist_au)
-
-        attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
-        return attr
-
-    # Get geocentric (or topocentric under FLG_TOPOCTR) position of target
-    if ipl == MOON:
-        target = planets["moon"]
-    elif ipl in _PLANET_MAP:
-        target_name = _PLANET_MAP[ipl]
-        # Try planet center first, fall back to barycenter if not available
-        try:
-            target = planets[target_name]
-        except KeyError:
-            if target_name in _PLANET_FALLBACK:
-                target = planets[_PLANET_FALLBACK[target_name]]
-            else:
-                raise
-    elif ipl in _ASTEROID_HG:
-        # Curated asteroids: positions via calc_ut (SPK/Keplerian backend),
-        # photometry via the IAU H-G system (compatibility contract).
-        return _calc_pheno_asteroid(t, ipl, iflag)
-    else:
-        # Point and model bodies without a physical disc: the compatibility
-        # contract fills the geometric phase triplet from their positions.
-        return _pheno_positional(float(t.ut1), ipl, iflag)
-
-    # Get observed positions (observer is geocentric or, under FLG_TOPOCTR,
-    # the topocentre; set once near the top of this function).
-    obs_at_t = get_cached_observer_at(observer, t)
-    if iflag & FLG_TRUEPOS:
-        # True geometric positions at t on BOTH legs: observe() would still
-        # retard the target by light time, which the reference removes.
-        target_pos_geo = (target - observer).at(t)
-        sun_pos_geo = (sun - observer).at(t)
-    else:
-        # Apparent positions
-        target_pos_geo = obs_at_t.observe(target).apparent()
-        sun_pos_geo = obs_at_t.observe(sun).apparent()
-
-    # Get heliocentric position of target for phase calculations
-    target_helio = get_cached_observer_at(sun, t).observe(target)
-    target_helio_dist = math.sqrt(sum(x**2 for x in target_helio.position.au))
-
-    # Get geocentric distance
-    target_geo_dist = math.sqrt(sum(x**2 for x in target_pos_geo.position.au))
-
-    # Special handling for Moon
-    if ipl == MOON:
-        # Sun position from Earth, same flavor (geometric/apparent) as the
-        # Moon leg above.
-        sun_from_earth = sun_pos_geo
-
-        # Get RA/Dec of Moon and Sun
-        moon_ra, moon_dec, moon_dist = target_pos_geo.radec()
-        sun_ra, sun_dec, sun_dist = sun_from_earth.radec()
-
-        # Elongation: angular distance between Moon and Sun
-        # Using spherical trigonometry
-        moon_ra_rad = moon_ra.radians
-        moon_dec_rad = moon_dec.radians
-        sun_ra_rad = sun_ra.radians
-        sun_dec_rad = sun_dec.radians
-
-        cos_elong = math.sin(moon_dec_rad) * math.sin(sun_dec_rad) + math.cos(
-            moon_dec_rad
-        ) * math.cos(sun_dec_rad) * math.cos(moon_ra_rad - sun_ra_rad)
-        cos_elong = max(-1.0, min(1.0, cos_elong))
-        elongation = math.degrees(math.acos(cos_elong))
-
-        # Phase angle for Moon using 3D vector approach
-        # The phase angle is the angle at the Moon vertex between the
-        # Sun-Moon and Earth-Moon directions. Using position vectors
-        # is more numerically stable than law-of-cosines for the Moon's
-        # extremely elongated triangle (Sun~1AU, Moon~0.003AU from Earth).
-        r_moon = float(moon_dist.au)  # Earth-Moon distance (native float, not numpy)
-
-        # Vectors in geocentric frame (Earth at origin)
-        M = target_pos_geo.position.au  # Moon position
-        S = sun_from_earth.position.au  # Sun position
-
-        # Sun-Moon distance (for the magnitude model below)
-        vec_moon_to_sun = S - M
-        vec_moon_to_earth = -M
-        mag_ms = math.sqrt(sum(x**2 for x in vec_moon_to_sun))
-        mag_me = math.sqrt(sum(x**2 for x in vec_moon_to_earth))
-
-        # Phase angle from the apparent geocentric triangle: both legs are
-        # taken from the apparent geocentric Sun and Moon vectors (geometric
-        # under FLG_TRUEPOS). See the note in the planet branch below for why
-        # this composition is used in place of the reference's.
-        bs = vec_moon_to_sun
-
-        dot_prod = sum(a * b for a, b in zip(bs, vec_moon_to_earth))
-        mag_bs = math.sqrt(sum(x**2 for x in bs))
-
-        if mag_bs > 0 and mag_me > 0:
-            cos_phase = dot_prod / (mag_bs * mag_me)
-            cos_phase = max(-1.0, min(1.0, cos_phase))
-            phase_angle = math.degrees(math.acos(cos_phase))
-        else:
-            phase_angle = 180.0 - elongation
-
-        # Phase (illuminated fraction)
-        phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
-
-        # Moon's apparent diameter based on physical radius
-        moon_radius_km = _BODY_RADIUS_KM[MOON]
-        diameter = _calc_apparent_diameter(moon_radius_km, r_moon)
-
-        # Moon's magnitude using piecewise Allen/Samaha photometric model
-        # mag_ms is the Sun-Moon distance (heliocentric distance of Moon) in AU
-        magnitude = _calc_moon_magnitude(phase_angle, r_moon, mag_ms)
-
-        # Slot [5]: the Moon's horizontal parallax. Without an observer the
-        # slot carries the geocentric equatorial horizontal parallax from
-        # the geometric geocentric distance; under FLG_TOPOCTR it carries the
-        # actual geocentric->topocentric parallactic displacement (the on-sky
-        # angle between the geocentric-apparent and topocentric-apparent Moon
-        # directions). Both are independent of the request's FLG_TRUEPOS bit
-        # (a convention of this library, shared with the LEB path above).
-        if iflag & FLG_TOPOCTR:
-            # Both legs are the APPARENT place (even under FLG_TRUEPOS, where
-            # target_pos_geo would be geometric): the topocentric parallax
-            # convention is the apparent geo->topo displacement.
-            geo_app = get_cached_observer_at(earth, t).observe(target).apparent()
-            topo_app = obs_at_t.observe(target).apparent()
-            v_geo = geo_app.position.au
-            v_topo = topo_app.position.au
-            dot_p = sum(a * b for a, b in zip(v_geo, v_topo))
-            n_geo = math.sqrt(sum(a * a for a in v_geo))
-            n_topo = math.sqrt(sum(a * a for a in v_topo))
-            if n_geo > 0 and n_topo > 0:
-                cos_par = max(-1.0, min(1.0, dot_p / (n_geo * n_topo)))
-                horizontal_parallax = math.degrees(math.acos(cos_par))
-            else:
-                horizontal_parallax = 0.0
-        else:
-            moon_geom = (target - earth).at(t)
-            dist_geom_au = math.sqrt(sum(x**2 for x in moon_geom.position.au))
-            horizontal_parallax = _moon_horizontal_parallax_deg(dist_geom_au)
-
-        attr = (
-            phase_angle,
-            phase,
-            elongation,
-            diameter,
-            magnitude,
-            horizontal_parallax,
-        ) + (0.0,) * 14
-        return attr
-
-    # For planets: calculate elongation, phase angle, etc.
-    # Get RA/Dec of planet and Sun
-    planet_ra, planet_dec, planet_dist = target_pos_geo.radec()
-    sun_ra, sun_dec, sun_dist = sun_pos_geo.radec()
-
-    # Elongation: angular distance between planet and Sun
-    planet_ra_rad = planet_ra.radians
-    planet_dec_rad = planet_dec.radians
-    sun_ra_rad = sun_ra.radians
-    sun_dec_rad = sun_dec.radians
-
-    cos_elong = math.sin(planet_dec_rad) * math.sin(sun_dec_rad) + math.cos(
-        planet_dec_rad
-    ) * math.cos(sun_dec_rad) * math.cos(planet_ra_rad - sun_ra_rad)
-    cos_elong = max(-1.0, min(1.0, cos_elong))
-    elongation = math.degrees(math.acos(cos_elong))
-
-    # Phase angle: angle at the planet vertex between the planet→Sun and
-    # planet→Earth directions, both taken from the apparent geocentric triangle
-    # (geometric under FLG_TRUEPOS): planet→Earth = −P and planet→Sun = S − P,
-    # from the apparent geocentric Sun and planet vectors already computed.
-    #
-    # The reference ephemeris composes this angle from a proprietary blend of
-    # apparent/astrometric legs that no published single- or double-light-time
-    # formula reproduces to <0.1" for every body: the per-body best fits
-    # contradict one another and the angle even responds to aberration
-    # (toggling NOABERR shifts it ~13-19"). Rather than track an unpublished
-    # composition, this uses the fully documented apparent geocentric triangle.
-    # The residual against the reference is arc-second level for the inner
-    # planets (Mercury worst) and model-dependent; FLG_TRUEPOS stays exact.
-    # See docs/comparison/intentional-divergences.md.
-    P = target_pos_geo.position.au  # Planet position (geocentric)
-    S = sun_pos_geo.position.au  # Sun position (geocentric)
-
-    vec_planet_to_earth = -P
-    mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
-    vec_planet_to_sun = S - P
-
-    dot_prod = sum(a * b for a, b in zip(vec_planet_to_sun, vec_planet_to_earth))
-    mag_ps = math.sqrt(sum(x**2 for x in vec_planet_to_sun))
-
-    if mag_ps > 0 and mag_pe > 0:
-        cos_phase = dot_prod / (mag_ps * mag_pe)
-        cos_phase = max(-1.0, min(1.0, cos_phase))
-        phase_angle = math.degrees(math.acos(cos_phase))
-    else:
-        phase_angle = 0.0
-
-    # Phase (illuminated fraction)
-    phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
-
-    # Apparent diameter based on physical radius
-    body_radius_km = _BODY_RADIUS_KM.get(
-        ipl, 1000.0
-    )  # Default 1000 km for unknown bodies
-    diameter = _calc_apparent_diameter(body_radius_km, target_geo_dist)
-
-    # Visual magnitude
-    # For Saturn, we need ecliptic coordinates for ring tilt calculation
-    # tjd is needed for Saturn (ring tilt) and Neptune (secular brightness)
-    geo_lon = 0.0
-    geo_lat = 0.0
-    helio_lon = 0.0
-    helio_lat = 0.0
-    tjd = t.tt
-
-    if ipl in (SATURN, URANUS):
-        # Saturn needs the ecliptic coordinates for the ring-tilt term and
-        # Uranus for the sub-Earth photometric latitude of Mallama & Hilton
-        # (2018) Eq. 15 — without them the Uranus term degenerates to a
-        # constant and the two backends split by tens of millimagnitudes.
-        # Get geocentric ecliptic coordinates
-        try:
-            geo_ecl_lat, geo_ecl_lon, _ = target_pos_geo.frame_latlon(ecliptic_frame)
-            geo_lon = geo_ecl_lon.degrees
-            geo_lat = geo_ecl_lat.degrees
-        except (AttributeError, ValueError, TypeError):
-            geo_lon = 0.0
-            geo_lat = 0.0
-
-        # Get heliocentric ecliptic coordinates
-        try:
-            helio_ecl_lat, helio_ecl_lon, _ = target_helio.frame_latlon(ecliptic_frame)
-            helio_lon = helio_ecl_lon.degrees
-            helio_lat = helio_ecl_lat.degrees
-        except (AttributeError, ValueError, TypeError):
-            helio_lon = 0.0
-            helio_lat = 0.0
-
-    if ipl == NEPTUNE:
-        magnitude = _calc_neptune_magnitude(target_helio_dist, target_geo_dist, tjd)
-    else:
+        geocentric_lat, geocentric_lon, _ = body_place.frame_latlon(ecliptic_frame)
+        solar_lat, solar_lon, _ = illumination_place.frame_latlon(ecliptic_frame)
         magnitude = _calc_planet_magnitude(
-            ipl,
-            target_helio_dist,
-            target_geo_dist,
+            body_id,
+            illumination_distance,
+            body_distance,
             phase_angle,
-            geo_lon,
-            geo_lat,
-            helio_lon,
-            helio_lat,
-            tjd,
+            float(geocentric_lon.degrees),
+            float(geocentric_lat.degrees),
+            float(solar_lon.degrees),
+            float(solar_lat.degrees),
+            float(t.tt),
         )
 
-    # Return tuple with at least 20 elements (reference-API compatibility)
-    attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
-    return attr
+    parallax = 0.0
+    if body_id == MOON:
+        if topocentric:
+            geocentric_vector, _ = _direct_observer_vector(
+                t, earth, target, geometric=False
+            )
+            topocentric_vector, _ = _direct_observer_vector(
+                t, observer, target, geometric=False
+            )
+            parallax = _vector_angle_deg(
+                geocentric_vector,
+                topocentric_vector,
+                "topocentric lunar parallax",
+            )
+        else:
+            geometric_vector, _ = _direct_observer_vector(
+                t, earth, target, geometric=True
+            )
+            parallax = _moon_horizontal_parallax_deg(_vector_norm(geometric_vector))
+    return (
+        phase_angle,
+        phase,
+        elongation,
+        diameter,
+        float(magnitude),
+        float(parallax),
+    ) + (0.0,) * 14
 
 
 def _validate_magnitude_real(value: object, name: str) -> float:
