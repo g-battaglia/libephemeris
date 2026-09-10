@@ -204,6 +204,14 @@ def isolate_unique_root(
             slope = derivative(domain)
             midpoint = (lo + hi) / 2
             point_value = function(midpoint)
+            if not slope.is_finite():
+                if midpoint == lo or midpoint == hi:
+                    raise IntervalCertificationError(
+                        "root derivative interval is not finite"
+                    )
+                queue.append((lo, midpoint))
+                queue.append((midpoint, hi))
+                continue
             if not contains_zero(slope):
                 newton = midpoint - point_value / slope
                 try:
@@ -225,9 +233,13 @@ def isolate_unique_root(
                             certified = lo.union(hi)
                             for _ in range(32):
                                 center = certified.mid()
-                                narrowed = certified.intersection(
-                                    center - function(center) / derivative(certified)
-                                )
+                                try:
+                                    narrowed = certified.intersection(
+                                        center
+                                        - function(center) / derivative(certified)
+                                    )
+                                except ValueError:
+                                    break
                                 if narrowed == certified:
                                     break
                                 certified = narrowed
