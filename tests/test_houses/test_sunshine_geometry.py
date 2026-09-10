@@ -203,6 +203,17 @@ def test_below_horizon_orientation_rotates_only_declared_anchors() -> None:
     assert _circular_difference(cusps[4], midheaven) < 1e-12
 
 
+def test_exact_meridian_horizon_contact_does_not_rotate() -> None:
+    """Exact contact belongs to the unrotated branch without a tolerance."""
+    armc = 90.0
+    obliquity = 23.44
+    latitude = -66.56
+    ascendant, midheaven = _anchors(armc, latitude, obliquity)
+    cusps = H._houses_sunshine(armc, latitude, obliquity, ascendant, midheaven, 0.0)
+    assert cusps[10] == midheaven % 360.0
+    assert _circular_difference(cusps[4], midheaven + 180.0) < 1e-12
+
+
 @pytest.mark.parametrize(
     "arguments",
     [

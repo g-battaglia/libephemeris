@@ -3990,10 +3990,10 @@ def _houses_sunshine(
         diurnal_semi_arc = 90.0 + ascensional_difference
         nocturnal_semi_arc = 90.0 - ascensional_difference
 
-    meridian_declination = math.atan2(
-        math.sin(math.radians(armc)) * sin_obliquity, cos_obliquity
+    meridian_declination = math.degrees(
+        math.atan2(math.sin(math.radians(armc)) * sin_obliquity, cos_obliquity)
     )
-    upper_meridian_below_horizon = math.cos(latitude - meridian_declination) < 0.0
+    upper_meridian_below_horizon = abs(lat - meridian_declination) > 90.0
 
     cusps = [0.0] * 13
     cusps[1] = float(asc % 360.0)
