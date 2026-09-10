@@ -223,6 +223,20 @@ Cusp and angle speeds are numerical derivatives of the independently computed
 geometry. Discontinuities at wraps and branch boundaries are handled as
 coordinate discontinuities, not fitted toward external output.
 
+#### Sunshine numerical geometry {#sunshine-numeric-geometry}
+
+The Sunshine/Treindl system (`I`) evaluates the published spherical triangle
+without replacing a collapsed circumpolar semi-arc by a nearby artificial angle
+and without treating every sufficiently small triangle as exactly collapsed.
+The resulting cusp movements reach `3.57e-6` arcsec in the recorded selector
+slice. This is a change in numerical realization, not a precision loss: an
+independent 100-decimal evaluation of every moved cusp above the ordinary
+level-1 floor puts the rewritten value closer on 6,785 of 6,879 leaves, with a
+worst rewritten error of `2.91e-7` arcsec. A separate Cartesian
+plane-intersection implementation remains within `2.56e-9` arcsec of that same
+oracle. ASCMC fields, speeds, metadata and exact-pole fallback outputs are not
+included in this cusp-specific numerical envelope.
+
 For Sunshine-Makransky (system ``i``), solar declination zero is a regular
 limit of Makransky's published construction: the ascensional difference is
 zero, the diurnal and nocturnal semiarcs are both 90 degrees, and the eight
