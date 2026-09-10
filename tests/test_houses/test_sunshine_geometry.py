@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from libephemeris.exceptions import PolarCircleError
+from libephemeris.exceptions import CalculationError, PolarCircleError
 
 
 H = __import__("libephemeris.houses", fromlist=["houses"])
@@ -212,6 +212,38 @@ def test_exact_meridian_horizon_contact_does_not_rotate() -> None:
     cusps = H._houses_sunshine(armc, latitude, obliquity, ascendant, midheaven, 0.0)
     assert cusps[10] == midheaven % 360.0
     assert _circular_difference(cusps[4], midheaven + 180.0) < 1e-12
+
+
+@pytest.mark.parametrize("error", [IndexError, TypeError, CalculationError])
+def test_unrelated_sun_provider_errors_propagate(monkeypatch, error) -> None:
+    """Only provider coverage failures select the analytic fallback."""
+
+    def boom(*args, **kwargs):
+        raise error("provider failure")
+
+    monkeypatch.setattr(H, "calc_ut", boom)
+    with pytest.raises(error, match="provider failure"):
+        H._sunshine_sun_declination(2451545.0, 0)
+
+
+def test_ecliptic_pole_intersection_is_rejected(monkeypatch) -> None:
+    """An exactly null homogeneous longitude pair has no longitude."""
+    inverse_sines = iter((0.0, math.radians(15.0)))
+    monkeypatch.setattr(H.math, "asin", lambda value: next(inverse_sines))
+    with pytest.raises(CalculationError, match="longitude is not uniquely defined"):
+        H._sunshine_arc_to_ecliptic(
+            0.0,
+            True,
+            0.0,
+            0.0,
+            0.0,
+            math.sin(0.0),
+            math.cos(0.0),
+            math.cos(0.0),
+            math.tan(0.0),
+            math.sin(math.radians(75.0)),
+            math.cos(math.radians(75.0)),
+        )
 
 
 @pytest.mark.parametrize(

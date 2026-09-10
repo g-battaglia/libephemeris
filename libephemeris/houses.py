@@ -883,19 +883,17 @@ def _sunshine_sun_declination(tjdut: float, iflag: int) -> float:
     """The Sun's apparent declination, for the Sunshine house systems.
 
     The ephemeris flags in ``iflag`` are forwarded to the Sun computation. A
-    date outside the loaded ephemeris falls back to the low-precision
-    analytic declination; any other failure of the Sun computation falls
-    back to zero declination, the equinox behaviour.
+    coverage failure reported as ``EphemerisRangeError`` or ``ValueError``
+    falls back to the low-precision analytic declination. Other failures
+    propagate because they do not establish that the Sun is unavailable.
     """
     try:
         # Extract ephemeris flags: FLG_JPLEPH=1, FLG_SWIEPH=2
         eph_flags = iflag & (FLG_JPLEPH | FLG_SWIEPH)
         sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
         return sun_pos[1]  # Declination is second element in equatorial coords
-    except EphemerisRangeError:
+    except (EphemerisRangeError, ValueError):
         return _sun_declination_analytic(tjdut)
-    except (IndexError, TypeError, ValueError, CalculationError):
-        return 0.0
 
 
 def _houses_from_armc(
@@ -3921,6 +3919,14 @@ def _sunshine_arc_to_ecliptic(
     else:
         right_ascension = math.radians(armc + 180.0) + meridian_offset
         pole_height = -pole_height
+
+    cos_pole_height = math.cos(pole_height)
+    longitude_y = math.sin(right_ascension) * cos_pole_height
+    longitude_x = cos_obliquity * math.cos(
+        right_ascension
+    ) * cos_pole_height - sin_obliquity * math.sin(pole_height)
+    if longitude_x == 0.0 and longitude_y == 0.0:
+        raise CalculationError("Sunshine cusp longitude is not uniquely defined")
 
     return _ra_to_ecliptic_longitude(
         math.degrees(right_ascension),

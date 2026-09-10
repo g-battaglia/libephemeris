@@ -210,13 +210,20 @@ def test_houses_apc_polar_flip():
 
 
 def test_houses_sunshine_sun_dec_exception(monkeypatch):
-    """A failing Sun calculation falls back to zero declination (808-810)."""
+    """A Sun-provider ValueError uses the analytic declination fallback."""
 
     def boom(*args, **kwargs):
         raise ValueError("sun unavailable")
 
+    fallback_declination = 12.345
     monkeypatch.setattr(H, "calc_ut", boom)
-    cusps, ascmc = ephem.houses(JD, ROME_LAT, ROME_LON, ord("I"))
+    monkeypatch.setattr(
+        H,
+        "_sun_declination_analytic",
+        lambda jd: fallback_declination,
+    )
+    assert H._sunshine_sun_declination(JD, 0) == fallback_declination
+    cusps, _ = ephem.houses(JD, ROME_LAT, ROME_LON, ord("I"))
     assert len(cusps) == 12
 
 
@@ -485,12 +492,19 @@ def test_houses_ex_sidereal_sunshine_both():
 
 
 def test_houses_ex_sidereal_sunshine_sun_dec_exception(monkeypatch):
-    """A failing Sun calc in sidereal Sunshine falls back to 0 dec (1683-1684)."""
+    """Sidereal Sunshine uses the analytic fallback after provider ValueError."""
 
     def boom(*args, **kwargs):
         raise ValueError("no sun")
 
+    fallback_declination = -8.765
     monkeypatch.setattr(H, "calc_ut", boom)
+    monkeypatch.setattr(
+        H,
+        "_sun_declination_analytic",
+        lambda jd: fallback_declination,
+    )
+    assert H._sunshine_sun_declination(JD, ephem.FLG_SIDEREAL) == fallback_declination
     ephem.set_sid_mode(ephem.SIDM_LAHIRI)
     cusps, _ = ephem.houses_ex(JD, ROME_LAT, ROME_LON, ord("I"), ephem.FLG_SIDEREAL)
     assert len(cusps) == 12
