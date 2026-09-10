@@ -16,6 +16,7 @@ from libephemeris.intervals import (
     certified_float,
     certified_sign,
     interval_precision,
+    isolate_unique_root,
     strictly_contains,
 )
 
@@ -67,6 +68,26 @@ def test_strictly_contains_distinguishes_boundary_contact() -> None:
     outer = arb(0, 2)
     assert strictly_contains(outer, arb(0, 1))
     assert not strictly_contains(arb(0, 1), arb(0, 1))
+
+
+def test_isolate_unique_root_proves_one_simple_root() -> None:
+    """Interval Newton isolates the only root on the complete domain."""
+    root = isolate_unique_root(lambda x: x * x - 2, lambda x: 2 * x, 1.0, 2.0)
+    assert root.overlaps(arb(2).sqrt())
+    assert float(root.upper() - root.lower()) < 1e-12
+    assert (root * root - 2).contains(0)
+
+
+def test_isolate_unique_root_rejects_multiple_roots() -> None:
+    """A domain containing two roots is not silently reduced to one."""
+    with pytest.raises(IntervalCertificationError, match="expected one"):
+        isolate_unique_root(lambda x: x * x - 1, lambda x: 2 * x, -2.0, 2.0)
+
+
+def test_isolate_unique_root_rejects_a_repeated_root() -> None:
+    """A derivative interval containing zero cannot certify a simple root."""
+    with pytest.raises(IntervalCertificationError):
+        isolate_unique_root(lambda x: x * x, lambda x: 2 * x, -1.0, 1.0)
 
 
 def test_certified_float_accepts_a_unique_rounding_cell() -> None:

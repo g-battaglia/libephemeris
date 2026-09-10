@@ -25,6 +25,7 @@ import math
 import struct
 from contextlib import contextmanager
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Iterator, TypeAlias
 
 from flint import arb, arb_mat, ctx
@@ -39,6 +40,7 @@ __all__ = [
     "certified_sign",
     "contains_zero",
     "interval_precision",
+    "isolate_unique_root",
     "strictly_contains",
 ]
 
@@ -131,6 +133,119 @@ def certified_sign(value: Ball) -> int:
 def strictly_contains(outer: Ball, inner: Ball) -> bool:
     """Whether ``inner`` is proved to lie in the interior of ``outer``."""
     return bool(outer.contains_interior(inner))
+
+
+def _exact_lower(value: Ball) -> Ball:
+    """Return the exact dyadic lower endpoint of an Arb ball."""
+    return arb(value.lower().mid())
+
+
+def _exact_upper(value: Ball) -> Ball:
+    """Return the exact dyadic upper endpoint of an Arb ball."""
+    return arb(value.upper().mid())
+
+
+def isolate_unique_root(
+    function: Callable[[Ball], Ball],
+    derivative: Callable[[Ball], Ball],
+    lower: float,
+    upper: float,
+    *,
+    precision: int = 192,
+    max_boxes: int = 1_000_000,
+) -> Ball:
+    """Isolate and certify one simple root over a complete closed interval.
+
+    Every discarded box has a function enclosure excluding zero. A retained
+    box is contracted with interval Newton; uniqueness is proved only when its
+    derivative enclosure excludes zero and the Newton image lies strictly in
+    the box. The entire input interval is exhausted, so a second root cannot be
+    hidden outside the returned enclosure.
+
+    Args:
+        function: Outward-rounded interval extension of a continuous scalar.
+        derivative: Outward-rounded interval extension of its derivative.
+        lower: Finite lower endpoint.
+        upper: Finite upper endpoint, strictly greater than ``lower``.
+        precision: Arb precision in bits.
+        max_boxes: Hard arithmetic work limit; exceeding it fails closed.
+
+    Returns:
+        An Arb enclosure containing exactly one simple root.
+
+    Raises:
+        ValueError: If the interval or limits are invalid.
+        IntervalCertificationError: If existence or uniqueness is not proved.
+    """
+    if not math.isfinite(lower) or not math.isfinite(upper) or not lower < upper:
+        raise ValueError("root interval must have finite increasing endpoints")
+    if not isinstance(max_boxes, int) or isinstance(max_boxes, bool) or max_boxes <= 0:
+        raise ValueError("max_boxes must be a positive integer")
+
+    with interval_precision(precision):
+        left = ball_from_float(lower)
+        right = ball_from_float(upper)
+        queue: list[tuple[Ball, Ball]] = [(left, right)]
+        roots: list[Ball] = []
+        boxes = 0
+        while queue:
+            lo, hi = queue.pop()
+            boxes += 1
+            if boxes > max_boxes:
+                raise IntervalCertificationError(
+                    "interval subdivision exceeded its certified work limit"
+                )
+            domain = lo.union(hi)
+            values = function(domain)
+            if not contains_zero(values):
+                continue
+
+            slope = derivative(domain)
+            midpoint = (lo + hi) / 2
+            point_value = function(midpoint)
+            if not contains_zero(slope):
+                newton = midpoint - point_value / slope
+                try:
+                    contracted = domain.intersection(newton)
+                except ValueError:
+                    continue
+                if contracted.is_finite():
+                    contracted_lo = _exact_lower(contracted)
+                    contracted_hi = _exact_upper(contracted)
+                    if contracted_lo < contracted_hi:
+                        if strictly_contains(domain, contracted):
+                            domain = contracted
+                            lo, hi = contracted_lo, contracted_hi
+                        left_sign = certified_sign(function(lo))
+                        right_sign = certified_sign(function(hi))
+                        if left_sign * right_sign < 0 and strictly_contains(
+                            lo.union(hi), midpoint - point_value / derivative(domain)
+                        ):
+                            certified = lo.union(hi)
+                            for _ in range(32):
+                                center = certified.mid()
+                                narrowed = certified.intersection(
+                                    center - function(center) / derivative(certified)
+                                )
+                                if narrowed == certified:
+                                    break
+                                certified = narrowed
+                            roots.append(certified)
+                            continue
+
+            midpoint = (lo + hi) / 2
+            if midpoint == lo or midpoint == hi:
+                raise IntervalCertificationError(
+                    "root box reached the arithmetic subdivision floor"
+                )
+            queue.append((lo, midpoint))
+            queue.append((midpoint, hi))
+
+        if len(roots) != 1:
+            raise IntervalCertificationError(
+                f"expected one certified root, isolated {len(roots)}"
+            )
+        return roots[0]
 
 
 def certified_float(value: Ball) -> float:
