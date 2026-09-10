@@ -64,6 +64,57 @@ def _plane_intersection_expected(
     return tuple(longitudes)
 
 
+def test_horizontal_degeneracies_are_finite_and_antipodal() -> None:
+    """Horizontal houses preserve paired geometry at parity and plane coincidences."""
+    for armc, latitude, obliquity in (
+        (0.0, 0.0, 23.4392911),
+        (0.0, 0.0, 0.0),
+        (0.0, 90.0, 0.0),
+        (0.0, -90.0, 0.0),
+        (0.0, 0.0, 90.0),
+        (180.0, 0.0, 90.0),
+    ):
+        ascendant, midheaven = _anchors(armc, latitude, obliquity)
+        cusps = H._houses_horizontal(armc, latitude, obliquity, ascendant, midheaven)
+        assert len(cusps) == 13
+        assert all(math.isfinite(value) and 0.0 <= value < 360.0 for value in cusps)
+        assert all(
+            _circular_difference(cusps[index + 6], cusps[index] + 180.0) < 1e-12
+            for index in range(1, 7)
+        )
+
+
+def test_horizontal_poles_share_the_northern_limit() -> None:
+    """Both exact poles use the same deterministic horizontal-house ring."""
+    armc, obliquity = 123.0, 23.4392911
+    north = H._houses_horizontal(
+        armc, 90.0, obliquity, *_anchors(armc, 90.0, obliquity)
+    )
+    south = H._houses_horizontal(
+        armc, -90.0, obliquity, *_anchors(armc, -90.0, obliquity)
+    )
+    assert all(
+        _circular_difference(left, right) < 1e-12 for left, right in zip(north, south)
+    )
+
+
+def test_horizontal_whole_turns_leave_the_ring_unchanged() -> None:
+    """ARMC and obliquity whole turns preserve every horizontal cusp."""
+    armc, latitude, obliquity = 211.0, -41.9, 23.4392911
+    base = H._houses_horizontal(
+        armc, latitude, obliquity, *_anchors(armc, latitude, obliquity)
+    )
+    rotated = H._houses_horizontal(
+        armc + 360.0,
+        latitude,
+        obliquity + 360.0,
+        *_anchors(armc + 360.0, latitude, obliquity + 360.0),
+    )
+    assert all(
+        _circular_difference(left, right) < 1e-12 for left, right in zip(base, rotated)
+    )
+
+
 @pytest.mark.parametrize(
     ("arc_offset", "is_diurnal"),
     [(20.0, True), (-20.0, True), (20.0, False), (-20.0, False)],

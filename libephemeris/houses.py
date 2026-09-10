@@ -4046,115 +4046,155 @@ def _houses_sunshine(
 def _houses_horizontal(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
-    """
-    Horizontal (Azimuthal) house system (code 'H').
+    """Construct the twelve horizontal/azimuthal house cusps.
 
-    The horizon is divided into 12 equal arcs of 30 degrees each, starting
-    from the East Point. For each division point, a vertical circle (great
-    circle through zenith and nadir) passes through that point and intersects
-    the ecliptic. Those intersection points define the house cusps.
-
-    Algorithm derived from the geometric definition described in:
-    Ralph William Holden, 'The Elements of House Division' (1977), ch. 10.
-
-    Geometric derivation (standard spherical trigonometry):
-        Let phi' = co-latitude (90 deg - |phi|, signed).
-        For each horizon division at angle theta from the meridian
-        (theta = k * 30 deg, k = 1..5), the vertical circle's parameters are:
-
-            pole_height = arcsin(sin(theta) * sin(phi'))
-            ra_offset   = atan2(cos(theta), sin(theta) * cos(phi'))
-
-        These follow from solving the spherical triangle (zenith, celestial
-        pole, horizon division point) via the spherical law of sines/cosines.
-
-        The ecliptic intersection is then computed via the rising-point formula
-        (Smart, 'Textbook on Spherical Astronomy', ch. 3).
+    The local horizon is divided into twelve equal azimuth arcs. Each division
+    and the zenith span a vertical-circle plane; its intersection with the
+    ecliptic gives one projective cusp line. The complete ring is oriented by
+    geometric horizon predicates and by the supplied anchors only where their
+    defining intersections are unique.
 
     Args:
-        armc: Sidereal time at Greenwich (RAMC) in degrees
-        lat: Geographic latitude in degrees
-        eps: True obliquity of ecliptic in degrees
-        asc: Ascendant longitude in degrees
-        mc: Midheaven longitude in degrees
+        armc: Right ascension of the local upper meridian, in degrees.
+        lat: Geographic latitude, north positive, in degrees.
+        eps: Finite obliquity of the ecliptic, in degrees.
+        asc: Ascendant anchor, in degrees; used when geometrically unique.
+        mc: Midheaven anchor, in degrees; used when geometrically unique.
 
     Returns:
-        List of 13 house cusp longitudes (index 0 unused, 1-12 are cusps)
+        Mutable 13-element list whose index zero is unused.
+
+    Raises:
+        ValueError: If an input is non-finite or latitude is outside [-90, 90].
+        CalculationError: If the analytic degenerate limit cannot be formed.
     """
-    cusps = [0.0] * 13
-    _NEAR_ZERO = 1e-10
+    if not all(math.isfinite(value) for value in (armc, lat, eps, asc, mc)):
+        raise ValueError("horizontal house construction requires finite angles")
+    if not -90.0 <= lat <= 90.0:
+        raise ValueError("horizontal house latitude must be in [-90, 90] degrees")
 
-    # Co-latitude: complement of geographic latitude
-    if lat > 0:
-        co_lat = 90.0 - lat
-    else:
-        co_lat = -90.0 - lat
+    theta = math.radians(armc)
+    latitude = math.radians(lat)
+    obliquity = math.radians(eps)
+    sin_theta = math.sin(theta)
+    cos_theta = math.cos(theta)
+    sin_latitude = math.sin(latitude)
+    cos_latitude = math.cos(latitude)
+    sin_obliquity = math.sin(obliquity)
+    cos_obliquity = math.cos(obliquity)
 
-    # Clamp to avoid singularity at the equator (|co_lat| = 90 deg)
-    if abs(abs(co_lat) - 90.0) < _NEAR_ZERO:
-        co_lat = (90.0 - _NEAR_ZERO) if co_lat > 0 else (-90.0 + _NEAR_ZERO)
+    zenith = (
+        cos_latitude * cos_theta,
+        cos_latitude * sin_theta,
+        sin_latitude,
+    )
+    east = (-sin_theta, cos_theta, 0.0)
+    north = (
+        -sin_latitude * cos_theta,
+        -sin_latitude * sin_theta,
+        cos_latitude,
+    )
+    ecliptic_normal = (0.0, -sin_obliquity, cos_obliquity)
 
-    # ARMC rotated by 180 deg (base reference for house calculations)
-    armc_base = (armc + 180.0) % 360.0
+    def dot(left: tuple[float, ...], right: tuple[float, ...]) -> float:
+        return math.fsum(a * b for a, b in zip(left, right))
 
-    sin_colat = math.sin(math.radians(co_lat))
-    cos_colat = math.cos(math.radians(co_lat))
-
-    # Compute 5 primary cusps by looping over horizon division angles.
-    # The horizon is divided at theta = k * 30 deg (k = 1..5) measured from
-    # the meridian toward the East Point along the horizon.
-    #
-    # Cusp mapping:  theta=30 -> cusp 3,  theta=60 -> cusp 2,
-    #                theta=90 -> cusp 1 (East Point),
-    #                theta=120 -> cusp 12, theta=150 -> cusp 11
-    _CUSP_MAP = [(3, 30.0), (2, 60.0), (1, 90.0), (12, 120.0), (11, 150.0)]
-
-    for cusp_idx, theta_deg in _CUSP_MAP:
-        theta_rad = math.radians(theta_deg)
-        sin_theta = math.sin(theta_rad)
-        cos_theta = math.cos(theta_rad)
-
-        # Pole height of the vertical circle at this division angle
-        pole_height = math.degrees(math.asin(sin_theta * sin_colat))
-
-        # RA offset from the base RA position (ARMC + 270 deg)
-        ra_offset = math.degrees(math.atan2(cos_theta, sin_theta * cos_colat))
-
-        cusps[cusp_idx] = _calc_ascendant(
-            armc_base + 90.0 + ra_offset, eps, lat, pole_height
+    def cross(
+        left: tuple[float, ...], right: tuple[float, ...]
+    ) -> tuple[float, float, float]:
+        return (
+            left[1] * right[2] - left[2] * right[1],
+            left[2] * right[0] - left[0] * right[2],
+            left[0] * right[1] - left[1] * right[0],
         )
 
-    # Polar circle handling: check Asc-MC orientation
-    if abs(co_lat) >= 90.0 - eps:
-        asc_mc_diff = (asc - mc + 540.0) % 360.0 - 180.0
-        if asc_mc_diff < 0:
-            asc = (asc + 180.0) % 360.0
-            mc = (mc + 180.0) % 360.0
-            for i in range(1, 13):
-                if 4 <= i < 10:
-                    continue
-                cusps[i] = (cusps[i] + 180.0) % 360.0
+    def norm(vector: tuple[float, ...]) -> float:
+        return math.sqrt(dot(vector, vector))
 
-    # Flip primary cusps by 180 deg (convention: cusps represent the opposite
-    # hemisphere from the direct calculation)
-    for i in [1, 2, 3, 11, 12]:
-        cusps[i] = (cusps[i] + 180.0) % 360.0
+    def direction(azimuth: float) -> tuple[float, float, float]:
+        cosine = math.cos(azimuth)
+        sine = math.sin(azimuth)
+        return tuple(cosine * north[index] + sine * east[index] for index in range(3))  # type: ignore[return-value]
 
-    # Check Asc/DC orientation
-    asc_mc_diff = (asc - mc + 540.0) % 360.0 - 180.0
-    if asc_mc_diff < 0:
-        asc = (asc + 180.0) % 360.0
+    def longitude(vector: tuple[float, ...]) -> float:
+        y = vector[1] * cos_obliquity + vector[2] * sin_obliquity
+        return math.degrees(math.atan2(y, vector[0])) % 360.0
 
-    # Set MC/IC and derive opposite cusps (4-9 from 10-3)
-    cusps[10] = mc
-    cusps[4] = (mc + 180.0) % 360.0
-    cusps[7] = (cusps[1] + 180.0) % 360.0
-    cusps[8] = (cusps[2] + 180.0) % 360.0
-    cusps[9] = (cusps[3] + 180.0) % 360.0
-    cusps[5] = (cusps[11] + 180.0) % 360.0
-    cusps[6] = (cusps[12] + 180.0) % 360.0
+    north_limit = lat > 0.0
+    provisional = [0.0] * 13
+    parity = dot(ecliptic_normal, zenith) == 0.0
 
-    return cusps
+    # The first six define the coupled projective ring; the second six are their
+    # exact antipodes. Sector order moves toward north in the northern
+    # hemisphere and toward south in the southern/equatorial convention.
+    for index in range(1, 7):
+        sector_angle = math.radians(30.0 * (index - 1))
+        azimuth = (
+            math.pi / 2.0 - sector_angle
+            if north_limit
+            else math.pi / 2.0 + sector_angle
+        )
+        horizon_direction = direction(azimuth)
+        vertical_normal = cross(zenith, horizon_direction)
+        intersection = cross(ecliptic_normal, vertical_normal)
+
+        if parity:
+            selector = dot(ecliptic_normal, horizon_direction)
+            if selector == 0.0:
+                # Analytic derivative in increasing sector order. dD/ds is
+                # -dD/dA in the north and +dD/dA otherwise.
+                derivative_azimuth = tuple(
+                    -math.sin(azimuth) * north[k] + math.cos(azimuth) * east[k]
+                    for k in range(3)
+                )
+                if north_limit:
+                    derivative_azimuth = tuple(-value for value in derivative_azimuth)
+                selector = dot(ecliptic_normal, derivative_azimuth)
+                intersection = cross(ecliptic_normal, cross(zenith, derivative_azimuth))
+            if selector == 0.0 or norm(intersection) == 0.0:
+                raise CalculationError(
+                    "horizontal house parity limit is not uniquely oriented"
+                )
+            if selector < 0.0:
+                intersection = tuple(-value for value in intersection)  # type: ignore[assignment]
+        else:
+            selector = dot(intersection, horizon_direction)
+            if selector == 0.0:
+                raise CalculationError(
+                    "horizontal house tangent is not uniquely oriented"
+                )
+            if selector < 0.0:
+                intersection = tuple(-value for value in intersection)  # type: ignore[assignment]
+
+        provisional[index] = longitude(intersection)
+        provisional[index + 6] = (provisional[index] + 180.0) % 360.0
+
+    # Plane-normal cross products decide whether each public anchor exists.
+    meridian_anchor_unique = norm(cross(ecliptic_normal, east)) != 0.0
+    horizon_anchor_unique = norm(cross(ecliptic_normal, zenith)) != 0.0
+
+    def circular_distance(left: float, right: float) -> float:
+        return abs((left - right + 180.0) % 360.0 - 180.0)
+
+    flipped = [(value + 180.0) % 360.0 for value in provisional]
+    use_flipped = False
+    if meridian_anchor_unique:
+        direct_distance = circular_distance(provisional[10], mc)
+        flipped_distance = circular_distance(flipped[10], mc)
+        if flipped_distance < direct_distance:
+            use_flipped = True
+        elif flipped_distance == direct_distance and horizon_anchor_unique:
+            use_flipped = circular_distance(flipped[1], asc) < circular_distance(
+                provisional[1], asc
+            )
+    elif horizon_anchor_unique:
+        use_flipped = circular_distance(flipped[1], asc) < circular_distance(
+            provisional[1], asc
+        )
+
+    result = flipped if use_flipped else provisional
+    result[0] = 0.0
+    return [float(value % 360.0) for value in result]
 
 
 def _houses_natural_gradient(
