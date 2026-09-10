@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Certified arbitrary-precision interval primitives backed by the MIT-licensed
+  Arb/python-flint implementation. Geometry solvers can now ingest binary64
+  values exactly, prove interval signs and unique scalar roots, and fail closed
+  when an enclosure cannot select one binary64 result. This infrastructure does
+  not relax any compatibility tolerance.
 - `TIDAL_WILLIAMS_BOGGS_2016` (-25.97 arcsec/cy²): the lunar-laser-ranging
   determination of the Moon's tidal acceleration published by Williams & Boggs
   (2016), Celest. Mech. Dyn. Astron. 126, 89-129, as a documented alternative
