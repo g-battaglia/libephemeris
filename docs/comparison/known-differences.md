@@ -200,6 +200,36 @@ installed external data file is never consumed.
 
 ## Per-API catalog
 
+### Split light-time evaluation {#split-light-time}
+
+LEB apparent places preserve the residual of a retarded epoch as a two-part
+Julian Day until the Chebyshev polynomial is evaluated. A scalar subtraction
+near JD 2451545 has a spacing of `4.656612873077393e-10` day, about 40.2
+microseconds, and can discard up to half of it. The split representation avoids
+that quantization while retaining the same coefficients, three fixed-point
+iterations, observer state and optical reductions.
+
+A direct high-precision Chebyshev recurrence and converged light-time solution
+checked the four bodies used by `calc_angles` at all 69 affected epochs. The
+split vector was closer in 276 of 276 body/date pairs and its direction was
+closer in 274 of 276. The worst directional error fell from
+`3.176955784322063e-4` to `7.442428830937958e-9` arcsecond. The independent
+public ceiling is `0.001` arcsecond: half a JD ULP propagated with a
+conservative 60 km/s target speed (above the
+[NASA Mercury maximum of 58.98 km/s](https://nssdc.gsfc.nasa.gov/planetary/factsheet/mercuryfact.html))
+and the
+[NASA 5000-year minimum lunar distance of 356,355 km](https://eclipse.gsfc.nasa.gov/SEhelp/moonorbit.html)
+remains below `6.99e-4` arcsecond, including the light-time rate factor.
+
+At J2000 the same coefficient oracle reduces the solar-vector error from
+`1.7098110772558483e-15` to `4.85821461284813e-17` AU. Propagating that result
+through a 120-decimal evaluation of all affected Sunshine cusp frames gives a
+maximum absolute condition `|d lambda / d solar_declination|` of
+`42.05206373235947`; the registered `1e-6` arcsecond cusp ceiling is more than
+three orders of magnitude above the resulting error bound and is limited to the
+four affected cusp leaves. No compatibility displacement selects either
+ceiling.
+
 ### `calc*` and coordinate flags
 
 - Geocentric, heliocentric, barycentric, topocentric, ecliptic, equatorial, and
