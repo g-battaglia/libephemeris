@@ -187,6 +187,8 @@ def test_circumpolar_continuation_and_exact_pole_partition() -> None:
 
     with pytest.raises(PolarCircleError):
         H._houses_sunshine(armc, 90.0, obliquity, 100.0, 280.0, 0.0)
+    with pytest.raises(PolarCircleError):
+        H.houses_armc(armc, 90.0, obliquity, ord("I"), 0.0)
 
 
 def test_below_horizon_orientation_rotates_only_declared_anchors() -> None:
