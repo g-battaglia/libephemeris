@@ -23,6 +23,83 @@ def _circular_difference(left: float, right: float) -> float:
     return abs((left - right + 180.0) % 360.0 - 180.0)
 
 
+def _plane_intersection_expected(
+    arc_offset: float,
+    is_diurnal: bool,
+    armc: float,
+    latitude: float,
+    declination: float,
+    obliquity: float,
+) -> tuple[float, float]:
+    """Intersect the independently constructed house and ecliptic planes."""
+    phi = math.radians(latitude)
+    theta = math.radians(armc)
+    epsilon = math.radians(obliquity)
+    point_ra = math.radians((armc if is_diurnal else armc + 180.0) + arc_offset)
+    delta = math.radians(declination)
+    north = (
+        -math.sin(phi) * math.cos(theta),
+        -math.sin(phi) * math.sin(theta),
+        math.cos(phi),
+    )
+    point = (
+        math.cos(delta) * math.cos(point_ra),
+        math.cos(delta) * math.sin(point_ra),
+        math.sin(delta),
+    )
+    ecliptic_normal = (0.0, -math.sin(epsilon), math.cos(epsilon))
+
+    def cross(left: tuple[float, ...], right: tuple[float, ...]) -> tuple[float, ...]:
+        return (
+            left[1] * right[2] - left[2] * right[1],
+            left[2] * right[0] - left[0] * right[2],
+            left[0] * right[1] - left[1] * right[0],
+        )
+
+    intersection = cross(ecliptic_normal, cross(north, point))
+    longitudes = []
+    for direction in (intersection, tuple(-value for value in intersection)):
+        ecliptic_y = direction[1] * math.cos(epsilon) + direction[2] * math.sin(epsilon)
+        longitudes.append(math.degrees(math.atan2(ecliptic_y, direction[0])) % 360.0)
+    return tuple(longitudes)
+
+
+@pytest.mark.parametrize(
+    ("arc_offset", "is_diurnal"),
+    [(20.0, True), (-20.0, True), (20.0, False), (-20.0, False)],
+)
+def test_helper_selects_one_direct_plane_intersection(
+    arc_offset: float, is_diurnal: bool
+) -> None:
+    """The returned cusp is one antipode of the direct plane intersection."""
+    armc = 200.0
+    latitude = 41.9
+    declination = 10.0
+    obliquity = 23.4392911
+    actual = H._sunshine_arc_to_ecliptic(
+        arc_offset,
+        is_diurnal,
+        armc,
+        latitude,
+        declination,
+        math.sin(math.radians(latitude)),
+        math.cos(math.radians(latitude)),
+        math.cos(math.radians(declination)),
+        math.tan(math.radians(declination)),
+        math.sin(math.radians(obliquity)),
+        math.cos(math.radians(obliquity)),
+    )
+    intersections = _plane_intersection_expected(
+        arc_offset, is_diurnal, armc, latitude, declination, obliquity
+    )
+    assert (
+        min(
+            _circular_difference(actual, intersection) for intersection in intersections
+        )
+        < 1e-12
+    )
+
+
 def test_zero_declination_is_the_same_house_circle_pencil() -> None:
     """An equatorial reference parallel reproduces the rational pencil."""
     for armc, latitude, obliquity in (
