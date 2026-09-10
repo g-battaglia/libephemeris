@@ -84,6 +84,11 @@ kind = "permissively-licensed-format-and-library"
 citation = "Zstandard compression format and reference implementation"
 url = "https://github.com/facebook/zstd/blob/dev/doc/zstd_compression_format.md"
 
+[sources.ARB]
+kind = "primary-publication-and-permissively-licensed-library"
+citation = "Johansson (2017), Arb: efficient arbitrary-precision midpoint-radius interval arithmetic, IEEE Transactions on Computers 66(8); python-flint MIT-licensed bindings"
+url = "https://doi.org/10.1109/TC.2017.2690633"
+
 [sources.SKYFIELD]
 kind = "permissively-licensed-upstream-library"
 citation = "Skyfield, MIT-licensed astronomical computation library"
@@ -242,14 +247,15 @@ paths = [
   "libephemeris/cache.py",
   "libephemeris/exceptions.py",
   "libephemeris/inventory.py",
+  "libephemeris/intervals.py",
   "libephemeris/logging_config.py",
   "libephemeris/net.py",
   "libephemeris/profiling.py",
   "libephemeris/tracing.py",
 ]
 scientific_content = false
-origin = "Project-authored configuration, caching, diagnostics, exceptions, network policy, active-data inventory, and observability. These modules contain no astronomical model or scientific coefficient."
-sources = []
+origin = "Project-authored configuration, caching, diagnostics, exceptions, network policy, active-data inventory, observability, and certified numeric plumbing. The interval wrapper uses Arb's outward-rounded balls without defining an astronomical model or scientific coefficient."
+sources = ["ARB", "IEEE_754"]
 documentation = ["docs/development/architecture-overview.md", "docs/guides/tracing.md"]
 docstring = "detailed"
 

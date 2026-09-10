@@ -567,6 +567,7 @@ dependencies = [
     { name = "certifi" },
     { name = "click" },
     { name = "pyerfa" },
+    { name = "python-flint" },
     { name = "skyfield" },
     { name = "skyfield-data" },
     { name = "zstandard" },
@@ -635,6 +636,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.1.1" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5.0" },
+    { name = "python-flint", specifier = ">=0.9.0,<0.10.0" },
     { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "pyyaml", marker = "extra == 'docs-epub'", specifier = ">=6.0" },
     { name = "rebound", marker = "extra == 'nbody'", specifier = ">=4.4.11,<5.0.0" },
@@ -1207,6 +1209,39 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/78/b4/439b179d1ff526791eb921115fca8e44e596a13efeda518b9d845a619450/pytest_xdist-3.8.0.tar.gz", hash = "sha256:7e578125ec9bc6050861aa93f2d59f1d8d085595d6551c2c90b6f4fad8d3a9f1", size = 88069, upload-time = "2025-07-01T13:30:59.346Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ca/31/d4e37e9e550c2b92a9cbc2e4d0b7420a27224968580b5a447f420847c975/pytest_xdist-3.8.0-py3-none-any.whl", hash = "sha256:202ca578cfeb7370784a8c33d6d05bc6e13b4f25b5053c30a152269fd10f0b88", size = 46396, upload-time = "2025-07-01T13:30:56.632Z" },
+]
+
+[[package]]
+name = "python-flint"
+version = "0.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/03/d3/32226210a7703b0cfbe0f5b2c56e38b7b7177d4c69663247d8813352595c/python_flint-0.9.0.tar.gz", hash = "sha256:686b2907eedaf0c0842caefab29a5775d2e633fd5815b81e13b81ca2c6ad0a36", size = 486670, upload-time = "2026-07-03T23:29:23.737Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/20/42ec7f09155485314f97071e53e576bbf00c03cdfd52b37b8dced83a2baa/python_flint-0.9.0-cp310-abi3-macosx_10_9_x86_64.whl", hash = "sha256:be6f010e4c2dbe8994250e2ca218ff1e301ee143c03e712bab812ff9e6b4fc46", size = 8870927, upload-time = "2026-07-03T23:28:23.197Z" },
+    { url = "https://files.pythonhosted.org/packages/41/c3/2323ed921fa08ad2a0935775dddba8502d30bfdc3034920abfdac2138236/python_flint-0.9.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:025fd4e77f2cbbf40f63b9cd7571aad3803deb57aecd72e7c397480fe84921a0", size = 7882651, upload-time = "2026-07-03T23:28:25.477Z" },
+    { url = "https://files.pythonhosted.org/packages/db/3f/5f57004f9f43ac6508f874cc97123f11b27b6811b5bb0d320c43f600f0cb/python_flint-0.9.0-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:376b88cacd30612479e839ffdba887599d3f9c8c0e214852bf80bb2b194e4d76", size = 10125938, upload-time = "2026-07-03T23:28:27.426Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/43/fe3689c62e6e5bd2f511165b3baaa4edfce1db2f2c26d0108a0f753b2c49/python_flint-0.9.0-cp310-abi3-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:0e681705564a22367def0e026185af43783fd466839493baf7bc21c9e506bf15", size = 10137028, upload-time = "2026-07-03T23:28:29.717Z" },
+    { url = "https://files.pythonhosted.org/packages/63/dd/4b49e36612e924707090c569cf5c3daa9ba3c3e3050897715e3136d055af/python_flint-0.9.0-cp310-abi3-win_amd64.whl", hash = "sha256:8f1059536b7393e48b1444894c3b54ce1b961e4aa4a356e19217b26690f20db0", size = 9593474, upload-time = "2026-07-03T23:28:31.729Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/0e/bf3ad3be80edf54cb98005e3dd19d9b0a8d3618f841f12b703c819b94282/python_flint-0.9.0-cp310-abi3-win_arm64.whl", hash = "sha256:4d78476bce46d28e3655ac5521c2af29a1928ac320aa7e6ace88ebe46fb136e2", size = 7874815, upload-time = "2026-07-03T23:28:33.696Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/78/39c80424b399677603629d3e6a2e67dbdaf49a33ace98a581be93ed14688/python_flint-0.9.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:cf1356f6850c8ef11789773005d192a9035e828bc41644be56ec9b35ac41b2fe", size = 9134679, upload-time = "2026-07-03T23:28:35.202Z" },
+    { url = "https://files.pythonhosted.org/packages/47/99/f0b224ca7f85c1368bacc6ad1aac6f13ce9355e25f17a5bcf4e21c4bb639/python_flint-0.9.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:70e965a6f8096b3f40cd335d16227715a61c59e27a1cf9979e57717cfae4e6da", size = 7962573, upload-time = "2026-07-03T23:28:37.122Z" },
+    { url = "https://files.pythonhosted.org/packages/22/7d/a9c0538fbd4444cd6ef98852e1ded2b65caadd255604963d38917358653b/python_flint-0.9.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:2a0d8db1fab69104afdc7a9763a690337a1cecafbf476b310f5bcd8ccc97b29b", size = 10190202, upload-time = "2026-07-03T23:28:39.121Z" },
+    { url = "https://files.pythonhosted.org/packages/24/a1/db9ded0b3938117a55581057ddaa78d997607e3c5c632e8e7f2b6c6ae017/python_flint-0.9.0-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7d60da4bf413c264215ba396ed87601632ede21dfc8c05661b424942cbbfb98e", size = 10222717, upload-time = "2026-07-03T23:28:41.172Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/3d/8fa26b07514d7c433d14d338df9df4c57ad6875ef7a01fb578d79be8a449/python_flint-0.9.0-cp313-cp313-win_amd64.whl", hash = "sha256:1f3a3672d589e376d47288dcebcb712997dc719880a4dbf1779bf0f2b20d0293", size = 9682364, upload-time = "2026-07-03T23:28:43.326Z" },
+    { url = "https://files.pythonhosted.org/packages/4c/4c/28a9e33bbc323263dc2408e6a253e77099183b5e870f453dfc1efeb75107/python_flint-0.9.0-cp313-cp313-win_arm64.whl", hash = "sha256:e9d5fcfc3eca4254306ba4130914c61f84b5a4e816f97e31070fda620478dd96", size = 7964982, upload-time = "2026-07-03T23:28:45.475Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/5b/fa2a8a6a786a79f084fa8a1d2bd529d7a1e9f386fcb777271835f3198d87/python_flint-0.9.0-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:8a1309db059bd30234b4ad4e55b0de76832109f78379d7533bc7c1fd7ccb9859", size = 9143627, upload-time = "2026-07-03T23:28:47.431Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/8d/523c31701a55f539b8b2074b8a4faa921679bed76968d254c99ea71990df/python_flint-0.9.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:57ed504043c69740b983b7dae3b44e0e06704a749cf42a7ead088e78b1eb85f5", size = 7983061, upload-time = "2026-07-03T23:28:49.703Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/3d/b73a9f789f981baefbb32b00c8318bf4beb1d14b1b063984aa63461ee9b2/python_flint-0.9.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:2736832e42fa5487026fe8431d62e626c083f01fde86c6e45a402e808466778e", size = 10202236, upload-time = "2026-07-03T23:28:52.132Z" },
+    { url = "https://files.pythonhosted.org/packages/39/2e/236741752daa06dbedb44abbe2c6d3a8ece3e4cc7ece34edfb8e3d6aba97/python_flint-0.9.0-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7f6532950e27cb3e836bfd23f5228af012e4d6332f6885bed338a591b01be659", size = 10276464, upload-time = "2026-07-03T23:28:54.188Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/6b/660e6982354b07080fc23459b0e30e02b84076dc7876c48de07e30e1da4b/python_flint-0.9.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl", hash = "sha256:b31f5c00e0e36040ab58d00b3025156e20869b990d776e4bf90f870b1ee11ad3", size = 7121329, upload-time = "2026-07-03T23:28:56.259Z" },
+    { url = "https://files.pythonhosted.org/packages/be/fb/11328589c0edd04a900b6e6521b5b85e0218d54d4641c0f419aa561267a7/python_flint-0.9.0-cp314-cp314-win_amd64.whl", hash = "sha256:1c32c16bb7119ae200a138558cd5d41e61efab8a94b2a967e7168c9e04797ec6", size = 9913628, upload-time = "2026-07-03T23:28:57.93Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/0d/f84f84e50120fd89a45d44e5d67444bd1ecb7c354200e2f1c27ac18f0225/python_flint-0.9.0-cp314-cp314-win_arm64.whl", hash = "sha256:335a4e55c61eecda315292d38b0dcb6687f85ffa6a4fa6bea8dba8d143e4387d", size = 8261445, upload-time = "2026-07-03T23:28:59.979Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/68/d15b652a710aec669d99e9fb648188ad4d4fa5435ea8e987245be9f50f03/python_flint-0.9.0-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:83ca0da26f3344da6eeac33a3cc4dd2d323b56d9b1eaa430a49a8e82cca68d80", size = 9279643, upload-time = "2026-07-03T23:29:01.532Z" },
+    { url = "https://files.pythonhosted.org/packages/42/db/0d25d9cfd61b648dd39b44255c2bf8a5b207e25c7a9aab53cde29515dd60/python_flint-0.9.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:f0ba8c7bceaf93dd4d391ee2fab487a672bd7004600e07ceddbd3878025673e9", size = 8238305, upload-time = "2026-07-03T23:29:03.7Z" },
+    { url = "https://files.pythonhosted.org/packages/41/85/7535f8a1422eef89fab8422b62d3f97c8fd9b556763aa6cd46154abdcd5b/python_flint-0.9.0-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c2d37959bc802220640e54724439c66a123b7aad565bfa889dbb8e8857ba4d64", size = 10246910, upload-time = "2026-07-03T23:29:05.319Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/70/bb4e62cb8d139d4239712a93714c5b5a3f99dade40f182f4d802e288b33d/python_flint-0.9.0-cp314-cp314t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:68b089c32b689223429754be5752b0d38a23e431903a8d5857bb182ebffce51f", size = 10309233, upload-time = "2026-07-03T23:29:07.131Z" },
+    { url = "https://files.pythonhosted.org/packages/87/56/ef957e332776d1283138bf0f66479101e64cd38814a5b7289d94729783a0/python_flint-0.9.0-cp314-cp314t-win_amd64.whl", hash = "sha256:c5430048cdc95007e6152b03ad242bfa1192a1f927faee5ec333f7018bd2d350", size = 10402344, upload-time = "2026-07-03T23:29:09.129Z" },
+    { url = "https://files.pythonhosted.org/packages/50/f9/7b8900ed86f36b3ca423859cbfe9b0116936b85717bb172f94cbf1e03184/python_flint-0.9.0-cp314-cp314t-win_arm64.whl", hash = "sha256:69c054f3f16e607515193080f887f3357961c36bffbcf8169680566f1bb8bc29", size = 8426268, upload-time = "2026-07-03T23:29:11.309Z" },
 ]
 
 [[package]]

@@ -55,6 +55,7 @@ dependencies = [
     "pyerfa>=2.0.0",  # IAU ERFA: high-precision nutation (IAU 2006/2000A), obliquity, precession, aberration
     "zstandard>=0.22.0",  # Zstandard compression for LEB2 compressed ephemeris format
     # tomllib is in stdlib since 3.11, no longer needed with >=3.12
+    "python-flint>=0.9.0,<0.10.0",
 ]
 
 [project.optional-dependencies]
