@@ -238,6 +238,43 @@ class TestSweHousesWithFallback:
         assert "Equal" in warning
 
     @pytest.mark.unit
+    def test_makransky_fallback_handles_all_recorded_thresholdless_errors(self):
+        """All 66 recorded Makransky fallback failures now return fallback cusps."""
+        jd = 2451643.5
+        cases = [
+            (latitude, longitude, ord("O"), True)
+            for latitude in (-90.0, -89.999, -89.0, 89.0, 89.999, 90.0)
+            for longitude in (-180.0, -179.999, -90.0, 0.0, 90.0, 179.999, 180.0)
+        ]
+        cases.extend(
+            (latitude, longitude, fallback, validate)
+            for latitude in (-90.0, 90.0)
+            for longitude in (-90.0, 0.0, 179.999)
+            for fallback in (ord("O"), ord("W"))
+            for validate in (True, False)
+        )
+        assert len(cases) == 66
+
+        for latitude, longitude, fallback, validate in cases:
+            direct_cusps, direct_ascmc = ephem.houses(jd, latitude, longitude, fallback)
+            cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
+                jd,
+                latitude,
+                longitude,
+                ord("i"),
+                fallback_hsys=fallback,
+                validate_cusps=validate,
+            )
+
+            assert cusps == direct_cusps
+            assert ascmc == direct_ascmc
+            assert used_fallback is True
+            assert warning is not None
+            assert "Sunshine-Makransky" in warning
+            assert " as fallback" in warning
+            assert "None" not in warning
+
+    @pytest.mark.unit
     def test_all_polar_affected_systems(self):
         """Should handle all polar-affected systems."""
         jd = 2451545.0
@@ -338,6 +375,24 @@ class TestSweHousesArmcWithFallback:
 
         assert used_fallback is True
         assert "Whole Sign" in warning
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("latitude", [-90.0, 90.0])
+    def test_makransky_fallback_handles_errors_without_threshold(self, latitude):
+        """The ARMC wrapper handles Makransky's exact-pole refusal."""
+        direct_cusps, direct_ascmc = ephem.houses_armc(280.0, latitude, 23.44, ord("O"))
+
+        cusps, ascmc, used_fallback, warning = ephem.houses_armc_with_fallback(
+            280.0, latitude, 23.44, ord("i")
+        )
+
+        assert cusps == direct_cusps
+        assert ascmc == direct_ascmc
+        assert used_fallback is True
+        assert warning is not None
+        assert "Sunshine-Makransky" in warning
+        assert "Makransky horizon axis is undefined at a geographic pole" in warning
+        assert "Using Porphyry as fallback" in warning
 
 
 class TestPolarCircleEdgeCases:

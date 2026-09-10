@@ -156,6 +156,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   model instead of testing registry membership. No number and no public
   behaviour changed.
 
+### Fixed
+
+- `houses_with_fallback()` and `houses_armc_with_fallback()` now preserve the
+  reason from construction-level polar refusals that do not carry a numeric
+  polar-circle threshold, then return the requested fallback result instead of
+  raising a `TypeError` while formatting the warning.
+
 ### Removed
 
 - The never-called IAU 2006 Fukushima-Williams precession block of

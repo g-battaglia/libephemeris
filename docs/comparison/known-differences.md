@@ -248,6 +248,15 @@ reference API instead exposes an exact-zero/equatorial branch discontinuity in
 LibEphemeris intentionally returns the source-defined continuous limit. This is
 covered by provenance tests rather than by preserving the reference anomaly.
 
+#### Sunshine fallback refusals {#sunshine-fallback-refusals}
+
+The polar-safe house helpers now handle both kinds of `PolarCircleError`: the
+ordinary latitude-domain errors that carry a numeric polar-circle threshold and
+construction-level errors whose defining geometry has no such threshold. In the
+latter case the warning preserves the construction's own reason and reports the
+selected fallback. Earlier versions attempted to format the absent threshold as
+a float and raised `TypeError` instead of returning the fallback result.
+
 #### Krusinski house position at the equator {#krusinski-equator}
 
 The Krusinski–Pisa–Goelzer system (selector ``U``) divides the great circle

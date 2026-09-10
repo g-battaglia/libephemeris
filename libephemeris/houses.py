@@ -1113,6 +1113,7 @@ _FALLBACK_SYSTEM_NAMES: dict[str, str] = {
     "F": "Carter",
     "Y": "APC",
     "N": "Natural Gradient",
+    "i": "Sunshine-Makransky",
 }
 
 
@@ -1177,10 +1178,13 @@ def _houses_with_fallback_impl(
         # Use fallback house system
         cusps, ascmc = compute(fallback_hsys)
 
+        if e.threshold is None:
+            reason = str(e)
+        else:
+            reason = f"polar circle threshold: {e.threshold:.2f}°"
         warning = (
             f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
-            f"(polar circle threshold: {e.threshold:.2f}°). "
-            f"Using {fallback_name} as fallback."
+            f"({reason}). Using {fallback_name} as fallback."
         )
         return cusps, ascmc, True, warning
 
