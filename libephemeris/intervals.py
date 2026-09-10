@@ -36,6 +36,7 @@ __all__ = [
     "IntervalCertificationError",
     "ball_from_float",
     "ball_from_bounds",
+    "best_root_float",
     "certified_float",
     "certified_sign",
     "contains_zero",
@@ -246,6 +247,49 @@ def isolate_unique_root(
                 f"expected one certified root, isolated {len(roots)}"
             )
         return roots[0]
+
+
+def best_root_float(function: Callable[[Ball], Ball], root: Ball) -> float:
+    """Select the binary64 candidate with the smaller certified residual.
+
+    The two adjacent candidates around the isolated root are evaluated as exact
+    binary64 inputs. One is selected only when its absolute residual enclosure
+    is strictly below the other's. An exact tie uses the earlier number.
+    """
+    midpoint = float(root.mid())
+    candidates = tuple(
+        sorted(
+            {
+                math.nextafter(midpoint, -math.inf),
+                midpoint,
+                math.nextafter(midpoint, math.inf),
+            }
+        )
+    )
+    for bits in (192, 256, 384, 512):
+        with interval_precision(bits):
+            residuals = [
+                (candidate, abs(function(ball_from_float(candidate))))
+                for candidate in candidates
+            ]
+            ordered = sorted(residuals, key=lambda item: float(item[1].mid()))
+            best_candidate, best_residual = ordered[0]
+            second_residual = ordered[1][1]
+            if best_residual.upper() < second_residual.lower():
+                return best_candidate
+            if (
+                best_residual.is_exact()
+                and second_residual.is_exact()
+                and best_residual == second_residual
+            ):
+                return min(
+                    candidate
+                    for candidate, residual in residuals
+                    if residual == best_residual
+                )
+    raise IntervalCertificationError(
+        "adjacent binary64 root candidates have overlapping residual enclosures"
+    )
 
 
 def certified_float(value: Ball) -> float:

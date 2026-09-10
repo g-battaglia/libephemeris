@@ -13,6 +13,7 @@ from libephemeris.intervals import (
     IntervalCertificationError,
     ball_from_bounds,
     ball_from_float,
+    best_root_float,
     certified_float,
     certified_sign,
     interval_precision,
@@ -88,6 +89,20 @@ def test_isolate_unique_root_rejects_a_repeated_root() -> None:
     """A derivative interval containing zero cannot certify a simple root."""
     with pytest.raises(IntervalCertificationError):
         isolate_unique_root(lambda x: x * x, lambda x: 2 * x, -1.0, 1.0)
+
+
+def test_best_root_float_selects_the_smaller_residual() -> None:
+    """Adjacent binary64 candidates are ordered by certified residual bounds."""
+    root = isolate_unique_root(lambda x: x * x - 2, lambda x: 2 * x, 1.0, 2.0)
+    selected = best_root_float(lambda x: x * x - 2, root)
+    neighbors = (
+        math.nextafter(selected, -math.inf),
+        math.nextafter(selected, math.inf),
+    )
+    assert selected == math.sqrt(2.0)
+    assert abs(selected - math.sqrt(2.0)) <= min(
+        abs(candidate - math.sqrt(2.0)) for candidate in neighbors
+    )
 
 
 def test_certified_float_accepts_a_unique_rounding_cell() -> None:
