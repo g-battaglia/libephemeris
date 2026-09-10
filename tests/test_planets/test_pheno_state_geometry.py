@@ -46,6 +46,16 @@ def test_geometry_matches_independent_cross_dot_angles(body, sun) -> None:
     assert fraction == pytest.approx((1.0 + math.cos(math.radians(phase_angle))) / 2.0)
 
 
+def test_apparent_diameter_uses_exact_spherical_geometry() -> None:
+    """A finite spherical body uses twice its exact angular radius."""
+    from libephemeris.planets import _calc_apparent_diameter
+
+    radius_km = 1737.4
+    distance_au = 0.00257
+    expected = 2.0 * math.degrees(math.asin(radius_km / (distance_au * 149597870.7)))
+    assert _calc_apparent_diameter(radius_km, distance_au) == expected
+
+
 @pytest.mark.parametrize("distance_au", [0.0024, 0.00257, 0.00272])
 def test_horizontal_parallax_matches_earth_radius_relation(distance_au: float) -> None:
     """Geocentric lunar slot 5 follows asin(R_E / Delta)."""
@@ -58,6 +68,30 @@ def test_horizontal_parallax_rejects_invalid_distance(bad) -> None:
     """The pure helper rejects invalid geometry instead of returning a sentinel."""
     with pytest.raises(InputValidationError):
         _moon_horizontal_parallax_deg(bad)
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [
+        le.FLG_NOABERR,
+        le.FLG_NOGDEFL,
+        le.FLG_ASTROMETRIC,
+        le.FLG_TRUEPOS | le.FLG_NOABERR,
+    ],
+)
+def test_sealed_leb_keeps_reduction_flags_on_the_leb_path(
+    flags: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reduction flags must not open the direct ephemeris in sealed LEB mode."""
+    import libephemeris.planets as planets
+
+    def fail_direct_path():
+        raise AssertionError("direct ephemeris path used in sealed LEB mode")
+
+    monkeypatch.setattr(planets, "_get_computation_ephemeris", fail_direct_path)
+    result = le.pheno_ut(2451545.0, le.MARS, flags)
+    assert len(result) == 20
+    assert all(type(value) is float for value in result)
 
 
 def test_public_sentinels_and_ignored_heliocentric_flag() -> None:

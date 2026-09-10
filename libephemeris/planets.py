@@ -10467,20 +10467,14 @@ _AU_KM = 149597870.7
 # lunar distance modulus in _calc_moon_magnitude (6378136.6 m).
 _EARTH_EQ_RADIUS_KM = 6378.1366
 
-# Conversion factor: radians to arcseconds
-_RAD_TO_ARCSEC = 206264.80624709636  # (180/pi) * 3600
-
-
 def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
     """
     Calculate apparent angular diameter in degrees.
 
-    Uses the small-angle approximation which is accurate for all solar system bodies
-    as seen from Earth (maximum angular size is ~0.5 degrees for Sun/Moon).
+    Uses the exact angular radius of a sphere viewed from an external point.
 
     The formula is:
-        diameter_deg = 2 * radius_km / distance_km * RAD_TO_DEG
-                     = 2 * radius_km / (distance_au * AU_KM) * (180 / pi)
+        diameter_deg = 2 * asin(radius_km / distance_km) * RAD_TO_DEG
 
     Returns degrees for reference-API compatibility (pheno_ut attr[3]).
 
@@ -10494,9 +10488,10 @@ def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
     if distance_au <= 0:
         return 0.0
     distance_km = distance_au * _AU_KM
-    # Angular diameter = 2 * arctan(radius/distance) ≈ 2 * radius/distance (small angle)
-    # Convert from radians to degrees (not arcseconds) for reference-API compatibility
-    return 2.0 * radius_km / distance_km * _RAD_TO_ARCSEC / 3600.0
+    ratio = radius_km / distance_km
+    if ratio > 1.0:
+        raise CalculationError("apparent diameter requires an external observer")
+    return float(2.0 * math.degrees(math.asin(ratio)))
 
 
 # Visual magnitude parameters for outer planets (generic fallback:
@@ -10979,9 +10974,8 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
     # --- LEB fast path ---
     from .state import get_leb_reader
 
-    _unsupported_pheno_flags = FLG_NOABERR | FLG_NOGDEFL
     reader = get_leb_reader()
-    if reader is not None and not (flags & _unsupported_pheno_flags):
+    if reader is not None:
         try:
             return _calc_pheno_leb(tjdut, planet, flags)
         except (KeyError, ValueError) as _leb_err:
@@ -11023,9 +11017,8 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
     # --- LEB fast path ---
     from .state import get_leb_reader
 
-    _unsupported_pheno_flags_tt = FLG_NOABERR | FLG_NOGDEFL
     reader = get_leb_reader()
-    if reader is not None and not (flags & _unsupported_pheno_flags_tt):
+    if reader is not None:
         try:
             from .time_utils import deltat
 

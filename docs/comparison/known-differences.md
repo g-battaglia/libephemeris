@@ -682,6 +682,32 @@ Photometric conventions are empirical and can differ between almanacs. Such
 differences are reported as model choices, not used to reverse-engineer a
 reference curve.
 
+#### Phenomena state geometry {#phenomena-state-geometry}
+
+For phase and elongation, `pheno` and `pheno_ut` form apparent Cartesian vectors
+from the active observer to the body and Sun. With `FLG_TRUEPOS`, both vectors
+are geometric instead. Phase is the angle between body-to-observer and
+body-to-Sun; elongation is the angle between the two observer-centred vectors.
+Both use `atan2(norm(cross), dot)`, which remains well-conditioned near 0° and
+180° and avoids the cancellation of an inverse cosine.
+
+The distance factor used by the magnitude models has a distinct physical
+meaning. It is the simultaneous geometric Sun-body distance
+`norm(B_body(t) - B_sun(t))` from barycentric body-centre states at the requested
+TT instant. It is independent of the terrestrial observer and of `FLG_TRUEPOS`:
+apparent observer-centred vectors carry different light-time epochs and their
+difference is not a simultaneous illumination state. This convention changes
+only magnitude slot 4 relative to using a light-time-retarded heliocentric
+range. The largest movement in the verification grid was `7.12e-5` magnitude
+for Mercury, while the independent simultaneous-state check agreed exactly in
+the stored binary64 inputs on both LEB and direct backends.
+
+The Cartesian rewrite also moves phase, elongation, diameter and lunar parallax
+by last-place amounts. The largest sampled phase movement was `2.04e-8` arcsec
+at a near-zero Neptune phase. A 100-decimal cross/dot evaluation reduced the
+arithmetic error there from `2.04e-8` arcsec to `4.7e-12` arcsec. Output shape,
+sentinels, body classes and reserved slots are unchanged.
+
 #### Planetary magnitude models {#planetary-magnitude-models}
 
 The visual-magnitude channel uses Johnson V models from published photometry.
@@ -696,11 +722,12 @@ coefficient from 1980 through 2000, with a proleptic-Gregorian fractional year.
 
 The Sun uses Willmer's (2018) Johnson V Vega-system magnitude, `-26.76` at one
 astronomical unit. The prior `-26.86` value had no verified source, so this
-moves every solar magnitude by exactly `+0.10` magnitude. Across the complete
-recorded base-tier phenomena grid, the corresponding largest movements are
+moves every solar magnitude by exactly `+0.10` magnitude. In the C-P02
+coefficient-isolation replay, the corresponding largest movements were
 `0.0439` magnitude for Saturn, `0.00174` for Uranus, and `0.001993` for Neptune.
-Only magnitude slot 4 changes; phase angle, illuminated fraction, elongation,
-diameter, result shape, and error behavior do not. The public Neptune path
+Those model replacements changed only magnitude slot 4; the later state-geometry
+rewrite described above separately improves the arithmetic of phase angle,
+illuminated fraction, elongation, diameter and parallax. The public Neptune path
 continues to return a value when its computed phase slightly exceeds the
 paper's rounded Earth-visible limit because the adopted secular equation is
 phase-independent; the direct internal model evaluator still enforces its

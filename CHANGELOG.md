@@ -71,15 +71,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0 s at sea level, with no event gained or lost and no transit moved. Sea
   level, zero pressure and the model's edges are unchanged. See
   `docs/comparison/known-differences.md#horizon-dip`.
+- `pheno` and `pheno_ut` now derive phase and elongation from direct Cartesian
+  observer-to-body and observer-to-Sun vectors with stable
+  `atan2(norm(cross), dot)` geometry. Their photometric distance is the
+  simultaneous geometric Sun-body separation at the requested TT instant,
+  rather than a light-time-retarded apparent heliocentric range; this moves
+  magnitude slot 4 by at most `7.12e-5` magnitude in the verification grid and
+  removes inverse-cosine cancellation at near-zero phase. Lunar slot 5 retains
+  its geometric horizontal-parallax or apparent topocentric-displacement
+  convention. See
+  `docs/comparison/known-differences.md#phenomena-state-geometry`.
 - `pheno` and `pheno_ut` now use published Johnson V photometry throughout:
   Mallama and Hilton (2018) for Mercury through Neptune, including the
   geometric-mean Saturn ring opening from independently derived WGCCRE pole
   geometry, consistent WGCCRE frame geometry for Uranus, and Neptune's
   published `-0.0054` magnitude/year secular law with exact Gregorian year
   fractions; and Willmer (2018) for the Sun's `-26.76` magnitude at one AU.
-  Only magnitude slot 4 changes: by exactly +0.10 magnitude for the Sun and by
-  at most 0.0439, 0.00174, and 0.001993 magnitude for Saturn, Uranus, and
-  Neptune on the recorded base-tier grid. See
+  In the coefficient-isolation replay, only magnitude slot 4 changed: by
+  exactly +0.10 magnitude for the Sun and by at most 0.0439, 0.00174, and
+  0.001993 magnitude for Saturn, Uranus, and Neptune. The separate phenomena
+  state rewrite above subsequently corrects the distance supplied to these
+  equations. See
   `docs/comparison/known-differences.md#planetary-magnitude-models`.
 - `planets.py` computes apparent diameters from the published IAU mean radii:
   the Sun is the IAU 2015 Resolution B3 nominal solar radius (696000 -> 695700
