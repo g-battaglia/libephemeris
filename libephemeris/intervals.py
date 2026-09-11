@@ -204,6 +204,16 @@ def isolate_unique_root(
             slope = derivative(domain)
             midpoint = (lo + hi) / 2
             point_value = function(midpoint)
+            # An exact interior zero is already a certified singleton root when
+            # the derivative excludes zero.  Handling it before interval Newton
+            # avoids repeatedly subdividing an exact dyadic solution.
+            if (
+                point_value.is_exact()
+                and point_value.is_zero()
+                and not contains_zero(slope)
+            ):
+                roots.append(midpoint)
+                continue
             if not slope.is_finite():
                 if midpoint == lo or midpoint == hi:
                     raise IntervalCertificationError(

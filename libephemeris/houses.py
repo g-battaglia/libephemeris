@@ -109,6 +109,14 @@ from .exceptions import (
     validate_coordinates,
     validate_latitude,
 )
+from .intervals import (
+    IntervalCertificationError,
+    Ball,
+    ball_from_float,
+    certified_float,
+    interval_precision,
+    isolate_unique_root,
+)
 from .house_constructions import (
     apc_cusp as _apc_cusp,
     houses_krusinski as _houses_krusinski,
@@ -3477,6 +3485,210 @@ def _houses_carter(
     return cusps
 
 
+# The interval solver works in degrees.  ``arb`` trigonometric functions use
+# radians, so keeping this conversion in one place also makes the residuals
+# below easy to audit against the equations in the approved construction.
+_GAUGE_DEG_TO_RAD = math.pi / 180.0
+_GAUGE_RAD_TO_DEG = 180.0 / math.pi
+
+
+def _gauge_sin_deg(value: Ball) -> Ball:
+    """Evaluate sine of a degree-valued Arb ball."""
+    return (value * Ball.pi() / 180).sin()
+
+
+def _gauge_cos_deg(value: Ball) -> Ball:
+    """Evaluate cosine of a degree-valued Arb ball."""
+    return (value * Ball.pi() / 180).cos()
+
+
+def _gauge_tan_deg(value: Ball) -> Ball:
+    """Evaluate tangent of a degree-valued Arb ball."""
+    return (value * Ball.pi() / 180).tan()
+
+
+def _gauge_ad(armc: Ball, hour_angle: Ball, coefficient: Ball) -> Ball:
+    """Ascensional difference as a continuous-hour-angle interval."""
+    return (coefficient * _gauge_sin_deg(armc - hour_angle)).asin() * _GAUGE_RAD_TO_DEG
+
+
+def _gauge_residual(
+    sector: int, armc: Ball, hour_angle: Ball, coefficient: Ball
+) -> Ball:
+    """Return the branch-free residual for one non-cardinal boundary."""
+    ad = _gauge_ad(armc, hour_angle, coefficient)
+    sad = 90 + ad
+    san = 90 - ad
+    j: int
+    if 2 <= sector <= 9:
+        j = sector - 1
+        return hour_angle + sad - j * sad / 9
+    if 11 <= sector <= 18:
+        j = sector - 10
+        return hour_angle - j * sad / 9
+    if 20 <= sector <= 27:
+        j = sector - 19
+        return hour_angle - sad - j * san / 9
+    if 29 <= sector <= 36:
+        j = sector - 28
+        return hour_angle - 180 - j * san / 9
+    raise ValueError("sector is cardinal or outside the Gauquelin range")
+
+
+def _gauge_derivative(
+    sector: int, armc: Ball, hour_angle: Ball, coefficient: Ball
+) -> Ball:
+    """Return the analytic derivative of a Gauquelin residual."""
+    argument = armc - hour_angle
+    sine = _gauge_sin_deg(argument)
+    cosine = _gauge_cos_deg(argument)
+    denominator = (1 - (coefficient * sine) ** 2).sqrt()
+    # Degree-to-radian factors cancel when differentiating the degree-valued
+    # inverse sine with respect to a degree-valued hour angle.
+    ad_prime = -coefficient * cosine / denominator
+    if 2 <= sector <= 9:
+        j = sector - 1
+        return 1 + (1 - j / 9) * ad_prime
+    if 11 <= sector <= 18:
+        j = sector - 10
+        return 1 - (j / 9) * ad_prime
+    if 20 <= sector <= 27:
+        j = sector - 19
+        return 1 - (1 - j / 9) * ad_prime
+    if 29 <= sector <= 36:
+        j = sector - 28
+        return 1 + (j / 9) * ad_prime
+    raise ValueError("sector is cardinal or outside the Gauquelin range")
+
+
+def _gauge_chart_piece(alpha: Ball, eps: float, k: int) -> Ball:
+    """Convert one pole-free local alpha chart to ecliptic longitude."""
+    beta = alpha - k
+    cosine = _gauge_cos_deg(ball_from_float(eps))
+    tangent = _gauge_tan_deg(beta)
+    if k % 180 == 0:
+        return k + (tangent / cosine).atan() * _GAUGE_RAD_TO_DEG
+    return k + (cosine * tangent).atan() * _GAUGE_RAD_TO_DEG
+
+
+def _gauge_alpha_to_longitude(alpha: Ball, eps: float) -> Ball:
+    """Use local, branch-free charts to convert a certified alpha interval."""
+    lower = float(alpha.lower().mid())
+    upper = float(alpha.upper().mid())
+    if not math.isfinite(lower) or not math.isfinite(upper):
+        raise IntervalCertificationError("right-ascension enclosure is not finite")
+
+    # A root enclosure normally lies in one chart.  At a +/-45 degree seam,
+    # split exactly at the seam and take the outward hull of both closed charts.
+    seams = []
+    first = math.floor((lower - 45.0) / 90.0) - 1
+    last = math.ceil((upper - 45.0) / 90.0) + 1
+    for index in range(first, last + 1):
+        seam = 45.0 + 90.0 * index
+        seam_ball = ball_from_float(seam)
+        if alpha.contains(seam_ball):
+            seams.append(seam)
+    if len(seams) > 1:
+        raise IntervalCertificationError(
+            "alpha enclosure contains multiple chart seams"
+        )
+
+    if not seams:
+        midpoint = (lower + upper) / 2
+        k = int(math.floor(midpoint / 90.0 + 0.5)) * 90
+        return _gauge_chart_piece(alpha, eps, k)
+
+    seam = seams[0]
+    seam_ball = ball_from_float(seam)
+    pieces: list[Ball] = []
+    try:
+        left = alpha.intersection(ball_from_float(lower).union(seam_ball))
+        right = alpha.intersection(seam_ball.union(ball_from_float(upper)))
+    except ValueError as exc:
+        raise IntervalCertificationError("chart seam split is empty") from exc
+    if left.is_finite() and left.lower() <= left.upper():
+        left_k = int(math.floor((float(left.mid()) / 90.0) + 0.5)) * 90
+        pieces.append(_gauge_chart_piece(left, eps, left_k))
+    if right.is_finite() and right.lower() <= right.upper():
+        right_k = int(math.floor((float(right.mid()) / 90.0) + 0.5)) * 90
+        pieces.append(_gauge_chart_piece(right, eps, right_k))
+    if not pieces:
+        raise IntervalCertificationError("chart seam split produced no pieces")
+    result = pieces[0]
+    for piece in pieces[1:]:
+        result = result.union(piece)
+    return result
+
+
+def _gauge_certified_sector(sector: int, armc: float, lat: float, eps: float) -> float:
+    """Certify one non-cardinal root at both required Arb precisions."""
+    coefficient = math.tan(math.radians(lat)) * math.tan(math.radians(eps))
+    if not math.isfinite(coefficient) or abs(coefficient) >= 1.0:
+        raise IntervalCertificationError("ordinary Gauquelin coefficient is invalid")
+    armc_ball = ball_from_float(armc)
+    coefficient_ball = ball_from_float(coefficient)
+    intervals = {
+        2: (-180.0, 0.0),
+        3: (-180.0, 0.0),
+        4: (-180.0, 0.0),
+        5: (-180.0, 0.0),
+        6: (-180.0, 0.0),
+        7: (-180.0, 0.0),
+        8: (-180.0, 0.0),
+        9: (-180.0, 0.0),
+    }
+    if 11 <= sector <= 18:
+        interval = (0.0, 180.0)
+    elif 20 <= sector <= 27:
+        interval = (0.0, 180.0)
+    elif 29 <= sector <= 36:
+        interval = (180.0, 360.0)
+    else:
+        interval = intervals[sector]
+
+    candidates: list[float] = []
+    for bits in (192, 256):
+        with interval_precision(bits):
+
+            def residual(value: Ball) -> Ball:
+                return _gauge_residual(sector, armc_ball, value, coefficient_ball)
+
+            def derivative(value: Ball) -> Ball:
+                return _gauge_derivative(sector, armc_ball, value, coefficient_ball)
+
+            root = isolate_unique_root(
+                residual,
+                derivative,
+                *interval,
+                precision=bits,
+            )
+            # Preserve an exact dyadic root when the certified enclosure's
+            # binary64 midpoint is proved to make the residual exactly zero.
+            # This is important for cardinal right ascensions and avoids
+            # turning an exact chart cardinal into a tiny signed enclosure.
+            root_candidate = float(root.mid())
+            if math.isfinite(root_candidate):
+                with interval_precision(bits):
+                    candidate_ball = ball_from_float(root_candidate)
+                    if (
+                        residual(candidate_ball).is_exact()
+                        and residual(candidate_ball).is_zero()
+                    ):
+                        root = candidate_ball
+            # Root isolation precision and the final chart precision are
+            # separate: chart seams and binary64 cells can need extra guard
+            # bits even after the root enclosure is unique.
+            with interval_precision(max(bits, 512)):
+                alpha = armc_ball - root
+                longitude = _gauge_alpha_to_longitude(alpha, eps)
+                candidates.append(certified_float(longitude))
+    if candidates[0] != candidates[1]:
+        raise IntervalCertificationError(
+            "precisions selected different longitude cells"
+        )
+    return float(candidates[1] % 360.0)
+
+
 def _gauquelin_cusp_for_sector(
     sector_offset: int,
     base_ramc: float,
@@ -3491,13 +3703,80 @@ def _gauquelin_cusp_for_sector(
     convergence_threshold: float,
     near_zero: float,
 ) -> float:
-    raise NotImplementedError("Gauquelin cusp construction is pending rewrite")
+    """Certify a single non-cardinal Gauquelin boundary in continuous H."""
+    del ramc_sign, ascensional_diff, tan_obliquity, sin_obliquity, tan_lat
+    del niter_max, convergence_threshold, near_zero
+    if sector_offset in (1, 10, 19, 28) or not 1 <= sector_offset <= 36:
+        raise CalculationError("cardinal Gauquelin boundaries have supplied anchors")
+    try:
+        return _gauge_certified_sector(
+            sector_offset, float(base_ramc), float(lat), float(eps)
+        )
+    except (IntervalCertificationError, ValueError, OverflowError) as exc:
+        raise CalculationError("Gauquelin root certification failed") from exc
 
 
 def _houses_gauquelin(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
-    raise NotImplementedError("Gauquelin house construction is pending rewrite")
+    """Construct the 36 certified temporal Gauquelin sector boundaries."""
+    values = [0.0] * 37
+    for name, value in (
+        ("ARMC", armc),
+        ("latitude", lat),
+        ("obliquity", eps),
+        ("Ascendant", asc),
+        ("MC", mc),
+    ):
+        if not math.isfinite(value):
+            raise CalculationError(f"Gauquelin {name} must be finite")
+    if not -90.0 <= lat <= 90.0 or not 0.0 <= eps < 90.0:
+        raise CalculationError("Gauquelin frame is outside its numeric domain")
+
+    values[1] = float(asc % 360.0)
+    values[10] = float(mc % 360.0)
+    values[19] = float((asc + 180.0) % 360.0)
+    values[28] = float((mc + 180.0) % 360.0)
+
+    # The tangent and beyond-polar continuations are deliberately simple and
+    # deterministic.  Public dispatch rejects the latter before reaching here.
+    if abs(lat) + eps >= 90.0:
+        for sector in range(1, 37):
+            values[sector] = float((asc - 10.0 * (sector - 1)) % 360.0)
+        return values
+
+    # These exact limits avoid dividing by tan(eps), and preserve the specified
+    # ecliptic-ring convention when the two planes coincide.
+    if eps == 0.0:
+        for sector in range(1, 37):
+            values[sector] = float((asc - 10.0 * (sector - 1)) % 360.0)
+        return values
+
+    try:
+        if lat == 0.0:
+            # Equal H/RA spacing remains nonlinear only in the final chart.
+            for sector in range(2, 37):
+                if sector in (10, 19, 28):
+                    continue
+                hour_angle = -90.0 + 10.0 * (sector - 1)
+                with interval_precision(256):
+                    alpha = ball_from_float(armc - hour_angle)
+                    longitude = _gauge_alpha_to_longitude(alpha, eps)
+                    values[sector] = float(certified_float(longitude) % 360.0)
+        else:
+            for sector in range(2, 37):
+                if sector in (10, 19, 28):
+                    continue
+                values[sector] = _gauquelin_cusp_for_sector(
+                    sector, armc, 1.0, 0.0, 0.0, 0.0, 0.0, eps, lat, 0, 0.0, 0.0
+                )
+    except (IntervalCertificationError, ValueError, OverflowError) as exc:
+        raise CalculationError("Gauquelin longitude certification failed") from exc
+
+    # The antipodal relation is exact at the public binary64 boundary.
+    for sector in range(1, 19):
+        values[sector + 18] = float((values[sector] + 180.0) % 360.0)
+    return values
 
 
 def _ecliptic_to_ra_simple(lon: float, eps: float) -> float:
