@@ -821,6 +821,22 @@ class TestParseTPolynomialErrors:
         assert poly.constant == pytest.approx(0.0)
         assert poly.linear == pytest.approx(1.0)
 
+    @pytest.mark.parametrize(
+        "expression, expected",
+        [("   1 + 2 * T   ", (1.0, 2.0)), ("   -1 + 3.5 * T   ", (-1.0, 3.5))],
+    )
+    def test_arbitrary_padded_e7_values(self, expression, expected):
+        poly = _parse_t_polynomial(expression)
+        assert (poly.constant, poly.linear) == pytest.approx(expected)
+
+    @pytest.mark.parametrize(
+        "expression",
+        [".5", "1.", "+1", "01", "1e2", "1 + 2  * T"],
+    )
+    def test_rejects_unlisted_lexemes(self, expression):
+        with pytest.raises(ValueError):
+            _parse_t_polynomial(expression)
+
 
 class TestParseOrbitalElementsLine:
     """Direct tests for _parse_orbital_elements_line function."""
