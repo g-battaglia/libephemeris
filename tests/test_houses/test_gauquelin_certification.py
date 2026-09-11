@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import importlib
 import math
 from fractions import Fraction
 
 import pytest
+
 import libephemeris as ephem
-import importlib
 
 houses_module = importlib.import_module("libephemeris.houses")
 from libephemeris.exceptions import CalculationError, PolarCircleError

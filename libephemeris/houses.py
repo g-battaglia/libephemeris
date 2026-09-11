@@ -3541,13 +3541,15 @@ def _gauge_linear_sector(sector: int, armc: float, lat: float, eps: float) -> fl
     if eps == 0.0:
         # The ecliptic/equator limit is the exact clockwise ring.  This helper
         # receives the ring's first longitude as its ARMC-like anchor.
-        longitude = (armc_exact - 10 * (sector - 1)) % 360
-        return _gauge_exact_binary64(longitude)
+        ring_longitude: Fraction = (armc_exact - 10 * (sector - 1)) % 360
+        return _gauge_exact_binary64(ring_longitude)
     hour_angle = _gauge_linear_hour_angle(sector)
+    armc_minus_hour: Fraction = armc_exact - hour_angle
     with interval_precision(1024):
-        alpha = _gauge_ball_from_fraction(armc_exact - hour_angle)
-        longitude = _gauge_alpha_to_longitude(alpha, eps)
-        return float(certified_float(longitude) % 360.0)
+        alpha: Ball = _gauge_ball_from_fraction(armc_minus_hour)
+        longitude: Ball = _gauge_alpha_to_longitude(alpha, eps)
+        selected: float = certified_float(longitude)
+        return float(selected % 360.0)
 
 
 def _gauge_sin_deg(value: Ball) -> Ball:
@@ -3706,6 +3708,7 @@ def _gauge_certified_sector(sector: int, armc: float, lat: float, eps: float) ->
         interval = intervals[sector]
 
     candidates: list[float] = []
+    root_representatives: list[float] = []
     for bits in (192, 256):
         with interval_precision(bits):
 
@@ -3741,9 +3744,13 @@ def _gauge_certified_sector(sector: int, armc: float, lat: float, eps: float) ->
                 alpha = armc_ball - root
                 longitude = _gauge_alpha_to_longitude(alpha, eps)
                 candidates.append(certified_float(longitude))
-    if candidates[0] != candidates[1]:
+                root_representatives.append(float(root.mid()))
+    if (
+        candidates[0] != candidates[1]
+        or root_representatives[0] != root_representatives[1]
+    ):
         raise IntervalCertificationError(
-            "precisions selected different longitude cells"
+            "precisions selected different root enclosures or longitude cells"
         )
     return float(candidates[1] % 360.0)
 
