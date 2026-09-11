@@ -79,6 +79,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from fractions import Fraction
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Tuple, Union, overload
 from .constants import *
@@ -1012,7 +1013,13 @@ def _houses_from_armc(
 
     # Placidus, Koch and Gauquelin - and the default an unknown selector
     # reaches - cannot be calculated when abs(lat) + eps > 90.
-    if system.raises_at_pole and _is_polar_circle(lat, eps):
+    # Gauquelin's strict ordinary boundary is evaluated without the rounded
+    # binary64 sum: the exact rational inputs decide whether |lat| + eps is
+    # beyond the tangent. Other systems retain their established predicate.
+    gauquelin_polar = hsys_char == "G" and (Fraction(abs(lat)) + Fraction(eps) > 90)
+    if system.raises_at_pole and (
+        gauquelin_polar if hsys_char == "G" else _is_polar_circle(lat, eps)
+    ):
         _raise_polar_circle_error(lat, eps, hsys_char, func_name)
 
     cusps = system.build_cusps(
@@ -3492,6 +3499,27 @@ _GAUGE_DEG_TO_RAD = math.pi / 180.0
 _GAUGE_RAD_TO_DEG = 180.0 / math.pi
 
 
+def _gauge_ball_from_fraction(value: Fraction) -> Ball:
+    """Create an exact Arb ball from a rational degree value."""
+    return Ball(value.numerator) / Ball(value.denominator)
+
+
+def _gauge_exact_binary64(value: Fraction) -> float:
+    """Round an exact normalized degree to binary64, choosing lower ties."""
+    candidate = float(value)
+    if not math.isfinite(candidate):
+        raise IntervalCertificationError("exact degree is outside binary64")
+    lower = math.nextafter(candidate, -math.inf)
+    upper = math.nextafter(candidate, math.inf)
+    midpoint_lower = (Fraction.from_float(lower) + Fraction.from_float(candidate)) / 2
+    midpoint_upper = (Fraction.from_float(candidate) + Fraction.from_float(upper)) / 2
+    if value == midpoint_lower:
+        return lower
+    if value == midpoint_upper:
+        return candidate
+    return candidate
+
+
 def _gauge_sin_deg(value: Ball) -> Ball:
     """Evaluate sine of a degree-valued Arb ball."""
     return (value * Ball.pi() / 180).sin()
@@ -3572,21 +3600,23 @@ def _gauge_chart_piece(alpha: Ball, eps: float, k: int) -> Ball:
 
 
 def _gauge_alpha_to_longitude(alpha: Ball, eps: float) -> Ball:
-    """Use local, branch-free charts to convert a certified alpha interval."""
-    lower = float(alpha.lower().mid())
-    upper = float(alpha.upper().mid())
-    if not math.isfinite(lower) or not math.isfinite(upper):
+    """Use local charts, splitting exactly at any contained 45-degree seam."""
+    lower = alpha.lower()
+    upper = alpha.upper()
+    if not lower.is_finite() or not upper.is_finite():
         raise IntervalCertificationError("right-ascension enclosure is not finite")
 
-    # A root enclosure normally lies in one chart.  At a +/-45 degree seam,
-    # split exactly at the seam and take the outward hull of both closed charts.
-    seams = []
-    first = math.floor((lower - 45.0) / 90.0) - 1
-    last = math.ceil((upper - 45.0) / 90.0) + 1
+    # The seam candidates are exact integer-degree Arb values.  The midpoint
+    # is used only to enumerate nearby integer candidates; containment and the
+    # split itself use exact Arb endpoint comparisons.
+    center = float(alpha.mid())
+    first = math.floor((center - 45.0) / 90.0) - 2
+    last = math.ceil((center - 45.0) / 90.0) + 2
+    seams: list[int] = []
     for index in range(first, last + 1):
-        seam = 45.0 + 90.0 * index
-        seam_ball = ball_from_float(seam)
-        if alpha.contains(seam_ball):
+        seam = 45 + 90 * index
+        seam_ball = ball_from_float(float(seam))
+        if lower <= seam_ball and seam_ball <= upper:
             seams.append(seam)
     if len(seams) > 1:
         raise IntervalCertificationError(
@@ -3594,24 +3624,21 @@ def _gauge_alpha_to_longitude(alpha: Ball, eps: float) -> Ball:
         )
 
     if not seams:
-        midpoint = (lower + upper) / 2
+        midpoint = center
         k = int(math.floor(midpoint / 90.0 + 0.5)) * 90
         return _gauge_chart_piece(alpha, eps, k)
 
-    seam = seams[0]
-    seam_ball = ball_from_float(seam)
+    seam_ball = ball_from_float(float(seams[0]))
     pieces: list[Ball] = []
     try:
-        left = alpha.intersection(ball_from_float(lower).union(seam_ball))
-        right = alpha.intersection(seam_ball.union(ball_from_float(upper)))
+        left = alpha.intersection(lower.union(seam_ball))
+        right = alpha.intersection(seam_ball.union(upper))
     except ValueError as exc:
         raise IntervalCertificationError("chart seam split is empty") from exc
-    if left.is_finite() and left.lower() <= left.upper():
-        left_k = int(math.floor((float(left.mid()) / 90.0) + 0.5)) * 90
-        pieces.append(_gauge_chart_piece(left, eps, left_k))
-    if right.is_finite() and right.lower() <= right.upper():
-        right_k = int(math.floor((float(right.mid()) / 90.0) + 0.5)) * 90
-        pieces.append(_gauge_chart_piece(right, eps, right_k))
+    for piece in (left, right):
+        if piece.is_finite() and piece.lower() <= piece.upper():
+            piece_k = int(math.floor(float(piece.mid()) / 90.0 + 0.5)) * 90
+            pieces.append(_gauge_chart_piece(piece, eps, piece_k))
     if not pieces:
         raise IntervalCertificationError("chart seam split produced no pieces")
     result = pieces[0]
@@ -3690,28 +3717,13 @@ def _gauge_certified_sector(sector: int, armc: float, lat: float, eps: float) ->
 
 
 def _gauquelin_cusp_for_sector(
-    sector_offset: int,
-    base_ramc: float,
-    ramc_sign: float,
-    ascensional_diff: float,
-    tan_obliquity: float,
-    sin_obliquity: float,
-    tan_lat: float,
-    eps: float,
-    lat: float,
-    niter_max: int,
-    convergence_threshold: float,
-    near_zero: float,
+    sector: int, armc: float, lat: float, eps: float
 ) -> float:
-    """Certify a single non-cardinal Gauquelin boundary in continuous H."""
-    del ramc_sign, ascensional_diff, tan_obliquity, sin_obliquity, tan_lat
-    del niter_max, convergence_threshold, near_zero
-    if sector_offset in (1, 10, 19, 28) or not 1 <= sector_offset <= 36:
-        raise CalculationError("cardinal Gauquelin boundaries have supplied anchors")
+    """Certify one non-cardinal Gauquelin boundary in continuous hour angle."""
+    if sector in (1, 10, 19, 28) or not 1 <= sector <= 36:
+        raise CalculationError("cardinal Gauquelin boundaries use supplied anchors")
     try:
-        return _gauge_certified_sector(
-            sector_offset, float(base_ramc), float(lat), float(eps)
-        )
+        return _gauge_certified_sector(sector, float(armc), float(lat), float(eps))
     except (IntervalCertificationError, ValueError, OverflowError) as exc:
         raise CalculationError("Gauquelin root certification failed") from exc
 
@@ -3748,8 +3760,11 @@ def _houses_gauquelin(
     # These exact limits avoid dividing by tan(eps), and preserve the specified
     # ecliptic-ring convention when the two planes coincide.
     if eps == 0.0:
+        asc_fraction = Fraction.from_float(asc)
         for sector in range(1, 37):
-            values[sector] = float((asc - 10.0 * (sector - 1)) % 360.0)
+            values[sector] = _gauge_exact_binary64(
+                (asc_fraction - 10 * (sector - 1)) % 360
+            )
         return values
 
     try:
@@ -3758,18 +3773,18 @@ def _houses_gauquelin(
             for sector in range(2, 37):
                 if sector in (10, 19, 28):
                     continue
-                hour_angle = -90.0 + 10.0 * (sector - 1)
+                hour_angle = Fraction(-90) + 10 * (sector - 1)
                 with interval_precision(256):
-                    alpha = ball_from_float(armc - hour_angle)
+                    alpha = _gauge_ball_from_fraction(
+                        Fraction.from_float(armc) - hour_angle
+                    )
                     longitude = _gauge_alpha_to_longitude(alpha, eps)
                     values[sector] = float(certified_float(longitude) % 360.0)
         else:
             for sector in range(2, 37):
                 if sector in (10, 19, 28):
                     continue
-                values[sector] = _gauquelin_cusp_for_sector(
-                    sector, armc, 1.0, 0.0, 0.0, 0.0, 0.0, eps, lat, 0, 0.0, 0.0
-                )
+                values[sector] = _gauquelin_cusp_for_sector(sector, armc, lat, eps)
     except (IntervalCertificationError, ValueError, OverflowError) as exc:
         raise CalculationError("Gauquelin longitude certification failed") from exc
 

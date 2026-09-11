@@ -609,20 +609,7 @@ def test_gauquelin_mid_latitude_iteration():
 def test_gauquelin_cusp_helper_equator_degenerate():
     """A cusp on the equator returns the seed RA directly (line 3478)."""
     # tan_lat = 0 at the equator forces tan(cusp_dec) ~ 0.
-    val = H._gauquelin_cusp_for_sector(
-        sector_offset=4,
-        base_ramc=0.0,
-        ramc_sign=1.0,
-        ascensional_diff=0.0,
-        tan_obliquity=math.tan(math.radians(EPS)),
-        sin_obliquity=math.sin(math.radians(EPS)),
-        tan_lat=0.0,
-        eps=EPS,
-        lat=0.0,
-        niter_max=100,
-        convergence_threshold=1e-8,
-        near_zero=1e-10,
-    )
+    val = H._gauquelin_cusp_for_sector(4, 0.0, 0.0, EPS)
     assert 0.0 <= val < 360.0
 
 
@@ -687,20 +674,7 @@ def test_gauquelin_helper_high_latitude_iterates():
     tan_lat = math.tan(math.radians(lat))
     tan_eps = math.tan(math.radians(EPS))
     ad = math.degrees(math.asin(max(-1.0, min(1.0, tan_lat * tan_eps))))
-    val = H._gauquelin_cusp_for_sector(
-        sector_offset=4,
-        base_ramc=33.0,
-        ramc_sign=1.0,
-        ascensional_diff=ad,
-        tan_obliquity=tan_eps,
-        sin_obliquity=math.sin(math.radians(EPS)),
-        tan_lat=tan_lat,
-        eps=EPS,
-        lat=lat,
-        niter_max=100,
-        convergence_threshold=1e-8,
-        near_zero=1e-10,
-    )
+    val = H._gauquelin_cusp_for_sector(4, 33.0, lat, EPS)
     assert 0.0 <= val < 360.0
 
 
