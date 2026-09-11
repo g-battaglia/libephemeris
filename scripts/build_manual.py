@@ -51,14 +51,14 @@ EMOJI_MAP = {
 
 MANUALS = {
     "it": {
-        "src": DOCS_DIR / "manual",
-        "metadata": DOCS_DIR / "manual" / "metadata.yaml",
+        "src": DOCS_DIR / "manual" / "it",
+        "metadata": DOCS_DIR / "manual" / "it" / "metadata.yaml",
         "epub": BUILD_DIR / "libephemeris-manual-it.epub",
         "pdf": BUILD_DIR / "libephemeris-manual-it.pdf",
     },
     "en": {
-        "src": DOCS_DIR / "manual-eng",
-        "metadata": DOCS_DIR / "manual-eng" / "metadata.yaml",
+        "src": DOCS_DIR / "manual" / "en",
+        "metadata": DOCS_DIR / "manual" / "en" / "metadata.yaml",
         "epub": BUILD_DIR / "libephemeris-manual-en.epub",
         "pdf": BUILD_DIR / "libephemeris-manual-en.pdf",
     },

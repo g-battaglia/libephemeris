@@ -49,12 +49,12 @@ BUILD_DIR = DOCS_DIR / "build"
 
 MANUALS = {
     "it": {
-        "src": DOCS_DIR / "manual",
+        "src": DOCS_DIR / "manual" / "it",
         "out": BUILD_DIR / "libephemeris-manual-it.epub",
         "identifier": "libephemeris-manual-it-2026",
     },
     "en": {
-        "src": DOCS_DIR / "manual-eng",
+        "src": DOCS_DIR / "manual" / "en",
         "out": BUILD_DIR / "libephemeris-manual-en.epub",
         "identifier": "libephemeris-manual-en-2026",
     },
