@@ -58,6 +58,37 @@ def test_all_non_cardinal_roots_are_in_semantic_order() -> None:
         assert math.isclose(placement, float(sector), abs_tol=3e-12)
 
 
+def test_noncardinal_longitudes_stay_on_named_clockwise_arcs() -> None:
+    for latitude in (48.0, -48.0):
+        _, angles = ephem.houses_armc(ARMC, latitude, EPS, ord("G"))
+        cusps, _ = ephem.houses_armc(ARMC, latitude, EPS, ord("G"))
+        asc, mc = angles[0], angles[1]
+
+        def clockwise(start: float, value: float) -> float:
+            return (start - value) % 360.0
+
+        anchors = {1: asc, 10: mc, 19: (asc + 180.0) % 360.0, 28: (mc + 180.0) % 360.0}
+        for sector in (
+            tuple(range(2, 10))
+            + tuple(range(11, 19))
+            + tuple(range(20, 28))
+            + tuple(range(29, 37))
+        ):
+            if sector <= 9:
+                start, end = anchors[1], anchors[10]
+            elif sector <= 18:
+                start, end = anchors[10], anchors[19]
+            elif sector <= 27:
+                start, end = anchors[19], anchors[28]
+            else:
+                start, end = anchors[28], anchors[1]
+            arc = clockwise(start, end)
+            position = clockwise(start, cusps[sector - 1])
+            assert 0.0 < position <= arc
+            if position == arc:
+                assert sector in (9, 18, 27, 36)
+
+
 def test_local_charts_agree_at_exact_positive_and_negative_seams() -> None:
     with pytest.raises(IntervalCertificationError):
         # A deliberately wide interval crossing two seams must fail closed.
@@ -101,12 +132,15 @@ def test_positive_width_seam_spies_both_adjacent_charts(
         EPS,
         90,
     )
-    assert result.contains(left) or math.isclose(
-        float(result.mid()), float(left.mid()), abs_tol=1e-12
-    )
-    assert result.contains(right) or math.isclose(
-        float(result.mid()), float(right.mid()), abs_tol=1e-12
-    )
+    assert result.lower() <= left.lower()
+    assert result.upper() >= left.upper()
+    assert result.lower() <= right.lower()
+    assert result.upper() >= right.upper()
+    expected_hull = left.union(right)
+    assert result.lower() <= left.lower()
+    assert result.upper() >= left.upper()
+    assert result.lower() <= right.lower()
+    assert result.upper() >= right.upper()
 
 
 def test_eps_zero_midpoint_uses_declared_directional_candidate() -> None:
@@ -170,8 +204,14 @@ def test_production_uses_both_precisions_and_agrees(
         return original(*args, **kwargs)
 
     monkeypatch.setattr(houses_module, "isolate_unique_root", wrapped)
-    houses_module._gauquelin_cusp_for_sector(4, ARMC, LAT, EPS)
-    assert seen == [192, 256]
+    for sector in (
+        tuple(range(2, 10))
+        + tuple(range(11, 19))
+        + tuple(range(20, 28))
+        + tuple(range(29, 37))
+    ):
+        houses_module._gauquelin_cusp_for_sector(sector, ARMC, LAT, EPS)
+    assert seen == [bits for _ in range(32) for bits in (192, 256)]
 
 
 def test_cross_precision_disagreement_fails_closed(
