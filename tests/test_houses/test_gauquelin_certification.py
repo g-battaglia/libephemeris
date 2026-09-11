@@ -15,6 +15,8 @@ from libephemeris.exceptions import CalculationError, PolarCircleError
 from libephemeris.houses import (
     _gauge_alpha_to_longitude,
     _gauge_chart_piece,
+    _gauge_derivative,
+    _gauge_residual,
     _houses_gauquelin,
     house_pos,
 )
@@ -22,6 +24,8 @@ from libephemeris.intervals import (
     IntervalCertificationError,
     ball_from_float,
     certified_float,
+    interval_precision,
+    isolate_unique_root,
 )
 
 
@@ -121,6 +125,74 @@ def test_private_beyond_polar_fallback_is_explicit() -> None:
     cusps = _houses_gauquelin(270.0, 30.0, math.nextafter(60.0, math.inf), ASC, MC)
     assert cusps[1] == ASC
     assert cusps[2] == (ASC - 10.0) % 360.0
+
+
+def test_production_uses_both_precisions_and_agrees(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[int] = []
+    original = houses_module.isolate_unique_root
+
+    def wrapped(*args, **kwargs):
+        seen.append(kwargs["precision"])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(houses_module, "isolate_unique_root", wrapped)
+    houses_module._gauquelin_cusp_for_sector(4, ARMC, LAT, EPS)
+    assert seen == [192, 256]
+
+
+def test_cross_precision_disagreement_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = houses_module._gauge_alpha_to_longitude
+    calls = 0
+
+    def disagree(alpha, eps):
+        nonlocal calls
+        calls += 1
+        result = original(alpha, eps)
+        if calls == 2:
+            return result + ball_from_float(1.0)
+        return result
+
+    monkeypatch.setattr(houses_module, "_gauge_alpha_to_longitude", disagree)
+    with pytest.raises(CalculationError):
+        houses_module._gauquelin_cusp_for_sector(4, ARMC, LAT, EPS)
+
+
+def test_complete_interval_residual_and_derivative_certificate() -> None:
+    coefficient = math.tan(math.radians(LAT)) * math.tan(math.radians(EPS))
+    with interval_precision(256):
+        armc = ball_from_float(ARMC)
+        coeff = ball_from_float(coefficient)
+        for sector, bounds in (
+            (2, (-180.0, 0.0)),
+            (12, (0.0, 180.0)),
+            (22, (0.0, 180.0)),
+            (32, (180.0, 360.0)),
+        ):
+            root = isolate_unique_root(
+                lambda h: _gauge_residual(sector, armc, h, coeff),
+                lambda h: _gauge_derivative(sector, armc, h, coeff),
+                *bounds,
+                precision=256,
+            )
+            assert bounds[0] < float(root.mid()) < bounds[1]
+            assert not _gauge_derivative(sector, armc, root, coeff).contains(0)
+            residual = _gauge_residual(sector, armc, root.mid(), coeff)
+            assert abs(float(residual.mid())) < 1e-30
+
+
+def test_unresolved_nonlinear_midpoint_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unresolved(_value):
+        raise IntervalCertificationError("synthetic unresolved midpoint")
+
+    monkeypatch.setattr(houses_module, "certified_float", unresolved)
+    with pytest.raises(CalculationError):
+        houses_module._gauquelin_cusp_for_sector(2, 0.0, LAT, EPS)
 
 
 def test_rounding_cell_overlap_fails_closed() -> None:
