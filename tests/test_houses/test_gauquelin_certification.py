@@ -77,6 +77,38 @@ def test_local_charts_agree_at_exact_positive_and_negative_seams() -> None:
         )
 
 
+def test_positive_width_seam_spies_both_adjacent_charts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = houses_module._gauge_chart_piece
+    seen: list[int] = []
+
+    def spy(alpha, eps, k):
+        seen.append(k)
+        return original(alpha, eps, k)
+
+    monkeypatch.setattr(houses_module, "_gauge_chart_piece", spy)
+    alpha = ball_from_float(45.0 - 1e-12).union(ball_from_float(45.0 + 1e-12))
+    result = _gauge_alpha_to_longitude(alpha, EPS)
+    assert set(seen) == {0, 90}
+    left = original(
+        alpha.intersection(ball_from_float(45.0 - 1e-12).union(ball_from_float(45.0))),
+        EPS,
+        0,
+    )
+    right = original(
+        alpha.intersection(ball_from_float(45.0).union(ball_from_float(45.0 + 1e-12))),
+        EPS,
+        90,
+    )
+    assert result.contains(left) or math.isclose(
+        float(result.mid()), float(left.mid()), abs_tol=1e-12
+    )
+    assert result.contains(right) or math.isclose(
+        float(result.mid()), float(right.mid()), abs_tol=1e-12
+    )
+
+
 def test_eps_zero_midpoint_uses_declared_directional_candidate() -> None:
     assert (
         houses_module._gauquelin_cusp_for_sector(2, 2**-45, 0.0, 0.0) == 350.0 + 2**-44
@@ -153,7 +185,7 @@ def test_cross_precision_disagreement_fails_closed(
         calls += 1
         result = original(alpha, eps)
         if calls == 2:
-            return result + ball_from_float(1.0)
+            return ball_from_float(float(result.mid()) + math.ulp(float(result.mid())))
         return result
 
     monkeypatch.setattr(houses_module, "_gauge_alpha_to_longitude", disagree)
@@ -162,26 +194,48 @@ def test_cross_precision_disagreement_fails_closed(
 
 
 def test_complete_interval_residual_and_derivative_certificate() -> None:
-    coefficient = math.tan(math.radians(LAT)) * math.tan(math.radians(EPS))
-    with interval_precision(256):
-        armc = ball_from_float(ARMC)
-        coeff = ball_from_float(coefficient)
-        for sector, bounds in (
-            (2, (-180.0, 0.0)),
-            (12, (0.0, 180.0)),
-            (22, (0.0, 180.0)),
-            (32, (180.0, 360.0)),
-        ):
-            root = isolate_unique_root(
-                lambda h: _gauge_residual(sector, armc, h, coeff),
-                lambda h: _gauge_derivative(sector, armc, h, coeff),
-                *bounds,
-                precision=256,
-            )
-            assert bounds[0] < float(root.mid()) < bounds[1]
-            assert not _gauge_derivative(sector, armc, root, coeff).contains(0)
-            residual = _gauge_residual(sector, armc, root.mid(), coeff)
-            assert abs(float(residual.mid())) < 1e-30
+    for latitude in (48.0, -48.0):
+        coefficient = math.tan(math.radians(latitude)) * math.tan(math.radians(EPS))
+        with interval_precision(256):
+            armc = ball_from_float(ARMC)
+            coeff = ball_from_float(coefficient)
+            for sector in (
+                tuple(range(2, 10))
+                + tuple(range(11, 19))
+                + tuple(range(20, 28))
+                + tuple(range(29, 37))
+            ):
+                if sector <= 9:
+                    bounds = (-180.0, 0.0)
+                elif sector <= 18:
+                    bounds = (0.0, 180.0)
+                elif sector <= 27:
+                    bounds = (0.0, 180.0)
+                else:
+                    bounds = (180.0, 360.0)
+                root = isolate_unique_root(
+                    lambda h: _gauge_residual(sector, armc, h, coeff),
+                    lambda h: _gauge_derivative(sector, armc, h, coeff),
+                    *bounds,
+                    precision=256,
+                )
+                left_value = _gauge_residual(
+                    sector, armc, ball_from_float(bounds[0]), coeff
+                )
+                right_value = _gauge_residual(
+                    sector, armc, ball_from_float(bounds[1]), coeff
+                )
+                assert left_value.upper() * right_value.lower() < 0
+                assert bounds[0] < float(root.mid()) < bounds[1]
+                derivative = _gauge_derivative(
+                    sector,
+                    armc,
+                    ball_from_float(bounds[0]).union(ball_from_float(bounds[1])),
+                    coeff,
+                )
+                assert derivative.lower() > 0
+                residual = _gauge_residual(sector, armc, root.mid(), coeff)
+                assert abs(float(residual.mid())) < 1e-30
 
 
 def test_unresolved_nonlinear_midpoint_fails_closed(
