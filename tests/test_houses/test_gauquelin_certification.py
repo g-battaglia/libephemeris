@@ -84,9 +84,7 @@ def test_noncardinal_longitudes_stay_on_named_clockwise_arcs() -> None:
                 start, end = anchors[28], anchors[1]
             arc = clockwise(start, end)
             position = clockwise(start, cusps[sector - 1])
-            assert 0.0 < position <= arc
-            if position == arc:
-                assert sector in (9, 18, 27, 36)
+            assert 0.0 < position < arc
 
 
 def test_local_charts_agree_at_exact_positive_and_negative_seams() -> None:
@@ -113,10 +111,13 @@ def test_positive_width_seam_spies_both_adjacent_charts(
 ) -> None:
     original = houses_module._gauge_chart_piece
     seen: list[int] = []
+    pieces: list = []
 
     def spy(alpha, eps, k):
         seen.append(k)
-        return original(alpha, eps, k)
+        result = original(alpha, eps, k)
+        pieces.append(result)
+        return result
 
     monkeypatch.setattr(houses_module, "_gauge_chart_piece", spy)
     alpha = ball_from_float(45.0 - 1e-12).union(ball_from_float(45.0 + 1e-12))
@@ -132,15 +133,9 @@ def test_positive_width_seam_spies_both_adjacent_charts(
         EPS,
         90,
     )
-    assert result.lower() <= left.lower()
-    assert result.upper() >= left.upper()
-    assert result.lower() <= right.lower()
-    assert result.upper() >= right.upper()
-    expected_hull = left.union(right)
-    assert result.lower() <= left.lower()
-    assert result.upper() >= left.upper()
-    assert result.lower() <= right.lower()
-    assert result.upper() >= right.upper()
+    expected_hull = pieces[0].union(pieces[1])
+    assert result.lower() == expected_hull.lower()
+    assert result.upper() == expected_hull.upper()
 
 
 def test_eps_zero_midpoint_uses_declared_directional_candidate() -> None:
@@ -197,13 +192,21 @@ def test_production_uses_both_precisions_and_agrees(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: list[int] = []
+    candidates: list[float] = []
     original = houses_module.isolate_unique_root
+    original_float = houses_module.certified_float
 
     def wrapped(*args, **kwargs):
         seen.append(kwargs["precision"])
         return original(*args, **kwargs)
 
+    def record(value):
+        result = original_float(value)
+        candidates.append(result)
+        return result
+
     monkeypatch.setattr(houses_module, "isolate_unique_root", wrapped)
+    monkeypatch.setattr(houses_module, "certified_float", record)
     for sector in (
         tuple(range(2, 10))
         + tuple(range(11, 19))
@@ -212,6 +215,9 @@ def test_production_uses_both_precisions_and_agrees(
     ):
         houses_module._gauquelin_cusp_for_sector(sector, ARMC, LAT, EPS)
     assert seen == [bits for _ in range(32) for bits in (192, 256)]
+    assert len(candidates) == 64
+    for offset in range(0, len(candidates), 2):
+        assert candidates[offset] == candidates[offset + 1]
 
 
 def test_cross_precision_disagreement_fails_closed(
