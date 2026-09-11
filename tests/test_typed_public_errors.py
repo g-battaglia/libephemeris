@@ -52,12 +52,6 @@ _OCCULT_ENTRY_POINTS = [
 ]
 
 
-@pytest.fixture(scope="module")
-def sun_answers():
-    """The Sun's answer from each entry point, computed once."""
-    return {label: call(eph.SUN) for label, call in _OCCULT_ENTRY_POINTS}
-
-
 @pytest.mark.unit
 @pytest.mark.parametrize(
     ("label", "call"),
@@ -65,9 +59,10 @@ def sun_answers():
     ids=[name for name, _ in _OCCULT_ENTRY_POINTS],
 )
 @pytest.mark.parametrize("body", [-1, -2, -1000])
-def test_negative_body_is_answered_as_the_sun(label, call, body, sun_answers):
+def test_negative_body_is_answered_as_the_sun(label, call, body):
     """ECL_NUT (-1) is a pseudo-target; the reference answers it as body 0."""
-    assert call(body) == sun_answers[label]
+    sun_answer = call(eph.SUN)
+    assert call(body) == sun_answer
 
 
 @pytest.mark.unit
