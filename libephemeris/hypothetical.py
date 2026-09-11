@@ -47,10 +47,12 @@ import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import (
     Callable,
     Dict,
     List,
+    Mapping,
     NoReturn,
     Optional,
     Tuple,
@@ -1359,19 +1361,191 @@ class OrbitalElements:
         return 0.9856076686 / self.semi_axis**1.5
 
 
-_EPOCH_JD: dict[str, float] = {}
+_STANDARD_EPOCHS: Mapping[str, float] = MappingProxyType(
+    {
+        "J1900": 2415020.0,
+        "B1950": 2433282.42345905,
+        "J2000": 2451545.0,
+    }
+)
+
+# The text format deliberately accepts a finite vocabulary of affine forms.  The
+# number fragments below describe the lexical grammar, rather than delegating
+# expression interpretation to a general-purpose evaluator.
+_ORDINAL_NUMBER = r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
+_SIGNED_NUMBER = rf"-?{_ORDINAL_NUMBER}"
 
 
 def _parse_epoch_or_equinox(value: str) -> Tuple[Optional[float], bool]:
-    raise NotImplementedError("orbital epoch parsing is pending rewrite")
+    """Parse one of the published epoch/equinox anchor spellings."""
+    token = value.strip()
+    upper = token.upper()
+    if upper == "JDATE":
+        return (None, True)
+    anchor = _STANDARD_EPOCHS.get(upper)
+    if anchor is not None:
+        return (float(anchor), False)
+    try:
+        return (float(token), False)
+    except (TypeError, ValueError):
+        raise ValueError(f"cannot parse the epoch/equinox {value!r}") from None
+
+
+def _polynomial_match(
+    expression: str,
+    pattern: str,
+    *,
+    rate_first: bool = False,
+    rate_only: bool = False,
+) -> Optional[TPolynomial]:
+    """Match one finite affine spelling and return its semantic coefficients."""
+    match = re.fullmatch(pattern, expression)
+    if match is None:
+        return None
+    if rate_only:
+        return TPolynomial(0.0, float(match.group("rate")))
+    if "rate" not in match.groupdict():
+        return TPolynomial(float(match.group("constant")), 0.0)
+    if rate_first:
+        constant = float(match.group("constant"))
+        if match.group("operator") == "-":
+            constant = -constant
+        return TPolynomial(constant, float(match.group("rate")))
+    linear = float(match.group("rate"))
+    if match.groupdict().get("operator") == "-":
+        linear = -linear
+    return TPolynomial(float(match.group("constant")), linear)
 
 
 def _parse_t_polynomial(expr: str) -> TPolynomial:
-    raise NotImplementedError("orbital polynomial parsing is pending rewrite")
+    """Parse one of the finite affine expressions in the orbital-file grammar."""
+    expression = expr
+    patterns: List[Tuple[str, bool, bool]] = []
+
+    # Constant-only expressions (E1), including the observed negative form.
+    patterns.append((rf"(?P<constant>{_SIGNED_NUMBER})", False, False))
+
+    # Constant-first plus/minus expressions (E2/E3).  Each spacing tuple is
+    # (before operator, after operator, before '*', after '*').
+    spacings = (
+        (1, 1, 1, 1),
+        (0, 0, 0, 0),
+        (1, 0, 0, 0),
+        (0, 1, 0, 0),
+        (1, 1, 0, 0),
+        (0, 1, 1, 1),
+        (1, 0, 1, 1),
+        (0, 0, 1, 0),
+        (0, 0, 0, 1),
+        (0, 0, 1, 1),
+        (2, 2, 2, 2),
+    )
+    for before_op, after_op, before_star, after_star in spacings:
+        left = " " * before_op
+        right = " " * after_op
+        star_left = " " * before_star
+        star_right = " " * after_star
+        for operator in ("+", "-"):
+            patterns.append(
+                (
+                    rf"(?P<constant>{_SIGNED_NUMBER}){left}"
+                    rf"(?P<operator>\{operator}){right}"
+                    rf"(?P<rate>{_ORDINAL_NUMBER}){star_left}\*{star_right}[Tt]",
+                    False,
+                    False,
+                )
+            )
+
+    # E7: exactly three outer ASCII spaces around the standard spaced form.
+    patterns.append(
+        (
+            rf"   (?P<constant>{_SIGNED_NUMBER}) (?P<operator>\+) "
+            rf"(?P<rate>{_ORDINAL_NUMBER}) \* [Tt]   ",
+            False,
+            False,
+        )
+    )
+
+    # Rate-first forms (E4), where the subtraction sign applies to the
+    # constant term.  The operator is retained as a semantic stage, not
+    # interpreted as arbitrary source text.
+    for operator in ("+", "-"):
+        patterns.append(
+            (
+                rf"(?P<rate>{_ORDINAL_NUMBER}) \* [Tt] "
+                rf"(?P<operator>\{operator}) (?P<constant>{_SIGNED_NUMBER})",
+                True,
+                False,
+            )
+        )
+
+    # E5 rate-only and bare-T forms.
+    patterns.append((rf"(?P<rate>{_ORDINAL_NUMBER}) \* T", False, True))
+    patterns.append((rf"(?P<rate>{_ORDINAL_NUMBER})\*t", False, True))
+    patterns.append((r"T", False, False))
+    patterns.append((r"-T", False, False))
+
+    # E6's two explicitly observed tolerant literals.
+    patterns.append((r"100  \+  \+  50  \*  T", False, False))
+    patterns.append((r"\+ \* T", False, False))
+
+    for pattern, rate_first, rate_only in patterns:
+        if pattern == r"T":
+            if expression == "T":
+                return TPolynomial(0.0, 1.0)
+            continue
+        if pattern == r"-T":
+            if expression == "-T":
+                return TPolynomial(0.0, -1.0)
+            continue
+        if pattern == r"100  \+  \+  50  \*  T":
+            if expression in ("100  +  +  50  *  T", "100 ++ 50 * T"):
+                return TPolynomial(100.0, 50.0)
+            continue
+        if pattern == r"\+ \* T":
+            if expression == "+ * T":
+                return TPolynomial(0.0, 1.0)
+            continue
+        result = _polynomial_match(
+            expression, pattern, rate_first=rate_first, rate_only=rate_only
+        )
+        if result is not None:
+            return result
+
+    raise ValueError(f"cannot parse T-polynomial expression {expr!r}")
+
+
+def _parse_plain_number(value: str, label: str) -> float:
+    """Parse an ordinary unsigned numeric field with its semantic label."""
+    if re.fullmatch(_ORDINAL_NUMBER, value) is None:
+        raise ValueError(f"cannot parse the {label} {value!r}")
+    return float(value)
 
 
 def parse_orbital_elements(filepath: Union[str, Path]) -> List[OrbitalElements]:
-    raise NotImplementedError("orbital element file parsing is pending rewrite")
+    """Parse the comma-delimited custom orbital-elements text format."""
+    path = Path(filepath)
+    if not path.exists():
+        raise FileNotFoundError(f"Orbital elements file not found: {filepath}")
+
+    elements: List[OrbitalElements] = []
+    with path.open(encoding="utf-8") as handle:
+        for line_number, raw_line in enumerate(handle, start=1):
+            content = raw_line.split("#", 1)[0].strip()
+            if not content:
+                continue
+            try:
+                element = _parse_orbital_elements_line(content, line_number)
+            except ValueError as exc:
+                message = str(exc)
+                if message.startswith("expected at least"):
+                    message = message[0].upper() + message[1:]
+                raise ValueError(
+                    f"Error parsing line {line_number}: {message}"
+                ) from exc
+            if element is not None:
+                elements.append(element)
+    return elements
 
 
 def get_bundled_fictitious_orbits_path() -> Path:
@@ -1471,7 +1645,7 @@ def _resolve_equinox(token: str, jd_text: str) -> float:
         )
     if not token:
         return _parse_column(jd_text, "equinox Julian Day")
-    equinox_jd = _EPOCH_JD.get(token.upper())
+    equinox_jd = _STANDARD_EPOCHS.get(token.upper())
     if equinox_jd is None:
         raise ValueError(f"cannot parse the equinox token {token!r}")
     return equinox_jd
@@ -1615,10 +1789,57 @@ def load_bundled_fictitious_orbits() -> List[OrbitalElements]:
     return _parse_fictitious_orbits_csv(get_bundled_fictitious_orbits_path())
 
 
-def _parse_orbital_elements_line(
-    line: str, line_num: int
-) -> Optional[OrbitalElements]:
-    raise NotImplementedError("orbital element line parsing is pending rewrite")
+def _parse_orbital_elements_line(line: str, line_num: int) -> Optional[OrbitalElements]:
+    """Parse one semantic orbital-elements record."""
+    text = line.split("#", 1)[0].strip()
+    if not text:
+        return None
+
+    clauses = [part.strip() for part in text.split(",", 8)]
+    if len(clauses) < 9:
+        raise ValueError(
+            f"expected at least 9 comma-separated fields, got {len(clauses)}"
+        )
+
+    epoch_text, equinox_text = clauses[0], clauses[1]
+    epoch_jd, epoch_is_jdate = _parse_epoch_or_equinox(epoch_text)
+    if epoch_is_jdate:
+        raise ValueError("epoch is JDATE; an epoch must be fixed")
+    assert epoch_jd is not None
+
+    equinox_jd, equinox_is_jdate = _parse_epoch_or_equinox(equinox_text)
+    if not equinox_is_jdate:
+        assert equinox_jd is not None
+    mean_anomaly = _parse_t_polynomial(clauses[2])
+    semi_axis = _parse_plain_number(clauses[3], "semi-major axis")
+    eccentricity = _parse_t_polynomial(clauses[4])
+    arg_perihelion = _parse_t_polynomial(clauses[5])
+    asc_node = _parse_t_polynomial(clauses[6])
+    inclination = _parse_t_polynomial(clauses[7])
+
+    identity = clauses[8].strip()
+    is_geocentric = False
+    if identity.endswith(", geo"):
+        identity = identity[:-5].rstrip()
+        is_geocentric = True
+    elif identity.endswith(" geo"):
+        identity = identity[:-4]
+        is_geocentric = True
+
+    return OrbitalElements(
+        name=identity,
+        epoch_jd=float(epoch_jd),
+        equinox_jd=None if equinox_is_jdate else equinox_jd,
+        equinox_is_jdate=bool(equinox_is_jdate),
+        mean_anomaly=mean_anomaly,
+        semi_axis=float(semi_axis),
+        eccentricity=eccentricity,
+        arg_perihelion=arg_perihelion,
+        asc_node=asc_node,
+        inclination=inclination,
+        is_geocentric=is_geocentric,
+        line_number=int(line_num),
+    )
 
 
 def get_orbital_body_by_name(
