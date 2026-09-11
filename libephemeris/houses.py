@@ -659,49 +659,14 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
 
     Precision: ~0.001° for non-equatorial latitudes
     """
-    eps_rad = math.radians(eps)
+    raise NotImplementedError("C-H13 Vertex implementation pending")
 
-    # Preserve real nonzero latitudes. Only the exact singularity needs a
-    # deterministic one-sided limit.
-    if lat == 0.0:
-        lat = 1e-12
 
-    # Evaluate the prime-vertical/ecliptic intersection derived in the
-    # docstring, then choose its western antipode geometrically below.
-    armc_rad = math.radians(armc_deg)
-    lat_rad = math.radians(lat)
-
-    num = -math.cos(armc_rad)
-    den = math.sin(armc_rad) * math.cos(eps_rad) - math.sin(eps_rad) / math.tan(lat_rad)
-
-    # 0/0 singularity at |lat| == eps with armc 90/270 (den collapses to
-    # cos(eps) - cos(eps)): atan2 of the rounding noise is meaningless.
-    # At this geometric degeneracy choose the western cardinal intersection.
-    if abs(num) < 1e-12 and abs(den) < 1e-12:
-        return (armc_deg + 270.0) % 360.0
-
-    vtx_rad = math.atan2(num, den)
-    vtx = math.degrees(vtx_rad) % 360.0
-
-    # The atan2 above yields one of the two antipodal intersections of the
-    # prime vertical with the ecliptic; the Vertex is the WESTERN one.
-    # Disambiguate in the equatorial frame: convert the candidate to right
-    # ascension and require an hour angle in (0, 180), i.e. west of the
-    # upper meridian.  (A previous version compared the candidate's
-    # *ecliptic* longitude against the ARMC, an *equatorial* longitude;
-    # that mixed-frame test is off by up to ~2.5 deg and flipped the
-    # Vertex by 180 deg whenever it fell within that margin of
-    # ARMC + 180, which is reachable at |lat| < eps.
-    vtx_r = math.radians(vtx)
-    ra_vtx = (
-        math.degrees(math.atan2(math.cos(eps_rad) * math.sin(vtx_r), math.cos(vtx_r)))
-        % 360.0
-    )
-    hour_angle = (armc_deg - ra_vtx) % 360.0
-    if not (0.0 < hour_angle < 180.0):
-        vtx = (vtx + 180.0) % 360.0
-
-    return vtx
+def _auxiliary_ascmc(
+    armc_deg: float, lat: float, eps: float, hsys_char: str
+) -> tuple[float, float, float, float, float]:
+    """Build public ASCMC slots 3 through 7 from one shared geometry."""
+    raise NotImplementedError("C-H13 auxiliary ASCMC implementation pending")
 
 
 def _ra_to_ecliptic_longitude(
@@ -946,61 +911,9 @@ def _houses_from_armc(
     mc = _armc_to_mc(armc_active, eps)
     asc = _rising_longitude(armc_deg, eps, lat)
 
-    # Vertex uses the original ARMC and the geometric equator convention in
-    # _calc_vertex.
-    vertex = _calc_vertex(armc_deg, eps, lat)
-
-    # Equatorial Ascendant (East Point)
-    # This is the intersection of the ecliptic with the celestial equator in the east
-    # It's the ecliptic longitude where RA = ARMC + 90°
-    equ_asc_ra = (armc_deg + 90.0) % 360.0
-    # Convert RA to ecliptic longitude
-    # tan(Lon) = tan(RA) / cos(eps)
-    # y = sin(RA)
-    # x = cos(RA) * cos(eps)
-    equ_asc_ra_r = math.radians(equ_asc_ra)
-    eps_r = math.radians(eps)
-    y = math.sin(equ_asc_ra_r)
-    x = math.cos(equ_asc_ra_r) * math.cos(eps_r)
-    equ_asc = math.degrees(math.atan2(y, x)) % 360.0
-
-    # Co-Ascendant W. Koch (coasc1)
-    # Co-Ascendant (Koch) formula:
-    # coasc1 = Asc(ARMC - 90°, latitude) + 180°
-    # This is the Ascendant calculated 90° westward on the equator, then opposite point
-    coasc_armc = (armc_deg - 90.0) % 360.0
-    co_asc_koch = _calc_ascendant(coasc_armc, eps, lat, lat)
-
-    # Add 180° to get opposite point
-    co_asc_koch = (co_asc_koch + 180.0) % 360.0
-
-    # Co-Ascendant M. Munkasey (coasc2)
-    # Co-Ascendant (Munkasey) formula:
-    # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
-    # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
-    # At the exact equator the northern (+90-lat) and southern (-90-lat) pole
-    # heights give antipodal one-sided limits for coasc2 (180 vs 0).
-    # Compatibility contract: the degeneracy is resolved per house system: the horizon
-    # system 'H' takes the southern branch (coasc2 -> 0), while every other
-    # system takes the northern branch (coasc2 -> 180). Away from lat == 0 the
-    # sign of the latitude selects the branch unambiguously and the two
-    # implementations already agree.
-    coasc2_armc = (armc_deg + 90.0) % 360.0
-    if lat > 0.0 or (lat == 0.0 and hsys_char != "H"):
-        coasc2_lat = 90.0 - lat
-    else:
-        coasc2_lat = -90.0 - lat
-    co_asc = _calc_ascendant(coasc2_armc, eps, coasc2_lat, coasc2_lat)
-
-    # Polar Ascendant M. Munkasey (polasc)
-    # Polar Ascendant formula:
-    # polasc = Asc(ARMC - 90°, latitude)
-    # Note: This is the same as coasc1 but WITHOUT the +180°
-    polar_asc = _calc_ascendant(coasc_armc, eps, lat, lat)
-
-    # ASCMC array with 8 elements (reference API compatible): Asc, MC, ARMC,
-    # Vertex, EquAsc, coasc1 (W. Koch), coasc2 (M. Munkasey), polasc.
-    ascmc = [asc, mc, armc_deg, vertex, equ_asc, co_asc_koch, co_asc, polar_asc]
+    # ASCMC slots 3-7 are built once from the shared auxiliary geometry.
+    auxiliary = _auxiliary_ascmc(armc_deg, lat, eps, hsys_char)
+    ascmc = [asc, mc, armc_deg, *auxiliary]
 
     # Placidus, Koch and Gauquelin - and the default an unknown selector
     # reaches - cannot be calculated when abs(lat) + eps > 90.
