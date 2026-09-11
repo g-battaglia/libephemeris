@@ -1045,10 +1045,17 @@ def _houses_from_armc(
     # in the returned tuple). degnorm snaps the bare-%360 artifact (a
     # tiny-negative angle wrapping to exactly 360.0) back to 0.0, keeping
     # every output in [0, 360) like the reference API.
-    return (
-        tuple(degnorm(c) for c in cusps[1 : system.sectors + 1]),
-        tuple(degnorm(a) for a in ascmc),
-    )
+    normalized_cusps = [degnorm(c) for c in cusps[1 : system.sectors + 1]]
+    normalized_angles = tuple(degnorm(a) for a in ascmc)
+    if hsys_char == "G":
+        # Gauquelin's four cardinal labels are the caller's anchors.  Restore
+        # them after the generic output normalization so no solved boundary,
+        # neighboring cusp, or normalization roundoff can replace an anchor.
+        normalized_cusps[0] = normalized_angles[0]
+        normalized_cusps[9] = normalized_angles[1]
+        normalized_cusps[18] = (normalized_angles[0] + 180.0) % 360.0
+        normalized_cusps[27] = (normalized_angles[1] + 180.0) % 360.0
+    return tuple(normalized_cusps), normalized_angles
 
 
 def houses(
@@ -3801,6 +3808,8 @@ def _houses_gauquelin(
     if eps == 0.0:
         asc_fraction = Fraction.from_float(asc)
         for sector in range(1, 37):
+            if sector in (1, 10, 19, 28):
+                continue
             values[sector] = _gauge_exact_binary64(
                 (asc_fraction - 10 * (sector - 1)) % 360
             )
@@ -3827,9 +3836,17 @@ def _houses_gauquelin(
     except (IntervalCertificationError, ValueError, OverflowError) as exc:
         raise CalculationError("Gauquelin longitude certification failed") from exc
 
-    # The antipodal relation is exact at the public binary64 boundary.
+    # The antipodal relation is exact for non-cardinal boundaries.  The four
+    # cardinal labels are authoritative anchors, not values reconstructed from
+    # a solved or rounded neighboring boundary.
     for sector in range(1, 19):
+        if sector in (1, 10):
+            continue
         values[sector + 18] = float((values[sector] + 180.0) % 360.0)
+    values[1] = float(asc % 360.0)
+    values[10] = float(mc % 360.0)
+    values[19] = float((asc + 180.0) % 360.0)
+    values[28] = float((mc + 180.0) % 360.0)
     return values
 
 

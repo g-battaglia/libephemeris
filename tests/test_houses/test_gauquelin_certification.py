@@ -46,6 +46,62 @@ def test_strict_ordinary_outputs_and_cardinal_anchors() -> None:
     assert cusps[28] == (MC + 180.0) % 360.0
 
 
+def test_public_armc_cardinals_are_exact_authoritative_anchors() -> None:
+    cusps, angles = ephem.houses_armc(0.001, -80.0, 0.0, ord("G"), 0.0)
+    asc, mc = angles[0], angles[1]
+
+    assert cusps[0] == asc
+    assert cusps[9] == mc
+    assert cusps[18] == (asc + 180.0) % 360.0
+    assert cusps[27] == (mc + 180.0) % 360.0
+    assert cusps[9] == 0.001
+
+
+def test_public_cardinal_anchors_hold_across_strict_ordinary_grid() -> None:
+    frames = (
+        (0.0, -20.0, 0.0),
+        (math.nextafter(0.0, -math.inf), 20.0, 5.0),
+        (math.nextafter(0.0, math.inf), -20.0, 23.4392911),
+        (90.0, 0.0, 60.0),
+        (math.nextafter(90.0, math.inf), 20.0, 23.4392911),
+        (180.0, -20.0, 60.0),
+        (math.nextafter(270.0, -math.inf), 20.0, 5.0),
+        (270.0, 0.0, 23.4392911),
+    )
+    for armc, latitude, obliquity in frames:
+        cusps, angles = ephem.houses_armc(armc, latitude, obliquity, ord("G"), 0.0)
+        asc, mc = angles[0], angles[1]
+        assert cusps[0] == asc
+        assert cusps[9] == mc
+        assert cusps[18] == (asc + 180.0) % 360.0
+        assert cusps[27] == (mc + 180.0) % 360.0
+        assert all(isinstance(value, float) for value in cusps)
+
+        anchors = {
+            1: asc,
+            10: mc,
+            19: (asc + 180.0) % 360.0,
+            28: (mc + 180.0) % 360.0,
+        }
+        for sector in (
+            tuple(range(2, 10))
+            + tuple(range(11, 19))
+            + tuple(range(20, 28))
+            + tuple(range(29, 37))
+        ):
+            if sector <= 9:
+                start, end = anchors[1], anchors[10]
+            elif sector <= 18:
+                start, end = anchors[10], anchors[19]
+            elif sector <= 27:
+                start, end = anchors[19], anchors[28]
+            else:
+                start, end = anchors[28], anchors[1]
+            arc = (start - end) % 360.0
+            position = (start - cusps[sector - 1]) % 360.0
+            assert 0.0 < position < arc
+
+
 def test_all_non_cardinal_roots_are_in_semantic_order() -> None:
     _, angles = ephem.houses_armc(ARMC, LAT, EPS, ord("G"))
     asc, mc = angles[0], angles[1]
@@ -67,7 +123,12 @@ def test_noncardinal_longitudes_stay_on_named_clockwise_arcs() -> None:
         def clockwise(start: float, value: float) -> float:
             return (start - value) % 360.0
 
-        anchors = {1: asc, 10: mc, 19: (asc + 180.0) % 360.0, 28: (mc + 180.0) % 360.0}
+        anchors = {
+            1: asc,
+            10: mc,
+            19: (asc + 180.0) % 360.0,
+            28: (mc + 180.0) % 360.0,
+        }
         for sector in (
             tuple(range(2, 10))
             + tuple(range(11, 19))
@@ -149,7 +210,16 @@ def test_eps_zero_is_exact_clockwise_ring() -> None:
     cusps = _houses_gauquelin(ARMC, LAT, 0.0, asc, MC)
     expected = Fraction.from_float(asc)
     for sector in range(1, 37):
-        expected_value = float((expected - 10 * (sector - 1)) % 360)
+        if sector == 1:
+            expected_value = asc
+        elif sector == 10:
+            expected_value = MC
+        elif sector == 19:
+            expected_value = (asc + 180.0) % 360.0
+        elif sector == 28:
+            expected_value = (MC + 180.0) % 360.0
+        else:
+            expected_value = float((expected - 10 * (sector - 1)) % 360)
         assert math.isclose(cusps[sector], expected_value, abs_tol=1e-12)
 
 
