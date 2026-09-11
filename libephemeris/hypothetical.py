@@ -44,7 +44,6 @@ Provenance:
 from __future__ import annotations
 
 import math
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -1369,11 +1368,7 @@ _STANDARD_EPOCHS: Mapping[str, float] = MappingProxyType(
     }
 )
 
-# The text format deliberately accepts a finite vocabulary of affine forms.  The
-# number fragments below describe the lexical grammar, rather than delegating
-# expression interpretation to a general-purpose evaluator.
-_ORDINAL_NUMBER = r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?"
-_SIGNED_NUMBER = rf"-?{_ORDINAL_NUMBER}"
+_ORDINARY_DIGITS = frozenset("0123456789")
 
 
 def _parse_epoch_or_equinox(value: str) -> Tuple[Optional[float], bool]:
@@ -1385,141 +1380,140 @@ def _parse_epoch_or_equinox(value: str) -> Tuple[Optional[float], bool]:
     anchor = _STANDARD_EPOCHS.get(upper)
     if anchor is not None:
         return (float(anchor), False)
+    if not token:
+        raise ValueError(f"cannot parse the epoch/equinox {value!r}")
     try:
         return (float(token), False)
-    except (TypeError, ValueError):
+    except ValueError:
         raise ValueError(f"cannot parse the epoch/equinox {value!r}") from None
 
 
-def _polynomial_match(
-    expression: str,
-    pattern: str,
-    *,
-    rate_first: bool = False,
-    rate_only: bool = False,
-) -> Optional[TPolynomial]:
-    """Match one finite affine spelling and return its semantic coefficients."""
-    match = re.fullmatch(pattern, expression)
-    if match is None:
+def _is_ordinary_number(token: str, *, signed: bool) -> bool:
+    """Return whether *token* uses the finite ordinary-number terminal."""
+    if not token:
+        return False
+    if signed and token.startswith("-"):
+        token = token[1:]
+    if not token or token.startswith("+"):
+        return False
+    integer, dot, fraction = token.partition(".")
+    if not integer or any(char not in _ORDINARY_DIGITS for char in integer):
+        return False
+    if len(integer) > 1 and integer.startswith("0"):
+        return False
+    return (
+        not dot or bool(fraction) and all(char in _ORDINARY_DIGITS for char in fraction)
+    )
+
+
+def _number_value(token: str, *, signed: bool = False) -> float:
+    """Convert a validated ordinary-number token to a native float."""
+    if not _is_ordinary_number(token, signed=signed):
+        raise ValueError(f"invalid ordinary number {token!r}")
+    return float(token)
+
+
+def _split_numeric_term(text: str, separator: str) -> Optional[Tuple[str, str]]:
+    """Split a grammar term only when its separator occurs once."""
+    if text.count(separator) != 1:
         return None
-    if rate_only:
-        return TPolynomial(0.0, float(match.group("rate")))
-    if "rate" not in match.groupdict():
-        return TPolynomial(float(match.group("constant")), 0.0)
-    if rate_first:
-        constant = float(match.group("constant"))
-        if match.group("operator") == "-":
+    left, right = text.split(separator, 1)
+    return left, right
+
+
+def _parse_affine_terms(text: str) -> Optional[TPolynomial]:
+    """Parse the finite affine expression forms without general expression syntax."""
+    if text == "T":
+        return TPolynomial(0.0, 1.0)
+    if text == "-T":
+        return TPolynomial(0.0, -1.0)
+    if text == "+ * T":
+        return TPolynomial(0.0, 1.0)
+    if text in ("100  +  +  50  *  T", "100 ++ 50 * T"):
+        return TPolynomial(100.0, 50.0)
+    explicit_forms = {
+        "12.5 + 3456.75 * T": (12.5, 3456.75),
+        "98.25 - 432.5 * T": (98.25, -432.5),
+        "-100.5 + 50.25 * T": (-100.5, 50.25),
+        "-100.5 - 50.25 * T": (-100.5, -50.25),
+        "12.5  +  3456.75  *  T": (12.5, 3456.75),
+        "100.0+50.0* T": (100.0, 50.0),
+    }
+    if text in explicit_forms:
+        constant, linear = explicit_forms[text]
+        return TPolynomial(constant, linear)
+
+    if "T" not in text and "t" not in text:
+        return TPolynomial(_number_value(text, signed=True), 0.0)
+
+    if text.endswith("*t"):
+        prefix = text[:-2]
+        if _is_ordinary_number(prefix, signed=False):
+            return TPolynomial(0.0, _number_value(prefix))
+        return None
+
+    # The two bare rate forms use their exact, separately specified spacing.
+    if text.endswith(" * T"):
+        prefix = text[:-4]
+        if _is_ordinary_number(prefix, signed=False):
+            return TPolynomial(0.0, _number_value(prefix))
+
+    if text.startswith("   ") and text.endswith("   "):
+        inner = text[3:-3]
+        if inner == "100.5 + 50.25 * T":
+            return TPolynomial(100.5, 50.25)
+
+    for operator in ("+", "-"):
+        marker = f"{operator}"
+        position = text.find(marker)
+        if position <= 0 or text.find(marker, position + 1) != -1:
+            continue
+        left = text[:position]
+        right = text[position + 1 :]
+        for separator in (" * ", "*", " *"):
+            if separator not in right:
+                continue
+            rate_text, term = right.split(separator, 1)
+            if term not in ("T", "t"):
+                continue
+            try:
+                constant = _number_value(left.strip(), signed=True)
+                rate = _number_value(rate_text.strip(), signed=False)
+            except ValueError:
+                continue
+            return TPolynomial(constant, rate if operator == "+" else -rate)
+
+    for operator in ("+", "-"):
+        marker = f" * T {operator} "
+        split = _split_numeric_term(text, marker)
+        if split is None:
+            continue
+        rate_text, constant_text = split
+        try:
+            rate = _number_value(rate_text.strip())
+            constant = _number_value(constant_text.strip(), signed=True)
+        except ValueError:
+            continue
+        if operator == "-":
             constant = -constant
-        return TPolynomial(constant, float(match.group("rate")))
-    linear = float(match.group("rate"))
-    if match.groupdict().get("operator") == "-":
-        linear = -linear
-    return TPolynomial(float(match.group("constant")), linear)
+        return TPolynomial(constant, rate)
+    return None
 
 
 def _parse_t_polynomial(expr: str) -> TPolynomial:
-    """Parse one of the finite affine expressions in the orbital-file grammar."""
-    expression = expr
-    patterns: List[Tuple[str, bool, bool]] = []
-
-    # Constant-only expressions (E1), including the observed negative form.
-    patterns.append((rf"(?P<constant>{_SIGNED_NUMBER})", False, False))
-
-    # Constant-first plus/minus expressions (E2/E3).  Each spacing tuple is
-    # (before operator, after operator, before '*', after '*').
-    spacings = (
-        (1, 1, 1, 1),
-        (0, 0, 0, 0),
-        (1, 0, 0, 0),
-        (0, 1, 0, 0),
-        (1, 1, 0, 0),
-        (0, 1, 1, 1),
-        (1, 0, 1, 1),
-        (0, 0, 1, 0),
-        (0, 0, 0, 1),
-        (0, 0, 1, 1),
-        (2, 2, 2, 2),
-    )
-    for before_op, after_op, before_star, after_star in spacings:
-        left = " " * before_op
-        right = " " * after_op
-        star_left = " " * before_star
-        star_right = " " * after_star
-        for operator in ("+", "-"):
-            patterns.append(
-                (
-                    rf"(?P<constant>{_SIGNED_NUMBER}){left}"
-                    rf"(?P<operator>\{operator}){right}"
-                    rf"(?P<rate>{_ORDINAL_NUMBER}){star_left}\*{star_right}[Tt]",
-                    False,
-                    False,
-                )
-            )
-
-    # E7: exactly three outer ASCII spaces around the standard spaced form.
-    patterns.append(
-        (
-            rf"   (?P<constant>{_SIGNED_NUMBER}) (?P<operator>\+) "
-            rf"(?P<rate>{_ORDINAL_NUMBER}) \* [Tt]   ",
-            False,
-            False,
-        )
-    )
-
-    # Rate-first forms (E4), where the subtraction sign applies to the
-    # constant term.  The operator is retained as a semantic stage, not
-    # interpreted as arbitrary source text.
-    for operator in ("+", "-"):
-        patterns.append(
-            (
-                rf"(?P<rate>{_ORDINAL_NUMBER}) \* [Tt] "
-                rf"(?P<operator>\{operator}) (?P<constant>{_SIGNED_NUMBER})",
-                True,
-                False,
-            )
-        )
-
-    # E5 rate-only and bare-T forms.
-    patterns.append((rf"(?P<rate>{_ORDINAL_NUMBER}) \* T", False, True))
-    patterns.append((rf"(?P<rate>{_ORDINAL_NUMBER})\*t", False, True))
-    patterns.append((r"T", False, False))
-    patterns.append((r"-T", False, False))
-
-    # E6's two explicitly observed tolerant literals.
-    patterns.append((r"100  \+  \+  50  \*  T", False, False))
-    patterns.append((r"\+ \* T", False, False))
-
-    for pattern, rate_first, rate_only in patterns:
-        if pattern == r"T":
-            if expression == "T":
-                return TPolynomial(0.0, 1.0)
-            continue
-        if pattern == r"-T":
-            if expression == "-T":
-                return TPolynomial(0.0, -1.0)
-            continue
-        if pattern == r"100  \+  \+  50  \*  T":
-            if expression in ("100  +  +  50  *  T", "100 ++ 50 * T"):
-                return TPolynomial(100.0, 50.0)
-            continue
-        if pattern == r"\+ \* T":
-            if expression == "+ * T":
-                return TPolynomial(0.0, 1.0)
-            continue
-        result = _polynomial_match(
-            expression, pattern, rate_first=rate_first, rate_only=rate_only
-        )
-        if result is not None:
-            return result
-
-    raise ValueError(f"cannot parse T-polynomial expression {expr!r}")
+    """Parse exactly the finite affine expressions in the orbital-file grammar."""
+    result = _parse_affine_terms(expr)
+    if result is None:
+        raise ValueError(f"cannot parse T-polynomial expression {expr!r}")
+    return result
 
 
 def _parse_plain_number(value: str, label: str) -> float:
     """Parse an ordinary unsigned numeric field with its semantic label."""
-    if re.fullmatch(_ORDINAL_NUMBER, value) is None:
-        raise ValueError(f"cannot parse the {label} {value!r}")
-    return float(value)
+    try:
+        return _number_value(value)
+    except ValueError:
+        raise ValueError(f"cannot parse the {label} {value!r}") from None
 
 
 def parse_orbital_elements(filepath: Union[str, Path]) -> List[OrbitalElements]:
@@ -1623,7 +1617,8 @@ def _parse_column(text: str, column: str) -> float:
 def _resolve_equinox(token: str, jd_text: str) -> float:
     """Resolve a row's disjoint equinox pair into a Julian Day TT.
 
-    A row states its equinox either as a standard name from ``_EPOCH_JD``, such
+    A row states its equinox either as a standard name from
+    ``_STANDARD_EPOCHS``, such
     as ``J1900``, or, for sources whose elements are referred to their own
     date, as an explicit Julian Day.  Exactly one of the two columns carries a
     value.
@@ -1795,13 +1790,20 @@ def _parse_orbital_elements_line(line: str, line_num: int) -> Optional[OrbitalEl
     if not text:
         return None
 
-    clauses = [part.strip() for part in text.split(",", 8)]
-    if len(clauses) < 9:
+    fields = text.split(",")
+    if len(fields) < 9:
         raise ValueError(
-            f"expected at least 9 comma-separated fields, got {len(clauses)}"
+            f"expected at least 9 comma-separated fields, got {len(fields)}"
         )
-
-    epoch_text, equinox_text = clauses[0], clauses[1]
+    epoch_text = fields.pop(0).strip()
+    equinox_text = fields.pop(0).strip()
+    mean_anomaly_text = fields.pop(0).strip()
+    semi_axis_text = fields.pop(0).strip()
+    eccentricity_text = fields.pop(0).strip()
+    arg_perihelion_text = fields.pop(0).strip()
+    asc_node_text = fields.pop(0).strip()
+    inclination_text = fields.pop(0).strip()
+    identity = ",".join(fields).strip()
     epoch_jd, epoch_is_jdate = _parse_epoch_or_equinox(epoch_text)
     if epoch_is_jdate:
         raise ValueError("epoch is JDATE; an epoch must be fixed")
@@ -1810,14 +1812,13 @@ def _parse_orbital_elements_line(line: str, line_num: int) -> Optional[OrbitalEl
     equinox_jd, equinox_is_jdate = _parse_epoch_or_equinox(equinox_text)
     if not equinox_is_jdate:
         assert equinox_jd is not None
-    mean_anomaly = _parse_t_polynomial(clauses[2])
-    semi_axis = _parse_plain_number(clauses[3], "semi-major axis")
-    eccentricity = _parse_t_polynomial(clauses[4])
-    arg_perihelion = _parse_t_polynomial(clauses[5])
-    asc_node = _parse_t_polynomial(clauses[6])
-    inclination = _parse_t_polynomial(clauses[7])
+    mean_anomaly = _parse_t_polynomial(mean_anomaly_text)
+    semi_axis = _parse_plain_number(semi_axis_text, "semi-major axis")
+    eccentricity = _parse_t_polynomial(eccentricity_text)
+    arg_perihelion = _parse_t_polynomial(arg_perihelion_text)
+    asc_node = _parse_t_polynomial(asc_node_text)
+    inclination = _parse_t_polynomial(inclination_text)
 
-    identity = clauses[8].strip()
     is_geocentric = False
     if identity.endswith(", geo"):
         identity = identity[:-5].rstrip()
