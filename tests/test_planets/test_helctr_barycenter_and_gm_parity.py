@@ -28,6 +28,20 @@ def _norm(vector) -> float:
     return math.sqrt(sum(float(component) ** 2 for component in vector))
 
 
+def _coverage_intervals(segment) -> list[tuple[float, float]]:
+    """Return coverage intervals from a Skyfield segment or segment stack."""
+    segments = getattr(segment, "segments", None)
+    candidates = segments if segments is not None else (segment,)
+    intervals = []
+    for candidate in candidates:
+        coverage = getattr(candidate, "spk_segment", candidate)
+        start_jd = getattr(coverage, "start_jd", None)
+        end_jd = getattr(coverage, "end_jd", None)
+        if start_jd is not None and end_jd is not None:
+            intervals.append((float(start_jd), float(end_jd)))
+    return intervals
+
+
 @pytest.mark.parametrize("name", ["MERCURY", "JUPITER", "SATURN", "PLUTO"])
 def test_helctr_position_is_finite_spherical_state(name: str) -> None:
     pos, _ret = lib.calc(_J2000, _ipl(name), lib.FLG_SWIEPH | lib.FLG_HELCTR)
@@ -82,8 +96,11 @@ def test_jupiter_true_positions_use_a_covered_planet_center() -> None:
         segment = get_planet_center_segment(599)
         if segment is None:
             pytest.skip("Jupiter planet-center SPK is not installed")
-        spk_segment = segment.spk_segment
-        jd_tt = 0.5 * (spk_segment.start_jd + spk_segment.end_jd)
+        intervals = _coverage_intervals(segment)
+        if not intervals:
+            pytest.skip("Jupiter planet-center SPK exposes no coverage metadata")
+        start_jd, end_jd = intervals[len(intervals) // 2]
+        jd_tt = 0.5 * (start_jd + end_jd)
         epoch = get_timescale().tt_jd(jd_tt)
         center = get_planet_target(planets, "jupiter").at(epoch).position.au
         barycenter = planets["jupiter barycenter"].at(epoch).position.au

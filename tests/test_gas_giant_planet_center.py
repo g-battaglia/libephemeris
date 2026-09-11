@@ -41,6 +41,20 @@ from libephemeris.planets import (
 from libephemeris.state import get_planets
 
 
+def _coverage_intervals(segment) -> list[tuple[float, float]]:
+    """Return coverage intervals from a Skyfield segment or segment stack."""
+    segments = getattr(segment, "segments", None)
+    candidates = segments if segments is not None else (segment,)
+    intervals = []
+    for candidate in candidates:
+        coverage = getattr(candidate, "spk_segment", candidate)
+        start_jd = getattr(coverage, "start_jd", None)
+        end_jd = getattr(coverage, "end_jd", None)
+        if start_jd is not None and end_jd is not None:
+            intervals.append((float(start_jd), float(end_jd)))
+    return intervals
+
+
 class TestGasGiantPlanetCenter:
     """Tests for gas giant planet center calculations."""
 
@@ -243,8 +257,11 @@ class TestPlanetCenterPrecision:
         segment = get_planet_center_segment(599)
         if segment is None:
             pytest.skip("Jupiter planet-center SPK is not installed")
-        spk_segment = segment.spk_segment
-        jd = 0.5 * (spk_segment.start_jd + spk_segment.end_jd)
+        intervals = _coverage_intervals(segment)
+        if not intervals:
+            pytest.skip("Jupiter planet-center SPK exposes no coverage metadata")
+        start_jd, end_jd = intervals[len(intervals) // 2]
+        jd = 0.5 * (start_jd + end_jd)
         t = ts.tt_jd(jd)
 
         # Get raw barycenter position
@@ -281,8 +298,10 @@ class TestPlanetCenterPrecision:
         if segment is None:
             pytest.skip("Jupiter planet-center SPK is not installed")
 
-        spk_segment = segment.spk_segment
-        jd = spk_segment.end_jd + 2.0
+        intervals = _coverage_intervals(segment)
+        if not intervals:
+            pytest.skip("Jupiter planet-center SPK exposes no coverage metadata")
+        jd = max(end_jd for _, end_jd in intervals) + 2.0
         ts = get_timescale()
         t = ts.tt_jd(jd)
         barycenter = planets["jupiter barycenter"]
