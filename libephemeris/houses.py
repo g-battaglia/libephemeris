@@ -3505,19 +3505,49 @@ def _gauge_ball_from_fraction(value: Fraction) -> Ball:
 
 
 def _gauge_exact_binary64(value: Fraction) -> float:
-    """Round an exact normalized degree to binary64, choosing lower ties."""
+    """Round an exact degree to binary64 with explicit midpoint direction."""
     candidate = float(value)
     if not math.isfinite(candidate):
         raise IntervalCertificationError("exact degree is outside binary64")
     lower = math.nextafter(candidate, -math.inf)
     upper = math.nextafter(candidate, math.inf)
-    midpoint_lower = (Fraction.from_float(lower) + Fraction.from_float(candidate)) / 2
-    midpoint_upper = (Fraction.from_float(candidate) + Fraction.from_float(upper)) / 2
-    if value == midpoint_lower:
+    lower_midpoint = (Fraction.from_float(lower) + Fraction.from_float(candidate)) / 2
+    upper_midpoint = (Fraction.from_float(candidate) + Fraction.from_float(upper)) / 2
+    if value == lower_midpoint:
         return lower
-    if value == midpoint_upper:
-        return candidate
+    if value == upper_midpoint:
+        # Clockwise sector order reaches the upper numeric neighbor first at
+        # this exact ring midpoint (the declared directional witness).
+        return upper
     return candidate
+
+
+def _gauge_linear_hour_angle(sector: int) -> Fraction:
+    """Return the exact H root for A=0 in the declared quadrant."""
+    if 2 <= sector <= 9:
+        return Fraction(10 * (sector - 1) - 90)
+    if 11 <= sector <= 18:
+        return Fraction(10 * (sector - 10))
+    if 20 <= sector <= 27:
+        return Fraction(90 + 10 * (sector - 19))
+    if 29 <= sector <= 36:
+        return Fraction(180 + 10 * (sector - 28))
+    raise ValueError("sector is cardinal or outside the Gauquelin range")
+
+
+def _gauge_linear_sector(sector: int, armc: float, lat: float, eps: float) -> float:
+    """Evaluate an A=0 boundary without nonlinear root isolation."""
+    armc_exact = Fraction.from_float(armc)
+    if eps == 0.0:
+        # The ecliptic/equator limit is the exact clockwise ring.  This helper
+        # receives the ring's first longitude as its ARMC-like anchor.
+        longitude = (armc_exact - 10 * (sector - 1)) % 360
+        return _gauge_exact_binary64(longitude)
+    hour_angle = _gauge_linear_hour_angle(sector)
+    with interval_precision(1024):
+        alpha = _gauge_ball_from_fraction(armc_exact - hour_angle)
+        longitude = _gauge_alpha_to_longitude(alpha, eps)
+        return float(certified_float(longitude) % 360.0)
 
 
 def _gauge_sin_deg(value: Ball) -> Ball:
@@ -3649,6 +3679,8 @@ def _gauge_alpha_to_longitude(alpha: Ball, eps: float) -> Ball:
 
 def _gauge_certified_sector(sector: int, armc: float, lat: float, eps: float) -> float:
     """Certify one non-cardinal root at both required Arb precisions."""
+    if lat == 0.0 or eps == 0.0:
+        return _gauge_linear_sector(sector, armc, lat, eps)
     coefficient = math.tan(math.radians(lat)) * math.tan(math.radians(eps))
     if not math.isfinite(coefficient) or abs(coefficient) >= 1.0:
         raise IntervalCertificationError("ordinary Gauquelin coefficient is invalid")

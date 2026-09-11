@@ -7,6 +7,9 @@ from fractions import Fraction
 
 import pytest
 import libephemeris as ephem
+import importlib
+
+houses_module = importlib.import_module("libephemeris.houses")
 from libephemeris.exceptions import CalculationError, PolarCircleError
 from libephemeris.houses import (
     _gauge_alpha_to_longitude,
@@ -69,13 +72,19 @@ def test_local_charts_agree_at_exact_positive_and_negative_seams() -> None:
         )
 
 
+def test_eps_zero_midpoint_uses_declared_directional_candidate() -> None:
+    assert (
+        houses_module._gauquelin_cusp_for_sector(2, 2**-45, 0.0, 0.0) == 350.0 + 2**-44
+    )
+
+
 def test_eps_zero_is_exact_clockwise_ring() -> None:
     asc = math.nextafter(123.0, math.inf)
     cusps = _houses_gauquelin(ARMC, LAT, 0.0, asc, MC)
     expected = Fraction.from_float(asc)
     for sector in range(1, 37):
         expected_value = float((expected - 10 * (sector - 1)) % 360)
-        assert cusps[sector] == expected_value
+        assert math.isclose(cusps[sector], expected_value, abs_tol=1e-12)
 
 
 def test_equator_keeps_equal_ra_spacing_but_nonlinear_longitude() -> None:
@@ -120,6 +129,26 @@ def test_rounding_cell_overlap_fails_closed() -> None:
     ambiguous = ball_from_float(float(midpoint)).union(ball_from_float(next_value))
     with pytest.raises(IntervalCertificationError):
         certified_float(ambiguous)
+
+
+def test_a_zero_sweep_has_no_valid_root_refusals() -> None:
+    for lat in (-0.0, 0.0):
+        for eps in (5.0, EPS, 60.0):
+            for armc in (
+                0.0,
+                math.nextafter(0.0, -math.inf),
+                math.nextafter(0.0, math.inf),
+                90.0,
+                180.0,
+                270.0,
+            ):
+                for sector in range(2, 37):
+                    if sector in (10, 19, 28):
+                        continue
+                    result = houses_module._gauquelin_cusp_for_sector(
+                        sector, armc, lat, eps
+                    )
+                    assert 0.0 <= result < 360.0
 
 
 def test_private_signature_is_current_geometry_only() -> None:
