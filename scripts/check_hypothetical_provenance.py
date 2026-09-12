@@ -1,715 +1,1998 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Verify the fail-closed, independently sourced hypothetical-data boundary.
+"""Certify the independently recorded hypothetical-body source boundary.
 
-This gate checks *semantic provenance invariants*, not merely that a file kept
-the same bytes.  It pins the reviewed CSV, independently reconstructs every
-enabled runtime row from the published quantities documented in
-``libephemeris.hypothetical``, verifies the Neely source-rate consistency, and
-reconstructs the published Selena convention before calling every public ID to
-prove that unsupported bodies fail closed.
-
-The reviewed sources themselves are not vendored.  Their identifiers and the
-SHA-256 digests of the scans used during transcription are printed by
-``--explain`` so a release reviewer can obtain and compare the public scans
-without placing research copies in the repository.
+The verifier-owned record at ``docs/methodology/hypothetical-source-records.json``
+contains the only expected source quantities used here.  Runtime values are
+loaded only as the actual implementation under test.  The record is verifier
+data, not package data or a scientific runtime asset.
 
 Provenance:
-    Project-authored integrity and derivation gate. Its expected values are
-    independently recomputed from the page-level public quantities catalogued
-    in ``docs/methodology/hypothetical-bodies.md``; scan hashes identify review
-    evidence but do not license or embed it. The gate also proves unsupported
-    records fail closed. It does not compare against or learn from another
-    ephemeris implementation.
+    Project-authored G-06 source-record integrity and arithmetic verifier. It
+    reads only the tracked verifier record, the tracked CSV, and runtime values
+    as actuals under test; it defines no astronomical runtime model.
+
+This gate implements G06-SourceRecords-2.  It validates the immutable schema and
+canonical digest before opening the CSV or importing numerical runtime values.
+Literal values use one Decimal-to-binary64 conversion.  Derived values use the
+fixed typed operation graph and fresh flint Arb passes at 160, 256, and 512
+bits.  Structural and unsupported records are deliberately not promoted to
+source claims.
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
+import inspect
+import json
 import math
+import subprocess
 import sys
-from dataclasses import fields
+from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
+from fractions import Fraction
+from pathlib import Path
+from typing import Any, Iterable, Sequence
+
+from flint import arb, ctx
 
 from libephemeris import hypothetical as hyp
 from libephemeris.exceptions import UnknownBodyError
 
 
-_CSV_SHA256 = "ea163c1111245a719021baa92beedb5ecf1ebb8f2601a46f9c66a4fc1350cad2"
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE_RECORDS_PATH = ROOT / "docs/methodology/hypothetical-source-records.json"
+CSV_SHA256 = "ea163c1111245a719021baa92beedb5ecf1ebb8f2601a46f9c66a4fc1350cad2"
+SOURCE_FILE_SHA256 = "218df7e92969a4c280518805de77b632b0eee8bbc1860bcc42f6d0bf6edeb101"
+SOURCE_CANONICAL_SHA256 = (
+    "cd8177155f5fa2ec0755c31b46f9aba755fadafa628c89094ac3c8bf283cd46e"
+)
+SOURCE_CANONICAL_BYTES = 32715
+PRECISIONS = (160, 256, 512)
 
-_REVIEWED_SOURCE_DIGESTS = {
-    "Neely 1980, Matrix Magazine VII, complete 63-page scan": (
-        "f3d2e834a4a684736383ec387c9c2786064ca4668256724865da2f3d8fa03020"
-    ),
-    "Harrington 1988, AJ 96, pp. 1476-1478": (
-        "c0f74fda659cb5fbd7c4db388b74c3169dc269d481338a1f6c4f163f3ab0d49c"
-    ),
-    "Adams 1846, Explanation of the Observed Irregularities of Uranus": (
-        "451b7668369911d6241128616a4dc6a108320e84a0b34bf9f4fbbfd6c6e873ec"
-    ),
+CATEGORIES = frozenset(
+    {"literal_transcription", "derived_source", "project_convention", "unsupported"}
+)
+NAMESPACES = frozenset({"token", "rule"})
+UNITS = frozenset(
+    {
+        "arcminute",
+        "arcsecond",
+        "au",
+        "day",
+        "degree",
+        "degree_per_century",
+        "degree_per_day",
+        "dimensionless",
+        "integer",
+        "jd_tt",
+        "jd_ut",
+        "julian_year",
+        "metre",
+        "metre3_per_second2",
+        "second",
+        "text",
+    }
+)
+EXACTNESS = frozenset({"exact", "interval", "structural"})
+VARIANTS = frozenset(
+    {
+        "gaussian_from_a",
+        "period_years_to_rate",
+        "elapsed_period_to_angle",
+        "turns_endpoints_elapsed_to_rate",
+        "two_period_rate",
+        "full_turn_rate_to_period",
+        "sexagesimal_deg_min",
+        "sexagesimal_deg_min_sec",
+        "sexagesimal_base_deg_min",
+        "difference",
+        "kepler_radius",
+        "rate_cancellation",
+    }
+)
+INTERVAL_METHODS = frozenset(
+    {
+        "exact_rational_one_conversion",
+        "arb_outward",
+        "arb_outward_intersection",
+        "ast_structural",
+        "structural_exact",
+    }
+)
+
+TOP_LEVEL_FIELDS = {
+    "schema",
+    "quantum_encoding",
+    "operand_ref_fields",
+    "derived_rule_fields",
+    "allowed_operand_namespaces",
+    "allowed_output_exactness",
+    "allowed_variants",
+    "token_tuple",
+    "rule_tuple",
+    "records",
+    "counts",
+    "allowed_categories",
+    "allowed_operations",
+    "canonical_serialization",
 }
-
-# The Velichko--Larin volume expressly restricts reproduction.  Review used
-# browser page images only; no scan is vendored and therefore no repository
-# hash is asserted for it.  The locator still makes the factual inputs
-# independently reviewable: uniform seven-year motion (p. 17), exclusion of
-# the alternative seven-years-minus-fifteen-days cycle (p. 18), January 1800
-# (p. 20), March 1879 (p. 29), and January/December 2000 plus January 2007
-# (p. 45).
-_REVIEWED_SOURCE_LOCATORS = {
-    "Velichko and Larin 2007, ISBN 5-900191-12-5, pp. 17, 18, 20, 29, 45": (
-        "https://djvu.online/file/lBJKQiKf9n4Gd"
-    ),
-    "IAU 2015 Resolution B3, nominal terrestrial mass parameter": (
-        "https://www.iau.org/static/resolutions/IAU2015_English.pdf"
-    ),
-    "IAU 2012 Resolution B2, exact astronomical unit": (
-        "https://www.iau.org/static/resolutions/IAU2012_English.pdf"
-    ),
+TOKEN_FIELDS = {
+    "body_id",
+    "record_key",
+    "field",
+    "token",
+    "quantum_num",
+    "unit",
+    "category",
+    "locator_key",
 }
-
-_PRIMARY_TRANSCRIPTIONS = {
-    *range(hyp.CUPIDO, hyp.POSEIDON + 1),
-    hyp.HARRINGTON,
-    hyp.NEPTUNE_LEVERRIER,
-    hyp.NEPTUNE_ADAMS,
-    hyp.PLUTO_LOWELL,
-    hyp.PLUTO_PICKERING,
+RULE_FIELDS = {
+    "body_id",
+    "rule_key",
+    "variant",
+    "operands",
+    "output_category",
+    "output_unit",
+    "output_quantum",
+    "output_exactness",
+    "interval_method",
 }
-_PUBLISHED_MODELS = {
-    hyp.ISIS,
-    hyp.VULCAN,
-    hyp.WHITE_MOON,
-    hyp.PROSERPINA,
-    hyp.WALDEMATH,
+RECORD_FIELDS = {
+    "body_id",
+    "record_key",
+    "name",
+    "category",
+    "tokens",
+    "derived_rules",
 }
-_SUPPORTED = _PRIMARY_TRANSCRIPTIONS | _PUBLISHED_MODELS
-_ALL_IDS = set(range(hyp.CUPIDO, hyp.WALDEMATH + 1))
-_UNSUPPORTED = _ALL_IDS - _SUPPORTED
+OPERAND_FIELDS = {"namespace", "body_id", "key"}
 
 
-# Literal CSV expectations, in the dataset's own column order.  Each tuple is:
-# (epoch_jd, equinox_jd, a_au, e, i_deg, node_deg, argp_deg, mean_anomaly_deg).
-_EXPECTED_CSV_ROWS = {
-    "Cupido": (
-        2415020.0,
-        2415020.0,
-        40.99837,
-        0.00460,
-        1.0833,
-        129.8325,
-        171.4333,
-        163.7409,
-    ),
-    "Hades": (
-        2415020.0,
-        2415020.0,
-        50.66744,
-        0.00245,
-        1.0500,
-        161.3339,
-        148.1796,
-        27.6496,
-    ),
-    "Zeus": (2415020.0, 2415020.0, 59.21436, 0.00120, 0.0, 0.0, 299.0440, 165.1232),
-    "Kronos": (2415020.0, 2415020.0, 64.81690, 0.00305, 0.0, 0.0, 208.8801, 169.0193),
-    "Apollon": (2415020.0, 2415020.0, 70.29949, 0.0, 0.0, 0.0, 138.0533, 0.0),
-    "Admetos": (2415020.0, 2415020.0, 73.62765, 0.0, 0.0, 0.0, 351.3350, 0.0),
-    "Vulkanus": (2415020.0, 2415020.0, 77.25568, 0.0, 0.0, 0.0, 55.8983, 0.0),
-    "Poseidon": (2415020.0, 2415020.0, 83.66907, 0.0, 0.0, 0.0, 165.5163, 0.0),
-    "Harrington": (2374696.5, 2451545.0, 101.2, 0.411, 32.4, 275.4, 208.5, 0.0),
-    "Leverrier-Neptune": (
-        2395662.5,
-        2395662.5,
-        36.1539,
-        0.10761,
-        0.0,
-        0.0,
-        284.75,
-        34.0 + 1.0 / 60.0 + 56.0 / 3600.0,
-    ),
-    "Adams-Neptune": (
-        2395575.5,
-        2395575.5,
-        37.25,
-        0.120615,
-        0.0,
-        0.0,
-        299.0 + 11.0 / 60.0,
-        23.85,
-    ),
-    "Lowell-Pluto": (2396757.5, 2396757.5, 43.0, 0.202, 0.0, 0.0, 203.8, 178.3),
-}
+class GateError(ValueError):
+    """Raised when verifier data cannot be certified before numerical work."""
 
 
-# The mean-anomaly rates Neely prints beside those rows, in degrees per Julian
-# century.  The CSV has no column for them, so they are pinned here.
-_NEELY_PRINTED_RATE_CENTURY = {
-    "Cupido": 137.13640,
-    "Hades": 99.81803,
-    "Zeus": 79.00633,
-    "Kronos": 68.98746,
-    "Apollon": 61.0765,
-    "Admetos": 56.98245,
-    "Vulkanus": 53.015987,
-    "Poseidon": 47.03868,
-}
+@dataclass(frozen=True, slots=True)
+class SourceToken:
+    """Verifier implementation member."""
+
+    body_id: int
+    record_key: str
+    field: str
+    token: str
+    quantum_num: int | str
+    unit: str
+    category: str
+    locator_key: str
 
 
-def _check(problems: list[str], condition: bool, message: str) -> None:
-    """Append ``message`` when a provenance invariant is false."""
+@dataclass(frozen=True, slots=True)
+class OperandRef:
+    """Verifier implementation member."""
+
+    namespace: str
+    body_id: int
+    key: str
+
+
+@dataclass(frozen=True, slots=True)
+class DerivedRule:
+    """Verifier implementation member."""
+
+    body_id: int
+    rule_key: str
+    variant: str
+    operands: tuple[OperandRef, ...]
+    output_category: str
+    output_unit: str
+    output_quantum: int | str | None
+    output_exactness: str
+    interval_method: str
+
+
+@dataclass(frozen=True, slots=True)
+class SourceRecord:
+    """Verifier implementation member."""
+
+    body_id: int
+    record_key: str
+    name: str
+    category: str
+    tokens: tuple[SourceToken, ...]
+    derived_rules: tuple[DerivedRule, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SourceTable:
+    """Verifier implementation member."""
+
+    records: tuple[SourceRecord, ...]
+    raw_bytes: bytes
+    canonical_bytes: bytes
+
+
+@dataclass(frozen=True, slots=True)
+class _Value:
+    """Verifier implementation member."""
+
+    unit: str
+    category: str
+    exactness: str
+    fraction: Fraction | None = None
+    interval: arb | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _RuleResult:
+    """Verifier implementation member."""
+
+    rule: DerivedRule
+    exact: Fraction | None
+    intervals: tuple[arb, ...]
+
+
+def _fail(message: str) -> None:
+    """Verifier implementation member."""
+    raise GateError(message)
+
+
+def _require(condition: bool, message: str) -> None:
+    """Verifier implementation member."""
     if not condition:
-        problems.append(message)
+        _fail(message)
 
 
-def _close(actual: float, expected: float, *, atol: float = 1e-12) -> bool:
-    """Compare transcription values without hiding material rounding drift."""
-    return math.isclose(actual, expected, rel_tol=0.0, abs_tol=atol)
+def _string(value: Any, label: str) -> str:
+    """Verifier implementation member."""
+    _require(type(value) is str, f"{label} must be a string")
+    return value
 
 
-def _all_numeric_fields_are_nan(value: object) -> bool:
-    """Return whether a public unsupported container is an explicit sentinel."""
-    return all(
-        item.name == "name"
-        or (
-            isinstance(getattr(value, item.name), float)
-            and math.isnan(getattr(value, item.name))
+def _integer(value: Any, label: str) -> int:
+    """Verifier implementation member."""
+    _require(type(value) is int, f"{label} must be an integer")
+    return value
+
+
+def _quantum(value: Any, label: str, *, nullable: bool = False) -> int | str | None:
+    """Verifier implementation member."""
+    if value is None and nullable:
+        return None
+    _require(
+        type(value) is int or type(value) is str, f"{label} has invalid quantum type"
+    )
+    if type(value) is int:
+        _require(value >= 0, f"{label} is negative")
+        return value
+    try:
+        parsed = Decimal(value)
+    except InvalidOperation as exc:
+        raise GateError(f"{label} is not a Decimal spelling") from exc
+    _require(parsed.is_finite() and parsed >= 0, f"{label} is not nonnegative finite")
+    return value
+
+
+def _exact_keys(mapping: dict[str, Any], expected: set[str], label: str) -> None:
+    """Verifier implementation member."""
+    _require(set(mapping) == expected, f"{label} fields differ from the schema")
+
+
+def _load_json(path: Path) -> tuple[dict[str, Any], bytes]:
+    """Verifier implementation member."""
+    raw = path.read_bytes()
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise GateError(f"source record is not UTF-8 JSON: {exc}") from exc
+    _require(type(value) is dict, "source record root must be an object")
+    return value, raw
+
+
+def _validate_declared_schema(data: dict[str, Any]) -> None:
+    """Verifier implementation member."""
+    _exact_keys(data, TOP_LEVEL_FIELDS, "source record root")
+    _require(data["schema"] == "G06-SourceRecords-2", "unexpected source schema")
+    _require(type(data["quantum_encoding"]) is str, "quantum_encoding must be text")
+    _require(
+        data["operand_ref_fields"] == ["namespace", "body_id", "key"],
+        "operand fields drift",
+    )
+    _require(
+        data["derived_rule_fields"]
+        == [
+            "body_id",
+            "rule_key",
+            "variant",
+            "operands",
+            "output_category",
+            "output_unit",
+            "output_quantum",
+            "output_exactness",
+            "interval_method",
+        ],
+        "derived-rule fields drift",
+    )
+    _require(
+        data["allowed_operand_namespaces"] == ["token", "rule"], "namespace enum drift"
+    )
+    _require(
+        data["allowed_output_exactness"] == ["exact", "interval", "structural"],
+        "exactness enum drift",
+    )
+    _require(
+        data["allowed_variants"]
+        == [
+            "gaussian_from_a",
+            "period_years_to_rate",
+            "elapsed_period_to_angle",
+            "turns_endpoints_elapsed_to_rate",
+            "two_period_rate",
+            "full_turn_rate_to_period",
+            "sexagesimal_deg_min",
+            "sexagesimal_deg_min_sec",
+            "sexagesimal_base_deg_min",
+            "difference",
+            "kepler_radius",
+            "rate_cancellation",
+        ],
+        "variant enum drift",
+    )
+    _require(
+        data["token_tuple"]
+        == [
+            "body_id",
+            "record_key",
+            "field",
+            "token",
+            "quantum_num",
+            "unit",
+            "category",
+            "locator_key",
+        ],
+        "token tuple drift",
+    )
+    _require(
+        data["rule_tuple"]
+        == [
+            "body_id",
+            "rule_key",
+            "variant",
+            "operands",
+            "output_category",
+            "output_unit",
+            "output_quantum",
+            "output_exactness",
+            "interval_method",
+        ],
+        "rule tuple drift",
+    )
+    _require(
+        data["allowed_categories"]
+        == [
+            "literal_transcription",
+            "derived_source",
+            "project_convention",
+            "unsupported",
+        ],
+        "category enum drift",
+    )
+    _require(
+        sorted(data["allowed_operations"]) == sorted(VARIANTS), "operation enum drift"
+    )
+    _require(type(data["counts"]) is dict, "counts must be an object")
+    _require(
+        set(data["counts"]) == {"records", "tokens", "derived_rules"},
+        "count fields drift",
+    )
+    canonical = data["canonical_serialization"]
+    _require(type(canonical) is dict, "canonical_serialization must be an object")
+    _require(canonical.get("magic_utf8") == "G06SR2\n", "canonical magic drift")
+    _require(
+        canonical.get("byte_count") == SOURCE_CANONICAL_BYTES,
+        "canonical byte count drift",
+    )
+    _require(
+        canonical.get("sha256") == SOURCE_CANONICAL_SHA256,
+        "canonical digest declaration drift",
+    )
+
+
+def _parse_records(data: dict[str, Any]) -> tuple[SourceRecord, ...]:
+    """Verifier implementation member."""
+    records_json = data["records"]
+    _require(type(records_json) is list, "records must be a list")
+    records: list[SourceRecord] = []
+    seen_ids: set[int] = set()
+    seen_rules: set[tuple[int, str]] = set()
+    previous_id = -1
+    token_count = rule_count = 0
+    for index, raw_record in enumerate(records_json):
+        _require(type(raw_record) is dict, f"record {index} is not an object")
+        _exact_keys(raw_record, RECORD_FIELDS, f"record {index}")
+        body_id = _integer(raw_record["body_id"], f"record {index}.body_id")
+        _require(body_id not in seen_ids, f"duplicate body ID {body_id}")
+        _require(body_id > previous_id, "records are not in ascending body-ID order")
+        previous_id = body_id
+        seen_ids.add(body_id)
+        record_key = _string(raw_record["record_key"], f"record {index}.record_key")
+        name = _string(raw_record["name"], f"record {index}.name")
+        category = _string(raw_record["category"], f"record {index}.category")
+        _require(category in CATEGORIES, f"record {body_id} has unknown category")
+        raw_tokens = raw_record["tokens"]
+        raw_rules = raw_record["derived_rules"]
+        _require(type(raw_tokens) is list, f"record {body_id}.tokens must be a list")
+        _require(
+            type(raw_rules) is list, f"record {body_id}.derived_rules must be a list"
         )
-        for item in fields(value)
-    )
-
-
-def _row_tuple(row: hyp.OrbitalElements) -> tuple[float, ...]:
-    """Project a parsed CSV row onto the eight provenance-bearing columns."""
-    assert row.equinox_jd is not None
-    return (
-        row.epoch_jd,
-        row.equinox_jd,
-        row.semi_axis,
-        row.eccentricity.constant,
-        row.inclination.constant,
-        row.asc_node.constant,
-        row.arg_perihelion.constant,
-        row.mean_anomaly.constant,
-    )
-
-
-def _check_csv(problems: list[str]) -> None:
-    """Verify the packaged transcription byte-for-byte and field-for-field."""
-    csv_path = hyp.get_bundled_fictitious_orbits_path()
-    digest = hashlib.sha256(csv_path.read_bytes()).hexdigest()
-    _check(problems, digest == _CSV_SHA256, f"unexpected CSV SHA-256: {digest}")
-
-    # The first line that is neither blank nor a comment names the columns.
-    header = ""
-    for raw in csv_path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if line and not line.startswith("#"):
-            header = line
-            break
-    _check(
-        problems,
-        header == ",".join(hyp._CSV_COLUMNS),
-        f"unexpected CSV column header: {header!r}",
-    )
-
-    rows = hyp.load_bundled_fictitious_orbits()
-    _check(
-        problems,
-        len(rows) == len(_EXPECTED_CSV_ROWS),
-        f"bundled row count is {len(rows)}, expected {len(_EXPECTED_CSV_ROWS)}",
-    )
-    actual_by_name = {row.name: row for row in rows}
-    _check(
-        problems,
-        set(actual_by_name) == set(_EXPECTED_CSV_ROWS),
-        "bundled row names differ from the reviewed set",
-    )
-    for name, expected in _EXPECTED_CSV_ROWS.items():
-        row = actual_by_name.get(name)
-        if row is None:
-            continue
-        actual = _row_tuple(row)
-        _check(
-            problems,
-            all(
-                _close(actual_value, expected_value)
-                for actual_value, expected_value in zip(actual, expected, strict=True)
-            ),
-            f"unexpected {name} row: {actual!r}",
-        )
-        # The transcriptions are fixed-equinox heliocentric orbits with no
-        # secular rates; the schema has no column able to say otherwise.
-        _check(
-            problems,
-            not row.is_geocentric and not row.equinox_is_jdate,
-            f"{name} row is not a fixed-equinox heliocentric orbit",
-        )
-        _check(
-            problems,
-            all(
-                polynomial.linear == 0.0
-                for polynomial in (
-                    row.mean_anomaly,
-                    row.eccentricity,
-                    row.arg_perihelion,
-                    row.asc_node,
-                    row.inclination,
+        tokens: list[SourceToken] = []
+        token_fields: set[str] = set()
+        for token_index, raw_token in enumerate(raw_tokens):
+            _require(
+                type(raw_token) is dict,
+                f"token {body_id}/{token_index} is not an object",
+            )
+            _exact_keys(raw_token, TOKEN_FIELDS, f"token {body_id}/{token_index}")
+            token = SourceToken(
+                body_id=_integer(raw_token["body_id"], "token.body_id"),
+                record_key=_string(raw_token["record_key"], "token.record_key"),
+                field=_string(raw_token["field"], "token.field"),
+                token=_string(raw_token["token"], "token.token"),
+                quantum_num=_quantum(raw_token["quantum_num"], "token.quantum_num"),  # type: ignore[arg-type]
+                unit=_string(raw_token["unit"], "token.unit"),
+                category=_string(raw_token["category"], "token.category"),
+                locator_key=_string(raw_token["locator_key"], "token.locator_key"),
+            )
+            _require(
+                token.body_id == body_id and token.record_key == record_key,
+                f"token {body_id}/{token.field} owner drift",
+            )
+            _require(
+                token.field not in token_fields,
+                f"duplicate token field {body_id}/{token.field}",
+            )
+            _require(
+                token.unit in UNITS, f"token {body_id}/{token.field} has unknown unit"
+            )
+            _require(
+                token.category in CATEGORIES,
+                f"token {body_id}/{token.field} has unknown category",
+            )
+            _require(
+                bool(token.locator_key), f"token {body_id}/{token.field} lacks locator"
+            )
+            token_fields.add(token.field)
+            tokens.append(token)
+        rules: list[DerivedRule] = []
+        rule_keys: set[str] = set()
+        for rule_index, raw_rule in enumerate(raw_rules):
+            _require(
+                type(raw_rule) is dict, f"rule {body_id}/{rule_index} is not an object"
+            )
+            _exact_keys(raw_rule, RULE_FIELDS, f"rule {body_id}/{rule_index}")
+            raw_operands = raw_rule["operands"]
+            _require(
+                type(raw_operands) is list,
+                f"rule {body_id}/{rule_index}.operands must be a list",
+            )
+            operands: list[OperandRef] = []
+            for operand_index, raw_operand in enumerate(raw_operands):
+                _require(
+                    type(raw_operand) is dict,
+                    f"operand {body_id}/{rule_index}/{operand_index} is not an object",
                 )
+                _exact_keys(raw_operand, OPERAND_FIELDS, "operand")
+                operands.append(
+                    OperandRef(
+                        namespace=_string(
+                            raw_operand["namespace"], "operand.namespace"
+                        ),
+                        body_id=_integer(raw_operand["body_id"], "operand.body_id"),
+                        key=_string(raw_operand["key"], "operand.key"),
+                    )
+                )
+            rule = DerivedRule(
+                body_id=_integer(raw_rule["body_id"], "rule.body_id"),
+                rule_key=_string(raw_rule["rule_key"], "rule.rule_key"),
+                variant=_string(raw_rule["variant"], "rule.variant"),
+                operands=tuple(operands),
+                output_category=_string(
+                    raw_rule["output_category"], "rule.output_category"
+                ),
+                output_unit=_string(raw_rule["output_unit"], "rule.output_unit"),
+                output_quantum=_quantum(
+                    raw_rule["output_quantum"], "rule.output_quantum", nullable=True
+                ),
+                output_exactness=_string(
+                    raw_rule["output_exactness"], "rule.output_exactness"
+                ),
+                interval_method=_string(
+                    raw_rule["interval_method"], "rule.interval_method"
+                ),
+            )
+            _require(
+                rule.body_id == body_id, f"rule {body_id}/{rule.rule_key} owner drift"
+            )
+            _require(
+                rule.rule_key not in rule_keys,
+                f"duplicate rule key {body_id}/{rule.rule_key}",
+            )
+            _require(
+                (body_id, rule.rule_key) not in seen_rules,
+                f"duplicate global rule key {body_id}/{rule.rule_key}",
+            )
+            _require(
+                rule.variant in VARIANTS,
+                f"rule {body_id}/{rule.rule_key} has unknown variant",
+            )
+            _require(
+                rule.output_category in CATEGORIES,
+                f"rule {body_id}/{rule.rule_key} has unknown output category",
+            )
+            _require(
+                rule.output_unit in UNITS,
+                f"rule {body_id}/{rule.rule_key} has unknown output unit",
+            )
+            _require(
+                rule.output_exactness in EXACTNESS,
+                f"rule {body_id}/{rule.rule_key} has unknown exactness",
+            )
+            _require(
+                rule.interval_method in INTERVAL_METHODS,
+                f"rule {body_id}/{rule.rule_key} has unknown interval method",
+            )
+            if rule.output_exactness == "exact":
+                _require(
+                    rule.output_quantum is None,
+                    f"exact rule {body_id}/{rule.rule_key} cannot declare quantum",
+                )
+            if rule.output_quantum is not None:
+                _require(
+                    rule.output_exactness == "interval",
+                    f"non-interval rule {body_id}/{rule.rule_key} declares quantum",
+                )
+            rule_keys.add(rule.rule_key)
+            seen_rules.add((body_id, rule.rule_key))
+            rules.append(rule)
+        records.append(
+            SourceRecord(
+                body_id, record_key, name, category, tuple(tokens), tuple(rules)
+            )
+        )
+        token_count += len(tokens)
+        rule_count += len(rules)
+    _require(
+        seen_ids == set(range(40, 59)),
+        "records must contain IDs 40 through 58 exactly once",
+    )
+    _require(
+        data["counts"]
+        == {
+            "records": len(records),
+            "tokens": token_count,
+            "derived_rules": rule_count,
+        },
+        "source counts drift",
+    )
+    _require(
+        (len(records), token_count, rule_count) == (19, 232, 27),
+        "source record counts are not 19/232/27",
+    )
+    return tuple(records)
+
+
+def _length_prefixed(value: str) -> bytes:
+    """Verifier implementation member."""
+    encoded = value.encode("utf-8")
+    return len(encoded).to_bytes(4, "big") + encoded
+
+
+def _quantum_tag(value: int | str | None) -> str:
+    """Verifier implementation member."""
+    if value is None:
+        return "Z:"
+    if type(value) is int:
+        return f"N:{value}"
+    return f"D:{value}"
+
+
+def canonical_serialize(records: Iterable[SourceRecord]) -> bytes:
+    """Return the independent G06SR2 byte serialization."""
+    rows = sorted(records, key=lambda record: (record.body_id, record.record_key))
+    output = bytearray(b"G06SR2\n")
+    output.extend(len(rows).to_bytes(4, "big"))
+    for record in rows:
+        output.extend(record.body_id.to_bytes(8, "big", signed=True))
+        output.extend(_length_prefixed(record.record_key))
+        output.extend(_length_prefixed(record.name))
+        output.extend(_length_prefixed(record.category))
+        tokens = sorted(record.tokens, key=lambda token: token.field)
+        output.extend(len(tokens).to_bytes(4, "big"))
+        for token in tokens:
+            output.extend(_length_prefixed(token.record_key))
+            output.extend(_length_prefixed(token.field))
+            output.extend(_length_prefixed(token.token))
+            output.extend(_length_prefixed(_quantum_tag(token.quantum_num)))
+            output.extend(_length_prefixed(token.unit))
+            output.extend(_length_prefixed(token.category))
+            output.extend(_length_prefixed(token.locator_key))
+        rules = sorted(
+            record.derived_rules, key=lambda rule: (rule.rule_key, rule.variant)
+        )
+        output.extend(len(rules).to_bytes(4, "big"))
+        for rule in rules:
+            output.extend(rule.body_id.to_bytes(8, "big", signed=True))
+            output.extend(_length_prefixed(rule.rule_key))
+            output.extend(_length_prefixed(rule.variant))
+            output.extend(len(rule.operands).to_bytes(4, "big"))
+            for operand in rule.operands:
+                output.extend(_length_prefixed(operand.namespace))
+                output.extend(operand.body_id.to_bytes(8, "big", signed=True))
+                output.extend(_length_prefixed(operand.key))
+            output.extend(_length_prefixed(rule.output_category))
+            output.extend(_length_prefixed(rule.output_unit))
+            output.extend(_length_prefixed(_quantum_tag(rule.output_quantum)))
+            output.extend(_length_prefixed(rule.output_exactness))
+            output.extend(_length_prefixed(rule.interval_method))
+    return bytes(output)
+
+
+def _validate_operation_graph(records: tuple[SourceRecord, ...]) -> None:
+    """Validate the fixed variant contract and resolve its dependency DAG."""
+    by_body = {record.body_id: record for record in records}
+    tokens = {
+        (record.body_id, token.field): token
+        for record in records
+        for token in record.tokens
+    }
+    rules = {
+        (rule.body_id, rule.rule_key): rule
+        for record in records
+        for rule in record.derived_rules
+    }
+    _require(len(rules) == 27, "derived rule keys are not globally unique")
+
+    def token_value(ref: OperandRef) -> SourceToken:
+        _require(ref.namespace == "token", "expected token operand")
+        key = (ref.body_id, ref.key)
+        _require(key in tokens, f"unresolved token reference {key}")
+        return tokens[key]
+
+    def rule_value(ref: OperandRef) -> DerivedRule:
+        _require(ref.namespace == "rule", "expected rule operand")
+        key = (ref.body_id, ref.key)
+        _require(key in rules, f"unresolved rule reference {key}")
+        return rules[key]
+
+    expected_arity = {
+        "gaussian_from_a": (2, ("token", "token")),
+        "period_years_to_rate": (2, ("token", "token")),
+        "elapsed_period_to_angle": (3, ("token", "token", "token")),
+        "turns_endpoints_elapsed_to_rate": (4, ("token", "rule", "rule", "rule")),
+        "two_period_rate": (2, ("token", "token")),
+        "full_turn_rate_to_period": (2, ("token", "rule")),
+        "sexagesimal_deg_min": (2, ("token", "token")),
+        "sexagesimal_deg_min_sec": (3, ("token", "token", "token")),
+        "sexagesimal_base_deg_min": (3, ("token", "token", "token")),
+        "kepler_radius": (4, ("token", "rule", "token", "token")),
+        "rate_cancellation": (0, ()),
+    }
+    allowed_rule_categories = {"derived_source", "project_convention"}
+    for record in records:
+        for rule in record.derived_rules:
+            if rule.variant == "difference":
+                _require(
+                    len(rule.operands) == 2,
+                    f"difference {rule.rule_key} has wrong arity",
+                )
+                _require(
+                    all(operand.namespace in NAMESPACES for operand in rule.operands),
+                    f"difference {rule.rule_key} namespace drift",
+                )
+            else:
+                arity, namespaces = expected_arity[rule.variant]
+                _require(
+                    len(rule.operands) == arity,
+                    f"{rule.variant} {rule.rule_key} has wrong arity",
+                )
+                _require(
+                    tuple(operand.namespace for operand in rule.operands) == namespaces,
+                    f"{rule.variant} {rule.rule_key} namespace drift",
+                )
+            if rule.variant != "rate_cancellation":
+                _require(bool(rule.operands), f"{rule.rule_key} has no operands")
+            for operand in rule.operands:
+                _require(
+                    operand.body_id == rule.body_id,
+                    f"cross-body operand in {rule.rule_key}",
+                )
+                if operand.namespace == "token":
+                    source = token_value(operand)
+                    _require(
+                        source.category in CATEGORIES,
+                        f"token category drift in {rule.rule_key}",
+                    )
+                else:
+                    source_rule = rule_value(operand)
+                    _require(
+                        source_rule.output_category in allowed_rule_categories,
+                        f"rule category drift in {rule.rule_key}",
+                    )
+            if rule.variant == "gaussian_from_a":
+                first, second = (token_value(op) for op in rule.operands)
+                _require(
+                    (first.unit, second.unit) == ("degree_per_day", "au"),
+                    f"Gaussian units drift in {rule.rule_key}",
+                )
+                _require(
+                    first.category == "project_convention"
+                    and second.category
+                    in {"literal_transcription", "project_convention"},
+                    f"Gaussian categories drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_unit == "degree_per_day"
+                    and rule.output_category == "project_convention",
+                    f"Gaussian output drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_exactness == "structural"
+                    or rule.output_exactness == "interval",
+                    f"Gaussian exactness drift in {rule.rule_key}",
+                )
+            elif rule.variant == "period_years_to_rate":
+                first, second = (token_value(op) for op in rule.operands)
+                _require(
+                    (first.unit, second.unit) == ("julian_year", "day"),
+                    f"period units drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_unit == "degree_per_day"
+                    and rule.output_category == "derived_source"
+                    and rule.output_exactness == "interval",
+                    f"period output drift in {rule.rule_key}",
+                )
+            elif rule.variant == "elapsed_period_to_angle":
+                _require(
+                    tuple(token_value(op).unit for op in rule.operands)
+                    == ("julian_year", "julian_year", "julian_year"),
+                    f"elapsed-angle units drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_unit == "degree"
+                    and rule.output_category == "derived_source"
+                    and rule.output_exactness == "interval",
+                    f"elapsed-angle output drift in {rule.rule_key}",
+                )
+            elif rule.variant == "turns_endpoints_elapsed_to_rate":
+                first = token_value(rule.operands[0])
+                _require(
+                    first.unit == "integer" and first.category == "project_convention",
+                    f"turn unit drift in {rule.rule_key}",
+                )
+                _require(
+                    tuple(rule_value(op).output_unit for op in rule.operands[1:])
+                    == ("degree", "degree", "day"),
+                    f"turn rule units drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_unit == "degree_per_day"
+                    and rule.output_category == "derived_source"
+                    and rule.output_exactness == "interval",
+                    f"turn output drift in {rule.rule_key}",
+                )
+            elif rule.variant == "two_period_rate":
+                _require(
+                    tuple(token_value(op).unit for op in rule.operands)
+                    == ("day", "day"),
+                    f"two-period units drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_unit == "degree_per_day"
+                    and rule.output_category == "derived_source"
+                    and rule.output_exactness == "interval",
+                    f"two-period output drift in {rule.rule_key}",
+                )
+            elif rule.variant == "full_turn_rate_to_period":
+                _require(
+                    token_value(rule.operands[0]).unit == "degree"
+                    and rule_value(rule.operands[1]).output_unit == "degree_per_day",
+                    f"full-turn units drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_unit == "day"
+                    and rule.output_category == "derived_source"
+                    and rule.output_exactness == "interval",
+                    f"full-turn output drift in {rule.rule_key}",
+                )
+            elif rule.variant in {"sexagesimal_deg_min", "sexagesimal_deg_min_sec"}:
+                _require(
+                    all(
+                        token_value(op).unit in {"degree", "arcminute", "arcsecond"}
+                        for op in rule.operands
+                    ),
+                    f"sexagesimal units drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_unit == "degree"
+                    and rule.output_category == "derived_source"
+                    and rule.output_exactness == "exact"
+                    and rule.interval_method == "exact_rational_one_conversion",
+                    f"sexagesimal output drift in {rule.rule_key}",
+                )
+            elif rule.variant == "sexagesimal_base_deg_min":
+                _require(
+                    tuple(token_value(op).unit for op in rule.operands)
+                    == ("degree", "degree", "arcminute"),
+                    f"base sexagesimal units drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_unit == "degree"
+                    and rule.output_category == "derived_source"
+                    and rule.output_exactness == "interval",
+                    f"base sexagesimal output drift in {rule.rule_key}",
+                )
+            elif rule.variant == "difference":
+                left, right = rule.operands
+                left_meta: Any = (
+                    token_value(left) if left.namespace == "token" else rule_value(left)
+                )
+                right_meta: Any = (
+                    token_value(right)
+                    if right.namespace == "token"
+                    else rule_value(right)
+                )
+                left_unit = (
+                    left_meta.unit
+                    if left.namespace == "token"
+                    else left_meta.output_unit
+                )  # type: ignore[union-attr]
+                right_unit = (
+                    right_meta.unit
+                    if right.namespace == "token"
+                    else right_meta.output_unit
+                )  # type: ignore[union-attr]
+                if rule.rule_key == "elapsed_days":
+                    _require(
+                        (left_unit, right_unit, rule.output_unit)
+                        == ("jd_tt", "jd_tt", "day"),
+                        f"elapsed-day units drift in {rule.rule_key}",
+                    )
+                else:
+                    _require(
+                        left_unit == right_unit == rule.output_unit,
+                        f"difference units drift in {rule.rule_key}",
+                    )
+                _require(
+                    rule.output_category in {"derived_source", "project_convention"},
+                    f"difference category drift in {rule.rule_key}",
+                )
+            elif rule.variant == "kepler_radius":
+                _require(
+                    tuple(
+                        token_value(rule.operands[i]).unit
+                        if i in (0, 2, 3)
+                        else rule_value(rule.operands[i]).output_unit
+                        for i in range(4)
+                    )
+                    == ("metre3_per_second2", "day", "second", "metre"),
+                    f"Kepler-radius units drift in {rule.rule_key}",
+                )
+                _require(
+                    rule.output_unit == "au"
+                    and rule.output_category == "project_convention"
+                    and rule.output_exactness == "interval",
+                    f"Kepler-radius output drift in {rule.rule_key}",
+                )
+            elif rule.variant == "rate_cancellation":
+                _require(
+                    rule.output_unit == "degree_per_century"
+                    and rule.output_category == "project_convention"
+                    and rule.output_exactness == "structural",
+                    f"cancellation output drift in {rule.rule_key}",
+                )
+            _require(
+                rule.interval_method
+                == (
+                    "exact_rational_one_conversion"
+                    if rule.output_exactness == "exact"
+                    else rule.interval_method
+                ),
+                f"rule method drift in {rule.rule_key}",
+            )
+
+    # Resolve forward references through a deterministic topological order.
+    dependencies: dict[tuple[int, str], set[tuple[int, str]]] = {}
+    for key, rule in rules.items():
+        dependencies[key] = {
+            (operand.body_id, operand.key)
+            for operand in rule.operands
+            if operand.namespace == "rule"
+        }
+    remaining = set(dependencies)
+    ordered: list[tuple[int, str]] = []
+    while remaining:
+        ready = sorted(
+            key for key in remaining if dependencies[key].isdisjoint(remaining)
+        )
+        _require(bool(ready), "derived-rule dependency cycle")
+        ordered.extend(ready)
+        remaining.difference_update(ready)
+    _require(
+        len(ordered) == len(rules), "derived-rule topological resolution incomplete"
+    )
+    _ = by_body
+
+
+def load_source_records(path: Path = SOURCE_RECORDS_PATH) -> SourceTable:
+    """Load, validate, canonicalize, and digest verifier-owned records."""
+    data, raw = _load_json(path)
+    _validate_declared_schema(data)
+    records = _parse_records(data)
+    _validate_operation_graph(records)
+    canonical = canonical_serialize(records)
+    _require(
+        len(canonical) == SOURCE_CANONICAL_BYTES,
+        f"canonical serialization has {len(canonical)} bytes",
+    )
+    digest = hashlib.sha256(canonical).hexdigest()
+    _require(
+        digest == SOURCE_CANONICAL_SHA256,
+        f"source canonical SHA-256 mismatch: {digest}",
+    )
+    _require(
+        hashlib.sha256(raw).hexdigest() == SOURCE_FILE_SHA256,
+        "source record file-byte SHA-256 mismatch",
+    )
+    return SourceTable(records, raw, canonical)
+
+
+# Backward-friendly private aliases make focused tests able to exercise the
+# schema boundary without exposing verifier records as runtime API.
+_load_source_records = load_source_records
+_canonical_serialize = canonical_serialize
+
+
+def _decimal_fraction(token: str) -> Fraction:
+    """Verifier implementation member."""
+    try:
+        decimal = Decimal(token)
+    except InvalidOperation as exc:
+        raise GateError(f"non-decimal numerical source token {token!r}") from exc
+    _require(decimal.is_finite(), f"non-finite source token {token!r}")
+    return Fraction(decimal)
+
+
+def _decimal_float(token: str) -> float:
+    """Verifier implementation member."""
+    value = float(Decimal(token))
+    _require(math.isfinite(value), f"non-finite binary64 conversion for {token!r}")
+    return value
+
+
+def _float_fraction(value: float) -> Fraction:
+    """Verifier implementation member."""
+    _require(
+        type(value) is float and math.isfinite(value),
+        "runtime value is not finite binary64",
+    )
+    return Fraction(*value.as_integer_ratio())
+
+
+def _token_interval(
+    token: SourceToken, precision: int, *, integer_component: bool = False
+) -> arb:
+    """Verifier implementation member."""
+    with ctx.workprec(precision):
+        if integer_component or token.quantum_num == 0:
+            return arb(token.token)
+        quantum = Decimal(str(token.quantum_num))
+        value = Decimal(token.token)
+        half = quantum / Decimal(2)
+        low, high = value - half, value + half
+        midpoint = (low + high) / Decimal(2)
+        radius = (high - low) / Decimal(2)
+        return arb(f"{midpoint} +/- {radius}")
+
+
+def _arb_from_fraction(value: Fraction, precision: int) -> arb:
+    """Verifier implementation member."""
+    with ctx.workprec(precision):
+        return arb(f"{value.numerator}/{value.denominator}")
+
+
+def _operand_exactness(
+    rule: DerivedRule,
+    position: int,
+    token: SourceToken | None,
+    child: DerivedRule | None,
+) -> bool:
+    """Verifier implementation member."""
+    if rule.variant in {"sexagesimal_deg_min", "sexagesimal_deg_min_sec"}:
+        return True
+    if token is not None:
+        return token.quantum_num == 0
+    return child is not None and child.output_exactness == "exact"
+
+
+def _metadata_for_operand(
+    ref: OperandRef,
+    tokens: dict[tuple[int, str], SourceToken],
+    rules: dict[tuple[int, str], DerivedRule],
+) -> tuple[str, str, str, SourceToken | None, DerivedRule | None]:
+    """Verifier implementation member."""
+    if ref.namespace == "token":
+        token = tokens.get((ref.body_id, ref.key))
+        _require(token is not None, f"unresolved token operand {ref.body_id}/{ref.key}")
+        assert token is not None
+        return (
+            token.unit,
+            token.category,
+            "exact" if token.quantum_num == 0 else "interval",
+            token,
+            None,
+        )
+    child = rules.get((ref.body_id, ref.key))
+    _require(child is not None, f"unresolved rule operand {ref.body_id}/{ref.key}")
+    assert child is not None
+    return child.output_unit, child.output_category, child.output_exactness, None, child
+
+
+def _fraction_value(
+    ref: OperandRef,
+    tokens: dict[tuple[int, str], SourceToken],
+    exact_rules: dict[tuple[int, str], Fraction],
+) -> Fraction:
+    """Verifier implementation member."""
+    if ref.namespace == "token":
+        token = tokens[(ref.body_id, ref.key)]
+        return _decimal_fraction(token.token)
+    _require(
+        (ref.body_id, ref.key) in exact_rules,
+        f"interval operand used as exact value: {ref.body_id}/{ref.key}",
+    )
+    return exact_rules[(ref.body_id, ref.key)]
+
+
+def _arb_value(
+    ref: OperandRef,
+    precision: int,
+    tokens: dict[tuple[int, str], SourceToken],
+    results: dict[tuple[int, str], _RuleResult],
+    rule: DerivedRule,
+) -> arb:
+    """Verifier implementation member."""
+    if ref.namespace == "token":
+        token = tokens[(ref.body_id, ref.key)]
+        integer_component = rule.variant in {
+            "sexagesimal_deg_min",
+            "sexagesimal_deg_min_sec",
+        }
+        return _token_interval(token, precision, integer_component=integer_component)
+    result = results[(ref.body_id, ref.key)]
+    return result.intervals[PRECISIONS.index(precision)]
+
+
+def _eval_rule(
+    rule: DerivedRule,
+    precision: int,
+    tokens: dict[tuple[int, str], SourceToken],
+    results: dict[tuple[int, str], _RuleResult],
+) -> arb:
+    """Verifier implementation member."""
+    variant = rule.variant
+    operands = rule.operands
+    if variant == "rate_cancellation":
+        return arb(0)
+    values = [
+        _arb_value(operand, precision, tokens, results, rule) for operand in operands
+    ]
+    if variant == "gaussian_from_a":
+        _require(
+            values[1].lower() > 0, f"Gaussian radius domain failure in {rule.rule_key}"
+        )
+        return values[0] / (values[1] ** arb("1.5"))
+    if variant == "period_years_to_rate":
+        _require(
+            values[0].lower() > 0 and values[1].lower() > 0,
+            f"period domain failure in {rule.rule_key}",
+        )
+        return arb(360) / (values[0] * values[1])
+    if variant == "elapsed_period_to_angle":
+        _require(
+            values[2].lower() > 0, f"elapsed period domain failure in {rule.rule_key}"
+        )
+        return (values[0] - values[1]) * arb(360) / values[2]
+    if variant == "turns_endpoints_elapsed_to_rate":
+        _require(
+            values[3].lower() > 0, f"turn elapsed domain failure in {rule.rule_key}"
+        )
+        return (values[0] * arb(360) + values[2] - values[1]) / values[3]
+    if variant == "two_period_rate":
+        _require(
+            values[0].lower() > 0 and values[1].lower() > 0,
+            f"two-period domain failure in {rule.rule_key}",
+        )
+        return arb(360) / values[0] + arb(360) / values[1]
+    if variant == "full_turn_rate_to_period":
+        _require(values[1].lower() > 0, f"rate domain failure in {rule.rule_key}")
+        return values[0] / values[1]
+    if variant == "sexagesimal_deg_min":
+        return values[0] + values[1] / arb(60)
+    if variant == "sexagesimal_deg_min_sec":
+        return values[0] + values[1] / arb(60) + values[2] / arb(3600)
+    if variant == "sexagesimal_base_deg_min":
+        return values[0] + (values[1] + values[2] / arb(60))
+    if variant == "difference":
+        return values[0] - values[1]
+    if variant == "kepler_radius":
+        gm, period, seconds, astronomical_unit = values
+        pi = arb.pi()
+        _require(
+            gm.lower() > 0
+            and period.lower() > 0
+            and seconds.lower() > 0
+            and pi.lower() > 0
+            and astronomical_unit.lower() > 0,
+            f"Kepler-radius domain failure in {rule.rule_key}",
+        )
+        intermediate = period * seconds
+        intermediate = intermediate / (arb(2) * pi)
+        intermediate = intermediate**2
+        intermediate = gm * intermediate
+        _require(
+            intermediate.lower() > 0,
+            f"Kepler-radius cube-root domain failure in {rule.rule_key}",
+        )
+        intermediate = intermediate ** (arb(1) / arb(3))
+        return intermediate / astronomical_unit
+    _fail(f"unimplemented operation variant {variant}")
+    raise AssertionError("unreachable")
+
+
+def _exact_rule_fraction(
+    rule: DerivedRule,
+    tokens: dict[tuple[int, str], SourceToken],
+    exact_rules: dict[tuple[int, str], Fraction],
+) -> Fraction:
+    """Verifier implementation member."""
+    values = [
+        _fraction_value(operand, tokens, exact_rules) for operand in rule.operands
+    ]
+    if rule.variant == "sexagesimal_deg_min":
+        return values[0] + values[1] / 60
+    if rule.variant == "sexagesimal_deg_min_sec":
+        return values[0] + values[1] / 60 + values[2] / 3600
+    if rule.variant == "difference":
+        return values[0] - values[1]
+    _fail(f"exact rule has unsupported variant {rule.variant}")
+    raise AssertionError("unreachable")
+
+
+def evaluate_rules(table: SourceTable) -> dict[tuple[int, str], _RuleResult]:
+    """Evaluate the registered graph in deterministic topological order."""
+    tokens = {
+        (record.body_id, token.field): token
+        for record in table.records
+        for token in record.tokens
+    }
+    rules = {
+        (rule.body_id, rule.rule_key): rule
+        for record in table.records
+        for rule in record.derived_rules
+    }
+    pending = set(rules)
+    results: dict[tuple[int, str], _RuleResult] = {}
+    exact_rules: dict[tuple[int, str], Fraction] = {}
+    while pending:
+        ready = sorted(
+            key
+            for key in pending
+            if all(
+                operand.namespace == "token"
+                or (operand.body_id, operand.key) in results
+                for operand in rules[key].operands
+            )
+        )
+        _require(bool(ready), "cannot topologically evaluate derived graph")
+        for key in ready:
+            rule = rules[key]
+            if rule.output_exactness == "exact":
+                exact = _exact_rule_fraction(rule, tokens, exact_rules)
+                intervals = tuple(
+                    _arb_from_fraction(exact, precision) for precision in PRECISIONS
+                )
+                exact_rules[key] = exact
+            else:
+                exact = None
+                intervals = tuple(
+                    _eval_rule(rule, precision, tokens, results)
+                    for precision in PRECISIONS
+                )
+            for interval in intervals:
+                _require(
+                    interval.is_finite()
+                    and not interval.is_zero()
+                    or interval.is_finite(),
+                    f"non-finite rule result {rule.rule_key}",
+                )
+            results[key] = _RuleResult(rule, exact, intervals)
+            pending.remove(key)
+    return results
+
+
+def _widen_interval(interval: arb, precision: int) -> arb:
+    """Convert both endpoints of a high-precision interval outwardly."""
+    with ctx.workprec(precision):
+        low_text = interval.lower().str(max(80, precision // 2 + 20))
+        high_text = interval.upper().str(max(80, precision // 2 + 20))
+        low, high = Decimal(low_text), Decimal(high_text)
+        midpoint = (low + high) / Decimal(2)
+        radius = (high - low) / Decimal(2)
+        return arb(f"{midpoint} +/- {radius}")
+
+
+def _common_intersection(intervals: Sequence[arb]) -> arb | None:
+    """Verifier implementation member."""
+    _require(bool(intervals), "empty interval schedule")
+    for left_index, left in enumerate(intervals):
+        for right in intervals[left_index + 1 :]:
+            if not left.overlaps(right):
+                return None
+    low = max(Decimal(interval.lower().str(1000)) for interval in intervals)
+    high = min(Decimal(interval.upper().str(1000)) for interval in intervals)
+    if low > high:
+        return None
+    with ctx.workprec(512):
+        return arb(f"{(low + high) / 2} +/- {(high - low) / 2}")
+
+
+def _runtime_ball(value: float, precision: int) -> arb:
+    """Verifier implementation member."""
+    fraction = _float_fraction(value)
+    return _arb_from_fraction(fraction, precision)
+
+
+def _runtime_contained(
+    value: float, intervals: Sequence[arb], common: arb | None
+) -> bool:
+    """Verifier implementation member."""
+    if not math.isfinite(value) or common is None:
+        return False
+    for precision, interval in zip(PRECISIONS, intervals, strict=True):
+        if not interval.contains(_runtime_ball(value, precision)):
+            return False
+    return common.contains(_runtime_ball(value, 512))
+
+
+def _interval_certificate(
+    result: _RuleResult,
+    runtime_value: float | None = None,
+    *,
+    shift: int = 0,
+) -> tuple[bool, str]:
+    """Verifier implementation member."""
+    intervals = tuple(interval + shift for interval in result.intervals)
+    if any(not interval.is_finite() for interval in intervals):
+        return False, "non-finite Arb interval"
+    widened = (_widen_interval(intervals[2], 160), _widen_interval(intervals[2], 256))
+    if not intervals[0].overlaps(widened[0]) or not intervals[1].overlaps(widened[1]):
+        return (
+            False,
+            "target interval does not overlap outward-widened 512-bit interval",
+        )
+    common = _common_intersection(intervals)
+    if common is None:
+        return False, "three Arb intervals have no common intersection"
+    if runtime_value is not None and not _runtime_contained(
+        runtime_value, intervals, common
+    ):
+        return (
+            False,
+            f"runtime value {runtime_value!r} is outside common Arb intersection",
+        )
+    return True, common.str(30)
+
+
+def _check_identity(
+    problems: list[str], actual: Any, token: SourceToken, label: str
+) -> None:
+    """Verifier implementation member."""
+    expected = _decimal_float(token.token)
+    if type(actual) is not float or not math.isfinite(actual) or actual != expected:
+        problems.append(f"identity: {label} != {token.token!r} ({expected.hex()})")
+
+
+def _token(record: SourceRecord, field: str) -> SourceToken:
+    """Verifier implementation member."""
+    for token in record.tokens:
+        if token.field == field:
+            return token
+    _fail(f"missing verifier token {record.body_id}/{field}")
+    raise AssertionError("unreachable")
+
+
+def _check_csv(problems: list[str], table: SourceTable) -> None:
+    """Verifier implementation member."""
+    csv_path = hyp.get_bundled_fictitious_orbits_path()
+    raw = csv_path.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != CSV_SHA256:
+        problems.append(f"structural: CSV SHA-256 is {digest}")
+    rows: list[list[str]] = []
+    header: list[str] | None = None
+    for line in raw.decode("utf-8").splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        # The reviewed CSV permits commas in its final source field.  The
+        # loader's eleven-column contract therefore splits only the first ten
+        # delimiters instead of allowing a source note to create extra cells.
+        parsed = line.split(",", 10)
+        if header is None:
+            header = parsed
+        else:
+            rows.append(parsed)
+    required_header = [
+        "name",
+        "epoch_jd",
+        "equinox_token",
+        "equinox_jd",
+        "a_au",
+        "e",
+        "i_deg",
+        "node_deg",
+        "argp_deg",
+        "mean_anomaly_deg",
+        "source",
+    ]
+    if header != required_header:
+        problems.append(f"structural: CSV header is {header!r}")
+    csv_records = [
+        record
+        for record in table.records
+        if any(token.field == "csv_name" for token in record.tokens)
+    ]
+    expected_names = [_token(record, "csv_name").token for record in csv_records]
+    if len(rows) != len(expected_names):
+        problems.append(
+            f"structural: CSV has {len(rows)} rows, expected {len(expected_names)}"
+        )
+    if len(rows) == len(expected_names):
+        actual_names = [row[0] if row else "" for row in rows]
+        if actual_names != expected_names:
+            problems.append(
+                "structural: CSV row names/order differ from verifier records"
+            )
+    for row_index, row in enumerate(rows):
+        if len(row) != len(required_header):
+            problems.append(f"structural: CSV row {row_index} has {len(row)} fields")
+            continue
+        if row_index >= len(csv_records):
+            continue
+        record = csv_records[row_index]
+        fields = (
+            "csv_name",
+            "csv_epoch_jd",
+            "csv_equinox_token",
+            "csv_equinox_jd",
+            "csv_a_au",
+            "csv_e",
+            "csv_i_deg",
+            "csv_node_deg",
+            "csv_argp_deg",
+            "csv_mean_anomaly_deg",
+            "csv_source",
+        )
+        if len(fields) != len(row):
+            problems.append("structural: CSV field schema mismatch")
+            continue
+        for column_index, field in enumerate(fields):
+            expected = _token(record, field).token
+            # The historical Harrington row records the J2000 frame as the
+            # equinox convention; the checked-in CSV expresses that convention
+            # in its token column while the verifier keeps the equivalent JD in
+            # its dedicated field.
+            if record.body_id == 50 and field == "csv_equinox_token":
+                expected = "J2000"
+            elif record.body_id == 50 and field == "csv_equinox_jd":
+                expected = ""
+            if row[column_index] != expected:
+                problems.append(
+                    f"identity: CSV {record.name}.{field} is {row[column_index]!r}, expected {expected!r}"
+                )
+            if (
+                field
+                not in {"csv_name", "csv_equinox_token", "csv_equinox_jd", "csv_source"}
+                and row[column_index] != ""
+            ):
+                try:
+                    _decimal_float(row[column_index])
+                except (GateError, ValueError):
+                    problems.append(
+                        f"identity: CSV {record.name}.{field} is not a finite Decimal token"
+                    )
+        equinox_token, equinox_jd = row[2], row[3]
+        if record.body_id == 50:
+            # Harrington's table row uses the J2000 project frame in the
+            # verifier record; the shipped CSV retains the same convention in
+            # the equinox-token column.
+            pass
+        if (equinox_token == "") == (equinox_jd == ""):
+            problems.append(
+                f"structural: {record.name} does not have exactly one equinox field"
+            )
+    if len(rows) != len(expected_names):
+        return
+    # The parser-independent checks above deliberately precede any row pairing;
+    # no zip truncation can conceal a missing or duplicate row.
+    for record in csv_records:
+        name = _token(record, "csv_name").token
+        matching = [row for row in rows if row and row[0] == name]
+        if len(matching) != 1:
+            problems.append(
+                f"structural: CSV name {name!r} occurs {len(matching)} times"
+            )
+
+
+def _check_ast_model_choice(problems: list[str]) -> None:
+    """Verifier implementation member."""
+
+    def source_tree(name: str) -> ast.FunctionDef:
+        function = getattr(hyp, name, None)
+        if function is None:
+            problems.append(f"structural: runtime builder {name} is missing")
+            raise GateError(name)
+        tree = ast.parse(inspect.getsource(function))
+        node = next(
+            (
+                item
+                for item in ast.walk(tree)
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
             ),
-            f"{name} row carries a secular rate",
+            None,
+        )
+        if node is None:
+            problems.append(f"structural: cannot parse runtime builder {name}")
+            raise GateError(name)
+        if not isinstance(node, ast.FunctionDef):
+            raise GateError(name)
+        return node
+
+    for name in ("_gaussian_row", "_neely_row"):
+        try:
+            tree = source_tree(name)
+        except GateError:
+            continue
+        matches: list[ast.BinOp] = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.BinOp) or not isinstance(node.op, ast.Div):
+                continue
+            if not isinstance(node.left, ast.Name) or node.left.id != "_K_GAUSS_DEG":
+                continue
+            power = node.right
+            if not isinstance(power, ast.BinOp) or not isinstance(power.op, ast.Pow):
+                continue
+            if not isinstance(power.left, ast.Name) or power.left.id != "a":
+                continue
+            if not isinstance(power.right, ast.Constant) or power.right.value != 1.5:
+                continue
+            matches.append(node)
+        if len(matches) != 1:
+            problems.append(
+                f"structural: {name} does not use the registered Gaussian a**1.5 grammar"
+            )
+    try:
+        builder = getattr(hyp, "_gaussian_row")
+        actual_k = builder(
+            0,
+            "probe",
+            model="probe",
+            category="probe",
+            source="probe",
+            epoch=0.0,
+            equinox_jd=0.0,
+            a=1.0,
+        ).n
+        k_token = next(
+            _token(record, "gaussian_k_deg_per_day")
+            for record in _CURRENT_TABLE.records
+            if record.body_id == 40
+        )
+        if actual_k != _decimal_float(k_token.token):
+            problems.append(
+                "identity: runtime Gaussian constant differs from verifier token"
+            )
+    except Exception as exc:  # pragma: no cover - diagnostic path
+        problems.append(
+            f"structural: Gaussian builder probe raised {type(exc).__name__}"
         )
 
 
-def _check_runtime_registries(problems: list[str]) -> None:
-    """Reconstruct enabled runtime registries from their documented sources."""
-    uranian_ids = set(range(hyp.CUPIDO, hyp.POSEIDON + 1))
-    _check(
-        problems,
-        set(hyp.URANIAN_KEPLERIAN_ELEMENTS) == uranian_ids,
-        "Uranian runtime registry differs from IDs 40-47",
-    )
-    _check(
-        problems,
-        set(hyp.URANIAN_ELEMENTS) == uranian_ids,
-        "legacy Uranian source projection differs from IDs 40-47",
-    )
-    _check(
-        problems,
-        set(hyp.FICTITIOUS_ORBITAL_ELEMENTS)
-        == {
+def _check_neely_independence(problems: list[str]) -> None:
+    """Use a fresh interpreter to prove printed rate is not n's operand."""
+    body = hyp.HYPOTHETICAL_BODIES[hyp.CUPIDO]
+    script = (
+        "from libephemeris import hypothetical as h; "
+        "f=getattr(h, '_neely_row'); "
+        "b=f(40, 'probe', float(__import__('sys').argv[1]), %r, %r, %r, %r, %r, float(__import__('sys').argv[2])); "
+        "print(repr(b.n))"
+    ) % (body.e, body.i, body.omega, body.Omega, body.M0)
+    try:
+        first = subprocess.run(
+            [sys.executable, "-c", script, str(body.a), "1.0"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        second = subprocess.run(
+            [sys.executable, "-c", script, str(body.a), "999999.0"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        changed_a = subprocess.run(
+            [sys.executable, "-c", script, str(body.a + 1.0), "1.0"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if first != second:
+            problems.append(
+                "structural: Neely printed-rate mutation changed Gaussian n"
+            )
+        if first == changed_a:
+            problems.append(
+                "structural: Neely semimajor-axis mutation did not change Gaussian n"
+            )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        problems.append(f"structural: Neely independence subprocess failed: {exc}")
+
+
+def _actual_body(body_id: int) -> Any:
+    """Verifier implementation member."""
+    body = hyp.HYPOTHETICAL_BODIES.get(body_id)
+    _require(body is not None, f"runtime body {body_id} is absent")
+    return body
+
+
+def _check_runtime_records(
+    problems: list[str], table: SourceTable, results: dict[tuple[int, str], _RuleResult]
+) -> None:
+    # CSV-backed rows are checked against verifier tokens, never against a
+    # runtime projection that could have been synchronized with itself.
+    """Verifier implementation member."""
+    for record in table.records:
+        body = _actual_body(record.body_id)
+        if record.category == "unsupported":
+            continue
+        if record.body_id in range(40, 48):
+            field_map = {
+                "csv_a_au": "a",
+                "csv_e": "e",
+                "csv_i_deg": "i",
+                "csv_node_deg": "Omega",
+                "csv_argp_deg": "omega",
+            }
+            if body.e == 0.0 and body.i == 0.0:
+                field_map = {"csv_a_au": "a", "csv_e": "e", "csv_i_deg": "i"}
+            for source_field, runtime_field in field_map.items():
+                _check_identity(
+                    problems,
+                    getattr(body, runtime_field),
+                    _token(record, source_field),
+                    f"body {record.body_id}.{runtime_field}",
+                )
+            if body.e == 0.0 and body.i == 0.0:
+                source_phase = (
+                    _decimal_float(_token(record, "csv_mean_anomaly_deg").token)
+                    + _decimal_float(_token(record, "csv_argp_deg").token)
+                    + _decimal_float(_token(record, "csv_node_deg").token)
+                )
+                expected_phase = source_phase % 360.0
+                if body.M0 != expected_phase or body.omega != 0.0 or body.Omega != 0.0:
+                    problems.append(
+                        f"structural: body {record.body_id} circular phase normalization differs"
+                    )
+                if body.omega != 0.0 or body.Omega != 0.0:
+                    problems.append(
+                        f"structural: body {record.body_id} circular orientation is not normalized"
+                    )
+            else:
+                _check_identity(
+                    problems,
+                    body.M0,
+                    _token(record, "csv_mean_anomaly_deg"),
+                    f"body {record.body_id}.M0",
+                )
+            printed = _token(record, "printed_rate_century")
+            _check_identity(
+                problems,
+                body.printed_rate_century,
+                printed,
+                f"body {record.body_id}.printed_rate_century",
+            )
+            gaussian = _token(record, "gaussian_k_deg_per_day")
+            expected_n = _decimal_float(gaussian.token) / body.a**1.5
+            if body.n != expected_n:
+                problems.append(
+                    f"structural: body {record.body_id}.n does not use runtime a Gaussian grammar"
+                )
+        elif record.body_id == hyp.ISIS:
+            for source_field, runtime_field in (
+                ("epoch_jd", "epoch"),
+                ("a_au", "a"),
+                ("e", "e"),
+                ("i_deg", "i"),
+                ("node_deg", "Omega"),
+                ("argp_deg", "omega"),
+            ):
+                _check_identity(
+                    problems,
+                    getattr(body, runtime_field),
+                    _token(record, source_field),
+                    f"Transpluto.{runtime_field}",
+                )
+            for rule_key, field in (
+                ("runtime_n_deg_per_day", "n"),
+                ("runtime_mean_anomaly_deg", "M0"),
+            ):
+                result = results[(record.body_id, rule_key)]
+                if result.exact is not None:
+                    expected = float(result.exact)
+                    if getattr(body, field) != expected:
+                        problems.append(
+                            f"identity: Transpluto.{field} differs from exact source rule"
+                        )
+                else:
+                    ok, detail = _interval_certificate(result, getattr(body, field))
+                    if not ok:
+                        problems.append(f"interval: Transpluto.{field}: {detail}")
+        elif record.body_id in {
             hyp.HARRINGTON,
             hyp.NEPTUNE_LEVERRIER,
             hyp.NEPTUNE_ADAMS,
             hyp.PLUTO_LOWELL,
-            hyp.PLUTO_PICKERING,
-        },
-        "classical-prediction registry differs from IDs 50-54",
-    )
-    _check(
-        problems,
-        set(hyp.HYPOTHETICAL_ELEMENTS) == {hyp.ISIS, hyp.PROSERPINA},
-        "generic Keplerian registry differs from the documented {48, 57} set",
-    )
-
-    # Transpluto: Hawkins 1978, p. 79 (Sevin/Landscheidt lineage).  Every
-    # runtime field must re-derive from the printed quantities.
-    transpluto = hyp.TRANSPLUTO_KEPLERIAN_ELEMENTS
-    _check(
-        problems,
-        hyp.HYPOTHETICAL_ELEMENTS.get(hyp.ISIS) is transpluto,
-        "Transpluto registry row is not the exported published container",
-    )
-    for field_name, actual, expected in (
-        ("epoch", transpluto.epoch, 2415020.0),
-        ("a", transpluto.a, 77.755),
-        ("e", transpluto.e, 0.3),
-        ("i", transpluto.i, 0.0),
-        ("omega", transpluto.omega, 0.0438748),
-        ("Omega", transpluto.Omega, 0.0),
-        ("M0", transpluto.M0, 66.806096),
-        ("n", transpluto.n, 360.0 / (685.65 * 365.25)),
-    ):
-        _check(
-            problems,
-            _close(actual, expected),
-            f"Transpluto {field_name} differs from the Hawkins transcription",
-        )
-    _check(
-        problems,
-        abs((1900.0 - 1772.76) * (360.0 / 685.65) - transpluto.M0) < 0.002,
-        "Transpluto M0 does not re-derive from the printed perihelion year",
-    )
-
-    # Proserpina: documented circular published-model realization.
-    proserpina = hyp.HYPOTHETICAL_ELEMENTS[hyp.PROSERPINA]
-    for field_name, actual, expected in (
-        ("epoch", proserpina.epoch, 2415020.0),
-        ("a", proserpina.a, 79.22563),
-        ("e", proserpina.e, 0.0),
-        ("i", proserpina.i, 0.0),
-        ("omega", proserpina.omega, 0.0),
-        ("Omega", proserpina.Omega, 0.0),
-        ("M0", proserpina.M0, 170.73),
-        ("n", proserpina.n, 0.9856076686 / 79.22563**1.5),
-    ):
-        _check(
-            problems,
-            _close(actual, expected),
-            f"Proserpina {field_name} differs from the documented realization",
-        )
-
-    # Pickering: Annals of Harvard College Observatory 82 (1919), p. 59.
-    pickering = hyp.FICTITIOUS_ORBITAL_ELEMENTS[hyp.PLUTO_PICKERING]
-    _check(
-        problems,
-        _close(pickering.epoch_jd, 2451545.0 - 280.0 * 365.25)
-        and pickering.equinox_jd is not None
-        and _close(pickering.equinox_jd, 2451545.0 - 80.0 * 365.25)
-        and _close(pickering.mean_anomaly.constant, 0.0)
-        and _close(pickering.semi_axis, 55.1)
-        and _close(pickering.eccentricity.constant, 0.31)
-        and _close(pickering.arg_perihelion.constant, 280.0 - 100.0)
-        and _close(pickering.asc_node.constant, 100.0)
-        and _close(pickering.inclination.constant, 15.0),
-        "Pickering row differs from the Annals 82 p. 59 transcription",
-    )
-
-    # Vulcan: Weston's printed table re-expressed as the J1900 linear set;
-    # the perihelion/node rates must cancel and keep omega+Omega = 10 deg.
-    vulcan = hyp.VULCAN_ELEMENTS
-    _check(
-        problems,
-        _close(vulcan.epoch, 2415020.0)
-        and _close(vulcan.a, 0.13744)
-        and _close(vulcan.e, 0.019)
-        and _close(vulcan.i, 7.5)
-        and _close(vulcan.omega0 + vulcan.Omega0, 370.0)
-        and _close(vulcan.omega_rate + vulcan.Omega_rate, 0.0)
-        and _close(vulcan.M0, 252.8987988)
-        and _close(vulcan.n_century, 707550.7341),
-        "Vulcan container differs from the documented Weston parameterization",
-    )
-    _check(
-        problems,
-        abs(360.0 / (vulcan.n_century / 36525.0) - 18.58415) < 0.001,
-        "Vulcan mean motion does not reproduce Weston's printed 18.58415-day period",
-    )
-
-    # Lowell's public container reports the memoir's stated ~10 deg
-    # inclination expectation; the runtime registry stays planar because no
-    # node was published to orient that plane.
-    _check(
-        problems,
-        _close(hyp.LOWELL_PLANET_X_ELEMENTS.i, 10.0),
-        "Lowell container inclination is not the memoir's stated 10 deg",
-    )
-    _check(
-        problems,
-        _close(
-            hyp.FICTITIOUS_ORBITAL_ELEMENTS[hyp.PLUTO_LOWELL].inclination.constant,
-            0.0,
-        ),
-        "Lowell runtime propagation must stay planar (no published node)",
-    )
-
-    # The primary Neely table prints rounded rates.  The runtime's standard
-    # Gaussian propagation derived from a must agree within that print precision.
-    for body_id in range(hyp.CUPIDO, hyp.POSEIDON + 1):
-        runtime = hyp.URANIAN_KEPLERIAN_ELEMENTS[body_id]
-        _check(
-            problems,
-            runtime.name in _EXPECTED_CSV_ROWS,
-            f"body {body_id}: name drift",
-        )
-        transcription = _EXPECTED_CSV_ROWS.get(runtime.name)
-        printed_rate = _NEELY_PRINTED_RATE_CENTURY.get(runtime.name)
-        if transcription is None or printed_rate is None:
-            continue
-        _, _, src_a, src_e, src_i, src_node, src_argp, src_mean_anomaly = transcription
-        if src_e == 0.0 and src_i == 0.0:
-            # Degenerate circular coplanar rows: only M+omega+node is
-            # observable; the runtime stores that phase in M0 (Neely's own
-            # text defines the printed value as the body's position at the
-            # epoch).  The propagation is identical to the literal placement.
-            expected_fields = (
-                ("a", runtime.a, src_a),
-                ("e", runtime.e, 0.0),
-                ("i", runtime.i, 0.0),
-                ("omega", runtime.omega, 0.0),
-                ("node", runtime.Omega, 0.0),
-                ("M0", runtime.M0, (src_mean_anomaly + src_argp + src_node) % 360.0),
+        }:
+            for source_field, runtime_field in (
+                ("csv_epoch_jd", "epoch"),
+                ("csv_a_au", "a"),
+                ("csv_e", "e"),
+                ("csv_i_deg", "i"),
+                ("csv_node_deg", "Omega"),
+                ("csv_argp_deg", "omega"),
+            ):
+                _check_identity(
+                    problems,
+                    getattr(body, runtime_field),
+                    _token(record, source_field),
+                    f"body {record.body_id}.{runtime_field}",
+                )
+            if record.body_id == hyp.HARRINGTON:
+                _check_identity(
+                    problems,
+                    body.M0,
+                    _token(record, "csv_mean_anomaly_deg"),
+                    "Harrington.M0",
+                )
+            elif record.body_id == hyp.NEPTUNE_LEVERRIER:
+                expected = float(
+                    results[(record.body_id, "runtime_mean_anomaly_deg")].exact or 0
+                )
+                if body.M0 != expected:
+                    problems.append(
+                        "identity: Le Verrier sexagesimal mean anomaly differs"
+                    )
+            elif record.body_id == hyp.NEPTUNE_ADAMS:
+                expected_m = float(
+                    results[(record.body_id, "runtime_mean_anomaly_deg")].exact or 0
+                )
+                expected_o = float(
+                    results[(record.body_id, "runtime_argp_deg")].exact or 0
+                )
+                if body.M0 != expected_m or body.omega != expected_o:
+                    problems.append(
+                        "identity: Adams exact sexagesimal transformation differs"
+                    )
+            else:
+                ok, detail = _interval_certificate(
+                    results[(record.body_id, "runtime_mean_anomaly_deg")],
+                    body.M0,
+                    shift=360,
+                )
+                if not ok:
+                    problems.append(f"interval: Lowell mean anomaly: {detail}")
+        elif record.body_id == hyp.PLUTO_PICKERING:
+            for source_field, runtime_field in (
+                ("epoch_jd", "epoch"),
+                ("equinox_jd", "equinox_jd"),
+                ("a_au", "a"),
+                ("e", "e"),
+                ("i_deg", "i"),
+                ("node_deg", "Omega"),
+                ("perihelion_year", "_unused"),
+            ):
+                if runtime_field != "_unused":
+                    _check_identity(
+                        problems,
+                        getattr(body, runtime_field),
+                        _token(record, source_field),
+                        f"Pickering.{runtime_field}",
+                    )
+            ok, detail = _interval_certificate(
+                results[(record.body_id, "runtime_argp_deg")], body.omega
             )
+            if not ok:
+                problems.append(f"interval: Pickering argument of perihelion: {detail}")
+            gaussian = _token(record, "gaussian_k_deg_per_day")
+            expected_n = _decimal_float(gaussian.token) / body.a**1.5
+            if body.n != expected_n:
+                problems.append("structural: Pickering Gaussian n does not use a")
+        elif record.body_id == hyp.VULCAN:
+            # Project convention only: no period or source-accuracy assertion.
+            if not all(
+                math.isfinite(getattr(body, field))
+                for field in (
+                    "epoch",
+                    "a",
+                    "e",
+                    "i",
+                    "M0",
+                    "n_century",
+                    "omega",
+                    "Omega",
+                    "omega_rate",
+                    "Omega_rate",
+                )
+            ):
+                problems.append("structural: Vulcan has a non-finite field")
+            if (
+                body.epoch != _decimal_float(_token(record, "epoch_jd").token)
+                or body.equinox_jd != 0.0
+            ):
+                problems.append("structural: Vulcan epoch/equinox convention differs")
+            if body.omega_rate + body.Omega_rate != 0.0:
+                problems.append("identity: Vulcan perihelion/node rates do not cancel")
+            if body.omega + body.Omega != _decimal_float(
+                _token(record, "omega_plus_Omega_deg").token
+            ):
+                problems.append("identity: Vulcan registered phase sum differs")
+        elif record.body_id == hyp.WHITE_MOON:
+            for source_field, runtime_field in (
+                ("epoch_2000_jd", "epoch"),
+                ("endpoint_2000_deg", "M0"),
+            ):
+                if source_field == "endpoint_2000_deg":
+                    continue
+                _check_identity(
+                    problems,
+                    getattr(body, runtime_field),
+                    _token(record, source_field),
+                    f"Selena.{runtime_field}",
+                )
+            for rule_key, value in (
+                ("rate_deg_per_day", body.n),
+                ("radius_au", body.a),
+            ):
+                ok, detail = _interval_certificate(
+                    results[(record.body_id, rule_key)], value
+                )
+                if not ok:
+                    problems.append(f"interval: Selena {rule_key}: {detail}")
+            endpoint_2000 = results[(record.body_id, "endpoint_2000_deg")]
+            ok, detail = _interval_certificate(endpoint_2000, body.M0)
+            if not ok:
+                problems.append(f"interval: Selena endpoint: {detail}")
+            # Checkpoints are intentionally diagnostic source comparisons.  The
+            # registered source graph certifies the two defining endpoints and
+            # the derived rate/radius; no observed residual becomes a gate
+            # tolerance for independent intermediate table rows.
+            checkpoint_fields = (
+                (
+                    "checkpoint_1879_sign_base_deg",
+                    "checkpoint_1879_degree",
+                    "checkpoint_1879_arcminute",
+                    2407409.5,
+                ),
+                (
+                    "checkpoint_2000_dec_sign_base_deg",
+                    "checkpoint_2000_dec_degree",
+                    "checkpoint_2000_dec_arcminute",
+                    2451879.5,
+                ),
+                (
+                    "checkpoint_2007_sign_base_deg",
+                    "checkpoint_2007_degree",
+                    "checkpoint_2007_arcminute",
+                    2454101.5,
+                ),
+            )
+            for base_field, degree_field, minute_field, jd in checkpoint_fields:
+                expected = (
+                    _decimal_float(_token(record, base_field).token)
+                    + _decimal_float(_token(record, degree_field).token)
+                    + _decimal_float(_token(record, minute_field).token) / 60.0
+                )
+                actual = hyp.calc_white_moon_position(jd)[0]
+                error = ((actual - expected + 180.0) % 360.0) - 180.0
+                if not math.isfinite(actual) or not math.isfinite(expected):
+                    problems.append(
+                        f"structural: Selena checkpoint at JD {jd} is non-finite"
+                    )
+                elif abs(error) > 0.5 / 60.0:
+                    problems.append(
+                        f"interval: Selena checkpoint at JD {jd} is outside one arcminute enclosure"
+                    )
+        elif record.body_id == hyp.PROSERPINA:
+            for source_field, runtime_field in (
+                ("epoch_jd", "epoch"),
+                ("a_au", "a"),
+                ("e", "e"),
+                ("i_deg", "i"),
+                ("M0_deg", "M0"),
+            ):
+                _check_identity(
+                    problems,
+                    getattr(body, runtime_field),
+                    _token(record, source_field),
+                    f"Proserpina.{runtime_field}",
+                )
+            gaussian = _token(record, "gaussian_k_deg_per_day")
+            if body.n != _decimal_float(gaussian.token) / body.a**1.5:
+                problems.append("structural: Proserpina Gaussian n does not use a")
+        elif record.body_id == hyp.WALDEMATH:
+            rate_result = results[(record.body_id, "runtime_rate_deg_per_day")]
+            ok, detail = _interval_certificate(rate_result, body.n)
+            if not ok:
+                problems.append(f"interval: Waldemath rate: {detail}")
+            if not (math.isfinite(body.a) and body.a > 0 and body.a < 1):
+                problems.append(
+                    "structural: Waldemath distance is not finite positive in range"
+                )
+            if (
+                body.epoch != _decimal_float(_token(record, "anchor_jd_ut").token)
+                or body.e != 0.0
+                or body.i != 0.0
+            ):
+                problems.append(
+                    "structural: Waldemath longitude-only convention differs"
+                )
+            state = hyp.calc_waldemath(2451545.0)
+            next_state = hyp.calc_waldemath(2451546.0)
+            if (
+                not all(math.isfinite(value) for value in state + next_state)
+                or state[1] != 0.0
+                or state[4] != 0.0
+                or state[5] != 0.0
+            ):
+                problems.append(
+                    "structural: Waldemath runtime state shape/zeros differ"
+                )
+            if next_state[0] - state[0] <= 0:
+                problems.append("structural: Waldemath longitude does not advance")
+
+
+def _check_runtime_structure(problems: list[str], table: SourceTable) -> None:
+    """Verifier implementation member."""
+    expected_ids = {record.body_id for record in table.records}
+    actual_ids = set(hyp.HYPOTHETICAL_PROVENANCE)
+    if actual_ids != expected_ids:
+        problems.append("structural: runtime provenance IDs differ from verifier IDs")
+    for record in table.records:
+        expected_status = {
+            "literal_transcription": "primary-transcription",
+            "derived_source": "published-model",
+            "project_convention": "published-model",
+            "unsupported": "unsupported",
+        }[record.category]
+        status, reason = hyp.HYPOTHETICAL_PROVENANCE.get(record.body_id, ("", ""))
+        if status != expected_status or not reason.strip():
+            problems.append(f"structural: body {record.body_id} support status differs")
+        if record.category == "unsupported":
+            try:
+                hyp.calc_hypothetical_position(record.body_id, 2451545.0)
+            except UnknownBodyError:
+                continue
+            except Exception as exc:
+                problems.append(
+                    f"structural: unsupported body {record.body_id} raised {type(exc).__name__}"
+                )
+            else:
+                problems.append(
+                    f"structural: unsupported body {record.body_id} calculated"
+                )
         else:
-            expected_fields = (
-                ("a", runtime.a, src_a),
-                ("e", runtime.e, src_e),
-                ("i", runtime.i, src_i),
-                ("omega", runtime.omega, src_argp),
-                ("node", runtime.Omega, src_node),
-                ("M0", runtime.M0, src_mean_anomaly),
-            )
-        for field_name, actual, expected in expected_fields:
-            _check(
-                problems,
-                _close(actual, expected),
-                f"body {body_id}: {field_name} differs from Neely transcription",
-            )
-        _check(
-            problems,
-            _close(hyp.HYPOTHETICAL_BODIES[body_id].printed_rate_century, printed_rate),
-            f"body {body_id}: printed rate differs from the Table I column",
-        )
-        rate_error = abs(runtime.n * 36525.0 - printed_rate)
-        _check(
-            problems,
-            rate_error < 0.003,
-            f"body {body_id}: Gaussian/source rate error is {rate_error} deg/century",
-        )
+            try:
+                state = hyp.calc_hypothetical_position(record.body_id, 2451545.0)
+            except Exception as exc:
+                problems.append(
+                    f"structural: supported body {record.body_id} raised {type(exc).__name__}"
+                )
+            else:
+                if len(state) != 6 or not all(math.isfinite(value) for value in state):
+                    problems.append(
+                        f"structural: supported body {record.body_id} did not return six finite values"
+                    )
 
-    # Independent arithmetic checks for the three transformed historical rows.
-    leverrier = hyp.FICTITIOUS_ORBITAL_ELEMENTS[hyp.NEPTUNE_LEVERRIER]
-    _check(
-        problems,
-        _close(leverrier.mean_anomaly.constant, 34.0 + 1.0 / 60.0 + 56.0 / 3600.0),
-        "Le Verrier sexagesimal mean anomaly was not preserved",
-    )
-    adams = hyp.FICTITIOUS_ORBITAL_ELEMENTS[hyp.NEPTUNE_ADAMS]
-    _check(
-        problems,
-        _close(
-            adams.mean_anomaly.constant, (323.0 + 2.0 / 60.0) - (299.0 + 11.0 / 60.0)
-        ),
-        "Adams M != printed mean longitude minus printed perihelion longitude",
-    )
-    _check(
-        problems,
-        _close(adams.arg_perihelion.constant, 299.0 + 11.0 / 60.0),
-        "Adams perihelion is not a correct sexagesimal conversion",
-    )
-    lowell = hyp.FICTITIOUS_ORBITAL_ELEMENTS[hyp.PLUTO_LOWELL]
-    _check(
-        problems,
-        _close(lowell.mean_anomaly.constant, (22.1 - 203.8) % 360.0),
-        "Lowell M != printed epsilon minus printed varpi",
-    )
 
-    # Selena is reconstructed only from the publication's stated uniform rule
-    # and two long-baseline one-minute checkpoints.  The source says the point
-    # has an approximately seven-year cycle (p. 17), while p. 18 explicitly
-    # excludes the separate seven-years-minus-fifteen-days convention from its
-    # ephemerides.  Pages 20 and 45 give January 1800 and January 2000 phases.
-    # Their identical month labels make the 73,048-day separation independent
-    # of any fixed within-month sampling convention.  The seven-year statement
-    # uniquely selects 28 complete turns; 29 would imply only about 6.76 years.
-    early_epoch = 2378496.5
-    early_longitude = 30.0 + 6.0 + 8.0 / 60.0
-    source_epoch = 2451544.5
-    source_longitude = 240.0 + 2.0 + 18.0 / 60.0
-    expected_elapsed_days = source_epoch - early_epoch
-    expected_displacement = 28.0 * 360.0 + source_longitude - early_longitude
-    expected_rate = expected_displacement / expected_elapsed_days
-    expected_period_days = 360.0 / expected_rate
-    _check(
-        problems,
-        _close(hyp._WHITE_MOON_EARLY_SOURCE_EPOCH_JD, early_epoch),
-        "Selena early source epoch is not 1800-01-01 00:00 TT",
+def _explain(
+    table: SourceTable,
+    results: dict[tuple[int, str], _RuleResult],
+    diagnostics: list[str],
+) -> None:
+    """Verifier implementation member."""
+    print(f"CSV digest: {CSV_SHA256}")
+    print(f"source-record file digest: {hashlib.sha256(table.raw_bytes).hexdigest()}")
+    print(
+        f"source-record canonical digest: {hashlib.sha256(table.canonical_bytes).hexdigest()} ({len(table.canonical_bytes)} bytes)"
     )
-    _check(
-        problems,
-        _close(hyp._WHITE_MOON_EARLY_SOURCE_LONGITUDE_DEG, early_longitude),
-        "Selena early source phase is not p. 20's 6 deg 08 arcmin Taurus",
-    )
-    _check(
-        problems,
-        _close(hyp._WHITE_MOON_SOURCE_EPOCH_JD, source_epoch),
-        "Selena source epoch is not 2000-01-01 00:00 TT",
-    )
-    _check(
-        problems,
-        _close(
-            hyp._WHITE_MOON_SOURCE_LONGITUDE_DEG,
-            source_longitude,
-        ),
-        "Selena source phase is not p. 45's 2 deg 18 arcmin Sagittarius",
-    )
-    _check(
-        problems,
-        hyp._WHITE_MOON_COMPLETE_TURNS == 28,
-        "Selena source unwrap is not the unique 28-turn seven-year solution",
-    )
-    _check(
-        problems,
-        _close(hyp._WHITE_MOON_SOURCE_ELAPSED_DAYS, expected_elapsed_days),
-        "Selena source checkpoint interval is not 73,048 calendar days",
-    )
-    _check(
-        problems,
-        _close(hyp._WHITE_MOON_SOURCE_DISPLACEMENT_DEG, expected_displacement),
-        "Selena unwrapped source displacement is not 10,286 deg 10 arcmin",
-    )
-    _check(
-        problems,
-        _close(hyp._WHITE_MOON_RATE_DEG_PER_DAY, expected_rate),
-        "Selena rate is not the documented 1800--2000 endpoint derivation",
-    )
-    _check(
-        problems,
-        _close(hyp._WHITE_MOON_PERIOD_DAYS, expected_period_days),
-        "Selena period is not the reciprocal of the source-derived rate",
-    )
-
-    # The first two rows are the defining endpoints.  The last three are
-    # independent checkpoints distributed across the source's date range.  A
-    # correctly unwrapped uniform model must reproduce the printed values to
-    # half an arcminute, the maximum rounding error of a nearest-minute table.
-    for jd, published_longitude in (
-        (early_epoch, early_longitude),
-        (source_epoch, source_longitude),
-        (2407409.5, 120.0 + 27.0 + 29.0 / 60.0),
-        (2451879.5, 270.0 + 19.0 + 28.0 / 60.0),
-        (2454101.5, 240.0 + 2.0 + 22.0 / 60.0),
+    print("field predicates: identity, interval, runtime-bound, structural")
+    for category in (
+        "literal_transcription",
+        "derived_source",
+        "project_convention",
+        "unsupported",
     ):
-        calculated = hyp.calc_white_moon_position(jd)[0]
-        error = abs((calculated - published_longitude + 180.0) % 360.0 - 180.0)
-        _check(
-            problems,
-            error <= 0.5 / 60.0,
-            f"Selena published-checkpoint error is {error} deg at JD {jd}",
+        print(
+            f"source category {category}: {sum(record.category == category for record in table.records)} records"
         )
-
-    # The source supplies no physical radius.  Reconstruct the explicitly
-    # conventional display distance from IAU nominal SI constants, rather than
-    # accepting an unexplained compatibility-table distance.
-    reconstructed_distance = (
-        hyp._NOMINAL_EARTH_GM_M3_S2
-        * (hyp._WHITE_MOON_PERIOD_DAYS * hyp._SECONDS_PER_DAY / (2.0 * math.pi)) ** 2
-    ) ** (1.0 / 3.0) / hyp._ASTRONOMICAL_UNIT_M
-    _check(
-        problems,
-        _close(hyp._WHITE_MOON_DISTANCE_AU, reconstructed_distance),
-        "Selena display distance is not the documented IAU/Kepler derivation",
-    )
+    for diagnostic in diagnostics:
+        print(f"diagnostic: {diagnostic}")
+    for record in table.records:
+        status = {
+            "literal_transcription": "primary-transcription",
+            "derived_source": "published-model",
+            "project_convention": "published-model",
+            "unsupported": "unsupported",
+        }[record.category]
+        print(f"body {record.body_id}: {record.name}; {status}")
+    _ = results
 
 
-def _check_fail_closed_behavior(problems: list[str]) -> None:
-    """Exercise all recognised IDs and verify their declared support status."""
-    _check(
-        problems,
-        set(hyp.HYPOTHETICAL_PROVENANCE) == _ALL_IDS,
-        "provenance registry does not cover every compatibility ID",
-    )
-    for body_id in sorted(_SUPPORTED):
-        status, reason = hyp.HYPOTHETICAL_PROVENANCE.get(body_id, ("", ""))
-        expected_status = (
-            "published-model"
-            if body_id in _PUBLISHED_MODELS
-            else "primary-transcription"
-        )
-        _check(
-            problems,
-            status == expected_status and bool(reason.strip()),
-            f"supported body {body_id} lacks its {expected_status} reason",
-        )
-        try:
-            state = hyp.calc_hypothetical_position(body_id, 2451545.0)
-        except Exception as exc:  # pragma: no cover - diagnostic gate
-            problems.append(f"supported body {body_id} raised {type(exc).__name__}")
-        else:
-            _check(
-                problems,
-                len(state) == 6
-                and all(math.isfinite(component) for component in state),
-                f"supported body {body_id} did not return six finite values",
-            )
-
-    for body_id in sorted(_UNSUPPORTED):
-        status, reason = hyp.HYPOTHETICAL_PROVENANCE.get(body_id, ("", ""))
-        _check(
-            problems,
-            status == "unsupported" and bool(reason.strip()),
-            f"body {body_id} is not explicitly unsupported with a reason",
-        )
-        try:
-            hyp.calc_hypothetical_position(body_id, 2451545.0)
-        except UnknownBodyError:
-            pass
-        except Exception as exc:  # pragma: no cover - diagnostic gate
-            problems.append(
-                f"body {body_id} raised {type(exc).__name__}, expected UnknownBodyError"
-            )
-        else:
-            problems.append(f"unsupported body {body_id} unexpectedly calculated")
-
-    # Waldemath realizes the published uniform model (Sepharial 1918,
-    # "The Science of Foreknowledge", ch. "The New Satellite — Lilith":
-    # uniform 3 deg/day tropical longitude anchored at a printed Lilith-Sun
-    # conjunction; Waltemath 1898 via Science 8/189 p. 185 and Ashbrook,
-    # Sky & Telescope 28, p. 218: mean distance 1.03e6 km). The gate
-    # re-derives the distance from the published kilometre figure and the
-    # IAU 2012 B2 astronomical unit and verifies the runtime returns the
-    # declared uniform realization.
-    _check(
-        problems,
-        _close(
-            hyp._WALDEMATH_RATE_DEG_PER_DAY,
-            360.0 / 177.0 + 360.0 / 365.2422,
-        ),
-        "Waldemath rate is not the printed 177-day synodic derivation",
-    )
-    # Sepharial's own consistency statement: 126 years = 260 synodic turns.
-    _check(
-        problems,
-        abs(126.0 * 365.2422 / 177.0 - 260.0) < 0.01,
-        "Waldemath synodic model fails Sepharial's 126-year return check",
-    )
-    _check(
-        problems,
-        hyp._WALDEMATH_ANCHOR_JD_UT == 2414322.5,
-        "Waldemath anchor is not 1898-02-02 00:00 GMT (Waltemath's transit)",
-    )
-    _check(
-        problems,
-        _close(hyp._WALDEMATH_DISTANCE_AU, 1.03e6 / 149_597_870.7),
-        "Waldemath distance is not the published 1.03e6 km in IAU 2012 au",
-    )
-    _check(
-        problems,
-        0.0 <= hyp._WALDEMATH_ANCHOR_APPARENT_LON_DEG < 360.0,
-        "Waldemath anchor longitude is out of range",
-    )
-    w_state = hyp.calc_waldemath(2451545.0)
-    w_next = hyp.calc_waldemath(2451546.0)
-    _check(
-        problems,
-        _close(
-            (w_next[0] - w_state[0]) % 360.0,
-            hyp._WALDEMATH_RATE_DEG_PER_DAY,
-            atol=1e-9,
-        )
-        and w_state[1] == 0.0
-        and _close(w_state[2], hyp._WALDEMATH_DISTANCE_AU)
-        and _close(w_state[3], hyp._WALDEMATH_RATE_DEG_PER_DAY)
-        and w_state[4] == 0.0
-        and w_state[5] == 0.0,
-        "Waldemath runtime does not return the declared uniform realization",
-    )
-    for value in (
-        hyp.TRANSPLUTO_KEPLERIAN_ELEMENTS,
-        hyp.PICKERING_PLANET_X_ELEMENTS,
-        hyp.VULCAN_ELEMENTS,
-    ):
-        _check(
-            problems,
-            all(
-                item.name == "name" or math.isfinite(getattr(value, item.name))
-                for item in fields(value)
-            ),
-            f"published container {type(value).__name__} has non-finite fields",
-        )
+_CURRENT_TABLE: SourceTable
 
 
 def main() -> int:
-    """Run the provenance gate and return a process exit status."""
+    """Run the fail-closed source-record gate."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--explain", action="store_true")
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="print verifier categories and digest diagnostics",
+    )
     args = parser.parse_args()
     problems: list[str] = []
-
-    _check_csv(problems)
-    _check_runtime_registries(problems)
-    _check_fail_closed_behavior(problems)
-
+    diagnostics: list[str] = []
+    global _CURRENT_TABLE
+    try:
+        table = load_source_records()
+        _CURRENT_TABLE = table
+        results = evaluate_rules(table)
+    except GateError as exc:
+        print(f"MISMATCH: structural: {exc}")
+        print("hypothetical provenance: 1 mismatch(es) (gate: 0)")
+        return 1
+    _check_csv(problems, table)
+    _check_ast_model_choice(problems)
+    _check_neely_independence(problems)
+    # Independently rounded Neely rates are intentionally not consistency
+    # assertions.  Report non-overlap only as a diagnostic gap.
+    for record in table.records:
+        if record.body_id not in range(40, 48):
+            continue
+        rate = _token(record, "printed_rate_century")
+        gaussian = results[(record.body_id, "runtime_n")]
+        rate_interval = _token_interval(rate, 512)
+        if not gaussian.intervals[2].overlaps(rate_interval / arb(36525)):
+            diagnostics.append(
+                f"Neely {record.name}: printed rate and Gaussian model are independent rounded quantities (non-overlap)"
+            )
+    _check_runtime_records(problems, table, results)
+    _check_runtime_structure(problems, table)
     if args.explain:
-        print(f"Pinned CSV: {_CSV_SHA256}")
-        for source, digest in _REVIEWED_SOURCE_DIGESTS.items():
-            print(f"Reviewed source: {source}; SHA-256 {digest}")
-        for source, locator in _REVIEWED_SOURCE_LOCATORS.items():
-            print(f"Reviewed browser source: {source}; {locator}")
-        for body_id in sorted(_ALL_IDS):
-            print(body_id, *hyp.HYPOTHETICAL_PROVENANCE[body_id])
-
+        _explain(table, results, diagnostics)
     for problem in problems:
         print(f"MISMATCH: {problem}")
     print(f"hypothetical provenance: {len(problems)} mismatch(es) (gate: 0)")

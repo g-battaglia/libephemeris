@@ -1,0 +1,3267 @@
+{
+  "schema": "G06-SourceRecords-2",
+  "quantum_encoding": "Source quantum is an exact integer or Decimal spelling in the stated unit; quantum 0 is exact and is never interpreted as a half-width. Derived output quantum is optional (null) or an exact integer/Decimal spelling.",
+  "operand_ref_fields": [
+    "namespace",
+    "body_id",
+    "key"
+  ],
+  "derived_rule_fields": [
+    "body_id",
+    "rule_key",
+    "variant",
+    "operands",
+    "output_category",
+    "output_unit",
+    "output_quantum",
+    "output_exactness",
+    "interval_method"
+  ],
+  "allowed_operand_namespaces": [
+    "token",
+    "rule"
+  ],
+  "allowed_output_exactness": [
+    "exact",
+    "interval",
+    "structural"
+  ],
+  "allowed_variants": [
+    "gaussian_from_a",
+    "period_years_to_rate",
+    "elapsed_period_to_angle",
+    "turns_endpoints_elapsed_to_rate",
+    "two_period_rate",
+    "full_turn_rate_to_period",
+    "sexagesimal_deg_min",
+    "sexagesimal_deg_min_sec",
+    "sexagesimal_base_deg_min",
+    "difference",
+    "kepler_radius",
+    "rate_cancellation"
+  ],
+  "token_tuple": [
+    "body_id",
+    "record_key",
+    "field",
+    "token",
+    "quantum_num",
+    "unit",
+    "category",
+    "locator_key"
+  ],
+  "rule_tuple": [
+    "body_id",
+    "rule_key",
+    "variant",
+    "operands",
+    "output_category",
+    "output_unit",
+    "output_quantum",
+    "output_exactness",
+    "interval_method"
+  ],
+  "records": [
+    {
+      "body_id": 40,
+      "record_key": "id40_cupido",
+      "name": "Cupido",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_name",
+          "token": "Cupido",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_equinox_token",
+          "token": "J1900",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_equinox_jd",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_a_au",
+          "token": "40.99837",
+          "quantum_num": "0.00001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_e",
+          "token": "0.00460",
+          "quantum_num": "0.00001",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_i_deg",
+          "token": "1.0833",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_node_deg",
+          "token": "129.8325",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_argp_deg",
+          "token": "171.4333",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_mean_anomaly_deg",
+          "token": "163.7409",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "csv_source",
+          "token": "primary-transcription: Neely 1980 Matrix VII p.8 Table I",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "printed_rate_century",
+          "token": "137.13640",
+          "quantum_num": "0.00001",
+          "unit": "degree_per_century",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 40,
+          "record_key": "id40_cupido",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 40,
+          "rule_key": "runtime_n",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 40,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 40,
+              "key": "csv_a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "ast_structural"
+        }
+      ]
+    },
+    {
+      "body_id": 41,
+      "record_key": "id41_hades",
+      "name": "Hades",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_name",
+          "token": "Hades",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_equinox_token",
+          "token": "J1900",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_equinox_jd",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_a_au",
+          "token": "50.66744",
+          "quantum_num": "0.00001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_e",
+          "token": "0.00245",
+          "quantum_num": "0.00001",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_i_deg",
+          "token": "1.0500",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_node_deg",
+          "token": "161.3339",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_argp_deg",
+          "token": "148.1796",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_mean_anomaly_deg",
+          "token": "27.6496",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "csv_source",
+          "token": "primary-transcription: Neely 1980 Matrix VII p.8 Table I",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "printed_rate_century",
+          "token": "99.81803",
+          "quantum_num": "0.00001",
+          "unit": "degree_per_century",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 41,
+          "record_key": "id41_hades",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 41,
+          "rule_key": "runtime_n",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 41,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 41,
+              "key": "csv_a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "ast_structural"
+        }
+      ]
+    },
+    {
+      "body_id": 42,
+      "record_key": "id42_zeus",
+      "name": "Zeus",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_name",
+          "token": "Zeus",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_equinox_token",
+          "token": "J1900",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_equinox_jd",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_a_au",
+          "token": "59.21436",
+          "quantum_num": "0.00001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_e",
+          "token": "0.00120",
+          "quantum_num": "0.00001",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_i_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_node_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_argp_deg",
+          "token": "299.0440",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_mean_anomaly_deg",
+          "token": "165.1232",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "csv_source",
+          "token": "primary-transcription: Neely 1980 Matrix VII p.8 Table I",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "printed_rate_century",
+          "token": "79.00633",
+          "quantum_num": "0.00001",
+          "unit": "degree_per_century",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 42,
+          "record_key": "id42_zeus",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 42,
+          "rule_key": "runtime_n",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 42,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 42,
+              "key": "csv_a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "ast_structural"
+        }
+      ]
+    },
+    {
+      "body_id": 43,
+      "record_key": "id43_kronos",
+      "name": "Kronos",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_name",
+          "token": "Kronos",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_equinox_token",
+          "token": "J1900",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_equinox_jd",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_a_au",
+          "token": "64.81690",
+          "quantum_num": "0.00001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_e",
+          "token": "0.00305",
+          "quantum_num": "0.00001",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_i_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_node_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_argp_deg",
+          "token": "208.8801",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_mean_anomaly_deg",
+          "token": "169.0193",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "csv_source",
+          "token": "primary-transcription: Neely 1980 Matrix VII p.8 Table I",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "printed_rate_century",
+          "token": "68.98746",
+          "quantum_num": "0.00001",
+          "unit": "degree_per_century",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 43,
+          "record_key": "id43_kronos",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 43,
+          "rule_key": "runtime_n",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 43,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 43,
+              "key": "csv_a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "ast_structural"
+        }
+      ]
+    },
+    {
+      "body_id": 44,
+      "record_key": "id44_apollon",
+      "name": "Apollon",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_name",
+          "token": "Apollon",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_equinox_token",
+          "token": "J1900",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_equinox_jd",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_a_au",
+          "token": "70.29949",
+          "quantum_num": "0.00001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_e",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_i_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_node_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_argp_deg",
+          "token": "138.0533",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_mean_anomaly_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "csv_source",
+          "token": "primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "printed_rate_century",
+          "token": "61.0765",
+          "quantum_num": "0.0001",
+          "unit": "degree_per_century",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 44,
+          "record_key": "id44_apollon",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 44,
+          "rule_key": "runtime_n",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 44,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 44,
+              "key": "csv_a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "ast_structural"
+        }
+      ]
+    },
+    {
+      "body_id": 45,
+      "record_key": "id45_admetos",
+      "name": "Admetos",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_name",
+          "token": "Admetos",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_equinox_token",
+          "token": "J1900",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_equinox_jd",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_a_au",
+          "token": "73.62765",
+          "quantum_num": "0.00001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_e",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_i_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_node_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_argp_deg",
+          "token": "351.3350",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_mean_anomaly_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "csv_source",
+          "token": "primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "printed_rate_century",
+          "token": "56.98245",
+          "quantum_num": "0.00001",
+          "unit": "degree_per_century",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 45,
+          "record_key": "id45_admetos",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 45,
+          "rule_key": "runtime_n",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 45,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 45,
+              "key": "csv_a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "ast_structural"
+        }
+      ]
+    },
+    {
+      "body_id": 46,
+      "record_key": "id46_vulkanus",
+      "name": "Vulkanus",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_name",
+          "token": "Vulkanus",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_equinox_token",
+          "token": "J1900",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_equinox_jd",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_a_au",
+          "token": "77.25568",
+          "quantum_num": "0.00001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_e",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_i_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_node_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_argp_deg",
+          "token": "55.8983",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_mean_anomaly_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "csv_source",
+          "token": "primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "printed_rate_century",
+          "token": "53.015987",
+          "quantum_num": "0.000001",
+          "unit": "degree_per_century",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 46,
+          "record_key": "id46_vulkanus",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 46,
+          "rule_key": "runtime_n",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 46,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 46,
+              "key": "csv_a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "ast_structural"
+        }
+      ]
+    },
+    {
+      "body_id": 47,
+      "record_key": "id47_poseidon",
+      "name": "Poseidon",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_name",
+          "token": "Poseidon",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_equinox_token",
+          "token": "J1900",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_equinox_jd",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_a_au",
+          "token": "83.66907",
+          "quantum_num": "0.00001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_e",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_i_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_node_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_argp_deg",
+          "token": "165.5163",
+          "quantum_num": "0.0001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_mean_anomaly_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "csv_source",
+          "token": "primary-transcription: Neely 1980 Matrix VII p.8 Table I; circular phase convention",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "printed_rate_century",
+          "token": "47.03868",
+          "quantum_num": "0.00001",
+          "unit": "degree_per_century",
+          "category": "literal_transcription",
+          "locator_key": "neely_table_i"
+        },
+        {
+          "body_id": 47,
+          "record_key": "id47_poseidon",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 47,
+          "rule_key": "runtime_n",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 47,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 47,
+              "key": "csv_a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "ast_structural"
+        }
+      ]
+    },
+    {
+      "body_id": 48,
+      "record_key": "id48_transpluto",
+      "name": "Transpluto",
+      "category": "derived_source",
+      "tokens": [
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "hawkins_p79"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "a_au",
+          "token": "77.755",
+          "quantum_num": "0.001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "hawkins_p79"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "e",
+          "token": "0.3",
+          "quantum_num": "0.1",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "hawkins_p79"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "i_deg",
+          "token": "0",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "hawkins_p79"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "node_deg",
+          "token": "0",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "hawkins_p79"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "argp_deg",
+          "token": "0.0438748",
+          "quantum_num": "0.0000001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "hawkins_p79"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "mean_anomaly_deg",
+          "token": "66.806096",
+          "quantum_num": "0.000001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "hawkins_p79"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "period_years",
+          "token": "685.65",
+          "quantum_num": "0.01",
+          "unit": "julian_year",
+          "category": "literal_transcription",
+          "locator_key": "hawkins_p79"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "perihelion_year",
+          "token": "1772.76",
+          "quantum_num": "0.01",
+          "unit": "julian_year",
+          "category": "literal_transcription",
+          "locator_key": "hawkins_p79"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "anchor_year",
+          "token": "1900.0",
+          "quantum_num": 0,
+          "unit": "julian_year",
+          "category": "project_convention",
+          "locator_key": "j1900_convention"
+        },
+        {
+          "body_id": 48,
+          "record_key": "id48_transpluto",
+          "field": "julian_year_days",
+          "token": "365.25",
+          "quantum_num": 0,
+          "unit": "day",
+          "category": "project_convention",
+          "locator_key": "julian_year_convention"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 48,
+          "rule_key": "runtime_n_deg_per_day",
+          "variant": "period_years_to_rate",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 48,
+              "key": "period_years"
+            },
+            {
+              "namespace": "token",
+              "body_id": 48,
+              "key": "julian_year_days"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        },
+        {
+          "body_id": 48,
+          "rule_key": "runtime_mean_anomaly_deg",
+          "variant": "elapsed_period_to_angle",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 48,
+              "key": "anchor_year"
+            },
+            {
+              "namespace": "token",
+              "body_id": 48,
+              "key": "perihelion_year"
+            },
+            {
+              "namespace": "token",
+              "body_id": 48,
+              "key": "period_years"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        }
+      ]
+    },
+    {
+      "body_id": 49,
+      "record_key": "id49_nibiru",
+      "name": "Nibiru",
+      "category": "unsupported",
+      "tokens": [
+        {
+          "body_id": 49,
+          "record_key": "id49_nibiru",
+          "field": "status",
+          "token": "unsupported",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "unsupported",
+          "locator_key": "missing_model_inventory"
+        }
+      ],
+      "derived_rules": []
+    },
+    {
+      "body_id": 50,
+      "record_key": "id50_harrington",
+      "name": "Harrington",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_name",
+          "token": "Harrington",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_harrington"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_epoch_jd",
+          "token": "2374696.5",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "harrington_p1478"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_equinox_token",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_equinox_jd",
+          "token": "2451545.0",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "project_convention",
+          "locator_key": "harrington_j2000_frame"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_a_au",
+          "token": "101.2",
+          "quantum_num": "0.1",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "harrington_p1478"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_e",
+          "token": "0.411",
+          "quantum_num": "0.001",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "harrington_p1478"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_i_deg",
+          "token": "32.4",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "harrington_p1478"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_node_deg",
+          "token": "275.4",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "harrington_p1478"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_argp_deg",
+          "token": "208.5",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "harrington_p1478"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_mean_anomaly_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "harrington_p1478"
+        },
+        {
+          "body_id": 50,
+          "record_key": "id50_harrington",
+          "field": "csv_source",
+          "token": "primary-transcription: Harrington 1988 AJ 96 p.1478; J2000 project frame",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        }
+      ],
+      "derived_rules": []
+    },
+    {
+      "body_id": 51,
+      "record_key": "id51_leverrier",
+      "name": "Leverrier-Neptune",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_name",
+          "token": "Leverrier-Neptune",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_leverrier"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_epoch_jd",
+          "token": "2395662.5",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_cras"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_equinox_token",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_equinox_jd",
+          "token": "2395662.5",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_cras"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_a_au",
+          "token": "36.1539",
+          "quantum_num": "0.0001",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_recherches"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_e",
+          "token": "0.10761",
+          "quantum_num": "0.00001",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_recherches"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_i_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "leverrier_ecliptic_plane"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_node_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "leverrier_ecliptic_plane"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_argp_deg",
+          "token": "284.75",
+          "quantum_num": "0.01",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_cras"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_mean_anomaly_deg",
+          "token": "34.03222222222222",
+          "quantum_num": "0.00000000000001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_recherches"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "csv_source",
+          "token": "primary-transcription: Le Verrier 1846 CRAS 23 p.432 and Recherches pp.234-236",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "sexagesimal_m_deg",
+          "token": "34",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_recherches"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "sexagesimal_m_arcminute",
+          "token": "1",
+          "quantum_num": 1,
+          "unit": "arcminute",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_recherches"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "sexagesimal_m_arcsecond",
+          "token": "56",
+          "quantum_num": 1,
+          "unit": "arcsecond",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_recherches"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "sexagesimal_argp_deg",
+          "token": "284",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_cras"
+        },
+        {
+          "body_id": 51,
+          "record_key": "id51_leverrier",
+          "field": "sexagesimal_argp_arcminute",
+          "token": "45",
+          "quantum_num": 1,
+          "unit": "arcminute",
+          "category": "literal_transcription",
+          "locator_key": "leverrier_cras"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 51,
+          "rule_key": "runtime_mean_anomaly_deg",
+          "variant": "sexagesimal_deg_min_sec",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 51,
+              "key": "sexagesimal_m_deg"
+            },
+            {
+              "namespace": "token",
+              "body_id": 51,
+              "key": "sexagesimal_m_arcminute"
+            },
+            {
+              "namespace": "token",
+              "body_id": 51,
+              "key": "sexagesimal_m_arcsecond"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "exact",
+          "interval_method": "exact_rational_one_conversion"
+        }
+      ]
+    },
+    {
+      "body_id": 52,
+      "record_key": "id52_adams",
+      "name": "Adams-Neptune",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_name",
+          "token": "Adams-Neptune",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_adams"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_epoch_jd",
+          "token": "2395575.5",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_equinox_token",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_equinox_jd",
+          "token": "2395575.5",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_a_au",
+          "token": "37.25",
+          "quantum_num": "0.01",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_e",
+          "token": "0.120615",
+          "quantum_num": "0.000001",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_i_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "adams_planar_convention"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_node_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "adams_planar_convention"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_argp_deg",
+          "token": "299.18333333333334",
+          "quantum_num": "0.00000000000001",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_mean_anomaly_deg",
+          "token": "23.85",
+          "quantum_num": "0.01",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "csv_source",
+          "token": "primary-transcription: Adams 1846 sections 47-48 pp.25-26; corrected sexagesimal conversion",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "sexagesimal_mean_longitude_deg",
+          "token": "323",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "sexagesimal_mean_longitude_arcminute",
+          "token": "2",
+          "quantum_num": 1,
+          "unit": "arcminute",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "sexagesimal_perihelion_deg",
+          "token": "299",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        },
+        {
+          "body_id": 52,
+          "record_key": "id52_adams",
+          "field": "sexagesimal_perihelion_arcminute",
+          "token": "11",
+          "quantum_num": 1,
+          "unit": "arcminute",
+          "category": "literal_transcription",
+          "locator_key": "adams_sections_47_48"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 52,
+          "rule_key": "source_mean_longitude_deg",
+          "variant": "sexagesimal_deg_min",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 52,
+              "key": "sexagesimal_mean_longitude_deg"
+            },
+            {
+              "namespace": "token",
+              "body_id": 52,
+              "key": "sexagesimal_mean_longitude_arcminute"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "exact",
+          "interval_method": "exact_rational_one_conversion"
+        },
+        {
+          "body_id": 52,
+          "rule_key": "source_perihelion_deg",
+          "variant": "sexagesimal_deg_min",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 52,
+              "key": "sexagesimal_perihelion_deg"
+            },
+            {
+              "namespace": "token",
+              "body_id": 52,
+              "key": "sexagesimal_perihelion_arcminute"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "exact",
+          "interval_method": "exact_rational_one_conversion"
+        },
+        {
+          "body_id": 52,
+          "rule_key": "runtime_mean_anomaly_deg",
+          "variant": "difference",
+          "operands": [
+            {
+              "namespace": "rule",
+              "body_id": 52,
+              "key": "source_mean_longitude_deg"
+            },
+            {
+              "namespace": "rule",
+              "body_id": 52,
+              "key": "source_perihelion_deg"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "exact",
+          "interval_method": "exact_rational_one_conversion"
+        },
+        {
+          "body_id": 52,
+          "rule_key": "runtime_argp_deg",
+          "variant": "sexagesimal_deg_min",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 52,
+              "key": "sexagesimal_perihelion_deg"
+            },
+            {
+              "namespace": "token",
+              "body_id": 52,
+              "key": "sexagesimal_perihelion_arcminute"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "exact",
+          "interval_method": "exact_rational_one_conversion"
+        }
+      ]
+    },
+    {
+      "body_id": 53,
+      "record_key": "id53_lowell",
+      "name": "Lowell-Pluto",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_name",
+          "token": "Lowell-Pluto",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_lowell"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_epoch_jd",
+          "token": "2396757.5",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "project_convention",
+          "locator_key": "lowell_j1850"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_equinox_token",
+          "token": "",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "csv_schema"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_equinox_jd",
+          "token": "2396757.5",
+          "quantum_num": "0.1",
+          "unit": "jd_tt",
+          "category": "project_convention",
+          "locator_key": "lowell_j1850"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_a_au",
+          "token": "43.0",
+          "quantum_num": "0.1",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "lowell_p105"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_e",
+          "token": "0.202",
+          "quantum_num": "0.001",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "lowell_p105"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_i_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "lowell_planar_model"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_node_deg",
+          "token": "0.0",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "lowell_planar_model"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_argp_deg",
+          "token": "203.8",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "lowell_p105"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_mean_anomaly_deg",
+          "token": "178.3",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "derived_source",
+          "locator_key": "lowell_p105"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "csv_source",
+          "token": "primary-transcription: Lowell 1915 pp.5,9,105; direct J1850 element convention",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "literal_transcription",
+          "locator_key": "csv_source"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "epsilon_deg",
+          "token": "22.1",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "lowell_p105"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "varpi_deg",
+          "token": "203.8",
+          "quantum_num": "0.1",
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "lowell_p105"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "runtime_planar_inclination_deg",
+          "token": "0.0",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "lowell_planar_model"
+        },
+        {
+          "body_id": 53,
+          "record_key": "id53_lowell",
+          "field": "runtime_unoriented_node",
+          "token": "zero",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "lowell_planar_model"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 53,
+          "rule_key": "runtime_mean_anomaly_deg",
+          "variant": "difference",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 53,
+              "key": "epsilon_deg"
+            },
+            {
+              "namespace": "token",
+              "body_id": 53,
+              "key": "varpi_deg"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        }
+      ]
+    },
+    {
+      "body_id": 54,
+      "record_key": "id54_pickering",
+      "name": "Planet X Pickering",
+      "category": "literal_transcription",
+      "tokens": [
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "a_au",
+          "token": "55.1",
+          "quantum_num": "0.1",
+          "unit": "au",
+          "category": "literal_transcription",
+          "locator_key": "pickering_p59"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "e",
+          "token": "0.31",
+          "quantum_num": "0.01",
+          "unit": "dimensionless",
+          "category": "literal_transcription",
+          "locator_key": "pickering_p59"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "i_deg",
+          "token": "15",
+          "quantum_num": 5,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "pickering_p59"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "node_deg",
+          "token": "100",
+          "quantum_num": 5,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "pickering_p59"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "longitude_perihelion_deg",
+          "token": "280",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "pickering_p59"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "perihelion_year",
+          "token": "1720.0",
+          "quantum_num": 0,
+          "unit": "julian_year",
+          "category": "literal_transcription",
+          "locator_key": "pickering_p59"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "epoch_year",
+          "token": "1920.0",
+          "quantum_num": 0,
+          "unit": "julian_year",
+          "category": "project_convention",
+          "locator_key": "pickering_epoch"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "epoch_jd",
+          "token": "2349275.0",
+          "quantum_num": 0,
+          "unit": "jd_tt",
+          "category": "project_convention",
+          "locator_key": "pickering_epoch"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "equinox_jd",
+          "token": "2422325.0",
+          "quantum_num": 0,
+          "unit": "jd_tt",
+          "category": "project_convention",
+          "locator_key": "pickering_epoch"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "julian_year_days",
+          "token": "365.25",
+          "quantum_num": 0,
+          "unit": "day",
+          "category": "project_convention",
+          "locator_key": "julian_year_convention"
+        },
+        {
+          "body_id": 54,
+          "record_key": "id54_pickering",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 54,
+          "rule_key": "runtime_argp_deg",
+          "variant": "difference",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 54,
+              "key": "longitude_perihelion_deg"
+            },
+            {
+              "namespace": "token",
+              "body_id": 54,
+              "key": "node_deg"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        },
+        {
+          "body_id": 54,
+          "rule_key": "runtime_n_deg_per_day",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 54,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 54,
+              "key": "a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        }
+      ]
+    },
+    {
+      "body_id": 55,
+      "record_key": "id55_vulcan",
+      "name": "Vulcan",
+      "category": "project_convention",
+      "tokens": [
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": 0,
+          "unit": "jd_tt",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "equinox_mode",
+          "token": "JDATE",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "a_au",
+          "token": "0.13744",
+          "quantum_num": 0,
+          "unit": "au",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "e",
+          "token": "0.019",
+          "quantum_num": 0,
+          "unit": "dimensionless",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "i_deg",
+          "token": "7.5",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "M0_deg",
+          "token": "252.8987988",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "n_century",
+          "token": "707550.7341",
+          "quantum_num": 0,
+          "unit": "degree_per_century",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "omega0_deg",
+          "token": "322.212069",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "Omega0_deg",
+          "token": "47.787931",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "omega_rate",
+          "token": "1670.056",
+          "quantum_num": 0,
+          "unit": "degree_per_century",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "Omega_rate",
+          "token": "-1670.056",
+          "quantum_num": 0,
+          "unit": "degree_per_century",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "omega_plus_Omega_deg",
+          "token": "370.0",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        },
+        {
+          "body_id": 55,
+          "record_key": "id55_vulcan",
+          "field": "rate_sum_deg_per_century",
+          "token": "0.0",
+          "quantum_num": 0,
+          "unit": "degree_per_century",
+          "category": "project_convention",
+          "locator_key": "vulcan_project_convention"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 55,
+          "rule_key": "rate_cancellation",
+          "variant": "rate_cancellation",
+          "operands": [],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_century",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "structural_exact"
+        }
+      ]
+    },
+    {
+      "body_id": 56,
+      "record_key": "id56_selena",
+      "name": "White Moon",
+      "category": "project_convention",
+      "tokens": [
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "epoch_1800_jd",
+          "token": "2378496.5",
+          "quantum_num": 0,
+          "unit": "jd_tt",
+          "category": "project_convention",
+          "locator_key": "selena_date_convention"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "epoch_2000_jd",
+          "token": "2451544.5",
+          "quantum_num": 0,
+          "unit": "jd_tt",
+          "category": "project_convention",
+          "locator_key": "selena_date_convention"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "endpoint_1800_sign_base_deg",
+          "token": "30",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "endpoint_1800_degree",
+          "token": "6",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "endpoint_1800_arcminute",
+          "token": "8",
+          "quantum_num": 1,
+          "unit": "arcminute",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "endpoint_2000_sign_base_deg",
+          "token": "240",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "endpoint_2000_degree",
+          "token": "2",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "endpoint_2000_arcminute",
+          "token": "18",
+          "quantum_num": 1,
+          "unit": "arcminute",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "complete_turns",
+          "token": "28",
+          "quantum_num": 0,
+          "unit": "integer",
+          "category": "project_convention",
+          "locator_key": "selena_seven_year_rule"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "checkpoint_1879_sign_base_deg",
+          "token": "120",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "checkpoint_1879_degree",
+          "token": "27",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "checkpoint_1879_arcminute",
+          "token": "29",
+          "quantum_num": 1,
+          "unit": "arcminute",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "checkpoint_2000_dec_sign_base_deg",
+          "token": "270",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "checkpoint_2000_dec_degree",
+          "token": "19",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "checkpoint_2000_dec_arcminute",
+          "token": "28",
+          "quantum_num": 1,
+          "unit": "arcminute",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "checkpoint_2007_sign_base_deg",
+          "token": "240",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "checkpoint_2007_degree",
+          "token": "2",
+          "quantum_num": 1,
+          "unit": "degree",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "checkpoint_2007_arcminute",
+          "token": "22",
+          "quantum_num": 1,
+          "unit": "arcminute",
+          "category": "literal_transcription",
+          "locator_key": "selena_velichko_larin"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "nominal_earth_gm_m3_s2",
+          "token": "3.986004e14",
+          "quantum_num": 0,
+          "unit": "metre3_per_second2",
+          "category": "project_convention",
+          "locator_key": "iau_2015_b3"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "astronomical_unit_m",
+          "token": "149597870700",
+          "quantum_num": 0,
+          "unit": "metre",
+          "category": "project_convention",
+          "locator_key": "iau_2012_b2"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "seconds_per_day",
+          "token": "86400",
+          "quantum_num": 0,
+          "unit": "second",
+          "category": "project_convention",
+          "locator_key": "day_convention"
+        },
+        {
+          "body_id": 56,
+          "record_key": "id56_selena",
+          "field": "full_turn_deg",
+          "token": "360",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "angle_convention"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 56,
+          "rule_key": "endpoint_1800_deg",
+          "variant": "sexagesimal_base_deg_min",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "endpoint_1800_sign_base_deg"
+            },
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "endpoint_1800_degree"
+            },
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "endpoint_1800_arcminute"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        },
+        {
+          "body_id": 56,
+          "rule_key": "endpoint_2000_deg",
+          "variant": "sexagesimal_base_deg_min",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "endpoint_2000_sign_base_deg"
+            },
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "endpoint_2000_degree"
+            },
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "endpoint_2000_arcminute"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        },
+        {
+          "body_id": 56,
+          "rule_key": "elapsed_days",
+          "variant": "difference",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "epoch_2000_jd"
+            },
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "epoch_1800_jd"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "day",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        },
+        {
+          "body_id": 56,
+          "rule_key": "rate_deg_per_day",
+          "variant": "turns_endpoints_elapsed_to_rate",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "complete_turns"
+            },
+            {
+              "namespace": "rule",
+              "body_id": 56,
+              "key": "endpoint_1800_deg"
+            },
+            {
+              "namespace": "rule",
+              "body_id": 56,
+              "key": "endpoint_2000_deg"
+            },
+            {
+              "namespace": "rule",
+              "body_id": 56,
+              "key": "elapsed_days"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        },
+        {
+          "body_id": 56,
+          "rule_key": "period_days",
+          "variant": "full_turn_rate_to_period",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "full_turn_deg"
+            },
+            {
+              "namespace": "rule",
+              "body_id": 56,
+              "key": "rate_deg_per_day"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "day",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        },
+        {
+          "body_id": 56,
+          "rule_key": "radius_au",
+          "variant": "kepler_radius",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "nominal_earth_gm_m3_s2"
+            },
+            {
+              "namespace": "rule",
+              "body_id": 56,
+              "key": "period_days"
+            },
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "seconds_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 56,
+              "key": "astronomical_unit_m"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "au",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward_intersection"
+        }
+      ]
+    },
+    {
+      "body_id": 57,
+      "record_key": "id57_proserpina",
+      "name": "Proserpina",
+      "category": "project_convention",
+      "tokens": [
+        {
+          "body_id": 57,
+          "record_key": "id57_proserpina",
+          "field": "epoch_jd",
+          "token": "2415020.0",
+          "quantum_num": 0,
+          "unit": "jd_tt",
+          "category": "project_convention",
+          "locator_key": "proserpina_project_convention"
+        },
+        {
+          "body_id": 57,
+          "record_key": "id57_proserpina",
+          "field": "equinox_mode",
+          "token": "JDATE",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "proserpina_project_convention"
+        },
+        {
+          "body_id": 57,
+          "record_key": "id57_proserpina",
+          "field": "a_au",
+          "token": "79.22563",
+          "quantum_num": 0,
+          "unit": "au",
+          "category": "project_convention",
+          "locator_key": "proserpina_project_convention"
+        },
+        {
+          "body_id": 57,
+          "record_key": "id57_proserpina",
+          "field": "e",
+          "token": "0.0",
+          "quantum_num": 0,
+          "unit": "dimensionless",
+          "category": "project_convention",
+          "locator_key": "proserpina_project_convention"
+        },
+        {
+          "body_id": 57,
+          "record_key": "id57_proserpina",
+          "field": "i_deg",
+          "token": "0.0",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "proserpina_project_convention"
+        },
+        {
+          "body_id": 57,
+          "record_key": "id57_proserpina",
+          "field": "M0_deg",
+          "token": "170.73",
+          "quantum_num": 0,
+          "unit": "degree",
+          "category": "project_convention",
+          "locator_key": "proserpina_project_convention"
+        },
+        {
+          "body_id": 57,
+          "record_key": "id57_proserpina",
+          "field": "gaussian_k_deg_per_day",
+          "token": "0.9856076686",
+          "quantum_num": "0.0000000001",
+          "unit": "degree_per_day",
+          "category": "project_convention",
+          "locator_key": "gaussian_constant"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 57,
+          "rule_key": "runtime_n",
+          "variant": "gaussian_from_a",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 57,
+              "key": "gaussian_k_deg_per_day"
+            },
+            {
+              "namespace": "token",
+              "body_id": 57,
+              "key": "a_au"
+            }
+          ],
+          "output_category": "project_convention",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "structural",
+          "interval_method": "ast_structural"
+        }
+      ]
+    },
+    {
+      "body_id": 58,
+      "record_key": "id58_waldemath",
+      "name": "Waldemath",
+      "category": "project_convention",
+      "tokens": [
+        {
+          "body_id": 58,
+          "record_key": "id58_waldemath",
+          "field": "synodic_days",
+          "token": "177",
+          "quantum_num": 0,
+          "unit": "day",
+          "category": "literal_transcription",
+          "locator_key": "sepharial_1918"
+        },
+        {
+          "body_id": 58,
+          "record_key": "id58_waldemath",
+          "field": "tropical_year_days",
+          "token": "365.2422",
+          "quantum_num": "0.0001",
+          "unit": "day",
+          "category": "literal_transcription",
+          "locator_key": "sepharial_1918"
+        },
+        {
+          "body_id": 58,
+          "record_key": "id58_waldemath",
+          "field": "anchor_jd_ut",
+          "token": "2414322.5",
+          "quantum_num": 0,
+          "unit": "jd_ut",
+          "category": "project_convention",
+          "locator_key": "waldemath_anchor"
+        },
+        {
+          "body_id": 58,
+          "record_key": "id58_waldemath",
+          "field": "model",
+          "token": "longitude_only",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "waldemath_model_convention"
+        },
+        {
+          "body_id": 58,
+          "record_key": "id58_waldemath",
+          "field": "latitude_policy",
+          "token": "zero",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "waldemath_model_convention"
+        },
+        {
+          "body_id": 58,
+          "record_key": "id58_waldemath",
+          "field": "distance_policy",
+          "token": "finite_positive_in_range_only",
+          "quantum_num": 0,
+          "unit": "text",
+          "category": "project_convention",
+          "locator_key": "waldemath_model_convention"
+        }
+      ],
+      "derived_rules": [
+        {
+          "body_id": 58,
+          "rule_key": "runtime_rate_deg_per_day",
+          "variant": "two_period_rate",
+          "operands": [
+            {
+              "namespace": "token",
+              "body_id": 58,
+              "key": "synodic_days"
+            },
+            {
+              "namespace": "token",
+              "body_id": 58,
+              "key": "tropical_year_days"
+            }
+          ],
+          "output_category": "derived_source",
+          "output_unit": "degree_per_day",
+          "output_quantum": null,
+          "output_exactness": "interval",
+          "interval_method": "arb_outward"
+        }
+      ]
+    }
+  ],
+  "counts": {
+    "records": 19,
+    "tokens": 232,
+    "derived_rules": 27
+  },
+  "allowed_categories": [
+    "literal_transcription",
+    "derived_source",
+    "project_convention",
+    "unsupported"
+  ],
+  "allowed_operations": [
+    "difference",
+    "elapsed_period_to_angle",
+    "full_turn_rate_to_period",
+    "gaussian_from_a",
+    "kepler_radius",
+    "period_years_to_rate",
+    "rate_cancellation",
+    "sexagesimal_base_deg_min",
+    "sexagesimal_deg_min",
+    "sexagesimal_deg_min_sec",
+    "turns_endpoints_elapsed_to_rate",
+    "two_period_rate"
+  ],
+  "canonical_serialization": {
+    "magic_utf8": "G06SR2\n",
+    "integer_encoding": "big-endian signed 64-bit for body_id; big-endian unsigned 32-bit for counts and UTF-8 byte lengths",
+    "record_order": "ascending (body_id, record_key)",
+    "token_order": "ascending field",
+    "rule_order": "ascending (rule_key, variant)",
+    "record_fields": [
+      "body_id",
+      "record_key",
+      "name",
+      "category",
+      "tokens",
+      "derived_rules"
+    ],
+    "token_fields": [
+      "body_id",
+      "record_key",
+      "field",
+      "token",
+      "quantum_num",
+      "unit",
+      "category",
+      "locator_key"
+    ],
+    "operand_ref_fields": [
+      "namespace",
+      "body_id",
+      "key"
+    ],
+    "rule_fields": [
+      "body_id",
+      "rule_key",
+      "variant",
+      "operands",
+      "output_category",
+      "output_unit",
+      "output_quantum",
+      "output_exactness",
+      "interval_method"
+    ],
+    "quantum_encoding": "N:<base-10 integer> for integer, D:<original Decimal string> for string, Z: for null; no float encodings",
+    "bytes": "magic, record_count, then each record body_id, LP record_key/name/category, token_count, each token LP record_key/field/token/tagged quantum/unit/category/locator_key, rule_count, each rule body_id, LP rule_key/variant, operand_count and each operand LP namespace, I64 body_id, LP key, then LP output_category/output_unit/tagged output_quantum/output_exactness/interval_method",
+    "byte_count": 32715,
+    "sha256": "cd8177155f5fa2ec0755c31b46f9aba755fadafa628c89094ac3c8bf283cd46e"
+  }
+}
