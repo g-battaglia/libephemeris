@@ -161,14 +161,14 @@ def test_unknown_variant_and_operand_namespace_fail(gate, tmp_path):
 
     data = _data()
     data["records"][0]["derived_rules"][0]["operands"][0]["namespace"] = "runtime"  # type: ignore[index]
-    with pytest.raises(gate.GateError, match="namespace|digest"):
+    with pytest.raises(gate.GateError, match="namespace|operand|digest"):
         gate.load_source_records(_write_mutation(tmp_path, data))
 
 
 def test_wrong_arity_unit_category_and_cycle_fail(gate, tmp_path):
     data = _data()
     data["records"][56 - 40]["derived_rules"][3]["operands"].pop()  # type: ignore[index]
-    with pytest.raises(gate.GateError, match="arity|digest"):
+    with pytest.raises(gate.GateError, match="arity|quantum|digest"):
         gate.load_source_records(_write_mutation(tmp_path, data))
 
     data = _data()
@@ -183,7 +183,7 @@ def test_wrong_arity_unit_category_and_cycle_fail(gate, tmp_path):
         "body_id": 52,
         "key": "runtime_mean_anomaly_deg",
     }
-    with pytest.raises(gate.GateError, match="cycle|namespace|digest"):
+    with pytest.raises(gate.GateError, match="cycle|namespace|operand|quantum|digest"):
         gate.load_source_records(_write_mutation(tmp_path, data))
 
 

@@ -57,6 +57,7 @@ def _mutations(data: dict[str, object]):
         "key": "not-a-reference",
         "quantum": "0.1",
     }
+    genuine = 0
     for record in data["records"]:  # type: ignore[union-attr]
         for rule in record["derived_rules"]:
             body_id = record["body_id"]
@@ -75,6 +76,8 @@ def _mutations(data: dict[str, object]):
                     else "difference",
                 ),
             ):
+                if rule[field] == value:
+                    continue
                 mutated = copy.deepcopy(data)
                 _rule(mutated, body_id, key)[field] = value
                 yield f"rule:{body_id}:{key}:{field}", mutated
@@ -98,6 +101,8 @@ def _mutations(data: dict[str, object]):
                         ("category", "unsupported"),
                         ("quantum_num", "0.1"),
                     ):
+                        if token[field] == value:
+                            continue
                         mutated = copy.deepcopy(data)
                         token2 = next(
                             token
@@ -115,6 +120,8 @@ def _mutations(data: dict[str, object]):
                         ("output_quantum", "0.1"),
                         ("interval_method", "structural_exact"),
                     ):
+                        if child[field] == value:
+                            continue
                         mutated = copy.deepcopy(data)
                         child2 = _rule(mutated, body_id, operand["key"])
                         child2[field] = value
@@ -123,7 +130,7 @@ def _mutations(data: dict[str, object]):
 
 def test_every_rule_and_operand_mutation_fails_before_eval(gate, monkeypatch):
     mutations = list(_mutations(_data()))
-    assert len(mutations) > 83
+    assert len(mutations) == 522
     accepted_invalid: list[str] = []
     evaluated: list[object] = []
 
@@ -145,7 +152,7 @@ def test_every_rule_and_operand_mutation_fails_before_eval(gate, monkeypatch):
             path.unlink(missing_ok=True)
     assert not evaluated
     assert accepted_invalid == []
-    assert len(mutations) > 83
+    assert len(mutations) == 522
 
 
 def test_structural_child_interval_rejected_before_eval(gate, monkeypatch, tmp_path):
@@ -165,7 +172,7 @@ def test_no_zip_truncation_in_operand_contract(gate, tmp_path):
     _rule(data, 56, "rate_deg_per_day")["operands"].pop()
     path = tmp_path / "truncated.json"
     path.write_text(json.dumps(data) + "\n", encoding="utf-8")
-    with pytest.raises(gate.GateError, match="arity"):
+    with pytest.raises(gate.GateError, match="arity|quantum"):
         gate.load_source_records(path)
 
 

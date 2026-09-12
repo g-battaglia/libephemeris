@@ -838,6 +838,37 @@ def canonical_serialize(records: Iterable[SourceRecord]) -> bytes:
     return bytes(output)
 
 
+_RULE_QUANTA = {
+    (40, "runtime_n"): (("0.0000000001", "0.00001"), None),
+    (41, "runtime_n"): (("0.0000000001", "0.00001"), None),
+    (42, "runtime_n"): (("0.0000000001", "0.00001"), None),
+    (43, "runtime_n"): (("0.0000000001", "0.00001"), None),
+    (44, "runtime_n"): (("0.0000000001", "0.00001"), None),
+    (45, "runtime_n"): (("0.0000000001", "0.00001"), None),
+    (46, "runtime_n"): (("0.0000000001", "0.00001"), None),
+    (47, "runtime_n"): (("0.0000000001", "0.00001"), None),
+    (48, "runtime_n_deg_per_day"): (("0.01", 0), None),
+    (48, "runtime_mean_anomaly_deg"): ((0, "0.01", "0.01"), None),
+    (51, "runtime_mean_anomaly_deg"): ((1, 1, 1), None),
+    (52, "source_mean_longitude_deg"): ((1, 1), None),
+    (52, "source_perihelion_deg"): ((1, 1), None),
+    (52, "runtime_mean_anomaly_deg"): ((None, None), None),
+    (52, "runtime_argp_deg"): ((1, 1), None),
+    (53, "runtime_mean_anomaly_deg"): (("0.1", "0.1"), None),
+    (54, "runtime_argp_deg"): ((1, 5), None),
+    (54, "runtime_n_deg_per_day"): (("0.0000000001", "0.1"), None),
+    (55, "rate_cancellation"): ((), None),
+    (56, "endpoint_1800_deg"): ((0, 1, 1), None),
+    (56, "endpoint_2000_deg"): ((0, 1, 1), None),
+    (56, "elapsed_days"): ((0, 0), None),
+    (56, "rate_deg_per_day"): ((0, None, None, None), None),
+    (56, "period_days"): ((0, None), None),
+    (56, "radius_au"): ((0, None, 0, 0), None),
+    (57, "runtime_n"): (("0.0000000001", 0), None),
+    (58, "runtime_rate_deg_per_day"): ((0, "0.0001"), None),
+}
+
+
 def _validate_rule_metadata(
     rule: DerivedRule,
     token_value: Any,
@@ -920,6 +951,20 @@ def _validate_rule_metadata(
                 f"exact difference has interval operand in {rule.rule_key}",
             )
         return
+    expected_quanta = _RULE_QUANTA[(rule.body_id, rule.rule_key)]
+    actual_quanta = tuple(
+        token_value(operand).quantum_num
+        if operand.namespace == "token"
+        else rule_value(operand).output_quantum
+        for operand in rule.operands
+    )
+    _require(
+        actual_quanta == expected_quanta[0], f"{rule.rule_key} operand quantum drift"
+    )
+    _require(
+        rule.output_quantum == expected_quanta[1],
+        f"{rule.rule_key} output quantum drift",
+    )
     expected_operands, output = _VARIANT_METADATA[rule.variant]
     _require(
         len(rule.operands) == len(expected_operands),
