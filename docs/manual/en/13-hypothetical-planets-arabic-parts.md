@@ -29,7 +29,7 @@ The eight Uranian planets are:
 
 IDs 40–47 calculate from a fresh transcription of James Neely's “Orbital
 Elements for the Transneptunian Planets,” *Matrix Magazine* VII (1980),
-Table I, p. 10. The source defines its time variable as Julian centuries from
+Table I, p. 8. The source defines its time variable as Julian centuries from
 JD 2415020.0; LibEphemeris documents the literal elements, frame choice, and
 two-body propagation in the
 [provenance record](../../methodology/hypothetical-bodies.md).
@@ -38,11 +38,12 @@ two-body propagation in the
 
 ## 13.2 Built-in hypothetical bodies
 
-Thirteen IDs compute from built-in, page-level source reconstructions:
-**Cupido–Poseidon** (40–47), **Harrington** (50), **Le Verrier** (51),
-**Adams** (52), **Lowell** (53), and **White Moon / Selena** (56). IDs 48, 49,
-54, 55, 57, and 58 remain named for compatibility but raise
-`UnknownBodyError`; the exact missing fields are listed in
+Eighteen IDs compute from documented built-in models: **Cupido–Poseidon**
+(40–47), **Transpluto / Isis** (48), **Harrington** (50), **Le Verrier** (51),
+**Adams** (52), **Lowell** (53), **Pickering** (54), **Vulcan** (55), **White
+Moon / Selena** (56), **Proserpina** (57), and **Waldemath** (58). Vulcan and
+Proserpina are explicit project conventions. Only Nibiru (49) raises
+`UnknownBodyError`; its missing fields are listed in
 [the missing-models inventory](../../methodology/missing-hypothetical-models.md).
 
 ```python
@@ -201,17 +202,17 @@ In this chapter we explored non-physical celestial bodies used in various astrol
 **Key concepts:**
 
 - The **Uranian planets** are eight mathematical points (Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon) with hypothetical orbits, used in the Hamburg School and in the midpoints technique
-- IDs 40–47, 50–53, and 56 have independently reconstructed, cited models;
-  the six unrecovered IDs fail closed while retaining names and constants
-- Every supported historical model has a page-level derivation and a pinned
-  provenance test
+- IDs 40–48 and 50–58 have documented runtime models; Vulcan and Proserpina
+  are explicit project conventions, while only Nibiru (49) fails closed
+- Every supported historical model has an explicit source or project-convention
+  record and a pinned provenance test
 - **Custom fictitious orbits** allow you to define any hypothetical body with its own orbital elements
 - The **Arabic parts** are points calculated by the formula ASC + Planet A − Planet B, with the Part of Fortune being the most important
 
 **Functions introduced:**
 
 - `calc_hypothetical_position(body_id, jd_tt)` — calculate any supported
-  hypothetical body (IDs 40–47, 50–53, and 56)
+  hypothetical body (IDs 40–48 and 50–58)
 - `load_bundled_fictitious_orbits()` — loads predefined fictitious orbits
 - `parse_orbital_elements(filepath)` — loads fictitious orbits from a custom file
 - `get_orbital_body_by_name(elements, name)` — searches for a body by name in the list of orbits

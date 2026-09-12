@@ -762,9 +762,9 @@ Earth-relative analytical quantities).
 Fictitious bodies (IDs 40–58) are never sourced from a persisted LEB channel.
 `fast_calc_ut` raises the typed `FictitiousRuntimeDispatch` signal (a
 `KeyError` subclass) so `calc`/`calc_ut` continue to the runtime analytical
-models in `libephemeris.hypothetical`: the Hamburg bodies at IDs 40–47 and
-IDs 50–53 and 56 use their reviewed source-backed models, while IDs 48, 49,
-54, 55, 57, and 58 fail closed. The sealed-mode fallback logger records this
+models in `libephemeris.hypothetical`: eighteen IDs use their documented
+source-backed or project-convention models, while only Nibiru (49) fails
+closed. The sealed-mode fallback logger records this
 by-design dispatch at DEBUG, not as a degradation warning.
 
 The heliocentric Pipeline C and the `uranians` LEB2 companion that fed it
@@ -1501,7 +1501,7 @@ These are never stored as LEB Chebyshev data:
 
 | Category | Bodies | IDs | Count | How computed |
 |----------|--------|-----|-------|--------------|
-| Historical hypothetical | 13 source-backed models; 6 names-only IDs | 40–58 | 19 IDs | IDs 40–47, 50–53, and 56 use reviewed runtime models; IDs 48, 49, 54, 55, 57, and 58 raise `UnknownBodyError` |
+| Historical hypothetical | 18 runtime models; 1 names-only ID | 40–58 | 19 IDs | IDs 40–48 and 50–58 use documented source-backed or project-convention models; Nibiru (49) raises `UnknownBodyError` |
 | Fixed stars | full star catalog (Regulus, Spica, Aldebaran, …) | FIXSTAR_OFFSET + n | 1447 | `fixed_stars.py` (see §9.4) |
 | Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | MOON_OFFSET + n | 21 | SPK via `planetary_moons.py`; unavailable in sealed `leb` mode |
 | Astrological angles | Ascendant, MC, Descendant, IC, Vertex, Antivertex | 9000–9005 | 6 | `angles.py` (house-based) |
@@ -1513,11 +1513,11 @@ in `auto`/`skyfield` mode. They fail explicitly in sealed `leb` mode because
 there is neither a LEB coefficient stream nor a reviewed local model.
 
 IDs 40–47 always use their primary-source runtime models (the pre-3.1.0
-`uranians` LEB2 companion is retired). IDs 50–53 and 56 use local
-primary-source models; the six IDs without independently reviewed complete
-definitions fail closed.
+`uranians` LEB2 companion is retired). IDs 48 and 50–58 likewise use local
+documented models; Vulcan (55) and Proserpina (57) are explicit project
+conventions. Only Nibiru (49) fails closed.
 
-**Total bodies NOT in LEB Chebyshev data:** ~1490 (11 hypothetical + 1447
+**Total bodies NOT in LEB Chebyshev data:** ~1498 (19 hypothetical + 1447
 stars + 21 moons + 10 angles/parts + 1 nutation).
 
 **Why the core/exotics split:** the frequently used compressed LEB2 `core`

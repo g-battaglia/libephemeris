@@ -24,12 +24,12 @@ Previously, `calc(jd, SUN, FLG_HELCTR)` returned ~126° longitude
 
 ### Historical hypothetical-body availability (v3 provenance boundary)
 
-IDs 40–47, 50–53, and 56 have reviewed primary-source numerical models. IDs
-48, 49, 54, 55, 57, and 58 remain recognised for API compatibility but raise
-`UnknownBodyError` because a source-complete transcription could not be
-established. This is a deliberate provenance boundary rather than an
-accidental failure. See
-[Hypothetical bodies](../methodology/hypothetical-bodies.md) and the exact
+IDs 40–48, 50–58 have documented runtime models. Vulcan (55) and Proserpina
+(57) are explicit project conventions; the remaining modeled IDs use the
+sources and constructions listed in
+[Hypothetical bodies](../methodology/hypothetical-bodies.md). Only Nibiru (49)
+raises `UnknownBodyError` because no source-complete model has been established;
+see the exact
 [missing-models field inventory](../methodology/missing-hypothetical-models.md).
 
 ## Horizons Backend Limitations

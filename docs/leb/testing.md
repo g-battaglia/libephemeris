@@ -341,9 +341,8 @@ external-comparison measurements.
 ### Hypothetical bodies
 
 LEB channels for IDs 40–58 are always bypassed (legacy files may still carry
-them). IDs 40–47, 50–53, and 56 are always computed from their reviewed local
-runtime models; IDs 48, 49, 54, 55, 57, and 58 remain unavailable and raise
-`UnknownBodyError`.
+them). Eighteen IDs are computed from their documented local runtime models;
+only Nibiru (49) remains unavailable and raises `UnknownBodyError`.
 
 ---
 

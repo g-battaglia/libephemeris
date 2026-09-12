@@ -8,6 +8,34 @@ documented models or from public API behavior. Quantitative accuracy claims are
 established against JPL, IAU/ERFA, primary literature, and internal
 cross-backend checks.
 
+## Registered level-2 changes
+
+The current validation register contains 33 level-2 entries. Each points to one
+of the technical sections below; multiple entries can share a section when they
+cover different APIs or output components of the same scientific change.
+
+| Registered task | Entries | Technical record |
+|---|---:|---|
+| S-E | 1 | [AU conversion factors](#au-conversion-factors) |
+| S-L | 1 | [Vondrák precession through ERFA](#vondrak-erfa) |
+| C-R01 | 5 | [Horizon dip](#horizon-dip) |
+| C-H04 | 3 | [Krusinski equator](#krusinski-equator), [Krusinski poles](#krusinski-poles) |
+| C-H02 | 2 | [Topocentric exact root](#topocentric-root) |
+| C-R03 | 2 | [Heliacal visibility window](#heliacal-window) |
+| C-H01 | 2 | [Regiomontanus poles](#regiomontanus-poles) |
+| C-E02 | 3 | [Shadow ground point](#shadow-ground-point) |
+| S-I | 2 | [Body radii](#body-radii) |
+| C-H05 | 2 | [APC equator](#apc-equator), [APC narrow pencil](#apc-narrow-pencil) |
+| C-H07 | 1 | [Midheaven at 90-degree obliquity](#midheaven-obliquity-90) |
+| C-P02 | 4 | [Planetary magnitude models](#planetary-magnitude-models) |
+| C-P03 | 2 | [Phenomena state geometry](#phenomena-state-geometry) |
+| C-H08 | 1 | [Sunshine numerical geometry](#sunshine-numeric-geometry) |
+| split-light-time acceptance | 2 | [Split light-time evaluation](#split-light-time) |
+
+The machine-readable register remains authoritative for exact functions,
+components, bounds, and verification records. Tickets without an active level-2
+entry are not added to this table in anticipation of future acceptance.
+
 ## Why numerical differences occur
 
 ### Ephemeris states
@@ -252,6 +280,22 @@ observed without reconstructing hidden numerical constants.
 Cusp and angle speeds are numerical derivatives of the independently computed
 geometry. Discontinuities at wraps and branch boundaries are handled as
 coordinate discontinuities, not fitted toward external output.
+
+#### Midheaven at 90-degree obliquity {#midheaven-obliquity-90}
+
+At an obliquity of exactly 90 degrees, the ecliptic passes through both
+celestial poles and a general meridian has no unique ecliptic Midheaven. The
+ordinary two-component ARMC-to-ecliptic relation therefore reaches a genuine
+projective degeneracy rather than an astronomical longitude that can be
+selected continuously.
+
+The recorded ARMC grid contains 2,784 such cells. The geometric continuation
+changes 619 of them, with a maximum positional displacement of 1,080,000
+arcseconds (half a turn). In `houses_armc_ex2`, a centered difference across
+that discontinuity can reach about 2.6 million degrees per day; neither value
+is a physical angular velocity at the jump. The corresponding level-2 entry is
+restricted to the direct ARMC APIs and to the exact obliquity argument
+`eps = 90.0`, so it cannot reach a physical-obliquity chart.
 
 #### Sunshine numerical geometry {#sunshine-numeric-geometry}
 
@@ -941,11 +985,11 @@ implementation are the visible consequence of that independence.
 
 ### Hypothetical bodies
 
-IDs 40–48 and 50–55, 57–58 calculate from independently transcribed
-primary-source models: Neely, Harrington, Le Verrier, Adams, Lowell,
-Pickering, and the historical Vulcan, Isis, Proserpina, and Waldemath
-literature. ID 56 (Selena/White
-Moon) uses Velichko and Larin's published seven-year uniform zodiac cycle,
+IDs 40–54 and 58 calculate from documented historical models based on Neely,
+Hawkins, Harrington, Le Verrier, Adams, Lowell, Pickering, and Waldemath
+sources. Vulcan (55) and Proserpina (57) use explicit project conventions.
+ID 56 (Selena/White Moon) uses Velichko and Larin's published seven-year
+uniform zodiac cycle,
 unwrapped over their published January 1800–January 2000 endpoints and checked
 against three unused rows through 2007; its compatibility-only radius is
 derived from published IAU nominal constants. ID 49 (Nibiru)

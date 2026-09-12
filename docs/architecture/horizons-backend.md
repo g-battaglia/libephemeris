@@ -65,15 +65,14 @@ swe.set_calc_mode("horizons")
 | Standard planets | Sun, Moon, Mercury-Pluto, Earth | Horizons VECTORS API |
 | Asteroids | Chiron, Ceres, Pallas, Juno, Vesta | Horizons small-body syntax |
 | Mean Node / Mean Apogee | MEAN_NODE (10), MEAN_APOG (12) | ERFA/IERS fundamental arguments (no HTTP) |
-| Reviewed hypothetical bodies | IDs 40–47, 50–53, and 56 | Cited local runtime models (no HTTP) |
+| Historical hypothetical bodies | IDs 40–48 and 50–58 | Documented local runtime models (no HTTP); 55 and 57 are project conventions |
 
 ### Not Supported (fallback to Skyfield)
 
 - **True Node, Osculating Apogee, Interpolated Apogee/Perigee** (11, 13, 21, 22) — require Moon state vectors
 - **Fixed stars** — no Horizons equivalent
 - **Planetary moons** — require satellite-specific SPK
-- **Unverified historical hypothetical IDs** — IDs 48, 49, 54, 55, 57, and 58 are
-  recognised but raise `UnknownBodyError`; they do not fall through to HTTP
+- **Nibiru (49)** — recognised but raises `UnknownBodyError`; it does not fall through to HTTP
 - **FLG_TOPOCTR** — requires Earth orientation parameters
 - **Hypothetical center conversions** — non-native heliocentric/geocentric or
   barycentric requests fall through to Skyfield for the Earth/Sun vector

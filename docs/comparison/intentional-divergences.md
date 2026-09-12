@@ -8,6 +8,34 @@ channel, or would conflict with an independently sourced scientific model.
 This page records the semantic choices and the independent rationale behind
 each retained divergence.
 
+## Registered level-2 decision index
+
+The validation register currently contains 33 level-2 entries grouped into 15
+reviewed decisions. The table links each decision to its quantitative record in
+[Known differences](known-differences.md); the register remains authoritative
+for exact functions, components, and bounds.
+
+| Decision | Registered envelope | Quantitative record |
+|---|---|---|
+| AU conversion definitions (S-E) | relative `1e-13` | [AU conversion factors](known-differences.md#au-conversion-factors) |
+| Long-term degenerate solar frame (S-L) | `1e-5″`, relative `1e-6` | [Vondrák through ERFA](known-differences.md#vondrak-erfa) |
+| Horizon dip (C-R01) | ordinary `11″` / `5.1e-5°`; degenerate `91,707″` | [Horizon dip](known-differences.md#horizon-dip) |
+| Krusinski positions (C-H04) | relative `3e-5`, `5e-12`, and polar `3` | [Equator](known-differences.md#krusinski-equator), [poles](known-differences.md#krusinski-poles) |
+| Topocentric exact roots (C-H02) | relative `2e-6`; polar `1e-4` | [Topocentric root](known-differences.md#topocentric-root) |
+| Heliacal visibility window (C-R03) | relative `8.7e-12`, absolute `2.1e-5` / `0.106` day | [Heliacal window](known-differences.md#heliacal-window) |
+| Regiomontanus poles (C-H01) | relative `2e-9`; equinoctial `0.6` | [Regiomontanus poles](known-differences.md#regiomontanus-poles) |
+| Eclipse shadow ground geometry (C-E02) | main: `9,500″`, relative `0.013`, absolute `0.002` day; apex: `9,500″`, relative `2`, absolute `91 km`; terminator: `103,000″`, relative `0.013`, absolute `0.002` day | [Shadow ground point](known-differences.md#shadow-ground-point) |
+| Published body radii (S-I) | `0.9″`, `0.2″`, absolute `0.035` | [Body radii](known-differences.md#body-radii) |
+| APC limiting positions (C-H05) | relative `2e-8` / `1e-9` | [Equator](known-differences.md#apc-equator), [narrow pencil](known-differences.md#apc-narrow-pencil) |
+| Midheaven at 90-degree obliquity (C-H07) | `1.3e6″` | [Projective degeneracy](known-differences.md#midheaven-obliquity-90) |
+| Planetary magnitudes (C-P02) | absolute `0.1`, `0.07`, `0.02` magnitude | [Magnitude models](known-differences.md#planetary-magnitude-models) |
+| Phenomena state geometry (C-P03) | angular `0.001″`, relative `1e-8`; photometry absolute `0.001` magnitude | [State geometry](known-differences.md#phenomena-state-geometry) |
+| Sunshine geometry (C-H08) | `1e-6″` | [Sunshine geometry](known-differences.md#sunshine-numeric-geometry) |
+| Split light-time evaluation | `0.001″`; Sunshine `1e-6″` | [Split light time](known-differences.md#split-light-time) |
+
+Tickets without an active level-2 entry are not listed in anticipation of a
+future acceptance decision.
+
 ## `SIDEREAL | J2000` is honored uniformly for lunar points
 
 `FLG_J2000` combined with `FLG_SIDEREAL` is applied to **every** lunar point

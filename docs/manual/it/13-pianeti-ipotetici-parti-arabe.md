@@ -28,7 +28,7 @@ Gli otto pianeti uraniani sono:
 
 Gli ID 40–47 vengono calcolati da una nuova trascrizione di “Orbital Elements
 for the Transneptunian Planets” di James Neely, *Matrix Magazine* VII (1980),
-Tabella I, p. 10. La fonte definisce il tempo in secoli giuliani da
+Tabella I, p. 8. La fonte definisce il tempo in secoli giuliani da
 JD 2415020.0; elementi letterali, scelta del frame e propagazione a due corpi
 sono descritti nel
 [registro di provenienza](../../methodology/hypothetical-bodies.md).
@@ -37,11 +37,12 @@ sono descritti nel
 
 ## 13.2 Corpi ipotetici integrati
 
-Tredici ID vengono calcolati da ricostruzioni documentali verificate pagina per
-pagina: **Cupido–Poseidon** (40–47), **Harrington** (50), **Le Verrier** (51),
-**Adams** (52), **Lowell** (53) e **Luna Bianca / Selena** (56). Gli ID 48,
-49, 54, 55, 57 e 58 restano nominati per compatibilità ma sollevano
-`UnknownBodyError`; tutti i campi mancanti sono elencati
+Diciotto ID vengono calcolati da modelli integrati documentati:
+**Cupido–Poseidon** (40–47), **Transpluto / Isis** (48), **Harrington** (50),
+**Le Verrier** (51), **Adams** (52), **Lowell** (53), **Pickering** (54),
+**Vulcan** (55), **Luna Bianca / Selena** (56), **Proserpina** (57) e
+**Waldemath** (58). Vulcan e Proserpina sono convenzioni esplicite del progetto.
+Solo Nibiru (49) solleva `UnknownBodyError`; i suoi campi mancanti sono elencati
 [nell'inventario dei modelli mancanti](../../methodology/missing-hypothetical-models.md).
 
 ```python
@@ -202,18 +203,18 @@ In questo capitolo abbiamo esplorato i corpi celesti non fisici usati in diverse
 **Concetti chiave:**
 
 - I **pianeti uraniani** sono otto punti matematici (Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus, Poseidon) con orbite ipotetiche, usati nella Scuola di Amburgo e nella tecnica dei punti medi
-- Gli ID 40–47, 50–53 e 56 hanno modelli ricostruiti indipendentemente e
-  documentati; i sei ID non recuperati falliscono in modo esplicito
-  conservando nomi e costanti
-- Ogni modello storico supportato ha una derivazione pagina per pagina e un
-  test di provenienza vincolante
+- Gli ID 40–48 e 50–58 hanno modelli runtime documentati; Vulcan e Proserpina
+  sono convenzioni esplicite del progetto, mentre solo Nibiru (49) fallisce in
+  modo esplicito
+- Ogni modello storico supportato ha un record sorgente o di convenzione del
+  progetto e un test di provenienza vincolante
 - Le **orbite fittizie personalizzate** permettono di definire qualsiasi corpo ipotetico con i propri elementi orbitali
 - Le **parti arabe** sono punti calcolati dalla formula ASC + Pianeta A − Pianeta B, con la Parte di Fortuna come la più importante
 
 **Funzioni introdotte:**
 
 - `calc_hypothetical_position(body_id, jd_tt)` — calcola un corpo ipotetico
-  supportato (ID 40–47, 50–53 e 56)
+  supportato (ID 40–48 e 50–58)
 - `load_bundled_fictitious_orbits()` — carica le orbite fittizie predefinite
 - `parse_orbital_elements(filepath)` — carica orbite fittizie da un file personalizzato
 - `get_orbital_body_by_name(elements, nome)` — cerca un corpo per nome nella lista di orbite

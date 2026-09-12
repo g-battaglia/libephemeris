@@ -1,13 +1,14 @@
 # Hypothetical bodies
 
 LibEphemeris recognises all historical compatibility IDs 40–58. Eighteen IDs
-have independently reconstructed numerical models: the eight Hamburg-school
-points (40–47), Transpluto/Isis (48), Harrington (50), Le Verrier (51),
-Adams (52), Lowell (53), Pickering (54), Vulcan (55), the symbolic White
-Moon / Selena convention (56), Proserpina (57), and the Waldemath /
-Sepharial Dark Moon (58). Only Nibiru (49) retains its name and constants
-while deliberately raising `UnknownBodyError`; its missing evidence is
-inventoried in [the missing-models inventory](missing-hypothetical-models.md).
+have documented numerical models: page-level transcriptions, derived historical
+models, and explicitly labelled project conventions. They comprise the eight
+Hamburg-school points (40–47), Transpluto/Isis (48), Harrington (50), Le Verrier
+(51), Adams (52), Lowell (53), Pickering (54), Vulcan (55), the symbolic White
+Moon / Selena convention (56), Proserpina (57), and the Waldemath / Sepharial
+Dark Moon (58). Only Nibiru (49) retains its name and constants while
+raising `UnknownBodyError`; its missing evidence is inventoried in
+[the missing-models inventory](missing-hypothetical-models.md).
 
 These are historical mathematical, predictive, or astrological conventions.
 Their inclusion does not assert that the proposed objects physically exist.
@@ -24,10 +25,10 @@ Their inclusion does not assert that the proposed objects physically exist.
 | 52 | Adams | Supported; Adams (1846), sections 47–48, printed pp. 25–26. |
 | 53 | Lowell | Supported; Lowell (1915), pp. 5, 9, and 105. |
 | 54 | Pickering | Supported; Pickering (1919), *Annals of Harvard College Observatory* 82, No. 3, p. 59. |
-| 55 | Vulcan | Supported; J1900 linear element convention — compatibility values, primary source not verified. |
+| 55 | Vulcan | Supported as a LibEphemeris project convention; J1900 linear element and rate contract. |
 | 56 | White Moon / Selena | Supported; Velichko and Larin (2007), pp. 17, 18, 20, 29, and 45, plus explicit LibEphemeris time/radius conventions derived from IAU standards. |
-| 57 | Proserpina | Supported; circular trans-Plutonian convention — compatibility values, primary source not verified. |
-| 58 | Waldemath | Supported; Sepharial, *The Science of Foreknowledge* (1918), ch. "The New Satellite — Lilith"; Waltemath 1898 via *Science* 8/189, p. 185 and Ashbrook, *Sky & Telescope* 28 (1964), p. 218. |
+| 57 | Proserpina | Supported as a LibEphemeris project convention; circular trans-Plutonian model. |
+| 58 | Waldemath | Supported as a project realization of the documented Sepharial/Waltemath uniform-motion tradition; sources and project conventions are separated in the verifier record. |
 
 `HYPOTHETICAL_PROVENANCE` exposes the same boundary in machine-readable
 form: every supported ID carries its source annotation, and Nibiru is the
@@ -115,9 +116,11 @@ Ruler of Taurus?* (Hawkins Enterprising Publications, Dallas, 1976; 2nd ed.
 Landscheidt (1972) lineage: epoch and equinox J1900, `a = 77.755 AU`,
 `e = 0.3`, `i = 0`, `Omega = 0`, longitude of perihelion `0.0438748 deg`,
 `M0 = 66.806096 deg`, and a 685.65-Julian-year period (mean motion
-`360/(685.65*365.25)` deg/day). The printed phase is self-consistent with the
-printed 1772.76 perihelion epoch:
-`(1900 - 1772.76) * 360 / 685.65 ≈ 66.8 deg`. The planar orbit is propagated
+`360/(685.65*365.25)` deg/day). The runtime retains the printed phase and derives
+mean motion from the printed period. Direct arithmetic from the separately
+rounded period and perihelion year differs from the printed phase by about
+0.0012 degrees, so these source fields are not presented as an exact
+self-consistency identity. The planar orbit is propagated
 on its stated J1900 ecliptic and the longitude is precessed to J2000; the
 output stays on the ecliptic (zero latitude), as the source's zero
 inclination requires.
@@ -142,9 +145,10 @@ the J1900 epoch: `a = 0.13744 AU`, `e = 0.019`, `i = 7.5 deg`,
 `M = 252.8987988 + 707550.7341 T`, `omega = 322.212069 + 1670.056 T`,
 `Omega = 47.787931 - 1670.056 T`, equinox of date, `T` in Julian centuries
 TT from JD 2415020. The equal and opposite perihelion and node rates keep
-the longitude of perihelion `omega + Omega` fixed at 10 degrees. These
-numbers are compatibility values: the primary source is not verified, and no
-derivation from a published table is claimed.
+the longitude of perihelion `omega + Omega` fixed at 10 degrees. This is a
+LibEphemeris project convention. The verifier-owned source record classifies
+each parameter as `project_convention`, and the runtime enforces the stated
+epoch, equinox, angular-rate, and cancellation rules.
 
 ## ID 57: Proserpina
 
@@ -152,8 +156,9 @@ Proserpina is a hypothetical trans-Plutonian planet of the astrological
 tradition. LibEphemeris realizes it as a circular, planar heliocentric orbit
 with `a = 79.22563 AU` (Gaussian mean motion, period ≈ 705 years),
 `e = i = 0`, mean longitude `170.73 deg` at J1900, angles on the equinox of
-date. These numbers are compatibility values: the primary source is not
-verified, and no derivation from a published ephemeris is claimed.
+date. This is a LibEphemeris project convention. Its verifier-owned record
+classifies the numerical fields as `project_convention`; no primary-source
+orbit is claimed.
 
 ## ID 50: Harrington's nominal Planet X
 

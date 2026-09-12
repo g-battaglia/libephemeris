@@ -202,12 +202,14 @@ residual-Fourier experiment retained in
 `generate_short_period_corrections.py` is labelled non-production: its output
 is neither shipped nor imported.
 
-Historical hypothetical bodies have a stricter rule. Every supported CSV field
-has a page-level transcription and a documented frame/unit conversion in
-[hypothetical-bodies.md](hypothetical-bodies.md). A known name is not enough to
-invent an orbit. Models whose defining fields could not be recovered are
-listed in [missing-hypothetical-models.md](missing-hypothetical-models.md) and
-raise `UnknownBodyError`.
+Historical hypothetical bodies have a stricter rule. Source-transcription
+fields retain page-level locators and documented frame/unit conversions;
+derived models and project conventions are labelled separately in
+[hypothetical-bodies.md](hypothetical-bodies.md) and in the verifier-owned
+source-record table. A known name is not enough to invent an orbit. The sole ID
+without a model is listed in
+[missing-hypothetical-models.md](missing-hypothetical-models.md) and raises
+`UnknownBodyError`.
 
 ### Planetary moons and physical centers
 

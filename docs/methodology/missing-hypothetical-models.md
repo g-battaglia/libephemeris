@@ -46,9 +46,10 @@ one direction, and it does not recover the historical model.
 |---:|---|---|---|---|
 | 49 | Nibiru | Missing | `UnknownBodyError` | No credible primary publication defining a complete numerical orbit has been identified. |
 
-IDs 48 (Transpluto/Isis), 54 (Pickering), 55 (Vulcan), 57 (Proserpina) and
-58 (Waldemath / Sepharial Dark Moon) were recovered from their primary
-publications and moved to [Hypothetical bodies](hypothetical-bodies.md).
+IDs 48 (Transpluto/Isis), 54 (Pickering), 55 (Vulcan), 57 (Proserpina), and
+58 (Waldemath / Sepharial Dark Moon) have documented runtime models and are
+listed in [Hypothetical bodies](hypothetical-bodies.md). Vulcan and Proserpina
+are project conventions rather than primary-source transcriptions.
 
 ## ID 49 — Nibiru
 
