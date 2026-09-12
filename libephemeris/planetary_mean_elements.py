@@ -24,6 +24,8 @@ Provenance:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .constants import (
     EARTH,
     JUPITER,
@@ -99,6 +101,42 @@ _MEAN_ELEMENTS: dict[int, dict[str, tuple[float, ...] | None]] = {
 }
 
 _J2000_JD = 2451545.0
+
+
+@dataclass(frozen=True, slots=True)
+class _MeanElementCoefficients:
+    """Immutable coefficient row for one certified perturbing planet."""
+
+    body_id: int
+    a: tuple[float, ...]
+    e: tuple[float, ...]
+    i: tuple[float, ...]
+    node: tuple[float, ...]
+    perihelion: tuple[float, ...]
+
+
+def _mean_element_coefficients(ipl: int) -> _MeanElementCoefficients | None:
+    """Return the registered coefficient row for a B-11 perturber.
+
+    The returned tuples are the immutable values held by ``_MEAN_ELEMENTS``;
+    this accessor deliberately does not maintain a second coefficient table.
+    """
+    if not isinstance(ipl, int) or isinstance(ipl, bool):
+        raise TypeError("planet identifier must be an exact int")
+    if ipl not in (JUPITER, SATURN, URANUS, NEPTUNE):
+        return None
+    element = _MEAN_ELEMENTS[ipl]
+    node = element["Omega"]
+    if node is None:
+        return None
+    return _MeanElementCoefficients(
+        body_id=ipl,
+        a=element["a"],  # type: ignore[arg-type]
+        e=element["e"],  # type: ignore[arg-type]
+        i=element["i"],  # type: ignore[arg-type]
+        node=node,
+        perihelion=element["pi"],  # type: ignore[arg-type]
+    )
 
 
 def _poly(coeffs: tuple[float, ...], t: float) -> float:
