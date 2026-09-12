@@ -74,6 +74,25 @@ def _metadata_canonical_bytes() -> bytes:
     ).encode("utf-8")
 
 
+def _quantum_map_canonical_bytes() -> bytes:
+    """Serialize the complete fixed per-rule quantum map."""
+    normalized = [
+        [body_id, rule_key, list(operands), output]
+        for (body_id, rule_key), (operands, output) in sorted(_RULE_QUANTA.items())
+    ]
+    return json.dumps(normalized, separators=(",", ":")).encode("utf-8")
+
+
+def _validate_quantum_map_digest() -> None:
+    """Reject mutations of the independent per-rule quantum contract."""
+    serialized = _quantum_map_canonical_bytes()
+    _require(len(serialized) == RULE_QUANTA_BYTES, "quantum map byte count drift")
+    _require(
+        hashlib.sha256(serialized).hexdigest() == RULE_QUANTA_SHA256,
+        "quantum map digest mismatch",
+    )
+
+
 def _validate_variant_metadata_digest() -> None:
     """Reject any mutation of the fixed normative operation table."""
     serialized = _metadata_canonical_bytes()
@@ -838,6 +857,10 @@ def canonical_serialize(records: Iterable[SourceRecord]) -> bytes:
     return bytes(output)
 
 
+RULE_QUANTA_BYTES = 1196
+RULE_QUANTA_SHA256 = "5b9bae362b320c856aa661739ce7bfe48cb0abf886b22158eae36e72fc4179c3"
+
+
 _RULE_QUANTA = {
     (40, "runtime_n"): (("0.0000000001", "0.00001"), None),
     (41, "runtime_n"): (("0.0000000001", "0.00001"), None),
@@ -1348,6 +1371,7 @@ def load_source_records(path: Path = SOURCE_RECORDS_PATH) -> SourceTable:
     """Load, validate, canonicalize, and digest verifier-owned records."""
     _validate_precisions()
     _validate_variant_metadata_digest()
+    _validate_quantum_map_digest()
     data, raw = _load_json(path)
     _validate_declared_schema(data)
     records = _parse_records(data)
@@ -2328,6 +2352,7 @@ def _explain(
     print(
         f"source-record canonical digest: {hashlib.sha256(table.canonical_bytes).hexdigest()} ({len(table.canonical_bytes)} bytes)"
     )
+    print(f"quantum map digest: {RULE_QUANTA_SHA256} ({RULE_QUANTA_BYTES} bytes)")
     print("field predicates: identity, interval, runtime-bound, structural")
     for category in (
         "literal_transcription",

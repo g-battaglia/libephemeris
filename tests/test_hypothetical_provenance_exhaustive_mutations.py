@@ -197,6 +197,25 @@ def test_normative_metadata_digest_is_independent_and_pinned(gate, monkeypatch):
         monkeypatch.setitem(gate._VARIANT_METADATA, variant, original)
 
 
+def test_quantum_map_digest_is_independent_and_pinned(gate, monkeypatch):
+    assert len(gate._quantum_map_canonical_bytes()) == 1196
+    assert (
+        gate.RULE_QUANTA_SHA256
+        == "5b9bae362b320c856aa661739ce7bfe48cb0abf886b22158eae36e72fc4179c3"
+    )
+    original = dict(gate._RULE_QUANTA)
+    for key in tuple(original):
+        old = original[key]
+        mutated = (("mutated",), None) if old[0] else (("mutated",), None)
+        monkeypatch.setitem(gate._RULE_QUANTA, key, mutated)
+        with pytest.raises(gate.GateError, match="quantum map (byte count|digest)"):
+            gate.load_source_records()
+        monkeypatch.setitem(gate._RULE_QUANTA, key, original[key])
+    monkeypatch.setitem(gate._RULE_QUANTA, (999, "extra"), ((), None))
+    with pytest.raises(gate.GateError, match="quantum map"):
+        gate.load_source_records()
+
+
 def test_interval_certificate_requires_exact_precision_keys(gate):
     table = gate.load_source_records()
     result = gate.evaluate_rules(table)[(56, "radius_au")]
