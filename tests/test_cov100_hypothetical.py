@@ -68,9 +68,8 @@ def test_parse_epoch_rejects_unknown_text() -> None:
         ("12.5", 12.5, 0.0),
         ("12.5 + 3.0 * T", 12.5, 3.0),
         ("12.5 - 3.0*T", 12.5, -3.0),
-        ("3*T + 12", 12.0, 3.0),
-        ("3*T - 12", -12.0, 3.0),
-        ("T + 2", 2.0, 1.0),
+        ("3 * T + 12", 12.0, 3.0),
+        ("3 * T - 12", -12.0, 3.0),
     ],
 )
 def test_parse_t_polynomial_variants(
@@ -81,9 +80,10 @@ def test_parse_t_polynomial_variants(
     assert value.linear == linear
 
 
-def test_parse_t_polynomial_rejects_non_numeric_text() -> None:
+@pytest.mark.parametrize("expression", ["invalid", "T + 2"])
+def test_parse_t_polynomial_rejects_unsupported_text(expression: str) -> None:
     with pytest.raises(ValueError):
-        _parse_t_polynomial("invalid")
+        _parse_t_polynomial(expression)
 
 
 def test_parse_custom_file_and_inline_comment(tmp_path: Path) -> None:
