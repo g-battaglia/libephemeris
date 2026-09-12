@@ -505,10 +505,11 @@ paths = [
   "libephemeris/exotic_bodies.py",
   "libephemeris/minor_bodies.py",
   "libephemeris/planetary_mean_elements.py",
+  "libephemeris/perturber_elements.py",
 ]
 scientific_content = true
-origin = "Public JPL elements/states propagated with published two-body and perturbation methods. Source constants, experimental approximations, precision limits, and SPK fallbacks are explicit."
-sources = ["JPL_SBDB", "JPL_HORIZONS", "SIMON_1994", "MINOR_BODY_DYNAMICS"]
+origin = "Public JPL elements/states propagated with published two-body and perturbation methods. Perturbing-planet tuples use the registered Simon mean-element polynomials, direct ERFA long-term ecliptic frames, and certified Arb binary64 selection. Source constants, experimental approximations, precision limits, and SPK fallbacks are explicit."
+sources = ["JPL_SBDB", "JPL_HORIZONS", "SIMON_1994", "MINOR_BODY_DYNAMICS", "VONDRAK_2011", "ERFA", "ARB", "IEEE_754"]
 documentation = ["docs/development/keplerian-improvements.md", "docs/development/full-range-coverage.md"]
 docstring = "detailed"
 

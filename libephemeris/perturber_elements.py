@@ -7,6 +7,14 @@ implements the internal B-11 algebra contract: exact binary64 inputs are
 promoted to fresh Arb balls, source-frame elements are converted through the
 relative ERFA ecliptic frame, and two independent precision passes must select
 the same five native floats.
+
+Provenance:
+    The source coefficients are exposed by the registered Simon et al. (1994)
+    mean-element table. ERFA evaluates the published Vondrák long-term ecliptic
+    frame. Arb supplies outward interval arithmetic, while IEEE 754 defines the
+    exact binary64 ingestion and final rounding cells. The relative-frame,
+    singular-axis, and fail-closed selection policies are project-defined in the
+    independently reviewed B-11 specification.
 """
 
 from __future__ import annotations
@@ -162,6 +170,7 @@ def _identity() -> Matrix:
 
 
 def _transpose(matrix: Matrix) -> Matrix:
+    """Transpose one three-dimensional interval matrix."""
     return tuple(tuple(matrix[row][column] for row in range(3)) for column in range(3))  # type: ignore[return-value]
 
 
@@ -178,6 +187,7 @@ def _matrix_product(left: Matrix, right: Matrix) -> Matrix:
 
 
 def _matrix_vector(matrix: Matrix, vector: Vector) -> Vector:
+    """Multiply one three-dimensional interval matrix and vector."""
     return tuple(_dot(matrix[row], vector) for row in range(3))  # type: ignore[return-value]
 
 
@@ -219,6 +229,7 @@ def _source_vectors(
 
 
 def _absolute_ball(value: arb) -> arb:
+    """Return an outward enclosure of an interval's absolute value."""
     if value > 0:
         return value
     if value < 0:
