@@ -284,9 +284,9 @@ def run_section5_sidereal(rng, n_dates=10):
             for bid in [0, 1, 4]:
                 try:
                     trop = ephem.calc_ut(float(jd), bid, ephem.FLG_SPEED)[0]
-                    sid = ephem.calc_ut(float(jd), bid, ephem.FLG_SPEED | ephem.FLG_SIDEREAL)[
-                        0
-                    ]
+                    sid = ephem.calc_ut(
+                        float(jd), bid, ephem.FLG_SPEED | ephem.FLG_SIDEREAL
+                    )[0]
                     r.check(
                         math.isfinite(sid[0]), f"mode={mode_id} body={bid}: not finite"
                     )
