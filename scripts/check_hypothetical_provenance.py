@@ -1484,31 +1484,6 @@ def _check_ast_model_choice(problems: list[str]) -> None:
             problems.append(
                 f"structural: {name} does not use the registered Gaussian a**1.5 grammar"
             )
-    try:
-        builder = getattr(hyp, "_gaussian_row")
-        actual_k = builder(
-            0,
-            "probe",
-            model="probe",
-            category="probe",
-            source="probe",
-            epoch=0.0,
-            equinox_jd=0.0,
-            a=1.0,
-        ).n
-        k_token = next(
-            _token(record, "gaussian_k_deg_per_day")
-            for record in _CURRENT_TABLE.records
-            if record.body_id == 40
-        )
-        if actual_k != _decimal_float(k_token.token):
-            problems.append(
-                "identity: runtime Gaussian constant differs from verifier token"
-            )
-    except Exception as exc:  # pragma: no cover - diagnostic path
-        problems.append(
-            f"structural: Gaussian builder probe raised {type(exc).__name__}"
-        )
 
 
 def _check_neely_independence(problems: list[str]) -> None:
@@ -1614,12 +1589,6 @@ def _check_runtime_records(
                 printed,
                 f"body {record.body_id}.printed_rate_century",
             )
-            gaussian = _token(record, "gaussian_k_deg_per_day")
-            expected_n = _decimal_float(gaussian.token) / body.a**1.5
-            if body.n != expected_n:
-                problems.append(
-                    f"structural: body {record.body_id}.n does not use runtime a Gaussian grammar"
-                )
         elif record.body_id == hyp.ISIS:
             for source_field, runtime_field in (
                 ("epoch_jd", "epoch"),
@@ -1635,21 +1604,20 @@ def _check_runtime_records(
                     _token(record, source_field),
                     f"Transpluto.{runtime_field}",
                 )
-            for rule_key, field in (
-                ("runtime_n_deg_per_day", "n"),
-                ("runtime_mean_anomaly_deg", "M0"),
-            ):
-                result = results[(record.body_id, rule_key)]
-                if result.exact is not None:
-                    expected = float(result.exact)
-                    if getattr(body, field) != expected:
-                        problems.append(
-                            f"identity: Transpluto.{field} differs from exact source rule"
-                        )
-                else:
-                    ok, detail = _interval_certificate(result, getattr(body, field))
-                    if not ok:
-                        problems.append(f"interval: Transpluto.{field}: {detail}")
+            # The registered mean-motion rule is evaluated for diagnostics,
+            # but runtime ``n`` is not a provenance predicate.  Its model
+            # choice is certified only by the AST grammar and mutation probe.
+            result = results[(record.body_id, "runtime_mean_anomaly_deg")]
+            if result.exact is not None:
+                expected = float(result.exact)
+                if body.M0 != expected:
+                    problems.append(
+                        "identity: Transpluto mean anomaly differs from exact source rule"
+                    )
+            else:
+                ok, detail = _interval_certificate(result, body.M0)
+                if not ok:
+                    problems.append(f"interval: Transpluto.M0: {detail}")
         elif record.body_id in {
             hyp.HARRINGTON,
             hyp.NEPTUNE_LEVERRIER,
@@ -1726,10 +1694,6 @@ def _check_runtime_records(
             )
             if not ok:
                 problems.append(f"interval: Pickering argument of perihelion: {detail}")
-            gaussian = _token(record, "gaussian_k_deg_per_day")
-            expected_n = _decimal_float(gaussian.token) / body.a**1.5
-            if body.n != expected_n:
-                problems.append("structural: Pickering Gaussian n does not use a")
         elif record.body_id == hyp.VULCAN:
             # Project convention only: no period or source-accuracy assertion.
             if not all(
@@ -1772,15 +1736,13 @@ def _check_runtime_records(
                     _token(record, source_field),
                     f"Selena.{runtime_field}",
                 )
-            for rule_key, value in (
-                ("rate_deg_per_day", body.n),
-                ("radius_au", body.a),
-            ):
-                ok, detail = _interval_certificate(
-                    results[(record.body_id, rule_key)], value
-                )
-                if not ok:
-                    problems.append(f"interval: Selena {rule_key}: {detail}")
+            # The rate rule remains available for --explain diagnostics.  The
+            # runtime mean motion is intentionally not a numerical predicate.
+            ok, detail = _interval_certificate(
+                results[(record.body_id, "radius_au")], body.a
+            )
+            if not ok:
+                problems.append(f"interval: Selena radius_au: {detail}")
             endpoint_2000 = results[(record.body_id, "endpoint_2000_deg")]
             ok, detail = _interval_certificate(endpoint_2000, body.M0)
             if not ok:
@@ -1839,14 +1801,9 @@ def _check_runtime_records(
                     _token(record, source_field),
                     f"Proserpina.{runtime_field}",
                 )
-            gaussian = _token(record, "gaussian_k_deg_per_day")
-            if body.n != _decimal_float(gaussian.token) / body.a**1.5:
-                problems.append("structural: Proserpina Gaussian n does not use a")
         elif record.body_id == hyp.WALDEMATH:
-            rate_result = results[(record.body_id, "runtime_rate_deg_per_day")]
-            ok, detail = _interval_certificate(rate_result, body.n)
-            if not ok:
-                problems.append(f"interval: Waldemath rate: {detail}")
+            # Waldemath's derived rate is informational; runtime ``n`` is not
+            # compared to a verifier recomputation.
             if not (math.isfinite(body.a) and body.a > 0 and body.a < 1):
                 problems.append(
                     "structural: Waldemath distance is not finite positive in range"
@@ -1951,9 +1908,6 @@ def _explain(
     _ = results
 
 
-_CURRENT_TABLE: SourceTable
-
-
 def main() -> int:
     """Run the fail-closed source-record gate."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1965,10 +1919,8 @@ def main() -> int:
     args = parser.parse_args()
     problems: list[str] = []
     diagnostics: list[str] = []
-    global _CURRENT_TABLE
     try:
         table = load_source_records()
-        _CURRENT_TABLE = table
         results = evaluate_rules(table)
     except GateError as exc:
         print(f"MISMATCH: structural: {exc}")

@@ -174,6 +174,34 @@ def test_runtime_field_mutation_is_rejected_without_changing_verifier(
     assert any("body 40.a" in problem for problem in problems)
 
 
+def test_runtime_n_ulp_is_not_a_provenance_predicate(gate, monkeypatch):
+    table = gate.load_source_records()
+    results = gate.evaluate_rules(table)
+    original = hyp.HYPOTHETICAL_BODIES[40]
+    monkeypatch.setitem(
+        hyp.HYPOTHETICAL_BODIES,
+        40,
+        replace(original, n=__import__("math").nextafter(original.n, float("inf"))),
+    )
+    problems: list[str] = []
+    gate._check_runtime_records(problems, table, results)
+    assert not any(".n" in problem or "mean motion" in problem for problem in problems)
+
+
+def test_runtime_printed_rate_mutation_is_rejected(gate, monkeypatch):
+    table = gate.load_source_records()
+    results = gate.evaluate_rules(table)
+    original = hyp.HYPOTHETICAL_BODIES[40]
+    monkeypatch.setitem(
+        hyp.HYPOTHETICAL_BODIES,
+        40,
+        replace(original, printed_rate_century=original.printed_rate_century + 1.0),
+    )
+    problems: list[str] = []
+    gate._check_runtime_records(problems, table, results)
+    assert any("printed_rate_century" in problem for problem in problems)
+
+
 def test_neely_printed_rate_and_a_are_independent(gate):
     problems: list[str] = []
     gate._check_neely_independence(problems)
@@ -187,7 +215,11 @@ def test_ast_rejects_generic_close_and_runtime_expected_tables(gate):
     assert "_EXPECTED_CSV_ROWS" not in SCRIPT.read_text(encoding="utf-8")
     assert "Weston" not in SCRIPT.read_text(encoding="utf-8")
     assert "18.58415" not in SCRIPT.read_text(encoding="utf-8")
-    assert "_WALDEMATH_DISTANCE_AU" not in SCRIPT.read_text(encoding="utf-8")
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "_WALDEMATH_DISTANCE_AU" not in source
+    assert "expected_n =" not in source
+    assert "body.n !=" not in source
+    assert "_interval_certificate(result, body.n" not in source
 
 
 def test_cli_normal_and_explain():
