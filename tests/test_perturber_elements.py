@@ -9,10 +9,14 @@ import struct
 
 import erfa
 import pytest
-from flint import ctx
+from flint import arb, ctx
 
 from libephemeris.constants import JUPITER, NEPTUNE, SATURN, URANUS
+from libephemeris.exceptions import CalculationError
+import libephemeris.perturber_elements as perturber_elements
 from libephemeris.perturber_elements import (
+    _angle_chart,
+    _angle_degrees,
     _canonical_coefficients_bytes,
     _certified_perturber_tuple,
     _frame_rows,
@@ -105,9 +109,7 @@ def test_required_extrapolation_dates_are_certified() -> None:
     """The private gate handles the two conditioning witnesses."""
     for body_id in _IDS:
         for centuries in (-100.0, 10.0):
-            value = _certified_perturber_tuple(
-                body_id, 2451545.0 + 36525.0 * centuries
-            )
+            value = _certified_perturber_tuple(body_id, 2451545.0 + 36525.0 * centuries)
             assert len(value) == 5
             assert all(type(item) is float for item in value)
 
@@ -139,6 +141,56 @@ def test_frame_rows_use_direct_erfa_poles(monkeypatch: pytest.MonkeyPatch) -> No
     assert [name for name, _ in calls] == ["ecl", "equ"]
     assert all(row[0].is_finite() for row in rows)
     assert _matrix_product(rows, _transpose(rows))
+
+
+@pytest.mark.parametrize(
+    ("x", "y", "expected"),
+    [
+        (0, 1, 90.0),
+        (0, -1, 270.0),
+        (1, 0, 0.0),
+        (-1, 0, 180.0),
+    ],
+)
+def test_exact_axes_have_canonical_angles(x: int, y: int, expected: float) -> None:
+    """Only exact zero axes use canonical degree values."""
+    assert _angle_degrees(arb(x), arb(y)) == expected
+
+
+@pytest.mark.parametrize(
+    ("x", "y"),
+    [(arb(0, "0.1"), arb(1)), (arb(1), arb(0, "0.1")), (arb(-1, "2"), arb(1))],
+)
+def test_unresolved_signs_fail_closed(x: arb, y: arb) -> None:
+    """A ball containing zero is never treated as an axis or a sign."""
+    with pytest.raises(Exception):
+        _angle_chart(x, y)
+
+
+def test_exact_origin_fails_closed() -> None:
+    """The exact origin has no atan2 value."""
+    with pytest.raises(Exception):
+        _angle_degrees(arb(0), arb(0))
+
+
+def test_denominator_crossing_seam_fails_closed() -> None:
+    """A ratio denominator that contains zero cannot enter a chart."""
+    with pytest.raises(Exception):
+        _angle_chart(arb(0, "0.1"), arb(0.2))
+
+
+def test_retry_schedule_reaches_final_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed upstream proof retries every declared precision then raises."""
+    calls: list[int] = []
+
+    def fail(body_id: int, jd_tt: float, bits: int):
+        calls.append(bits)
+        raise CalculationError("unresolved")
+
+    monkeypatch.setattr(perturber_elements, "_one_precision_pass", fail)
+    with pytest.raises(perturber_elements.CalculationError):
+        _certified_perturber_tuple(JUPITER, 2451545.0)
+    assert calls == [192, 384, 768, 1536, 3072, 4096]
 
 
 def test_precision_context_is_restored_after_tuple() -> None:

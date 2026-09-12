@@ -226,10 +226,21 @@ def _absolute_ball(value: arb) -> arb:
     return value.union(-value)
 
 
+def _proved_sign(value: arb, name: str) -> int:
+    """Return a proved sign, distinguishing exact zero from an unresolved ball."""
+    if value.is_exact() and value.is_zero():
+        return 0
+    if value > 0:
+        return 1
+    if value < 0:
+        return -1
+    raise CalculationError(f"{name} sign is not separated from zero")
+
+
 def _angle_chart(pair_x: arb, pair_y: arb) -> arb:
     """Evaluate a finite local atan2 chart or fail closed."""
-    x_sign = 1 if pair_x > 0 else -1 if pair_x < 0 else 0
-    y_sign = 1 if pair_y > 0 else -1 if pair_y < 0 else 0
+    x_sign = _proved_sign(pair_x, "atan2 x")
+    y_sign = _proved_sign(pair_y, "atan2 y")
     if x_sign == 0 and y_sign == 0:
         raise CalculationError("angle pair is an unresolved origin")
     if x_sign == 0:
@@ -289,17 +300,15 @@ def _angle_chart(pair_x: arb, pair_y: arb) -> arb:
 
 
 def _axis_angle_degrees(pair_x: arb, pair_y: arb) -> float | None:
-    """Return the exact canonical degree for an exact axis pair."""
-    if not (
-        pair_x.is_exact()
-        and pair_y.is_exact()
-        and (pair_x.is_zero() or pair_y.is_zero())
-    ):
-        return None
-    if pair_x.is_zero():
-        return 90.0 if pair_y > 0 else 270.0
-    if pair_y.is_zero():
-        return 0.0 if pair_x > 0 else 180.0
+    """Return a canonical degree only for a proved exact axis pair."""
+    x_sign = _proved_sign(pair_x, "atan2 x")
+    y_sign = _proved_sign(pair_y, "atan2 y")
+    if x_sign == 0 and y_sign == 0:
+        raise CalculationError("angle pair is an undefined exact origin")
+    if x_sign == 0:
+        return 90.0 if y_sign > 0 else 270.0
+    if y_sign == 0:
+        return 0.0 if x_sign > 0 else 180.0
     return None
 
 
