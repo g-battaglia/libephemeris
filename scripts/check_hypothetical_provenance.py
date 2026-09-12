@@ -53,6 +53,20 @@ SOURCE_CANONICAL_SHA256 = (
 SOURCE_CANONICAL_BYTES = 33036
 PRECISIONS = (160, 256, 512)
 
+
+def _validate_precisions() -> None:
+    """Require the immutable independent Arb precision schedule."""
+    _require(
+        type(PRECISIONS) is tuple
+        and PRECISIONS == (160, 256, 512)
+        and all(
+            type(value) is int and not isinstance(value, bool) for value in PRECISIONS
+        )
+        and len(set(PRECISIONS)) == 3,
+        "PRECISIONS must be exactly (160, 256, 512)",
+    )
+
+
 CATEGORIES = frozenset(
     {"literal_transcription", "derived_source", "project_convention", "unsupported"}
 )
@@ -103,6 +117,115 @@ INTERVAL_METHODS = frozenset(
         "structural_exact",
     }
 )
+
+# Normative typed operation table. Each operand entry is
+# (namespace, unit, permitted category, permitted exactness). ``rounded``
+# denotes a nonzero token quantum; ``interval-compatible`` denotes a rule
+# output whose declared exactness is exact or interval.
+_VARIANT_METADATA = {
+    "gaussian_from_a": (
+        (
+            ("token", "degree_per_day", {"project_convention"}, {"exact", "rounded"}),
+            (
+                "token",
+                "au",
+                {"literal_transcription", "project_convention"},
+                {"exact", "rounded"},
+            ),
+        ),
+        (
+            "degree_per_day",
+            "project_convention",
+            {"structural", "interval"},
+            {"ast_structural", "arb_outward"},
+        ),
+    ),
+    "period_years_to_rate": (
+        (
+            ("token", "julian_year", {"literal_transcription"}, {"exact", "rounded"}),
+            ("token", "day", {"project_convention"}, {"exact", "rounded"}),
+        ),
+        ("degree_per_day", "derived_source", {"interval"}, "arb_outward"),
+    ),
+    "elapsed_period_to_angle": (
+        (
+            (
+                "token",
+                "julian_year",
+                {"project_convention", "literal_transcription"},
+                {"exact", "rounded"},
+            ),
+        )
+        * 3,
+        ("degree", "derived_source", {"interval"}, "arb_outward"),
+    ),
+    "turns_endpoints_elapsed_to_rate": (
+        (
+            ("token", "integer", {"project_convention"}, {"exact"}),
+            ("rule", "degree", {"derived_source"}, {"interval-compatible"}),
+            ("rule", "degree", {"derived_source"}, {"interval-compatible"}),
+            ("rule", "day", {"project_convention"}, {"interval-compatible"}),
+        ),
+        ("degree_per_day", "derived_source", {"interval"}, "arb_outward"),
+    ),
+    "two_period_rate": (
+        (("token", "day", {"literal_transcription"}, {"exact", "rounded"}),) * 2,
+        ("degree_per_day", "derived_source", {"interval"}, "arb_outward"),
+    ),
+    "full_turn_rate_to_period": (
+        (
+            ("token", "degree", {"project_convention"}, {"exact", "rounded"}),
+            ("rule", "degree_per_day", {"derived_source"}, {"interval-compatible"}),
+        ),
+        ("day", "derived_source", {"interval"}, "arb_outward"),
+    ),
+    "sexagesimal_deg_min": (
+        (
+            ("token", "degree", {"literal_transcription"}, {"exact"}),
+            ("token", "arcminute", {"literal_transcription"}, {"exact"}),
+        ),
+        ("degree", "derived_source", {"exact"}, "exact_rational_one_conversion"),
+    ),
+    "sexagesimal_deg_min_sec": (
+        (
+            ("token", "degree", {"literal_transcription"}, {"exact"}),
+            ("token", "arcminute", {"literal_transcription"}, {"exact"}),
+            ("token", "arcsecond", {"literal_transcription"}, {"exact"}),
+        ),
+        ("degree", "derived_source", {"exact"}, "exact_rational_one_conversion"),
+    ),
+    "sexagesimal_base_deg_min": (
+        (
+            ("token", "degree", {"project_convention"}, {"exact"}),
+            ("token", "degree", {"literal_transcription"}, {"rounded"}),
+            ("token", "arcminute", {"literal_transcription"}, {"rounded"}),
+        ),
+        ("degree", "derived_source", {"interval"}, "arb_outward"),
+    ),
+    "kepler_radius": (
+        (
+            (
+                "token",
+                "metre3_per_second2",
+                {"project_convention"},
+                {"exact", "rounded"},
+            ),
+            ("rule", "day", {"derived_source"}, {"interval-compatible"}),
+            ("token", "second", {"project_convention"}, {"exact", "rounded"}),
+            ("token", "metre", {"project_convention"}, {"exact", "rounded"}),
+        ),
+        ("au", "project_convention", {"interval"}, "arb_outward_intersection"),
+    ),
+    "rate_cancellation": (
+        (),
+        (
+            "degree_per_century",
+            "project_convention",
+            {"structural"},
+            "structural_exact",
+        ),
+    ),
+}
 
 TOP_LEVEL_FIELDS = {
     "schema",
@@ -678,6 +801,145 @@ def canonical_serialize(records: Iterable[SourceRecord]) -> bytes:
     return bytes(output)
 
 
+def _validate_rule_metadata(
+    rule: DerivedRule,
+    token_value: Any,
+    rule_value: Any,
+) -> None:
+    """Enforce the normative typed metadata contract for one rule."""
+    if rule.variant == "difference":
+        _require(len(rule.operands) == 2, f"difference {rule.rule_key} has wrong arity")
+        metadata = [
+            token_value(op) if op.namespace == "token" else rule_value(op)
+            for op in rule.operands
+        ]
+        units = [
+            value.unit if operand.namespace == "token" else value.output_unit
+            for operand, value in zip(rule.operands, metadata, strict=True)
+        ]
+        categories = [
+            value.category if operand.namespace == "token" else value.output_category
+            for operand, value in zip(rule.operands, metadata, strict=True)
+        ]
+        _require(
+            units[0] == units[1], f"difference input units drift in {rule.rule_key}"
+        )
+        if rule.rule_key == "elapsed_days":
+            _require(
+                units == ["jd_tt", "jd_tt"] and rule.output_unit == "day",
+                f"elapsed-day units drift in {rule.rule_key}",
+            )
+        else:
+            _require(
+                rule.output_unit == units[0],
+                f"difference output unit drift in {rule.rule_key}",
+            )
+        _require(
+            all(
+                category
+                in {"literal_transcription", "project_convention", "derived_source"}
+                for category in categories
+            ),
+            f"difference input categories drift in {rule.rule_key}",
+        )
+        _require(
+            rule.output_category in {"derived_source", "project_convention"},
+            f"difference output category drift in {rule.rule_key}",
+        )
+        _require(
+            rule.output_exactness in {"exact", "interval"},
+            f"difference exactness drift in {rule.rule_key}",
+        )
+        _require(
+            rule.interval_method in {"exact_rational_one_conversion", "arb_outward"},
+            f"difference method drift in {rule.rule_key}",
+        )
+        if rule.interval_method == "exact_rational_one_conversion":
+            _require(
+                all(
+                    (
+                        value.quantum_num == 0
+                        if operand.namespace == "token"
+                        else value.output_exactness == "exact"
+                    )
+                    for operand, value in zip(rule.operands, metadata, strict=True)
+                ),
+                f"exact difference has interval operand in {rule.rule_key}",
+            )
+        return
+    expected_operands, output = _VARIANT_METADATA[rule.variant]
+    _require(
+        len(rule.operands) == len(expected_operands),
+        f"{rule.variant} {rule.rule_key} has wrong arity",
+    )
+    for index, (operand, expected) in enumerate(
+        zip(rule.operands, expected_operands, strict=True)
+    ):
+        namespace, unit, categories, exactness = expected  # type: ignore[assignment]
+        _require(
+            operand.namespace == namespace,
+            f"{rule.variant} operand namespace drift at {index}",
+        )
+        value = token_value(operand) if namespace == "token" else rule_value(operand)
+        actual_unit = value.unit if namespace == "token" else value.output_unit
+        actual_category = (
+            value.category if namespace == "token" else value.output_category
+        )
+        actual_exact = (
+            "exact"
+            if namespace == "token"
+            and (
+                value.quantum_num == 0
+                or rule.variant in {"sexagesimal_deg_min", "sexagesimal_deg_min_sec"}
+            )
+            else "rounded"
+            if namespace == "token"
+            else value.output_exactness
+        )
+        _require(actual_unit == unit, f"{rule.variant} operand unit drift at {index}")
+        _require(
+            actual_category in categories,
+            f"{rule.variant} operand category drift at {index}",
+        )
+        exact_ok = (
+            actual_exact in exactness
+            or "interval-compatible" in exactness
+            and actual_exact in {"exact", "interval"}
+        )
+        _require(exact_ok, f"{rule.variant} operand exactness drift at {index}")
+    output_unit, output_category, output_exactness, methods = output
+    _require(rule.output_unit == output_unit, f"{rule.variant} output unit drift")
+    _require(
+        rule.output_category == output_category, f"{rule.variant} output category drift"
+    )
+    _require(
+        rule.output_exactness in output_exactness,
+        f"{rule.variant} output exactness drift",
+    )
+    _require(rule.interval_method in methods, f"{rule.variant} interval method drift")
+    if rule.interval_method == "exact_rational_one_conversion":
+        _require(
+            all(
+                (
+                    (
+                        value.quantum_num == 0
+                        or rule.variant
+                        in {"sexagesimal_deg_min", "sexagesimal_deg_min_sec"}
+                    )
+                    if operand.namespace == "token"
+                    else value.output_exactness == "exact"
+                )
+                for operand in rule.operands
+                for value in [
+                    token_value(operand)
+                    if operand.namespace == "token"
+                    else rule_value(operand)
+                ]
+            ),
+            f"exact rational rule has interval operand in {rule.rule_key}",
+        )
+
+
 def _validate_operation_graph(records: tuple[SourceRecord, ...]) -> None:
     """Validate the fixed variant contract and resolve its dependency DAG."""
     by_body = {record.body_id: record for record in records}
@@ -721,6 +983,7 @@ def _validate_operation_graph(records: tuple[SourceRecord, ...]) -> None:
     allowed_rule_categories = {"derived_source", "project_convention"}
     for record in records:
         for rule in record.derived_rules:
+            _validate_rule_metadata(rule, token_value, rule_value)
             if rule.variant == "difference":
                 _require(
                     len(rule.operands) == 2,
@@ -967,6 +1230,7 @@ def _validate_operation_graph(records: tuple[SourceRecord, ...]) -> None:
 
 def load_source_records(path: Path = SOURCE_RECORDS_PATH) -> SourceTable:
     """Load, validate, canonicalize, and digest verifier-owned records."""
+    _validate_precisions()
     data, raw = _load_json(path)
     _validate_declared_schema(data)
     records = _parse_records(data)
@@ -1048,7 +1312,8 @@ def _operand_exactness(
     token: SourceToken | None,
     child: DerivedRule | None,
 ) -> bool:
-    """Verifier implementation member."""
+    """Return whether one typed operand is an exact source quantity."""
+    del position
     if rule.variant in {"sexagesimal_deg_min", "sexagesimal_deg_min_sec"}:
         return True
     if token is not None:
@@ -1326,6 +1591,11 @@ def _interval_certificate(
     shift: int = 0,
 ) -> tuple[bool, str]:
     """Verifier implementation member."""
+    _validate_precisions()
+    _require(
+        len(result.intervals) == len(PRECISIONS),
+        "interval result does not contain exactly one pass per precision",
+    )
     intervals = tuple(interval + shift for interval in result.intervals)
     if any(not interval.is_finite() for interval in intervals):
         return False, "non-finite Arb interval"
@@ -1959,6 +2229,14 @@ def _explain(
     _ = results
 
 
+def _run_check(problems: list[str], function: Any, *args: Any) -> None:
+    """Convert deterministic verifier errors into failed gate problems."""
+    try:
+        function(problems, *args)
+    except GateError as exc:
+        problems.append(f"structural: {exc}")
+
+
 def main() -> int:
     """Run the fail-closed source-record gate."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1977,9 +2255,9 @@ def main() -> int:
         print(f"MISMATCH: structural: {exc}")
         print("hypothetical provenance: 1 mismatch(es) (gate: 0)")
         return 1
-    _check_csv(problems, table)
-    _check_ast_model_choice(problems)
-    _check_neely_independence(problems)
+    _run_check(problems, _check_csv, table)
+    _run_check(problems, _check_ast_model_choice)
+    _run_check(problems, _check_neely_independence)
     # Independently rounded Neely rates are intentionally not consistency
     # assertions.  Report non-overlap only as a diagnostic gap.
     for record in table.records:
@@ -1992,8 +2270,8 @@ def main() -> int:
             diagnostics.append(
                 f"Neely {record.name}: printed rate and Gaussian model are independent rounded quantities (non-overlap)"
             )
-    _check_runtime_records(problems, table, results)
-    _check_runtime_structure(problems, table)
+    _run_check(problems, _check_runtime_records, table, results)
+    _run_check(problems, _check_runtime_structure, table)
     if args.explain:
         _explain(table, results, diagnostics)
     for problem in problems:

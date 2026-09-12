@@ -64,6 +64,33 @@ def test_approved_record_file_and_canonical_digest(gate):
     assert hashlib.sha256(table.raw_bytes).hexdigest() == gate.SOURCE_FILE_SHA256
 
 
+def test_precision_schedule_mutations_fail_deterministically(gate, monkeypatch):
+    for value in (
+        (160, 256),
+        (160, 512),
+        (256,),
+        (),
+        (160, 160, 512),
+        (256, 160, 512),
+        (True, 256, 512),
+        ("160", 256, 512),
+    ):
+        monkeypatch.setattr(gate, "PRECISIONS", value)
+        with pytest.raises(gate.GateError, match="PRECISIONS"):
+            gate.load_source_records()
+    monkeypatch.setattr(gate, "PRECISIONS", (160, 256, 512))
+
+
+def test_interval_certificate_rejects_wrong_pass_count(gate):
+    table = gate.load_source_records()
+    results = gate.evaluate_rules(table)
+    result = results[(56, "radius_au")]
+    for intervals in (result.intervals[:2], result.intervals[:1], ()):
+        broken = replace(result, intervals=intervals)
+        with pytest.raises(gate.GateError, match="exactly one pass"):
+            gate._interval_certificate(broken)
+
+
 def test_schema_declarations_are_exact_and_ordered(gate):
     data = _data()
     assert list(data) == list(gate.TOP_LEVEL_FIELD_ORDER)
