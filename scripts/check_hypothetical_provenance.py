@@ -184,7 +184,7 @@ _VARIANT_METADATA = {
             ("token", "degree", {"literal_transcription"}, {"exact"}),
             ("token", "arcminute", {"literal_transcription"}, {"exact"}),
         ),
-        ("degree", "derived_source", {"exact"}, "exact_rational_one_conversion"),
+        ("degree", "derived_source", {"exact"}, {"exact_rational_one_conversion"}),
     ),
     "sexagesimal_deg_min_sec": (
         (
@@ -192,7 +192,7 @@ _VARIANT_METADATA = {
             ("token", "arcminute", {"literal_transcription"}, {"exact"}),
             ("token", "arcsecond", {"literal_transcription"}, {"exact"}),
         ),
-        ("degree", "derived_source", {"exact"}, "exact_rational_one_conversion"),
+        ("degree", "derived_source", {"exact"}, {"exact_rational_one_conversion"}),
     ),
     "sexagesimal_base_deg_min": (
         (
@@ -376,6 +376,7 @@ class _RuleResult:
     rule: DerivedRule
     exact: Fraction | None
     intervals: tuple[arb, ...]
+    pass_precisions: tuple[int, ...] = PRECISIONS
 
 
 def _fail(message: str) -> None:
@@ -808,6 +809,13 @@ def _validate_rule_metadata(
 ) -> None:
     """Enforce the normative typed metadata contract for one rule."""
     if rule.variant == "difference":
+        if rule.rule_key == "elapsed_days":
+            elapsed_expected = (
+                (("token", "jd_tt", "project_convention", "exact"),) * 2,
+                ("project_convention", "day", None, "interval", "arb_outward"),
+            )
+        else:
+            elapsed_expected = None
         _require(len(rule.operands) == 2, f"difference {rule.rule_key} has wrong arity")
         metadata = [
             token_value(op) if op.namespace == "token" else rule_value(op)
@@ -854,6 +862,15 @@ def _validate_rule_metadata(
             rule.interval_method in {"exact_rational_one_conversion", "arb_outward"},
             f"difference method drift in {rule.rule_key}",
         )
+        if elapsed_expected is not None:
+            _require(
+                rule.output_category == elapsed_expected[1][0]
+                and rule.output_unit == elapsed_expected[1][1]
+                and rule.output_quantum == elapsed_expected[1][2]
+                and rule.output_exactness == elapsed_expected[1][3]
+                and rule.interval_method == elapsed_expected[1][4],
+                f"elapsed-day output metadata drift in {rule.rule_key}",
+            )
         if rule.interval_method == "exact_rational_one_conversion":
             _require(
                 all(
@@ -913,10 +930,28 @@ def _validate_rule_metadata(
         rule.output_category == output_category, f"{rule.variant} output category drift"
     )
     _require(
-        rule.output_exactness in output_exactness,
+        rule.output_exactness in output_exactness
+        or rule.variant == "gaussian_from_a"
+        and rule.output_exactness == "structural",
         f"{rule.variant} output exactness drift",
     )
     _require(rule.interval_method in methods, f"{rule.variant} interval method drift")
+    if rule.variant == "gaussian_from_a":
+        if rule.body_id == 54:
+            _require(
+                rule.output_exactness == "interval", "Gaussian output exactness drift"
+            )
+            _require(
+                rule.interval_method == "arb_outward", "Gaussian interval method drift"
+            )
+        else:
+            _require(
+                rule.output_exactness == "structural", "Gaussian output exactness drift"
+            )
+            _require(
+                rule.interval_method == "ast_structural",
+                "Gaussian interval method drift",
+            )
     if rule.interval_method == "exact_rational_one_conversion":
         _require(
             all(
@@ -1519,7 +1554,9 @@ def evaluate_rules(table: SourceTable) -> dict[tuple[int, str], _RuleResult]:
                             result.is_finite(),
                             f"non-finite rule result {rule.rule_key}",
                         )
-                        pass_results[key] = _RuleResult(rule, exact, (result,))
+                        pass_results[key] = _RuleResult(
+                            rule, exact, (result,), (precision,)
+                        )
                         pending.remove(key)
                 for key, pass_result in pass_results.items():
                     previous = final_results.get(key)
@@ -1528,12 +1565,14 @@ def evaluate_rules(table: SourceTable) -> dict[tuple[int, str], _RuleResult]:
                             pass_result.rule,
                             pass_result.exact,
                             (pass_result.intervals[0],),
+                            (precision,),
                         )
                     else:
                         final_results[key] = _RuleResult(
                             pass_result.rule,
                             pass_result.exact,
                             previous.intervals + (pass_result.intervals[0],),
+                            previous.pass_precisions + (precision,),
                         )
     finally:
         ctx.prec = ambient_precision
@@ -1593,7 +1632,8 @@ def _interval_certificate(
     """Verifier implementation member."""
     _validate_precisions()
     _require(
-        len(result.intervals) == len(PRECISIONS),
+        result.pass_precisions == PRECISIONS
+        and len(result.intervals) == len(PRECISIONS),
         "interval result does not contain exactly one pass per precision",
     )
     intervals = tuple(interval + shift for interval in result.intervals)
