@@ -56,12 +56,19 @@ def test_approved_record_file_and_canonical_digest(gate):
     assert sum(len(record.tokens) for record in table.records) == 232
     assert sum(len(record.derived_rules) for record in table.records) == 27
     assert [record.body_id for record in table.records] == list(range(40, 59))
-    assert len(table.canonical_bytes) == 32715
+    assert len(table.canonical_bytes) == 33036
     assert (
         hashlib.sha256(table.canonical_bytes).hexdigest()
         == gate.SOURCE_CANONICAL_SHA256
     )
     assert hashlib.sha256(table.raw_bytes).hexdigest() == gate.SOURCE_FILE_SHA256
+
+
+def test_schema_declarations_are_exact_and_ordered(gate):
+    data = _data()
+    assert list(data) == list(gate.TOP_LEVEL_FIELD_ORDER)
+    assert data["allowed_units"] == sorted(gate.UNITS)
+    assert data["allowed_interval_methods"] == sorted(gate.INTERVAL_METHODS)
 
 
 def test_records_are_frozen_slot_values(gate):
@@ -78,6 +85,17 @@ def test_source_mutation_fails_before_numeric_work(gate, tmp_path):
     path = _write_mutation(tmp_path, data)
     with pytest.raises(gate.GateError, match="canonical|file-byte"):
         gate.load_source_records(path)
+
+
+def test_declaration_mutations_fail_before_digest(gate, tmp_path):
+    for key, mutation in (
+        ("allowed_units", lambda values: values.append("bogus")),
+        ("allowed_interval_methods", lambda values: values.reverse()),
+    ):
+        data = _data()
+        mutation(data[key])  # type: ignore[arg-type]
+        with pytest.raises(gate.GateError):
+            gate.load_source_records(_write_mutation(tmp_path, data, f"{key}.json"))
 
 
 def test_quantum_mutation_fails_closed(gate, tmp_path):
@@ -154,10 +172,27 @@ def test_exact_sexagesimal_one_conversion(gate):
 
 def test_interval_schedule_has_three_precisions_and_common_intersection(gate):
     table = gate.load_source_records()
+    before = gate.ctx.prec
     results = gate.evaluate_rules(table)
+    assert gate.ctx.prec == before
     result = results[(56, "radius_au")]
     assert len(result.intervals) == 3
     assert gate._interval_certificate(result, hyp.HYPOTHETICAL_BODIES[56].a)[0]
+
+
+def test_interval_passes_observe_real_precisions(gate, monkeypatch):
+    table = gate.load_source_records()
+    seen: list[int] = []
+    original = gate._eval_rule
+
+    def observe(rule, precision, tokens, results):
+        seen.append(precision)
+        return original(rule, precision, tokens, results)
+
+    monkeypatch.setattr(gate, "_eval_rule", observe)
+    gate.evaluate_rules(table)
+    assert set(seen) == {160, 256, 512}
+    assert seen.count(160) == seen.count(256) == seen.count(512)
 
 
 def test_runtime_field_mutation_is_rejected_without_changing_verifier(
@@ -241,9 +276,9 @@ def test_cli_normal_and_explain():
     assert explain.returncode == 0, explain.stdout + explain.stderr
     gate_output = explain.stdout
     assert gate_output
-    assert "32715 bytes" in gate_output
+    assert "33036 bytes" in gate_output
     assert (
-        "cd8177155f5fa2ec0755c31b46f9aba755fadafa628c89094ac3c8bf283cd46e"
+        "2fa15e3a7ab3ff546171479e4a85d2ebddd9014334fe56dc8464d5ab759fe72a"
         in gate_output
     )
     assert "Neely Cupido" in gate_output

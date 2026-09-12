@@ -46,11 +46,11 @@ from libephemeris.exceptions import UnknownBodyError
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_RECORDS_PATH = ROOT / "docs/methodology/hypothetical-source-records.json"
 CSV_SHA256 = "ea163c1111245a719021baa92beedb5ecf1ebb8f2601a46f9c66a4fc1350cad2"
-SOURCE_FILE_SHA256 = "218df7e92969a4c280518805de77b632b0eee8bbc1860bcc42f6d0bf6edeb101"
+SOURCE_FILE_SHA256 = "3071cd51272bab30037308f8305d91068c17e6e2959be9799e2894c496bfce33"
 SOURCE_CANONICAL_SHA256 = (
-    "cd8177155f5fa2ec0755c31b46f9aba755fadafa628c89094ac3c8bf283cd46e"
+    "2fa15e3a7ab3ff546171479e4a85d2ebddd9014334fe56dc8464d5ab759fe72a"
 )
-SOURCE_CANONICAL_BYTES = 32715
+SOURCE_CANONICAL_BYTES = 33036
 PRECISIONS = (160, 256, 512)
 
 CATEGORIES = frozenset(
@@ -112,6 +112,8 @@ TOP_LEVEL_FIELDS = {
     "allowed_operand_namespaces",
     "allowed_output_exactness",
     "allowed_variants",
+    "allowed_units",
+    "allowed_interval_methods",
     "token_tuple",
     "rule_tuple",
     "records",
@@ -120,6 +122,24 @@ TOP_LEVEL_FIELDS = {
     "allowed_operations",
     "canonical_serialization",
 }
+TOP_LEVEL_FIELD_ORDER = (
+    "schema",
+    "quantum_encoding",
+    "operand_ref_fields",
+    "derived_rule_fields",
+    "allowed_operand_namespaces",
+    "allowed_output_exactness",
+    "allowed_variants",
+    "allowed_units",
+    "allowed_interval_methods",
+    "token_tuple",
+    "rule_tuple",
+    "records",
+    "counts",
+    "allowed_categories",
+    "allowed_operations",
+    "canonical_serialization",
+)
 TOKEN_FIELDS = {
     "body_id",
     "record_key",
@@ -282,10 +302,16 @@ def _exact_keys(mapping: dict[str, Any], expected: set[str], label: str) -> None
 
 
 def _load_json(path: Path) -> tuple[dict[str, Any], bytes]:
-    """Verifier implementation member."""
+    """Load JSON while rejecting duplicate object declarations."""
     raw = path.read_bytes()
+
+    def pairs_hook(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        keys = [key for key, _ in pairs]
+        _require(len(keys) == len(set(keys)), "duplicate JSON declaration")
+        return dict(pairs)
+
     try:
-        value = json.loads(raw.decode("utf-8"))
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=pairs_hook)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise GateError(f"source record is not UTF-8 JSON: {exc}") from exc
     _require(type(value) is dict, "source record root must be an object")
@@ -295,6 +321,9 @@ def _load_json(path: Path) -> tuple[dict[str, Any], bytes]:
 def _validate_declared_schema(data: dict[str, Any]) -> None:
     """Verifier implementation member."""
     _exact_keys(data, TOP_LEVEL_FIELDS, "source record root")
+    _require(
+        tuple(data) == TOP_LEVEL_FIELD_ORDER, "source record top-level order drift"
+    )
     _require(data["schema"] == "G06-SourceRecords-2", "unexpected source schema")
     _require(type(data["quantum_encoding"]) is str, "quantum_encoding must be text")
     _require(
@@ -369,6 +398,11 @@ def _validate_declared_schema(data: dict[str, Any]) -> None:
             "interval_method",
         ],
         "rule tuple drift",
+    )
+    _require(data["allowed_units"] == sorted(UNITS), "unit enum declaration drift")
+    _require(
+        data["allowed_interval_methods"] == sorted(INTERVAL_METHODS),
+        "interval-method enum declaration drift",
     )
     _require(
         data["allowed_categories"]
@@ -603,6 +637,10 @@ def canonical_serialize(records: Iterable[SourceRecord]) -> bytes:
     """Return the independent G06SR2 byte serialization."""
     rows = sorted(records, key=lambda record: (record.body_id, record.record_key))
     output = bytearray(b"G06SR2\n")
+    for declaration in (sorted(UNITS), sorted(INTERVAL_METHODS)):
+        output.extend(len(declaration).to_bytes(4, "big"))
+        for item in declaration:
+            output.extend(_length_prefixed(item))
     output.extend(len(rows).to_bytes(4, "big"))
     for record in rows:
         output.extend(record.body_id.to_bytes(8, "big", signed=True))
@@ -1073,7 +1111,7 @@ def _arb_value(
         }
         return _token_interval(token, precision, integer_component=integer_component)
     result = results[(ref.body_id, ref.key)]
-    return result.intervals[PRECISIONS.index(precision)]
+    return result.intervals[0]
 
 
 def _eval_rule(
@@ -1173,7 +1211,7 @@ def _exact_rule_fraction(
 
 
 def evaluate_rules(table: SourceTable) -> dict[tuple[int, str], _RuleResult]:
-    """Evaluate the registered graph in deterministic topological order."""
+    """Evaluate each graph pass in fresh 160/256/512-bit Arb contexts."""
     tokens = {
         (record.body_id, token.field): token
         for record in table.records
@@ -1184,44 +1222,57 @@ def evaluate_rules(table: SourceTable) -> dict[tuple[int, str], _RuleResult]:
         for record in table.records
         for rule in record.derived_rules
     }
-    pending = set(rules)
-    results: dict[tuple[int, str], _RuleResult] = {}
-    exact_rules: dict[tuple[int, str], Fraction] = {}
-    while pending:
-        ready = sorted(
-            key
-            for key in pending
-            if all(
-                operand.namespace == "token"
-                or (operand.body_id, operand.key) in results
-                for operand in rules[key].operands
-            )
-        )
-        _require(bool(ready), "cannot topologically evaluate derived graph")
-        for key in ready:
-            rule = rules[key]
-            if rule.output_exactness == "exact":
-                exact = _exact_rule_fraction(rule, tokens, exact_rules)
-                intervals = tuple(
-                    _arb_from_fraction(exact, precision) for precision in PRECISIONS
-                )
-                exact_rules[key] = exact
-            else:
-                exact = None
-                intervals = tuple(
-                    _eval_rule(rule, precision, tokens, results)
-                    for precision in PRECISIONS
-                )
-            for interval in intervals:
-                _require(
-                    interval.is_finite()
-                    and not interval.is_zero()
-                    or interval.is_finite(),
-                    f"non-finite rule result {rule.rule_key}",
-                )
-            results[key] = _RuleResult(rule, exact, intervals)
-            pending.remove(key)
-    return results
+    final_results: dict[tuple[int, str], _RuleResult] = {}
+    ambient_precision = ctx.prec
+    try:
+        for precision in PRECISIONS:
+            with ctx.workprec(precision):
+                pending = set(rules)
+                pass_results: dict[tuple[int, str], _RuleResult] = {}
+                exact_rules: dict[tuple[int, str], Fraction] = {}
+                while pending:
+                    ready = sorted(
+                        key
+                        for key in pending
+                        if all(
+                            operand.namespace == "token"
+                            or (operand.body_id, operand.key) in pass_results
+                            for operand in rules[key].operands
+                        )
+                    )
+                    _require(bool(ready), "cannot topologically evaluate derived graph")
+                    for key in ready:
+                        rule = rules[key]
+                        if rule.output_exactness == "exact":
+                            exact = _exact_rule_fraction(rule, tokens, exact_rules)
+                            result = _arb_from_fraction(exact, precision)
+                            exact_rules[key] = exact
+                        else:
+                            exact = None
+                            result = _eval_rule(rule, precision, tokens, pass_results)
+                        _require(
+                            result.is_finite(),
+                            f"non-finite rule result {rule.rule_key}",
+                        )
+                        pass_results[key] = _RuleResult(rule, exact, (result,))
+                        pending.remove(key)
+                for key, pass_result in pass_results.items():
+                    previous = final_results.get(key)
+                    if previous is None:
+                        final_results[key] = _RuleResult(
+                            pass_result.rule,
+                            pass_result.exact,
+                            (pass_result.intervals[0],),
+                        )
+                    else:
+                        final_results[key] = _RuleResult(
+                            pass_result.rule,
+                            pass_result.exact,
+                            previous.intervals + (pass_result.intervals[0],),
+                        )
+    finally:
+        ctx.prec = ambient_precision
+    return final_results
 
 
 def _widen_interval(interval: arb, precision: int) -> arb:

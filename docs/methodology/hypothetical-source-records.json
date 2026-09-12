@@ -40,6 +40,31 @@
     "kepler_radius",
     "rate_cancellation"
   ],
+  "allowed_units": [
+    "arcminute",
+    "arcsecond",
+    "au",
+    "day",
+    "degree",
+    "degree_per_century",
+    "degree_per_day",
+    "dimensionless",
+    "integer",
+    "jd_tt",
+    "jd_ut",
+    "julian_year",
+    "metre",
+    "metre3_per_second2",
+    "second",
+    "text"
+  ],
+  "allowed_interval_methods": [
+    "arb_outward",
+    "arb_outward_intersection",
+    "ast_structural",
+    "exact_rational_one_conversion",
+    "structural_exact"
+  ],
   "token_tuple": [
     "body_id",
     "record_key",
@@ -3260,8 +3285,13 @@
       "interval_method"
     ],
     "quantum_encoding": "N:<base-10 integer> for integer, D:<original Decimal string> for string, Z: for null; no float encodings",
-    "bytes": "magic, record_count, then each record body_id, LP record_key/name/category, token_count, each token LP record_key/field/token/tagged quantum/unit/category/locator_key, rule_count, each rule body_id, LP rule_key/variant, operand_count and each operand LP namespace, I64 body_id, LP key, then LP output_category/output_unit/tagged output_quantum/output_exactness/interval_method",
-    "byte_count": 32715,
-    "sha256": "cd8177155f5fa2ec0755c31b46f9aba755fadafa628c89094ac3c8bf283cd46e"
+    "bytes": "magic, allowed_units_count and sorted LP allowed_units, allowed_interval_methods_count and sorted LP allowed_interval_methods, record_count, then each record body_id, LP record_key/name/category, token_count, each token LP record_key/field/token/tagged quantum/unit/category/locator_key, rule_count, each rule body_id, LP rule_key/variant, operand_count and each operand LP namespace, I64 body_id, LP key, then LP output_category/output_unit/tagged output_quantum/output_exactness/interval_method",
+    "byte_count": 33036,
+    "sha256": "2fa15e3a7ab3ff546171479e4a85d2ebddd9014334fe56dc8464d5ab759fe72a",
+    "declaration_order": [
+      "allowed_units",
+      "allowed_interval_methods"
+    ],
+    "declaration_encoding": "after magic_utf8, each declaration is a U32 item count followed by each sorted item as LP UTF-8; then record_count and record bodies"
   }
 }
