@@ -65,7 +65,7 @@ class TestDeltatWithUserdef:
         ephem.set_delta_t_userdef(None)
 
     @pytest.mark.unit
-    def test_swe_deltat_returns_userdef_value(self):
+    def test_public_deltat_returns_userdef_value(self):
         """deltat should return user-defined value when set."""
         dt_value = 0.00075  # ~65 seconds in days
         ephem.set_delta_t_userdef(dt_value)
@@ -75,7 +75,7 @@ class TestDeltatWithUserdef:
         assert result == dt_value
 
     @pytest.mark.unit
-    def test_swe_deltat_ignores_jd_when_userdef_set(self):
+    def test_public_deltat_ignores_jd_when_userdef_set(self):
         """deltat should return same value regardless of JD when userdef is set."""
         dt_value = 0.00075
         ephem.set_delta_t_userdef(dt_value)
@@ -89,7 +89,7 @@ class TestDeltatWithUserdef:
         assert ephem.deltat(jd3) == dt_value
 
     @pytest.mark.unit
-    def test_swe_deltat_uses_computed_when_cleared(self):
+    def test_public_deltat_uses_computed_when_cleared(self):
         """deltat should use computed value after clearing userdef."""
         dt_userdef = 0.00075
         ephem.set_delta_t_userdef(dt_userdef)
@@ -108,7 +108,7 @@ class TestDeltatWithUserdef:
         assert 60 < dt_seconds < 70
 
     @pytest.mark.unit
-    def test_swe_deltat_userdef_zero_returns_zero(self):
+    def test_public_deltat_userdef_zero_returns_zero(self):
         """deltat should return exactly 0.0 when userdef is set to 0."""
         ephem.set_delta_t_userdef(0.0)
         jd = 2451545.0  # J2000
@@ -173,7 +173,7 @@ class TestDeltatExWithUserdef:
         ephem.set_delta_t_userdef(None)
 
     @pytest.mark.unit
-    def test_swe_deltat_ex_returns_userdef_value(self):
+    def test_public_deltat_ex_returns_userdef_value(self):
         """deltat_ex should return user-defined value when set."""
         dt_value = 0.00075  # ~65 seconds in days
         ephem.set_delta_t_userdef(dt_value)
@@ -183,7 +183,7 @@ class TestDeltatExWithUserdef:
         assert result == dt_value
 
     @pytest.mark.unit
-    def test_swe_deltat_ex_userdef_ignores_flag(self):
+    def test_public_deltat_ex_userdef_ignores_flag(self):
         """deltat_ex should return userdef regardless of ephemeris flag."""
         dt_value = 0.00075
         ephem.set_delta_t_userdef(dt_value)
@@ -200,7 +200,7 @@ class TestDeltatExWithUserdef:
         assert result_moseph == dt_value
 
     @pytest.mark.unit
-    def test_swe_deltat_ex_matches_swe_deltat_with_userdef(self):
+    def test_public_deltat_ex_matches_public_deltat_with_userdef(self):
         """deltat and deltat_ex should match when userdef is set."""
         dt_value = 0.00075
         ephem.set_delta_t_userdef(dt_value)
@@ -213,7 +213,7 @@ class TestDeltatExWithUserdef:
 
 
 class TestDeltaTUserdefAliases:
-    """Test that both swe_ and non-prefixed aliases work."""
+    """Test that both public_ and non-prefixed aliases work."""
 
     @pytest.fixture(autouse=True)
     def reset_delta_t(self):
@@ -223,12 +223,12 @@ class TestDeltaTUserdefAliases:
         ephem.set_delta_t_userdef(None)
 
     @pytest.mark.unit
-    def test_swe_set_delta_t_userdef_exists(self):
+    def test_public_set_delta_t_userdef_exists(self):
         """set_delta_t_userdef alias should exist."""
         assert hasattr(ephem, "set_delta_t_userdef")
 
     @pytest.mark.unit
-    def test_swe_get_delta_t_userdef_exists(self):
+    def test_public_get_delta_t_userdef_exists(self):
         """get_delta_t_userdef alias should exist."""
         assert hasattr(ephem, "get_delta_t_userdef")
 
@@ -244,7 +244,7 @@ class TestDeltaTUserdefAliases:
 
     @pytest.mark.unit
     def test_aliases_are_same_function(self):
-        """swe_ and non-prefixed aliases should be the same function."""
+        """public_ and non-prefixed aliases should be the same function."""
 
 
 class TestDeltaTUserdefUseCases:

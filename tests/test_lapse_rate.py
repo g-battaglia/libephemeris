@@ -30,8 +30,8 @@ class TestLapseRateBasic:
         assert hasattr(ephem, "set_lapse_rate")
         assert callable(ephem.set_lapse_rate)
 
-    def test_swe_prefixed_versions_exported(self):
-        """Test that swe_ prefixed versions are exported."""
+    def test_public_prefixed_versions_exported(self):
+        """Test that public_ prefixed versions are exported."""
         assert hasattr(ephem, "get_lapse_rate")
         assert hasattr(ephem, "set_lapse_rate")
         assert callable(ephem.get_lapse_rate)
@@ -164,8 +164,8 @@ class TestLapseRateGlobalState:
         ephem.set_lapse_rate(None)
         assert state._LAPSE_RATE is None
 
-    def test_swe_prefixed_functions_same_as_unprefixed(self):
-        """Test that swe_ prefixed functions behave identically."""
+    def test_public_prefixed_functions_same_as_unprefixed(self):
+        """Test that public_ prefixed functions behave identically."""
         ephem.set_lapse_rate(0.006)
         assert ephem.get_lapse_rate() == 0.006
         assert ephem.get_lapse_rate() == 0.006

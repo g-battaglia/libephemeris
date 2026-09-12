@@ -17,8 +17,7 @@ agreement with libephemeris eclipse computations.
 Note on excluded eclipses:
     - 2015-Apr-04 lunar: Excluded because it's the most borderline total lunar
       eclipse of the century (umbra magnitude 1.0008, total duration 4m43s).
-      Different shadow enlargement models (NASA Danjon vs Swiss Ephemeris) may
-      classify it differently.
+      Different shadow-enlargement conventions can classify it differently.
     - 2027-Jul-18 lunar: Excluded because it's the smallest penumbral eclipse
       of the century (penumbral magnitude 0.0014), too marginal to reliably
       detect.

@@ -37,8 +37,8 @@ class TestLunEclipseGammaFunctionSignature:
 
         assert callable(lun_eclipse_gamma)
 
-    def test_swe_function_exists_in_package(self):
-        """Test that swe_ prefixed function is exported."""
+    def test_public_function_exists_in_package(self):
+        """Test that public_ prefixed function is exported."""
         from libephemeris import lun_eclipse_gamma
 
         assert callable(lun_eclipse_gamma)
@@ -61,7 +61,7 @@ class TestLunEclipseGammaFunctionSignature:
         assert isinstance(result, float)
 
 
-class TestSweLunEclipseGammaFunctionSignature:
+class TestPublicLunEclipseGammaFunctionSignature:
     """Test lun_eclipse_gamma function signature."""
 
     def test_function_exists_in_module(self):
@@ -172,8 +172,8 @@ class TestGammaValues:
 class TestGammaConsistency:
     """Test consistency of gamma calculations."""
 
-    def test_swe_function_matches_legacy_function(self):
-        """Test that swe_ function gives same result as legacy function."""
+    def test_public_function_matches_legacy_function(self):
+        """Test that public_ function gives same result as legacy function."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
         result_legacy = lun_eclipse_gamma(jd_eclipse)

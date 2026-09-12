@@ -24,7 +24,7 @@ from libephemeris import (
 )
 
 
-class TestSweSolEclipseWhereSignature:
+class TestPublicSolEclipseWhereSignature:
     """Test the public ``sol_eclipse_where`` signature and result layout."""
 
     def test_function_exists(self):
@@ -62,7 +62,7 @@ class TestSweSolEclipseWhereSignature:
         assert len(attr) == 20
 
 
-class TestSweSolEclipseWhereApril2024:
+class TestPublicSolEclipseWhereApril2024:
     """Test sol_eclipse_where with April 8, 2024 total solar eclipse."""
 
     def setup_method(self):
@@ -167,7 +167,7 @@ class TestSweSolEclipseWhereApril2024:
         assert 0 <= separation < 0.5, f"Separation {separation} out of range"
 
 
-class TestSweSolEclipseHowSignature:
+class TestPublicSolEclipseHowSignature:
     """Test the public ``sol_eclipse_how`` signature and result layout."""
 
     def test_function_exists(self):
@@ -219,12 +219,12 @@ class TestSweSolEclipseHowSignature:
         """Test that legacy sol_eclipse_how function works."""
         tjd_ut = 2460409.26
 
-        # Now aliases swe_ signature: (jd, geopos, ifl)
+        # Now aliases public_ signature: (jd, geopos, ifl)
         retflag, attr = sol_eclipse_how(tjd_ut, (-96.797, 32.7767, 0), FLG_SWIEPH)
         assert len(attr) == 20
 
 
-class TestSweSolEclipseHowDallasApril2024:
+class TestPublicSolEclipseHowDallasApril2024:
     """Test sol_eclipse_how at Dallas during April 8, 2024 total eclipse."""
 
     def setup_method(self):
@@ -316,7 +316,7 @@ class TestSweSolEclipseHowDallasApril2024:
         )
 
 
-class TestSweSolEclipseHowNYCApril2024:
+class TestPublicSolEclipseHowNYCApril2024:
     """Test sol_eclipse_how at NYC during April 8, 2024 eclipse (partial)."""
 
     def setup_method(self):
@@ -354,7 +354,7 @@ class TestSweSolEclipseHowNYCApril2024:
         )
 
 
-class TestSweSolEclipseHowNoEclipse:
+class TestPublicSolEclipseHowNoEclipse:
     """Test sol_eclipse_how when no eclipse is happening."""
 
     def test_no_eclipse_returns_zero_flag(self):
@@ -371,7 +371,7 @@ class TestSweSolEclipseHowNoEclipse:
         )
 
 
-class TestSweSolEclipseWhereTimeVariation:
+class TestPublicSolEclipseWhereTimeVariation:
     """Test sol_eclipse_where at different times during eclipse."""
 
     def test_eclipse_path_moves_east(self):
@@ -397,7 +397,7 @@ class TestSweSolEclipseWhereTimeVariation:
             pass  # Complex to test due to longitude wrapping
 
 
-class TestSweSolEclipseWherePartialEclipse:
+class TestPublicSolEclipseWherePartialEclipse:
     """Test sol_eclipse_where during a partial-only eclipse."""
 
     def test_partial_eclipse_returns_partial_flag(self):
@@ -414,7 +414,7 @@ class TestSweSolEclipseWherePartialEclipse:
             assert geopos[0] != 0 or geopos[1] != 0
 
 
-class TestSweSolEclipseHowEdgeCases:
+class TestPublicSolEclipseHowEdgeCases:
     """Test edge cases for sol_eclipse_how."""
 
     def test_high_altitude_observer(self):
@@ -451,7 +451,7 @@ class TestSweSolEclipseHowEdgeCases:
         assert isinstance(retflag, int)
 
 
-class TestSweSolEclipseWhereLimits:
+class TestPublicSolEclipseWhereLimits:
     """Validate the public ``sol_eclipse_where`` result contract."""
 
     def setup_method(self):

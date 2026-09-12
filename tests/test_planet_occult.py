@@ -88,7 +88,7 @@ class TestPlanetOccultWhenGlob:
         with pytest.raises(ValueError):
             planet_occult_when_glob(jd_start, VENUS, 0, "UnknownStar123", FLG_SWIEPH, 0)
 
-    def test_swe_alias(self):
+    def test_public_alias(self):
         """Test that planet_occult_when_glob is an alias."""
 
     def test_search_terminates_properly(self):
@@ -149,7 +149,7 @@ class TestPlanetOccultWhenLoc:
                 jd_start, VENUS, VENUS, "", 40.0, -74.0, 0, FLG_SWIEPH
             )
 
-    def test_swe_alias(self):
+    def test_public_alias(self):
         """Test that planet_occult_when_loc is an alias."""
 
 
@@ -218,8 +218,8 @@ class TestPlanetOccultImports:
         assert callable(planet_occult_when_glob)
         assert callable(planet_occult_when_loc)
 
-    def test_swe_aliases_are_same_function(self):
-        """Test that swe_* are aliases to base functions."""
+    def test_public_aliases_are_same_function(self):
+        """Test that public_* are aliases to base functions."""
 
 
 class TestPlanetOccultDocumentation:

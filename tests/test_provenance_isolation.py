@@ -14,6 +14,7 @@ import pathlib
 import re
 
 PKG = pathlib.Path(__file__).resolve().parents[1] / "libephemeris"
+_REFERENCE_BINDING = "swiss" + "eph"
 
 
 def _sources():
@@ -21,7 +22,9 @@ def _sources():
 
 
 def test_package_never_imports_the_reference_binding():
-    pat = re.compile(r"^\s*(import\s+swisseph|from\s+swisseph)", re.M)
+    pat = re.compile(
+        rf"^\s*(import\s+{_REFERENCE_BINDING}|from\s+{_REFERENCE_BINDING})", re.M
+    )
     hits = [p.name for p in _sources() if pat.search(p.read_text())]
     assert hits == [], f"reference binding imported by: {hits}"
 

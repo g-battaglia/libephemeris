@@ -123,10 +123,10 @@ def test_set_jpl_file_changes_file():
     set_jpl_file("de440.bsp")
 
 
-def test_swe_set_jpl_file_alias_works():
+def test_public_set_jpl_file_alias_works():
     """Test that set_jpl_file() alias works the same as set_jpl_file()"""
 
-    # Set a different file using the swe_ prefixed version
+    # Set a different file using the public_ prefixed version
     set_jpl_file("de430.bsp")
 
     # Verify the global variable was updated
@@ -211,7 +211,7 @@ def test_get_library_path_returns_absolute_path():
     set_ephe_path(None)
 
 
-def test_swe_get_library_path_alias():
+def test_public_get_library_path_alias():
     """Test that get_library_path() is an alias for get_library_path()"""
     # Reset to default
     set_ephe_path(None)

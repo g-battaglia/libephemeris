@@ -37,8 +37,8 @@ class TestLunEclipseUmbralMagnitudeFunctionSignature:
 
         assert callable(lun_eclipse_umbral_magnitude)
 
-    def test_swe_function_exists_in_package(self):
-        """Test that swe_ prefixed function is exported."""
+    def test_public_function_exists_in_package(self):
+        """Test that public_ prefixed function is exported."""
         from libephemeris import lun_eclipse_umbral_magnitude
 
         assert callable(lun_eclipse_umbral_magnitude)
@@ -61,7 +61,7 @@ class TestLunEclipseUmbralMagnitudeFunctionSignature:
         assert isinstance(result, float)
 
 
-class TestSweLunEclipseUmbralMagnitudeFunctionSignature:
+class TestPublicLunEclipseUmbralMagnitudeFunctionSignature:
     """Test lun_eclipse_umbral_magnitude function signature."""
 
     def test_function_exists_in_module(self):
@@ -175,8 +175,8 @@ class TestUmbralMagnitudeConsistency:
             f"from_how={umbral_mag_from_how}"
         )
 
-    def test_swe_function_matches_legacy_function(self):
-        """Test that swe_ function gives same result as legacy function."""
+    def test_public_function_matches_legacy_function(self):
+        """Test that public_ function gives same result as legacy function."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
         result_legacy = lun_eclipse_umbral_magnitude(jd_eclipse)

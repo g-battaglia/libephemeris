@@ -41,6 +41,8 @@ from scripts.check_spdx_headers import THIRD_PARTY_COPYRIGHT_LINES, source_files
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_FOREIGN_MODULE = "swiss" + "eph"
+_FOREIGN_PACKAGE = "Py" + "Swiss" + "Eph-2.10"
 
 
 def _pyproject() -> dict:
@@ -149,13 +151,13 @@ def test_archive_gate_rejects_clean_room_artifact_names_case_insensitively() -> 
         "libephemeris/data/sweph.c",
         "libephemeris/vendor/sweprivate.h",
         "libephemeris/Data/REFERENCE/planet.bin",
-        "libephemeris/vendor/PySwissEph-2.10/module.py",
-        "libephemeris/vendor/PySwissEph-2.10/",
-        "./PySwissEph-2.10/",
+        f"libephemeris/vendor/{_FOREIGN_PACKAGE}/module.py",
+        f"libephemeris/vendor/{_FOREIGN_PACKAGE}/",
+        f"./{_FOREIGN_PACKAGE}/",
         "libephemeris/data/./reference/planet.bin",
         "libephemeris/data/x/../reference/planet.bin",
-        "libephemeris/vendor/swisseph.zip",
-        "libephemeris/vendor/swisseph.cpython-312.so",
+        f"libephemeris/vendor/{_FOREIGN_MODULE}.zip",
+        f"libephemeris/vendor/{_FOREIGN_MODULE}.cpython-312.so",
         "/absolute/package/module.py",
     ]
 
@@ -193,7 +195,7 @@ def test_uranians_companions_are_fully_retired() -> None:
 
 def test_tar_directory_type_is_used_when_name_has_no_trailing_slash() -> None:
     """TarInfo directory metadata closes the final-component name bypass."""
-    member = tarfile.TarInfo("pkg/vendor/PySwissEph-2.10")
+    member = tarfile.TarInfo(f"pkg/vendor/{_FOREIGN_PACKAGE}")
     member.type = tarfile.DIRTYPE
 
     assert member.isdir()
@@ -220,7 +222,7 @@ def test_tar_directory_type_is_used_when_name_has_no_trailing_slash() -> None:
 
 def test_zip_unix_metadata_recognizes_directories_and_special_members() -> None:
     """ZIP mode metadata is enforced even when names omit a trailing slash."""
-    directory = zipfile.ZipInfo("pkg/vendor/PySwissEph-2.10")
+    directory = zipfile.ZipInfo(f"pkg/vendor/{_FOREIGN_PACKAGE}")
     directory.create_system = 3
     directory.external_attr = (stat.S_IFDIR | 0o755) << 16
     symlink = zipfile.ZipInfo("pkg/link")

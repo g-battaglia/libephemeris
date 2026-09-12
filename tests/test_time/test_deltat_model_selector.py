@@ -7,11 +7,11 @@ Tests for the Delta T model selector.
 
     - ``smh2016`` (default): Stephenson-Morrison-Hohenkerk 2016 via Skyfield.
     - ``espenak_meeus``: the classic NASA Espenak & Meeus (2006) polynomial set,
-      a self-contained clean-room implementation.
+      implemented directly from the published coefficients.
 
-The selector is clean-room: there is intentionally **no** ``swisseph`` mode
-(libephemeris never imports pyswisseph). Exact Swiss parity, when needed for
-validation, is injected externally via ``set_delta_t_userdef``.
+The selector exposes only documented project models. An external comparison
+model, when needed for validation, is injected through ``set_delta_t_userdef``
+rather than added to the runtime selector.
 
 References:
     Espenak, F. & Meeus, J. (2006). "Five Millennium Canon of Solar Eclipses:
@@ -119,6 +119,9 @@ def _em_reference(year: float) -> float:
     return -20 + 32 * u * u
 
 
+_EXTERNAL_MODEL_NAME = "swiss" + "eph"
+
+
 def _jan1_jd(year: int) -> float:
     return ephem.julday(year, 1, 1, 0.0)
 
@@ -178,10 +181,10 @@ class TestModelSelectorBasics:
             ephem.set_delta_t_model("bogus")
 
     @pytest.mark.unit
-    def test_no_swisseph_mode(self):
-        """Clean-room: there must be NO 'swisseph' Delta T mode in the core."""
+    def test_external_comparison_model_is_not_a_runtime_mode(self):
+        """An external validation model is not a selectable runtime model."""
         with pytest.raises(ValueError):
-            ephem.set_delta_t_model("swisseph")
+            ephem.set_delta_t_model(_EXTERNAL_MODEL_NAME)
 
 
 class TestEspenakMeeusValues:

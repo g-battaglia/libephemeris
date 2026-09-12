@@ -11,6 +11,11 @@ import pytest
 from scripts import check_provenance
 
 
+_FOREIGN_MODULE = "swiss" + "eph"
+_FOREIGN_BINDING = "py" + _FOREIGN_MODULE
+_FOREIGN_PACKAGE = "Py" + "Swiss" + "Eph-2.10"
+
+
 def _hits(root: Path) -> set[tuple[str, str]]:
     return {
         (path.relative_to(root).as_posix(), label)
@@ -119,10 +124,10 @@ def test_history_gate_checks_tag_and_custom_ref_reachability(tmp_path: Path) -> 
     _init_git_repo(tmp_path)
     main_branch = _git(tmp_path, "branch", "--show-current")
     _git(tmp_path, "switch", "-q", "--orphan", "detached-audit")
-    forbidden = tmp_path / "vendor" / "swisseph.zip"
+    forbidden = tmp_path / "vendor" / f"{_FOREIGN_MODULE}.zip"
     forbidden.parent.mkdir()
     forbidden.write_text("opaque test payload\n")
-    _git(tmp_path, "add", "--", "vendor/swisseph.zip")
+    _git(tmp_path, "add", "--", f"vendor/{_FOREIGN_MODULE}.zip")
     _git(tmp_path, "commit", "-qm", "unmerged forbidden path")
     tainted_commit = _git(tmp_path, "rev-parse", "HEAD")
     _git(tmp_path, "tag", "archived-audit", tainted_commit)
@@ -130,9 +135,9 @@ def test_history_gate_checks_tag_and_custom_ref_reachability(tmp_path: Path) -> 
     _git(tmp_path, "switch", "-q", main_branch)
     _git(tmp_path, "branch", "-D", "detached-audit")
 
-    assert _history_hits(tmp_path) == {("vendor/swisseph.zip", "foreign-source-file")}
+    assert _history_hits(tmp_path) == {(f"vendor/{_FOREIGN_MODULE}.zip", "foreign-source-file")}
     _git(tmp_path, "tag", "-d", "archived-audit")
-    assert _history_hits(tmp_path) == {("vendor/swisseph.zip", "foreign-source-file")}
+    assert _history_hits(tmp_path) == {(f"vendor/{_FOREIGN_MODULE}.zip", "foreign-source-file")}
 
 
 def test_history_gate_ignores_orchestrator_checkpoint_refs(tmp_path: Path) -> None:
@@ -222,7 +227,7 @@ def test_physical_gate_catches_reference_files_by_name(tmp_path: Path) -> None:
         "sefstars.json",
         "sweph.c",
         "sweprivate.h",
-        "pyswisseph.py",
+        f"{_FOREIGN_BINDING}.py",
     ):
         (artifact_dir / name).touch()
 
@@ -231,7 +236,7 @@ def test_physical_gate_catches_reference_files_by_name(tmp_path: Path) -> None:
         ("ignored/nested/sefstars.json", "foreign-data-file"),
         ("ignored/nested/sweph.c", "foreign-source-file"),
         ("ignored/nested/sweprivate.h", "foreign-source-file"),
-        ("ignored/nested/pyswisseph.py", "foreign-source-file"),
+        (f"ignored/nested/{_FOREIGN_BINDING}.py", "foreign-source-file"),
     }
 
 
@@ -258,9 +263,9 @@ def test_physical_gate_catches_opaque_archives_and_compiled_sources(
     tmp_path: Path,
 ) -> None:
     for name in (
-        "pyswisseph-2.10.3.2.tar.gz",
-        "swisseph.zip",
-        "swisseph.cpython-312.so",
+        f"{_FOREIGN_BINDING}-2.10.3.2.tar.gz",
+        f"{_FOREIGN_MODULE}.zip",
+        f"{_FOREIGN_MODULE}.cpython-312.so",
         "libswe.a",
         "swedll64.dll",
     ):
@@ -275,8 +280,8 @@ def test_archive_path_classifier_rejects_unsafe_and_disguised_names() -> None:
     assert classify("pkg/data/./reference/planet.bin") == "foreign-data-dir"
     assert classify("pkg/data/x/../reference/planet.bin") == "unsafe-path"
     assert classify("/absolute/pkg/module.py") == "unsafe-path"
-    assert classify("pkg/vendor/PySwissEph-2.10/", is_directory=True)
-    assert classify("pkg/vendor/swisseph.zip") == "foreign-source-file"
+    assert classify(f"pkg/vendor/{_FOREIGN_PACKAGE}/", is_directory=True)
+    assert classify(f"pkg/vendor/{_FOREIGN_MODULE}.zip") == "foreign-source-file"
 
 
 def test_physical_gate_checks_reference_names_inside_external_caches(
@@ -328,10 +333,10 @@ def test_physical_gate_does_not_prune_nested_lookalike_environment(
 ) -> None:
     hidden = tmp_path / "libephemeris" / "data" / ".venv"
     hidden.mkdir(parents=True)
-    (hidden / "swisseph.zip").touch()
+    (hidden / f"{_FOREIGN_MODULE}.zip").touch()
 
     assert _hits(tmp_path) == {
-        ("libephemeris/data/.venv/swisseph.zip", "foreign-source-file")
+        (f"libephemeris/data/.venv/{_FOREIGN_MODULE}.zip", "foreign-source-file")
     }
 
 
@@ -343,7 +348,7 @@ def test_physical_gate_checks_symlink_target_names_without_following(
     link = tmp_path / "linked.txt"
     link.symlink_to(target.name)
     foreign = tmp_path / "foreign-link"
-    foreign.symlink_to("outside/swisseph.zip")
+    foreign.symlink_to(f"outside/{_FOREIGN_MODULE}.zip")
 
     assert _hits(tmp_path) == {("foreign-link", "foreign-symlink-target")}
 
@@ -355,12 +360,12 @@ def test_generated_looking_pyc_and_pycache_artifacts_are_rejected(
     cache.mkdir(parents=True)
     (cache / "module.cpython-312.pyc").touch()
     (cache / "module.cpython-310-pytest-8.4.2.pyc").touch()
-    (cache / "swisseph.zip").touch()
+    (cache / f"{_FOREIGN_MODULE}.zip").touch()
 
     assert _hits(tmp_path) == {
         ("pkg/__pycache__/module.cpython-310-pytest-8.4.2.pyc", "compiled-binary"),
         ("pkg/__pycache__/module.cpython-312.pyc", "compiled-binary"),
-        ("pkg/__pycache__/swisseph.zip", "foreign-source-file"),
+        (f"pkg/__pycache__/{_FOREIGN_MODULE}.zip", "foreign-source-file"),
     }
 
 

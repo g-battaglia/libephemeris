@@ -125,18 +125,18 @@ class TestRoundTrip:
             )
 
 
-class TestSweAliases:
-    """Test swe_ prefixed aliases."""
+class TestPublicAliases:
+    """Test public_ prefixed aliases."""
 
     @pytest.mark.unit
-    def test_swe_lat_to_lmt_exists(self):
+    def test_public_lat_to_lmt_exists(self):
         """lat_to_lmt is an alias for lat_to_lmt."""
         r1 = swe.lat_to_lmt(JD_J2000, 10.0)
         r2 = swe.lat_to_lmt(JD_J2000, 10.0)
         assert r1 == r2
 
     @pytest.mark.unit
-    def test_swe_lmt_to_lat_exists(self):
+    def test_public_lmt_to_lat_exists(self):
         """lmt_to_lat is an alias for lmt_to_lat."""
         r1 = swe.lmt_to_lat(JD_J2000, 10.0)
         r2 = swe.lmt_to_lat(JD_J2000, 10.0)

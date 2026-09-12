@@ -35,8 +35,8 @@ class TestSolEclipseMagnitudeAtLocSignature:
 
         assert callable(sol_eclipse_magnitude_at_loc)
 
-    def test_swe_version_exported(self):
-        """Test that swe_ prefixed version is exported."""
+    def test_public_version_exported(self):
+        """Test that public_ prefixed version is exported."""
         from libephemeris import sol_eclipse_magnitude_at_loc
 
         assert callable(sol_eclipse_magnitude_at_loc)
@@ -74,7 +74,7 @@ class TestSolEclipseMagnitudeAtLocSignature:
         assert isinstance(result, float)
 
 
-class TestSweSolEclipseMagnitudeAtLocSignature:
+class TestPublicSolEclipseMagnitudeAtLocSignature:
     """Test sol_eclipse_magnitude_at_loc function signature."""
 
     def test_function_exists(self):
@@ -231,8 +231,8 @@ class TestConsistencyWithSweEclipseHow:
             )
 
 
-class TestSweApiConvention:
-    """Test that swe_ version follows the reference ephemeris API conventions."""
+class TestPublicApiConvention:
+    """Test that public_ version follows the reference ephemeris API conventions."""
 
     def test_geopos_lon_lat_order(self):
         """Test that geopos uses [lon, lat, alt] order."""

@@ -199,7 +199,7 @@ class TestLunEclipseWhenLoc:
         # during moonrise/moonset, but it should still be reasonable
         assert -90 <= moon_alt <= 90
 
-    def test_swe_alias(self):
+    def test_public_alias(self):
         """Test that lun_eclipse_when_loc matches lun_eclipse_when_loc."""
         jd_start = julday(2024, 1, 1, 0)
         cape_town_lat, cape_town_lon = -33.9249, 18.4241
@@ -207,7 +207,7 @@ class TestLunEclipseWhenLoc:
         ecl_type1, times1, attr1 = lun_eclipse_when_loc(
             jd_start, (cape_town_lon, cape_town_lat, 0.0)
         )
-        # swe_ version takes geopos tuple: [lon, lat, alt]
+        # public_ version takes geopos tuple: [lon, lat, alt]
         geopos = [cape_town_lon, cape_town_lat, 0]
         ecl_type2, times2, attr2 = lun_eclipse_when_loc(jd_start, geopos)
 

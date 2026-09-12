@@ -112,10 +112,10 @@ class TestFastCalcConsistency:
 
             # Compare with calc_ut (LEB mode)
             swe.close()
-            swe_result, _ = swe.calc_ut(jd, body_id, flags)
+            public_result, _ = swe.calc_ut(jd, body_id, flags)
 
             # Longitude within 1 arcsecond
-            lon_diff = abs(fast_result[0] - swe_result[0])
+            lon_diff = abs(fast_result[0] - public_result[0])
             if lon_diff > 180:
                 lon_diff = 360 - lon_diff
             assert lon_diff < 1.0 / 3600, (

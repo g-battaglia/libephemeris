@@ -1171,8 +1171,8 @@ class TestLocalEclipseRegression:
         assert type_leb == type_sf, f"Type: LEB={type_leb} SF={type_sf}"
 
     @pytest.mark.slow
-    def test_swe_sol_eclipse_when_loc(self):
-        """swe_ API local solar eclipse."""
+    def test_public_sol_eclipse_when_loc(self):
+        """public_ API local solar eclipse."""
         from libephemeris.eclipse import sol_eclipse_when_loc
 
         jd = julday(2024, 1, 1, 0.0)

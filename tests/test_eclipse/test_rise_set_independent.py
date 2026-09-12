@@ -1,6 +1,6 @@
 """Independent (erfa) validation of rise/set/twilight.
 
-The existing rise/set tests check ordering + loose bounds vs Swiss Ephemeris.
+The existing rise/set tests check ordering and broad public-contract bounds.
 These adjudicate rise_trans against an independent observed-altitude reference:
 
   * Sun rise + astronomical twilight via erfa.atco13 (observed zenith distance),
