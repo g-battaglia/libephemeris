@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Diagnose Chebyshev fitting error for Saturn segment around JD 2501964.8.
 
 Directly evaluates the generator pipeline at Chebyshev nodes for one segment,
@@ -76,7 +78,7 @@ def eval_pipeline_at_jds(jds_array):
     return result  # (N, 3): lon, lat, dist
 
 
-def eval_swe_calc_at_jds(jds_array):
+def eval_ephem_calc_at_jds(jds_array):
     """Evaluate calc at given JDs."""
     ephem.set_calc_mode("skyfield")
     results = np.zeros((len(jds_array), 3))
@@ -122,15 +124,15 @@ def main():
     pipeline_vals = eval_pipeline_at_jds(node_jds)
 
     # Method B: calc (scalar, reference)
-    swe_vals = eval_swe_calc_at_jds(node_jds)
+    ephem_vals = eval_ephem_calc_at_jds(node_jds)
 
     print("\nNode-by-node comparison (pipeline vs calc):")
     for i in range(DEGREE + 1):
-        lon_err = ang_diff(pipeline_vals[i, 0], swe_vals[i, 0]) * 3600
-        abs(pipeline_vals[i, 1] - swe_vals[i, 1]) * 3600
+        lon_err = ang_diff(pipeline_vals[i, 0], ephem_vals[i, 0]) * 3600
+        abs(pipeline_vals[i, 1] - ephem_vals[i, 1]) * 3600
         print(
             f"  node {i:2d}: JD={node_jds[i]:.6f}  "
-            f"pipe_lon={pipeline_vals[i, 0]:.10f}  swe_lon={swe_vals[i, 0]:.10f}  "
+            f"pipe_lon={pipeline_vals[i, 0]:.10f}  ephem_lon={ephem_vals[i, 0]:.10f}  "
             f'diff={lon_err:.6f}"'
         )
 
@@ -142,21 +144,21 @@ def main():
         coeffs_pipe[c] = chebfit(nodes_01, pipe_fit[:, c], DEGREE)
 
     # Fit Chebyshev to calc values
-    swe_fit = swe_vals.copy()
-    swe_fit[:, 0] = np.degrees(np.unwrap(np.radians(swe_fit[:, 0])))
-    coeffs_swe = np.zeros((3, DEGREE + 1))
+    ephem_fit = ephem_vals.copy()
+    ephem_fit[:, 0] = np.degrees(np.unwrap(np.radians(ephem_fit[:, 0])))
+    coeffs_ephem = np.zeros((3, DEGREE + 1))
     for c in range(3):
-        coeffs_swe[c] = chebfit(nodes_01, swe_fit[:, c], DEGREE)
+        coeffs_ephem[c] = chebfit(nodes_01, ephem_fit[:, c], DEGREE)
 
     # Evaluate both fits at test points
     n_test = 50
     print(f"\n--- Verification at {n_test} intermediate points ---")
     print(
-        f"{'JD':>16s}  {'pipe_fit_err':>14s}  {'swe_fit_err':>14s}  {'pipe_vs_swe':>14s}"
+        f"{'JD':>16s}  {'pipe_fit_err':>14s}  {'ephem_fit_err':>14s}  {'pipe_vs_ephem':>14s}"
     )
 
     max_pipe_err = 0.0
-    max_swe_err = 0.0
+    max_ephem_err = 0.0
     max_cross_err = 0.0
 
     for k in range(n_test):
@@ -172,27 +174,27 @@ def main():
 
         # Evaluate fitted Chebyshev
         pipe_fitted_lon = float(chebval(tau, coeffs_pipe[0])) % 360.0
-        swe_fitted_lon = float(chebval(tau, coeffs_swe[0])) % 360.0
+        ephem_fitted_lon = float(chebval(tau, coeffs_ephem[0])) % 360.0
 
         err_pipe = ang_diff(pipe_fitted_lon, pipe_ref[0]) * 3600
-        err_swe = ang_diff(swe_fitted_lon, ref[0]) * 3600
+        err_ephem = ang_diff(ephem_fitted_lon, ref[0]) * 3600
         err_cross = ang_diff(pipe_fitted_lon, ref[0]) * 3600
 
         if err_pipe > max_pipe_err:
             max_pipe_err = err_pipe
-        if err_swe > max_swe_err:
-            max_swe_err = err_swe
+        if err_ephem > max_ephem_err:
+            max_ephem_err = err_ephem
         if err_cross > max_cross_err:
             max_cross_err = err_cross
 
         if k % 10 == 0:
             print(
-                f'  {jd_test:.6f}  {err_pipe:12.6f}"  {err_swe:12.6f}"  {err_cross:12.6f}"'
+                f'  {jd_test:.6f}  {err_pipe:12.6f}"  {err_ephem:12.6f}"  {err_cross:12.6f}"'
             )
 
     print("\nMax errors:")
     print(f'  Pipeline fit vs pipeline ref:  {max_pipe_err:.6f}"')
-    print(f'  calc fit vs calc ref:  {max_swe_err:.6f}"')
+    print(f'  calc fit vs calc ref:  {max_ephem_err:.6f}"')
     print(f'  Pipeline fit vs calc ref:  {max_cross_err:.6f}"')
 
     # Also test: what does the LEB file give?

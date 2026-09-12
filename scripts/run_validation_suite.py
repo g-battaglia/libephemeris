@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Validation suite: comprehensive cross-backend verification.
 
@@ -29,7 +31,7 @@ import time
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import libephemeris as swe
+import libephemeris as ephem
 
 # ============================================================================
 BODIES_CORE = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 14]
@@ -110,27 +112,27 @@ def run_section1_positions(rng, n_dates=200):
     jds = rng.uniform(2396760, 2506330, n_dates)
 
     # Skyfield reference
-    swe.set_calc_mode("skyfield")
+    ephem.set_calc_mode("skyfield")
     ref = {}
     for jd in jds:
         for bid in BODIES_CORE + BODIES_LUNAR:
             try:
-                res = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)
+                res = ephem.calc_ut(float(jd), bid, ephem.FLG_SPEED)
                 ref[(float(jd), bid)] = res[0][:3]
             except Exception:
                 pass
-    swe.close()
+    ephem.close()
 
     # LEB2
-    swe.set_leb_file("data/leb2/base_core.leb2")
-    swe.set_calc_mode("leb")
+    ephem.set_leb_file("data/leb2/base_core.leb2")
+    ephem.set_calc_mode("leb")
     for jd in jds:
         for bid in BODIES_CORE + BODIES_LUNAR:
             k = (float(jd), bid)
             if k not in ref:
                 continue
             try:
-                res = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)
+                res = ephem.calc_ut(float(jd), bid, ephem.FLG_SPEED)
                 v2 = res[0][:3]
                 v1 = ref[k]
                 ld = abs(v2[0] - v1[0])
@@ -148,7 +150,7 @@ def run_section1_positions(rng, n_dates=200):
                 )
             except Exception:
                 pass
-    swe.close()
+    ephem.close()
     return r.summary("Skyfield vs LEB2")
 
 
@@ -158,30 +160,30 @@ def run_section2_flags(rng, n_dates=50):
     r = Results()
 
     flags_list = [
-        swe.FLG_SPEED,
-        swe.FLG_SPEED | swe.FLG_SIDEREAL,
-        swe.FLG_SPEED | swe.FLG_EQUATORIAL,
-        swe.FLG_SPEED | swe.FLG_J2000,
-        swe.FLG_SPEED | swe.FLG_NOABERR,
-        swe.FLG_SPEED | swe.FLG_HELCTR,
-        swe.FLG_SPEED | swe.FLG_TRUEPOS,
-        swe.FLG_SPEED | swe.FLG_NONUT,
-        swe.FLG_SPEED | swe.FLG_XYZ,
-        swe.FLG_SPEED | swe.FLG_RADIANS,
+        ephem.FLG_SPEED,
+        ephem.FLG_SPEED | ephem.FLG_SIDEREAL,
+        ephem.FLG_SPEED | ephem.FLG_EQUATORIAL,
+        ephem.FLG_SPEED | ephem.FLG_J2000,
+        ephem.FLG_SPEED | ephem.FLG_NOABERR,
+        ephem.FLG_SPEED | ephem.FLG_HELCTR,
+        ephem.FLG_SPEED | ephem.FLG_TRUEPOS,
+        ephem.FLG_SPEED | ephem.FLG_NONUT,
+        ephem.FLG_SPEED | ephem.FLG_XYZ,
+        ephem.FLG_SPEED | ephem.FLG_RADIANS,
     ]
 
     jds = rng.uniform(2415020, 2488069, n_dates)
 
     # Test Skyfield only — Horizons flag coverage is identical and much slower
     for mode in ["skyfield"]:
-        swe.set_calc_mode(mode)
+        ephem.set_calc_mode(mode)
         for jd in jds:
             for bid in [0, 1, 2, 4, 5, 9]:
                 for fl in flags_list:
-                    if bid == 0 and (fl & swe.FLG_HELCTR):
+                    if bid == 0 and (fl & ephem.FLG_HELCTR):
                         continue  # Sun helio = (0,0,0), skip
                     try:
-                        res = swe.calc_ut(float(jd), bid, fl)
+                        res = ephem.calc_ut(float(jd), bid, fl)
                         v = res[0]
                         r.check(
                             len(v) == 6, f"mode={mode} body={bid} flag={fl}: len != 6"
@@ -195,7 +197,7 @@ def run_section2_flags(rng, n_dates=50):
                             f"mode={mode} body={bid}: lat not finite",
                         )
                         r.check(
-                            v[2] >= 0 or (fl & swe.FLG_XYZ),
+                            v[2] >= 0 or (fl & ephem.FLG_XYZ),
                             f"mode={mode} body={bid}: dist < 0",
                         )
                     except (KeyError, ValueError):
@@ -205,7 +207,7 @@ def run_section2_flags(rng, n_dates=50):
                             False,
                             f"mode={mode} body={bid} flag={fl}: {type(e).__name__}: {e}",
                         )
-        swe.close()
+        ephem.close()
     return r.summary("Flag combinations")
 
 
@@ -215,14 +217,14 @@ def run_section3_velocity(rng, n_dates=50):
     r = Results()
 
     jds = rng.uniform(2430000, 2470000, n_dates)
-    swe.set_calc_mode("skyfield")
+    ephem.set_calc_mode("skyfield")
 
     for jd in jds:
         for bid in [0, 1, 2, 4, 5, 14]:
             try:
                 dt = 0.001  # days
-                r1 = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)[0]
-                r2 = swe.calc_ut(float(jd) + dt, bid, swe.FLG_SPEED)[0]
+                r1 = ephem.calc_ut(float(jd), bid, ephem.FLG_SPEED)[0]
+                r2 = ephem.calc_ut(float(jd) + dt, bid, ephem.FLG_SPEED)[0]
                 num_speed = (r2[0] - r1[0]) / dt
                 if abs(num_speed) > 180 / dt:
                     num_speed = ((r2[0] - r1[0] + 180) % 360 - 180) / dt
@@ -233,7 +235,7 @@ def run_section3_velocity(rng, n_dates=50):
                 )
             except Exception:
                 pass
-    swe.close()
+    ephem.close()
     return r.summary("Velocity accuracy")
 
 
@@ -250,7 +252,7 @@ def run_section4_houses(rng, n_dates=20):
         for lon, lat in locs:
             for sys_byte in systems:
                 try:
-                    cusps, ascmc = swe.houses(float(jd), lat, lon, bytes([sys_byte]))
+                    cusps, ascmc = ephem.houses(float(jd), lat, lon, bytes([sys_byte]))
                     r.check(len(cusps) >= 12, f"sys={chr(sys_byte)}: cusps < 12")
                     r.check(
                         0 <= ascmc[0] < 360, f"sys={chr(sys_byte)}: ASC out of range"
@@ -277,12 +279,12 @@ def run_section5_sidereal(rng, n_dates=10):
     jds = rng.uniform(2430000, 2470000, n_dates)
 
     for mode_id in range(43):
-        swe.set_sid_mode(mode_id)
+        ephem.set_sid_mode(mode_id)
         for jd in jds:
             for bid in [0, 1, 4]:
                 try:
-                    trop = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)[0]
-                    sid = swe.calc_ut(float(jd), bid, swe.FLG_SPEED | swe.FLG_SIDEREAL)[
+                    trop = ephem.calc_ut(float(jd), bid, ephem.FLG_SPEED)[0]
+                    sid = ephem.calc_ut(float(jd), bid, ephem.FLG_SPEED | ephem.FLG_SIDEREAL)[
                         0
                     ]
                     r.check(
@@ -299,7 +301,7 @@ def run_section5_sidereal(rng, n_dates=10):
                 except Exception as e:
                     r.check(False, f"mode={mode_id} body={bid}: {e}")
     # Reset
-    swe.set_sid_mode(0)
+    ephem.set_sid_mode(0)
     return r.summary("Sidereal modes")
 
 
@@ -312,21 +314,21 @@ def run_section6_edges():
     for bid in [0, 1, 2, 5, 14]:
         for jd in [2396758.5, 2506331.5, 2451545.0, 2415020.5, 2488069.5]:
             try:
-                res = swe.calc_ut(jd, bid, swe.FLG_SPEED)
+                res = ephem.calc_ut(jd, bid, ephem.FLG_SPEED)
                 r.check(math.isfinite(res[0][0]), f"body={bid} jd={jd}: not finite")
             except (ValueError, KeyError):
                 r.check(True)  # expected range error
 
     # Invalid body
     try:
-        swe.calc_ut(2451545.0, 999, 0)
+        ephem.calc_ut(2451545.0, 999, 0)
         r.check(False, "body=999 should raise")
     except Exception:
         r.check(True)
 
     # Invalid mode
     try:
-        swe.set_calc_mode("invalid")
+        ephem.set_calc_mode("invalid")
         r.check(False, "invalid mode should raise")
     except ValueError:
         r.check(True)
@@ -344,8 +346,8 @@ def run_section7_julday(rng):
         m = int(rng.integers(1, 13))
         d = int(rng.integers(1, 29))
         h = float(rng.uniform(0, 24))
-        jd = swe.julday(y, m, d, h)
-        y2, m2, d2, h2 = swe.revjul(jd)
+        jd = ephem.julday(y, m, d, h)
+        y2, m2, d2, h2 = ephem.revjul(jd)
         r.check(
             y2 == y and m2 == m and d2 == d and abs(h2 - h) < 1e-6,
             f"revjul(julday({y},{m},{d},{h:.4f})) mismatch",
@@ -364,29 +366,29 @@ def run_section8_crossbackend(rng, n_dates=50):
 
     results_by_backend = {}
     for mode in ["skyfield", "horizons"]:
-        swe.set_calc_mode(mode)
+        ephem.set_calc_mode(mode)
         results_by_backend[mode] = {}
         for jd in jds:
             for bid in bodies:
                 try:
-                    res = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)
+                    res = ephem.calc_ut(float(jd), bid, ephem.FLG_SPEED)
                     results_by_backend[mode][(float(jd), bid)] = res[0][:3]
                 except Exception:
                     pass
-        swe.close()
+        ephem.close()
 
     # LEB2
-    swe.set_leb_file("data/leb2/base_core.leb2")
-    swe.set_calc_mode("leb")
+    ephem.set_leb_file("data/leb2/base_core.leb2")
+    ephem.set_calc_mode("leb")
     results_by_backend["leb2"] = {}
     for jd in jds:
         for bid in bodies:
             try:
-                res = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)
+                res = ephem.calc_ut(float(jd), bid, ephem.FLG_SPEED)
                 results_by_backend["leb2"][(float(jd), bid)] = res[0][:3]
             except Exception:
                 pass
-    swe.close()
+    ephem.close()
 
     # Compare pairs
     for jd in jds:
@@ -446,7 +448,7 @@ def main():
         lambda: run_section8_crossbackend(rng, n_dates=int(50 * scale)),
     ]
     for section_fn in sections:
-        swe.close()  # clean state between sections
+        ephem.close()  # clean state between sections
         all_pass &= section_fn()
 
     elapsed = time.time() - t0

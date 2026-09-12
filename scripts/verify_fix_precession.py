@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Verify the Lieske two-epoch precession in astrometry._precess_ecliptic.
 
 Compares the function against a reference built from erfa.pmat76 (the IAU

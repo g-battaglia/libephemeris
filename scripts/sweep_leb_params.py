@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Automated Chebyshev parameter sweep for LEB optimization.
 
 Tests a matrix of (interval_days, degree) combinations for all LEB bodies,

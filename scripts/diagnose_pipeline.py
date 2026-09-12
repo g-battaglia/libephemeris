@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Diagnose pipeline discrepancy between generator and calc().
 
 Compares the generator's _apply_geo_ecliptic_pipeline() against

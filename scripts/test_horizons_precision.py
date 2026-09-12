@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Fast Horizons vs Skyfield precision test.
 
@@ -27,7 +29,7 @@ import time
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import libephemeris as swe
+import libephemeris as ephem
 
 BODIES = [
     (0, "Sun"),
@@ -47,15 +49,15 @@ BODIES = [
 
 # Known bug: Sun heliocentric in Skyfield path returns wrong results
 # (documented in proposals/leb-optimization-findings.md)
-SKIP_COMBOS = {(0, swe.FLG_SPEED | swe.FLG_HELCTR)}
+SKIP_COMBOS = {(0, ephem.FLG_SPEED | ephem.FLG_HELCTR)}
 
 FLAGS = [
-    (swe.FLG_SPEED, "default"),
-    (swe.FLG_SPEED | swe.FLG_SIDEREAL, "sidereal"),
-    (swe.FLG_SPEED | swe.FLG_EQUATORIAL, "equatorial"),
-    (swe.FLG_SPEED | swe.FLG_J2000, "J2000"),
-    (swe.FLG_SPEED | swe.FLG_NOABERR, "no_aberr"),
-    (swe.FLG_SPEED | swe.FLG_HELCTR, "heliocentric"),
+    (ephem.FLG_SPEED, "default"),
+    (ephem.FLG_SPEED | ephem.FLG_SIDEREAL, "sidereal"),
+    (ephem.FLG_SPEED | ephem.FLG_EQUATORIAL, "equatorial"),
+    (ephem.FLG_SPEED | ephem.FLG_J2000, "J2000"),
+    (ephem.FLG_SPEED | ephem.FLG_NOABERR, "no_aberr"),
+    (ephem.FLG_SPEED | ephem.FLG_HELCTR, "heliocentric"),
 ]
 
 # Thresholds (arcseconds)
@@ -82,7 +84,7 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
     t0 = time.time()
 
     # Phase 1: Skyfield reference
-    swe.set_calc_mode("skyfield")
+    ephem.set_calc_mode("skyfield")
     ref = {}
     for jd in jds:
         for bid, _ in BODIES:
@@ -90,14 +92,14 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
                 if (bid, fl) in SKIP_COMBOS:
                     continue
                 try:
-                    r = swe.calc_ut(float(jd), bid, fl)
+                    r = ephem.calc_ut(float(jd), bid, fl)
                     ref[(float(jd), bid, fl)] = r[0][:3]
                 except Exception:
                     pass
-    swe.close()
+    ephem.close()
 
     # Phase 2: Horizons
-    swe.set_calc_mode("horizons")
+    ephem.set_calc_mode("horizons")
     n = 0
     n_fail = 0
     body_max: dict[int, tuple[float, str]] = {}
@@ -110,7 +112,7 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
                 if k not in ref:
                     continue
                 try:
-                    r = swe.calc_ut(float(jd), bid, fl)
+                    r = ephem.calc_ut(float(jd), bid, fl)
                     v2 = r[0][:3]
                     v1 = ref[k]
 
@@ -124,7 +126,7 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
 
                     threshold = (
                         HELIOCENTRIC_THRESHOLD
-                        if fl & swe.FLG_HELCTR
+                        if fl & ephem.FLG_HELCTR
                         else GEOCENTRIC_THRESHOLD
                     )
                     if err >= threshold:
@@ -136,7 +138,7 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
                 except Exception:
                     pass
 
-    swe.close()
+    ephem.close()
     elapsed = time.time() - t0
 
     # Report

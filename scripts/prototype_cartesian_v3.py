@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Prototype: test Chebyshev fitting of geocentric ecliptic CARTESIAN vs SPHERICAL.
 
 Hypothesis: ecliptic Cartesian (x, y, z) is smooth even during retrogrades,

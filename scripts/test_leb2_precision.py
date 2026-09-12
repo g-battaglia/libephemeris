@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Fast LEB2 vs LEB1 precision test.
 
@@ -33,7 +35,7 @@ import warnings
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import libephemeris as swe
+import libephemeris as ephem
 from libephemeris.leb_reader import open_leb  # noqa: E402
 
 BODY_NAMES = {
@@ -78,12 +80,12 @@ ALL_BODIES = sorted(BODY_NAMES.keys())
 HELIO_ONLY = {40, 41, 42, 43, 44, 45, 46, 47, 48}
 
 FLAGS = [
-    (swe.FLG_SPEED, "default"),
-    (swe.FLG_SPEED | swe.FLG_SIDEREAL, "sidereal"),
-    (swe.FLG_SPEED | swe.FLG_EQUATORIAL, "equatorial"),
-    (swe.FLG_SPEED | swe.FLG_J2000, "J2000"),
-    (swe.FLG_SPEED | swe.FLG_NOABERR, "no_aberr"),
-    (swe.FLG_SPEED | swe.FLG_HELCTR, "heliocentric"),
+    (ephem.FLG_SPEED, "default"),
+    (ephem.FLG_SPEED | ephem.FLG_SIDEREAL, "sidereal"),
+    (ephem.FLG_SPEED | ephem.FLG_EQUATORIAL, "equatorial"),
+    (ephem.FLG_SPEED | ephem.FLG_J2000, "J2000"),
+    (ephem.FLG_SPEED | ephem.FLG_NOABERR, "no_aberr"),
+    (ephem.FLG_SPEED | ephem.FLG_HELCTR, "heliocentric"),
 ]
 
 TIER_CONFIG = {
@@ -179,18 +181,18 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
     test_bodies = sorted(CORE_BODY_IDS)
 
     # Phase 1: LEB1 reference
-    swe.set_leb_file(cfg["leb1"])
-    swe.set_calc_mode("leb")
+    ephem.set_leb_file(cfg["leb1"])
+    ephem.set_calc_mode("leb")
     ref: dict[tuple[float, int, int], tuple[float, ...]] = {}
     failures: list[str] = []
     reference_coverage = {bid: 0 for bid in test_bodies}
     for jd in jds:
         for bid in test_bodies:
             for fl, _ in FLAGS:
-                if bid in HELIO_ONLY and not (fl & swe.FLG_HELCTR):
+                if bid in HELIO_ONLY and not (fl & ephem.FLG_HELCTR):
                     continue
                 try:
-                    value = tuple(swe.calc_ut(float(jd), bid, fl)[0][:3])
+                    value = tuple(ephem.calc_ut(float(jd), bid, fl)[0][:3])
                     if len(value) != 3:
                         raise ValueError(
                             f"LEB1 result has {len(value)} position components; expected 3"
@@ -203,11 +205,11 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
                     failures.append(
                         f"LEB1 body={bid} jd={float(jd):.6f} flags={fl}: {exc}"
                     )
-    swe.close()
+    ephem.close()
 
     # Phase 2: LEB2 compare
-    swe.set_leb_file(cfg["leb2"])
-    swe.set_calc_mode("leb")
+    ephem.set_leb_file(cfg["leb2"])
+    ephem.set_calc_mode("leb")
     n = 0
     n_over = 0
     body_max: dict[int, tuple[float, str]] = {}
@@ -220,7 +222,7 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
                 if k not in ref:
                     continue
                 try:
-                    v2 = tuple(swe.calc_ut(float(jd), bid, fl)[0][:3])
+                    v2 = tuple(ephem.calc_ut(float(jd), bid, fl)[0][:3])
                     v1 = ref[k]
                     if len(v2) != 3 or len(v1) != 3:
                         raise ValueError(
@@ -244,7 +246,7 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
                     failures.append(
                         f"LEB2 body={bid} jd={float(jd):.6f} flags={fl}: {exc}"
                     )
-    swe.close()
+    ephem.close()
     elapsed = time.time() - t0
 
     # Report
@@ -298,7 +300,7 @@ def main():
     # extended-tier samples intentionally cross the analytical model's advisory
     # range, so those model-validity warnings are unrelated to compression loss.
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", swe.MeeusPolynomialWarning)
+        warnings.simplefilter("ignore", ephem.MeeusPolynomialWarning)
         for tier in tiers:
             ok = run_test(tier, n_dates=args.dates)
             if not ok:

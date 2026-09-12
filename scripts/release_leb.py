@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Retired entry point for legacy LEB1 release uploads.
 
 The command-line shape is retained so existing automation fails safely and

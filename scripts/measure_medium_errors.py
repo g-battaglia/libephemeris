@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Measure actual max errors for medium tier LEB V3 across all tolerance categories.
 
 Usage: python scripts/measure_medium_errors.py

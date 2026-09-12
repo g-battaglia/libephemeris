@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Horizons vs LEB2 cross-validation test.
 
@@ -26,7 +28,7 @@ import time
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import libephemeris as swe
+import libephemeris as ephem
 
 BODIES = [
     (0, "Sun"),
@@ -46,12 +48,12 @@ BODIES = [
     (17, "Ceres"),
 ]
 
-SKIP_COMBOS = {(0, swe.FLG_SPEED | swe.FLG_HELCTR)}
+SKIP_COMBOS = {(0, ephem.FLG_SPEED | ephem.FLG_HELCTR)}
 
 FLAGS = [
-    (swe.FLG_SPEED, "default"),
-    (swe.FLG_SPEED | swe.FLG_SIDEREAL, "sidereal"),
-    (swe.FLG_SPEED | swe.FLG_EQUATORIAL, "equatorial"),
+    (ephem.FLG_SPEED, "default"),
+    (ephem.FLG_SPEED | ephem.FLG_SIDEREAL, "sidereal"),
+    (ephem.FLG_SPEED | ephem.FLG_EQUATORIAL, "equatorial"),
 ]
 
 JD_START = 2415020.5
@@ -80,8 +82,8 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
     t0 = time.time()
 
     # LEB2 reference
-    swe.set_leb_file(leb_path)
-    swe.set_calc_mode("leb")
+    ephem.set_leb_file(leb_path)
+    ephem.set_calc_mode("leb")
     ref = {}
     for jd in jds:
         for bid, _ in BODIES:
@@ -89,14 +91,14 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
                 if (bid, fl) in SKIP_COMBOS:
                     continue
                 try:
-                    r = swe.calc_ut(float(jd), bid, fl)
+                    r = ephem.calc_ut(float(jd), bid, fl)
                     ref[(float(jd), bid, fl)] = r[0][:3]
                 except Exception:
                     pass
-    swe.close()
+    ephem.close()
 
     # Horizons
-    swe.set_calc_mode("horizons")
+    ephem.set_calc_mode("horizons")
     n = 0
     n_fail = 0
     body_max: dict[int, tuple[float, str]] = {}
@@ -108,7 +110,7 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
                 if k not in ref:
                     continue
                 try:
-                    r = swe.calc_ut(float(jd), bid, fl)
+                    r = ephem.calc_ut(float(jd), bid, fl)
                     v2 = r[0][:3]
                     v1 = ref[k]
                     ld = abs(v2[0] - v1[0])
@@ -125,7 +127,7 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
                 except Exception:
                     pass
 
-    swe.close()
+    ephem.close()
     elapsed = time.time() - t0
 
     g = max(e[0] for e in body_max.values()) if body_max else 0

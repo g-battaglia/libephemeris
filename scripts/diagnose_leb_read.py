@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Diagnose LEB file read vs calc at specific JD.
 
 Reads the actual .leb Chebyshev data for Saturn at the worst-case JD

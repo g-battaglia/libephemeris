@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Verify the Horizons HTTP backend against the local LEB/Skyfield pipeline.
 
 Review finding C2 (REVIEW-2026-06-10.md): every fetch-based Horizons

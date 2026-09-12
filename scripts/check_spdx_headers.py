@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Check (or stamp) SPDX license headers on shipped source files.
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
+"""Check (or stamp) SPDX license headers on project-owned source files.
 
-Every Python file under ``libephemeris/`` must carry an SPDX identifier in
-its first lines.  Owned files are AGPL-3.0-only licensed; vendored/adapted files
-keep their upstream identifier (see ``EXCEPTIONS`` and THIRD_PARTY_NOTICES.md).
+Every Python file under ``libephemeris/``, ``scripts/``, and ``examples/`` must
+carry an SPDX identifier in its first lines. Owned files are AGPL-3.0-only
+licensed; vendored/adapted files keep their upstream identifier (see
+``EXCEPTIONS`` and THIRD_PARTY_NOTICES.md).
 
 Usage:
     python scripts/check_spdx_headers.py --check   # CI gate (default)
@@ -27,7 +30,11 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PACKAGE_ROOT = REPO_ROOT / "libephemeris"
+SOURCE_ROOTS = (
+    REPO_ROOT / "libephemeris",
+    REPO_ROOT / "scripts",
+    REPO_ROOT / "examples",
+)
 
 PROJECT_LICENSE = "AGPL-3.0-only"
 COPYRIGHT_LINE = "# Copyright (c) 2025-2026 Giacomo Battaglia"
@@ -110,6 +117,16 @@ def stamp(path: Path) -> None:
     path.write_text(new_text, encoding="utf-8")
 
 
+def source_files() -> list[Path]:
+    """Return every tracked source-class Python file covered by this gate."""
+    return sorted(
+        path
+        for root in SOURCE_ROOTS
+        for path in root.rglob("*.py")
+        if "__pycache__" not in path.parts
+    )
+
+
 def main() -> int:
     """Check or add SPDX headers according to explicit vendor exceptions."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -121,9 +138,7 @@ def main() -> int:
     missing: list[Path] = []
     mismatched: list[tuple[Path, str, str]] = []
     missing_copyrights: list[tuple[Path, str]] = []
-    files = sorted(
-        p for p in PACKAGE_ROOT.rglob("*.py") if "__pycache__" not in p.parts
-    )
+    files = source_files()
     for path in files:
         head = path.read_text(encoding="utf-8").splitlines()[:HEAD_LINES]
         found = find_spdx(head)

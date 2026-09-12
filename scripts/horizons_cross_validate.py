@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """JPL Horizons cross-validation for libephemeris.
 
 Queries NASA JPL Horizons for geocentric apparent ecliptic positions
@@ -52,7 +54,7 @@ warnings.filterwarnings("ignore")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import libephemeris as swe  # noqa: E402
+import libephemeris as ephem  # noqa: E402
 from astroquery.jplhorizons import Horizons  # noqa: E402
 
 
@@ -61,33 +63,33 @@ from astroquery.jplhorizons import Horizons  # noqa: E402
 # ============================================================================
 
 PLANETARY_BODIES: dict[str, tuple[str, int, str]] = {
-    # name: (horizons_id, swe_body_id, id_type)
-    "Sun": ("10", swe.SUN, "majorbody"),
-    "Moon": ("301", swe.MOON, "majorbody"),
-    "Mercury": ("199", swe.MERCURY, "majorbody"),
-    "Venus": ("299", swe.VENUS, "majorbody"),
-    "Mars": ("499", swe.MARS, "majorbody"),
-    "Jupiter": ("599", swe.JUPITER, "majorbody"),
-    "Saturn": ("699", swe.SATURN, "majorbody"),
-    "Uranus": ("799", swe.URANUS, "majorbody"),
-    "Neptune": ("899", swe.NEPTUNE, "majorbody"),
-    "Pluto": ("999", swe.PLUTO, "majorbody"),
+    # name: (horizons_id, ephem_body_id, id_type)
+    "Sun": ("10", ephem.SUN, "majorbody"),
+    "Moon": ("301", ephem.MOON, "majorbody"),
+    "Mercury": ("199", ephem.MERCURY, "majorbody"),
+    "Venus": ("299", ephem.VENUS, "majorbody"),
+    "Mars": ("499", ephem.MARS, "majorbody"),
+    "Jupiter": ("599", ephem.JUPITER, "majorbody"),
+    "Saturn": ("699", ephem.SATURN, "majorbody"),
+    "Uranus": ("799", ephem.URANUS, "majorbody"),
+    "Neptune": ("899", ephem.NEPTUNE, "majorbody"),
+    "Pluto": ("999", ephem.PLUTO, "majorbody"),
 }
 
 MINOR_BODIES: dict[str, tuple[str, int, str]] = {
-    "Chiron": ("2060", swe.CHIRON, "smallbody"),
-    "Ceres": ("Ceres", swe.CERES, "smallbody"),
-    "Pallas": ("Pallas", swe.PALLAS, "smallbody"),
-    "Juno": ("Juno", swe.JUNO, "smallbody"),
-    "Vesta": ("Vesta", swe.VESTA, "smallbody"),
+    "Chiron": ("2060", ephem.CHIRON, "smallbody"),
+    "Ceres": ("Ceres", ephem.CERES, "smallbody"),
+    "Pallas": ("Pallas", ephem.PALLAS, "smallbody"),
+    "Juno": ("Juno", ephem.JUNO, "smallbody"),
+    "Vesta": ("Vesta", ephem.VESTA, "smallbody"),
 }
 
 COB_BODIES: dict[str, tuple[str, str, int]] = {
-    # name: (body_center_id, barycenter_id, swe_body_id)
-    "Jupiter": ("599", "5", swe.JUPITER),
-    "Saturn": ("699", "6", swe.SATURN),
-    "Neptune": ("899", "8", swe.NEPTUNE),
-    "Pluto": ("999", "9", swe.PLUTO),
+    # name: (body_center_id, barycenter_id, ephem_body_id)
+    "Jupiter": ("599", "5", ephem.JUPITER),
+    "Saturn": ("699", "6", ephem.SATURN),
+    "Neptune": ("899", "8", ephem.NEPTUNE),
+    "Pluto": ("999", "9", ephem.PLUTO),
 }
 
 
@@ -253,7 +255,7 @@ def _wrap_delta(d: float) -> float:
 def compare_body(
     name: str,
     horizons_id: str,
-    swe_body: int,
+    ephem_body: int,
     dates: list[float],
     id_type: str = "majorbody",
     fixed_tolerance: float | None = None,
@@ -282,7 +284,7 @@ def compare_body(
         jd = h["jd"]
         tol = fixed_tolerance if fixed_tolerance else _get_tolerance(jd, name)
         try:
-            result, _flags = swe.calc_ut(jd, swe_body)
+            result, _flags = ephem.calc_ut(jd, ephem_body)
             lib_lon, lib_lat = result[0], result[1]
 
             dlon = _wrap_delta(lib_lon - h["ecl_lon"]) * 3600  # arcsec
@@ -340,7 +342,7 @@ def compare_body(
     return {
         "name": name,
         "horizons_id": horizons_id,
-        "swe_body": swe_body,
+        "ephem_body": ephem_body,
         "dates_tested": n_total,
         "dates_passed": n_pass,
         "max_lon_err_arcsec": round(max_lon, 6),
@@ -384,7 +386,7 @@ def main() -> int:
     report: dict = {
         "metadata": {
             "generated": datetime.now(timezone.utc).isoformat(),
-            "libephemeris_version": getattr(swe, "__version__", "unknown"),
+            "libephemeris_version": getattr(ephem, "__version__", "unknown"),
             "horizons_location": "500 (geocentric)",
             "coordinate_system": "apparent ecliptic of date (ObsEclLon/ObsEclLat)",
             "time_scale": "UT (both Horizons observer tables and calc_ut use UT)",

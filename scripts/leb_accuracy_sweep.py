@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """LEB Accuracy Sweep — comprehensive LEB vs Skyfield validation.
 
 Tests all LEB bodies across random dates, flag combinations, and boundary

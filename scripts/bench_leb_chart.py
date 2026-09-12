@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Benchmark: LEB full-chart calculation speed.
 
 Simulates realistic astrology usage: compute all bodies at the same JD,

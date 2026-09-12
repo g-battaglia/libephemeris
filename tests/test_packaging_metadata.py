@@ -37,7 +37,7 @@ from scripts.check_wheel_contents import (
     forbidden_in,
     main as wheel_audit_main,
 )
-from scripts.check_spdx_headers import THIRD_PARTY_COPYRIGHT_LINES
+from scripts.check_spdx_headers import THIRD_PARTY_COPYRIGHT_LINES, source_files
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +77,19 @@ def _has_requirement(requirements: list[str], package: str) -> bool:
     return any(
         requirement.lower().startswith(normalized) for requirement in requirements
     )
+
+
+def test_spdx_gate_covers_package_scripts_and_examples() -> None:
+    """The source-license gate covers all three project source directories."""
+    relative = {path.relative_to(_PROJECT_ROOT).as_posix() for path in source_files()}
+    tracked = {
+        path.relative_to(_PROJECT_ROOT).as_posix()
+        for directory in ("libephemeris", "scripts", "examples")
+        for path in (_PROJECT_ROOT / directory).rglob("*.py")
+        if "__pycache__" not in path.parts
+    }
+    assert relative == tracked
+    assert len(relative) == 147
 
 
 def test_astroquery_is_optional_catalog_tooling() -> None:

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Verify the fail-closed, independently sourced hypothetical-data boundary.
 
 This gate checks *semantic provenance invariants*, not merely that a file kept

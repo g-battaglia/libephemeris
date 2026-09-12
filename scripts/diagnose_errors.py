@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Decompose LEB errors into: Chebyshev fitting, COB offset, pipeline differences.
 
 For each failing outer planet, measures:

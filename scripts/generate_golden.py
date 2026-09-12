@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Generate golden reference files for regression testing.
 
 Creates a JSON file with 100 representative calculations spanning the full
@@ -28,7 +30,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, ".")
-import libephemeris as swe  # noqa: E402
+import libephemeris as ephem  # noqa: E402
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -60,8 +62,8 @@ def configure_reviewed_core() -> str:
             "Refusing to generate golden data: bundled base_core.leb2 failed "
             f"SHA-256 verification (expected {expected}, got {digest})"
         )
-    swe.set_leb_file(str(REVIEWED_CORE))
-    swe.set_calc_mode("leb")
+    ephem.set_leb_file(str(REVIEWED_CORE))
+    ephem.set_calc_mode("leb")
 
     def no_optional_planet_center(naif_id: int, jd: float | None = None) -> None:
         del naif_id, jd
@@ -84,18 +86,18 @@ JDS = [
 ]
 
 BODIES = [
-    swe.SUN,  # 0
-    swe.MOON,  # 1
-    swe.MERCURY,  # 2
-    swe.VENUS,  # 3
-    swe.MARS,  # 4
-    swe.JUPITER,  # 5
-    swe.SATURN,  # 6
-    swe.URANUS,  # 7
-    swe.NEPTUNE,  # 8
-    swe.PLUTO,  # 9
-    swe.MEAN_NODE,  # 10
-    swe.TRUE_NODE,  # 11
+    ephem.SUN,  # 0
+    ephem.MOON,  # 1
+    ephem.MERCURY,  # 2
+    ephem.VENUS,  # 3
+    ephem.MARS,  # 4
+    ephem.JUPITER,  # 5
+    ephem.SATURN,  # 6
+    ephem.URANUS,  # 7
+    ephem.NEPTUNE,  # 8
+    ephem.PLUTO,  # 9
+    ephem.MEAN_NODE,  # 10
+    ephem.TRUE_NODE,  # 11
 ]
 
 HOUSE_SYSTEMS = [ord("P"), ord("K"), ord("E"), ord("W")]
@@ -121,34 +123,34 @@ def generate_calc_ut_entries() -> list[dict]:
     entries = []
     flag_combos = [
         (0, "default"),
-        (swe.FLG_SPEED, "speed"),
-        (swe.FLG_EQUATORIAL, "equatorial"),
-        (swe.FLG_HELCTR, "heliocentric"),
+        (ephem.FLG_SPEED, "speed"),
+        (ephem.FLG_EQUATORIAL, "equatorial"),
+        (ephem.FLG_HELCTR, "heliocentric"),
     ]
 
     # 12 bodies × 8 dates × 1 flag = 96 entries (default flags only for all)
     for body in BODIES:
         for jd in JDS:
-            pos, retflag = swe.calc_ut(jd, body, swe.FLG_SPEED)
+            pos, retflag = ephem.calc_ut(jd, body, ephem.FLG_SPEED)
             entries.append(
                 {
                     "type": "calc_ut",
                     "jd": jd,
                     "body": body,
-                    "flags": swe.FLG_SPEED,
+                    "flags": ephem.FLG_SPEED,
                     "result": [safe_float(v) for v in pos],
                     "retflag": int(retflag),
                 }
             )
 
     # Additional flag combos for Sun and Moon only (to keep count manageable)
-    for body in [swe.SUN, swe.MOON]:
+    for body in [ephem.SUN, ephem.MOON]:
         jd = 2451545.0  # J2000
         for flags, desc in flag_combos:
-            if flags == swe.FLG_SPEED:
+            if flags == ephem.FLG_SPEED:
                 continue  # Already covered above
             try:
-                pos, retflag = swe.calc_ut(jd, body, flags)
+                pos, retflag = ephem.calc_ut(jd, body, flags)
                 entries.append(
                     {
                         "type": "calc_ut",
@@ -173,7 +175,7 @@ def generate_houses_entries() -> list[dict]:
 
     for lon, lat, loc_name in LOCATIONS:
         for hsys in HOUSE_SYSTEMS:
-            cusps, angles = swe.houses(jd, lat, lon, hsys)
+            cusps, angles = ephem.houses(jd, lat, lon, hsys)
             entries.append(
                 {
                     "type": "houses",
@@ -195,14 +197,14 @@ def generate_sidereal_entries() -> list[dict]:
     entries = []
     jd = 2451545.0
     modes = [
-        (swe.SIDM_J2000, "J2000"),
-        (swe.SIDM_TRUE_CITRA, "TrueCitra"),
+        (ephem.SIDM_J2000, "J2000"),
+        (ephem.SIDM_TRUE_CITRA, "TrueCitra"),
     ]
 
     for mode, mode_name in modes:
-        swe.set_sid_mode(mode)
-        for body in [swe.SUN, swe.MOON, swe.MARS]:
-            pos, retflag = swe.calc_ut(jd, body, swe.FLG_SIDEREAL | swe.FLG_SPEED)
+        ephem.set_sid_mode(mode)
+        for body in [ephem.SUN, ephem.MOON, ephem.MARS]:
+            pos, retflag = ephem.calc_ut(jd, body, ephem.FLG_SIDEREAL | ephem.FLG_SPEED)
             entries.append(
                 {
                     "type": "sidereal",
@@ -215,7 +217,7 @@ def generate_sidereal_entries() -> list[dict]:
             )
 
     # Reset to default
-    swe.set_sid_mode(swe.SIDM_J2000)
+    ephem.set_sid_mode(ephem.SIDM_J2000)
     return entries
 
 
@@ -230,8 +232,8 @@ def generate_time_entries() -> list[dict]:
         (2050, 12, 31, 23.99),
     ]
     for y, m, d, h in dates:
-        jd = swe.julday(y, m, d, h)
-        yr, mr, dr, hr = swe.revjul(jd)
+        jd = ephem.julday(y, m, d, h)
+        yr, mr, dr, hr = ephem.revjul(jd)
         entries.append(
             {
                 "type": "julday",
@@ -243,7 +245,7 @@ def generate_time_entries() -> list[dict]:
 
     # sidtime
     for jd in [2451545.0, 2460676.5]:
-        st = swe.sidtime(jd)
+        st = ephem.sidtime(jd)
         entries.append(
             {
                 "type": "sidtime",
@@ -254,7 +256,7 @@ def generate_time_entries() -> list[dict]:
 
     # deltat
     for jd in [2451545.0, 2460676.5]:
-        dt = swe.deltat(jd)
+        dt = ephem.deltat(jd)
         entries.append(
             {
                 "type": "deltat",
@@ -271,8 +273,8 @@ def generate_eclipse_entries() -> list[dict]:
     entries = []
 
     # Solar eclipse
-    jd = swe.julday(2024, 4, 1, 0.0)
-    ecl_type, times = swe.sol_eclipse_when_glob(jd, ecltype=swe.ECL_TOTAL)
+    jd = ephem.julday(2024, 4, 1, 0.0)
+    ecl_type, times = ephem.sol_eclipse_when_glob(jd, ecltype=ephem.ECL_TOTAL)
     entries.append(
         {
             "type": "solar_eclipse",
@@ -283,8 +285,8 @@ def generate_eclipse_entries() -> list[dict]:
     )
 
     # Lunar eclipse
-    jd = swe.julday(2025, 3, 1, 0.0)
-    ecl_type, times = swe.lun_eclipse_when(jd, ecltype=swe.ECL_TOTAL)
+    jd = ephem.julday(2025, 3, 1, 0.0)
+    ecl_type, times = ephem.lun_eclipse_when(jd, ecltype=ephem.ECL_TOTAL)
     entries.append(
         {
             "type": "lunar_eclipse",

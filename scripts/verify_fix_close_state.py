@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Verify the close() semantics fixes from the 2026-06 PR review.
 
 Checks (standalone, no pytest):

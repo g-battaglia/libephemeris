@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Compare eclipse calculation precision between LEB and Skyfield paths.
 
 Runs each eclipse function twice — once with LEB active, once forcing Skyfield —

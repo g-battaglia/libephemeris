@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Measure end-to-end LEB precision: fast_calc vs calc (Skyfield reference).
 
 Dense sampling across the full date range per body to find worst-case errors.
