@@ -54,6 +54,36 @@ SOURCE_CANONICAL_BYTES = 33036
 PRECISIONS = (160, 256, 512)
 
 
+def _metadata_canonical_bytes() -> bytes:
+    """Serialize the complete normative variant table deterministically."""
+
+    def normalize(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key: normalize(value[key]) for key in sorted(value)}
+        if isinstance(value, (tuple, list)):
+            return [normalize(item) for item in value]
+        if isinstance(value, set):
+            return sorted(normalize(item) for item in value)
+        return value
+
+    return json.dumps(
+        normalize(_VARIANT_METADATA),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _validate_variant_metadata_digest() -> None:
+    """Reject any mutation of the fixed normative operation table."""
+    serialized = _metadata_canonical_bytes()
+    _require(
+        len(serialized) == VARIANT_METADATA_BYTES, "normative metadata byte count drift"
+    )
+    digest = hashlib.sha256(serialized).hexdigest()
+    _require(digest == VARIANT_METADATA_SHA256, "normative metadata digest mismatch")
+
+
 def _validate_precisions() -> None:
     """Require the immutable independent Arb precision schedule."""
     _require(
@@ -122,6 +152,12 @@ INTERVAL_METHODS = frozenset(
 # (namespace, unit, permitted category, permitted exactness). ``rounded``
 # denotes a nonzero token quantum; ``interval-compatible`` denotes a rule
 # output whose declared exactness is exact or interval.
+VARIANT_METADATA_BYTES = 2797
+VARIANT_METADATA_SHA256 = (
+    "6931031d63c06f16086214f2cc9ddff339b50a0bdcafe0f1114edd5ef4ed0dc1"
+)
+
+
 _VARIANT_METADATA = {
     "gaussian_from_a": (
         (
@@ -1266,6 +1302,7 @@ def _validate_operation_graph(records: tuple[SourceRecord, ...]) -> None:
 def load_source_records(path: Path = SOURCE_RECORDS_PATH) -> SourceTable:
     """Load, validate, canonicalize, and digest verifier-owned records."""
     _validate_precisions()
+    _validate_variant_metadata_digest()
     data, raw = _load_json(path)
     _validate_declared_schema(data)
     records = _parse_records(data)

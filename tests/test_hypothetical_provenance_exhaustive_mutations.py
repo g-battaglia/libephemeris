@@ -169,6 +169,27 @@ def test_no_zip_truncation_in_operand_contract(gate, tmp_path):
         gate.load_source_records(path)
 
 
+def test_normative_metadata_digest_is_independent_and_pinned(gate, monkeypatch):
+    expected = gate._metadata_canonical_bytes()
+    assert len(expected) == 2797
+    assert (
+        gate.VARIANT_METADATA_SHA256
+        == "6931031d63c06f16086214f2cc9ddff339b50a0bdcafe0f1114edd5ef4ed0dc1"
+    )
+    assert gate._metadata_canonical_bytes() == expected
+    for variant in tuple(gate._VARIANT_METADATA):
+        original = gate._VARIANT_METADATA[variant]
+        mutated = (
+            ((("token", "text", {"unsupported"}, {"rounded"}),), original[1])
+            if not original[0]
+            else ((), original[1])
+        )
+        monkeypatch.setitem(gate._VARIANT_METADATA, variant, mutated)
+        with pytest.raises(gate.GateError, match="metadata (byte count|digest)"):
+            gate.load_source_records()
+        monkeypatch.setitem(gate._VARIANT_METADATA, variant, original)
+
+
 def test_interval_certificate_requires_exact_precision_keys(gate):
     table = gate.load_source_records()
     result = gate.evaluate_rules(table)[(56, "radius_au")]
