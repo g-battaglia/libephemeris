@@ -11,6 +11,8 @@ import erfa
 import pytest
 from flint import arb, ctx
 
+from libephemeris.intervals import interval_precision
+
 from libephemeris.constants import JUPITER, NEPTUNE, SATURN, URANUS
 from libephemeris.exceptions import CalculationError
 import libephemeris.perturber_elements as perturber_elements
@@ -22,6 +24,7 @@ from libephemeris.perturber_elements import (
     _frame_rows,
     _identity,
     _matrix_product,
+    _normalized_degrees,
     _transpose,
 )
 from libephemeris.planetary_mean_elements import (
@@ -143,14 +146,41 @@ def test_frame_rows_use_direct_erfa_poles(monkeypatch: pytest.MonkeyPatch) -> No
     assert _matrix_product(rows, _transpose(rows))
 
 
+@pytest.mark.parametrize("multiple", [-1000, -17, -4, -2, 0, 2, 4, 17, 1000])
+def test_exact_pi_multiples_normalize_without_float_midpoint(multiple: int) -> None:
+    """Exact Arb pi multiples canonicalize through exact integer arithmetic."""
+    expected = 0.0 if multiple % 2 == 0 else 180.0
+    assert _normalized_degrees(arb.pi() * multiple) == expected
+
+
+@pytest.mark.parametrize("offset", ["1e-30", "0.1", "-0.1"])
+def test_turn_offsets_are_arb_certified(offset: str) -> None:
+    """Narrow offsets normalize while a wide turn crossing fails closed."""
+    with interval_precision(4096):
+        value = arb.pi() * 2 + arb(offset)
+        if offset.startswith("-"):
+            assert _normalized_degrees(value) > 350.0
+        else:
+            assert _normalized_degrees(value) < 6.0
+    with interval_precision(4096), pytest.raises(CalculationError):
+        _normalized_degrees(arb.pi() * 2 + arb(0, "4.0"))
+
+
+def test_negative_subnormal_near_zero_is_not_a_turn_boundary() -> None:
+    """A representable tiny negative angle remains unresolved at zero only when its cell does."""
+    with pytest.raises(CalculationError):
+        _normalized_degrees(arb(-5e-324))
+
+
+@pytest.mark.parametrize("multiple", [-2, 0, 2, 4])
+def test_exact_axis_angles_are_turn_independent(multiple: int) -> None:
+    """Axis recovery remains canonical after exact whole-turn translations."""
+    assert _normalized_degrees(arb.pi() * multiple) == 0.0
+
+
 @pytest.mark.parametrize(
     ("x", "y", "expected"),
-    [
-        (0, 1, 90.0),
-        (0, -1, 270.0),
-        (1, 0, 0.0),
-        (-1, 0, 180.0),
-    ],
+    [(0, 1, 90.0), (0, -1, 270.0), (1, 0, 0.0), (-1, 0, 180.0)],
 )
 def test_exact_axes_have_canonical_angles(x: int, y: int, expected: float) -> None:
     """Only exact zero axes use canonical degree values."""

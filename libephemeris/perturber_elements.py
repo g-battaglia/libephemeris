@@ -320,23 +320,50 @@ def _angle_degrees(pair_x: arb, pair_y: arb) -> float:
     return _normalized_degrees(_angle_chart(pair_x, pair_y))
 
 
+def _exact_pi_multiple(angle: arb) -> int | None:
+    """Recognize an exact Arb construction of an integer multiple of pi."""
+    if angle.is_exact() and angle.is_zero():
+        return 0
+    quotient = angle / arb.pi()
+    multiple = quotient.unique_fmpz()
+    if multiple is None:
+        return None
+    reference = arb.pi() * multiple
+    if angle.lower() == reference.lower() and angle.upper() == reference.upper():
+        return int(multiple)
+    return None
+
+
 def _normalized_degrees(angle: arb) -> float:
-    """Certify an angle in degrees after one exact integer-turn translation."""
-    midpoint = float(angle.mid()) * (180.0 / math.pi)
-    if not math.isfinite(midpoint):
+    """Certify degrees using Arb turn bounds, never a midpoint decision."""
+    if not angle.is_finite():
         raise CalculationError("angle is not finite")
-    turns = math.floor(midpoint / 360.0)
-    normalized = angle * (180.0 / math.pi) - 360.0 * turns
-    candidate = float(normalized.mid())
-    candidate %= 360.0
-    # Keep the interval near the candidate's normalized branch.  A value at the
-    # upper endpoint is represented by zero, not by 360.
-    if candidate == 0.0 and normalized.mid() > 359:
-        normalized = normalized - 360.0
+    exact_multiple = _exact_pi_multiple(angle)
+    if exact_multiple is not None:
+        canonical = arb(180 if exact_multiple % 2 else 0)
+        return float(certified_float(canonical))
+
+    two_pi = arb.pi() * 2
+    turns_ball = angle / two_pi
+    lower_floor = turns_ball.lower().floor()
+    upper_floor = turns_ball.upper().floor()
+    lower_candidate = lower_floor.unique_fmpz()
+    upper_candidate = upper_floor.unique_fmpz()
+    if lower_candidate is None or upper_candidate is None:
+        raise CalculationError("angle turn translation is unresolved")
+    if lower_candidate != upper_candidate:
+        raise CalculationError("angle interval straddles a turn boundary")
+    turns = int(lower_candidate)
+    normalized = (angle - two_pi * turns) * (180 / arb.pi())
+    if normalized < 0 or normalized >= 360:
+        raise CalculationError("angle normalization is outside one turn")
     try:
-        return float(certified_float(normalized))
+        result = float(certified_float(normalized))
     except Exception as exc:
         raise CalculationError("angle does not select one binary64 cell") from exc
+    if result < 0.0 or result >= 360.0:
+        raise CalculationError("angle selects a normalization boundary")
+    return result
 
 
 def _recover_tuple(
@@ -400,7 +427,7 @@ def _recover_tuple(
     result = (
         float(certified_float(a)),
         float(certified_float(eccentricity)),
-        float(certified_float(inclination * (180.0 / math.pi))),
+        float(certified_float(inclination * (arb(180) / arb.pi()))),
         omega_node_deg,
         omega_deg,
     )
