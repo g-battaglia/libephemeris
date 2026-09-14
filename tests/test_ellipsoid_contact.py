@@ -14,6 +14,7 @@ from flint import arb
 from libephemeris.ellipsoid_contact import (
     _ConeSection,
     _EllipsoidContactFrame,
+    _certify_regular_root_box,
     _evaluate_regular_contact,
     _regular_contact_jacobian,
 )
@@ -169,6 +170,54 @@ def test_regular_contact_jacobian_encloses_e1_finite_difference() -> None:
         for row, (before, after) in enumerate(zip(low_values, high_values)):
             difference = (float(after.mid()) - float(before.mid())) / (2 * step)
             assert abs(float(jacobian[row, column].mid()) - difference) < 1e-8
+
+
+def test_regular_root_box_certifies_e1_kkt_root() -> None:
+    """Strict Krawczyk inclusion isolates the regular E1 stationary root."""
+    frame = _frame(axis_point_km=(-3.5, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    cone = _ConeSection(1.0, 0.8, 1)
+    box = (
+        arb(-1.6, "0.01"),
+        arb(0, "0.01"),
+        arb(1.2, "0.01"),
+        arb(1, "0.01"),
+    )
+    certificate = _certify_regular_root_box(frame, cone, box)
+    assert all(
+        outer.contains_interior(inner)
+        for outer, inner in zip(certificate.root_box, certificate.image)
+    )
+    assert certificate.cone_residual.contains(0)
+
+
+def test_regular_root_box_rejects_noncontracting_or_negative_lambda_box() -> None:
+    """A broad image or multiplier crossing zero cannot certify a root."""
+    frame = _frame(axis_point_km=(-3.5, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    cone = _ConeSection(1.0, 0.8, 1)
+    with pytest.raises(IntervalCertificationError, match="strictly inside"):
+        _certify_regular_root_box(
+            frame,
+            cone,
+            (arb(-1.6, "0.3"), arb(0, "0.3"), arb(1.2, "0.3"), arb(1.5, "0.3")),
+        )
+    with pytest.raises(ValueError, match="multiplier"):
+        _certify_regular_root_box(
+            frame,
+            cone,
+            (arb(-1.6, "0.01"), arb(0, "0.01"), arb(1.2, "0.01"), arb(0, 1)),
+        )
+
+
+def test_regular_root_certificate_does_not_claim_cone_contact() -> None:
+    """A KKT root with a changed cone radius retains a nonzero g enclosure."""
+    frame = _frame(axis_point_km=(-3.5, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    cone = _ConeSection(0.5, 0.8, 1)
+    certificate = _certify_regular_root_box(
+        frame,
+        cone,
+        (arb(-1.6, "0.01"), arb(0, "0.01"), arb(1.2, "0.01"), arb(1, "0.01")),
+    )
+    assert not certificate.cone_residual.contains(0)
 
 
 def test_regular_contact_requires_smooth_domain() -> None:

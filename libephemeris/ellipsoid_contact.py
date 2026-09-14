@@ -37,6 +37,8 @@ from .intervals import (
     IntervalCertificationError,
     ball_from_float,
     interval_cholesky,
+    krawczyk_image,
+    strictly_contains_vector,
 )
 
 __all__: list[str] = []
@@ -79,6 +81,15 @@ class _RegularContactEvaluation:
     nappe_radius: Ball
     radial_distance: Ball
     stationarity: BallVector3
+
+
+@dataclass(frozen=True, slots=True)
+class _RegularRootCertificate:
+    """Strict Krawczyk inclusion for one regular KKT root."""
+
+    root_box: tuple[Ball, Ball, Ball, Ball]
+    image: tuple[Ball, Ball, Ball, Ball]
+    cone_residual: Ball
 
 
 @dataclass(frozen=True, slots=True)
@@ -340,6 +351,100 @@ def _regular_contact_jacobian(
             )
         jacobian[row + 1, _VECTOR_DIMENSION] = 2 * metric_point[row]
     return jacobian
+
+
+def _certify_regular_root_box(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    root_box: tuple[Ball, Ball, Ball, Ball],
+) -> _RegularRootCertificate:
+    """Certify one regular KKT root by strict Krawczyk inclusion.
+
+    The first three variables are a point on the ellipsoid and the fourth is the
+    non-negative ellipsoid multiplier. The box must already exclude ``rho=0``
+    and ``r=0``. This function proves one root of ``[E, stationarity]`` inside
+    the supplied box. It returns the cone residual for a separate exact-contact
+    decision; it does not claim that the root lies on ``g=0`` or is the global
+    minimizer.
+
+    Args:
+        frame: Validated private contact frame.
+        cone: Validated selected cone section.
+        root_box: Four finite Arb intervals ``(x,y,z,lambda)``.
+
+    Returns:
+        The root box, strict Krawczyk image, and cone residual at the box.
+
+    Raises:
+        ValueError: If the box shape or entries are invalid.
+        IntervalCertificationError: If the midpoint Jacobian is singular, the
+            Krawczyk image is not strictly inside the box, or the smooth domain
+            is not certified.
+    """
+    if (
+        type(root_box) is not tuple
+        or len(root_box) != _VECTOR_DIMENSION + 1
+        or any(type(value) is not arb or not value.is_finite() for value in root_box)
+    ):
+        raise ValueError("regular root box must contain four finite Arb intervals")
+    if root_box[3].lower() < 0:
+        raise ValueError("regular root multiplier box must be non-negative")
+
+    center = tuple(arb(value.mid()) for value in root_box)
+    point_box: BallVector3 = (root_box[0], root_box[1], root_box[2])
+    point_center: BallVector3 = (center[0], center[1], center[2])
+    multiplier_center = center[_VECTOR_DIMENSION]
+    box_evaluation = _evaluate_regular_contact(
+        frame, cone, point_box, root_box[_VECTOR_DIMENSION]
+    )
+    center_evaluation = _evaluate_regular_contact(
+        frame, cone, point_center, multiplier_center
+    )
+    values = (center_evaluation.ellipsoid,) + center_evaluation.stationarity
+    jacobian_box = _regular_contact_jacobian(
+        frame, cone, point_box, root_box[_VECTOR_DIMENSION]
+    )
+    midpoint_jacobian = _regular_contact_jacobian(
+        frame, cone, point_center, multiplier_center
+    ).mid()
+    try:
+        inverse_enclosure = midpoint_jacobian.inv()
+    except ZeroDivisionError as exc:
+        raise IntervalCertificationError(
+            "regular root midpoint Jacobian is not invertible"
+        ) from exc
+    try:
+        preconditioner = arb_mat(
+            [
+                [
+                    ball_from_float(float(inverse_enclosure[row, column].mid()))
+                    for column in range(_VECTOR_DIMENSION + 1)
+                ]
+                for row in range(_VECTOR_DIMENSION + 1)
+            ]
+        )
+    except (OverflowError, ValueError) as exc:
+        raise IntervalCertificationError(
+            "regular root inverse has no finite point preconditioner"
+        ) from exc
+    if not preconditioner.det().is_finite() or preconditioner.det().contains(0):
+        raise IntervalCertificationError(
+            "regular root point preconditioner is singular"
+        )
+    image_matrix = krawczyk_image(
+        center, values, jacobian_box, root_box, preconditioner
+    )
+    domain_matrix = arb_mat([[value] for value in root_box])
+    if not strictly_contains_vector(domain_matrix, image_matrix):
+        raise IntervalCertificationError(
+            "regular root Krawczyk image is not strictly inside its box"
+        )
+    image = tuple(image_matrix[index, 0] for index in range(_VECTOR_DIMENSION + 1))
+    return _RegularRootCertificate(
+        root_box,
+        image,  # type: ignore[arg-type]
+        box_evaluation.cone,
+    )
 
 
 def _validate_vector(vector: object, name: str) -> None:
