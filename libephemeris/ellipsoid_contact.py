@@ -87,9 +87,21 @@ class _RegularContactEvaluation:
 class _RegularRootCertificate:
     """Strict Krawczyk inclusion for one regular KKT root."""
 
+    frame: _EllipsoidContactFrame
+    cone: _ConeSection
     root_box: tuple[Ball, Ball, Ball, Ball]
     image: tuple[Ball, Ball, Ball, Ball]
     cone_residual: Ball
+
+
+@dataclass(frozen=True, slots=True)
+class _ResidualReduction:
+    """Ordered minimum and normalized sign within a supplied candidate set."""
+
+    minimum: Ball
+    normalized: Ball
+    sign: int
+    candidate_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -441,10 +453,80 @@ def _certify_regular_root_box(
         )
     image = tuple(image_matrix[index, 0] for index in range(_VECTOR_DIMENSION + 1))
     return _RegularRootCertificate(
+        frame,
+        cone,
         root_box,
         image,  # type: ignore[arg-type]
         box_evaluation.cone,
     )
+
+
+def _reduce_regular_residuals(
+    cone: _ConeSection,
+    candidates: tuple[_RegularRootCertificate, ...],
+) -> _ResidualReduction:
+    """Order residuals within one supplied regular-candidate set.
+
+    This helper deliberately has no global or completeness parameter. It only
+    reduces candidates whose validity has already been certified. A future
+    active-set enumerator must prove that its union covers the whole constrained
+    problem before interpreting this local reduction as the global reach.
+
+    Args:
+        cone: The cone whose positive cosine normalizes the residual.
+        candidates: Non-empty immutable tuple of certified regular candidates.
+
+    Returns:
+        Ordered minimum enclosure, normalized negative residual, certified sign,
+        and candidate count.
+
+    Raises:
+        ValueError: If the candidate container is malformed.
+        IntervalCertificationError: If residual intervals overlap in a way that
+            prevents one ordered minimum or the normalized sign is unresolved.
+    """
+    cone.validate()
+    if (
+        type(candidates) is not tuple
+        or not candidates
+        or any(
+            type(candidate) is not _RegularRootCertificate for candidate in candidates
+        )
+    ):
+        raise ValueError("regular candidates must be a non-empty certificate tuple")
+    frame = candidates[0].frame
+    if any(
+        candidate.frame != frame or candidate.cone != cone for candidate in candidates
+    ):
+        raise ValueError("regular candidates must belong to one frame and cone")
+    residuals = [candidate.cone_residual for candidate in candidates]
+    if any(not residual.is_finite() for residual in residuals):
+        raise ValueError("regular candidate residuals must be finite intervals")
+    minimum_index: int | None = None
+    for index, residual in enumerate(residuals):
+        if all(
+            index == other or residual.upper() < competing.lower()
+            for other, competing in enumerate(residuals)
+        ):
+            minimum_index = index
+            break
+    if len(residuals) == 1:
+        minimum_index = 0
+    if minimum_index is None:
+        raise IntervalCertificationError(
+            "regular candidates do not determine one minimum enclosure"
+        )
+    minimum = residuals[minimum_index]
+    reach = -minimum / ball_from_float(cone.cosine)
+    if reach > 0:
+        sign = 1
+    elif reach < 0:
+        sign = -1
+    elif reach.is_exact() and reach.is_zero():
+        sign = 0
+    else:
+        raise IntervalCertificationError("regular residual sign is not certified")
+    return _ResidualReduction(minimum, reach, sign, len(candidates))
 
 
 def _validate_vector(vector: object, name: str) -> None:

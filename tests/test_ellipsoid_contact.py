@@ -14,8 +14,10 @@ from flint import arb
 from libephemeris.ellipsoid_contact import (
     _ConeSection,
     _EllipsoidContactFrame,
+    _RegularRootCertificate,
     _certify_regular_root_box,
     _evaluate_regular_contact,
+    _reduce_regular_residuals,
     _regular_contact_jacobian,
 )
 from libephemeris.intervals import IntervalCertificationError
@@ -220,6 +222,55 @@ def test_regular_root_box_covers_e2_e3_and_e4(
         assert certificate.cone_residual.contains(0)
     else:
         assert certificate.cone_residual > 0
+
+
+def test_regular_residual_reduction_orders_supplied_candidates_only() -> None:
+    """The reducer selects a separated minimum without claiming completeness."""
+    frame = _frame(axis_point_km=(-3.5, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    cone = _ConeSection(1.0, 0.8, 1)
+    first = _certify_regular_root_box(
+        frame,
+        cone,
+        (arb(-1.6, "0.01"), arb(0, "0.01"), arb(1.2, "0.01"), arb(1, "0.01")),
+    )
+    second = _RegularRootCertificate(
+        frame,
+        cone,
+        first.root_box,
+        first.image,
+        arb(1.0, "0.01"),
+    )
+    with pytest.raises(IntervalCertificationError, match="sign"):
+        _reduce_regular_residuals(cone, (first, second))
+    separated = _RegularRootCertificate(
+        frame,
+        cone,
+        first.root_box,
+        first.image,
+        arb(-0.5, "0.01"),
+    )
+    reduction = _reduce_regular_residuals(cone, (separated, second))
+    assert reduction.minimum is separated.cone_residual
+    assert reduction.candidate_count == 2
+    assert reduction.sign == 1
+
+
+def test_regular_residual_reduction_rejects_overlapping_candidates() -> None:
+    """Overlapping residual ranges cannot establish one ordered candidate."""
+    frame = _frame(axis_point_km=(-3.5, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    cone = _ConeSection(1.0, 0.8, 1)
+    first = _certify_regular_root_box(
+        frame,
+        cone,
+        (arb(-1.6, "0.01"), arb(0, "0.01"), arb(1.2, "0.01"), arb(1, "0.01")),
+    )
+    with pytest.raises(IntervalCertificationError, match="minimum"):
+        _reduce_regular_residuals(cone, (first, first))
+    with pytest.raises(ValueError, match="non-empty"):
+        _reduce_regular_residuals(cone, ())
+    other_cone = _ConeSection(0.5, 0.8, 1)
+    with pytest.raises(ValueError, match="one frame and cone"):
+        _reduce_regular_residuals(other_cone, (first,))
 
 
 def test_regular_root_box_rejects_noncontracting_or_negative_lambda_box() -> None:
