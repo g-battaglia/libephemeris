@@ -190,6 +190,38 @@ def test_regular_root_box_certifies_e1_kkt_root() -> None:
     assert certificate.cone_residual.contains(0)
 
 
+@pytest.mark.parametrize(
+    ("axis_point", "axis_span", "expected_contact"),
+    [
+        ((-4.0, 0.0, 0.0), (0.0, 0.0, 1.0), True),
+        ((-4.0, 0.0, 0.0), (0.0, 1.0, 1.0), True),
+        ((-5.0, 0.0, 0.0), (0.0, 1.0, 1.0), False),
+    ],
+)
+def test_regular_root_box_covers_e2_e3_and_e4(
+    axis_point, axis_span, expected_contact
+) -> None:
+    """Principal/inclined tangencies and the inclined miss stay distinct."""
+    frame = _frame(
+        metric_km_minus_2=(
+            (1.0 / 9.0, 0.0, 0.0),
+            (0.0, 1.0 / 9.0, 0.0),
+            (0.0, 0.0, 0.25),
+        ),
+        axis_point_km=axis_point,
+        axis_span=axis_span,
+    )
+    certificate = _certify_regular_root_box(
+        frame,
+        _ConeSection(1.0, 1.0, 1),
+        (arb(-3, "0.001"), arb(0, "0.001"), arb(0, "0.001"), arb(1.5, "0.001")),
+    )
+    if expected_contact:
+        assert certificate.cone_residual.contains(0)
+    else:
+        assert certificate.cone_residual > 0
+
+
 def test_regular_root_box_rejects_noncontracting_or_negative_lambda_box() -> None:
     """A broad image or multiplier crossing zero cannot certify a root."""
     frame = _frame(axis_point_km=(-3.5, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
