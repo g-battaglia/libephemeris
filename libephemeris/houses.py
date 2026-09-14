@@ -4561,10 +4561,8 @@ _HOUSE_SYSTEMS: dict[str, HouseSystem] = {
 }
 
 
-# Shared placement constants. Degenerate spherical arguments use a small
-# binary64 guard. Cusp placement is unbiased; exact cusps belong to the
-# interval selected by the geometric comparisons below.
-_NEAR_ZERO = 1e-10
+# Cusp placement is unbiased; exact cusps belong to the interval selected by
+# the geometric comparisons below.
 CUSP_BOUNDARY_OFFSET = 0.0
 
 
