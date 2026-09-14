@@ -84,6 +84,16 @@ class _RegularContactEvaluation:
 
 
 @dataclass(frozen=True, slots=True)
+class _NappeBoundaryEvaluation:
+    """KKT residuals on the active ``r=0`` boundary with ``rho>0``."""
+
+    ellipsoid: Ball
+    nappe_radius: Ball
+    radial_distance: Ball
+    stationarity: BallVector3
+
+
+@dataclass(frozen=True, slots=True)
 class _RegularRootCertificate:
     """Strict Krawczyk inclusion for one regular KKT root."""
 
@@ -210,24 +220,27 @@ def _metric_vector(metric: BallMatrix, vector: BallVector3) -> BallVector3:
     return tuple(product[index, 0] for index in range(_VECTOR_DIMENSION))  # type: ignore[return-value]
 
 
-def _evaluate_regular_contact(
+def _evaluate_smooth_contact(
     frame: _EllipsoidContactFrame,
     cone: _ConeSection,
     point_km: BallVector3,
     ellipsoid_multiplier: Ball,
+    *,
+    require_positive_nappe: bool,
 ) -> _RegularContactEvaluation:
-    """Evaluate equations (1), (2), and regular-contact stationarity.
+    """Evaluate smooth cone geometry, optionally requiring inactive nappe.
 
-    This evaluator covers only ``rho > 0`` and ``r > 0``. It does not solve the
-    equations, classify a global minimum, or handle the radial subgradient and
-    active nappe boundary. A caller must prove the two strict domain conditions
-    before applying Krawczyk to this smooth system.
+    The radial domain ``rho > 0`` is mandatory because the cone gradient is
+    otherwise nonsmooth. The nappe radius is returned as an equation; regular
+    callers require it positive, while the active-boundary evaluator permits an
+    enclosure containing zero. This helper evaluates no global classification.
 
     Args:
         frame: Validated private ellipsoid and axis source frame.
         cone: One validated physical cone section.
         point_km: Three-dimensional interval point.
         ellipsoid_multiplier: Non-negative KKT multiplier enclosure.
+        require_positive_nappe: Require ``r>0`` for the inactive constraint.
 
     Returns:
         Outward enclosures of the ellipsoid equation, cone equation, nappe
@@ -235,8 +248,8 @@ def _evaluate_regular_contact(
 
     Raises:
         ValueError: If a point/multiplier/cone input is malformed or non-finite.
-        IntervalCertificationError: If ``rho`` or the nappe radius is not proved
-            strictly positive.
+        IntervalCertificationError: If ``rho>0`` or a requested ``r>0`` is not
+            certified.
     """
     frame.validate()
     cone.validate()
@@ -275,7 +288,7 @@ def _evaluate_regular_contact(
     branch = arb(cone.branch_sign)
     tangent = sine / cosine
     nappe_radius = radius + branch * tangent * axial
-    if not nappe_radius > 0:
+    if require_positive_nappe and not nappe_radius > 0:
         raise IntervalCertificationError(
             "regular contact requires nappe radius separated above zero"
         )
@@ -295,6 +308,84 @@ def _evaluate_regular_contact(
         cone_value,
         nappe_radius,
         radial,
+        stationarity,  # type: ignore[arg-type]
+    )
+
+
+def _evaluate_regular_contact(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    point_km: BallVector3,
+    ellipsoid_multiplier: Ball,
+) -> _RegularContactEvaluation:
+    """Evaluate the smooth KKT terms with inactive nappe constraint."""
+    return _evaluate_smooth_contact(
+        frame,
+        cone,
+        point_km,
+        ellipsoid_multiplier,
+        require_positive_nappe=True,
+    )
+
+
+def _evaluate_nappe_boundary(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    point_km: BallVector3,
+    ellipsoid_multiplier: Ball,
+    nappe_multiplier: Ball,
+) -> _NappeBoundaryEvaluation:
+    """Evaluate the active-nappe KKT system for ``r=0`` and ``rho>0``.
+
+    The stationarity equation is
+
+    ``grad(g) + 2*lambda*A*x - mu*k*tan(f)*e = 0``
+
+    with both multipliers non-negative. This evaluator includes the ellipsoid
+    equation and the active ``r=0`` equation; it does not isolate a root or
+    prove that this active set is globally minimizing.
+
+    Args:
+        frame: Validated private ellipsoid and axis frame.
+        cone: Validated cone section.
+        point_km: Three finite Arb coordinate intervals.
+        ellipsoid_multiplier: Certified non-negative ``lambda`` enclosure.
+        nappe_multiplier: Certified non-negative ``mu`` enclosure.
+
+    Returns:
+        Outward enclosures of ``E``, ``r``, ``rho``, and stationarity.
+
+    Raises:
+        ValueError: If inputs are malformed or multipliers are not certified
+            non-negative.
+        IntervalCertificationError: If ``rho>0`` is not certified.
+    """
+    regular = _evaluate_smooth_contact(
+        frame,
+        cone,
+        point_km,
+        ellipsoid_multiplier,
+        require_positive_nappe=False,
+    )
+    if (
+        type(nappe_multiplier) is not arb
+        or not nappe_multiplier.is_finite()
+        or nappe_multiplier.lower() < 0
+    ):
+        raise ValueError("nappe multiplier must be a finite non-negative interval")
+    axis = frame.certified_axis_line()
+    cosine = ball_from_float(cone.cosine)
+    tangent = (1 - cosine * cosine).sqrt() / cosine
+    branch = arb(cone.branch_sign)
+    stationarity = tuple(
+        regular.stationarity[index]
+        - nappe_multiplier * branch * tangent * axis.direction[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    return _NappeBoundaryEvaluation(
+        regular.ellipsoid,
+        regular.nappe_radius,
+        regular.radial_distance,
         stationarity,  # type: ignore[arg-type]
     )
 

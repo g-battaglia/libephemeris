@@ -16,6 +16,7 @@ from libephemeris.ellipsoid_contact import (
     _EllipsoidContactFrame,
     _RegularRootCertificate,
     _certify_regular_root_box,
+    _evaluate_nappe_boundary,
     _evaluate_regular_contact,
     _reduce_regular_residuals,
     _regular_contact_jacobian,
@@ -301,6 +302,42 @@ def test_regular_root_certificate_does_not_claim_cone_contact() -> None:
         (arb(-1.6, "0.01"), arb(0, "0.01"), arb(1.2, "0.01"), arb(1, "0.01")),
     )
     assert not certificate.cone_residual.contains(0)
+
+
+def test_nappe_boundary_evaluator_accepts_zero_containing_radius() -> None:
+    """The active r=0 equation is returned instead of forced into r>0."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    evaluation = _evaluate_nappe_boundary(
+        frame,
+        _ConeSection(1.0, 0.8, 1),
+        (arb(1), arb(0), arb(-4) / 3),
+        arb(0),
+        arb(0),
+    )
+    assert evaluation.nappe_radius.contains(0)
+    assert evaluation.radial_distance > 0
+    assert all(component.is_finite() for component in evaluation.stationarity)
+
+
+def test_nappe_boundary_rejects_uncertified_multiplier_or_radial_axis() -> None:
+    """The active set keeps non-negative mu and smooth rho contracts."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    with pytest.raises(ValueError, match="nappe multiplier"):
+        _evaluate_nappe_boundary(
+            frame,
+            _ConeSection(1.0, 0.8, 1),
+            (arb(1), arb(0), arb(-4) / 3),
+            arb(0),
+            arb(0, 1),
+        )
+    with pytest.raises(IntervalCertificationError, match="radial"):
+        _evaluate_nappe_boundary(
+            frame,
+            _ConeSection(0.0, 0.8, 1),
+            (arb(0), arb(0), arb(0)),
+            arb(0),
+            arb(0),
+        )
 
 
 def test_regular_contact_requires_smooth_domain() -> None:
