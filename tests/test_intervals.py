@@ -17,6 +17,7 @@ from libephemeris.intervals import (
     certified_float,
     certified_sign,
     ellipsoid_line_discriminant,
+    ellipsoid_line_intersections,
     interval_cholesky,
     interval_precision,
     isolate_unique_root,
@@ -122,6 +123,40 @@ def test_ellipsoid_line_discriminant_certifies_exact_dyadic_tangency() -> None:
     )
     assert chi.is_exact()
     assert certified_sign(chi) == 0
+
+
+def test_ellipsoid_line_intersections_match_e5_parameters() -> None:
+    """The E5 axis crossings enclose the two exact quadratic roots."""
+    metric = arb_mat(
+        [
+            [arb(1) / 9, arb(0), arb(0)],
+            [arb(0), arb(1) / 9, arb(0)],
+            [arb(0), arb(0), arb(1) / 4],
+        ]
+    )
+    root_two = arb(2).sqrt()
+    direction = (arb(0), 1 / root_two, 1 / root_two)
+    first, second = ellipsoid_line_intersections(metric, direction, (arb(0),) * 3)
+    expected = (arb(72) / 13).sqrt()
+    assert first.contains(-expected)
+    assert second.contains(expected)
+    assert first < second
+
+
+def test_ellipsoid_line_intersections_reject_tangent_or_miss() -> None:
+    """Tangency and misses never masquerade as two crossing points."""
+    metric = arb_mat(
+        [
+            [arb(1) / 4, arb(0), arb(0)],
+            [arb(0), arb(1) / 4, arb(0)],
+            [arb(0), arb(0), arb(1) / 4],
+        ]
+    )
+    direction = (arb(0), arb(0), arb(1))
+    with pytest.raises(IntervalCertificationError, match="positive discriminant"):
+        ellipsoid_line_intersections(metric, direction, (arb(-2), arb(0), arb(0)))
+    with pytest.raises(IntervalCertificationError, match="positive discriminant"):
+        ellipsoid_line_intersections(metric, direction, (arb(-3), arb(0), arb(0)))
 
 
 def test_ellipsoid_line_discriminant_rejects_invalid_inputs() -> None:

@@ -41,6 +41,7 @@ __all__ = [
     "certified_sign",
     "contains_zero",
     "ellipsoid_line_discriminant",
+    "ellipsoid_line_intersections",
     "interval_cholesky",
     "interval_precision",
     "isolate_unique_root",
@@ -162,6 +163,34 @@ def strictly_contains_vector(outer: BallMatrix, inner: BallMatrix) -> bool:
     )
 
 
+def _ellipsoid_line_coefficients(
+    metric: BallMatrix,
+    direction: Sequence[Ball],
+    anchor: Sequence[Ball],
+) -> tuple[Ball, Ball, Ball]:
+    """Validate a line/ellipsoid problem and return its quadratic coefficients."""
+    dimension = len(direction)
+    if dimension == 0 or len(anchor) != dimension:
+        raise ValueError("line vectors must have the same non-zero dimension")
+    if metric.nrows() != dimension or metric.ncols() != dimension:
+        raise ValueError("ellipsoid metric must match the line dimension")
+    if any(not value.is_finite() for value in (*direction, *anchor)):
+        raise ValueError("ellipsoid line vectors must contain finite intervals")
+    interval_cholesky(metric)
+    direction_vector = _column_vector(direction, "direction")
+    anchor_vector = _column_vector(anchor, "anchor")
+    metric_direction = metric * direction_vector
+    metric_anchor = metric * anchor_vector
+    a = (direction_vector.transpose() * metric_direction)[0, 0]
+    b = (direction_vector.transpose() * metric_anchor)[0, 0]
+    c = (anchor_vector.transpose() * metric_anchor)[0, 0] - 1
+    if not a > 0:
+        raise IntervalCertificationError(
+            "line direction has no certified positive ellipsoid norm"
+        )
+    return a, b, c
+
+
 def ellipsoid_line_discriminant(
     metric: BallMatrix,
     direction: Sequence[Ball],
@@ -189,26 +218,47 @@ def ellipsoid_line_discriminant(
         IntervalCertificationError: If the metric is not certified positive
             definite.
     """
-    dimension = len(direction)
-    if dimension == 0 or len(anchor) != dimension:
-        raise ValueError("line vectors must have the same non-zero dimension")
-    if metric.nrows() != dimension or metric.ncols() != dimension:
-        raise ValueError("ellipsoid metric must match the line dimension")
-    if any(not value.is_finite() for value in (*direction, *anchor)):
-        raise ValueError("ellipsoid line vectors must contain finite intervals")
-    interval_cholesky(metric)
-    direction_vector = _column_vector(direction, "direction")
-    anchor_vector = _column_vector(anchor, "anchor")
-    metric_direction = metric * direction_vector
-    metric_anchor = metric * anchor_vector
-    a = (direction_vector.transpose() * metric_direction)[0, 0]
-    b = (direction_vector.transpose() * metric_anchor)[0, 0]
-    c = (anchor_vector.transpose() * metric_anchor)[0, 0] - 1
-    if not a > 0:
-        raise IntervalCertificationError(
-            "line direction has no certified positive ellipsoid norm"
-        )
+    a, b, c = _ellipsoid_line_coefficients(metric, direction, anchor)
     return b * b - a * c
+
+
+def ellipsoid_line_intersections(
+    metric: BallMatrix,
+    direction: Sequence[Ball],
+    anchor: Sequence[Ball],
+) -> tuple[Ball, Ball]:
+    """Return certified line parameters for two ellipsoid intersections.
+
+    The returned pair is ordered by line parameter. A strict positive
+    discriminant is required; exact tangency is a distinct one-point contract,
+    while a zero-containing enclosure is unresolved and fails closed.
+
+    Args:
+        metric: Finite symmetric positive-definite ellipsoid metric.
+        direction: Finite interval line direction.
+        anchor: Finite interval line anchor.
+
+    Returns:
+        The two outward-rounded line-parameter enclosures.
+
+    Raises:
+        IntervalCertificationError: If two crossings are not certified or their
+            parameter enclosures cannot be strictly ordered.
+    """
+    a, b, c = _ellipsoid_line_coefficients(metric, direction, anchor)
+    discriminant = b * b - a * c
+    if not discriminant > 0:
+        raise IntervalCertificationError(
+            "line/ellipsoid intersections need a strictly positive discriminant"
+        )
+    root = discriminant.sqrt()
+    first = (-b - root) / a
+    second = (-b + root) / a
+    if not first < second:
+        raise IntervalCertificationError(
+            "line/ellipsoid intersection parameters are not strictly ordered"
+        )
+    return first, second
 
 
 def interval_cholesky(matrix: BallMatrix) -> BallMatrix:
