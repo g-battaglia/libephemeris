@@ -25,7 +25,7 @@ import math
 import struct
 from contextlib import contextmanager
 from dataclasses import dataclass
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Iterator, TypeAlias
 
 from flint import arb, arb_mat, ctx
@@ -40,9 +40,12 @@ __all__ = [
     "certified_float",
     "certified_sign",
     "contains_zero",
+    "interval_cholesky",
     "interval_precision",
     "isolate_unique_root",
+    "krawczyk_image",
     "strictly_contains",
+    "strictly_contains_vector",
 ]
 
 Ball: TypeAlias = arb
@@ -134,6 +137,143 @@ def certified_sign(value: Ball) -> int:
 def strictly_contains(outer: Ball, inner: Ball) -> bool:
     """Whether ``inner`` is proved to lie in the interior of ``outer``."""
     return bool(outer.contains_interior(inner))
+
+
+def strictly_contains_vector(outer: BallMatrix, inner: BallMatrix) -> bool:
+    """Whether one interval column vector strictly contains another.
+
+    Args:
+        outer: An ``n x 1`` interval vector.
+        inner: An ``n x 1`` interval vector of the same dimension.
+
+    Returns:
+        True only when every inner component lies in the interior of its
+        corresponding outer component.
+
+    Raises:
+        ValueError: If either matrix is not a compatible column vector.
+    """
+    if outer.ncols() != 1 or inner.ncols() != 1 or outer.nrows() != inner.nrows():
+        raise ValueError("interval vectors must be compatible column matrices")
+    return all(
+        strictly_contains(outer[index, 0], inner[index, 0])
+        for index in range(outer.nrows())
+    )
+
+
+def interval_cholesky(matrix: BallMatrix) -> BallMatrix:
+    """Certify positive definiteness and return a lower Cholesky enclosure.
+
+    The standard scalar Cholesky recurrence is evaluated in Arb. Every pivot
+    must be proved strictly positive before its square root is taken; an
+    enclosure touching zero is not accepted as numerical positive definiteness.
+
+    Args:
+        matrix: Symmetric square interval matrix.
+
+    Returns:
+        Lower-triangular interval matrix ``L`` enclosing a factor with
+        ``matrix = L * L.T``.
+
+    Raises:
+        ValueError: If the matrix is empty, non-square, or not certifiably
+            symmetric.
+        IntervalCertificationError: If a pivot is not proved positive.
+    """
+    rows = matrix.nrows()
+    if rows == 0 or matrix.ncols() != rows:
+        raise ValueError("Cholesky input must be a non-empty square matrix")
+    for row in range(rows):
+        for column in range(row):
+            if matrix[row, column] != matrix[column, row]:
+                raise ValueError("Cholesky input must be certifiably symmetric")
+    factor = arb_mat(rows, rows)
+    for row in range(rows):
+        for column in range(row + 1):
+            remainder = matrix[row, column]
+            for index in range(column):
+                remainder -= factor[row, index] * factor[column, index]
+            if row == column:
+                if not remainder > 0:
+                    raise IntervalCertificationError(
+                        f"Cholesky pivot {row} is not separated above zero"
+                    )
+                factor[row, column] = remainder.sqrt()
+            else:
+                factor[row, column] = remainder / factor[column, column]
+    return factor
+
+
+def _column_vector(values: Sequence[Ball], name: str) -> BallMatrix:
+    """Build a column matrix after validating one interval-vector input."""
+    if not values:
+        raise ValueError(f"{name} must be a non-empty interval vector")
+    return arb_mat([[value] for value in values])
+
+
+def krawczyk_image(
+    center: Sequence[Ball],
+    values_at_center: Sequence[Ball],
+    jacobian_box: BallMatrix,
+    domain: Sequence[Ball],
+    preconditioner: BallMatrix,
+) -> BallMatrix:
+    """Return the interval Krawczyk image for a square nonlinear system.
+
+    For a point ``x`` and interval box ``X``, system value ``F(x)``, interval
+    Jacobian ``J(X)``, and point preconditioner ``C``, the operator is
+
+    ``K = x - C F(x) + (I - C J(X)) (X - x)``.
+
+    Strict inclusion ``K`` inside ``X`` proves one root in the box under the
+    usual Krawczyk theorem. This helper computes only the outward enclosure;
+    callers retain responsibility for complete-domain subdivision and every
+    problem-specific boundary or active-set certificate.
+
+    Args:
+        center: Exact or point-valued center vector ``x``.
+        values_at_center: Outward enclosure of ``F(x)``.
+        jacobian_box: Outward enclosure of ``J(X)``.
+        domain: Interval box ``X``.
+        preconditioner: Square point matrix ``C``.
+
+    Returns:
+        The outward-rounded Krawczyk image as an ``n x 1`` matrix.
+
+    Raises:
+        ValueError: If dimensions do not form one square system, or if the
+            center/preconditioner are not exact point quantities.
+    """
+    dimension = len(center)
+    if dimension == 0 or len(values_at_center) != dimension or len(domain) != dimension:
+        raise ValueError("Krawczyk vectors must have the same non-zero dimension")
+    if jacobian_box.nrows() != dimension or jacobian_box.ncols() != dimension:
+        raise ValueError("Krawczyk Jacobian must be square and match the vectors")
+    if preconditioner.nrows() != dimension or preconditioner.ncols() != dimension:
+        raise ValueError("Krawczyk preconditioner must match the system dimension")
+    if any(not value.is_exact() for value in center):
+        raise ValueError("Krawczyk center must contain exact point values")
+    if any(
+        not preconditioner[row, column].is_exact()
+        for row in range(dimension)
+        for column in range(dimension)
+    ):
+        raise ValueError("Krawczyk preconditioner must be an exact point matrix")
+
+    center_vector = _column_vector(center, "center")
+    value_vector = _column_vector(values_at_center, "values_at_center")
+    domain_vector = _column_vector(domain, "domain")
+    identity = arb_mat(
+        [
+            [arb(1 if row == column else 0) for column in range(dimension)]
+            for row in range(dimension)
+        ]
+    )
+    return (
+        center_vector
+        - preconditioner * value_vector
+        + (identity - preconditioner * jacobian_box) * (domain_vector - center_vector)
+    )
 
 
 def _exact_lower(value: Ball) -> Ball:

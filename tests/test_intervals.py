@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 
 import pytest
-from flint import arb, ctx
+from flint import arb, arb_mat, ctx
 
 from libephemeris.intervals import (
     IntervalCertificationError,
@@ -16,9 +16,12 @@ from libephemeris.intervals import (
     best_root_float,
     certified_float,
     certified_sign,
+    interval_cholesky,
     interval_precision,
     isolate_unique_root,
+    krawczyk_image,
     strictly_contains,
+    strictly_contains_vector,
 )
 
 
@@ -69,6 +72,62 @@ def test_strictly_contains_distinguishes_boundary_contact() -> None:
     outer = arb(0, 2)
     assert strictly_contains(outer, arb(0, 1))
     assert not strictly_contains(arb(0, 1), arb(0, 1))
+
+
+def test_interval_cholesky_certifies_spd_matrix() -> None:
+    """The interval factor encloses a known positive-definite matrix."""
+    matrix = arb_mat([[arb(4), arb(2)], [arb(2), arb(3)]])
+    factor = interval_cholesky(matrix)
+    assert (factor * factor.transpose()).contains(matrix)
+    assert factor[0, 1].is_zero()
+    assert factor[0, 0] > 0
+    assert factor[1, 1] > 0
+
+
+def test_interval_cholesky_rejects_uncertain_or_indefinite_pivot() -> None:
+    """A pivot touching zero is not a positive-definiteness certificate."""
+    with pytest.raises(IntervalCertificationError, match="pivot"):
+        interval_cholesky(arb_mat([[arb(1), arb(0)], [arb(0), arb(0, 1)]]))
+    with pytest.raises(IntervalCertificationError, match="pivot"):
+        interval_cholesky(arb_mat([[arb(1), arb(2)], [arb(2), arb(1)]]))
+
+
+def test_interval_cholesky_rejects_asymmetric_matrix() -> None:
+    """The SPD contract does not silently symmetrize its input."""
+    with pytest.raises(ValueError, match="symmetric"):
+        interval_cholesky(arb_mat([[arb(1), arb(0)], [arb(1), arb(1)]]))
+
+
+def test_krawczyk_image_certifies_linear_root() -> None:
+    """An exact inverse contracts a linear two-variable system to its root."""
+    jacobian = arb_mat([[arb(2), arb(0)], [arb(0), arb(4)]])
+    preconditioner = arb_mat([[arb(1) / 2, arb(0)], [arb(0), arb(1) / 4]])
+    center = (arb(1), arb(2))
+    values = (arb(0), arb(0))
+    domain = (arb(1, "0.25"), arb(2, "0.25"))
+    image = krawczyk_image(center, values, jacobian, domain, preconditioner)
+    box = arb_mat([[domain[0]], [domain[1]]])
+    assert image[0, 0] == center[0]
+    assert image[1, 0] == center[1]
+    assert strictly_contains_vector(box, image)
+
+
+def test_krawczyk_image_rejects_nonpoint_preconditioner() -> None:
+    """An interval inverse cannot masquerade as the point preconditioner."""
+    with pytest.raises(ValueError, match="preconditioner"):
+        krawczyk_image(
+            (arb(0),),
+            (arb(0),),
+            arb_mat([[arb(1)]]),
+            (arb(0, 1),),
+            arb_mat([[arb(1, "0.1")]]),
+        )
+
+
+def test_strictly_contains_vector_validates_dimensions() -> None:
+    """Vector inclusion requires compatible interval column matrices."""
+    with pytest.raises(ValueError, match="column"):
+        strictly_contains_vector(arb_mat([[arb(0), arb(0)]]), arb_mat([[arb(0)]]))
 
 
 def test_isolate_unique_root_proves_one_simple_root() -> None:
