@@ -9,7 +9,13 @@ import math
 
 import pytest
 
-from libephemeris.ellipsoid_contact import _EllipsoidContactFrame
+from flint import arb
+
+from libephemeris.ellipsoid_contact import (
+    _ConeSection,
+    _EllipsoidContactFrame,
+    _evaluate_regular_contact,
+)
 from libephemeris.intervals import IntervalCertificationError
 
 
@@ -89,6 +95,65 @@ def test_axis_vectors_fail_closed(field, value, message) -> None:
     """Malformed or non-finite source vectors never enter Arb geometry."""
     with pytest.raises((ValueError, IntervalCertificationError), match=message):
         _frame(**{field: value}).validate()
+
+
+def test_regular_contact_matches_exact_e1_tangency() -> None:
+    """E1 satisfies ellipsoid, cone, nappe, and stationarity equations."""
+    frame = _frame(axis_point_km=(-3.5, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    cone = _ConeSection(1.0, 0.8, 1)
+    evaluation = _evaluate_regular_contact(
+        frame,
+        cone,
+        (arb(-1.6), arb(0), arb(1.2)),
+        arb(1),
+    )
+    assert evaluation.ellipsoid.contains(0)
+    assert evaluation.cone.contains(0)
+    assert evaluation.nappe_radius > 0
+    assert evaluation.radial_distance > 0
+    assert all(component.contains(0) for component in evaluation.stationarity)
+
+
+def test_regular_contact_requires_smooth_domain() -> None:
+    """Axis and inactive-nappe points stay outside the regular KKT evaluator."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    with pytest.raises(IntervalCertificationError, match="radial"):
+        _evaluate_regular_contact(
+            frame, _ConeSection(1.0, 1.0, 1), (arb(0), arb(0), arb(0)), arb(0)
+        )
+    with pytest.raises(IntervalCertificationError, match="nappe"):
+        _evaluate_regular_contact(
+            frame,
+            _ConeSection(0.0, 0.8, 1),
+            (arb(1), arb(0), arb(-2)),
+            arb(0),
+        )
+
+
+@pytest.mark.parametrize(
+    "cone",
+    [
+        _ConeSection(-1.0, 0.8, 1),
+        _ConeSection(1.0, 0.0, 1),
+        _ConeSection(1.0, 1.1, 1),
+        _ConeSection(1.0, 0.8, 0),
+    ],
+)
+def test_cone_section_rejects_invalid_inputs(cone) -> None:
+    """Physical cone data is never clamped or assigned a default branch."""
+    with pytest.raises(ValueError):
+        cone.validate()
+
+
+def test_regular_contact_rejects_negative_multiplier() -> None:
+    """The regular external-contact multiplier is non-negative."""
+    with pytest.raises(ValueError, match="multiplier"):
+        _evaluate_regular_contact(
+            _frame(),
+            _ConeSection(1.0, 1.0, 1),
+            (arb(-2), arb(0), arb(0)),
+            arb(-1),
+        )
 
 
 def test_metric_rejects_asymmetry_and_nonpositive_definiteness() -> None:

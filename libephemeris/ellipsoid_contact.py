@@ -49,6 +49,39 @@ BallVector3 = tuple[Ball, Ball, Ball]
 
 
 @dataclass(frozen=True, slots=True)
+class _ConeSection:
+    """One selected cone section on the fundamental plane."""
+
+    radius_km: float
+    cosine: float
+    branch_sign: int
+
+    def validate(self) -> None:
+        """Validate a non-negative section and acute cone half-angle."""
+        if type(self.radius_km) is not float or not math.isfinite(self.radius_km):
+            raise ValueError("cone radius must be a finite native float")
+        if self.radius_km < 0.0:
+            raise ValueError("cone radius must be non-negative")
+        if type(self.cosine) is not float or not math.isfinite(self.cosine):
+            raise ValueError("cone cosine must be a finite native float")
+        if not 0.0 < self.cosine <= 1.0:
+            raise ValueError("cone cosine must lie in (0, 1]")
+        if type(self.branch_sign) is not int or self.branch_sign not in {-1, 1}:
+            raise ValueError("cone branch sign must be exactly -1 or +1")
+
+
+@dataclass(frozen=True, slots=True)
+class _RegularContactEvaluation:
+    """Regular cone/ellipsoid residuals and stationarity vector."""
+
+    ellipsoid: Ball
+    cone: Ball
+    nappe_radius: Ball
+    radial_distance: Ball
+    stationarity: BallVector3
+
+
+@dataclass(frozen=True, slots=True)
 class _CertifiedAxisLine:
     """Arb enclosure of a unit direction and closest axis anchor."""
 
@@ -140,6 +173,103 @@ class _EllipsoidContactFrame:
         if any(not value.is_finite() for value in (*direction, *anchor)):
             raise IntervalCertificationError("axis-line derivation is not finite")
         return _CertifiedAxisLine(direction, anchor)  # type: ignore[arg-type]
+
+
+def _dot(left: tuple[Ball, ...], right: tuple[Ball, ...]) -> Ball:
+    """Return one outward-rounded Euclidean dot product."""
+    return sum((left[index] * right[index] for index in range(len(left))), arb(0))
+
+
+def _metric_vector(metric: BallMatrix, vector: BallVector3) -> BallVector3:
+    """Multiply one three-dimensional Arb matrix/vector pair."""
+    column = arb_mat([[value] for value in vector])
+    product = metric * column
+    return tuple(product[index, 0] for index in range(_VECTOR_DIMENSION))  # type: ignore[return-value]
+
+
+def _evaluate_regular_contact(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    point_km: BallVector3,
+    ellipsoid_multiplier: Ball,
+) -> _RegularContactEvaluation:
+    """Evaluate equations (1), (2), and regular-contact stationarity.
+
+    This evaluator covers only ``rho > 0`` and ``r > 0``. It does not solve the
+    equations, classify a global minimum, or handle the radial subgradient and
+    active nappe boundary. A caller must prove the two strict domain conditions
+    before applying Krawczyk to this smooth system.
+
+    Args:
+        frame: Validated private ellipsoid and axis source frame.
+        cone: One validated physical cone section.
+        point_km: Three-dimensional interval point.
+        ellipsoid_multiplier: Non-negative KKT multiplier enclosure.
+
+    Returns:
+        Outward enclosures of the ellipsoid equation, cone equation, nappe
+        radius, radial distance, and three stationarity components.
+
+    Raises:
+        ValueError: If a point/multiplier/cone input is malformed or non-finite.
+        IntervalCertificationError: If ``rho`` or the nappe radius is not proved
+            strictly positive.
+    """
+    frame.validate()
+    cone.validate()
+    if (
+        type(point_km) is not tuple
+        or len(point_km) != _VECTOR_DIMENSION
+        or any(not value.is_finite() for value in point_km)
+    ):
+        raise ValueError("contact point must contain three finite Arb intervals")
+    if not ellipsoid_multiplier.is_finite() or ellipsoid_multiplier < 0:
+        raise ValueError("ellipsoid multiplier must be a finite non-negative interval")
+
+    metric = frame.metric_ball_matrix()
+    axis = frame.certified_axis_line()
+    relative = tuple(
+        point_km[index] - axis.anchor_km[index] for index in range(_VECTOR_DIMENSION)
+    )
+    axial = _dot(point_km, axis.direction)
+    perpendicular = tuple(
+        relative[index] - _dot(relative, axis.direction) * axis.direction[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    radial_squared = _dot(perpendicular, perpendicular)
+    if not radial_squared > 0:
+        raise IntervalCertificationError(
+            "regular contact requires radial distance separated above zero"
+        )
+    radial = radial_squared.sqrt()
+    cosine = ball_from_float(cone.cosine)
+    sine = (1 - cosine * cosine).sqrt()
+    radius = ball_from_float(cone.radius_km)
+    branch = arb(cone.branch_sign)
+    tangent = sine / cosine
+    nappe_radius = radius + branch * tangent * axial
+    if not nappe_radius > 0:
+        raise IntervalCertificationError(
+            "regular contact requires nappe radius separated above zero"
+        )
+    metric_point = _metric_vector(metric, point_km)
+    ellipsoid = _dot(point_km, metric_point) - 1
+    cone_value = cosine * radial - branch * sine * axial - cosine * radius
+    normal = tuple(
+        cosine * perpendicular[index] / radial - branch * sine * axis.direction[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    stationarity = tuple(
+        normal[index] + 2 * ellipsoid_multiplier * metric_point[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    return _RegularContactEvaluation(
+        ellipsoid,
+        cone_value,
+        nappe_radius,
+        radial,
+        stationarity,  # type: ignore[arg-type]
+    )
 
 
 def _validate_vector(vector: object, name: str) -> None:
