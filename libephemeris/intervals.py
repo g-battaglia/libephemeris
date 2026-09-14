@@ -176,13 +176,19 @@ def interval_cholesky(matrix: BallMatrix) -> BallMatrix:
         ``matrix = L * L.T``.
 
     Raises:
-        ValueError: If the matrix is empty, non-square, or not certifiably
-            symmetric.
+        ValueError: If the matrix is empty, non-square, contains a non-finite
+            entry, or is not certifiably symmetric.
         IntervalCertificationError: If a pivot is not proved positive.
     """
     rows = matrix.nrows()
     if rows == 0 or matrix.ncols() != rows:
         raise ValueError("Cholesky input must be a non-empty square matrix")
+    if any(
+        not matrix[row, column].is_finite()
+        for row in range(rows)
+        for column in range(rows)
+    ):
+        raise ValueError("Cholesky input must contain finite intervals")
     for row in range(rows):
         for column in range(row):
             if matrix[row, column] != matrix[column, row]:

@@ -98,6 +98,13 @@ def test_interval_cholesky_rejects_asymmetric_matrix() -> None:
         interval_cholesky(arb_mat([[arb(1), arb(0)], [arb(1), arb(1)]]))
 
 
+@pytest.mark.parametrize("nonfinite", [arb("nan"), arb("inf"), arb("-inf")])
+def test_interval_cholesky_rejects_nonfinite_entries(nonfinite: arb) -> None:
+    """A non-finite pivot cannot certify a finite SPD matrix."""
+    with pytest.raises(ValueError, match="finite"):
+        interval_cholesky(arb_mat([[arb(1), arb(0)], [arb(0), nonfinite]]))
+
+
 def test_krawczyk_image_certifies_linear_root() -> None:
     """An exact inverse contracts a linear two-variable system to its root."""
     jacobian = arb_mat([[arb(2), arb(0)], [arb(0), arb(4)]])
