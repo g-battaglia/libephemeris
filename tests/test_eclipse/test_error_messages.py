@@ -610,7 +610,9 @@ class TestPlanetOccultGlobal:
             planet_occult_when_glob(JD, 3, 3)
 
     def test_unknown_star(self):
-        with pytest.raises(ValueError, match=r"no fixed star matches the search string 'NoSuchStar'"):
+        with pytest.raises(
+            ValueError, match=r"no fixed star matches the search string 'NoSuchStar'"
+        ):
             planet_occult_when_glob(JD, 3, 0, "NoSuchStar")
 
     def test_search_exhausts_the_ephemeris(self, monkeypatch):
@@ -686,11 +688,40 @@ class TestPlanetOccultLocal:
             planet_occult_when_loc(JD, 3, 3, "", 41.9, 12.5)
 
     def test_unknown_star_in_the_visibility_check(self, monkeypatch):
+        from libephemeris import planets, state
+
+        class SkyNode:
+            degrees = 1.0
+
+            def __add__(self, _other):
+                return self
+
+            def at(self, _time):
+                return self
+
+            def observe(self, _target):
+                return self
+
+            def apparent(self):
+                return self
+
+            def altaz(self):
+                return self, self, None
+
+        class Timescale:
+            def ut1_jd(self, jd):
+                return jd
+
         fake_event = (1, (JD + 1.0, 0.0, JD + 0.9, JD + 1.1) + (0.0,) * 6)
         monkeypatch.setattr(
             eclipse, "planet_occult_when_glob", lambda *a, **k: fake_event
         )
-        with pytest.raises(ValueError, match=r"no fixed star matches the search string 'NoSuchStar'"):
+        monkeypatch.setattr(state, "get_planets", lambda: {"earth": SkyNode()})
+        monkeypatch.setattr(state, "get_timescale", Timescale)
+        monkeypatch.setattr(planets, "get_planet_target", lambda *_args: SkyNode())
+        with pytest.raises(
+            ValueError, match=r"no fixed star matches the search string 'NoSuchStar'"
+        ):
             eclipse._planet_occult_when_loc_impl(
                 JD, 3, 0, "NoSuchStar", 41.9, 12.5, 0.0, 2, reader=None
             )
