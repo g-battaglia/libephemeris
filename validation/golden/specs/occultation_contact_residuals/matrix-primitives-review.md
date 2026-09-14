@@ -50,3 +50,7 @@ The Cholesky return wording (“a factor with `matrix = L * L.T`”) should be r
 - Tiny probes checked finite uncertain Cholesky enclosure and input immutability, Krawczyk input immutability, and non-finite Cholesky behavior. The non-finite probe reproduced the blocker described above.
 
 No implementation files were edited. The verdict remains **REJECTED** until the Cholesky finite-entry guard is added and covered by a targeted test.
+
+## Re-review of `fc7db5f5`
+
+The finite-entry guard is now present before symmetry checks and the Cholesky recurrence. Parameterized tests cover `arb("nan")`, `arb("inf")`, and `arb("-inf")`; each is rejected with `ValueError` before recurrence. Verification passed: `uv run pytest tests/test_intervals.py -v` (**36 passed**), `uv run ruff check libephemeris/intervals.py tests/test_intervals.py`, and `uv run mypy libephemeris/intervals.py` (with the existing informational note in `libephemeris/state.py`). Verdict: **ACCEPTED**.
