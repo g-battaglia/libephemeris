@@ -241,8 +241,9 @@ def krawczyk_image(
         The outward-rounded Krawczyk image as an ``n x 1`` matrix.
 
     Raises:
-        ValueError: If dimensions do not form one square system, or if the
-            center/preconditioner are not exact point quantities.
+        ValueError: If dimensions do not form one square system, inputs are not
+            finite, point quantities are not exact, the preconditioner is
+            singular, or the center does not lie inside the domain.
     """
     dimension = len(center)
     if dimension == 0 or len(values_at_center) != dimension or len(domain) != dimension:
@@ -251,14 +252,29 @@ def krawczyk_image(
         raise ValueError("Krawczyk Jacobian must be square and match the vectors")
     if preconditioner.nrows() != dimension or preconditioner.ncols() != dimension:
         raise ValueError("Krawczyk preconditioner must match the system dimension")
-    if any(not value.is_exact() for value in center):
-        raise ValueError("Krawczyk center must contain exact point values")
+    if any(not value.is_exact() or not value.is_finite() for value in center):
+        raise ValueError("Krawczyk center must contain finite exact point values")
+    if any(not value.is_finite() for value in values_at_center):
+        raise ValueError("Krawczyk function values must be finite intervals")
+    if any(not value.is_finite() for value in domain):
+        raise ValueError("Krawczyk domain must contain finite intervals")
     if any(
-        not preconditioner[row, column].is_exact()
+        not jacobian_box[row, column].is_finite()
         for row in range(dimension)
         for column in range(dimension)
     ):
-        raise ValueError("Krawczyk preconditioner must be an exact point matrix")
+        raise ValueError("Krawczyk Jacobian must contain finite intervals")
+    if any(
+        not preconditioner[row, column].is_exact()
+        or not preconditioner[row, column].is_finite()
+        for row in range(dimension)
+        for column in range(dimension)
+    ):
+        raise ValueError("Krawczyk preconditioner must be a finite exact point matrix")
+    if not preconditioner.det().is_finite() or contains_zero(preconditioner.det()):
+        raise ValueError("Krawczyk preconditioner must be nonsingular")
+    if any(not domain[index].contains(center[index]) for index in range(dimension)):
+        raise ValueError("Krawczyk center must lie inside the domain box")
 
     center_vector = _column_vector(center, "center")
     value_vector = _column_vector(values_at_center, "values_at_center")

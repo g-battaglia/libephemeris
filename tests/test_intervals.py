@@ -124,6 +124,59 @@ def test_krawczyk_image_rejects_nonpoint_preconditioner() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("center", "values", "jacobian", "domain", "preconditioner", "message"),
+    [
+        (
+            (arb(2),),
+            (arb(0),),
+            arb_mat([[arb(1)]]),
+            (arb(0, 1),),
+            arb_mat([[arb(1)]]),
+            "inside",
+        ),
+        (
+            (arb(0),),
+            (arb("nan"),),
+            arb_mat([[arb(1)]]),
+            (arb(0, 1),),
+            arb_mat([[arb(1)]]),
+            "values",
+        ),
+        (
+            (arb(0),),
+            (arb(0),),
+            arb_mat([[arb("inf")]]),
+            (arb(0, 1),),
+            arb_mat([[arb(1)]]),
+            "Jacobian",
+        ),
+        (
+            (arb(0),),
+            (arb(0),),
+            arb_mat([[arb(1)]]),
+            (arb("inf"),),
+            arb_mat([[arb(1)]]),
+            "domain",
+        ),
+        (
+            (arb(0),),
+            (arb(0),),
+            arb_mat([[arb(1)]]),
+            (arb(0, 1),),
+            arb_mat([[arb(0)]]),
+            "nonsingular",
+        ),
+    ],
+)
+def test_krawczyk_image_rejects_invalid_certificate_inputs(
+    center, values, jacobian, domain, preconditioner, message
+) -> None:
+    """Invalid boxes and point operators fail before interval arithmetic."""
+    with pytest.raises(ValueError, match=message):
+        krawczyk_image(center, values, jacobian, domain, preconditioner)
+
+
 def test_strictly_contains_vector_validates_dimensions() -> None:
     """Vector inclusion requires compatible interval column matrices."""
     with pytest.raises(ValueError, match="column"):
