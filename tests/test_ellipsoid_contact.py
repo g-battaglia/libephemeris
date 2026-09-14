@@ -17,6 +17,7 @@ from libephemeris.ellipsoid_contact import (
     _RegularRootCertificate,
     _certify_regular_root_box,
     _evaluate_nappe_boundary,
+    _evaluate_radial_subgradient,
     _evaluate_regular_contact,
     _reduce_regular_residuals,
     _regular_contact_jacobian,
@@ -337,6 +338,62 @@ def test_nappe_boundary_rejects_uncertified_multiplier_or_radial_axis() -> None:
             (arb(0), arb(0), arb(0)),
             arb(0),
             arb(0),
+        )
+
+
+def test_radial_subgradient_evaluates_axis_witness_constraints() -> None:
+    """A centered point and zero witness expose exact nonsmooth residuals."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    evaluation = _evaluate_radial_subgradient(
+        frame,
+        _ConeSection(1.0, 1.0, 1),
+        (arb(0), arb(0), arb(0)),
+        (arb(0), arb(0), arb(0)),
+        arb(0),
+        arb(0),
+    )
+    assert evaluation.radial_squared.is_zero()
+    assert evaluation.witness_axis_dot.is_zero()
+    assert evaluation.witness_norm_squared.is_zero()
+    assert evaluation.nappe_radius == 1
+    assert evaluation.ellipsoid == -1
+    assert all(component.is_zero() for component in evaluation.stationarity)
+
+
+def test_radial_subgradient_retains_witness_inequality_residual() -> None:
+    """An inadmissible witness is reported, not silently normalized or clamped."""
+    evaluation = _evaluate_radial_subgradient(
+        _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(1.0, 1.0, 1),
+        (arb(0), arb(0), arb(0)),
+        (arb(2), arb(0), arb(0)),
+        arb(0),
+        arb(0),
+    )
+    assert evaluation.witness_norm_squared == 4
+    assert not evaluation.witness_norm_squared <= 1
+
+
+def test_radial_subgradient_rejects_bad_witness_or_multiplier() -> None:
+    """Nonsmooth KKT inputs retain exact Arb and non-negative contracts."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    with pytest.raises(ValueError, match="witness"):
+        _evaluate_radial_subgradient(
+            frame,
+            _ConeSection(1.0, 1.0, 1),
+            (arb(0), arb(0), arb(0)),
+            (arb(0), 0.0, arb(0)),
+            arb(0),
+            arb(0),
+        )
+    with pytest.raises(ValueError, match="nappe multiplier"):
+        _evaluate_radial_subgradient(
+            frame,
+            _ConeSection(1.0, 1.0, 1),
+            (arb(0), arb(0), arb(0)),
+            (arb(0), arb(0), arb(0)),
+            arb(0),
+            arb(0, 1),
         )
 
 

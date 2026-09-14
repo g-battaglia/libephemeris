@@ -94,6 +94,18 @@ class _NappeBoundaryEvaluation:
 
 
 @dataclass(frozen=True, slots=True)
+class _RadialSubgradientEvaluation:
+    """KKT residuals for one supplied ``rho=0`` subgradient witness."""
+
+    ellipsoid: Ball
+    radial_squared: Ball
+    nappe_radius: Ball
+    witness_axis_dot: Ball
+    witness_norm_squared: Ball
+    stationarity: BallVector3
+
+
+@dataclass(frozen=True, slots=True)
 class _RegularRootCertificate:
     """Strict Krawczyk inclusion for one regular KKT root."""
 
@@ -386,6 +398,91 @@ def _evaluate_nappe_boundary(
         regular.ellipsoid,
         regular.nappe_radius,
         regular.radial_distance,
+        stationarity,  # type: ignore[arg-type]
+    )
+
+
+def _evaluate_radial_subgradient(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    point_km: BallVector3,
+    witness: BallVector3,
+    ellipsoid_multiplier: Ball,
+    nappe_multiplier: Ball,
+) -> _RadialSubgradientEvaluation:
+    """Evaluate KKT residuals at ``rho=0`` using a supplied subgradient.
+
+    The supplied witness represents ``v`` in equation (7). Its admissible set is
+    ``v dot e = 0`` and ``||v|| <= 1``. This function returns those constraint
+    residuals together with ``rho^2``, ``E``, ``r``, and stationarity; it does
+    not claim to prove the existential witness or isolate a nonsmooth root.
+
+    Args:
+        frame: Validated private ellipsoid and axis frame.
+        cone: Validated selected cone section.
+        point_km: Three finite Arb point intervals.
+        witness: Three finite Arb subgradient intervals.
+        ellipsoid_multiplier: Certified non-negative ``lambda`` enclosure.
+        nappe_multiplier: Certified non-negative ``mu`` enclosure.
+
+    Returns:
+        Outward enclosures of all nonsmooth KKT residuals and witness bounds.
+
+    Raises:
+        ValueError: If inputs or multipliers are malformed or not certified
+            non-negative.
+    """
+    frame.validate()
+    cone.validate()
+    for values, name in ((point_km, "point"), (witness, "subgradient witness")):
+        if (
+            type(values) is not tuple
+            or len(values) != _VECTOR_DIMENSION
+            or any(type(value) is not arb or not value.is_finite() for value in values)
+        ):
+            raise ValueError(f"radial {name} must contain three finite Arb intervals")
+    for value, name in (
+        (ellipsoid_multiplier, "ellipsoid multiplier"),
+        (nappe_multiplier, "nappe multiplier"),
+    ):
+        if type(value) is not arb or not value.is_finite() or value.lower() < 0:
+            raise ValueError(f"radial {name} must be a finite non-negative interval")
+
+    metric = frame.metric_ball_matrix()
+    axis = frame.certified_axis_line()
+    relative = tuple(
+        point_km[index] - axis.anchor_km[index] for index in range(_VECTOR_DIMENSION)
+    )
+    projected = _dot(relative, axis.direction)
+    perpendicular = tuple(
+        relative[index] - projected * axis.direction[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    radial_squared = _dot(perpendicular, perpendicular)
+    axial = _dot(point_km, axis.direction)
+    cosine = ball_from_float(cone.cosine)
+    sine = (1 - cosine * cosine).sqrt()
+    tangent = sine / cosine
+    branch = arb(cone.branch_sign)
+    radius = ball_from_float(cone.radius_km)
+    nappe_radius = radius + branch * tangent * axial
+    metric_point = _metric_vector(metric, point_km)
+    ellipsoid = _dot(point_km, metric_point) - 1
+    witness_axis_dot = _dot(witness, axis.direction)
+    witness_norm_squared = _dot(witness, witness)
+    stationarity = tuple(
+        cosine * witness[index]
+        - branch * sine * axis.direction[index]
+        + 2 * ellipsoid_multiplier * metric_point[index]
+        - nappe_multiplier * branch * tangent * axis.direction[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    return _RadialSubgradientEvaluation(
+        ellipsoid,
+        radial_squared,
+        nappe_radius,
+        witness_axis_dot,
+        witness_norm_squared,
         stationarity,  # type: ignore[arg-type]
     )
 
