@@ -145,15 +145,23 @@ def test_cone_section_rejects_invalid_inputs(cone) -> None:
         cone.validate()
 
 
-def test_regular_contact_rejects_negative_multiplier() -> None:
-    """The regular external-contact multiplier is non-negative."""
+@pytest.mark.parametrize("multiplier", [arb(-1), arb(0, 1), -1.0, None])
+def test_regular_contact_rejects_uncertified_multiplier(multiplier) -> None:
+    """The KKT multiplier enclosure must be wholly non-negative."""
     with pytest.raises(ValueError, match="multiplier"):
         _evaluate_regular_contact(
             _frame(),
             _ConeSection(1.0, 1.0, 1),
             (arb(-2), arb(0), arb(0)),
-            arb(-1),
+            multiplier,
         )
+
+
+@pytest.mark.parametrize("point", [(arb(-2), 0.0, arb(0)), [arb(-2), arb(0), arb(0)]])
+def test_regular_contact_rejects_malformed_point(point) -> None:
+    """Wrong point containers and scalar types raise the declared ValueError."""
+    with pytest.raises(ValueError, match="contact point"):
+        _evaluate_regular_contact(_frame(), _ConeSection(1.0, 1.0, 1), point, arb(0))
 
 
 def test_metric_rejects_asymmetry_and_nonpositive_definiteness() -> None:

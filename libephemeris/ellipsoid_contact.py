@@ -220,10 +220,14 @@ def _evaluate_regular_contact(
     if (
         type(point_km) is not tuple
         or len(point_km) != _VECTOR_DIMENSION
-        or any(not value.is_finite() for value in point_km)
+        or any(type(value) is not arb or not value.is_finite() for value in point_km)
     ):
         raise ValueError("contact point must contain three finite Arb intervals")
-    if not ellipsoid_multiplier.is_finite() or ellipsoid_multiplier < 0:
+    if (
+        type(ellipsoid_multiplier) is not arb
+        or not ellipsoid_multiplier.is_finite()
+        or ellipsoid_multiplier.lower() < 0
+    ):
         raise ValueError("ellipsoid multiplier must be a finite non-negative interval")
 
     metric = frame.metric_ball_matrix()
