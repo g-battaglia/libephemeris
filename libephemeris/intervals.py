@@ -40,6 +40,7 @@ __all__ = [
     "certified_float",
     "certified_sign",
     "contains_zero",
+    "ellipsoid_line_discriminant",
     "interval_cholesky",
     "interval_precision",
     "isolate_unique_root",
@@ -159,6 +160,55 @@ def strictly_contains_vector(outer: BallMatrix, inner: BallMatrix) -> bool:
         strictly_contains(outer[index, 0], inner[index, 0])
         for index in range(outer.nrows())
     )
+
+
+def ellipsoid_line_discriminant(
+    metric: BallMatrix,
+    direction: Sequence[Ball],
+    anchor: Sequence[Ball],
+) -> Ball:
+    """Return the certified line/ellipsoid discriminant invariant.
+
+    For the ellipsoid ``x.T A x <= 1`` and line ``x = q + s e``, substitution
+    gives ``a*s^2 + 2*b*s + c`` with ``a=e.T A e``, ``b=e.T A q`` and
+    ``c=q.T A q - 1``. The invariant ``chi=b^2-a*c`` is positive for a crossing,
+    exact zero for tangency, and negative for a miss. This helper evaluates that
+    expression without assuming a spherical radius, principal-axis alignment,
+    unit direction, or closest-point anchor.
+
+    Args:
+        metric: Finite symmetric positive-definite ``n x n`` ellipsoid metric.
+        direction: Finite interval direction vector ``e``.
+        anchor: Finite interval line anchor ``q``.
+
+    Returns:
+        Outward-rounded enclosure of ``chi``.
+
+    Raises:
+        ValueError: If dimensions are invalid or vector entries are non-finite.
+        IntervalCertificationError: If the metric is not certified positive
+            definite.
+    """
+    dimension = len(direction)
+    if dimension == 0 or len(anchor) != dimension:
+        raise ValueError("line vectors must have the same non-zero dimension")
+    if metric.nrows() != dimension or metric.ncols() != dimension:
+        raise ValueError("ellipsoid metric must match the line dimension")
+    if any(not value.is_finite() for value in (*direction, *anchor)):
+        raise ValueError("ellipsoid line vectors must contain finite intervals")
+    interval_cholesky(metric)
+    direction_vector = _column_vector(direction, "direction")
+    anchor_vector = _column_vector(anchor, "anchor")
+    metric_direction = metric * direction_vector
+    metric_anchor = metric * anchor_vector
+    a = (direction_vector.transpose() * metric_direction)[0, 0]
+    b = (direction_vector.transpose() * metric_anchor)[0, 0]
+    c = (anchor_vector.transpose() * metric_anchor)[0, 0] - 1
+    if not a > 0:
+        raise IntervalCertificationError(
+            "line direction has no certified positive ellipsoid norm"
+        )
+    return b * b - a * c
 
 
 def interval_cholesky(matrix: BallMatrix) -> BallMatrix:

@@ -16,6 +16,7 @@ from libephemeris.intervals import (
     best_root_float,
     certified_float,
     certified_sign,
+    ellipsoid_line_discriminant,
     interval_cholesky,
     interval_precision,
     isolate_unique_root,
@@ -72,6 +73,70 @@ def test_strictly_contains_distinguishes_boundary_contact() -> None:
     outer = arb(0, 2)
     assert strictly_contains(outer, arb(0, 1))
     assert not strictly_contains(arb(0, 1), arb(0, 1))
+
+
+def test_ellipsoid_line_discriminant_matches_e5_crossing() -> None:
+    """The inclined E5 axis crosses independently of either cone."""
+    metric = arb_mat(
+        [
+            [arb(1) / 9, arb(0), arb(0)],
+            [arb(0), arb(1) / 9, arb(0)],
+            [arb(0), arb(0), arb(1) / 4],
+        ]
+    )
+    root_two = arb(2).sqrt()
+    direction = (arb(0), 1 / root_two, 1 / root_two)
+    chi = ellipsoid_line_discriminant(metric, direction, (arb(0),) * 3)
+    assert chi.contains(arb(13) / 72)
+    assert certified_sign(chi) == 1
+
+
+def test_ellipsoid_line_discriminant_encloses_e6_tangency() -> None:
+    """The non-dyadic E6 metric encloses zero without guessing its sign."""
+    metric = arb_mat(
+        [
+            [arb(1) / 9, arb(0), arb(0)],
+            [arb(0), arb(1) / 9, arb(0)],
+            [arb(0), arb(0), arb(1) / 4],
+        ]
+    )
+    chi = ellipsoid_line_discriminant(
+        metric, (arb(0), arb(0), arb(1)), (arb(-3), arb(0), arb(0))
+    )
+    assert chi.contains(0)
+    with pytest.raises(IntervalCertificationError):
+        certified_sign(chi)
+
+
+def test_ellipsoid_line_discriminant_certifies_exact_dyadic_tangency() -> None:
+    """A dyadic sphere and tangent line produce certified exact zero."""
+    metric = arb_mat(
+        [
+            [arb(1) / 4, arb(0), arb(0)],
+            [arb(0), arb(1) / 4, arb(0)],
+            [arb(0), arb(0), arb(1) / 4],
+        ]
+    )
+    chi = ellipsoid_line_discriminant(
+        metric, (arb(0), arb(0), arb(1)), (arb(-2), arb(0), arb(0))
+    )
+    assert chi.is_exact()
+    assert certified_sign(chi) == 0
+
+
+def test_ellipsoid_line_discriminant_rejects_invalid_inputs() -> None:
+    """The central-axis certificate requires finite SPD geometry."""
+    metric = arb_mat([[arb(1), arb(0)], [arb(0), arb(1)]])
+    with pytest.raises(ValueError, match="dimension"):
+        ellipsoid_line_discriminant(metric, (arb(1),), (arb(0),))
+    with pytest.raises(ValueError, match="finite"):
+        ellipsoid_line_discriminant(metric, (arb("inf"), arb(0)), (arb(0), arb(0)))
+    with pytest.raises(IntervalCertificationError, match="pivot"):
+        ellipsoid_line_discriminant(
+            arb_mat([[arb(1), arb(0)], [arb(0), arb(-1)]]),
+            (arb(1), arb(0)),
+            (arb(0), arb(0)),
+        )
 
 
 def test_interval_cholesky_certifies_spd_matrix() -> None:
