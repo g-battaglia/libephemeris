@@ -19,6 +19,7 @@ from libephemeris.ellipsoid_contact import (
     _evaluate_nappe_boundary,
     _evaluate_radial_subgradient,
     _evaluate_regular_contact,
+    _nappe_boundary_jacobian,
     _reduce_regular_residuals,
     _regular_contact_jacobian,
 )
@@ -318,6 +319,29 @@ def test_nappe_boundary_evaluator_accepts_zero_containing_radius() -> None:
     assert evaluation.nappe_radius.contains(0)
     assert evaluation.radial_distance > 0
     assert all(component.is_finite() for component in evaluation.stationarity)
+
+
+def test_nappe_boundary_jacobian_matches_centered_cylinder() -> None:
+    """A zero-angle active plane gives an independently explicit Jacobian."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    jacobian = _nappe_boundary_jacobian(
+        frame,
+        _ConeSection(0.0, 1.0, 1),
+        (arb(-2), arb(0), arb(0)),
+        arb(1),
+        arb(0),
+    )
+    expected = (
+        (-1.0, 0.0, 0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0, 0.0, 0.0),
+        (0.5, 0.0, 0.0, -1.0, 0.0),
+        (0.0, 1.0, 0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.5, 0.0, 0.0),
+    )
+    assert (jacobian.nrows(), jacobian.ncols()) == (5, 5)
+    for row in range(5):
+        for column in range(5):
+            assert jacobian[row, column].contains(expected[row][column])
 
 
 def test_nappe_boundary_rejects_uncertified_multiplier_or_radial_axis() -> None:

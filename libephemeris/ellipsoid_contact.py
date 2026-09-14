@@ -402,6 +402,60 @@ def _evaluate_nappe_boundary(
     )
 
 
+def _nappe_boundary_jacobian(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    point_km: BallVector3,
+    ellipsoid_multiplier: Ball,
+    nappe_multiplier: Ball,
+) -> BallMatrix:
+    """Return the Jacobian of ``[E, r, active stationarity]``.
+
+    The unknown vector is ``(x,y,z,lambda,mu)``. The active constraint row is
+    ``grad(r)=k*tan(f)*e``; the spatial stationarity block shares the regular cone
+    Hessian plus ``2*lambda*A``; multiplier columns are ``2*A*x`` and
+    ``-k*tan(f)*e``.
+    """
+    evaluation = _evaluate_nappe_boundary(
+        frame, cone, point_km, ellipsoid_multiplier, nappe_multiplier
+    )
+    metric = frame.metric_ball_matrix()
+    axis = frame.certified_axis_line()
+    relative = tuple(
+        point_km[index] - axis.anchor_km[index] for index in range(_VECTOR_DIMENSION)
+    )
+    projected = _dot(relative, axis.direction)
+    perpendicular = tuple(
+        relative[index] - projected * axis.direction[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    radial = evaluation.radial_distance
+    radial_cubed = radial * radial * radial
+    cosine = ball_from_float(cone.cosine)
+    tangent = (1 - cosine * cosine).sqrt() / cosine
+    branch = arb(cone.branch_sign)
+    metric_point = _metric_vector(metric, point_km)
+    jacobian = arb_mat(5, 5)
+    for column in range(_VECTOR_DIMENSION):
+        jacobian[0, column] = 2 * metric_point[column]
+        jacobian[1, column] = branch * tangent * axis.direction[column]
+    for row in range(_VECTOR_DIMENSION):
+        for column in range(_VECTOR_DIMENSION):
+            projector = arb(1 if row == column else 0) - (
+                axis.direction[row] * axis.direction[column]
+            )
+            hessian = cosine * (
+                projector / radial
+                - perpendicular[row] * perpendicular[column] / radial_cubed
+            )
+            jacobian[row + 2, column] = (
+                hessian + 2 * ellipsoid_multiplier * metric[row, column]
+            )
+        jacobian[row + 2, 3] = 2 * metric_point[row]
+        jacobian[row + 2, 4] = -branch * tangent * axis.direction[row]
+    return jacobian
+
+
 def _evaluate_radial_subgradient(
     frame: _EllipsoidContactFrame,
     cone: _ConeSection,
