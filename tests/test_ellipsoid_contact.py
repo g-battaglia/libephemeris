@@ -15,6 +15,7 @@ from libephemeris.ellipsoid_contact import (
     _ConeSection,
     _EllipsoidContactFrame,
     _evaluate_regular_contact,
+    _regular_contact_jacobian,
 )
 from libephemeris.intervals import IntervalCertificationError
 
@@ -112,6 +113,62 @@ def test_regular_contact_matches_exact_e1_tangency() -> None:
     assert evaluation.nappe_radius > 0
     assert evaluation.radial_distance > 0
     assert all(component.contains(0) for component in evaluation.stationarity)
+
+
+def test_regular_contact_jacobian_matches_exact_cylinder_case() -> None:
+    """A dyadic cylinder gives an independently explicit 4-by-4 Jacobian."""
+    frame = _frame(
+        metric_km_minus_2=(
+            (0.25, 0.0, 0.0),
+            (0.0, 0.25, 0.0),
+            (0.0, 0.0, 0.25),
+        ),
+        axis_point_km=(0.0, 0.0, 0.0),
+        axis_span=(0.0, 0.0, 1.0),
+    )
+    jacobian = _regular_contact_jacobian(
+        frame,
+        _ConeSection(1.0, 1.0, 1),
+        (arb(-2), arb(0), arb(0)),
+        arb(1),
+    )
+    expected = (
+        (-1.0, 0.0, 0.0, 0.0),
+        (0.5, 0.0, 0.0, -1.0),
+        (0.0, 1.0, 0.0, 0.0),
+        (0.0, 0.0, 0.5, 0.0),
+    )
+    assert (jacobian.nrows(), jacobian.ncols()) == (4, 4)
+    for row in range(4):
+        for column in range(4):
+            assert jacobian[row, column].contains(expected[row][column])
+
+
+def test_regular_contact_jacobian_encloses_e1_finite_difference() -> None:
+    """E1 analytic columns contain independent centered-difference estimates."""
+    frame = _frame(axis_point_km=(-3.5, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    cone = _ConeSection(1.0, 0.8, 1)
+    point = (-1.6, 0.0, 1.2)
+    jacobian = _regular_contact_jacobian(
+        frame, cone, tuple(arb(value) for value in point), arb(1)
+    )
+    step = 1e-6
+    for column in range(3):
+        low = list(point)
+        high = list(point)
+        low[column] -= step
+        high[column] += step
+        lower = _evaluate_regular_contact(
+            frame, cone, tuple(arb(value) for value in low), arb(1)
+        )
+        upper = _evaluate_regular_contact(
+            frame, cone, tuple(arb(value) for value in high), arb(1)
+        )
+        low_values = (lower.ellipsoid,) + lower.stationarity
+        high_values = (upper.ellipsoid,) + upper.stationarity
+        for row, (before, after) in enumerate(zip(low_values, high_values)):
+            difference = (float(after.mid()) - float(before.mid())) / (2 * step)
+            assert abs(float(jacobian[row, column].mid()) - difference) < 1e-8
 
 
 def test_regular_contact_requires_smooth_domain() -> None:

@@ -276,6 +276,72 @@ def _evaluate_regular_contact(
     )
 
 
+def _regular_contact_jacobian(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    point_km: BallVector3,
+    ellipsoid_multiplier: Ball,
+) -> BallMatrix:
+    """Return the analytic Jacobian of ``[E, stationarity]``.
+
+    The unknown vector is ``(x, y, z, lambda)``. On the regular domain,
+
+    ``H_g = c * (P/rho - w*w.T/rho^3)``
+
+    and the stationarity block is ``H_g + 2*lambda*A`` with final column
+    ``2*A*x``. The first row is the ellipsoid gradient ``2*A*x`` and zero in
+    the multiplier column. The cone residual is evaluated separately after a
+    KKT root has been isolated; it is not a fifth unknown equation.
+
+    Args:
+        frame: Validated private ellipsoid and axis source frame.
+        cone: One validated physical cone section.
+        point_km: Three-dimensional interval point in the regular domain.
+        ellipsoid_multiplier: Certified non-negative multiplier enclosure.
+
+    Returns:
+        Outward-rounded ``4 x 4`` interval Jacobian.
+
+    Raises:
+        ValueError: If an input violates the regular evaluator contract.
+        IntervalCertificationError: If the smooth-domain conditions are not
+            certified.
+    """
+    evaluation = _evaluate_regular_contact(frame, cone, point_km, ellipsoid_multiplier)
+    metric = frame.metric_ball_matrix()
+    axis = frame.certified_axis_line()
+    relative = tuple(
+        point_km[index] - axis.anchor_km[index] for index in range(_VECTOR_DIMENSION)
+    )
+    projected = _dot(relative, axis.direction)
+    perpendicular = tuple(
+        relative[index] - projected * axis.direction[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    radial = evaluation.radial_distance
+    radial_cubed = radial * radial * radial
+    cosine = ball_from_float(cone.cosine)
+    metric_point = _metric_vector(metric, point_km)
+
+    jacobian = arb_mat(_VECTOR_DIMENSION + 1, _VECTOR_DIMENSION + 1)
+    for column in range(_VECTOR_DIMENSION):
+        jacobian[0, column] = 2 * metric_point[column]
+    for row in range(_VECTOR_DIMENSION):
+        for column in range(_VECTOR_DIMENSION):
+            projector = arb(1 if row == column else 0) - (
+                axis.direction[row] * axis.direction[column]
+            )
+            cone_hessian = cosine * (
+                projector / radial
+                - perpendicular[row] * perpendicular[column] / radial_cubed
+            )
+            jacobian[row + 1, column] = (
+                cone_hessian + 2 * ellipsoid_multiplier * metric[row, column]
+            )
+        jacobian[row + 1, _VECTOR_DIMENSION] = 2 * metric_point[row]
+    return jacobian
+
+
 def _validate_vector(vector: object, name: str) -> None:
     """Require one tuple of three finite native Python floats."""
     if type(vector) is not tuple or len(vector) != _VECTOR_DIMENSION:
