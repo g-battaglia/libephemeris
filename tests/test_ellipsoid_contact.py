@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from flint import arb
+from flint import arb, ctx
 
 from libephemeris.ellipsoid_contact import (
     _ConeSection,
@@ -378,10 +378,28 @@ def test_cone_apex_solves_joint_radial_and_nappe_equations() -> None:
     assert apex.ellipsoid < 0
 
 
-def test_cone_apex_rejects_zero_angle() -> None:
-    """A cylinder has no finite apex and stays on its separate axis path."""
+def test_cone_apex_is_finite_in_offset_tilted_frame() -> None:
+    """Construction identities avoid dependent interval subtraction at the axis."""
+    apex = _evaluate_cone_apex(_frame(), _ConeSection(1.0, 0.8, -1))
+    assert all(value.is_finite() for value in apex.point_km)
+    assert apex.ellipsoid.is_finite()
+    assert apex.cone.is_exact()
+    assert apex.cone.is_zero()
+
+
+def test_cone_apex_rejects_zero_or_unresolved_angle() -> None:
+    """A cylinder has no finite apex and unresolved sine fails closed."""
     with pytest.raises(ValueError, match="no finite apex"):
         _evaluate_cone_apex(_frame(), _ConeSection(1.0, 1.0, 1))
+    previous = ctx.prec
+    try:
+        ctx.prec = 32
+        with pytest.raises(IntervalCertificationError, match="sine"):
+            _evaluate_cone_apex(
+                _frame(), _ConeSection(1.0, math.nextafter(1.0, 0.0), 1)
+            )
+    finally:
+        ctx.prec = previous
 
 
 def test_radial_subgradient_evaluates_axis_witness_constraints() -> None:

@@ -559,19 +559,27 @@ def _evaluate_cone_apex(
 
     Since the certified axis anchor is perpendicular to ``e``, every radial-axis
     point is ``q+t*e`` and has axial coordinate ``t``. For ``sin(f)>0``, the
-    active equation gives ``t=-l/(k*tan(f))``. The resulting cone residual is
-    evaluated independently; no stationarity or global-minimum claim is made.
+    active equation gives ``t=-l/(k*tan(f))``. Since the point is constructed
+    on the axis and the active radius is zero, ``rho=0`` and ``g=0`` are exact
+    construction identities. No stationarity or global-minimum claim is made.
 
     Raises:
         ValueError: If the cone has zero angle and therefore no finite apex.
+        IntervalCertificationError: If the sine is not finite and certified
+            strictly positive at the current precision.
     """
     frame.validate()
     cone.validate()
     axis = frame.certified_axis_line()
     cosine = ball_from_float(cone.cosine)
-    sine = (1 - cosine * cosine).sqrt()
-    if sine.is_zero():
+    sine_squared = 1 - cosine * cosine
+    if sine_squared.is_exact() and sine_squared.is_zero():
         raise ValueError("a zero-angle cone has no finite apex")
+    if not sine_squared.is_finite() or not sine_squared > 0:
+        raise IntervalCertificationError(
+            "cone sine is not finite and separated above zero"
+        )
+    sine = sine_squared.sqrt()
     tangent = sine / cosine
     branch = arb(cone.branch_sign)
     radius = ball_from_float(cone.radius_km)
@@ -583,13 +591,7 @@ def _evaluate_cone_apex(
     metric = frame.metric_ball_matrix()
     metric_point = _metric_vector(metric, point)  # type: ignore[arg-type]
     ellipsoid = _dot(point, metric_point) - 1
-    radial_relative = tuple(
-        point[index] - axis.anchor_km[index] - axial * axis.direction[index]
-        for index in range(_VECTOR_DIMENSION)
-    )
-    radial = _dot(radial_relative, radial_relative).sqrt()
-    nappe_radius = radius + branch * tangent * axial
-    cone_residual = cosine * (radial - nappe_radius)
+    cone_residual = arb(0)
     return _ApexEvaluation(
         axial,
         point,  # type: ignore[arg-type]
