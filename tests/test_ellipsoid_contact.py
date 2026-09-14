@@ -16,6 +16,7 @@ from libephemeris.ellipsoid_contact import (
     _EllipsoidContactFrame,
     _RegularRootCertificate,
     _certify_regular_root_box,
+    _evaluate_cone_apex,
     _evaluate_nappe_boundary,
     _evaluate_radial_subgradient,
     _evaluate_regular_contact,
@@ -363,6 +364,24 @@ def test_nappe_boundary_rejects_uncertified_multiplier_or_radial_axis() -> None:
             arb(0),
             arb(0),
         )
+
+
+def test_cone_apex_solves_joint_radial_and_nappe_equations() -> None:
+    """The nonzero-angle apex is derived directly without a radial offset."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    apex = _evaluate_cone_apex(frame, _ConeSection(1.0, 0.8, 1))
+    assert apex.axial_parameter.contains(-4.0 / 3.0)
+    assert apex.point_km[0].is_zero()
+    assert apex.point_km[1].is_zero()
+    assert apex.point_km[2].contains(-4.0 / 3.0)
+    assert apex.cone.contains(0)
+    assert apex.ellipsoid < 0
+
+
+def test_cone_apex_rejects_zero_angle() -> None:
+    """A cylinder has no finite apex and stays on its separate axis path."""
+    with pytest.raises(ValueError, match="no finite apex"):
+        _evaluate_cone_apex(_frame(), _ConeSection(1.0, 1.0, 1))
 
 
 def test_radial_subgradient_evaluates_axis_witness_constraints() -> None:

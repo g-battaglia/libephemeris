@@ -106,6 +106,16 @@ class _RadialSubgradientEvaluation:
 
 
 @dataclass(frozen=True, slots=True)
+class _ApexEvaluation:
+    """Exact geometric apex candidate for a nonzero-angle cone."""
+
+    axial_parameter: Ball
+    point_km: BallVector3
+    ellipsoid: Ball
+    cone: Ball
+
+
+@dataclass(frozen=True, slots=True)
 class _RegularRootCertificate:
     """Strict Krawczyk inclusion for one regular KKT root."""
 
@@ -538,6 +548,53 @@ def _evaluate_radial_subgradient(
         witness_axis_dot,
         witness_norm_squared,
         stationarity,  # type: ignore[arg-type]
+    )
+
+
+def _evaluate_cone_apex(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+) -> _ApexEvaluation:
+    """Evaluate the unique joint ``rho=0, r=0`` nonzero-angle candidate.
+
+    Since the certified axis anchor is perpendicular to ``e``, every radial-axis
+    point is ``q+t*e`` and has axial coordinate ``t``. For ``sin(f)>0``, the
+    active equation gives ``t=-l/(k*tan(f))``. The resulting cone residual is
+    evaluated independently; no stationarity or global-minimum claim is made.
+
+    Raises:
+        ValueError: If the cone has zero angle and therefore no finite apex.
+    """
+    frame.validate()
+    cone.validate()
+    axis = frame.certified_axis_line()
+    cosine = ball_from_float(cone.cosine)
+    sine = (1 - cosine * cosine).sqrt()
+    if sine.is_zero():
+        raise ValueError("a zero-angle cone has no finite apex")
+    tangent = sine / cosine
+    branch = arb(cone.branch_sign)
+    radius = ball_from_float(cone.radius_km)
+    axial = -radius / (branch * tangent)
+    point = tuple(
+        axis.anchor_km[index] + axial * axis.direction[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    metric = frame.metric_ball_matrix()
+    metric_point = _metric_vector(metric, point)  # type: ignore[arg-type]
+    ellipsoid = _dot(point, metric_point) - 1
+    radial_relative = tuple(
+        point[index] - axis.anchor_km[index] - axial * axis.direction[index]
+        for index in range(_VECTOR_DIMENSION)
+    )
+    radial = _dot(radial_relative, radial_relative).sqrt()
+    nappe_radius = radius + branch * tangent * axial
+    cone_residual = cosine * (radial - nappe_radius)
+    return _ApexEvaluation(
+        axial,
+        point,  # type: ignore[arg-type]
+        ellipsoid,
+        cone_residual,
     )
 
 
