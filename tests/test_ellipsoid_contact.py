@@ -14,6 +14,7 @@ from flint import arb, ctx
 
 from libephemeris.ellipsoid_contact import (
     _ConeSection,
+    _CrossDualWitness,
     _EllipsoidContactFrame,
     _GlobalReachStatus,
     _ProjectedDualWitness,
@@ -118,7 +119,7 @@ def test_global_reach_classifies_internal_certification_failure_unresolved(
 ) -> None:
     """A proof-engine failure is not mislabeled as invalid source data."""
     monkeypatch.setattr(
-        "libephemeris.ellipsoid_contact._projected_dual_vector",
+        "libephemeris.ellipsoid_contact._dual_vector",
         lambda *_: (_ for _ in ()).throw(IntervalCertificationError("synthetic")),
     )
     proof = _evaluate_global_reach(
@@ -129,6 +130,29 @@ def test_global_reach_classifies_internal_certification_failure_unresolved(
     )
     assert proof.status is _GlobalReachStatus.UNRESOLVED
     assert proof.reason == "synthetic"
+
+
+def test_cross_dual_payload_proves_same_e4_miss() -> None:
+    """The exact cross-product witness implements the second approved variant."""
+    frame = _frame(
+        metric_km_minus_2=(
+            (1.0 / 9.0, 0.0, 0.0),
+            (0.0, 1.0 / 9.0, 0.0),
+            (0.0, 0.0, 0.25),
+        ),
+        axis_point_km=(-5.0, 0.0, 0.0),
+        axis_span=(0.0, 1.0, 1.0),
+    )
+    span = tuple(Fraction.from_float(value) for value in frame.axis_span)
+    witness = _CrossDualWitness(
+        span,
+        (Fraction(0), Fraction(0), Fraction(-1)),
+        Fraction(-1),
+        Fraction(0),
+    )
+    proof = _evaluate_global_reach(frame, _ConeSection(1.0, 1.0, 1), None, witness)
+    assert proof.status is _GlobalReachStatus.MISS
+    assert proof.lower_bound > 0  # type: ignore[operator]
 
 
 def test_global_reach_rejects_nonpoint_primal_and_missing_witnesses() -> None:

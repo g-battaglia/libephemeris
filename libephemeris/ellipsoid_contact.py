@@ -150,12 +150,25 @@ class _GlobalReachStatus(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class _ProjectedDualWitness:
-    """Exact rational payload for one transverse dual support vector."""
+    """Exact rational projected payload for one transverse dual vector."""
 
     raw_span: tuple[Fraction, Fraction, Fraction]
     seed: tuple[Fraction, Fraction, Fraction]
     scale: Fraction
     multiplier: Fraction
+
+
+@dataclass(frozen=True, slots=True)
+class _CrossDualWitness:
+    """Exact rational cross-product payload for one transverse dual vector."""
+
+    raw_span: tuple[Fraction, Fraction, Fraction]
+    seed: tuple[Fraction, Fraction, Fraction]
+    scale: Fraction
+    multiplier: Fraction
+
+
+DualWitness = _ProjectedDualWitness | _CrossDualWitness
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +179,7 @@ class _GlobalReachProof:
     lower_bound: Ball | None
     upper_bound: Ball | None
     primal_point: BallVector3 | None
-    dual_witness: _ProjectedDualWitness | None
+    dual_witness: DualWitness | None
     reason: str
 
 
@@ -869,9 +882,9 @@ def _fraction_ball(value: Fraction) -> Ball:
     return arb(f"{value.numerator}/{value.denominator}")
 
 
-def _projected_dual_vector(witness: _ProjectedDualWitness) -> BallVector3:
-    """Construct the dual vector from an exact orthogonality identity."""
-    if type(witness) is not _ProjectedDualWitness:
+def _dual_vector(witness: DualWitness) -> BallVector3:
+    """Construct a dual vector from one exact orthogonality identity."""
+    if type(witness) not in {_ProjectedDualWitness, _CrossDualWitness}:
         raise ValueError("dual witness has the wrong private type")
     values = (*witness.raw_span, *witness.seed, witness.scale, witness.multiplier)
     if any(type(value) is not Fraction for value in values):
@@ -881,31 +894,42 @@ def _projected_dual_vector(witness: _ProjectedDualWitness) -> BallVector3:
     span_norm = sum((value * value for value in witness.raw_span), Fraction(0))
     if span_norm <= 0:
         raise ValueError("dual raw span must have positive exact norm")
-    seed_dot = sum(
-        (witness.seed[index] * witness.raw_span[index] for index in range(3)),
-        Fraction(0),
-    )
-    projected = tuple(
-        witness.scale
-        * (span_norm * witness.seed[index] - seed_dot * witness.raw_span[index])
-        for index in range(3)
-    )
+    if type(witness) is _ProjectedDualWitness:
+        seed_dot = sum(
+            (witness.seed[index] * witness.raw_span[index] for index in range(3)),
+            Fraction(0),
+        )
+        exact_vector = tuple(
+            witness.scale
+            * (span_norm * witness.seed[index] - seed_dot * witness.raw_span[index])
+            for index in range(3)
+        )
+    else:
+        cross = (
+            witness.raw_span[1] * witness.seed[2]
+            - witness.raw_span[2] * witness.seed[1],
+            witness.raw_span[2] * witness.seed[0]
+            - witness.raw_span[0] * witness.seed[2],
+            witness.raw_span[0] * witness.seed[1]
+            - witness.raw_span[1] * witness.seed[0],
+        )
+        exact_vector = tuple(witness.scale * value for value in cross)
     if (
         sum(
-            (projected[index] * witness.raw_span[index] for index in range(3)),
+            (exact_vector[index] * witness.raw_span[index] for index in range(3)),
             Fraction(0),
         )
         != 0
     ):
         raise IntervalCertificationError("dual orthogonality identity did not cancel")
-    return tuple(_fraction_ball(value) for value in projected)  # type: ignore[return-value]
+    return tuple(_fraction_ball(value) for value in exact_vector)  # type: ignore[return-value]
 
 
 def _evaluate_global_reach(
     frame: _EllipsoidContactFrame,
     cone: _ConeSection,
     primal_point: BallVector3 | None,
-    dual_witness: _ProjectedDualWitness | None,
+    dual_witness: DualWitness | None,
 ) -> _GlobalReachProof:
     """Evaluate independent strict primal and dual global bounds.
 
@@ -978,7 +1002,7 @@ def _evaluate_global_reach(
                     reasons.append("primal feasibility is not certified")
 
         if dual_witness is not None:
-            dual_vector = _projected_dual_vector(dual_witness)
+            dual_vector = _dual_vector(dual_witness)
             source_span = tuple(
                 _fraction_ball(value) for value in dual_witness.raw_span
             )
