@@ -84,7 +84,7 @@ def test_global_reach_proves_e4_miss() -> None:
     proof = _evaluate_global_reach(
         frame,
         _ConeSection(1.0, 1.0, 1),
-        (arb(-3), arb(0), arb(0)),
+        None,
         _ProjectedDualWitness(
             span,
             (Fraction(1), Fraction(0), Fraction(0)),
@@ -107,7 +107,7 @@ def test_global_reach_uses_strict_primal_upper_bound() -> None:
         frame,
         _ConeSection(0.0, 0.8, 1),
         (arb(0), arb(0), arb(1)),
-        _dual(scale=Fraction(0)),
+        None,
     )
     assert proof.status is _GlobalReachStatus.REACH
     assert proof.upper_bound < 0  # type: ignore[operator]
@@ -124,11 +124,25 @@ def test_global_reach_classifies_internal_certification_failure_unresolved(
     proof = _evaluate_global_reach(
         _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
         _ConeSection(1.0, 0.8, 1),
-        (arb(0), arb(0), arb(0)),
+        None,
         _dual(),
     )
     assert proof.status is _GlobalReachStatus.UNRESOLVED
     assert proof.reason == "synthetic"
+
+
+def test_global_reach_rejects_nonpoint_primal_and_missing_witnesses() -> None:
+    """A primal witness is an exact point and at least one witness is required."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    nonpoint = _evaluate_global_reach(
+        frame,
+        _ConeSection(0.0, 0.8, 1),
+        (arb(0, 1), arb(0), arb(1)),
+        None,
+    )
+    assert nonpoint.status is _GlobalReachStatus.INVALID
+    missing = _evaluate_global_reach(frame, _ConeSection(0.0, 0.8, 1), None, None)
+    assert missing.status is _GlobalReachStatus.INVALID
 
 
 def test_global_reach_rejects_wrong_dual_span_or_norm() -> None:
@@ -144,7 +158,7 @@ def test_global_reach_rejects_wrong_dual_span_or_norm() -> None:
     too_large = _evaluate_global_reach(
         frame,
         _ConeSection(1.0, 0.8, 1),
-        (arb(0), arb(0), arb(0)),
+        None,
         _dual(scale=Fraction(2)),
     )
     assert too_large.status is _GlobalReachStatus.UNRESOLVED
