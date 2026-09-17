@@ -179,6 +179,13 @@ def test_global_reach_rejects_wrong_dual_span_or_norm() -> None:
         _dual(span=(Fraction(0), Fraction(1), Fraction(0))),
     )
     assert wrong_span.status is _GlobalReachStatus.INVALID
+    near_span = _evaluate_global_reach(
+        frame,
+        _ConeSection(1.0, 0.8, 1),
+        None,
+        _dual(span=(Fraction(0), Fraction(1), Fraction(1, 10**100))),
+    )
+    assert near_span.status is _GlobalReachStatus.INVALID
     too_large = _evaluate_global_reach(
         frame,
         _ConeSection(1.0, 0.8, 1),

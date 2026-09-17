@@ -1002,13 +1002,10 @@ def _evaluate_global_reach(
                     reasons.append("primal feasibility is not certified")
 
         if dual_witness is not None:
-            dual_vector = _dual_vector(dual_witness)
-            source_span = tuple(
-                _fraction_ball(value) for value in dual_witness.raw_span
-            )
-            frame_span = _ball_vector(frame.axis_span)
-            if any(source_span[index] != frame_span[index] for index in range(3)):
+            frame_span = tuple(Fraction.from_float(value) for value in frame.axis_span)
+            if dual_witness.raw_span != frame_span:
                 raise ValueError("dual raw span does not match the contact frame")
+            dual_vector = _dual_vector(dual_witness)
             dual_norm_squared = _dot(dual_vector, dual_vector)
             if not dual_norm_squared <= cosine * cosine:
                 reasons.append("dual norm is not certified")
