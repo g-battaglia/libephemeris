@@ -14,6 +14,8 @@ from flint import arb, ctx
 
 from libephemeris.ellipsoid_contact import (
     _ConeSection,
+    _ContactEqualityProof,
+    _ContactEqualityVariant,
     _CrossDualWitness,
     _EllipsoidContactFrame,
     _GlobalReachStatus,
@@ -67,6 +69,89 @@ def test_global_reach_keeps_unproved_e1_equality_unresolved() -> None:
         _dual(scale=Fraction(4, 5)),
     )
     assert proof.status is _GlobalReachStatus.UNRESOLVED
+    assert proof.equality_proof is None
+
+
+def _zero_angle_equality(
+    point=(arb(0), arb(0), arb(0)),
+    witness=None,
+) -> _ContactEqualityProof:
+    if witness is None:
+        witness = _dual(scale=Fraction(0))
+    return _ContactEqualityProof(
+        _ContactEqualityVariant.ZERO_ANGLE_AXIS,
+        point,
+        witness,
+    )
+
+
+def test_global_reach_proves_exact_zero_angle_axis_contact() -> None:
+    """A typed construction identity proves exact L=U=0 contact."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    equality = _zero_angle_equality()
+    proof = _evaluate_global_reach(
+        frame,
+        _ConeSection(0.0, 1.0, 1),
+        None,
+        None,
+        equality,
+    )
+    assert proof.status is _GlobalReachStatus.CONTACT
+    assert proof.lower_bound.is_zero()  # type: ignore[union-attr]
+    assert proof.upper_bound.is_zero()  # type: ignore[union-attr]
+    assert proof.equality_proof is equality
+
+
+@pytest.mark.parametrize(
+    ("frame", "cone", "equality", "reason"),
+    [
+        (
+            _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+            _ConeSection(0.0, 0.8, 1),
+            _zero_angle_equality(),
+            "zero-angle contact requires an exact zero cone angle",
+        ),
+        (
+            _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+            _ConeSection(1.0, 1.0, 1),
+            _zero_angle_equality(),
+            "zero-angle axis contact requires zero cone radius",
+        ),
+        (
+            _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+            _ConeSection(0.0, 1.0, 1),
+            _zero_angle_equality(point=(arb(2), arb(0), arb(0))),
+            "zero-angle contact point must be the axis anchor",
+        ),
+        (
+            _frame(axis_point_km=(3.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+            _ConeSection(0.0, 1.0, 1),
+            _zero_angle_equality(point=(arb(3), arb(0), arb(0))),
+            "zero-angle contact point is not ellipsoid-feasible",
+        ),
+        (
+            _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+            _ConeSection(0.0, 1.0, 1),
+            _zero_angle_equality(witness=_dual()),
+            "zero-angle contact requires an exact zero dual vector",
+        ),
+        (
+            _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+            _ConeSection(0.0, 1.0, 1),
+            _zero_angle_equality(
+                witness=_dual(scale=Fraction(0), multiplier=Fraction(1))
+            ),
+            "zero-angle contact requires a zero dual multiplier",
+        ),
+    ],
+)
+def test_global_reach_rejects_false_zero_angle_equalities(
+    frame, cone, equality, reason
+) -> None:
+    """Every independent equality condition is fail-closed."""
+    proof = _evaluate_global_reach(frame, cone, None, None, equality)
+    assert proof.status is _GlobalReachStatus.INVALID
+    assert proof.reason == reason
 
 
 def test_global_reach_proves_e4_miss() -> None:

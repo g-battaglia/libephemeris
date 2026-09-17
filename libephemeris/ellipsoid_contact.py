@@ -38,6 +38,7 @@ from .intervals import (
     BallMatrix,
     IntervalCertificationError,
     ball_from_float,
+    ellipsoid_line_discriminant,
     interval_cholesky,
     krawczyk_image,
     strictly_contains_vector,
@@ -171,6 +172,21 @@ class _CrossDualWitness:
 DualWitness = _ProjectedDualWitness | _CrossDualWitness
 
 
+class _ContactEqualityVariant(str, Enum):
+    """Reviewed exact-identity routes for one contact equality."""
+
+    ZERO_ANGLE_AXIS = "zero-angle-axis"
+
+
+@dataclass(frozen=True, slots=True)
+class _ContactEqualityProof:
+    """Typed exact-equality payload independent of ordinary interval brackets."""
+
+    variant: _ContactEqualityVariant
+    primal_point: BallVector3
+    dual_witness: DualWitness
+
+
 @dataclass(frozen=True, slots=True)
 class _GlobalReachProof:
     """Standalone primal/dual bracket for one frame and cone."""
@@ -180,6 +196,7 @@ class _GlobalReachProof:
     upper_bound: Ball | None
     primal_point: BallVector3 | None
     dual_witness: DualWitness | None
+    equality_proof: _ContactEqualityProof | None
     reason: str
 
 
@@ -937,14 +954,14 @@ def _evaluate_global_reach(
     cone: _ConeSection,
     primal_point: BallVector3 | None,
     dual_witness: DualWitness | None,
+    equality_proof: _ContactEqualityProof | None = None,
 ) -> _GlobalReachProof:
-    """Evaluate independent strict primal and dual global bounds.
+    """Evaluate strict global bounds and an optional exact contact identity.
 
     A strict primal upper bound proves reach without a dual witness; a strict
-    dual lower bound proves miss without a primal witness. Contact equality is
-    intentionally deferred to a separate typed proof. Missing or unresolved
-    bounds remain ``UNRESOLVED`` and public eclipse consumers are not connected
-    to this private result.
+    dual lower bound proves miss without a primal witness. ``CONTACT`` requires
+    the separate typed equality payload and never follows from a zero-containing
+    ordinary bracket. Public eclipse consumers remain disconnected.
     """
     lower: Ball | None = None
     upper: Ball | None = None
@@ -952,8 +969,17 @@ def _evaluate_global_reach(
     try:
         frame.validate()
         cone.validate()
-        if primal_point is None and dual_witness is None:
-            raise ValueError("global reach needs a primal or dual witness")
+        if primal_point is None and dual_witness is None and equality_proof is None:
+            raise ValueError("global reach needs a primal, dual, or equality witness")
+        if equality_proof is not None:
+            if type(equality_proof) is not _ContactEqualityProof:
+                raise ValueError("contact equality proof has the wrong private type")
+            if primal_point is not None and primal_point != equality_proof.primal_point:
+                raise ValueError("contact equality primal point is inconsistent")
+            if dual_witness is not None and dual_witness != equality_proof.dual_witness:
+                raise ValueError("contact equality dual witness is inconsistent")
+            primal_point = equality_proof.primal_point
+            dual_witness = equality_proof.dual_witness
         axis = frame.certified_axis_line()
         metric = frame.metric_ball_matrix()
         cosine = ball_from_float(cone.cosine)
@@ -1047,7 +1073,44 @@ def _evaluate_global_reach(
                     )
                     lower = arb(dual_value.lower().mid())
 
-        if upper is not None and upper < 0:
+        contact = False
+        if equality_proof is not None:
+            if equality_proof.variant is not _ContactEqualityVariant.ZERO_ANGLE_AXIS:
+                raise ValueError("contact equality variant is not implemented")
+            if not sine_squared.is_exact() or not sine_squared.is_zero():
+                raise ValueError("zero-angle contact requires an exact zero cone angle")
+            if not radius.is_exact() or not radius.is_zero():
+                raise ValueError("zero-angle axis contact requires zero cone radius")
+            if primal_point is None or dual_witness is None:
+                raise ValueError("contact equality proof is incomplete")
+            if any(
+                primal_point[index] != axis.anchor_km[index]
+                for index in range(_VECTOR_DIMENSION)
+            ):
+                raise ValueError("zero-angle contact point must be the axis anchor")
+            metric_point = _metric_vector(metric, primal_point)
+            if not (_dot(primal_point, metric_point) - 1) <= 0:
+                raise ValueError("zero-angle contact point is not ellipsoid-feasible")
+            discriminant = ellipsoid_line_discriminant(
+                metric, axis.direction, axis.anchor_km
+            )
+            if not discriminant >= 0:
+                raise ValueError("zero-angle axis does not reach the ellipsoid")
+            dual_vector = _dual_vector(dual_witness)
+            if any(not component.is_zero() for component in dual_vector):
+                raise ValueError(
+                    "zero-angle contact requires an exact zero dual vector"
+                )
+            if dual_witness.multiplier != 0:
+                raise ValueError("zero-angle contact requires a zero dual multiplier")
+            contact = True
+            lower = arb(0)
+            upper = arb(0)
+
+        if contact:
+            status = _GlobalReachStatus.CONTACT
+            reason = "exact zero-angle axis equality proof"
+        elif upper is not None and upper < 0:
             status = _GlobalReachStatus.REACH
             reason = "strict primal upper bound"
         elif lower is not None and lower > 0:
@@ -1063,6 +1126,7 @@ def _evaluate_global_reach(
                 upper,
                 primal_point,
                 dual_witness,
+                equality_proof,
                 "primal and dual bounds are contradictory",
             )
         return _GlobalReachProof(
@@ -1071,6 +1135,7 @@ def _evaluate_global_reach(
             upper,
             primal_point,
             dual_witness,
+            equality_proof,
             reason,
         )
     except IntervalCertificationError as exc:
@@ -1080,6 +1145,7 @@ def _evaluate_global_reach(
             upper,
             primal_point,
             dual_witness,
+            equality_proof,
             str(exc),
         )
     except (ValueError, ZeroDivisionError) as exc:
@@ -1089,6 +1155,7 @@ def _evaluate_global_reach(
             upper,
             primal_point,
             dual_witness,
+            equality_proof,
             str(exc),
         )
 
