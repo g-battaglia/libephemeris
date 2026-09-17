@@ -169,6 +169,63 @@ def test_global_reach_rejects_nonpoint_primal_and_missing_witnesses() -> None:
     assert missing.status is _GlobalReachStatus.INVALID
 
 
+def test_global_reach_classifies_non_spd_source_invalid() -> None:
+    """A definitively indefinite source metric is invalid, not unresolved."""
+    frame = _frame(
+        metric_km_minus_2=(
+            (1.0, 0.0, 0.0),
+            (0.0, -1.0, 0.0),
+            (0.0, 0.0, 1.0),
+        ),
+        axis_point_km=(0.0, 0.0, 0.0),
+        axis_span=(0.0, 0.0, 1.0),
+    )
+    proof = _evaluate_global_reach(frame, _ConeSection(1.0, 1.0, 1), None, _dual())
+    assert proof.status is _GlobalReachStatus.INVALID
+    assert proof.reason == "ellipsoid metric must be positive definite"
+
+
+@pytest.mark.parametrize(
+    "witness",
+    [
+        _ProjectedDualWitness(
+            (Fraction(0),),
+            (Fraction(1), Fraction(0), Fraction(0)),
+            Fraction(1),
+            Fraction(0),
+        ),
+        _ProjectedDualWitness(
+            (Fraction(0), Fraction(0), Fraction(1)),
+            (Fraction(1),),
+            Fraction(1),
+            Fraction(0),
+        ),
+        _ProjectedDualWitness(
+            [Fraction(0), Fraction(0), Fraction(1)],  # type: ignore[arg-type]
+            (Fraction(1), Fraction(0), Fraction(0)),
+            Fraction(1),
+            Fraction(0),
+        ),
+        _CrossDualWitness(
+            (Fraction(0), Fraction(0), Fraction(1)),
+            None,  # type: ignore[arg-type]
+            Fraction(1),
+            Fraction(0),
+        ),
+    ],
+)
+def test_global_reach_returns_invalid_for_malformed_dual_shapes(witness) -> None:
+    """Malformed exact payload shapes stay inside the typed invalid result."""
+    proof = _evaluate_global_reach(
+        _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(1.0, 1.0, 1),
+        None,
+        witness,
+    )
+    assert proof.status is _GlobalReachStatus.INVALID
+    assert proof.reason == "dual witness vectors must be exact three-component tuples"
+
+
 def test_global_reach_rejects_wrong_dual_span_or_norm() -> None:
     """The exact dual payload stays bound to the frame and norm radius."""
     frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
@@ -670,7 +727,7 @@ def test_metric_rejects_asymmetry_and_nonpositive_definiteness() -> None:
                 (0.0, 0.0, 1.0),
             )
         ).validate()
-    with pytest.raises(IntervalCertificationError, match="pivot"):
+    with pytest.raises(ValueError, match="positive definite"):
         _frame(
             metric_km_minus_2=(
                 (1.0, 0.0, 0.0),

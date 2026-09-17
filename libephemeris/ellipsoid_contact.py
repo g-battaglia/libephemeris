@@ -886,6 +886,13 @@ def _dual_vector(witness: DualWitness) -> BallVector3:
     """Construct a dual vector from one exact orthogonality identity."""
     if type(witness) not in {_ProjectedDualWitness, _CrossDualWitness}:
         raise ValueError("dual witness has the wrong private type")
+    if (
+        type(witness.raw_span) is not tuple
+        or len(witness.raw_span) != _VECTOR_DIMENSION
+        or type(witness.seed) is not tuple
+        or len(witness.seed) != _VECTOR_DIMENSION
+    ):
+        raise ValueError("dual witness vectors must be exact three-component tuples")
     values = (*witness.raw_span, *witness.seed, witness.scale, witness.multiplier)
     if any(type(value) is not Fraction for value in values):
         raise ValueError("dual witness fields must be exact Fractions")
@@ -1002,10 +1009,10 @@ def _evaluate_global_reach(
                     reasons.append("primal feasibility is not certified")
 
         if dual_witness is not None:
+            dual_vector = _dual_vector(dual_witness)
             frame_span = tuple(Fraction.from_float(value) for value in frame.axis_span)
             if dual_witness.raw_span != frame_span:
                 raise ValueError("dual raw span does not match the contact frame")
-            dual_vector = _dual_vector(dual_witness)
             dual_norm_squared = _dot(dual_vector, dual_vector)
             if not dual_norm_squared <= cosine * cosine:
                 reasons.append("dual norm is not certified")
@@ -1104,9 +1111,10 @@ def _validate_metric(metric: object) -> None:
         for column in range(row):
             if metric[row][column] != metric[column][row]:
                 raise ValueError("ellipsoid metric must be exactly symmetric")
-    interval_cholesky(
-        arb_mat([[ball_from_float(value) for value in row] for row in metric])
-    )
+    metric_ball = arb_mat([[ball_from_float(value) for value in row] for row in metric])
+    if not metric_ball.det() > 0:
+        raise ValueError("ellipsoid metric must be positive definite")
+    interval_cholesky(metric_ball)
 
 
 def _ball_vector(vector: Vector3) -> BallVector3:
