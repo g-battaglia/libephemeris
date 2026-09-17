@@ -74,6 +74,23 @@ class _ConeSection:
             raise ValueError("cone branch sign must be exactly -1 or +1")
 
 
+class _CoreShadowClass(str, Enum):
+    """Classification carried separately from non-negative cone geometry."""
+
+    UMBRA = "umbra"
+    ANTUMBRA = "antumbra"
+    APEX = "apex"
+
+
+@dataclass(frozen=True, slots=True)
+class _CoreConeSection:
+    """Physical core cone paired with its signed-diameter classification."""
+
+    cone: _ConeSection
+    signed_diameter_km: float
+    shadow_class: _CoreShadowClass
+
+
 @dataclass(frozen=True, slots=True)
 class _RegularContactEvaluation:
     """Regular cone/ellipsoid residuals and stationarity vector."""
@@ -298,6 +315,27 @@ class _EllipsoidContactFrame:
         if any(not value.is_finite() for value in (*direction, *anchor)):
             raise IntervalCertificationError("axis-line derivation is not finite")
         return _CertifiedAxisLine(direction, anchor)  # type: ignore[arg-type]
+
+
+def _core_cone_section(
+    signed_diameter_km: float,
+    cosine: float,
+) -> _CoreConeSection:
+    """Keep signed core classification separate from physical cone radius."""
+    if type(signed_diameter_km) is not float or not math.isfinite(signed_diameter_km):
+        raise ValueError("signed core diameter must be a finite native float")
+    if signed_diameter_km < 0.0:
+        shadow_class = _CoreShadowClass.UMBRA
+        branch_sign = -1
+    elif signed_diameter_km > 0.0:
+        shadow_class = _CoreShadowClass.ANTUMBRA
+        branch_sign = 1
+    else:
+        shadow_class = _CoreShadowClass.APEX
+        branch_sign = 1
+    cone = _ConeSection(abs(signed_diameter_km) / 2.0, cosine, branch_sign)
+    cone.validate()
+    return _CoreConeSection(cone, signed_diameter_km, shadow_class)
 
 
 def _dot(left: tuple[Ball, ...], right: tuple[Ball, ...]) -> Ball:

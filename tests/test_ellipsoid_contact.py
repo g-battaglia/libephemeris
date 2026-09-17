@@ -15,6 +15,7 @@ from flint import arb, ctx
 from libephemeris.ellipsoid_contact import (
     _ConeSection,
     _ContactEqualityProof,
+    _CoreShadowClass,
     _ContactEqualityVariant,
     _CrossDualWitness,
     _EllipsoidContactFrame,
@@ -23,6 +24,7 @@ from libephemeris.ellipsoid_contact import (
     _RegularRootCertificate,
     _ZeroAngleLineRelation,
     _certify_regular_root_box,
+    _core_cone_section,
     _evaluate_cone_apex,
     _evaluate_nappe_boundary,
     _evaluate_radial_subgradient,
@@ -214,6 +216,43 @@ def test_global_reach_rejects_false_zero_angle_equalities(
     proof = _evaluate_global_reach(frame, cone, None, None, equality)
     assert proof.status is _GlobalReachStatus.INVALID
     assert proof.reason == reason
+
+
+@pytest.mark.parametrize(
+    ("signed_diameter", "shadow_class", "branch_sign"),
+    [
+        (-2.0, _CoreShadowClass.UMBRA, -1),
+        (2.0, _CoreShadowClass.ANTUMBRA, 1),
+        (0.0, _CoreShadowClass.APEX, 1),
+        (-0.0, _CoreShadowClass.APEX, 1),
+    ],
+)
+def test_core_cone_keeps_signed_class_separate_from_radius(
+    signed_diameter, shadow_class, branch_sign
+) -> None:
+    """E7 uses one physical radius while retaining umbra/antumbra class."""
+    section = _core_cone_section(signed_diameter, 1.0)
+    assert section.cone.radius_km == abs(signed_diameter) / 2.0
+    assert section.cone.branch_sign == branch_sign
+    assert section.signed_diameter_km == signed_diameter
+    assert section.shadow_class is shadow_class
+
+
+def test_e7_signed_core_geometry_is_identical_apart_from_class() -> None:
+    """E7's -2/+2 inputs cannot become negative physical cone lengths."""
+    umbra = _core_cone_section(-2.0, 1.0)
+    antumbra = _core_cone_section(2.0, 1.0)
+    assert umbra.cone.radius_km == antumbra.cone.radius_km == 1.0
+    assert umbra.cone.cosine == antumbra.cone.cosine == 1.0
+    assert umbra.shadow_class is _CoreShadowClass.UMBRA
+    assert antumbra.shadow_class is _CoreShadowClass.ANTUMBRA
+
+
+@pytest.mark.parametrize("value", [math.inf, -math.inf, math.nan, 2, None])
+def test_core_cone_rejects_nonfinite_or_nonnative_diameter(value) -> None:
+    """Signed classification accepts only finite native runtime values."""
+    with pytest.raises(ValueError, match="signed core diameter"):
+        _core_cone_section(value, 1.0)
 
 
 def test_global_reach_proves_e4_miss() -> None:
