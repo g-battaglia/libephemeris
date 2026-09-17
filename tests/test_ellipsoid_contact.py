@@ -72,30 +72,46 @@ def test_global_reach_keeps_unproved_e1_equality_unresolved() -> None:
     assert proof.equality_proof is None
 
 
-def _zero_angle_equality(
-    point=(arb(0), arb(0), arb(0)),
-    witness=None,
-) -> _ContactEqualityProof:
+def _zero_angle_equality(witness=None) -> _ContactEqualityProof:
     if witness is None:
         witness = _dual(scale=Fraction(0))
     return _ContactEqualityProof(
-        _ContactEqualityVariant.ZERO_ANGLE_AXIS,
-        point,
+        _ContactEqualityVariant.ZERO_ANGLE_LINE,
         witness,
     )
 
 
-def test_global_reach_proves_exact_zero_angle_axis_contact() -> None:
-    """A typed construction identity proves exact L=U=0 contact."""
-    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
-    equality = _zero_angle_equality()
-    proof = _evaluate_global_reach(
-        frame,
-        _ConeSection(0.0, 1.0, 1),
-        None,
-        None,
-        equality,
-    )
+@pytest.mark.parametrize("precision", [160, 256])
+def test_global_reach_proves_exact_zero_angle_line_contact(precision) -> None:
+    """The whole line identity proves exact L=U=0 at both start precisions."""
+    previous = ctx.prec
+    try:
+        ctx.prec = precision
+        frame = _frame(
+            metric_km_minus_2=(
+                (1.0, 0.8, 0.0),
+                (0.8, 1.0, 0.0),
+                (0.0, 0.0, 1.0),
+            ),
+            axis_point_km=(0.0, 1.5, 0.0),
+            axis_span=(1.0, 0.0, 0.0),
+        )
+        equality = _ContactEqualityProof(
+            _ContactEqualityVariant.ZERO_ANGLE_LINE,
+            _dual(
+                span=(Fraction(1), Fraction(0), Fraction(0)),
+                scale=Fraction(0),
+            ),
+        )
+        proof = _evaluate_global_reach(
+            frame,
+            _ConeSection(0.0, 1.0, 1),
+            None,
+            None,
+            equality,
+        )
+    finally:
+        ctx.prec = previous
     assert proof.status is _GlobalReachStatus.CONTACT
     assert proof.lower_bound.is_zero()  # type: ignore[union-attr]
     assert proof.upper_bound.is_zero()  # type: ignore[union-attr]
@@ -115,19 +131,13 @@ def test_global_reach_proves_exact_zero_angle_axis_contact() -> None:
             _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
             _ConeSection(1.0, 1.0, 1),
             _zero_angle_equality(),
-            "zero-angle axis contact requires zero cone radius",
-        ),
-        (
-            _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
-            _ConeSection(0.0, 1.0, 1),
-            _zero_angle_equality(point=(arb(2), arb(0), arb(0))),
-            "zero-angle contact point must be the axis anchor",
+            "zero-angle line contact requires zero cone radius",
         ),
         (
             _frame(axis_point_km=(3.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
             _ConeSection(0.0, 1.0, 1),
-            _zero_angle_equality(point=(arb(3), arb(0), arb(0))),
-            "zero-angle contact point is not ellipsoid-feasible",
+            _zero_angle_equality(),
+            "zero-angle axis does not reach the ellipsoid",
         ),
         (
             _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),

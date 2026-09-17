@@ -38,7 +38,6 @@ from .intervals import (
     BallMatrix,
     IntervalCertificationError,
     ball_from_float,
-    ellipsoid_line_discriminant,
     interval_cholesky,
     krawczyk_image,
     strictly_contains_vector,
@@ -175,7 +174,7 @@ DualWitness = _ProjectedDualWitness | _CrossDualWitness
 class _ContactEqualityVariant(str, Enum):
     """Reviewed exact-identity routes for one contact equality."""
 
-    ZERO_ANGLE_AXIS = "zero-angle-axis"
+    ZERO_ANGLE_LINE = "zero-angle-line"
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,7 +182,6 @@ class _ContactEqualityProof:
     """Typed exact-equality payload independent of ordinary interval brackets."""
 
     variant: _ContactEqualityVariant
-    primal_point: BallVector3
     dual_witness: DualWitness
 
 
@@ -974,11 +972,10 @@ def _evaluate_global_reach(
         if equality_proof is not None:
             if type(equality_proof) is not _ContactEqualityProof:
                 raise ValueError("contact equality proof has the wrong private type")
-            if primal_point is not None and primal_point != equality_proof.primal_point:
-                raise ValueError("contact equality primal point is inconsistent")
+            if primal_point is not None:
+                raise ValueError("zero-angle line equality has no primal point payload")
             if dual_witness is not None and dual_witness != equality_proof.dual_witness:
                 raise ValueError("contact equality dual witness is inconsistent")
-            primal_point = equality_proof.primal_point
             dual_witness = equality_proof.dual_witness
         axis = frame.certified_axis_line()
         metric = frame.metric_ball_matrix()
@@ -1075,27 +1072,14 @@ def _evaluate_global_reach(
 
         contact = False
         if equality_proof is not None:
-            if equality_proof.variant is not _ContactEqualityVariant.ZERO_ANGLE_AXIS:
+            if equality_proof.variant is not _ContactEqualityVariant.ZERO_ANGLE_LINE:
                 raise ValueError("contact equality variant is not implemented")
             if not sine_squared.is_exact() or not sine_squared.is_zero():
                 raise ValueError("zero-angle contact requires an exact zero cone angle")
             if not radius.is_exact() or not radius.is_zero():
-                raise ValueError("zero-angle axis contact requires zero cone radius")
-            if primal_point is None or dual_witness is None:
+                raise ValueError("zero-angle line contact requires zero cone radius")
+            if dual_witness is None:
                 raise ValueError("contact equality proof is incomplete")
-            if any(
-                primal_point[index] != axis.anchor_km[index]
-                for index in range(_VECTOR_DIMENSION)
-            ):
-                raise ValueError("zero-angle contact point must be the axis anchor")
-            metric_point = _metric_vector(metric, primal_point)
-            if not (_dot(primal_point, metric_point) - 1) <= 0:
-                raise ValueError("zero-angle contact point is not ellipsoid-feasible")
-            discriminant = ellipsoid_line_discriminant(
-                metric, axis.direction, axis.anchor_km
-            )
-            if not discriminant >= 0:
-                raise ValueError("zero-angle axis does not reach the ellipsoid")
             dual_vector = _dual_vector(dual_witness)
             if any(not component.is_zero() for component in dual_vector):
                 raise ValueError(
@@ -1103,13 +1087,28 @@ def _evaluate_global_reach(
                 )
             if dual_witness.multiplier != 0:
                 raise ValueError("zero-angle contact requires a zero dual multiplier")
+            metric_direction = _metric_vector(metric, axis.direction)
+            metric_anchor = _metric_vector(metric, axis.anchor_km)
+            line_a = _dot(axis.direction, metric_direction)
+            line_b = _dot(axis.direction, metric_anchor)
+            line_c = _dot(axis.anchor_km, metric_anchor) - 1
+            discriminant = line_b * line_b - line_a * line_c
+            if not discriminant >= 0:
+                raise ValueError("zero-angle axis does not reach the ellipsoid")
+            if not line_a > 0:
+                raise IntervalCertificationError("axis quadratic is unresolved")
+            minimum = line_c - line_b * line_b / line_a
+            if not minimum <= 0:
+                raise ValueError("zero-angle line has no ellipsoid-feasible point")
+            if lower is None or not lower.is_exact() or not lower.is_zero():
+                raise ValueError("zero-angle dual equality is not exact")
             contact = True
             lower = arb(0)
             upper = arb(0)
 
         if contact:
             status = _GlobalReachStatus.CONTACT
-            reason = "exact zero-angle axis equality proof"
+            reason = "exact zero-angle line equality proof"
         elif upper is not None and upper < 0:
             status = _GlobalReachStatus.REACH
             reason = "strict primal upper bound"
