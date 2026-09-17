@@ -1111,10 +1111,19 @@ def _validate_metric(metric: object) -> None:
         for column in range(row):
             if metric[row][column] != metric[column][row]:
                 raise ValueError("ellipsoid metric must be exactly symmetric")
-    metric_ball = arb_mat([[ball_from_float(value) for value in row] for row in metric])
-    if not metric_ball.det() > 0:
+    exact = tuple(tuple(Fraction.from_float(value) for value in row) for row in metric)
+    leading_minors = (
+        exact[0][0],
+        exact[0][0] * exact[1][1] - exact[0][1] * exact[1][0],
+        exact[0][0] * (exact[1][1] * exact[2][2] - exact[1][2] * exact[2][1])
+        - exact[0][1] * (exact[1][0] * exact[2][2] - exact[1][2] * exact[2][0])
+        + exact[0][2] * (exact[1][0] * exact[2][1] - exact[1][1] * exact[2][0]),
+    )
+    if any(minor <= 0 for minor in leading_minors):
         raise ValueError("ellipsoid metric must be positive definite")
-    interval_cholesky(metric_ball)
+    interval_cholesky(
+        arb_mat([[ball_from_float(value) for value in row] for row in metric])
+    )
 
 
 def _ball_vector(vector: Vector3) -> BallVector3:

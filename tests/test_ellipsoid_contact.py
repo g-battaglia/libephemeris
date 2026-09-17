@@ -169,14 +169,30 @@ def test_global_reach_rejects_nonpoint_primal_and_missing_witnesses() -> None:
     assert missing.status is _GlobalReachStatus.INVALID
 
 
-def test_global_reach_classifies_non_spd_source_invalid() -> None:
-    """A definitively indefinite source metric is invalid, not unresolved."""
-    frame = _frame(
-        metric_km_minus_2=(
+@pytest.mark.parametrize(
+    "metric",
+    [
+        (
             (1.0, 0.0, 0.0),
             (0.0, -1.0, 0.0),
             (0.0, 0.0, 1.0),
         ),
+        (
+            (-1.0, 0.0, 0.0),
+            (0.0, -1.0, 0.0),
+            (0.0, 0.0, 1.0),
+        ),
+        (
+            (1.0, 2.0, 0.0),
+            (2.0, 1.0, 0.0),
+            (0.0, 0.0, -1.0),
+        ),
+    ],
+)
+def test_global_reach_classifies_non_spd_source_invalid(metric) -> None:
+    """Every exactly indefinite source metric is invalid, not unresolved."""
+    frame = _frame(
+        metric_km_minus_2=metric,
         axis_point_km=(0.0, 0.0, 0.0),
         axis_span=(0.0, 0.0, 1.0),
     )
