@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+from fractions import Fraction
 
 import pytest
 
@@ -14,11 +15,14 @@ from flint import arb, ctx
 from libephemeris.ellipsoid_contact import (
     _ConeSection,
     _EllipsoidContactFrame,
+    _GlobalReachStatus,
+    _ProjectedDualWitness,
     _RegularRootCertificate,
     _certify_regular_root_box,
     _evaluate_cone_apex,
     _evaluate_nappe_boundary,
     _evaluate_radial_subgradient,
+    _evaluate_global_reach,
     _evaluate_regular_contact,
     _nappe_boundary_jacobian,
     _reduce_regular_residuals,
@@ -41,6 +45,91 @@ def _frame(**overrides) -> _EllipsoidContactFrame:
     }
     values.update(overrides)
     return _EllipsoidContactFrame(**values)
+
+
+def _dual(
+    span=(Fraction(0), Fraction(0), Fraction(1)),
+    seed=(Fraction(1), Fraction(0), Fraction(0)),
+    scale=Fraction(1),
+    multiplier=Fraction(0),
+) -> _ProjectedDualWitness:
+    return _ProjectedDualWitness(span, seed, scale, multiplier)
+
+
+def test_global_reach_keeps_unproved_e1_equality_unresolved() -> None:
+    """Matching zero-containing bounds are not an exact contact proof."""
+    frame = _frame(axis_point_km=(-3.5, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    proof = _evaluate_global_reach(
+        frame,
+        _ConeSection(1.0, 0.8, 1),
+        (arb(-1.6), arb(0), arb(1.2)),
+        _dual(scale=Fraction(4, 5)),
+    )
+    assert proof.status is _GlobalReachStatus.UNRESOLVED
+
+
+def test_global_reach_proves_e4_miss() -> None:
+    """The exact E4 support witness gives the global lower bound +1."""
+    root_two = math.sqrt(2.0)
+    frame = _frame(
+        metric_km_minus_2=(
+            (1.0 / 9.0, 0.0, 0.0),
+            (0.0, 1.0 / 9.0, 0.0),
+            (0.0, 0.0, 0.25),
+        ),
+        axis_point_km=(-5.0, 0.0, 0.0),
+        axis_span=(0.0, root_two, root_two),
+    )
+    span = tuple(Fraction.from_float(value) for value in frame.axis_span)
+    proof = _evaluate_global_reach(
+        frame,
+        _ConeSection(1.0, 1.0, 1),
+        (arb(-3), arb(0), arb(0)),
+        _ProjectedDualWitness(
+            span,
+            (Fraction(1), Fraction(0), Fraction(0)),
+            Fraction(1) / _dot_fraction(span, span),
+            Fraction(0),
+        ),
+    )
+    assert proof.status is _GlobalReachStatus.MISS
+    assert proof.lower_bound > 0  # type: ignore[operator]
+
+
+def _dot_fraction(left, right) -> Fraction:
+    return sum((a * b for a, b in zip(left, right)), Fraction(0))
+
+
+def test_global_reach_uses_strict_primal_upper_bound() -> None:
+    """A feasible point strictly inside a zero-radius cone proves reach."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    proof = _evaluate_global_reach(
+        frame,
+        _ConeSection(0.0, 0.8, 1),
+        (arb(0), arb(0), arb(1)),
+        _dual(scale=Fraction(0)),
+    )
+    assert proof.status is _GlobalReachStatus.REACH
+    assert proof.upper_bound < 0  # type: ignore[operator]
+
+
+def test_global_reach_rejects_wrong_dual_span_or_norm() -> None:
+    """The exact dual payload stays bound to the frame and norm radius."""
+    frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    wrong_span = _evaluate_global_reach(
+        frame,
+        _ConeSection(1.0, 0.8, 1),
+        (arb(0), arb(0), arb(0)),
+        _dual(span=(Fraction(0), Fraction(1), Fraction(0))),
+    )
+    assert wrong_span.status is _GlobalReachStatus.INVALID
+    too_large = _evaluate_global_reach(
+        frame,
+        _ConeSection(1.0, 0.8, 1),
+        (arb(0), arb(0), arb(0)),
+        _dual(scale=Fraction(2)),
+    )
+    assert too_large.status is _GlobalReachStatus.UNRESOLVED
 
 
 def test_frame_is_private_frozen_and_equal_by_value() -> None:

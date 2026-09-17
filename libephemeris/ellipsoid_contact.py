@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from enum import Enum
+from fractions import Fraction
 from typing import Final
 
 from flint import arb, arb_mat
@@ -134,6 +136,38 @@ class _ResidualReduction:
     normalized: Ball
     sign: int
     candidate_count: int
+
+
+class _GlobalReachStatus(str, Enum):
+    """Private result classes for standalone global certification."""
+
+    REACH = "reach"
+    MISS = "miss"
+    CONTACT = "contact"
+    UNRESOLVED = "unresolved"
+    INVALID = "invalid"
+
+
+@dataclass(frozen=True, slots=True)
+class _ProjectedDualWitness:
+    """Exact rational payload for one transverse dual support vector."""
+
+    raw_span: tuple[Fraction, Fraction, Fraction]
+    seed: tuple[Fraction, Fraction, Fraction]
+    scale: Fraction
+    multiplier: Fraction
+
+
+@dataclass(frozen=True, slots=True)
+class _GlobalReachProof:
+    """Standalone primal/dual bracket for one frame and cone."""
+
+    status: _GlobalReachStatus
+    lower_bound: Ball | None
+    upper_bound: Ball | None
+    primal_point: BallVector3 | None
+    dual_witness: _ProjectedDualWitness | None
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -828,6 +862,191 @@ def _reduce_regular_residuals(
     else:
         raise IntervalCertificationError("regular residual sign is not certified")
     return _ResidualReduction(minimum, reach, sign, len(candidates))
+
+
+def _fraction_ball(value: Fraction) -> Ball:
+    """Convert one exact rational payload field to an Arb point."""
+    return arb(f"{value.numerator}/{value.denominator}")
+
+
+def _projected_dual_vector(witness: _ProjectedDualWitness) -> BallVector3:
+    """Construct the dual vector from an exact orthogonality identity."""
+    if type(witness) is not _ProjectedDualWitness:
+        raise ValueError("dual witness has the wrong private type")
+    values = (*witness.raw_span, *witness.seed, witness.scale, witness.multiplier)
+    if any(type(value) is not Fraction for value in values):
+        raise ValueError("dual witness fields must be exact Fractions")
+    if witness.multiplier < 0:
+        raise ValueError("dual multiplier must be non-negative")
+    span_norm = sum((value * value for value in witness.raw_span), Fraction(0))
+    if span_norm <= 0:
+        raise ValueError("dual raw span must have positive exact norm")
+    seed_dot = sum(
+        (witness.seed[index] * witness.raw_span[index] for index in range(3)),
+        Fraction(0),
+    )
+    projected = tuple(
+        witness.scale
+        * (span_norm * witness.seed[index] - seed_dot * witness.raw_span[index])
+        for index in range(3)
+    )
+    if (
+        sum(
+            (projected[index] * witness.raw_span[index] for index in range(3)),
+            Fraction(0),
+        )
+        != 0
+    ):
+        raise IntervalCertificationError("dual orthogonality identity did not cancel")
+    return tuple(_fraction_ball(value) for value in projected)  # type: ignore[return-value]
+
+
+def _evaluate_global_reach(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    primal_point: BallVector3,
+    dual_witness: _ProjectedDualWitness,
+) -> _GlobalReachProof:
+    """Evaluate a standalone global primal/dual reach bracket.
+
+    This function implements only strict reach/miss decisions and exact singleton
+    zero closure. Any unresolved feasibility, norm, radicand, or zero equality
+    returns ``UNRESOLVED`` without a numerical reach result. Public eclipse
+    consumers are not connected to this private proof.
+    """
+    try:
+        frame.validate()
+        cone.validate()
+        if (
+            type(primal_point) is not tuple
+            or len(primal_point) != 3
+            or any(
+                type(value) is not arb or not value.is_finite()
+                for value in primal_point
+            )
+        ):
+            raise ValueError("primal point must contain three finite Arb intervals")
+        dual_vector = _projected_dual_vector(dual_witness)
+        source_span = tuple(_fraction_ball(value) for value in dual_witness.raw_span)
+        frame_span = _ball_vector(frame.axis_span)
+        if any(source_span[index] != frame_span[index] for index in range(3)):
+            raise ValueError("dual raw span does not match the contact frame")
+        axis = frame.certified_axis_line()
+        metric = frame.metric_ball_matrix()
+        metric_point = _metric_vector(metric, primal_point)
+        ellipsoid = _dot(primal_point, metric_point) - 1
+        cosine = ball_from_float(cone.cosine)
+        sine_squared = 1 - cosine * cosine
+        if not sine_squared.is_finite() or sine_squared < 0:
+            return _GlobalReachProof(
+                _GlobalReachStatus.UNRESOLVED,
+                None,
+                None,
+                primal_point,
+                dual_witness,
+                "cone sine is unresolved",
+            )
+        sine = sine_squared.sqrt()
+        tangent = sine / cosine
+        branch = arb(cone.branch_sign)
+        radius = ball_from_float(cone.radius_km)
+        axial = _dot(primal_point, axis.direction)
+        relative = tuple(
+            primal_point[index] - axis.anchor_km[index] for index in range(3)
+        )
+        projected = _dot(relative, axis.direction)
+        perpendicular = tuple(
+            relative[index] - projected * axis.direction[index] for index in range(3)
+        )
+        radial_squared = _dot(perpendicular, perpendicular)
+        if not radial_squared.is_finite() or radial_squared < 0:
+            return _GlobalReachProof(
+                _GlobalReachStatus.UNRESOLVED,
+                None,
+                None,
+                primal_point,
+                dual_witness,
+                "primal radial distance is unresolved",
+            )
+        radial = radial_squared.sqrt()
+        nappe_radius = radius + branch * tangent * axial
+        primal_objective = cosine * (radial - nappe_radius)
+        if not ellipsoid <= 0 or not nappe_radius >= 0:
+            return _GlobalReachProof(
+                _GlobalReachStatus.UNRESOLVED,
+                None,
+                primal_objective,
+                primal_point,
+                dual_witness,
+                "primal feasibility is not certified",
+            )
+        upper = arb(primal_objective.upper().mid())
+
+        dual_norm_squared = _dot(dual_vector, dual_vector)
+        if not dual_norm_squared <= cosine * cosine:
+            return _GlobalReachProof(
+                _GlobalReachStatus.UNRESOLVED,
+                None,
+                upper,
+                primal_point,
+                dual_witness,
+                "dual norm is not certified",
+            )
+        multiplier = _fraction_ball(dual_witness.multiplier)
+        direction = tuple(
+            dual_vector[index]
+            - branch * (sine + multiplier * tangent) * axis.direction[index]
+            for index in range(3)
+        )
+        try:
+            inverse = metric.inv()
+        except ZeroDivisionError as exc:
+            raise IntervalCertificationError("dual metric inverse failed") from exc
+        direction_column = arb_mat([[value] for value in direction])
+        radicand = (direction_column.transpose() * inverse * direction_column)[0, 0]
+        if not radicand.is_finite() or radicand < 0:
+            return _GlobalReachProof(
+                _GlobalReachStatus.UNRESOLVED,
+                None,
+                upper,
+                primal_point,
+                dual_witness,
+                "dual support radicand is unresolved",
+            )
+        support = radicand.sqrt()
+        dual_value = (
+            -support
+            - _dot(dual_vector, axis.anchor_km)
+            - cosine * radius
+            - multiplier * radius
+        )
+        lower = arb(dual_value.lower().mid())
+        if upper < 0:
+            status = _GlobalReachStatus.REACH
+            reason = "strict primal upper bound"
+        elif lower > 0:
+            status = _GlobalReachStatus.MISS
+            reason = "strict dual lower bound"
+        else:
+            status = _GlobalReachStatus.UNRESOLVED
+            reason = "global bracket does not separate a strict result"
+        return _GlobalReachProof(
+            status,
+            lower,
+            upper,
+            primal_point,
+            dual_witness,
+            reason,
+        )
+    except (IntervalCertificationError, ValueError, ZeroDivisionError) as exc:
+        return _GlobalReachProof(
+            _GlobalReachStatus.INVALID,
+            None,
+            None,
+            None,
+            None,
+            str(exc),
+        )
 
 
 def _validate_vector(vector: object, name: str) -> None:
