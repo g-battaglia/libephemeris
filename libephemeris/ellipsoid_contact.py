@@ -177,12 +177,20 @@ class _ContactEqualityVariant(str, Enum):
     ZERO_ANGLE_LINE = "zero-angle-line"
 
 
+class _ZeroAngleLineRelation(str, Enum):
+    """Exact source-level relation between one axis and the ellipsoid."""
+
+    CROSSING = "crossing"
+    TANGENT = "tangent"
+
+
 @dataclass(frozen=True, slots=True)
 class _ContactEqualityProof:
     """Typed exact-equality payload independent of ordinary interval brackets."""
 
     variant: _ContactEqualityVariant
     dual_witness: DualWitness
+    line_relation: _ZeroAngleLineRelation
 
 
 @dataclass(frozen=True, slots=True)
@@ -1093,13 +1101,55 @@ def _evaluate_global_reach(
             line_b = _dot(axis.direction, metric_anchor)
             line_c = _dot(axis.anchor_km, metric_anchor) - 1
             discriminant = line_b * line_b - line_a * line_c
-            if not discriminant >= 0:
-                raise ValueError("zero-angle axis does not reach the ellipsoid")
-            if not line_a > 0:
-                raise IntervalCertificationError("axis quadratic is unresolved")
-            minimum = line_c - line_b * line_b / line_a
-            if not minimum <= 0:
-                raise ValueError("zero-angle line has no ellipsoid-feasible point")
+            if equality_proof.line_relation is _ZeroAngleLineRelation.CROSSING:
+                if discriminant < 0:
+                    raise ValueError("zero-angle axis does not reach the ellipsoid")
+                if not discriminant > 0:
+                    raise IntervalCertificationError(
+                        "zero-angle crossing discriminant is unresolved"
+                    )
+            elif equality_proof.line_relation is _ZeroAngleLineRelation.TANGENT:
+                exact_metric = tuple(
+                    tuple(Fraction.from_float(value) for value in row)
+                    for row in frame.metric_km_minus_2
+                )
+                exact_point = tuple(
+                    Fraction.from_float(value) for value in frame.axis_point_km
+                )
+                exact_span = tuple(
+                    Fraction.from_float(value) for value in frame.axis_span
+                )
+                exact_a = sum(
+                    exact_span[row]
+                    * sum(
+                        exact_metric[row][column] * exact_span[column]
+                        for column in range(_VECTOR_DIMENSION)
+                    )
+                    for row in range(_VECTOR_DIMENSION)
+                )
+                exact_b = sum(
+                    exact_span[row]
+                    * sum(
+                        exact_metric[row][column] * exact_point[column]
+                        for column in range(_VECTOR_DIMENSION)
+                    )
+                    for row in range(_VECTOR_DIMENSION)
+                )
+                exact_c = (
+                    sum(
+                        exact_point[row]
+                        * sum(
+                            exact_metric[row][column] * exact_point[column]
+                            for column in range(_VECTOR_DIMENSION)
+                        )
+                        for row in range(_VECTOR_DIMENSION)
+                    )
+                    - 1
+                )
+                if exact_b * exact_b - exact_a * exact_c != 0:
+                    raise ValueError("zero-angle tangency identity does not hold")
+            else:
+                raise ValueError("zero-angle line relation has the wrong private type")
             if lower is None or not lower.is_exact() or not lower.is_zero():
                 raise ValueError("zero-angle dual equality is not exact")
             contact = True

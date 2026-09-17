@@ -21,6 +21,7 @@ from libephemeris.ellipsoid_contact import (
     _GlobalReachStatus,
     _ProjectedDualWitness,
     _RegularRootCertificate,
+    _ZeroAngleLineRelation,
     _certify_regular_root_box,
     _evaluate_cone_apex,
     _evaluate_nappe_boundary,
@@ -72,12 +73,16 @@ def test_global_reach_keeps_unproved_e1_equality_unresolved() -> None:
     assert proof.equality_proof is None
 
 
-def _zero_angle_equality(witness=None) -> _ContactEqualityProof:
+def _zero_angle_equality(
+    witness=None,
+    relation=_ZeroAngleLineRelation.CROSSING,
+) -> _ContactEqualityProof:
     if witness is None:
         witness = _dual(scale=Fraction(0))
     return _ContactEqualityProof(
         _ContactEqualityVariant.ZERO_ANGLE_LINE,
         witness,
+        relation,
     )
 
 
@@ -102,6 +107,7 @@ def test_global_reach_proves_exact_zero_angle_line_contact(precision) -> None:
                 span=(Fraction(1), Fraction(0), Fraction(0)),
                 scale=Fraction(0),
             ),
+            _ZeroAngleLineRelation.CROSSING,
         )
         proof = _evaluate_global_reach(
             frame,
@@ -116,6 +122,52 @@ def test_global_reach_proves_exact_zero_angle_line_contact(precision) -> None:
     assert proof.lower_bound.is_zero()  # type: ignore[union-attr]
     assert proof.upper_bound.is_zero()  # type: ignore[union-attr]
     assert proof.equality_proof is equality
+
+
+@pytest.mark.parametrize("precision", [160, 256])
+def test_global_reach_proves_exact_nondyadic_axis_tangency(precision) -> None:
+    """A raw binary64 rational identity proves non-principal line tangency."""
+    previous = ctx.prec
+    try:
+        ctx.prec = precision
+        frame = _frame(
+            axis_point_km=(-2.0, 1.0, 1.0),
+            axis_span=(0.0, 1.0, 1.0),
+        )
+        equality = _ContactEqualityProof(
+            _ContactEqualityVariant.ZERO_ANGLE_LINE,
+            _dual(
+                span=(Fraction(0), Fraction(1), Fraction(1)),
+                scale=Fraction(0),
+            ),
+            _ZeroAngleLineRelation.TANGENT,
+        )
+        proof = _evaluate_global_reach(
+            frame,
+            _ConeSection(0.0, 1.0, 1),
+            None,
+            None,
+            equality,
+        )
+    finally:
+        ctx.prec = previous
+    assert proof.status is _GlobalReachStatus.CONTACT
+    assert proof.lower_bound.is_zero()  # type: ignore[union-attr]
+    assert proof.upper_bound.is_zero()  # type: ignore[union-attr]
+
+
+def test_global_reach_rejects_false_tangency_identity() -> None:
+    """A tangency tag cannot promote an exact crossing to contact by assertion."""
+    equality = _zero_angle_equality(relation=_ZeroAngleLineRelation.TANGENT)
+    proof = _evaluate_global_reach(
+        _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(0.0, 1.0, 1),
+        None,
+        None,
+        equality,
+    )
+    assert proof.status is _GlobalReachStatus.INVALID
+    assert proof.reason == "zero-angle tangency identity does not hold"
 
 
 @pytest.mark.parametrize(
