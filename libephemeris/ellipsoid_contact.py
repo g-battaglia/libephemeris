@@ -909,10 +909,11 @@ def _evaluate_global_reach(
 ) -> _GlobalReachProof:
     """Evaluate a standalone global primal/dual reach bracket.
 
-    This function implements only strict reach/miss decisions and exact singleton
-    zero closure. Any unresolved feasibility, norm, radicand, or zero equality
-    returns ``UNRESOLVED`` without a numerical reach result. Public eclipse
-    consumers are not connected to this private proof.
+    This function implements only strict reach/miss decisions. Contact equality
+    is intentionally deferred to a separate typed proof. Any unresolved
+    feasibility, norm, radicand, or zero equality returns ``UNRESOLVED`` without
+    a numerical reach result. Public eclipse consumers are not connected to this
+    private proof.
     """
     try:
         frame.validate()
@@ -937,7 +938,9 @@ def _evaluate_global_reach(
         ellipsoid = _dot(primal_point, metric_point) - 1
         cosine = ball_from_float(cone.cosine)
         sine_squared = 1 - cosine * cosine
-        if not sine_squared.is_finite() or sine_squared < 0:
+        if not sine_squared.is_finite() or not (
+            sine_squared > 0 or sine_squared.is_exact() and sine_squared.is_zero()
+        ):
             return _GlobalReachProof(
                 _GlobalReachStatus.UNRESOLVED,
                 None,
@@ -959,7 +962,9 @@ def _evaluate_global_reach(
             relative[index] - projected * axis.direction[index] for index in range(3)
         )
         radial_squared = _dot(perpendicular, perpendicular)
-        if not radial_squared.is_finite() or radial_squared < 0:
+        if not radial_squared.is_finite() or not (
+            radial_squared > 0 or radial_squared.is_exact() and radial_squared.is_zero()
+        ):
             return _GlobalReachProof(
                 _GlobalReachStatus.UNRESOLVED,
                 None,
@@ -1004,7 +1009,9 @@ def _evaluate_global_reach(
             raise IntervalCertificationError("dual metric inverse failed") from exc
         direction_column = arb_mat([[value] for value in direction])
         radicand = (direction_column.transpose() * inverse * direction_column)[0, 0]
-        if not radicand.is_finite() or radicand < 0:
+        if not radicand.is_finite() or not (
+            radicand > 0 or radicand.is_exact() and radicand.is_zero()
+        ):
             return _GlobalReachProof(
                 _GlobalReachStatus.UNRESOLVED,
                 None,
@@ -1038,7 +1045,16 @@ def _evaluate_global_reach(
             dual_witness,
             reason,
         )
-    except (IntervalCertificationError, ValueError, ZeroDivisionError) as exc:
+    except IntervalCertificationError as exc:
+        return _GlobalReachProof(
+            _GlobalReachStatus.UNRESOLVED,
+            None,
+            None,
+            primal_point,
+            dual_witness,
+            str(exc),
+        )
+    except (ValueError, ZeroDivisionError) as exc:
         return _GlobalReachProof(
             _GlobalReachStatus.INVALID,
             None,

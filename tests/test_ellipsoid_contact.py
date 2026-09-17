@@ -113,6 +113,24 @@ def test_global_reach_uses_strict_primal_upper_bound() -> None:
     assert proof.upper_bound < 0  # type: ignore[operator]
 
 
+def test_global_reach_classifies_internal_certification_failure_unresolved(
+    monkeypatch,
+) -> None:
+    """A proof-engine failure is not mislabeled as invalid source data."""
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._projected_dual_vector",
+        lambda *_: (_ for _ in ()).throw(IntervalCertificationError("synthetic")),
+    )
+    proof = _evaluate_global_reach(
+        _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(1.0, 0.8, 1),
+        (arb(0), arb(0), arb(0)),
+        _dual(),
+    )
+    assert proof.status is _GlobalReachStatus.UNRESOLVED
+    assert proof.reason == "synthetic"
+
+
 def test_global_reach_rejects_wrong_dual_span_or_norm() -> None:
     """The exact dual payload stays bound to the frame and norm radius."""
     frame = _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
