@@ -186,6 +186,23 @@ def test_capability_carrier_authenticates_every_source_tag_field(tag) -> None:
     assert result.status is _ContactCapabilityStatus.INVALID_SOURCE
 
 
+@pytest.mark.parametrize("ephemeris", [1, 2, 4])
+def test_capability_carrier_accepts_all_owned_ephemeris_selectors(ephemeris) -> None:
+    """JPL, accepted selector, and analytic-compatible selector authenticate."""
+    flags = ephemeris | 2048 | 4096
+    result = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        4.0,
+        0.9,
+        -2.0,
+        0.95,
+        10.0,
+        1.0,
+        _source_tag(request_flags=flags, retflag=flags),
+    )
+    assert not isinstance(result, _ContactCapabilityBlock)
+
+
 def test_capability_carrier_catches_malformed_penumbral_scalar() -> None:
     """Wrong producer scalar types cannot escape before typed classification."""
     result = _build_contact_inputs(
@@ -201,6 +218,41 @@ def test_capability_carrier_catches_malformed_penumbral_scalar() -> None:
     assert isinstance(result, _ContactCapabilityBlock)
     assert result.status is _ContactCapabilityStatus.INVALID_SOURCE
     assert result.precision_evidence == ()
+
+
+def test_capability_carrier_rejects_same_status_root_disagreement(monkeypatch) -> None:
+    """Matching classes with contradictory root signs remain unresolved."""
+    calls = 0
+    original = _evaluate_central_axis_ray
+
+    def disagree(frame):
+        nonlocal calls
+        calls += 1
+        proof = original(frame)
+        if calls == 2:
+            return dataclasses.replace(
+                proof,
+                lower_parameter=arb(-9),
+                upper_parameter=arb(9),
+            )
+        return proof
+
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._evaluate_central_axis_ray", disagree
+    )
+    result = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        4.0,
+        0.9,
+        -2.0,
+        0.95,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert isinstance(result, _ContactCapabilityBlock)
+    assert result.status is _ContactCapabilityStatus.UNRESOLVED_AXIS
+    assert len(result.precision_evidence) == 2
 
 
 def test_capability_carrier_restores_ambient_precision() -> None:

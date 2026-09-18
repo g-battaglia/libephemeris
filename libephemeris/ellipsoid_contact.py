@@ -33,6 +33,7 @@ from typing import Final
 
 from flint import arb, arb_mat, ctx
 
+from .constants import FLG_EQUATORIAL, FLG_JPLEPH, FLG_MOSEPH, FLG_SWIEPH, FLG_XYZ
 from .intervals import (
     Ball,
     BallMatrix,
@@ -607,6 +608,29 @@ def _evaluate_central_axis_ray(
         )
 
 
+def _ball_sign_class(value: Ball | None) -> str:
+    """Return a closed sign class for precision-agreement evidence."""
+    if value is None:
+        return "none"
+    if value < 0:
+        return "negative"
+    if value > 0:
+        return "positive"
+    if value.is_exact() and value.is_zero():
+        return "zero"
+    return "unresolved"
+
+
+def _central_axis_signature(proof: _CentralAxisProof) -> tuple[object, ...]:
+    """Return canonical class/root-sign evidence for one central-ray proof."""
+    return (
+        proof.status,
+        _ball_sign_class(proof.lower_parameter),
+        _ball_sign_class(proof.upper_parameter),
+        proof.reason,
+    )
+
+
 def _build_contact_inputs(
     frame: _EllipsoidContactFrame,
     penumbral_diameter_km: float,
@@ -665,10 +689,12 @@ def _build_contact_inputs(
             None,
             "contact source tag fields have invalid native types",
         )
-    expected_flags = 6146
+    representation = FLG_EQUATORIAL | FLG_XYZ
+    ephemeris = source_tag.request_flags & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)
     if (
-        source_tag.request_flags != expected_flags
-        or source_tag.retflag != expected_flags
+        ephemeris not in {FLG_JPLEPH, FLG_SWIEPH, FLG_MOSEPH}
+        or source_tag.request_flags != representation | ephemeris
+        or source_tag.retflag != source_tag.request_flags
     ):
         return block(
             _ContactCapabilityStatus.INVALID_SOURCE,
@@ -752,7 +778,9 @@ def _build_contact_inputs(
             attempts.append(_ContactPrecisionAttempt(bits, ctx.prec, axis))
     evidence = tuple(attempts)
     first, second = attempts
-    if first.central_axis.status is not second.central_axis.status:
+    if _central_axis_signature(first.central_axis) != _central_axis_signature(
+        second.central_axis
+    ):
         return block(
             _ContactCapabilityStatus.UNRESOLVED_AXIS,
             source_tag,
