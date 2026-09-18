@@ -117,7 +117,6 @@ def test_bounded_generator_finds_primal_reach_and_dual_miss() -> None:
         _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
         _ConeSection(0.0, 0.8, 1),
         max_level=1,
-        multiplier_bound=Fraction(0),
     )
     assert reach.status is _WitnessGenerationStatus.REACH
     miss_frame = _frame(
@@ -133,9 +132,54 @@ def test_bounded_generator_finds_primal_reach_and_dual_miss() -> None:
         miss_frame,
         _ConeSection(1.0, 1.0, 1),
         max_level=1,
-        multiplier_bound=Fraction(0),
     )
     assert miss.status is _WitnessGenerationStatus.MISS
+    assert miss.multiplier_bound is not None
+    assert {record.bits for record in miss.precision_evidence} == {160, 256}
+
+
+def test_bounded_generator_proves_zero_angle_contact() -> None:
+    """Source-selected equality precedes the strict candidate stream."""
+    result = _generate_global_witness(
+        _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(0.0, 1.0, 1),
+        max_level=0,
+    )
+    assert result.status is _WitnessGenerationStatus.CONTACT
+    assert result.work.total_candidates == 0
+    assert {record.bits for record in result.precision_evidence} == {160, 256}
+
+
+def test_bounded_generator_returns_typed_invalid_source() -> None:
+    """Malformed source data never escapes the private result boundary."""
+    result = _generate_global_witness(
+        _frame(
+            metric_km_minus_2=(
+                (-1.0, 0.0, 0.0),
+                (0.0, -1.0, 0.0),
+                (0.0, 0.0, 1.0),
+            )
+        ),
+        _ConeSection(1.0, 1.0, 1),
+        max_level=0,
+    )
+    assert result.status is _WitnessGenerationStatus.INVALID
+    assert result.work.total_candidates == 0
+    assert "positive definite" in result.reason
+
+
+def test_bounded_generator_deduplicates_zero_multiplier_payloads() -> None:
+    """Exact payload ownership, not index ownership, drives dual counters."""
+    frame = _frame(axis_point_km=(5.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0))
+    result = _generate_global_witness(
+        frame,
+        _ConeSection(1.0, 1.0, 1),
+        max_level=1,
+        max_primal=1_000,
+        max_dual=1_000,
+        max_total=2_000,
+    )
+    assert result.work.dual_candidates < 27
 
 
 def test_bounded_generator_reports_exact_work_limit() -> None:
