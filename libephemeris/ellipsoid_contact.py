@@ -31,7 +31,7 @@ from enum import Enum
 from fractions import Fraction
 from typing import Final
 
-from flint import arb, arb_mat
+from flint import arb, arb_mat, ctx
 
 from .intervals import (
     Ball,
@@ -328,6 +328,15 @@ class _CentralAxisProof:
     reason: str
 
 
+@dataclass(frozen=True, slots=True)
+class _ContactPrecisionAttempt:
+    """One independent source/frame/cone/ray validation attempt."""
+
+    requested_bits: int
+    actual_bits: int
+    central_axis: _CentralAxisProof
+
+
 class _ContactCapabilityStatus(str, Enum):
     """Closed capability-block reasons for the private producer stage."""
 
@@ -359,6 +368,7 @@ class _ReadyContactInputs:
     core: _CoreConeSection
     central_axis: _CentralAxisProof
     source_tag: _ContactSourceTag
+    precision_evidence: tuple[_ContactPrecisionAttempt, _ContactPrecisionAttempt]
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,6 +381,7 @@ class _ContactCapabilityBlock:
     penumbra: _ConeSection | None
     core: None
     central_axis: _CentralAxisProof | None
+    precision_evidence: tuple[_ContactPrecisionAttempt, ...]
     reason: str
 
 
@@ -607,21 +618,70 @@ def _build_contact_inputs(
     source_tag: _ContactSourceTag,
 ) -> ContactCertification:
     """Build the approved capability-only producer carrier."""
-    if type(source_tag) is not _ContactSourceTag:
+    evidence: tuple[_ContactPrecisionAttempt, ...] = ()
+
+    def block(
+        status: _ContactCapabilityStatus,
+        tag: _ContactSourceTag | None,
+        owned_frame: _EllipsoidContactFrame | None,
+        penumbra: _ConeSection | None,
+        axis: _CentralAxisProof | None,
+        reason: str,
+    ) -> _ContactCapabilityBlock:
         return _ContactCapabilityBlock(
-            _ContactCapabilityStatus.INVALID_SOURCE,
+            status,
+            tag,
+            owned_frame,
+            penumbra,
             None,
+            axis,
+            evidence,
+            reason,
+        )
+
+    if type(source_tag) is not _ContactSourceTag:
+        return block(
+            _ContactCapabilityStatus.INVALID_SOURCE,
             None,
             None,
             None,
             None,
             "contact source tag has the wrong private type",
         )
-    if source_tag.frame != "true_equator_of_date":
-        return _ContactCapabilityBlock(
-            _ContactCapabilityStatus.MIXED_OUTPUT_FRAME,
+    if (
+        type(source_tag.provider) is not str
+        or type(source_tag.request_flags) is not int
+        or type(source_tag.frame) is not str
+        or type(source_tag.body_kind) is not str
+        or type(source_tag.tjd_ut) is not float
+        or type(source_tag.retflag) is not int
+        or not math.isfinite(source_tag.tjd_ut)
+    ):
+        return block(
+            _ContactCapabilityStatus.INVALID_SOURCE,
             source_tag,
             None,
+            None,
+            None,
+            "contact source tag fields have invalid native types",
+        )
+    expected_flags = 6146
+    if (
+        source_tag.request_flags != expected_flags
+        or source_tag.retflag != expected_flags
+    ):
+        return block(
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            source_tag,
+            None,
+            None,
+            None,
+            "source request and retflag do not authenticate equatorial XYZ",
+        )
+    if source_tag.frame != "true_equator_of_date":
+        return block(
+            _ContactCapabilityStatus.MIXED_OUTPUT_FRAME,
+            source_tag,
             None,
             None,
             None,
@@ -631,27 +691,38 @@ def _build_contact_inputs(
         ("calc_integer", "integer"),
         ("fixstar", "star"),
     }:
-        return _ContactCapabilityBlock(
+        return block(
             _ContactCapabilityStatus.INVALID_SOURCE,
             source_tag,
-            None,
             None,
             None,
             None,
             "source provider and body kind are inconsistent",
         )
-    if (
-        type(source_radius_km) is not float
-        or type(occulter_radius_km) is not float
-        or not math.isfinite(source_radius_km)
-        or not math.isfinite(occulter_radius_km)
-        or source_radius_km < 0
-        or occulter_radius_km <= 0
+    producer_scalars = (
+        penumbral_diameter_km,
+        penumbral_cosine,
+        core_diameter_km,
+        core_cosine,
+        source_radius_km,
+        occulter_radius_km,
+    )
+    if any(
+        type(value) is not float or not math.isfinite(value)
+        for value in producer_scalars
     ):
-        return _ContactCapabilityBlock(
+        return block(
             _ContactCapabilityStatus.INVALID_SOURCE,
             source_tag,
             None,
+            None,
+            None,
+            "producer geometry must contain finite native floats",
+        )
+    if source_radius_km < 0 or occulter_radius_km <= 0:
+        return block(
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            source_tag,
             None,
             None,
             None,
@@ -666,59 +737,77 @@ def _build_contact_inputs(
         )
         penumbra.validate()
     except (ValueError, IntervalCertificationError) as exc:
-        return _ContactCapabilityBlock(
+        return block(
             _ContactCapabilityStatus.INVALID_SOURCE,
             source_tag,
-            None,
             None,
             None,
             None,
             str(exc),
         )
-    axis = _evaluate_central_axis_ray(frame)
-    if axis.status is _CentralAxisStatus.INVALID:
-        return _ContactCapabilityBlock(
-            _ContactCapabilityStatus.INVALID_SOURCE,
-            source_tag,
-            frame,
-            penumbra,
-            None,
-            axis,
-            axis.reason,
-        )
-    if axis.status is _CentralAxisStatus.UNRESOLVED:
-        return _ContactCapabilityBlock(
+    attempts: list[_ContactPrecisionAttempt] = []
+    for bits in (160, 256):
+        with interval_precision(bits):
+            axis = _evaluate_central_axis_ray(frame)
+            attempts.append(_ContactPrecisionAttempt(bits, ctx.prec, axis))
+    evidence = tuple(attempts)
+    first, second = attempts
+    if first.central_axis.status is not second.central_axis.status:
+        return block(
             _ContactCapabilityStatus.UNRESOLVED_AXIS,
             source_tag,
             frame,
             penumbra,
             None,
+            "central-axis precision decisions disagree",
+        )
+    axis = first.central_axis
+    if axis.status is _CentralAxisStatus.INVALID:
+        return block(
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            source_tag,
+            frame,
+            penumbra,
+            axis,
+            axis.reason,
+        )
+    if axis.status is _CentralAxisStatus.UNRESOLVED:
+        return block(
+            _ContactCapabilityStatus.UNRESOLVED_AXIS,
+            source_tag,
+            frame,
+            penumbra,
             axis,
             axis.reason,
         )
     if source_radius_km <= occulter_radius_km:
-        return _ContactCapabilityBlock(
+        return block(
             _ContactCapabilityStatus.EXCLUDED_CORE_SLOPE,
             source_tag,
             frame,
             penumbra,
-            None,
             axis,
             "core slope is not strictly positive",
         )
     try:
         core = _core_cone_section(core_diameter_km, core_cosine)
     except ValueError as exc:
-        return _ContactCapabilityBlock(
+        return block(
             _ContactCapabilityStatus.INVALID_SOURCE,
             source_tag,
             frame,
             penumbra,
-            None,
             axis,
             str(exc),
         )
-    return _ReadyContactInputs(frame, penumbra, core, axis, source_tag)
+    return _ReadyContactInputs(
+        frame,
+        penumbra,
+        core,
+        axis,
+        source_tag,
+        (attempts[0], attempts[1]),
+    )
 
 
 def _evaluate_smooth_contact(

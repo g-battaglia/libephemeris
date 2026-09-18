@@ -120,6 +120,14 @@ def test_capability_carrier_builds_ready_positive_slope_inputs() -> None:
     assert not isinstance(result, _ContactCapabilityBlock)
     assert result.core.shadow_class is _CoreShadowClass.UMBRA
     assert result.central_axis.status is _CentralAxisStatus.CROSSING
+    assert tuple(attempt.requested_bits for attempt in result.precision_evidence) == (
+        160,
+        256,
+    )
+    assert all(
+        attempt.central_axis.status is _CentralAxisStatus.CROSSING
+        for attempt in result.precision_evidence
+    )
 
 
 @pytest.mark.parametrize(
@@ -151,6 +159,69 @@ def test_capability_carrier_blocks_unsupported_source_domains(
     assert isinstance(result, _ContactCapabilityBlock)
     assert result.status is status
     assert result.core is None
+
+
+@pytest.mark.parametrize(
+    "tag",
+    [
+        _source_tag(request_flags=0),
+        _source_tag(retflag=0),
+        _source_tag(tjd_ut=math.nan),
+        _source_tag(request_flags=True),
+    ],
+)
+def test_capability_carrier_authenticates_every_source_tag_field(tag) -> None:
+    """Unauthenticated request, retflag, time, or type stays invalid."""
+    result = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        4.0,
+        0.9,
+        -2.0,
+        0.95,
+        10.0,
+        1.0,
+        tag,
+    )
+    assert isinstance(result, _ContactCapabilityBlock)
+    assert result.status is _ContactCapabilityStatus.INVALID_SOURCE
+
+
+def test_capability_carrier_catches_malformed_penumbral_scalar() -> None:
+    """Wrong producer scalar types cannot escape before typed classification."""
+    result = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        "4.0",  # type: ignore[arg-type]
+        0.9,
+        -2.0,
+        0.95,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert isinstance(result, _ContactCapabilityBlock)
+    assert result.status is _ContactCapabilityStatus.INVALID_SOURCE
+    assert result.precision_evidence == ()
+
+
+def test_capability_carrier_restores_ambient_precision() -> None:
+    """Independent starts restore process-local Arb precision."""
+    previous = ctx.prec
+    try:
+        ctx.prec = 93
+        result = _build_contact_inputs(
+            _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+            4.0,
+            0.9,
+            -2.0,
+            0.95,
+            10.0,
+            1.0,
+            _source_tag(),
+        )
+        assert ctx.prec == 93
+        assert not isinstance(result, _ContactCapabilityBlock)
+    finally:
+        ctx.prec = previous
 
 
 def test_power_of_two_bound_is_smallest_exact_enclosure() -> None:
