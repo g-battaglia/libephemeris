@@ -14,7 +14,11 @@ from flint import arb, ctx
 
 from libephemeris.ellipsoid_contact import (
     _ConeSection,
+    _CentralAxisStatus,
+    _ContactCapabilityBlock,
+    _ContactCapabilityStatus,
     _ContactEqualityProof,
+    _ContactSourceTag,
     _CoreShadowClass,
     _ContactEqualityVariant,
     _CrossDualWitness,
@@ -24,8 +28,10 @@ from libephemeris.ellipsoid_contact import (
     _RegularRootCertificate,
     _WitnessGenerationStatus,
     _ZeroAngleLineRelation,
+    _build_contact_inputs,
     _certify_regular_root_box,
     _core_cone_section,
+    _evaluate_central_axis_ray,
     _evaluate_cone_apex,
     _evaluate_nappe_boundary,
     _evaluate_radial_subgradient,
@@ -65,6 +71,86 @@ def _dual(
     multiplier=Fraction(0),
 ) -> _ProjectedDualWitness:
     return _ProjectedDualWitness(span, seed, scale, multiplier)
+
+
+@pytest.mark.parametrize(
+    ("axis_point", "axis_span", "status"),
+    [
+        ((0.0, 0.0, -3.0), (0.0, 0.0, 1.0), _CentralAxisStatus.CROSSING),
+        ((2.0, 0.0, 0.0), (0.0, 0.0, 1.0), _CentralAxisStatus.TANGENT),
+        ((3.0, 0.0, 0.0), (0.0, 0.0, 1.0), _CentralAxisStatus.MISS),
+        ((0.0, 0.0, 3.0), (0.0, 0.0, 1.0), _CentralAxisStatus.MISS),
+    ],
+)
+def test_central_axis_ray_respects_downstream_orientation(
+    axis_point, axis_span, status
+) -> None:
+    """The oriented ray distinguishes forward roots, tangency, and behind roots."""
+    proof = _evaluate_central_axis_ray(
+        _frame(axis_point_km=axis_point, axis_span=axis_span)
+    )
+    assert proof.status is status
+
+
+def _source_tag(**overrides) -> _ContactSourceTag:
+    values = {
+        "provider": "calc_integer",
+        "request_flags": 6146,
+        "frame": "true_equator_of_date",
+        "body_kind": "integer",
+        "tjd_ut": 2451545.0,
+        "retflag": 6146,
+    }
+    values.update(overrides)
+    return _ContactSourceTag(**values)
+
+
+def test_capability_carrier_builds_ready_positive_slope_inputs() -> None:
+    """Valid positive-slope geometry produces the exact private ready variant."""
+    result = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        4.0,
+        0.9,
+        -2.0,
+        0.95,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert not isinstance(result, _ContactCapabilityBlock)
+    assert result.core.shadow_class is _CoreShadowClass.UMBRA
+    assert result.central_axis.status is _CentralAxisStatus.CROSSING
+
+
+@pytest.mark.parametrize(
+    ("tag", "source_radius", "status"),
+    [
+        (_source_tag(frame="j2000"), 10.0, _ContactCapabilityStatus.MIXED_OUTPUT_FRAME),
+        (_source_tag(), 0.0, _ContactCapabilityStatus.EXCLUDED_CORE_SLOPE),
+        (
+            _source_tag(provider="fixstar", body_kind="integer"),
+            10.0,
+            _ContactCapabilityStatus.INVALID_SOURCE,
+        ),
+    ],
+)
+def test_capability_carrier_blocks_unsupported_source_domains(
+    tag, source_radius, status
+) -> None:
+    """Mixed frames, excluded slopes, and inconsistent tags fail closed."""
+    result = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        4.0,
+        0.9,
+        -2.0,
+        0.95,
+        source_radius,
+        1.0,
+        tag,
+    )
+    assert isinstance(result, _ContactCapabilityBlock)
+    assert result.status is status
+    assert result.core is None
 
 
 def test_power_of_two_bound_is_smallest_exact_enclosure() -> None:

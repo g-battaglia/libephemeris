@@ -308,6 +308,75 @@ class _GlobalReachProof:
     reason: str
 
 
+class _CentralAxisStatus(str, Enum):
+    """Private oriented downstream-ray classification."""
+
+    CROSSING = "crossing"
+    TANGENT = "tangent"
+    MISS = "miss"
+    UNRESOLVED = "unresolved"
+    INVALID = "invalid"
+
+
+@dataclass(frozen=True, slots=True)
+class _CentralAxisProof:
+    """Certified oriented-ray result in the raw source parameterization."""
+
+    status: _CentralAxisStatus
+    lower_parameter: Ball | None
+    upper_parameter: Ball | None
+    reason: str
+
+
+class _ContactCapabilityStatus(str, Enum):
+    """Closed capability-block reasons for the private producer stage."""
+
+    EXCLUDED_CORE_SLOPE = "excluded_core_slope"
+    MIXED_OUTPUT_FRAME = "mixed_output_frame"
+    INVALID_SOURCE = "invalid_source"
+    UNRESOLVED_AXIS = "unresolved_axis"
+    UNRESOLVED_NO_WITNESS_GENERATOR = "unresolved_no_witness_generator"
+
+
+@dataclass(frozen=True, slots=True)
+class _ContactSourceTag:
+    """Authenticated provider and frame identity for one producer state."""
+
+    provider: str
+    request_flags: int
+    frame: str
+    body_kind: str
+    tjd_ut: float
+    retflag: int
+
+
+@dataclass(frozen=True, slots=True)
+class _ReadyContactInputs:
+    """Validated private producer payload ready for witness generation."""
+
+    frame: _EllipsoidContactFrame
+    penumbra: _ConeSection
+    core: _CoreConeSection
+    central_axis: _CentralAxisProof
+    source_tag: _ContactSourceTag
+
+
+@dataclass(frozen=True, slots=True)
+class _ContactCapabilityBlock:
+    """Fail-closed private producer result with exact optional-field invariants."""
+
+    status: _ContactCapabilityStatus
+    source_tag: _ContactSourceTag | None
+    frame: _EllipsoidContactFrame | None
+    penumbra: _ConeSection | None
+    core: None
+    central_axis: _CentralAxisProof | None
+    reason: str
+
+
+ContactCertification = _ReadyContactInputs | _ContactCapabilityBlock
+
+
 @dataclass(frozen=True, slots=True)
 class _CertifiedAxisLine:
     """Arb enclosure of a unit direction and closest axis anchor."""
@@ -433,6 +502,223 @@ def _metric_vector(metric: BallMatrix, vector: BallVector3) -> BallVector3:
     column = arb_mat([[value] for value in vector])
     product = metric * column
     return tuple(product[index, 0] for index in range(_VECTOR_DIMENSION))  # type: ignore[return-value]
+
+
+def _evaluate_central_axis_ray(
+    frame: _EllipsoidContactFrame,
+) -> _CentralAxisProof:
+    """Classify the downstream ray from ``axis_point_km`` through ``axis_span``."""
+    try:
+        frame.validate()
+        metric = frame.metric_ball_matrix()
+        point = _ball_vector(frame.axis_point_km)
+        span = _ball_vector(frame.axis_span)
+        metric_span = _metric_vector(metric, span)
+        metric_point = _metric_vector(metric, point)
+        a = _dot(span, metric_span)
+        b = _dot(span, metric_point)
+        c = _dot(point, metric_point) - 1
+        discriminant = b * b - a * c
+        if discriminant < 0:
+            return _CentralAxisProof(
+                _CentralAxisStatus.MISS,
+                None,
+                None,
+                "oriented axis line misses the ellipsoid",
+            )
+        if discriminant > 0:
+            root = discriminant.sqrt()
+            lower = (-b - root) / a
+            upper = (-b + root) / a
+            if upper < 0:
+                return _CentralAxisProof(
+                    _CentralAxisStatus.MISS,
+                    lower,
+                    upper,
+                    "both line roots are behind the ray origin",
+                )
+            if upper >= 0:
+                return _CentralAxisProof(
+                    _CentralAxisStatus.CROSSING,
+                    lower,
+                    upper,
+                    "strict downstream upper root",
+                )
+            return _CentralAxisProof(
+                _CentralAxisStatus.UNRESOLVED,
+                lower,
+                upper,
+                "downstream root sign is unresolved",
+            )
+        exact_metric = tuple(
+            tuple(Fraction.from_float(value) for value in row)
+            for row in frame.metric_km_minus_2
+        )
+        exact_point = tuple(Fraction.from_float(value) for value in frame.axis_point_km)
+        exact_span = tuple(Fraction.from_float(value) for value in frame.axis_span)
+        exact_a = _exact_dot(exact_span, _exact_mat_vec(exact_metric, exact_span))  # type: ignore[arg-type]
+        exact_b = _exact_dot(exact_span, _exact_mat_vec(exact_metric, exact_point))  # type: ignore[arg-type]
+        exact_c = _exact_dot(exact_point, _exact_mat_vec(exact_metric, exact_point)) - 1  # type: ignore[arg-type]
+        if exact_b * exact_b - exact_a * exact_c != 0:
+            return _CentralAxisProof(
+                _CentralAxisStatus.UNRESOLVED,
+                None,
+                None,
+                "axis discriminant is not separated",
+            )
+        parameter = _fraction_ball(-exact_b / exact_a)
+        if parameter >= 0:
+            return _CentralAxisProof(
+                _CentralAxisStatus.TANGENT,
+                parameter,
+                parameter,
+                "exact source-rational tangency",
+            )
+        return _CentralAxisProof(
+            _CentralAxisStatus.MISS,
+            parameter,
+            parameter,
+            "tangent point is behind the ray origin",
+        )
+    except IntervalCertificationError as exc:
+        return _CentralAxisProof(
+            _CentralAxisStatus.UNRESOLVED,
+            None,
+            None,
+            str(exc),
+        )
+    except (ValueError, ZeroDivisionError) as exc:
+        return _CentralAxisProof(
+            _CentralAxisStatus.INVALID,
+            None,
+            None,
+            str(exc),
+        )
+
+
+def _build_contact_inputs(
+    frame: _EllipsoidContactFrame,
+    penumbral_diameter_km: float,
+    penumbral_cosine: float,
+    core_diameter_km: float,
+    core_cosine: float,
+    source_radius_km: float,
+    occulter_radius_km: float,
+    source_tag: _ContactSourceTag,
+) -> ContactCertification:
+    """Build the approved capability-only producer carrier."""
+    if type(source_tag) is not _ContactSourceTag:
+        return _ContactCapabilityBlock(
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "contact source tag has the wrong private type",
+        )
+    if source_tag.frame != "true_equator_of_date":
+        return _ContactCapabilityBlock(
+            _ContactCapabilityStatus.MIXED_OUTPUT_FRAME,
+            source_tag,
+            None,
+            None,
+            None,
+            None,
+            "source frame tag does not match true equator of date",
+        )
+    if (source_tag.provider, source_tag.body_kind) not in {
+        ("calc_integer", "integer"),
+        ("fixstar", "star"),
+    }:
+        return _ContactCapabilityBlock(
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            source_tag,
+            None,
+            None,
+            None,
+            None,
+            "source provider and body kind are inconsistent",
+        )
+    if (
+        type(source_radius_km) is not float
+        or type(occulter_radius_km) is not float
+        or not math.isfinite(source_radius_km)
+        or not math.isfinite(occulter_radius_km)
+        or source_radius_km < 0
+        or occulter_radius_km <= 0
+    ):
+        return _ContactCapabilityBlock(
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            source_tag,
+            None,
+            None,
+            None,
+            None,
+            "source radii are outside their physical domain",
+        )
+    try:
+        frame.validate()
+        penumbra = _ConeSection(
+            penumbral_diameter_km / 2.0,
+            penumbral_cosine,
+            1,
+        )
+        penumbra.validate()
+    except (ValueError, IntervalCertificationError) as exc:
+        return _ContactCapabilityBlock(
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            source_tag,
+            None,
+            None,
+            None,
+            None,
+            str(exc),
+        )
+    axis = _evaluate_central_axis_ray(frame)
+    if axis.status is _CentralAxisStatus.INVALID:
+        return _ContactCapabilityBlock(
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            source_tag,
+            frame,
+            penumbra,
+            None,
+            axis,
+            axis.reason,
+        )
+    if axis.status is _CentralAxisStatus.UNRESOLVED:
+        return _ContactCapabilityBlock(
+            _ContactCapabilityStatus.UNRESOLVED_AXIS,
+            source_tag,
+            frame,
+            penumbra,
+            None,
+            axis,
+            axis.reason,
+        )
+    if source_radius_km <= occulter_radius_km:
+        return _ContactCapabilityBlock(
+            _ContactCapabilityStatus.EXCLUDED_CORE_SLOPE,
+            source_tag,
+            frame,
+            penumbra,
+            None,
+            axis,
+            "core slope is not strictly positive",
+        )
+    try:
+        core = _core_cone_section(core_diameter_km, core_cosine)
+    except ValueError as exc:
+        return _ContactCapabilityBlock(
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            source_tag,
+            frame,
+            penumbra,
+            None,
+            axis,
+            str(exc),
+        )
+    return _ReadyContactInputs(frame, penumbra, core, axis, source_tag)
 
 
 def _evaluate_smooth_contact(
