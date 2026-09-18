@@ -114,6 +114,33 @@ class _PrecisionDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class _MultiplierBoundEvidence:
+    """Source-exact inputs and outputs of the canonical multiplier bound."""
+
+    inverse_metric: tuple[tuple[Fraction, ...], ...]
+    h_bound: Fraction
+    e_lower: Fraction
+    q_upper: Fraction
+    sine_lower: Fraction
+    tangent_lower: Fraction
+    numerator_upper: Fraction
+    denominator_lower: Fraction
+    raw_bound: Fraction
+    power_bound: Fraction
+
+
+@dataclass(frozen=True, slots=True)
+class _CandidateEvidence:
+    """Digestible record of one owned exact candidate and its decisions."""
+
+    kind: str
+    level: int | None
+    indices: tuple[int, ...] | None
+    payload: object
+    precision_evidence: tuple[_PrecisionProof, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class _WitnessGenerationResult:
     """Private generator result, distinct from verifier proof payloads."""
 
@@ -125,6 +152,10 @@ class _WitnessGenerationResult:
     precision_evidence: tuple[_PrecisionProof, ...]
     source_identity: tuple[object, ...]
     multiplier_bound: Fraction | None
+    multiplier_evidence: _MultiplierBoundEvidence | None
+    accepted_candidate: _CandidateEvidence | None
+    attempted_candidates: tuple[_CandidateEvidence, ...]
+    equality_variant_index: int | None
     reason: str
 
 
@@ -1056,13 +1087,24 @@ def _exact_mat_vec(
 def _multiplier_power_bound(
     frame: _EllipsoidContactFrame,
     cone: _ConeSection,
-) -> Fraction:
-    """Return the reviewed source-exact canonical dual multiplier bound."""
+) -> _MultiplierBoundEvidence:
+    """Return reviewed source-exact evidence for the multiplier bound."""
     inverse = _exact_metric_inverse(frame)
     cosine = Fraction.from_float(cone.cosine)
     sine_squared = 1 - cosine * cosine
     if sine_squared == 0:
-        return Fraction(0)
+        return _MultiplierBoundEvidence(
+            inverse,
+            Fraction(0),
+            Fraction(0),
+            Fraction(0),
+            Fraction(0),
+            Fraction(0),
+            Fraction(0),
+            Fraction(1),
+            Fraction(0),
+            Fraction(0),
+        )
     span = tuple(Fraction.from_float(value) for value in frame.axis_span)
     point = tuple(Fraction.from_float(value) for value in frame.axis_point_km)
     span_norm = _exact_dot(span, span)
@@ -1092,10 +1134,21 @@ def _multiplier_power_bound(
         raise IntervalCertificationError(
             "dual multiplier denominator is not separated above zero"
         )
-    raw_bound = (
-        max(Fraction(0), (v_upper + q_upper - cosine * radius) / denominator) + 1
+    numerator = v_upper + q_upper - cosine * radius
+    raw_bound = max(Fraction(0), numerator / denominator) + 1
+    power_bound = _pow2_upper_sqrt(raw_bound)
+    return _MultiplierBoundEvidence(
+        inverse,
+        h_bound,
+        e_lower,
+        q_upper,
+        sine_lower,
+        tangent_lower,
+        numerator,
+        denominator,
+        raw_bound,
+        power_bound,
     )
-    return _pow2_upper_sqrt(raw_bound)
 
 
 def _primal_power_bounds(
@@ -1252,6 +1305,7 @@ def _generate_global_witness(
     """Run the bounded canonical stream through the standalone verifier."""
     empty_work = _WitnessWorkEvidence(0, 0, 0, 0, None, None)
     empty_source: tuple[object, ...] = (frame, cone)
+    attempts: list[_CandidateEvidence] = []
 
     def result(
         status: _WitnessGenerationStatus,
@@ -1259,13 +1313,27 @@ def _generate_global_witness(
         level: int | None,
         index: int | None,
         work: _WitnessWorkEvidence,
-        evidence: tuple[_PrecisionProof, ...],
+        precision: tuple[_PrecisionProof, ...],
         source: tuple[object, ...],
-        bound: Fraction | None,
+        bound_evidence: _MultiplierBoundEvidence | None,
+        accepted: _CandidateEvidence | None,
+        variant_index: int | None,
         reason: str,
     ) -> _WitnessGenerationResult:
         return _WitnessGenerationResult(
-            status, proof, level, index, work, evidence, source, bound, reason
+            status,
+            proof,
+            level,
+            index,
+            work,
+            precision,
+            source,
+            bound_evidence.power_bound if bound_evidence is not None else None,
+            bound_evidence,
+            accepted,
+            tuple(attempts),
+            variant_index,
+            reason,
         )
 
     try:
@@ -1281,6 +1349,8 @@ def _generate_global_witness(
             (),
             empty_source,
             None,
+            None,
+            None,
             str(exc),
         )
     if (
@@ -1295,7 +1365,7 @@ def _generate_global_witness(
         raise ValueError("witness generation limits are invalid")
     try:
         bounds = _primal_power_bounds(frame)
-        multiplier_bound = _multiplier_power_bound(frame, cone)
+        multiplier_evidence = _multiplier_power_bound(frame, cone)
     except (ValueError, IntervalCertificationError) as exc:
         return result(
             _WitnessGenerationStatus.INVALID,
@@ -1306,6 +1376,8 @@ def _generate_global_witness(
             (),
             empty_source,
             None,
+            None,
+            None,
             str(exc),
         )
     raw_span: tuple[Fraction, Fraction, Fraction] = tuple(
@@ -1313,12 +1385,16 @@ def _generate_global_witness(
     )  # type: ignore[assignment]
     cosine = Fraction.from_float(cone.cosine)
     source_identity = (
-        frame.metric_km_minus_2,
-        frame.axis_point_km,
-        frame.axis_span,
-        cone.radius_km,
-        cone.cosine,
+        tuple(
+            tuple(Fraction.from_float(value) for value in row)
+            for row in frame.metric_km_minus_2
+        ),
+        tuple(Fraction.from_float(value) for value in frame.axis_point_km),
+        raw_span,
+        Fraction.from_float(cone.radius_km),
+        cosine,
         cone.branch_sign,
+        "witness-generator-v1",
     )
     primal_count = dual_count = total_count = candidate_index = 0
     last_level = 0
@@ -1336,48 +1412,77 @@ def _generate_global_witness(
             last_indices,
         )
 
-    # Source-selected equality precedes the strict stream.
+    # Source-selected equality variants precede the strict stream.
     if cosine == 1 and Fraction.from_float(cone.radius_km) == 0:
-        equality_dual = _ProjectedDualWitness(
-            raw_span,
-            (Fraction(0), Fraction(0), Fraction(0)),
-            Fraction(0),
-            Fraction(0),
+        exact_metric = tuple(
+            tuple(Fraction.from_float(value) for value in row)
+            for row in frame.metric_km_minus_2
         )
-        equality = _ContactEqualityProof(
-            _ContactEqualityVariant.ZERO_ANGLE_LINE,
-            equality_dual,
-            _ZeroAngleLineRelation.CROSSING,
+        exact_point = tuple(Fraction.from_float(value) for value in frame.axis_point_km)
+        metric_span = _exact_mat_vec(exact_metric, raw_span)  # type: ignore[arg-type]
+        metric_point = _exact_mat_vec(exact_metric, exact_point)  # type: ignore[arg-type]
+        line_a = _exact_dot(raw_span, metric_span)
+        line_b = _exact_dot(raw_span, metric_point)
+        line_c = _exact_dot(exact_point, metric_point) - 1
+        discriminant = line_b * line_b - line_a * line_c
+        relation = (
+            _ZeroAngleLineRelation.CROSSING
+            if discriminant > 0
+            else _ZeroAngleLineRelation.TANGENT
+            if discriminant == 0
+            else None
         )
-        decision = _evaluate_at_precisions(frame, cone, None, None, equality)
-        last_evidence = decision.evidence
-        if decision.proof is not None:
-            if decision.proof.status is _GlobalReachStatus.CONTACT:
-                return result(
-                    _WitnessGenerationStatus.CONTACT,
-                    decision.proof,
-                    None,
-                    None,
-                    work(),
-                    decision.evidence,
-                    source_identity,
-                    multiplier_bound,
-                    decision.proof.reason,
-                )
-            if decision.proof.status is _GlobalReachStatus.INVALID and (
-                "does not reach" not in decision.proof.reason
-            ):
-                return result(
-                    _WitnessGenerationStatus.INVALID,
-                    decision.proof,
-                    None,
-                    None,
-                    work(),
-                    decision.evidence,
-                    source_identity,
-                    multiplier_bound,
-                    decision.proof.reason,
-                )
+        if relation is not None:
+            equality_dual = _ProjectedDualWitness(
+                raw_span,
+                (Fraction(0), Fraction(0), Fraction(0)),
+                Fraction(0),
+                Fraction(0),
+            )
+            equality = _ContactEqualityProof(
+                _ContactEqualityVariant.ZERO_ANGLE_LINE,
+                equality_dual,
+                relation,
+            )
+            decision = _evaluate_at_precisions(frame, cone, None, None, equality)
+            entry = _CandidateEvidence(
+                "equality",
+                None,
+                (0,),
+                equality,
+                decision.evidence,
+            )
+            attempts.append(entry)
+            last_evidence = decision.evidence
+            if decision.proof is not None:
+                if decision.proof.status is _GlobalReachStatus.CONTACT:
+                    return result(
+                        _WitnessGenerationStatus.CONTACT,
+                        decision.proof,
+                        None,
+                        None,
+                        work(),
+                        decision.evidence,
+                        source_identity,
+                        multiplier_evidence,
+                        entry,
+                        0,
+                        decision.proof.reason,
+                    )
+                if decision.proof.status is _GlobalReachStatus.INVALID:
+                    return result(
+                        _WitnessGenerationStatus.INVALID,
+                        decision.proof,
+                        None,
+                        None,
+                        work(),
+                        decision.evidence,
+                        source_identity,
+                        multiplier_evidence,
+                        entry,
+                        0,
+                        decision.proof.reason,
+                    )
 
     seen_dual: set[tuple[tuple[Fraction, Fraction, Fraction], Fraction]] = set()
     for level in range(max_level + 1):
@@ -1392,7 +1497,9 @@ def _generate_global_witness(
                     work(),
                     last_evidence,
                     source_identity,
-                    multiplier_bound,
+                    multiplier_evidence,
+                    None,
+                    None,
                     "witness generation exhausted its candidate limit",
                 )
             last_kind, last_indices = "primal", indices
@@ -1409,10 +1516,16 @@ def _generate_global_witness(
                     work(),
                     last_evidence,
                     source_identity,
-                    multiplier_bound,
+                    multiplier_evidence,
+                    None,
+                    None,
                     "generated primal point is not exact at 160 bits",
                 )
             decision = _evaluate_at_precisions(frame, cone, primal, None)
+            entry = _CandidateEvidence(
+                "primal", level, indices, point, decision.evidence
+            )
+            attempts.append(entry)
             last_evidence = decision.evidence
             if decision.proof is not None:
                 if decision.proof.status is _GlobalReachStatus.INVALID:
@@ -1424,7 +1537,9 @@ def _generate_global_witness(
                         work(),
                         decision.evidence,
                         source_identity,
-                        multiplier_bound,
+                        multiplier_evidence,
+                        entry,
+                        None,
                         decision.proof.reason,
                     )
                 if decision.proof.status is _GlobalReachStatus.REACH:
@@ -1436,12 +1551,14 @@ def _generate_global_witness(
                         work(),
                         decision.evidence,
                         source_identity,
-                        multiplier_bound,
+                        multiplier_evidence,
+                        entry,
+                        None,
                         decision.proof.reason,
                     )
             candidate_index += 1
         for indices, vector, multiplier in _dual_level(
-            raw_span, cosine, multiplier_bound, level
+            raw_span, cosine, multiplier_evidence.power_bound, level
         ):
             payload = (vector, multiplier)
             if payload in seen_dual:
@@ -1456,7 +1573,9 @@ def _generate_global_witness(
                     work(),
                     last_evidence,
                     source_identity,
-                    multiplier_bound,
+                    multiplier_evidence,
+                    None,
+                    None,
                     "witness generation exhausted its candidate limit",
                 )
             last_kind, last_indices = "dual", indices
@@ -1469,6 +1588,8 @@ def _generate_global_witness(
                 multiplier,
             )
             decision = _evaluate_at_precisions(frame, cone, None, dual)
+            entry = _CandidateEvidence("dual", level, indices, dual, decision.evidence)
+            attempts.append(entry)
             last_evidence = decision.evidence
             if decision.proof is not None:
                 if decision.proof.status is _GlobalReachStatus.INVALID:
@@ -1480,7 +1601,9 @@ def _generate_global_witness(
                         work(),
                         decision.evidence,
                         source_identity,
-                        multiplier_bound,
+                        multiplier_evidence,
+                        entry,
+                        None,
                         decision.proof.reason,
                     )
                 if decision.proof.status is _GlobalReachStatus.MISS:
@@ -1492,7 +1615,9 @@ def _generate_global_witness(
                         work(),
                         decision.evidence,
                         source_identity,
-                        multiplier_bound,
+                        multiplier_evidence,
+                        entry,
+                        None,
                         decision.proof.reason,
                     )
             candidate_index += 1
@@ -1504,7 +1629,9 @@ def _generate_global_witness(
         work(),
         last_evidence,
         source_identity,
-        multiplier_bound,
+        multiplier_evidence,
+        None,
+        None,
         "witness generation exhausted its level limit",
     )
 

@@ -135,7 +135,13 @@ def test_bounded_generator_finds_primal_reach_and_dual_miss() -> None:
     )
     assert miss.status is _WitnessGenerationStatus.MISS
     assert miss.multiplier_bound is not None
+    assert miss.multiplier_evidence is not None
+    assert miss.multiplier_evidence.power_bound == miss.multiplier_bound
+    assert miss.accepted_candidate is not None
+    assert miss.accepted_candidate.kind == "dual"
+    assert miss.attempted_candidates[-1] is miss.accepted_candidate
     assert {record.bits for record in miss.precision_evidence} == {160, 256}
+    assert miss.source_identity[-1] == "witness-generator-v1"
 
 
 def test_bounded_generator_proves_zero_angle_contact() -> None:
@@ -148,6 +154,22 @@ def test_bounded_generator_proves_zero_angle_contact() -> None:
     assert result.status is _WitnessGenerationStatus.CONTACT
     assert result.work.total_candidates == 0
     assert {record.bits for record in result.precision_evidence} == {160, 256}
+
+
+def test_bounded_generator_selects_exact_zero_angle_tangency() -> None:
+    """Exact source discriminant selects TANGENT rather than CROSSING."""
+    result = _generate_global_witness(
+        _frame(axis_point_km=(2.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(0.0, 1.0, 1),
+        max_level=0,
+    )
+    assert result.status is _WitnessGenerationStatus.CONTACT
+    assert result.equality_variant_index == 0
+    assert result.accepted_candidate is not None
+    assert result.accepted_candidate.kind == "equality"
+    assert result.proof is not None
+    assert result.proof.equality_proof is not None
+    assert result.proof.equality_proof.line_relation is _ZeroAngleLineRelation.TANGENT
 
 
 def test_bounded_generator_returns_typed_invalid_source() -> None:
@@ -180,6 +202,58 @@ def test_bounded_generator_deduplicates_zero_multiplier_payloads() -> None:
         max_total=2_000,
     )
     assert result.work.dual_candidates < 27
+
+
+def test_generator_continues_after_ordinary_unresolved_candidate(monkeypatch) -> None:
+    """Ordinary non-separation is skipped until a later accepted proof."""
+    calls = 0
+    original = _evaluate_global_reach
+
+    def delayed(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls <= 2:
+            return dataclasses.replace(
+                original(*args, **kwargs),
+                status=_GlobalReachStatus.UNRESOLVED,
+                reason="synthetic unresolved",
+            )
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._evaluate_global_reach", delayed
+    )
+    result = _generate_global_witness(
+        _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(0.0, 0.8, 1),
+        max_level=1,
+    )
+    assert result.status is _WitnessGenerationStatus.REACH
+    assert len(result.attempted_candidates) >= 2
+
+
+def test_generator_internal_invalid_is_terminal(monkeypatch) -> None:
+    """A malformed generated payload is never skipped as ordinary unresolved."""
+    original = _evaluate_global_reach
+
+    def invalid(*args, **kwargs):
+        return dataclasses.replace(
+            original(*args, **kwargs),
+            status=_GlobalReachStatus.INVALID,
+            reason="synthetic generator defect",
+        )
+
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._evaluate_global_reach", invalid
+    )
+    result = _generate_global_witness(
+        _frame(axis_point_km=(5.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(1.0, 1.0, 1),
+        max_level=1,
+    )
+    assert result.status is _WitnessGenerationStatus.INVALID
+    assert result.reason == "synthetic generator defect"
+    assert result.work.total_candidates == 1
 
 
 def test_bounded_generator_reports_exact_work_limit() -> None:
