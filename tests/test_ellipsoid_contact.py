@@ -15,6 +15,7 @@ from flint import arb, ctx
 from libephemeris.ellipsoid_contact import (
     _ConeSection,
     _CentralAxisStatus,
+    _CertifiedContactProofs,
     _ContactCapabilityBlock,
     _ContactCapabilityStatus,
     _ContactEqualityProof,
@@ -29,6 +30,7 @@ from libephemeris.ellipsoid_contact import (
     _WitnessGenerationStatus,
     _ZeroAngleLineRelation,
     _build_contact_inputs,
+    _certify_contact_inputs,
     _certify_regular_root_box,
     _core_cone_section,
     _evaluate_central_axis_ray,
@@ -128,6 +130,34 @@ def test_capability_carrier_builds_ready_positive_slope_inputs() -> None:
         attempt.central_axis.status is _CentralAxisStatus.CROSSING
         for attempt in result.precision_evidence
     )
+
+
+def test_private_carrier_connects_to_both_witness_generators() -> None:
+    """Ready producer inputs produce owned penumbral and core proofs privately."""
+    inputs = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        4.0,
+        1.0,
+        -2.0,
+        1.0,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert not isinstance(inputs, _ContactCapabilityBlock)
+    result = _certify_contact_inputs(inputs, max_level=1)
+    assert isinstance(result, _CertifiedContactProofs)
+    assert result.penumbra.source_identity[0] == result.core.source_identity[0]
+    assert result.penumbra.status in {
+        _WitnessGenerationStatus.REACH,
+        _WitnessGenerationStatus.MISS,
+        _WitnessGenerationStatus.CONTACT,
+    }
+    assert result.core.status in {
+        _WitnessGenerationStatus.REACH,
+        _WitnessGenerationStatus.MISS,
+        _WitnessGenerationStatus.CONTACT,
+    }
 
 
 @pytest.mark.parametrize(

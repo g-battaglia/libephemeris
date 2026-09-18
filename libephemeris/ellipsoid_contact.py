@@ -390,6 +390,29 @@ ContactCertification = _ReadyContactInputs | _ContactCapabilityBlock
 
 
 @dataclass(frozen=True, slots=True)
+class _CertifiedContactProofs:
+    """Capability-only frame/cone proofs with no public classification."""
+
+    inputs: _ReadyContactInputs
+    penumbra: _WitnessGenerationResult
+    core: _WitnessGenerationResult
+
+
+@dataclass(frozen=True, slots=True)
+class _ContactProofBlock:
+    """Typed block when producer inputs or private proofs do not resolve."""
+
+    inputs: ContactCertification
+    status: _ContactCapabilityStatus
+    penumbra: _WitnessGenerationResult | None
+    core: _WitnessGenerationResult | None
+    reason: str
+
+
+ContactProofCertification = _CertifiedContactProofs | _ContactProofBlock
+
+
+@dataclass(frozen=True, slots=True)
 class _CertifiedAxisLine:
     """Arb enclosure of a unit direction and closest axis anchor."""
 
@@ -836,6 +859,79 @@ def _build_contact_inputs(
         source_tag,
         (attempts[0], attempts[1]),
     )
+
+
+def _certify_contact_inputs(
+    inputs: ContactCertification,
+    *,
+    max_level: int = 12,
+    max_primal: int = 2_000_000,
+    max_dual: int = 2_000_000,
+    max_total: int = 4_000_000,
+) -> ContactProofCertification:
+    """Connect the approved private carrier to the private witness generator."""
+    if isinstance(inputs, _ContactCapabilityBlock):
+        return _ContactProofBlock(inputs, inputs.status, None, None, inputs.reason)
+    if type(inputs) is not _ReadyContactInputs:
+        return _ContactProofBlock(
+            _ContactCapabilityBlock(
+                _ContactCapabilityStatus.INVALID_SOURCE,
+                None,
+                None,
+                None,
+                None,
+                None,
+                (),
+                "contact proof input has the wrong private type",
+            ),
+            _ContactCapabilityStatus.INVALID_SOURCE,
+            None,
+            None,
+            "contact proof input has the wrong private type",
+        )
+    penumbra = _generate_global_witness(
+        inputs.frame,
+        inputs.penumbra,
+        max_level=max_level,
+        max_primal=max_primal,
+        max_dual=max_dual,
+        max_total=max_total,
+    )
+    if penumbra.status in {
+        _WitnessGenerationStatus.INVALID,
+        _WitnessGenerationStatus.UNRESOLVED,
+    }:
+        return _ContactProofBlock(
+            inputs,
+            _ContactCapabilityStatus.UNRESOLVED_NO_WITNESS_GENERATOR
+            if penumbra.status is _WitnessGenerationStatus.UNRESOLVED
+            else _ContactCapabilityStatus.INVALID_SOURCE,
+            penumbra,
+            None,
+            penumbra.reason,
+        )
+    core = _generate_global_witness(
+        inputs.frame,
+        inputs.core.cone,
+        max_level=max_level,
+        max_primal=max_primal,
+        max_dual=max_dual,
+        max_total=max_total,
+    )
+    if core.status in {
+        _WitnessGenerationStatus.INVALID,
+        _WitnessGenerationStatus.UNRESOLVED,
+    }:
+        return _ContactProofBlock(
+            inputs,
+            _ContactCapabilityStatus.UNRESOLVED_NO_WITNESS_GENERATOR
+            if core.status is _WitnessGenerationStatus.UNRESOLVED
+            else _ContactCapabilityStatus.INVALID_SOURCE,
+            penumbra,
+            core,
+            core.reason,
+        )
+    return _CertifiedContactProofs(inputs, penumbra, core)
 
 
 def _evaluate_smooth_contact(
