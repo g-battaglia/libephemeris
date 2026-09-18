@@ -22,6 +22,7 @@ from libephemeris.ellipsoid_contact import (
     _GlobalReachStatus,
     _ProjectedDualWitness,
     _RegularRootCertificate,
+    _WitnessGenerationStatus,
     _ZeroAngleLineRelation,
     _certify_regular_root_box,
     _core_cone_section,
@@ -30,7 +31,11 @@ from libephemeris.ellipsoid_contact import (
     _evaluate_radial_subgradient,
     _evaluate_global_reach,
     _evaluate_regular_contact,
+    _generate_global_witness,
     _nappe_boundary_jacobian,
+    _pow2_upper_sqrt,
+    _primal_level,
+    _dual_level,
     _reduce_regular_residuals,
     _regular_contact_jacobian,
 )
@@ -60,6 +65,92 @@ def _dual(
     multiplier=Fraction(0),
 ) -> _ProjectedDualWitness:
     return _ProjectedDualWitness(span, seed, scale, multiplier)
+
+
+def test_power_of_two_bound_is_smallest_exact_enclosure() -> None:
+    """Source-rational bounds use one unique power of two."""
+    assert _pow2_upper_sqrt(Fraction(9, 4)) == 2
+    assert _pow2_upper_sqrt(Fraction(1, 4)) == Fraction(1, 2)
+    with pytest.raises(ValueError):
+        _pow2_upper_sqrt(Fraction(0))
+
+
+def test_canonical_primal_levels_own_each_point_once() -> None:
+    """Level-one endpoints survive and recursive duplicates start at level two."""
+    bounds = (Fraction(1), Fraction(1), Fraction(1))
+    levels = [list(_primal_level(bounds, level)) for level in range(4)]
+    assert [len(level) for level in levels] == [1, 26, 98, 604]
+    seen = set()
+    for level in levels:
+        points = {point for _indices, point in level}
+        assert not seen & points
+        seen |= points
+    assert (Fraction(-1),) * 3 in seen
+    assert (Fraction(1),) * 3 in seen
+
+
+def test_canonical_dual_levels_own_each_payload_once() -> None:
+    """Dual level one keeps endpoints and skips only physical zero."""
+    levels = [
+        list(
+            _dual_level(
+                (Fraction(0), Fraction(0), Fraction(1)),
+                Fraction(1),
+                Fraction(2),
+                level,
+            )
+        )
+        for level in range(4)
+    ]
+    assert [len(level) for level in levels] == [1, 26, 98, 604]
+    seen = set()
+    for level in levels:
+        payloads = {(vector, multiplier) for _indices, vector, multiplier in level}
+        assert not seen & payloads
+        seen |= payloads
+    assert ((Fraction(-1), Fraction(-1), Fraction(0)), Fraction(0)) in seen
+
+
+def test_bounded_generator_finds_primal_reach_and_dual_miss() -> None:
+    """Canonical stream reaches both approved strict proof paths."""
+    reach = _generate_global_witness(
+        _frame(axis_point_km=(0.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(0.0, 0.8, 1),
+        max_level=1,
+        multiplier_bound=Fraction(0),
+    )
+    assert reach.status is _WitnessGenerationStatus.REACH
+    miss_frame = _frame(
+        metric_km_minus_2=(
+            (1.0 / 9.0, 0.0, 0.0),
+            (0.0, 1.0 / 9.0, 0.0),
+            (0.0, 0.0, 0.25),
+        ),
+        axis_point_km=(-5.0, 0.0, 0.0),
+        axis_span=(0.0, 1.0, 1.0),
+    )
+    miss = _generate_global_witness(
+        miss_frame,
+        _ConeSection(1.0, 1.0, 1),
+        max_level=1,
+        multiplier_bound=Fraction(0),
+    )
+    assert miss.status is _WitnessGenerationStatus.MISS
+
+
+def test_bounded_generator_reports_exact_work_limit() -> None:
+    """Operational exhaustion remains unresolved with deterministic counters."""
+    result = _generate_global_witness(
+        _frame(axis_point_km=(5.0, 0.0, 0.0), axis_span=(0.0, 0.0, 1.0)),
+        _ConeSection(1.0, 1.0, 1),
+        max_level=0,
+        max_primal=1,
+        max_dual=1,
+        max_total=1,
+    )
+    assert result.status is _WitnessGenerationStatus.UNRESOLVED
+    assert result.work.total_candidates == 1
+    assert result.reason == "witness generation exhausted its candidate limit"
 
 
 def test_global_reach_keeps_unproved_e1_equality_unresolved() -> None:

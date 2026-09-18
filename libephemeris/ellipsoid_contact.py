@@ -39,6 +39,7 @@ from .intervals import (
     IntervalCertificationError,
     ball_from_float,
     interval_cholesky,
+    interval_precision,
     krawczyk_image,
     strictly_contains_vector,
 )
@@ -72,6 +73,40 @@ class _ConeSection:
             raise ValueError("cone cosine must lie in (0, 1]")
         if type(self.branch_sign) is not int or self.branch_sign not in {-1, 1}:
             raise ValueError("cone branch sign must be exactly -1 or +1")
+
+
+class _WitnessGenerationStatus(str, Enum):
+    """Private outcomes of bounded deterministic witness generation."""
+
+    REACH = "reach"
+    MISS = "miss"
+    CONTACT = "contact"
+    UNRESOLVED = "unresolved"
+    INVALID = "invalid"
+
+
+@dataclass(frozen=True, slots=True)
+class _WitnessWorkEvidence:
+    """Exact deterministic counters for one bounded generator attempt."""
+
+    primal_candidates: int
+    dual_candidates: int
+    total_candidates: int
+    last_level: int
+    last_kind: str | None
+    last_indices: tuple[int, ...] | None
+
+
+@dataclass(frozen=True, slots=True)
+class _WitnessGenerationResult:
+    """Private generator result, distinct from verifier proof payloads."""
+
+    status: _WitnessGenerationStatus
+    proof: _GlobalReachProof | None
+    generation_level: int | None
+    candidate_index: int | None
+    work: _WitnessWorkEvidence
+    reason: str
 
 
 class _CoreShadowClass(str, Enum):
@@ -936,6 +971,338 @@ def _reduce_regular_residuals(
     else:
         raise IntervalCertificationError("regular residual sign is not certified")
     return _ResidualReduction(minimum, reach, sign, len(candidates))
+
+
+def _pow2_upper_sqrt(value: Fraction) -> Fraction:
+    """Return the smallest integer power of two whose square bounds ``value``."""
+    if type(value) is not Fraction or value <= 0:
+        raise ValueError("power-of-two square-root input must be a positive Fraction")
+    exponent = 0
+    bound = Fraction(1)
+    if value > 1:
+        while bound * bound < value:
+            bound *= 2
+            exponent += 1
+    else:
+        while (bound / 2) * (bound / 2) >= value:
+            bound /= 2
+            exponent -= 1
+    assert (
+        bound == Fraction(2**exponent) if exponent >= 0 else Fraction(1, 2**-exponent)
+    )
+    return bound
+
+
+def _exact_metric_inverse(
+    frame: _EllipsoidContactFrame,
+) -> tuple[tuple[Fraction, ...], ...]:
+    """Invert the authenticated three-dimensional metric over exact rationals."""
+    matrix = [
+        [Fraction.from_float(value) for value in row] for row in frame.metric_km_minus_2
+    ]
+    augmented = [
+        row + [Fraction(int(i == j)) for j in range(3)] for i, row in enumerate(matrix)
+    ]
+    for column in range(3):
+        pivot = next((row for row in range(column, 3) if augmented[row][column]), None)
+        if pivot is None:
+            raise ValueError("exact metric inverse is singular")
+        augmented[column], augmented[pivot] = augmented[pivot], augmented[column]
+        divisor = augmented[column][column]
+        augmented[column] = [value / divisor for value in augmented[column]]
+        for row in range(3):
+            if row == column:
+                continue
+            factor = augmented[row][column]
+            augmented[row] = [
+                augmented[row][index] - factor * augmented[column][index]
+                for index in range(6)
+            ]
+    return tuple(tuple(row[3:]) for row in augmented)
+
+
+def _primal_power_bounds(
+    frame: _EllipsoidContactFrame,
+) -> tuple[Fraction, Fraction, Fraction]:
+    """Return precision-independent power-of-two coordinate bounds."""
+    inverse = _exact_metric_inverse(frame)
+    return tuple(_pow2_upper_sqrt(inverse[index][index]) for index in range(3))  # type: ignore[return-value]
+
+
+def _primal_level(
+    bounds: tuple[Fraction, Fraction, Fraction],
+    level: int,
+):
+    """Yield one canonical owned level of the exact dyadic primal stream."""
+    if type(level) is not int or level < 0:
+        raise ValueError("generation level must be a non-negative integer")
+    if level == 0:
+        yield (0, 0, 0), (Fraction(0), Fraction(0), Fraction(0))
+        return
+    limit = 1 << level
+    denominator = 1 << (level - 1)
+    for first in range(limit + 1):
+        for second in range(limit + 1):
+            for third in range(limit + 1):
+                indices = (first, second, third)
+                if level == 1 and indices == (1, 1, 1):
+                    continue
+                if level >= 2 and all(index % 2 == 0 for index in indices):
+                    continue
+                point = tuple(
+                    bounds[axis] * (-1 + Fraction(indices[axis], denominator))
+                    for axis in range(3)
+                )
+                yield indices, point
+
+
+def _dual_level(
+    raw_span: tuple[Fraction, Fraction, Fraction],
+    cosine: Fraction,
+    multiplier_bound: Fraction,
+    level: int,
+):
+    """Yield one canonical owned level of exact transverse dual payloads."""
+    if type(level) is not int or level < 0:
+        raise ValueError("generation level must be a non-negative integer")
+    pivot = min(
+        range(3),
+        key=lambda index: (-abs(raw_span[index]), index),
+    )
+    if raw_span[pivot] == 0:
+        raise ValueError("dual raw span must be nonzero")
+    transverse = tuple(index for index in range(3) if index != pivot)
+    if level == 0:
+        yield (0, 0, 0), (Fraction(0), Fraction(0), Fraction(0)), Fraction(0)
+        return
+    limit = 1 << level
+    denominator = 1 << (level - 1)
+    for mu_index in range(limit + 1):
+        for first in range(limit + 1):
+            for second in range(limit + 1):
+                indices = (mu_index, first, second)
+                if level == 1 and indices == (0, 1, 1):
+                    continue
+                if level >= 2 and all(index % 2 == 0 for index in indices):
+                    continue
+                vector = [Fraction(0), Fraction(0), Fraction(0)]
+                vector[transverse[0]] = cosine * (-1 + Fraction(first, denominator))
+                vector[transverse[1]] = cosine * (-1 + Fraction(second, denominator))
+                vector[pivot] = (
+                    -sum(raw_span[index] * vector[index] for index in transverse)
+                    / raw_span[pivot]
+                )
+                multiplier = Fraction(mu_index, limit) * multiplier_bound
+                yield indices, tuple(vector), multiplier
+
+
+def _evaluate_at_precisions(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    primal: BallVector3 | None,
+    dual: DualWitness | None,
+) -> _GlobalReachProof | None:
+    """Apply the approved deterministic precision-agreement state machine."""
+    decisive: _GlobalReachStatus | None = None
+    initial: list[_GlobalReachProof] = []
+    for bits in (160, 256):
+        with interval_precision(bits):
+            result = _evaluate_global_reach(frame, cone, primal, dual)
+        initial.append(result)
+        if result.status is _GlobalReachStatus.INVALID:
+            return result
+        if result.status in {
+            _GlobalReachStatus.REACH,
+            _GlobalReachStatus.MISS,
+            _GlobalReachStatus.CONTACT,
+        }:
+            if decisive is not None and result.status is not decisive:
+                return _GlobalReachProof(
+                    _GlobalReachStatus.INVALID,
+                    result.lower_bound,
+                    result.upper_bound,
+                    primal,
+                    dual,
+                    None,
+                    "witness precision decisions are contradictory",
+                )
+            decisive = result.status
+    if all(result.status is decisive for result in initial) and decisive is not None:
+        return initial[0]
+    escalated: list[_GlobalReachProof] = []
+    for bits in (384, 512):
+        with interval_precision(bits):
+            result = _evaluate_global_reach(frame, cone, primal, dual)
+        escalated.append(result)
+        if result.status is _GlobalReachStatus.INVALID:
+            return result
+        if result.status in {
+            _GlobalReachStatus.REACH,
+            _GlobalReachStatus.MISS,
+            _GlobalReachStatus.CONTACT,
+        }:
+            if decisive is not None and result.status is not decisive:
+                return _GlobalReachProof(
+                    _GlobalReachStatus.INVALID,
+                    result.lower_bound,
+                    result.upper_bound,
+                    primal,
+                    dual,
+                    None,
+                    "witness precision decisions are contradictory",
+                )
+            decisive = result.status
+    if all(result.status is decisive for result in escalated) and decisive is not None:
+        return escalated[0]
+    return None
+
+
+def _generate_global_witness(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    *,
+    max_level: int = 4,
+    max_primal: int = 100_000,
+    max_dual: int = 100_000,
+    max_total: int = 200_000,
+    multiplier_bound: Fraction = Fraction(0),
+) -> _WitnessGenerationResult:
+    """Run the bounded canonical stream through the standalone verifier.
+
+    The explicit multiplier bound is a temporary private implementation input;
+    the reviewed source-exact bound constructor remains a separate next layer.
+    """
+    frame.validate()
+    cone.validate()
+    if (
+        any(
+            type(value) is not int or isinstance(value, bool) or value <= 0
+            for value in (max_primal, max_dual, max_total)
+        )
+        or type(max_level) is not int
+        or isinstance(max_level, bool)
+        or max_level < 0
+    ):
+        raise ValueError("witness generation limits are invalid")
+    if type(multiplier_bound) is not Fraction or multiplier_bound < 0:
+        raise ValueError("dual multiplier bound must be a non-negative Fraction")
+    bounds = _primal_power_bounds(frame)
+    raw_span: tuple[Fraction, Fraction, Fraction] = tuple(
+        Fraction.from_float(value) for value in frame.axis_span
+    )  # type: ignore[assignment]
+    cosine = Fraction.from_float(cone.cosine)
+    primal_count = dual_count = total_count = candidate_index = 0
+    last_level = 0
+    last_kind: str | None = None
+    last_indices: tuple[int, ...] | None = None
+
+    def work() -> _WitnessWorkEvidence:
+        return _WitnessWorkEvidence(
+            primal_count,
+            dual_count,
+            total_count,
+            last_level,
+            last_kind,
+            last_indices,
+        )
+
+    for level in range(max_level + 1):
+        last_level = level
+        for indices, point in _primal_level(bounds, level):
+            if primal_count >= max_primal or total_count >= max_total:
+                return _WitnessGenerationResult(
+                    _WitnessGenerationStatus.UNRESOLVED,
+                    None,
+                    None,
+                    None,
+                    work(),
+                    "witness generation exhausted its candidate limit",
+                )
+            last_kind, last_indices = "primal", indices
+            primal_count += 1
+            total_count += 1
+            with interval_precision(160):
+                primal = tuple(_fraction_ball(value) for value in point)
+            if any(not value.is_exact() for value in primal):
+                return _WitnessGenerationResult(
+                    _WitnessGenerationStatus.INVALID,
+                    None,
+                    level,
+                    candidate_index,
+                    work(),
+                    "generated primal point is not exact at 160 bits",
+                )
+            proof = _evaluate_at_precisions(frame, cone, primal, None)  # type: ignore[arg-type]
+            if proof is not None:
+                if proof.status is _GlobalReachStatus.INVALID:
+                    return _WitnessGenerationResult(
+                        _WitnessGenerationStatus.INVALID,
+                        proof,
+                        level,
+                        candidate_index,
+                        work(),
+                        proof.reason,
+                    )
+                if proof.status is _GlobalReachStatus.REACH:
+                    return _WitnessGenerationResult(
+                        _WitnessGenerationStatus.REACH,
+                        proof,
+                        level,
+                        candidate_index,
+                        work(),
+                        proof.reason,
+                    )
+            candidate_index += 1
+        for indices, vector, multiplier in _dual_level(
+            raw_span, cosine, multiplier_bound, level
+        ):
+            if dual_count >= max_dual or total_count >= max_total:
+                return _WitnessGenerationResult(
+                    _WitnessGenerationStatus.UNRESOLVED,
+                    None,
+                    None,
+                    None,
+                    work(),
+                    "witness generation exhausted its candidate limit",
+                )
+            last_kind, last_indices = "dual", indices
+            dual_count += 1
+            total_count += 1
+            dual = _ProjectedDualWitness(
+                raw_span,
+                vector,
+                Fraction(1, sum(value * value for value in raw_span)),
+                multiplier,
+            )
+            proof = _evaluate_at_precisions(frame, cone, None, dual)
+            if proof is not None:
+                if proof.status is _GlobalReachStatus.INVALID:
+                    return _WitnessGenerationResult(
+                        _WitnessGenerationStatus.INVALID,
+                        proof,
+                        level,
+                        candidate_index,
+                        work(),
+                        proof.reason,
+                    )
+                if proof.status is _GlobalReachStatus.MISS:
+                    return _WitnessGenerationResult(
+                        _WitnessGenerationStatus.MISS,
+                        proof,
+                        level,
+                        candidate_index,
+                        work(),
+                        proof.reason,
+                    )
+            candidate_index += 1
+    return _WitnessGenerationResult(
+        _WitnessGenerationStatus.UNRESOLVED,
+        None,
+        None,
+        None,
+        work(),
+        "witness generation exhausted its level limit",
+    )
 
 
 def _fraction_ball(value: Fraction) -> Ball:
