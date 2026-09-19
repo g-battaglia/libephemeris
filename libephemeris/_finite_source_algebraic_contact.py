@@ -196,6 +196,7 @@ class _RootSign:
 
     def sign(self, expression: _Poly) -> int:
         """Return -1, 0 or 1 for an exact polynomial at the selected root."""
+        expression = _trim(list(expression))
         if expression == _POLY_ZERO:
             return 0
         common = _gcd(self.poly, expression)

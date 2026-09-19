@@ -78,6 +78,8 @@ def test_irrational_root_and_reducible_polynomial_signs() -> None:
     root = _RootSign((F(-2), F(0), F(1)), F(1), F(2))
     assert root.sign((F(-2), F(0), F(1))) == 0
     assert root.sign((F(-1), F(1))) == 1
+    assert root.sign((F(-1), F(1), F(0))) == 1
+    assert root.sign((F(0), F(0))) == 0
     assert root.sign((F(-2), F(1))) == -1
 
     reducible = _RootSign((F(6), F(-2), F(-3), F(1)), F(1), F(2))
@@ -230,6 +232,16 @@ def test_wrong_penumbral_nappe_fails_even_with_tangent_support() -> None:
     assert a == F(-1, 4) and a * a == h_t and gate == F(-17, 12)
     payload = _payload(F(2, 25), (F(0), F(0), F(8, 25)), F(0))
     assert not _verify_algebraic_contact(geometry, _Target.PENUMBRA, payload)
+
+
+def test_wrong_umbral_nappe_isolated_from_gate_and_support() -> None:
+    """The side check alone rejects an otherwise valid tangent separator."""
+    geometry = _geometry((F(-12), F(0), F(0)), (F(-7), F(0), F(0)), F(2), F(1))
+    tangent_point = (F(-1), F(0), F(0))
+    a, gate, h_t, _ = geometry._target_values(_Target.UMBRA, tangent_point)
+    assert a == F(-5) and gate == F(29) and a * a > h_t
+    payload = _payload(F(29, 120), (F(0), F(0), F(0)), F(1, 24))
+    assert not _verify_algebraic_contact(geometry, _Target.UMBRA, payload)
 
 
 def test_derived_geometry_fields_are_recomputed() -> None:
