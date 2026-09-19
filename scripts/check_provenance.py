@@ -857,6 +857,10 @@ def _high_precision_literal_hits(root: Path) -> list[tuple[Path, int, str, str]]
             if tok.type != tokenize.NUMBER:
                 continue
             literal = tok.string
+            # Hexadecimal integers may contain "e" as a digit; it is not
+            # a decimal exponent in that lexical form.
+            if literal.lower().startswith(("0x", "0o", "0b")):
+                continue
             if "." not in literal and "e" not in literal.lower():
                 continue
             if literal.lower().endswith("j"):

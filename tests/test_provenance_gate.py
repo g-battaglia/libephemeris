@@ -135,9 +135,13 @@ def test_history_gate_checks_tag_and_custom_ref_reachability(tmp_path: Path) -> 
     _git(tmp_path, "switch", "-q", main_branch)
     _git(tmp_path, "branch", "-D", "detached-audit")
 
-    assert _history_hits(tmp_path) == {(f"vendor/{_FOREIGN_MODULE}.zip", "foreign-source-file")}
+    assert _history_hits(tmp_path) == {
+        (f"vendor/{_FOREIGN_MODULE}.zip", "foreign-source-file")
+    }
     _git(tmp_path, "tag", "-d", "archived-audit")
-    assert _history_hits(tmp_path) == {(f"vendor/{_FOREIGN_MODULE}.zip", "foreign-source-file")}
+    assert _history_hits(tmp_path) == {
+        (f"vendor/{_FOREIGN_MODULE}.zip", "foreign-source-file")
+    }
 
 
 def test_history_gate_ignores_orchestrator_checkpoint_refs(tmp_path: Path) -> None:
@@ -659,6 +663,19 @@ def _rate(h):
         assert [(lb) for _p, _ln, lb, _s in hits] == ["reference-authored-constant"]
         literal_hits = check_provenance._high_precision_literal_hits(tmp_path)
         assert literal_hits == []
+
+    def test_hex_integer_word_is_not_a_decimal_float(self, tmp_path: Path) -> None:
+        module = _write_pkg_module(
+            tmp_path,
+            "word.py",
+            "_WORD = 0x3E0123456789ABCD\n_VALUE = 1.234567890123\n",
+        )
+
+        hits = check_provenance._high_precision_literal_hits(tmp_path)
+
+        assert [(path, line, label) for path, line, label, _text in hits] == [
+            (module, 2, "unannotated-high-precision-literal")
+        ]
 
 
 class TestNarrativeGateLeavesContractsAlone:
