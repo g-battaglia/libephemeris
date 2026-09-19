@@ -881,6 +881,13 @@ def _generation_source_identity(
     )
 
 
+def _same_ball(left: Ball | None, right: Ball | None) -> bool:
+    """Compare complete exact Arb endpoints, including optional absence."""
+    if left is None or right is None:
+        return left is right
+    return bool(left.lower() == right.lower() and left.upper() == right.upper())
+
+
 def _generation_evidence_error(
     generated: _WitnessGenerationResult,
     frame: _EllipsoidContactFrame,
@@ -922,10 +929,8 @@ def _generation_evidence_error(
         or record.proof.primal_point != generated.proof.primal_point
         or record.proof.dual_witness != generated.proof.dual_witness
         or record.proof.equality_proof != generated.proof.equality_proof
-        or _ball_sign_class(record.proof.lower_bound)
-        != _ball_sign_class(generated.proof.lower_bound)
-        or _ball_sign_class(record.proof.upper_bound)
-        != _ball_sign_class(generated.proof.upper_bound)
+        or not _same_ball(record.proof.lower_bound, generated.proof.lower_bound)
+        or not _same_ball(record.proof.upper_bound, generated.proof.upper_bound)
         for record in generated.precision_evidence
     ):
         return "accepted precision decisions do not match the decisive proof"
@@ -945,12 +950,30 @@ def _generation_evidence_error(
     if generated.status is _WitnessGenerationStatus.CONTACT:
         if (
             accepted.kind != "equality"
-            or generated.equality_variant_index is None
+            or accepted.level is not None
+            or accepted.indices != (0,)
+            or generated.generation_level is not None
+            or generated.candidate_index is not None
+            or generated.equality_variant_index != 0
+            or strict_attempts != 0
+            or generated.work.last_kind is not None
+            or generated.work.last_indices is not None
             or generated.proof.equality_proof != accepted.payload
         ):
             return "contact generator equality evidence is inconsistent"
     elif generated.equality_variant_index is not None:
         return "strict generator result carries an equality variant index"
+    elif (
+        accepted.kind not in {"primal", "dual"}
+        or accepted.level is None
+        or accepted.indices is None
+        or generated.generation_level != accepted.level
+        or generated.candidate_index != strict_attempts - 1
+        or generated.work.last_level != accepted.level
+        or generated.work.last_kind != accepted.kind
+        or generated.work.last_indices != accepted.indices
+    ):
+        return "strict generator stream position is inconsistent"
     elif generated.status is _WitnessGenerationStatus.REACH:
         if (
             accepted.kind != "primal"

@@ -226,6 +226,29 @@ def test_private_certification_rejects_malformed_decisive_result(monkeypatch) ->
                 for record in real.precision_evidence
             ),
         ),
+        lambda real: dataclasses.replace(real, generation_level=99),
+        lambda real: dataclasses.replace(real, candidate_index=99),
+        lambda real: dataclasses.replace(
+            real,
+            work=dataclasses.replace(real.work, last_indices=(99, 99, 99)),
+        ),
+        lambda real: dataclasses.replace(
+            real,
+            accepted_candidate=dataclasses.replace(real.accepted_candidate, level=99),
+        ),
+        lambda real: dataclasses.replace(
+            real,
+            precision_evidence=tuple(
+                dataclasses.replace(
+                    record,
+                    proof=dataclasses.replace(
+                        record.proof,
+                        upper_bound=arb(-999),
+                    ),
+                )
+                for record in real.precision_evidence
+            ),
+        ),
     ],
 )
 def test_private_certification_rejects_forged_candidate_ledger(
@@ -251,6 +274,34 @@ def test_private_certification_rejects_forged_candidate_ledger(
         lambda *_args, **_kwargs: forged,
     )
     result = _certify_contact_inputs(inputs, max_level=1)
+    assert not isinstance(result, _CertifiedContactProofs)
+    assert result.status is _ContactCapabilityStatus.INVALID_CERTIFICATION
+
+
+@pytest.mark.parametrize("variant_index", [-1, 1, 99])
+def test_private_certification_rejects_forged_equality_variant(
+    monkeypatch, variant_index
+) -> None:
+    """The sole source-selected equality variant has canonical index zero."""
+    inputs = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert not isinstance(inputs, _ContactCapabilityBlock)
+    real = _generate_global_witness(inputs.frame, inputs.penumbra, max_level=0)
+    assert real.status is _WitnessGenerationStatus.CONTACT
+    forged = dataclasses.replace(real, equality_variant_index=variant_index)
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._generate_global_witness",
+        lambda *_args, **_kwargs: forged,
+    )
+    result = _certify_contact_inputs(inputs, max_level=0)
     assert not isinstance(result, _CertifiedContactProofs)
     assert result.status is _ContactCapabilityStatus.INVALID_CERTIFICATION
 
