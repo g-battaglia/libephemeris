@@ -199,6 +199,11 @@ kind = "project-authored-reviewed-derivation"
 citation = "Independent finite-source three-target geometry and exact strict primal/dual certificate derivation; reviewed validation contract at commit 03292c3390b9a843e0b5547c69c54e5e933b69ec"
 url = "docs/methodology/finite-source-certificates.md"
 
+[sources.PROJECT_FINITE_SOURCE_ALGEBRAIC_CONTACT]
+kind = "project-authored-reviewed-derivation"
+citation = "Exact algebraic per-target contact certificate and independent root-sign method; disconnected verifier specification and review at validation commit 658875fd084ee339873d708687ff99d365b7bd9c"
+url = "docs/methodology/finite-source-algebraic-contact.md"
+
 [sources.PROJECT_FINITE_SOURCE_INPUT_MODEL]
 kind = "project-authored-reviewed-computational-specification"
 citation = "B-16 finite-source post-return input model and independent bounded review at validation commit aae8dbf0cd5c292e9b2f5830b92d5f0975380ccd; fixed specification SHA-256 e9d3937b290ca2bf7c355b762891cb7de3d3d072063b28638793938aaa837c36"
@@ -445,6 +450,16 @@ scientific_content = true
 origin = "Project-authored private arithmetic bridge for the reviewed Sun/Moon post-return binary64 input model at validation aae8dbf. It checks every captured native AU-to-kilometre relation and fixed radius/flattening operation chain bitwise, then derives exact rational two-centre geometry. It has no source receipt, astronomical state acquisition, witness generation or public route."
 sources = ["PROJECT_FINITE_SOURCE_INPUT_MODEL", "IAU_2012_B2"]
 documentation = ["docs/methodology/finite-source-native-input.md"]
+docstring = "detailed"
+
+[[component]]
+id = "finite-source-algebraic-contact-verifier"
+category = "numerical-method"
+paths = ["libephemeris/_finite_source_algebraic_contact.py"]
+scientific_content = true
+origin = "Project-authored private exact algebraic per-target contact checker. It independently validates one-root polynomial isolation, dual cone feasibility, ellipsoid tangent support and physical target membership. It has no certificate generator, astronomical source, runtime work cap or public route."
+sources = ["PROJECT_FINITE_SOURCE_ALGEBRAIC_CONTACT"]
+documentation = ["docs/methodology/finite-source-algebraic-contact.md"]
 docstring = "detailed"
 
 [[component]]
