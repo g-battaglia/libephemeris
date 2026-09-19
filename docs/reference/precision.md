@@ -298,9 +298,15 @@ see [sidereal-time-longterm.md](../methodology/sidereal-time-longterm.md)):
    nutation, the same one the planetary positions use
 3. GAST = GMST + equation of equinoxes
 
-Precision: sub-milliarcsecond agreement with the IAU 2006 sidereal time in the
-modern era, and no polynomial divergence at remote epochs, where an IAU-2006
-sidereal time is wrong by degrees. Only the ΔT model choice remains (§ Delta T).
+The modern-era GMST branch uses the IAU 2006 expression. Its apparent-time
+correction uses the classical Δψ · cos(ε) equation of the equinoxes;
+it omits the complementary terms included in the IAU 2000/2006 convention
+([IAU SOFA, *Tools for Earth Attitude*, §§3.6 and 8](https://www.iausofa.org/s/sofa_pn_c.pdf)).
+Consequently, the full apparent sidereal time is not identical to the IAU
+2006/2000A realization, and no sub-milliarcsecond agreement is claimed for
+it here. The long-term construction avoids extrapolating the modern GMST
+polynomial to remote epochs; the ΔT model and the chosen Earth-attitude
+realization also affect the result.
 
 ### True obliquity
 

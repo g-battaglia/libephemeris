@@ -111,6 +111,12 @@ the nutation in longitude projected on the equator (Δψ · cos ε), with the
 nutation supplied by the caller so that a chart's angles and bodies share one
 nutation model.
 
+This is the classical equation of the equinoxes. The implementation does not
+include the complementary terms used by the IAU 2000/2006 apparent sidereal
+time convention ([IAU SOFA, *Tools for Earth Attitude*, §§3.6 and 8](https://www.iausofa.org/s/sofa_pn_c.pdf)).
+Agreement of the mean-time and precession models with their modern counterparts
+does not by itself establish the same agreement for apparent sidereal time.
+
 Time scales follow the standard convention: precession and obliquity are
 evaluated at **TT**; the Earth-rotation hour angle uses **UT1**; the TT↔UT1
 difference is the library's own ΔT, so houses and positions share one ΔT.
