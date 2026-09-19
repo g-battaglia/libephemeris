@@ -204,6 +204,16 @@ kind = "project-authored-reviewed-derivation"
 citation = "Exact algebraic per-target contact certificate and independent root-sign method; disconnected verifier specification and review at validation commit 658875fd084ee339873d708687ff99d365b7bd9c"
 url = "docs/methodology/finite-source-algebraic-contact.md"
 
+[sources.PROJECT_FINITE_SOURCE_CONTACT_GENERATOR]
+kind = "project-authored-reviewed-derivation"
+citation = "Exact fixed-state finite-source contact candidate derivation, including nonsingular multiplier roots, the positive singular line, quadratic field extension and core apex; reviewed disconnected contract at validation commit c9f609891aea4c041a642198450e3f6c60ace43a"
+url = "docs/methodology/finite-source-contact-generator.md"
+
+[sources.PYTHON_FLINT_EXACT]
+kind = "permissively-licensed-exact-arithmetic-library"
+citation = "python-flint 0.9 fmpq_poly and fmpq_mat exact rational polynomial, factorization and matrix interfaces; MIT-licensed Python bindings to FLINT"
+url = "https://python-flint.readthedocs.io/en/latest/fmpq_poly.html"
+
 [sources.PROJECT_FINITE_SOURCE_INPUT_MODEL]
 kind = "project-authored-reviewed-computational-specification"
 citation = "B-16 finite-source post-return input model and independent bounded review at validation commit aae8dbf0cd5c292e9b2f5830b92d5f0975380ccd; fixed specification SHA-256 e9d3937b290ca2bf7c355b762891cb7de3d3d072063b28638793938aaa837c36"
@@ -460,6 +470,36 @@ scientific_content = true
 origin = "Project-authored private exact algebraic per-target contact checker. It independently validates one-root polynomial isolation, dual cone feasibility, ellipsoid tangent support and physical target membership. It has no certificate generator, astronomical source, runtime work cap or public route."
 sources = ["PROJECT_FINITE_SOURCE_ALGEBRAIC_CONTACT"]
 documentation = ["docs/methodology/finite-source-algebraic-contact.md"]
+docstring = "detailed"
+
+[[component]]
+id = "finite-source-contact-algebra"
+category = "numerical-method"
+paths = ["libephemeris/_finite_source_contact_algebra.py"]
+scientific_content = true
+origin = "Project-authored exact rational real-algebraic arithmetic for the disconnected finite-source contact producer. It normalizes irreducible polynomial factors, isolates real roots by rational Sturm counts, decides signs by exact interval refinement and constructs canonical centered dyadic isolators. It does not import verifier internals, read astronomical states or expose public results."
+sources = ["PROJECT_FINITE_SOURCE_CONTACT_GENERATOR", "PYTHON_FLINT_EXACT"]
+documentation = ["docs/methodology/finite-source-contact-generator.md"]
+docstring = "detailed"
+
+[[component]]
+id = "finite-source-contact-extension"
+category = "numerical-method"
+paths = ["libephemeris/_finite_source_contact_extension.py"]
+scientific_content = true
+origin = "Project-authored exact quadratic extension for the singular contact line. Rational multiplication matrices, characteristic polynomials and certified root isolation select the common field and express the multiplier and line coordinate in one real embedding. It has no astronomical provider or public routing."
+sources = ["PROJECT_FINITE_SOURCE_CONTACT_GENERATOR", "PYTHON_FLINT_EXACT"]
+documentation = ["docs/methodology/finite-source-contact-generator.md"]
+docstring = "detailed"
+
+[[component]]
+id = "finite-source-contact-generator"
+category = "numerical-method"
+paths = ["libephemeris/_finite_source_contact_generator.py"]
+scientific_content = true
+origin = "Project-authored private exact fixed-state contact candidate generator. It derives rational cone forms, exhausts positive nonsingular and singular multiplier branches plus the core apex, records exact rejection diagnostics and sends any accepted payload to the independently implemented algebraic contact verifier. It has no runtime cap, source receipt, temporal search or public route."
+sources = ["PROJECT_FINITE_SOURCE_CONTACT_GENERATOR", "PYTHON_FLINT_EXACT"]
+documentation = ["docs/methodology/finite-source-contact-generator.md"]
 docstring = "detailed"
 
 [[component]]
