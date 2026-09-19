@@ -160,6 +160,64 @@ def test_private_carrier_connects_to_both_witness_generators() -> None:
     }
 
 
+def test_private_certification_rejects_malformed_decisive_result(monkeypatch) -> None:
+    """A decisive top-level status cannot bypass proof/evidence ownership."""
+    inputs = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        4.0,
+        1.0,
+        -2.0,
+        1.0,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert not isinstance(inputs, _ContactCapabilityBlock)
+    real = _generate_global_witness(inputs.frame, inputs.penumbra, max_level=1)
+    malformed = dataclasses.replace(
+        real,
+        proof=None,
+        source_identity=("wrong",),
+        accepted_candidate=None,
+    )
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._generate_global_witness",
+        lambda *_args, **_kwargs: malformed,
+    )
+    result = _certify_contact_inputs(inputs, max_level=1)
+    assert not isinstance(result, _CertifiedContactProofs)
+    assert result.status is _ContactCapabilityStatus.INVALID_CERTIFICATION
+
+
+def test_private_certification_keeps_internal_invalid_distinct(monkeypatch) -> None:
+    """Generator defects are not mislabeled as malformed source data."""
+    inputs = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        4.0,
+        1.0,
+        -2.0,
+        1.0,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert not isinstance(inputs, _ContactCapabilityBlock)
+    real = _generate_global_witness(inputs.frame, inputs.penumbra, max_level=1)
+    invalid = dataclasses.replace(
+        real,
+        status=_WitnessGenerationStatus.INVALID,
+        reason="internal defect",
+    )
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._generate_global_witness",
+        lambda *_args, **_kwargs: invalid,
+    )
+    result = _certify_contact_inputs(inputs, max_level=1)
+    assert not isinstance(result, _CertifiedContactProofs)
+    assert result.status is _ContactCapabilityStatus.INVALID_CERTIFICATION
+    assert result.reason == "internal defect"
+
+
 @pytest.mark.parametrize(
     ("tag", "source_radius", "status"),
     [

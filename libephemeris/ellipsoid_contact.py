@@ -346,6 +346,7 @@ class _ContactCapabilityStatus(str, Enum):
     INVALID_SOURCE = "invalid_source"
     UNRESOLVED_AXIS = "unresolved_axis"
     UNRESOLVED_NO_WITNESS_GENERATOR = "unresolved_no_witness_generator"
+    INVALID_CERTIFICATION = "invalid_certification"
 
 
 @dataclass(frozen=True, slots=True)
@@ -861,6 +862,153 @@ def _build_contact_inputs(
     )
 
 
+def _expected_generation_source(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+) -> tuple[object, ...]:
+    """Return the exact source identity required from witness generation."""
+    return (
+        tuple(
+            tuple(Fraction.from_float(value) for value in row)
+            for row in frame.metric_km_minus_2
+        ),
+        tuple(Fraction.from_float(value) for value in frame.axis_point_km),
+        tuple(Fraction.from_float(value) for value in frame.axis_span),
+        Fraction.from_float(cone.radius_km),
+        Fraction.from_float(cone.cosine),
+        cone.branch_sign,
+        "witness-generator-v1",
+    )
+
+
+def _authenticate_generation_result(
+    result: _WitnessGenerationResult,
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+) -> str | None:
+    """Return a defect reason unless one decisive result owns complete evidence."""
+    expected_status = {
+        _WitnessGenerationStatus.REACH: _GlobalReachStatus.REACH,
+        _WitnessGenerationStatus.MISS: _GlobalReachStatus.MISS,
+        _WitnessGenerationStatus.CONTACT: _GlobalReachStatus.CONTACT,
+    }.get(result.status)
+    if expected_status is None:
+        return "witness generation result is not decisive"
+    if result.source_identity != _expected_generation_source(frame, cone):
+        return "witness generation source identity does not match the carrier"
+    if result.proof is None or result.proof.status is not expected_status:
+        return "witness generation proof does not match its decisive status"
+    if result.accepted_candidate is None:
+        return "witness generation has no accepted candidate evidence"
+    if not result.attempted_candidates or (
+        result.attempted_candidates[-1] is not result.accepted_candidate
+    ):
+        return "accepted witness is not the final attempted candidate"
+    if result.accepted_candidate.precision_evidence != result.precision_evidence:
+        return "accepted witness precision evidence is inconsistent"
+    if not result.precision_evidence or any(
+        record.proof.status is not expected_status
+        for record in result.precision_evidence
+    ):
+        return "decisive witness precision evidence does not agree"
+    if result.multiplier_evidence is None or (
+        result.multiplier_bound != result.multiplier_evidence.power_bound
+    ):
+        return "witness multiplier evidence is incomplete"
+    if result.accepted_candidate.kind == "primal" and result.proof.primal_point is None:
+        return "accepted primal witness has no proof point"
+    if result.accepted_candidate.kind == "dual" and result.proof.dual_witness is None:
+        return "accepted dual witness has no proof payload"
+    if (
+        result.accepted_candidate.kind == "equality"
+        and result.proof.equality_proof is None
+    ):
+        return "accepted equality witness has no equality proof"
+    return None
+
+
+def _generation_source_identity(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+) -> tuple[object, ...]:
+    """Return the canonical exact source identity owned by generator evidence."""
+    return (
+        tuple(
+            tuple(Fraction.from_float(value) for value in row)
+            for row in frame.metric_km_minus_2
+        ),
+        tuple(Fraction.from_float(value) for value in frame.axis_point_km),
+        tuple(Fraction.from_float(value) for value in frame.axis_span),
+        Fraction.from_float(cone.radius_km),
+        Fraction.from_float(cone.cosine),
+        cone.branch_sign,
+        "witness-generator-v1",
+    )
+
+
+def _generation_evidence_error(
+    generated: _WitnessGenerationResult,
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+) -> str | None:
+    """Authenticate one decisive generator result against its carrier owner."""
+    decisive = {
+        _WitnessGenerationStatus.REACH: _GlobalReachStatus.REACH,
+        _WitnessGenerationStatus.MISS: _GlobalReachStatus.MISS,
+        _WitnessGenerationStatus.CONTACT: _GlobalReachStatus.CONTACT,
+    }
+    expected_status = decisive.get(generated.status)
+    if expected_status is None:
+        return "generator result is not decisive"
+    if generated.proof is None or generated.proof.status is not expected_status:
+        return "decisive generator result has no matching proof"
+    if generated.source_identity != _generation_source_identity(frame, cone):
+        return "generator source identity does not match its carrier"
+    if (
+        generated.multiplier_evidence is None
+        or generated.multiplier_bound != generated.multiplier_evidence.power_bound
+    ):
+        return "generator multiplier evidence is incomplete"
+    accepted = generated.accepted_candidate
+    if accepted is None:
+        return "decisive generator result has no accepted candidate"
+    if (
+        not generated.attempted_candidates
+        or generated.attempted_candidates[-1] != accepted
+    ):
+        return "accepted candidate is not the final authenticated attempt"
+    if generated.precision_evidence != accepted.precision_evidence:
+        return "accepted candidate precision evidence is inconsistent"
+    if not generated.precision_evidence:
+        return "accepted candidate has no precision evidence"
+    if any(
+        record.proof.status is not expected_status
+        or record.proof.reason != generated.proof.reason
+        for record in generated.precision_evidence
+    ):
+        return "accepted precision decisions do not match the decisive proof"
+    strict_attempts = sum(
+        attempt.kind in {"primal", "dual"} for attempt in generated.attempted_candidates
+    )
+    if strict_attempts != generated.work.total_candidates:
+        return "generator work counters do not match its attempt ledger"
+    if generated.status is _WitnessGenerationStatus.CONTACT:
+        if (
+            accepted.kind != "equality"
+            or generated.equality_variant_index is None
+            or generated.proof.equality_proof != accepted.payload
+        ):
+            return "contact generator equality evidence is inconsistent"
+    elif generated.equality_variant_index is not None:
+        return "strict generator result carries an equality variant index"
+    elif generated.status is _WitnessGenerationStatus.REACH:
+        if accepted.kind != "primal" or generated.proof.primal_point is None:
+            return "reach generator primal evidence is inconsistent"
+    elif accepted.kind != "dual" or generated.proof.dual_witness != accepted.payload:
+        return "miss generator dual evidence is inconsistent"
+    return None
+
+
 def _certify_contact_inputs(
     inputs: ContactCertification,
     *,
@@ -905,10 +1053,21 @@ def _certify_contact_inputs(
             inputs,
             _ContactCapabilityStatus.UNRESOLVED_NO_WITNESS_GENERATOR
             if penumbra.status is _WitnessGenerationStatus.UNRESOLVED
-            else _ContactCapabilityStatus.INVALID_SOURCE,
+            else _ContactCapabilityStatus.INVALID_CERTIFICATION,
             penumbra,
             None,
             penumbra.reason,
+        )
+    penumbra_defect = _authenticate_generation_result(
+        penumbra, inputs.frame, inputs.penumbra
+    )
+    if penumbra_defect is not None:
+        return _ContactProofBlock(
+            inputs,
+            _ContactCapabilityStatus.INVALID_CERTIFICATION,
+            penumbra,
+            None,
+            penumbra_defect,
         )
     core = _generate_global_witness(
         inputs.frame,
@@ -926,10 +1085,19 @@ def _certify_contact_inputs(
             inputs,
             _ContactCapabilityStatus.UNRESOLVED_NO_WITNESS_GENERATOR
             if core.status is _WitnessGenerationStatus.UNRESOLVED
-            else _ContactCapabilityStatus.INVALID_SOURCE,
+            else _ContactCapabilityStatus.INVALID_CERTIFICATION,
             penumbra,
             core,
             core.reason,
+        )
+    core_defect = _authenticate_generation_result(core, inputs.frame, inputs.core.cone)
+    if core_defect is not None:
+        return _ContactProofBlock(
+            inputs,
+            _ContactCapabilityStatus.INVALID_CERTIFICATION,
+            penumbra,
+            core,
+            core_defect,
         )
     return _CertifiedContactProofs(inputs, penumbra, core)
 
