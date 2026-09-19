@@ -944,6 +944,54 @@ def _same_global_proof(left: _GlobalReachProof, right: _GlobalReachProof) -> boo
     )
 
 
+def _same_precision_evidence(
+    left: tuple[_PrecisionProof, ...],
+    right: tuple[_PrecisionProof, ...],
+) -> bool:
+    """Compare complete ordered precision records."""
+    return len(left) == len(right) and all(
+        first.bits == second.bits and _same_global_proof(first.proof, second.proof)
+        for first, second in zip(left, right)
+    )
+
+
+def _canonical_strict_candidates(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    evidence: _MultiplierBoundEvidence,
+):
+    """Yield the exact merged strict stream in canonical dispatch order."""
+    bounds = _primal_power_bounds(frame)
+    raw_span: tuple[Fraction, Fraction, Fraction] = tuple(
+        Fraction.from_float(value) for value in frame.axis_span
+    )  # type: ignore[assignment]
+    cosine = Fraction.from_float(cone.cosine)
+    seen_dual: set[tuple[tuple[Fraction, Fraction, Fraction], Fraction]] = set()
+    level = 0
+    while True:
+        for indices, payload in _primal_level(bounds, level):
+            yield "primal", level, indices, payload
+        for indices, vector, multiplier in _dual_level(
+            raw_span, cosine, evidence.power_bound, level
+        ):
+            key = (vector, multiplier)
+            if key in seen_dual:
+                continue
+            seen_dual.add(key)
+            yield (
+                "dual",
+                level,
+                indices,
+                _ProjectedDualWitness(
+                    raw_span,
+                    vector,
+                    Fraction(1, _exact_dot(raw_span, raw_span)),
+                    multiplier,
+                ),
+            )
+        level += 1
+
+
 def _generation_evidence_error(
     generated: _WitnessGenerationResult,
     frame: _EllipsoidContactFrame,
@@ -990,6 +1038,33 @@ def _generation_evidence_error(
         for record in generated.precision_evidence
     ):
         return "accepted precision decisions do not match the decisive proof"
+    strict_ledger = tuple(
+        attempt
+        for attempt in generated.attempted_candidates
+        if attempt.kind in {"primal", "dual"}
+    )
+    stream = _canonical_strict_candidates(frame, cone, generated.multiplier_evidence)
+    for attempt, canonical in zip(strict_ledger, stream):
+        kind, level, indices, payload = canonical
+        if (
+            attempt.kind != kind
+            or attempt.level != level
+            or attempt.indices != indices
+            or attempt.payload != payload
+        ):
+            return "generator attempt ledger is not in canonical stream order"
+        if not attempt.precision_evidence:
+            return "generator attempt has no precision evidence"
+        if kind == "primal":
+            primal = tuple(_fraction_ball(value) for value in payload)
+            decision = _evaluate_at_precisions(frame, cone, primal, None)  # type: ignore[arg-type]
+        else:
+            decision = _evaluate_at_precisions(frame, cone, None, payload)  # type: ignore[arg-type]
+        if not _same_precision_evidence(decision.evidence, attempt.precision_evidence):
+            return "generator attempt precision evidence does not replay"
+        if attempt is not generated.accepted_candidate and decision.proof is not None:
+            return "non-final generator attempt is unexpectedly decisive or invalid"
+
     primal_attempts = sum(
         attempt.kind == "primal" for attempt in generated.attempted_candidates
     )

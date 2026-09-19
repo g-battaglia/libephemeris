@@ -312,6 +312,63 @@ def test_private_certification_rejects_forged_candidate_ledger(
     assert result.status is _ContactCapabilityStatus.INVALID_CERTIFICATION
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda attempt: dataclasses.replace(
+            attempt, level=7, indices=(99, 99, 99), payload=("forged",)
+        ),
+        lambda attempt: dataclasses.replace(
+            attempt,
+            precision_evidence=tuple(
+                dataclasses.replace(
+                    record,
+                    proof=dataclasses.replace(
+                        record.proof, reason="forged earlier proof"
+                    ),
+                )
+                for record in attempt.precision_evidence
+            ),
+        ),
+    ],
+)
+def test_private_certification_replays_prior_attempt_ledger(
+    monkeypatch, mutation
+) -> None:
+    """Every stored pre-final attempt must match canonical order and replay."""
+    inputs = _build_contact_inputs(
+        _frame(
+            metric_km_minus_2=(
+                (1.0 / 9.0, 0.0, 0.0),
+                (0.0, 1.0 / 9.0, 0.0),
+                (0.0, 0.0, 0.25),
+            ),
+            axis_point_km=(-5.0, 0.0, 0.0),
+            axis_span=(0.0, 1.0, 1.0),
+        ),
+        2.0,
+        1.0,
+        2.0,
+        1.0,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert not isinstance(inputs, _ContactCapabilityBlock)
+    real = _generate_global_witness(inputs.frame, inputs.penumbra, max_level=1)
+    assert len(real.attempted_candidates) > 1
+    ledger = list(real.attempted_candidates)
+    ledger[0] = mutation(ledger[0])
+    forged = dataclasses.replace(real, attempted_candidates=tuple(ledger))
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._generate_global_witness",
+        lambda *_args, **_kwargs: forged,
+    )
+    result = _certify_contact_inputs(inputs, max_level=1)
+    assert not isinstance(result, _CertifiedContactProofs)
+    assert result.status is _ContactCapabilityStatus.INVALID_CERTIFICATION
+
+
 @pytest.mark.parametrize("variant_index", [-1, 1, 99])
 def test_private_certification_rejects_forged_equality_variant(
     monkeypatch, variant_index
