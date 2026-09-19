@@ -888,6 +888,62 @@ def _same_ball(left: Ball | None, right: Ball | None) -> bool:
     return bool(left.lower() == right.lower() and left.upper() == right.upper())
 
 
+def _owned_primal_payload(
+    frame: _EllipsoidContactFrame,
+    level: int,
+    indices: tuple[int, ...],
+) -> object | None:
+    """Return the canonical primal payload owned by one stream position."""
+    if len(indices) != 3:
+        return None
+    for candidate_indices, payload in _primal_level(_primal_power_bounds(frame), level):
+        if candidate_indices == indices:
+            return payload
+    return None
+
+
+def _owned_dual_payload(
+    frame: _EllipsoidContactFrame,
+    cone: _ConeSection,
+    evidence: _MultiplierBoundEvidence,
+    level: int,
+    indices: tuple[int, ...],
+) -> _ProjectedDualWitness | None:
+    """Return the canonical dual payload owned by one stream position."""
+    if len(indices) != 3:
+        return None
+    raw_span: tuple[Fraction, Fraction, Fraction] = tuple(
+        Fraction.from_float(value) for value in frame.axis_span
+    )  # type: ignore[assignment]
+    for candidate_indices, vector, multiplier in _dual_level(
+        raw_span,
+        Fraction.from_float(cone.cosine),
+        evidence.power_bound,
+        level,
+    ):
+        if candidate_indices == indices:
+            return _ProjectedDualWitness(
+                raw_span,
+                vector,
+                Fraction(1, _exact_dot(raw_span, raw_span)),
+                multiplier,
+            )
+    return None
+
+
+def _same_global_proof(left: _GlobalReachProof, right: _GlobalReachProof) -> bool:
+    """Compare complete verifier-owned fields and exact interval endpoints."""
+    return (
+        left.status is right.status
+        and left.reason == right.reason
+        and left.primal_point == right.primal_point
+        and left.dual_witness == right.dual_witness
+        and left.equality_proof == right.equality_proof
+        and _same_ball(left.lower_bound, right.lower_bound)
+        and _same_ball(left.upper_bound, right.upper_bound)
+    )
+
+
 def _generation_evidence_error(
     generated: _WitnessGenerationResult,
     frame: _EllipsoidContactFrame,
@@ -986,8 +1042,38 @@ def _generation_evidence_error(
         exact_primal = tuple(_fraction_ball(value) for value in accepted.payload)
         if exact_primal != generated.proof.primal_point:
             return "reach generator primal payload does not match its proof"
+        if (
+            _owned_primal_payload(frame, accepted.level, accepted.indices)
+            != accepted.payload
+        ):
+            return "reach candidate is not owned by its canonical stream position"
     elif accepted.kind != "dual" or generated.proof.dual_witness != accepted.payload:
         return "miss generator dual evidence is inconsistent"
+    elif (
+        _owned_dual_payload(
+            frame,
+            cone,
+            generated.multiplier_evidence,
+            accepted.level,
+            accepted.indices,
+        )
+        != accepted.payload
+    ):
+        return "miss candidate is not owned by its canonical stream position"
+
+    for record in generated.precision_evidence:
+        with interval_precision(record.bits):
+            replay = _evaluate_global_reach(
+                frame,
+                cone,
+                generated.proof.primal_point,
+                generated.proof.dual_witness,
+                generated.proof.equality_proof,
+            )
+        if not _same_global_proof(replay, record.proof):
+            return "accepted precision proof does not replay from its exact payload"
+    if not _same_global_proof(generated.proof, generated.precision_evidence[0].proof):
+        return "decisive proof does not match its canonical precision replay"
     return None
 
 

@@ -238,6 +238,13 @@ def test_private_certification_rejects_malformed_decisive_result(monkeypatch) ->
         ),
         lambda real: dataclasses.replace(
             real,
+            accepted_candidate=dataclasses.replace(
+                real.accepted_candidate, indices=(99, 99, 99)
+            ),
+            work=dataclasses.replace(real.work, last_indices=(99, 99, 99)),
+        ),
+        lambda real: dataclasses.replace(
+            real,
             precision_evidence=tuple(
                 dataclasses.replace(
                     record,
@@ -247,6 +254,33 @@ def test_private_certification_rejects_malformed_decisive_result(monkeypatch) ->
                     ),
                 )
                 for record in real.precision_evidence
+            ),
+        ),
+        lambda real: dataclasses.replace(
+            real,
+            proof=dataclasses.replace(real.proof, upper_bound=arb(-999)),
+            precision_evidence=tuple(
+                dataclasses.replace(
+                    record,
+                    proof=dataclasses.replace(
+                        record.proof,
+                        upper_bound=arb(-999),
+                    ),
+                )
+                for record in real.precision_evidence
+            ),
+            accepted_candidate=dataclasses.replace(
+                real.accepted_candidate,
+                precision_evidence=tuple(
+                    dataclasses.replace(
+                        record,
+                        proof=dataclasses.replace(
+                            record.proof,
+                            upper_bound=arb(-999),
+                        ),
+                    )
+                    for record in real.precision_evidence
+                ),
             ),
         ),
     ],
