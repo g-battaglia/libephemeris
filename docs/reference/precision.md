@@ -125,14 +125,20 @@ runtime pipeline.
 
 ### Vondrák 2011 long-term precession
 
-LibEphemeris uses the **Vondrák 2011** long-term precession model (Vondrák, Capitaine & Wallace 2011) via pyerfa's reference routines `erfa.ltp()` / `erfa.ltpb()` (see `libephemeris/precession_vondrak.py`). Unlike the IAU 2006 polynomial (Capitaine et al. 2003) — valid only a few centuries from J2000 and diverging at remote epochs (~36" for the Sun's longitude at year −3000) — the Vondrák model is fitted to a numerical integration and stays accurate over ±200,000 years. Near J2000 it agrees with IAU 2006 to better than 1 milliarcsecond, so modern results are unchanged.
+LibEphemeris uses the **Vondrák 2011** long-term precession model via pyerfa's
+`erfa.ltp()` / `erfa.ltpb()` (see `libephemeris/precession_vondrak.py`). The
+authors fitted it over ±200,000 years and report accuracy comparable to IAU
+2006 near J2000, a few arcseconds in historical epochs, and a few tenths of a
+degree near the interval ends ([Vondrák et al. 2011](https://www.aanda.org/articles/aa/pdf/2011/10/aa17274-11.pdf)).
+The long-term fit avoids extrapolating a short-range polynomial; its full fit
+interval does not imply milliarcsecond or arcsecond accuracy throughout.
 
 | Property | Value |
 |----------|-------|
 | Model | Vondrák, Capitaine & Wallace (2011) long-term precession |
 | Implementation | pyerfa `erfa.ltp()` / `erfa.ltpb()` |
-| Valid range | ±200,000 years around J2000.0 |
-| Agreement near J2000 | < 1 mas vs IAU 2006 (Capitaine et al. 2003) |
+| Fit interval | ±200,000 years around J2000.0; accuracy degrades with epoch |
+| Published accuracy | Comparable to IAU 2006 near J2000; a few arcseconds historically; a few tenths of a degree at the interval ends |
 | J2000 obliquity | 84381.406 arcseconds (23°26'21.406") |
 | Reference | Vondrák et al. (2011), A&A 534, A22 |
 
@@ -270,7 +276,7 @@ For J2000 ecliptic (`FLG_J2000`), step 5 uses a fixed rotation by the J2000 obli
 
 ### Mean obliquity of the ecliptic
 
-The of-date mean obliquity is the **Vondrák 2011** pole angle: the angle between the long-term ecliptic pole (`erfa.ltpecl()`) and equator pole (`erfa.ltpequ()`), computed in `libephemeris/sidereal_longterm.py` and exposed via `precession_vondrak.vondrak_mean_obliquity_rad()`. These are the same two poles ERFA builds the precession matrix above from, so precession and obliquity form one frame, valid over ±200,000 years. Near J2000 it matches the IAU 2006 polynomial (Capitaine et al. 2003) to sub-milliarcsecond precision:
+The of-date mean obliquity is the **Vondrák 2011** pole angle: the angle between the long-term ecliptic pole (`erfa.ltpecl()`) and equator pole (`erfa.ltpequ()`), computed in `libephemeris/sidereal_longterm.py` and exposed via `precession_vondrak.vondrak_mean_obliquity_rad()`. These are the same two poles ERFA builds the precession matrix above from, so precession and obliquity form one frame throughout the model's fit interval, with epoch-dependent accuracy. Near J2000 its value is close to the IAU 2006 polynomial (Capitaine et al. 2003):
 
 ```
 ε₀ = 84381.406" − 46.836769"·T − 0.0001831"·T² + 0.00200340"·T³

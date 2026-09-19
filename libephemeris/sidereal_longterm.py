@@ -8,8 +8,9 @@ This module is the single source, across the whole library, of:
 * the **precession matrix** (J2000 mean frame → mean equator/equinox of date), and
 * **Greenwich mean / apparent sidereal time** (the ARMC that house systems need),
 
-all evaluated with a model that stays correct over very long time spans
-(≈ ±200 millennia), rather than only a few centuries around J2000.0.
+using a precession model fitted over ±200 millennia. Its accuracy is
+epoch-dependent; that fit interval is not an arcsecond-accuracy guarantee for
+house angles or Earth's rotation throughout the interval.
 
 Why a long-term model (and why it beats the usual choice)
 ---------------------------------------------------------
@@ -33,12 +34,11 @@ We instead use the long-term precession of
     Astronomy & Astrophysics 534, A22.  DOI: 10.1051/0004-6361/201117274
     (with the corrigendum A&A 541, C1, 2012).
 
-It is fitted to a numerical integration and stays accurate over ±200 000 years,
-while agreeing with IAU 2006 to sub-milliarcsecond near J2000.0. Adopting it:
-
-* makes ancient/future house cusps **scientifically correct** (no polynomial
-  blow-up), and
-* leaves modern results **unchanged** (sub-mas agreement near J2000.0).
+The authors report a fit comparable to IAU 2006 near J2000.0, accurate to a
+few arcseconds in the historical period and a few tenths of a degree at the
+ends of the ±200 000-year interval. This avoids extrapolating a short-range
+precession polynomial; physical house-angle accuracy also depends on the
+uncertain Earth-rotation history (ΔT) and the other frame conventions.
 
 The model is evaluated by **ERFA** (pyerfa), the IAU SOFA-derived library that
 is already a hard dependency of this package, rather than by coefficient tables
@@ -88,9 +88,10 @@ the Earth has turned. What holds here is:
   own ΔT, read live, so that one chart's angles and bodies share one ΔT. At
   remote epochs the answer is correspondingly sensitive to ΔT: that sensitivity
   is physical.
-* **No ephemeris is consulted**, so there is no supported range and no coverage
-  refusal: every finite Julian Day is answered with a number in ``[0, 360)``.
-  An infinite epoch is refused, and NaN propagates.
+* **No ephemeris is consulted**, so there is no ephemeris coverage refusal:
+  every finite Julian Day is answered with a number in ``[0, 360)``. A
+  numerical answer outside the model's fit interval does not establish its
+  physical accuracy. An infinite epoch is refused, and NaN propagates.
 
 Apparent sidereal time is the hour angle of the *true* equinox of date: the
 mean value plus the equation of the equinoxes, the classical projection of the

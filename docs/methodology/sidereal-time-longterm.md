@@ -44,11 +44,12 @@ We use the long-term precession of
 > valid for long time intervals*, Astronomy & Astrophysics **534**, A22
 > (DOI 10.1051/0004-6361/201117274; corrigendum A&A **541**, C1, 2012).
 
-It is fitted to a numerical integration and stays accurate over **±200 000
-years**, while agreeing with IAU 2006 to **sub-milliarcsecond** near J2000.0. So:
-
-* modern results are **unchanged** (sub-mas agreement near J2000), and
-* ancient/future results are **scientifically correct** (no polynomial blow-up).
+The expressions are fitted over **±200 000 years**. The authors describe
+accuracy comparable to IAU 2006 near J2000, a few arcseconds in the
+historical period, and a few tenths of a degree near the ends of that fit
+interval ([Vondrák et al. 2011](https://www.aanda.org/articles/aa/pdf/2011/10/aa17274-11.pdf)).
+The model avoids extrapolating a short-range precession polynomial, but the
+fit interval is not a uniform accuracy claim for precession or house cusps.
 
 The model is evaluated by **ERFA** (pyerfa), the IAU SOFA-derived library that
 is already a dependency of libephemeris: `erfa.ltpecl` and `erfa.ltpequ` give
@@ -123,10 +124,11 @@ difference is the library's own ΔT, so houses and positions share one ΔT.
 
 ## Properties of this model
 
-* **Validity range.** The model is correct to arcsecond level over ±200 millennia,
-  so deep-historical charts (Babylonian, ancient-Egyptian) and far-future charts
-  keep accurate house cusps, where a truncated IAU 1976/2006 sidereal time accrues
-  degree-level errors.
+* **Fit interval.** The precession expressions cover ±200 millennia with
+  epoch-dependent accuracy: a few arcseconds in the historical period and a
+  few tenths of a degree near the interval ends, as reported by their authors.
+  House-cusp accuracy also depends on ΔT, nutation and the sidereal-time
+  convention; the fit interval alone gives no house-cusp error bound.
 * **Internal chart consistency.** House cusps and planetary positions use the
   *same* obliquity realization and the *same* ΔT. Using one model for positions and
   another for houses can place a body on the wrong side of a cusp at remote epochs
@@ -137,7 +139,7 @@ difference is the library's own ΔT, so houses and positions share one ΔT.
   2006 GMST expression of Capitaine, Wallace & Chapront 2003, A&A 412, 567) —
   a direct, auditable implementation of published physics.
 
-## The one honest caveat: ΔT at remote epochs
+## Time and model limits at remote epochs
 
 ΔT measures the Earth's rotation, which is **reconstructed** in the deep past
 (from ancient eclipse records) and **unpredictable** in the future. libephemeris
@@ -147,20 +149,11 @@ applied consistently across the whole library (see
 
 At remote epochs the *sidereal time* is extremely sensitive to ΔT: the Sun's mean
 longitude moves ~0.9856°/day ≈ 3548″/day, so a ΔT difference of even a fraction
-of a day is amplified into arcminutes of ARMC. Consequently, comparing against any
-engine that uses a different ΔT at ±8000 years can differ by arcminutes — but that
-difference is **entirely the ΔT-model choice**, not a precession/obliquity error,
-and it is:
-
-* **zero** in the era of real use (1700–2300: sub-arcsecond), and
-* negligible even for historical astrology (within a few arcseconds back to
-  ~1000 BCE — far below the arcminute working precision of any astrologer).
-
-When the same ΔT is used on both sides, the house cusps reproduce the
-published-physics target to **< 0.05″ across the entire supported range** (and the
-mean obliquity to < 0.001″) — i.e. the precession/sidereal-time model itself is an
-exact, independent reproduction of the published physics; only the (physical,
-unavoidable) ΔT choice remains.
+of a day can materially shift ARMC. Comparisons at remote epochs therefore
+require an explicit ΔT choice. Matching ΔT does not by itself match the
+precession, nutation, sidereal-time convention or the physical uncertainty in
+Earth rotation. A numerical comparison under matched models is evidence for
+those tested epochs and conventions, not a global error bound.
 
 ## House cusp speeds (daily motion)
 
