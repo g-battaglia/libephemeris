@@ -189,6 +189,11 @@ kind = "published-algorithms-and-public-data"
 citation = "Meeus (1998), chapter 54; Espenak & Meeus, solar NASA/TP-2006-214141 and lunar NASA/TP-2009-214172/214173; NASA Besselian definitions; JPL Sun/Moon states"
 url = "https://eclipse.gsfc.nasa.gov/SEpubs/5MCSE.html"
 
+[sources.PROJECT_FINITE_SOURCE_CERTIFICATES]
+kind = "project-authored-reviewed-derivation"
+citation = "Independent finite-source three-target geometry and exact strict primal/dual certificate derivation; reviewed validation contract at commit 03292c3390b9a843e0b5547c69c54e5e933b69ec"
+url = "docs/methodology/finite-source-certificates.md"
+
 [sources.PHOTOMETRY]
 kind = "primary-publications-and-official-constants"
 citation = "Mallama & Hilton (2018), Bowell et al. (1989), planet-specific cited photometry, NASA fact sheets, IAU 2015 Resolution B3"
@@ -410,6 +415,16 @@ scientific_content = true
 origin = "Project-authored typed carrier for the classical two-cone shadow geometry of Chauvenet and of the Explanatory Supplement (ch. 11): the axis offset, the cone sections on the fundamental plane and at the shadowed body's surface, the two half-angle cosines with their sines derived, and the radius of the shadowed body, each named for its physical quantity and its unit. The module reads no ephemeris, holds no fitted number and computes no geometry of its own; the sign convention of the inner cone is the classical Besselian sign of l2 and the values are produced by libephemeris/eclipse.py from JPL-backed states."
 sources = ["ECLIPSE_GEOMETRY", "JPL_DE"]
 documentation = ["docs/reference/precision.md", "docs/comparison/known-differences.md"]
+docstring = "detailed"
+
+[[component]]
+id = "finite-source-strict-certificates"
+category = "numerical-method"
+paths = ["libephemeris/_finite_source_certificates.py"]
+scientific_content = true
+origin = "Project-authored exact-rational checker for the independently derived finite-source penumbral, umbral and antumbral target inequalities. It validates strict primal interior points and dual affine ellipsoid separators without generating payloads, obtaining astronomical states, accepting rounded angles or changing public results. Its ordered domain guard distinguishes invalid inputs, unsupported slopes, proved source/occulter ball overlap or touch, and insufficient receiver enclosures."
+sources = ["PROJECT_FINITE_SOURCE_CERTIFICATES"]
+documentation = ["docs/methodology/finite-source-certificates.md"]
 docstring = "detailed"
 
 [[component]]
@@ -820,4 +835,3 @@ origin = "Reviewed LEB2 base-core generated from JPL DE440 and IAU/ERFA-derived 
 sources = ["JPL_DE", "IERS_2010", "ERFA", "CLENSHAW_1955"]
 documentation = ["docs/leb/base-core-provenance.md"]
 generator = ["scripts/generate_leb.py", "scripts/generate_leb2.py"]
-
