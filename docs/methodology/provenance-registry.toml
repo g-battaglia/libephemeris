@@ -194,6 +194,11 @@ kind = "project-authored-reviewed-derivation"
 citation = "Independent finite-source three-target geometry and exact strict primal/dual certificate derivation; reviewed validation contract at commit 03292c3390b9a843e0b5547c69c54e5e933b69ec"
 url = "docs/methodology/finite-source-certificates.md"
 
+[sources.PROJECT_FINITE_SOURCE_INPUT_MODEL]
+kind = "project-authored-reviewed-computational-specification"
+citation = "B-16 finite-source post-return input model and independent bounded review at validation commit aae8dbf0cd5c292e9b2f5830b92d5f0975380ccd; fixed specification SHA-256 e9d3937b290ca2bf7c355b762891cb7de3d3d072063b28638793938aaa837c36"
+url = "docs/methodology/finite-source-native-input.md"
+
 [sources.PHOTOMETRY]
 kind = "primary-publications-and-official-constants"
 citation = "Mallama & Hilton (2018), Bowell et al. (1989), planet-specific cited photometry, NASA fact sheets, IAU 2015 Resolution B3"
@@ -425,6 +430,16 @@ scientific_content = true
 origin = "Project-authored exact-rational checker for the independently derived finite-source penumbral, umbral and antumbral target inequalities. It validates strict primal interior points and dual affine ellipsoid separators without generating payloads, obtaining astronomical states, accepting rounded angles or changing public results. Its ordered domain guard distinguishes invalid inputs, unsupported slopes, proved source/occulter ball overlap or touch, and insufficient receiver enclosures."
 sources = ["PROJECT_FINITE_SOURCE_CERTIFICATES"]
 documentation = ["docs/methodology/finite-source-certificates.md"]
+docstring = "detailed"
+
+[[component]]
+id = "finite-source-native-input-bridge"
+category = "numerical-method"
+paths = ["libephemeris/_finite_source_input_model.py"]
+scientific_content = true
+origin = "Project-authored private arithmetic bridge for the reviewed Sun/Moon post-return binary64 input model at validation aae8dbf. It checks every captured native AU-to-kilometre relation and fixed radius/flattening operation chain bitwise, then derives exact rational two-centre geometry. It has no source receipt, astronomical state acquisition, witness generation or public route."
+sources = ["PROJECT_FINITE_SOURCE_INPUT_MODEL", "IAU_2012_B2"]
+documentation = ["docs/methodology/finite-source-native-input.md"]
 docstring = "detailed"
 
 [[component]]

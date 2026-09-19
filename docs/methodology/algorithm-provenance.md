@@ -284,6 +284,7 @@ the human navigation layer; every row names one registry component.
 | `eclipse-geometry` | Global/local eclipse events and contacts | NASA canon, Meeus, JPL states, physical geometry |
 | `shadow-geometry-record` | Typed carrier of the two shadow cones, the axis offset and the shadowed body's radius | Chauvenet and Explanatory Supplement ch. 11 cone geometry, classical Besselian sign of l2 |
 | `finite-source-strict-certificates` | Private exact-rational validation of strict finite-source penumbral and both core-nappe certificates | Project-authored [derivation](finite-source-certificates.md), reviewed fixed specification; no astronomical state or public claim |
+| `finite-source-native-input-bridge` | Private bitwise checks of native Sun/Moon post-return words and exact-rational two-centre geometry | Reviewed bounded [input model](finite-source-native-input.md), project operation chains and IAU 2012 exact AU; no source receipt or public claim |
 | `atmospheric-refraction` | Closed-form and ray-traced refraction | Bennett/Saemundsson, ISO/ICAO, Auer/Standish |
 | `atmospheric-visibility` | Extinction, contrast/visibility, and heliacal events | Schaefer, Kasten-Young, and named atmosphere publications |
 | `fixed-star-runtime` | Catalogue lookup and three-dimensional space motion | Hipparcos/van Leeuwen/WGSN and ERFA/Vondrak |
