@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -49,6 +50,17 @@ def _history_hits(root: Path) -> set[tuple[str, str]]:
         (artifact.path, artifact.label)
         for artifact in check_provenance._reachable_history_foreign_artifacts(root)
     }
+
+
+def test_provenance_gate_rejects_unsupported_python(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        check_provenance, "sys", SimpleNamespace(version_info=(3, 9, 6))
+    )
+
+    assert check_provenance.main() == 1
+    assert "Python 3.12+ required" in capsys.readouterr().out
 
 
 def test_history_gate_accepts_safe_complete_repository(tmp_path: Path) -> None:

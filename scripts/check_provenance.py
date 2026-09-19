@@ -1243,6 +1243,10 @@ def _reference_narrative_hits(
 
 def main() -> int:
     """Run every repository independence and provenance policy check."""
+    if sys.version_info < (3, 12):
+        print("provenance sweep: Python 3.12+ required (gate: 0)")
+        return 1
+
     name_hits: list[tuple[Path, int, str, str]] = []
 
     # Physical name gate: no reference-distribution directory, source file or
