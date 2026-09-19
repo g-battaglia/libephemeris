@@ -629,6 +629,16 @@ documentation = ["docs/leb/algorithms.md", "docs/leb/guide.md", "docs/leb/base-c
 docstring = "detailed"
 
 [[component]]
+id = "leb-immutable-snapshot-reader"
+category = "numerical-method"
+paths = ["libephemeris/_leb2_snapshot.py"]
+scientific_content = true
+origin = "Project-authored private byte-ownership layer for the reviewed LEB2-v2 base/medium core contract. Fixed independent size/SHA-256 pins are checked before the ordinary project LEB2 parser and evaluator read one immutable buffer. This reader neither changes the public mmap path nor authenticates a selected astronomical state call."
+sources = ["CLENSHAW_1955", "IEEE_754", "ZSTANDARD", "JPL_DE"]
+documentation = ["docs/leb/immutable-snapshot-reader.md", "docs/leb/algorithms.md", "docs/leb/base-core-provenance.md"]
+docstring = "detailed"
+
+[[component]]
 id = "astropy-evaluation"
 category = "verification-tool"
 paths = ["libephemeris/astropy_integration.py"]
