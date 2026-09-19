@@ -199,6 +199,11 @@ kind = "project-authored-reviewed-derivation"
 citation = "Independent finite-source three-target geometry and exact strict primal/dual certificate derivation; reviewed validation contract at commit 03292c3390b9a843e0b5547c69c54e5e933b69ec"
 url = "docs/methodology/finite-source-certificates.md"
 
+[sources.PROJECT_FINITE_SOURCE_STRICT_PROPOSER]
+kind = "project-authored-reviewed-computational-specification"
+citation = "Disconnected finite-policy projected saddle proposer for exact finite-source strict certificates; reviewed validation contract at commit 8754dba, SHA-256 a0300389313401ef69789a39e3ead7b490edbecef1b216ebdbbc731dbb9b516b"
+url = "docs/methodology/finite-source-strict-proposer.md"
+
 [sources.PROJECT_FINITE_SOURCE_ALGEBRAIC_CONTACT]
 kind = "project-authored-reviewed-derivation"
 citation = "Exact algebraic per-target contact certificate and independent root-sign method; disconnected verifier specification and review at validation commit 658875fd084ee339873d708687ff99d365b7bd9c"
@@ -450,6 +455,16 @@ scientific_content = true
 origin = "Project-authored exact-rational checker for the independently derived finite-source penumbral, umbral and antumbral target inequalities. It validates strict primal interior points and dual affine ellipsoid separators without generating payloads, obtaining astronomical states, accepting rounded angles or changing public results. Its ordered domain guard distinguishes invalid inputs, unsupported slopes, proved source/occulter ball overlap or touch, and insufficient receiver enclosures."
 sources = ["PROJECT_FINITE_SOURCE_CERTIFICATES"]
 documentation = ["docs/methodology/finite-source-certificates.md"]
+docstring = "detailed"
+
+[[component]]
+id = "finite-source-strict-proposer"
+category = "numerical-method"
+paths = ["libephemeris/_finite_source_strict_proposer.py"]
+scientific_content = true
+origin = "Project-authored disconnected finite-policy Decimal proposer. It derives affine forms and a uniform gradient bound from exact validated geometry, generates rational primal and dual candidates at atomic checkpoints, and delegates every decisive strict result to the independent exact verifier. It has no astronomical source, contact equality decision, whole-call resource cap, or public route."
+sources = ["PROJECT_FINITE_SOURCE_STRICT_PROPOSER", "PROJECT_FINITE_SOURCE_CERTIFICATES"]
+documentation = ["docs/methodology/finite-source-strict-proposer.md"]
 docstring = "detailed"
 
 [[component]]
