@@ -301,6 +301,7 @@ the human navigation layer; every row names one registry component.
 | `vendored-tass` | MIT TASS adaptation and periodic-term table | Identified upstream, retained license, and TASS publication |
 | `leb-representation` | Project LEB formats, compression, readers, and evaluation | Clenshaw, IEEE-754, Zstandard, measured error budgets |
 | `leb-immutable-snapshot-reader` | Private fixed-identity LEB2-v2 byte snapshot before shared parsing and evaluation | Reviewed [bounded contract](../leb/immutable-snapshot-reader.md), fixed base/medium asset pins; no state receipt |
+| `default-time-snapshot` | Private byte-owned default Delta-T constructor and evaluator | Reviewed [bounded contract](default-time-snapshot.md), fixed three-asset pins and versioned Skyfield/NumPy operation chain; no ordinary Time or state receipt |
 | `astropy-evaluation` | Optional independent comparison bridge | Astropy upstream; diagnostics never become model data |
 | `vendored-spk-type21` | MIT type-21 reader | Exact upstream/version/license/local edits |
 
