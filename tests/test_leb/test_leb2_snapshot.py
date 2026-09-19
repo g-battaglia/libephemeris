@@ -467,6 +467,30 @@ def test_fixed_allowlist_and_production_admission_ignore_mutable_fields() -> Non
             _ = snap.production_asset_tag
 
 
+def test_admission_is_instance_owned_without_global_alias(tmp_path: Path) -> None:
+    """Two readers retain separate admissions and close releases each one."""
+    path, record = _synthetic(tmp_path)
+    assert not hasattr(snapshot_module, "_ADMISSIONS")
+    first = _open_test_snapshot(path, record)
+    second = _open_test_snapshot(path, record)
+    original = first._admission
+    assert original is not None
+    assert second._admission is not original
+    assert second._snapshot is not first._snapshot
+    assert first._snapshot is not None
+    first._admission = snapshot_module._ProductionAdmission(
+        record, first._snapshot, "base"
+    )
+    with pytest.raises(_SnapshotIntegrityError):
+        _ = first.production_asset_tag
+    first._admission = original
+    first.close()
+    assert first._admission is None
+    assert second._admission is not None
+    assert second.production_asset_tag is None
+    second.close()
+
+
 def test_postclose_guards_caches_and_context_exit(tmp_path: Path) -> None:
     path, record = _synthetic(
         tmp_path, with_nutation=True, with_delta_t=True, with_stars=True

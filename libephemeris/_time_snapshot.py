@@ -18,7 +18,6 @@ import io
 import math
 import os
 import struct
-import weakref
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -147,11 +146,6 @@ class _Admission:
 @dataclass(frozen=True, slots=True)
 class _ProductionAdmission(_Admission):
     """Capability issued solely by the fixed production factory."""
-
-
-_ADMISSIONS: weakref.WeakKeyDictionary[_OwnedDefaultTime, _Admission] = (
-    weakref.WeakKeyDictionary()
-)
 
 
 def _source_digest(path: Path) -> str:
@@ -442,10 +436,11 @@ class _OwnedDefaultTime:
     about physical validity or about any ordinary public call.
     """
 
-    __slots__ = ("_owned", "_timescale", "_arrays", "__weakref__")
+    __slots__ = ("_owned", "_timescale", "_arrays", "_admission", "__weakref__")
     _owned: tuple[bytes, ...] | None
     _timescale: Timescale | None
     _arrays: tuple[np.ndarray, ...] | None
+    _admission: _Admission | None
 
     def __init__(self) -> None:
         raise TypeError("use a verified private time factory")
@@ -454,13 +449,17 @@ class _OwnedDefaultTime:
         """Revalidate exact owned bytes and the evaluator backing a claim."""
         if self._owned is None or self._timescale is None:
             raise _TimeSnapshotClosedError("private default time is closed")
-        admission = _ADMISSIONS.get(self)
+        admission = getattr(self, "_admission", None)
         if (
             admission is None
             or self._owned is not admission.owned
             or self._timescale is not admission.timescale
         ):
             raise _TimeSnapshotIntegrityError("time evaluator lacks its admission")
+        if isinstance(admission, _ProductionAdmission) != (
+            type(self) is _ProductionOwnedDefaultTime
+        ):
+            raise _TimeSnapshotIntegrityError("time admission class differs")
         for pin, owned in zip(admission.pins, admission.owned):
             if (
                 type(owned) is not bytes
@@ -549,7 +548,7 @@ class _OwnedDefaultTime:
 
     def close(self) -> None:
         """Idempotently release admission, bytes, arrays, and Timescale."""
-        _ADMISSIONS.pop(self, None)
+        self._admission = None
         self._owned = None
         self._arrays = None
         self._timescale = None
@@ -560,6 +559,12 @@ class _OwnedDefaultTime:
 
     def __exit__(self, *_exc: object) -> None:
         self.close()
+
+
+class _ProductionOwnedDefaultTime(_OwnedDefaultTime):
+    """Factory-only production object class distinct from test evaluators."""
+
+    __slots__ = ()
 
 
 def _open(
@@ -576,13 +581,16 @@ def _open(
     owned = _copy_all(paths, ordered_pins)
     arrays = _parse_arrays(owned, shape)
     timescale, held = _build_timescale(arrays)
-    reader = object.__new__(_OwnedDefaultTime)
+    reader = object.__new__(
+        _ProductionOwnedDefaultTime if production else _OwnedDefaultTime
+    )
     reader._owned = owned
     reader._timescale = timescale
     reader._arrays = held
+    reader._admission = None
     admission_type = _ProductionAdmission if production else _Admission
     try:
-        _ADMISSIONS[reader] = admission_type(ordered_pins, owned, timescale)
+        reader._admission = admission_type(ordered_pins, owned, timescale)
     except BaseException:
         reader.close()
         raise

@@ -173,6 +173,11 @@ def mean_obliquity_rad(jd_tt: float) -> float:
     Returns:
         The of-date mean obliquity in radians.
     """
+    return _mean_obliquity_rad_uncached(jd_tt)
+
+
+def _mean_obliquity_rad_uncached(jd_tt: float) -> float:
+    """Evaluate the same pole-angle chain without the process-global cache."""
     epj = _julian_epoch(jd_tt)
     ex, ey, ez = (float(c) for c in erfa.ltpecl(epj))
     qx, qy, qz = (float(c) for c in erfa.ltpequ(epj))

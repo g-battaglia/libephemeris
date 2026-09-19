@@ -603,8 +603,20 @@ def test_admission_is_immutable_and_close_releases_references(tmp_path: Path) ->
     assert not hasattr(private, "__dict__")
     assert private._arrays is not None
     assert all(not array.flags.writeable for array in private._arrays)
-    admission = snapshot._ADMISSIONS[private]
+    assert not hasattr(snapshot, "_ADMISSIONS")
+    admission = private._admission
+    assert admission is not None
     assert admission.owned is private._owned
+    other = _open_test_time(paths, pins, _SHAPE)
+    assert other._admission is not admission
+    assert other._owned is not private._owned
+    private._admission = snapshot._ProductionAdmission(
+        admission.pins, admission.owned, admission.timescale
+    )
+    with pytest.raises(_TimeSnapshotIntegrityError):
+        private.production_asset_tag  # noqa: B018
+    private._admission = admission
+    other.close()
     direct = object.__new__(snapshot._OwnedDefaultTime)
     direct._owned = private._owned
     direct._timescale = private._timescale
@@ -625,7 +637,7 @@ def test_admission_is_immutable_and_close_releases_references(tmp_path: Path) ->
     )
     private.close()
     private.close()
-    assert private not in snapshot._ADMISSIONS
+    assert private._admission is None
     assert private._owned is private._arrays is private._timescale is None
     with pytest.raises(_TimeSnapshotClosedError):
         private.production_asset_tag  # noqa: B018

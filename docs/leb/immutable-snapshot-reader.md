@@ -21,6 +21,9 @@ the medium record is 37,276,175 bytes with SHA-256
 The digest check relies on the standard SHA-256 collision-resistance
 assumption. A separate synthetic-fixture factory exercises the same copy,
 hash and parse path but cannot issue a production-asset identity.
+Each live reader holds its own admission record; no module-level registry
+holds aliases to reader objects or their full copied bytes. Production and
+test readers have distinct concrete classes, and close clears the admission.
 
 All subsequent metadata reads, chunk decompression and evaluations consume
 the accepted immutable object. The snapshot has no mmap prefetch or cache

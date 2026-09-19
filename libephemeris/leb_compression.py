@@ -303,6 +303,8 @@ def decompress_body(
     segment_count: int,
     degree: int,
     components: int,
+    *,
+    decoder: zstd.ZstdDecompressor | None = None,
 ) -> bytes:
     """Decompress a body's Chebyshev coefficients.
 
@@ -315,8 +317,13 @@ def decompress_body(
         ValueError: If the blob is not valid zstd data (corrupted file).
     """
     try:
-        with _DECOMPRESSOR_LOCK:
-            decompressed = _DECOMPRESSOR.decompress(
+        if decoder is None:
+            with _DECOMPRESSOR_LOCK:
+                decompressed = _DECOMPRESSOR.decompress(
+                    compressed, max_output_size=uncompressed_size
+                )
+        else:
+            decompressed = decoder.decompress(
                 compressed, max_output_size=uncompressed_size
             )
     except zstd.ZstdError as exc:

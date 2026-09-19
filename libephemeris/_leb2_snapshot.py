@@ -22,13 +22,15 @@ import hashlib
 import os
 import struct
 import threading
-import weakref
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Optional, Tuple
 
+import zstandard as zstd
+
 from .exceptions import LEBCorruptionError
 from .leb2_reader import LEB2Reader
+from .leb_compression import decompress_body
 from .leb_format import LEB2_VERSION, StarEntry
 
 _COPY_CHUNK_SIZE = 65536
@@ -72,11 +74,6 @@ class _ProductionAdmission(_SnapshotAdmission):
     """Capability issued only by the fixed production factory."""
 
     tier: str
-
-
-_ADMISSIONS: weakref.WeakKeyDictionary[_LEB2SnapshotReader, _SnapshotAdmission] = (
-    weakref.WeakKeyDictionary()
-)
 
 
 class _SnapshotIntegrityError(ValueError):
@@ -138,6 +135,8 @@ class _LEB2SnapshotReader(LEB2Reader):
     """Byte-owned LEB2-v2 reader sharing the ordinary parser and evaluator."""
 
     _snapshot: bytes | None
+    _private_decoder: zstd.ZstdDecompressor | None
+    _admission: _SnapshotAdmission | None
 
     def __init__(self) -> None:
         raise TypeError("use a verified snapshot factory")
@@ -159,6 +158,7 @@ class _LEB2SnapshotReader(LEB2Reader):
         reader = object.__new__(cls)
         reader._path = path
         reader._snapshot = snapshot
+        reader._admission = None
         setattr(reader, "_file", None)
         setattr(reader, "_mm", snapshot)
         reader._cache = {}
@@ -167,6 +167,7 @@ class _LEB2SnapshotReader(LEB2Reader):
         reader._chunk_index = {}
         reader._chunked = False
         reader._eval_cache = {}
+        reader._private_decoder = zstd.ZstdDecompressor()
         try:
             reader._parse()
             if reader._header.version != LEB2_VERSION or not reader._chunked:
@@ -191,7 +192,7 @@ class _LEB2SnapshotReader(LEB2Reader):
     def _checked_admission(self) -> _SnapshotAdmission:
         """Bind identity claims to the unchanged, factory-admitted bytes."""
         self._require_open()
-        admission = _ADMISSIONS.get(self)
+        admission = self._admission
         if admission is None:
             raise _SnapshotIntegrityError("snapshot has no factory admission")
         owned = self._snapshot
@@ -201,6 +202,10 @@ class _LEB2SnapshotReader(LEB2Reader):
             or self._mm is not owned
         ):
             raise _SnapshotIntegrityError("snapshot no longer owns admitted bytes")
+        if isinstance(admission, _ProductionAdmission) != (
+            type(self) is _ProductionLEB2SnapshotReader
+        ):
+            raise _SnapshotIntegrityError("snapshot admission class differs")
         if (
             len(owned) != admission.record.byte_count
             or hashlib.sha256(owned).hexdigest() != admission.record.sha256
@@ -282,6 +287,28 @@ class _LEB2SnapshotReader(LEB2Reader):
         self._require_open()
         return super()._read_blob(offset, size, what)
 
+    def _decode_coefficients(
+        self,
+        compressed: bytes,
+        uncompressed_size: int,
+        segment_count: int,
+        degree: int,
+        components: int,
+    ) -> bytes:
+        """Use this snapshot's decoder while sharing the lossless transforms."""
+        self._require_open()
+        decoder = self._private_decoder
+        if decoder is None:
+            raise _SnapshotClosedError("snapshot decoder is closed")
+        return decompress_body(
+            compressed,
+            uncompressed_size,
+            segment_count,
+            degree,
+            components,
+            decoder=decoder,
+        )
+
     def _eval_body_split(
         self, body_id: int, jd: float, offset: float
     ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
@@ -335,7 +362,7 @@ class _LEB2SnapshotReader(LEB2Reader):
 
     def close(self) -> None:
         """Idempotently drop owned bytes, parsed metadata, and all caches."""
-        _ADMISSIONS.pop(self, None)
+        self._admission = None
         with self._decomp_lock:
             self._cache.clear()
             self._chunk_cache.clear()
@@ -351,8 +378,13 @@ class _LEB2SnapshotReader(LEB2Reader):
                     values.clear()
             setattr(self, "_mm", None)
             self._snapshot = None
+            self._private_decoder = None
             self._nutation = None
             setattr(self, "_header", None)
+
+
+class _ProductionLEB2SnapshotReader(_LEB2SnapshotReader):
+    """Factory-only production object class distinct from test snapshots."""
 
 
 def _open_production_snapshot(
@@ -364,8 +396,10 @@ def _open_production_snapshot(
     record = _PRODUCTION_MANIFEST[tier]
     local_path = os.fspath(path)
     snapshot = _copy_verified(local_path, record)
-    reader = _LEB2SnapshotReader._from_verified_bytes(snapshot, local_path, record)
-    _ADMISSIONS[reader] = _ProductionAdmission(record, snapshot, tier)
+    reader = _ProductionLEB2SnapshotReader._from_verified_bytes(
+        snapshot, local_path, record
+    )
+    reader._admission = _ProductionAdmission(record, snapshot, tier)
     return reader
 
 
@@ -377,5 +411,5 @@ def _open_test_snapshot(
     local_path = os.fspath(path)
     snapshot = _copy_verified(local_path, record)
     reader = _LEB2SnapshotReader._from_verified_bytes(snapshot, local_path, record)
-    _ADMISSIONS[reader] = _SnapshotAdmission(record, snapshot)
+    reader._admission = _SnapshotAdmission(record, snapshot)
     return reader

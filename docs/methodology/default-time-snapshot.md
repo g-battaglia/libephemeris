@@ -35,6 +35,9 @@ reject malformed epochs, leap tables and spline intervals. A separate
 synthetic factory exercises the same path but cannot issue a production
 asset identity. A live production tag is bound to the still-owned byte
 objects and is rechecked on retrieval; closing the evaluator drops it.
+The admission is owned by that evaluator instance, with no module-level
+registry of live objects or asset bytes. Production and test evaluators have
+distinct concrete classes.
 SHA-256 identity relies on the usual collision-resistance assumption.
 
 For this first environment, the implementation also guards the exact

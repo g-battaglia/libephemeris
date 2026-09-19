@@ -654,6 +654,16 @@ documentation = ["docs/methodology/default-time-snapshot.md", "docs/methodology/
 docstring = "detailed"
 
 [[component]]
+id = "private-sun-moon-state-reducer"
+category = "scientific-pipeline"
+paths = ["libephemeris/_private_state_reducer.py"]
+scientific_content = true
+origin = "Project-authored disconnected diagnostic pipeline over fixed immutable LEB and default-time snapshots. It reuses the existing apparent-state arithmetic, instruments concrete source/control branches, and bypasses ordinary numerical caches; incomplete transitive code, binary and constant inventory prevents a source-receipt claim."
+sources = ["JPL_DE", "CLENSHAW_1955", "IERS_2010", "VONDRAK_2011", "ERFA", "DELTA_T", "SKYFIELD", "NUMPY", "ZSTANDARD", "IEEE_754"]
+documentation = ["docs/methodology/private-sun-moon-state-reducer.md", "docs/methodology/default-time-snapshot.md", "docs/leb/immutable-snapshot-reader.md"]
+docstring = "detailed"
+
+[[component]]
 id = "astropy-evaluation"
 category = "verification-tool"
 paths = ["libephemeris/astropy_integration.py"]

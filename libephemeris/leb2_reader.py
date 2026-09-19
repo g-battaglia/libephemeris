@@ -334,7 +334,7 @@ class LEB2Reader:
             chunk.compressed_size,
             f"chunk (body {body_id}, chunk {chunk_idx})",
         )
-        decompressed = decompress_body(
+        decompressed = self._decode_coefficients(
             compressed,
             chunk.uncompressed_size,
             chunk.segment_count,
@@ -374,7 +374,7 @@ class LEB2Reader:
         compressed = self._read_blob(
             entry.data_offset, entry.compressed_size, f"body {body_id}"
         )
-        data = decompress_body(
+        data = self._decode_coefficients(
             compressed,
             entry.uncompressed_size,
             entry.segment_count,
@@ -384,6 +384,19 @@ class LEB2Reader:
         # Runs under _decomp_lock (held by the caller)
         self._cache[body_id] = data
         return data
+
+    def _decode_coefficients(
+        self,
+        compressed: bytes,
+        uncompressed_size: int,
+        segment_count: int,
+        degree: int,
+        components: int,
+    ) -> bytes:
+        """Use the ordinary global decoder; private snapshots override it."""
+        return decompress_body(
+            compressed, uncompressed_size, segment_count, degree, components
+        )
 
     def __enter__(self) -> "LEB2Reader":
         return self

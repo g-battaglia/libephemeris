@@ -631,13 +631,18 @@ def _apply_gravitational_deflection(
     result = list(geo)
     pmag = math.sqrt(result[0] ** 2 + result[1] ** 2 + result[2] ** 2)
     if pmag == 0.0:
+        _record_private_control("deflection_zero_geocentric_vector")
         return geo
 
     for defl_body_id, rmass in _DEFLECTORS:
+        _record_private_control("deflector_selected", body=defl_body_id)
         # 1. Deflector barycentric position at observation time
         try:
             defl_pos, _ = reader.eval_body(defl_body_id, jd_tt)
         except (KeyError, ValueError):
+            _record_private_control(
+                "deflector_observation_read_skipped", body=defl_body_id
+            )
             continue
 
         # 2. Deflector relative to observer
@@ -656,11 +661,19 @@ def _apply_gravitational_deflection(
         # 5. Clamp and compute time at closest approach
         tclose_offset = max(0.0, min(dlt, light_time))
         tclose_jd = jd_tt - tclose_offset
+        _record_private_control(
+            "deflector_closest_approach",
+            body=defl_body_id,
+            raw_offset=dlt,
+            clamped_offset=tclose_offset,
+            epoch=tclose_jd,
+        )
 
         # 6. Deflector position at closest approach
         try:
             defl_close, _ = reader.eval_body(defl_body_id, tclose_jd)
         except (KeyError, ValueError):
+            _record_private_control("deflector_closest_read_skipped", body=defl_body_id)
             continue
 
         # 7. pe = observer - deflector (observer relative to deflector)
@@ -687,6 +700,9 @@ def _apply_gravitational_deflection(
         # supported geocentric/heliocentric observer (Earth is >= 0.98 AU
         # from the Sun and >= 4 AU from Jupiter/Saturn).
         if qmag == 0.0 or emag < 0.01:
+            _record_private_control(
+                "deflector_near_skip", body=defl_body_id, qmag=qmag, emag=emag
+            )
             continue
 
         qhat = (pq[0] / qmag, pq[1] / qmag, pq[2] / qmag)
@@ -698,6 +714,9 @@ def _apply_gravitational_deflection(
 
         # Skip if object is on the line-of-sight to the deflector
         if abs(edotp) > 0.99999999999:
+            _record_private_control(
+                "deflector_line_of_sight_skip", body=defl_body_id, edotp=edotp
+            )
             continue
 
         fac1 = 2.0 * _GS / (_C_MS * _C_MS * emag * _AU_M * rmass)
@@ -712,6 +731,13 @@ def _apply_gravitational_deflection(
         fac2 = 1.0 + qdote
         if fac2 < dlim:
             fac2 = dlim
+            _record_private_control(
+                "deflector_limiter", body=defl_body_id, limited=True
+            )
+        else:
+            _record_private_control(
+                "deflector_limiter", body=defl_body_id, limited=False
+            )
 
         coeff = fac1 / fac2 * pmag
         result[0] += coeff * (pdotq * ehat[0] - edotp * qhat[0])
@@ -873,6 +899,14 @@ def _get_leb_precession_matrix(
 # when state.close() releases the reader (via _reset_active_reader()).
 _active_local = threading.local()
 _active_generation: int = 0
+_private_state_local = threading.local()
+
+
+def _record_private_control(kind: str, **details: object) -> None:
+    """Emit an opt-in private branch fact without supplying numeric inputs."""
+    recorder = getattr(_private_state_local, "control", None)
+    if recorder is not None:
+        recorder(kind, details)
 
 
 def _reset_active_reader() -> None:
@@ -908,6 +942,9 @@ def _frame_data(
 
     Uses the thread-local active reader set by _fast_calc_core().
     """
+    private_provider = getattr(_private_state_local, "frame", None)
+    if private_provider is not None:
+        return private_provider(jd_tt)
     if _active_has_nutation():
         return _get_leb_frame_data(_active_local.reader, jd_tt)
     return _get_skyfield_frame_data(jd_tt)
@@ -1451,6 +1488,7 @@ def _frame_transform(
     # on the bodies sampled), where an earlier revision returned the plain
     # J2000 mean-equinox value and a comment claimed that matched.
     _icrs = bool(iflag & FLG_ICRS)
+    _record_private_control("frame_request", flags=iflag, xyz=want_xyz)
     if (iflag & FLG_EQUATORIAL) and (iflag & FLG_J2000):
         # Mean equator/equinox of J2000: ICRS rotated by IAU 2006 frame bias.
         # Under FLG_ICRS the bias is dropped, so the vector IS the output.
@@ -1546,6 +1584,7 @@ def _pipeline_icrs(
     # _fast_calc_core, so the module-level reference must be refreshed here
     # to avoid using a stale (closed) reader after state.close().
     _set_active_reader(reader)
+    _record_private_control("pipeline_icrs", body=ipl, system_bary=is_system_bary)
 
     # 1. Evaluate the public body center, retaining the system barycentre only
     # when no JPL center segment covers this epoch.
@@ -1598,13 +1637,24 @@ def _pipeline_icrs(
         # For HELCTR the observer is the Sun at the observation epoch; for
         # BARYCTR it is the SSB.
         retarded_pos = target_pos
-        for _ in range(3):  # Fixed-point iterations
+        for iteration in range(3):  # Fixed-point iterations
             dist = _vec3_dist(geo)
             if dist == 0.0:
+                _record_private_control(
+                    "light_time_early_exit", body=ipl, iteration=iteration
+                )
                 break
             lt = dist / C_LIGHT_AU_DAY
             rounded_jd = jd_tt - lt
             epoch_offset = math.fsum((jd_tt, -lt, -rounded_jd))
+            _record_private_control(
+                "light_time_iteration",
+                body=ipl,
+                iteration=iteration,
+                rounded_jd=rounded_jd,
+                residual=epoch_offset,
+                light_time=lt,
+            )
             retarded_pos, retarded_vel = _eval_body_center_state(
                 reader,
                 ipl,
@@ -1658,6 +1708,7 @@ def _pipeline_icrs(
     #    aberration (FLG_ASTROMETRIC combines NOABERR and NOGDEFL).
     _do_defl = not (iflag & (FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS))
     _do_defl = _do_defl and ipl != MOON and lt > 0.0
+    _record_private_control("deflection_branch", body=ipl, applied=_do_defl)
     _defl_delta: Tuple[float, float, float] = (0.0, 0.0, 0.0)
     if _do_defl:
         _pre_defl = geo
@@ -1667,6 +1718,7 @@ def _pipeline_icrs(
 
     # 6. Aberration (full special-relativistic, matching Skyfield).
     _do_aber = not (iflag & (FLG_NOABERR | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS))
+    _record_private_control("aberration_branch", body=ipl, applied=_do_aber)
     if _do_aber:
         geo = _apply_aberration(geo, earth_vel, lt)
 

@@ -114,6 +114,11 @@ def _precession_matrix(jd_tt: float, frame_bias: bool) -> Matrix3:
     Returns:
         The 3x3 precession rotation matrix as nested tuples of floats.
     """
+    return _precession_matrix_uncached(jd_tt, frame_bias)
+
+
+def _precession_matrix_uncached(jd_tt: float, frame_bias: bool) -> Matrix3:
+    """Evaluate the same ERFA precession chain without the global cache."""
     epj = _julian_epoch(jd_tt)
     p = erfa.ltpb(epj) if frame_bias else erfa.ltp(epj)
     return (
@@ -187,7 +192,12 @@ def vondrak_precession_matrix(jd_tt: float, frame_bias: bool = True) -> Matrix3:
 
 
 def vondrak_pn_matrix(
-    jd_tt: float, dpsi: float, deps: float, frame_bias: bool = True
+    jd_tt: float,
+    dpsi: float,
+    deps: float,
+    frame_bias: bool = True,
+    *,
+    _uncached: bool = False,
 ) -> Tuple[Matrix3, float]:
     """Full ICRS -> true-equator-of-date reduction matrix and true obliquity.
 
@@ -212,11 +222,20 @@ def vondrak_pn_matrix(
         Tuple ``(pn_mat, eps_true_rad)`` where ``pn_mat`` is the nested-tuple
         rotation matrix and ``eps_true_rad = eps_mean + deps``.
     """
-    eps_mean_rad = _mean_obliquity_rad(jd_tt)
+    if _uncached:
+        from .sidereal_longterm import _mean_obliquity_rad_uncached
+
+        eps_mean_rad = _mean_obliquity_rad_uncached(jd_tt)
+    else:
+        eps_mean_rad = _mean_obliquity_rad(jd_tt)
 
     # Standard nutation matrix (mean -> true equator of date).
     n = erfa.numat(eps_mean_rad, dpsi, deps)
-    p = np.asarray(_precession_matrix(jd_tt, frame_bias))
+    p = np.asarray(
+        _precession_matrix_uncached(jd_tt, frame_bias)
+        if _uncached
+        else _precession_matrix(jd_tt, frame_bias)
+    )
     pn = n @ p
 
     pn_mat: Matrix3 = (
