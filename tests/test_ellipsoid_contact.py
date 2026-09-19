@@ -369,6 +369,45 @@ def test_private_certification_replays_prior_attempt_ledger(
     assert result.status is _ContactCapabilityStatus.INVALID_CERTIFICATION
 
 
+@pytest.mark.parametrize("kind", ["bogus", "equality"])
+def test_private_certification_rejects_extra_strict_ledger_kind(
+    monkeypatch, kind
+) -> None:
+    """Strict ledgers cannot hide unknown or equality entries."""
+    inputs = _build_contact_inputs(
+        _frame(
+            metric_km_minus_2=(
+                (1.0 / 9.0, 0.0, 0.0),
+                (0.0, 1.0 / 9.0, 0.0),
+                (0.0, 0.0, 0.25),
+            ),
+            axis_point_km=(-5.0, 0.0, 0.0),
+            axis_span=(0.0, 1.0, 1.0),
+        ),
+        2.0,
+        1.0,
+        2.0,
+        1.0,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert not isinstance(inputs, _ContactCapabilityBlock)
+    real = _generate_global_witness(inputs.frame, inputs.penumbra, max_level=1)
+    extra = dataclasses.replace(real.attempted_candidates[0], kind=kind)
+    forged = dataclasses.replace(
+        real,
+        attempted_candidates=(extra,) + real.attempted_candidates,
+    )
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._generate_global_witness",
+        lambda *_args, **_kwargs: forged,
+    )
+    result = _certify_contact_inputs(inputs, max_level=1)
+    assert not isinstance(result, _CertifiedContactProofs)
+    assert result.status is _ContactCapabilityStatus.INVALID_CERTIFICATION
+
+
 @pytest.mark.parametrize("variant_index", [-1, 1, 99])
 def test_private_certification_rejects_forged_equality_variant(
     monkeypatch, variant_index
@@ -388,6 +427,33 @@ def test_private_certification_rejects_forged_equality_variant(
     real = _generate_global_witness(inputs.frame, inputs.penumbra, max_level=0)
     assert real.status is _WitnessGenerationStatus.CONTACT
     forged = dataclasses.replace(real, equality_variant_index=variant_index)
+    monkeypatch.setattr(
+        "libephemeris.ellipsoid_contact._generate_global_witness",
+        lambda *_args, **_kwargs: forged,
+    )
+    result = _certify_contact_inputs(inputs, max_level=0)
+    assert not isinstance(result, _CertifiedContactProofs)
+    assert result.status is _ContactCapabilityStatus.INVALID_CERTIFICATION
+
+
+def test_private_certification_rejects_extra_contact_ledger_entry(monkeypatch) -> None:
+    """Contact ledger contains exactly the canonical equality entry."""
+    inputs = _build_contact_inputs(
+        _frame(axis_point_km=(0.0, 0.0, -3.0), axis_span=(0.0, 0.0, 1.0)),
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        10.0,
+        1.0,
+        _source_tag(),
+    )
+    assert not isinstance(inputs, _ContactCapabilityBlock)
+    real = _generate_global_witness(inputs.frame, inputs.penumbra, max_level=0)
+    forged = dataclasses.replace(
+        real,
+        attempted_candidates=real.attempted_candidates + real.attempted_candidates,
+    )
     monkeypatch.setattr(
         "libephemeris.ellipsoid_contact._generate_global_witness",
         lambda *_args, **_kwargs: forged,

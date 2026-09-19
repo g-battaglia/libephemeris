@@ -1038,11 +1038,25 @@ def _generation_evidence_error(
         for record in generated.precision_evidence
     ):
         return "accepted precision decisions do not match the decisive proof"
+    if generated.status is _WitnessGenerationStatus.CONTACT:
+        if len(generated.attempted_candidates) != 1 or any(
+            attempt.kind != "equality" for attempt in generated.attempted_candidates
+        ):
+            return "contact generator ledger must contain one equality attempt"
+    elif any(
+        attempt.kind not in {"primal", "dual"}
+        for attempt in generated.attempted_candidates
+    ):
+        return "strict generator ledger contains an unknown candidate kind"
     strict_ledger = tuple(
         attempt
         for attempt in generated.attempted_candidates
         if attempt.kind in {"primal", "dual"}
     )
+    if generated.status is not _WitnessGenerationStatus.CONTACT and (
+        len(strict_ledger) != len(generated.attempted_candidates)
+    ):
+        return "strict generator ledger length is inconsistent"
     stream = _canonical_strict_candidates(frame, cone, generated.multiplier_evidence)
     for attempt, canonical in zip(strict_ledger, stream):
         kind, level, indices, payload = canonical
