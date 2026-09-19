@@ -97,6 +97,15 @@ def test_higher_degree_root_can_encode_rational_dual() -> None:
         hi=F(2),
     )
     assert _verify_algebraic_contact(geometry, _Target.PENUMBRA, payload)
+    reducible = _payload(
+        F(2, 25),
+        (F(0), F(0), F(8, 25)),
+        F(0),
+        P=(6, -2, -3, 1),
+        lo=F(1),
+        hi=F(2),
+    )
+    assert _verify_algebraic_contact(geometry, _Target.PENUMBRA, reducible)
 
 
 @pytest.mark.parametrize(
@@ -204,6 +213,21 @@ def test_penumbral_full_cone_apex_fails_the_physical_gate() -> None:
         F(11, 4),
         F(1, 4),
     )
+    payload = _payload(F(2, 25), (F(0), F(0), F(8, 25)), F(0))
+    assert not _verify_algebraic_contact(geometry, _Target.PENUMBRA, payload)
+
+
+def test_wrong_penumbral_nappe_fails_even_with_tangent_support() -> None:
+    """A negative cone side is rejected despite zero squared residual."""
+    geometry = _geometry(
+        (F(-119, 30), F(63, 80), F(0)),
+        (F(31, 30), F(63, 80), F(0)),
+        F(11, 4),
+        F(1, 4),
+    )
+    tangent_point = (F(3, 5), F(4, 5), F(0))
+    a, gate, h_t, _ = geometry._target_values(_Target.PENUMBRA, tangent_point)
+    assert a == F(-1, 4) and a * a == h_t and gate == F(-17, 12)
     payload = _payload(F(2, 25), (F(0), F(0), F(8, 25)), F(0))
     assert not _verify_algebraic_contact(geometry, _Target.PENUMBRA, payload)
 
