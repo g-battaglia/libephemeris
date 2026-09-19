@@ -9,7 +9,9 @@ at validation commit `c9f609891aea4c041a642198450e3f6c60ace43a`, SHA-256
 The project-authored mathematical derivation and reviewed design are in audit
 `B16_CANONICAL_CONTACT_GENERATOR_DRAFT.md`, SHA-256
 `6dca6e6964cebe89a52275f27c1cd71226911bc8a09053693345a651471964bf`.
-The audit review approved an implementation contract, not a runtime route.
+The audit rereview approved only a non-normative mathematical design. The
+validation specification and its independent rereview supplied the
+disconnected implementation contract; neither approved a runtime route.
 
 ## Exact fixed-state problem
 

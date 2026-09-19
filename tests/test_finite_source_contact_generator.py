@@ -310,6 +310,27 @@ def test_no_contact_result_is_not_a_miss_certificate() -> None:
     assert result.trace[2].summary.reason is _SummaryReason.PENUMBRAL_APEX_EXCLUDED
 
 
+@pytest.mark.parametrize("target", [_Target.UMBRA, _Target.ANTUMBRA])
+def test_core_apex_off_receiver_is_recorded_exactly(target: _Target) -> None:
+    zero = F(0)
+    geometry = _ValidatedGeometry(
+        (F(-12), zero, zero),
+        (F(-7), zero, zero),
+        F(2),
+        F(1),
+        _diagonal(F(1), F(1), F(1)),
+        F(1),
+    )
+    result = _generate_algebraic_contact(geometry, target)
+    assert result.status is _ContactGenerationStatus.NO_CONTACT_EXHAUSTED
+    apex = result.trace[2]
+    assert apex.summary.reason is _SummaryReason.APEX_OFF_RECEIVER
+    assert apex.summary.reason_value == (F(3),)
+    assert apex.summary.root_count == 0
+    assert apex.summary.point_count == 0
+    assert apex.attempts == ()
+
+
 def test_malformed_base_geometry_is_revalidated_before_generation() -> None:
     geometry = _smooth()
     object.__setattr__(geometry, "r", F(-1))
