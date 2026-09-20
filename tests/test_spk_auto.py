@@ -28,6 +28,13 @@ from libephemeris.constants import (
 )
 
 
+def _fake_direct_spk_download(**kwargs):
+    """Stand in for the direct client while honoring its staging directory."""
+    generated = Path(kwargs["path"]) / "generated-name.bsp"
+    generated.write_bytes(b"DAF/SPK fixture")
+    return str(generated)
+
+
 class TestAutoSpkConfig:
     """Test AutoSpkConfig class."""
 
@@ -1067,7 +1074,7 @@ class TestDownloadSpkFromHorizonsDirectoryCreation:
     @patch("libephemeris.spk.download_spk")
     def test_creates_output_directory(self, mock_download, tmp_path):
         output_path = tmp_path / "nested" / "test.bsp"
-        mock_download.return_value = str(output_path)
+        mock_download.side_effect = _fake_direct_spk_download
 
         result = spk_auto.download_spk_from_horizons(
             "2060", 2458849.5, 2462502.5, str(output_path)
@@ -1116,18 +1123,20 @@ class TestDownloadSpkFromHorizonsSuccess:
     @patch("libephemeris.spk.download_spk")
     def test_calls_direct_client_with_correct_params(self, mock_download, tmp_path):
         output_path = tmp_path / "test.bsp"
-        mock_download.return_value = str(output_path)
+        mock_download.side_effect = _fake_direct_spk_download
 
         result = spk_auto.download_spk_from_horizons(
             "2060", 2458849.5, 2462502.5, str(output_path)
         )
 
         assert result == str(output_path)
-        mock_download.assert_called_once_with(
+        mock_download.assert_called_once()
+        call = mock_download.call_args.kwargs
+        assert Path(call["path"]).parent == tmp_path
+        assert {key: value for key, value in call.items() if key != "path"} == dict(
             body="2060",
             start="2020-01-01",
             end="2030-01-01",
-            path=str(tmp_path),
             center="500@0",
             overwrite=True,
         )
@@ -1139,7 +1148,7 @@ class TestDownloadSpkFromHorizonsSuccess:
     def test_custom_location(self, location, expected_center, tmp_path):
         output_path = tmp_path / "test.bsp"
         with patch(
-            "libephemeris.spk.download_spk", return_value=str(output_path)
+            "libephemeris.spk.download_spk", side_effect=_fake_direct_spk_download
         ) as mock_download:
             spk_auto.download_spk_from_horizons(
                 "2060",
@@ -1154,7 +1163,7 @@ class TestDownloadSpkFromHorizonsSuccess:
     @patch("libephemeris.spk.download_spk")
     def test_accepts_integer_body_id(self, mock_download, tmp_path):
         output_path = tmp_path / "test.bsp"
-        mock_download.return_value = str(output_path)
+        mock_download.side_effect = _fake_direct_spk_download
 
         spk_auto.download_spk_from_horizons(
             2060, 2458849.5, 2462502.5, str(output_path)
@@ -1163,21 +1172,17 @@ class TestDownloadSpkFromHorizonsSuccess:
         assert mock_download.call_args.kwargs["body"] == "2060"
 
     def test_moves_generated_file_to_requested_path(self, tmp_path):
-        generated = tmp_path / "generated-name.bsp"
         requested = tmp_path / "requested-name.bsp"
-
-        def fake_download(**kwargs):
-            generated.write_bytes(b"DAF/SPK fixture")
-            return str(generated)
-
-        with patch("libephemeris.spk.download_spk", side_effect=fake_download):
+        with patch(
+            "libephemeris.spk.download_spk", side_effect=_fake_direct_spk_download
+        ):
             result = spk_auto.download_spk_from_horizons(
                 "2060", 2458849.5, 2462502.5, str(requested)
             )
 
         assert result == str(requested)
         assert requested.read_bytes() == b"DAF/SPK fixture"
-        assert not generated.exists()
+        assert sorted(path.name for path in tmp_path.iterdir()) == [requested.name]
 
 
 class TestDownloadSpkFromHorizonsModuleExport:
@@ -1444,9 +1449,7 @@ class TestDownloadSpkFromHorizonsWithRegistration:
         output_path = str(tmp_path / "test.bsp")
 
         with (
-            patch(
-                "libephemeris.spk.download_spk", return_value=output_path
-            ) as mock_download,
+            patch.object(spk_auto, "_download_spk_to_path") as mock_download,
             patch.object(spk_auto, "_register_spk_after_download") as mock_register,
         ):
             spk_auto.download_spk_from_horizons(
@@ -1465,7 +1468,7 @@ class TestDownloadSpkFromHorizonsWithRegistration:
         output_path = str(tmp_path / "test.bsp")
 
         with (
-            patch("libephemeris.spk.download_spk", return_value=output_path),
+            patch.object(spk_auto, "_download_spk_to_path"),
             patch.object(spk_auto, "_register_spk_after_download") as mock_register,
         ):
             spk_auto.download_spk_from_horizons(
@@ -1482,7 +1485,7 @@ class TestDownloadSpkFromHorizonsWithRegistration:
         output_path = str(tmp_path / "test.bsp")
 
         with (
-            patch("libephemeris.spk.download_spk", return_value=output_path),
+            patch.object(spk_auto, "_download_spk_to_path"),
             patch.object(spk_auto, "_register_spk_after_download") as mock_register,
         ):
             spk_auto.download_spk_from_horizons(

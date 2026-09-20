@@ -306,6 +306,40 @@ class AutoSpkConfig:
 # =============================================================================
 
 
+def _download_spk_to_path(
+    body: str,
+    start: str,
+    end: str,
+    output_path: str,
+    output_dir: str,
+    center: str,
+) -> None:
+    """Publish one verified direct download without consuming sibling cache files.
+
+    The direct client generates its own filename. An isolated directory on the
+    destination filesystem prevents that name from overwriting an unrelated
+    cached kernel before it is renamed to ``output_path``.
+    """
+    from . import spk
+
+    with tempfile.TemporaryDirectory(prefix=".spk-stage-", dir=output_dir) as stage:
+        result_path = spk.download_spk(
+            body=body,
+            start=start,
+            end=end,
+            path=stage,
+            center=center,
+            overwrite=True,
+        )
+        if (
+            os.path.dirname(os.path.abspath(result_path)) != os.path.abspath(stage)
+            or os.path.islink(result_path)
+            or not os.path.isfile(result_path)
+        ):
+            raise ValueError("SPK downloader returned a path outside staging")
+        os.replace(result_path, output_path)
+
+
 def _download_spk_astroquery(
     body_id: str,
     start: str,
@@ -333,8 +367,6 @@ def _download_spk_astroquery(
     Raises:
         ValueError: If body not found or download fails
     """
-    from . import spk
-
     logger = get_logger()
 
     logger.info(
@@ -350,28 +382,7 @@ def _download_spk_astroquery(
     os.makedirs(output_dir, exist_ok=True)
 
     try:
-        # The direct downloader uses a different final filename. Running it
-        # in output_dir would overwrite an existing direct-download cache
-        # entry before moving that name to output_path, losing the entry.
-        # Stage in the same filesystem, then publish only the verified result
-        # to the auto-cache name. TemporaryDirectory also removes a partial
-        # staging tree when the downloader fails.
-        with tempfile.TemporaryDirectory(prefix=".spk-stage-", dir=output_dir) as stage:
-            result_path = spk.download_spk(
-                body=body_id,
-                start=start,
-                end=end,
-                path=stage,
-                center="500@0",
-                overwrite=True,
-            )
-            if (
-                os.path.dirname(os.path.abspath(result_path)) != os.path.abspath(stage)
-                or os.path.islink(result_path)
-                or not os.path.isfile(result_path)
-            ):
-                raise ValueError("SPK downloader returned a path outside staging")
-            os.replace(result_path, output_path)
+        _download_spk_to_path(body_id, start, end, output_path, output_dir, "500@0")
 
         logger.info("SPK download complete: %s", os.path.basename(output_path))
         return output_path
@@ -1663,8 +1674,6 @@ def download_spk_from_horizons(
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    from . import spk as _spk_mod
-
     logger = get_logger()
     body_id_str = str(body_id)
 
@@ -1675,20 +1684,9 @@ def download_spk_from_horizons(
         center = location
 
     try:
-        # Download SPK via direct JPL Horizons HTTP API
-        result_path = _spk_mod.download_spk(
-            body=body_id_str,
-            start=start_date,
-            end=end_date,
-            path=output_dir or ".",
-            center=center,
-            overwrite=True,
+        _download_spk_to_path(
+            body_id_str, start_date, end_date, output_path, output_dir or ".", center
         )
-
-        # Rename to the requested output_path if the API generated a
-        # different filename (download_spk uses its own naming convention)
-        if os.path.abspath(result_path) != os.path.abspath(output_path):
-            os.replace(result_path, output_path)
 
         logger.info("SPK saved: %s", output_path)
 

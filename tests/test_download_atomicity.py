@@ -407,6 +407,29 @@ def test_auto_spk_invalid_download_preserves_both_cache_entries(tmp_path, monkey
     )
 
 
+def test_public_horizons_download_preserves_existing_direct_cache_entry(
+    tmp_path, monkeypatch
+):
+    """An explicit output name cannot consume the direct client's cache name."""
+    direct = tmp_path / "2060_202001_203001.bsp"
+    direct.write_bytes(b"standalone cached kernel")
+    target = tmp_path / "requested-name.bsp"
+    target.write_bytes(b"previous requested kernel")
+    monkeypatch.setattr(spk, "open_url", _horizons_serving(b"replacement SPK"))
+    monkeypatch.setattr(spk, "_is_valid_bsp", lambda path: True)
+
+    result = spk_auto.download_spk_from_horizons(
+        "2060", 2458849.5, 2462502.5, str(target)
+    )
+
+    assert result == str(target)
+    assert target.read_bytes() == b"replacement SPK"
+    assert direct.read_bytes() == b"standalone cached kernel"
+    assert sorted(path.name for path in tmp_path.iterdir()) == sorted(
+        [direct.name, target.name]
+    )
+
+
 # ---------------------------------------------------------------------------
 # 3. A sealed network policy is reported as such, whatever the cache directory
 # ---------------------------------------------------------------------------

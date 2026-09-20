@@ -1091,11 +1091,12 @@ class TestDownloadSpkFromHorizons:
     def test_creates_output_dir_and_renames(self, tmp_path):
         """Missing output dir is created; result renamed (1591, 1617->1620)."""
         out = tmp_path / "sub" / "chiron.bsp"
-        produced = tmp_path / "produced.bsp"
 
         def fake_download(**kwargs):
-            produced.write_bytes(b"x")
-            return str(produced)
+            produced = os.path.join(kwargs["path"], "produced.bsp")
+            with open(produced, "wb") as stream:
+                stream.write(b"x")
+            return produced
 
         with patch("libephemeris.spk.download_spk", side_effect=fake_download):
             result = spk_auto.download_spk_from_horizons(
@@ -1103,20 +1104,22 @@ class TestDownloadSpkFromHorizons:
             )
         assert result == str(out)
         assert out.exists()
+        assert sorted(path.name for path in out.parent.iterdir()) == [out.name]
 
-    def test_no_rename_when_same(self, tmp_path):
-        """result_path == output_path skips rename (branch 1617->1620)."""
+    def test_rejects_result_outside_staging(self, tmp_path):
+        """The public wrapper cannot move an unrelated path into its output."""
         out = tmp_path / "same.bsp"
+        out.write_bytes(b"previous data")
 
         def fake_download(**kwargs):
-            out.write_bytes(b"x")
             return str(out)
 
         with patch("libephemeris.spk.download_spk", side_effect=fake_download):
-            result = spk_auto.download_spk_from_horizons(
-                "2060", 2458849.5, 2462502.5, str(out)
-            )
-        assert result == str(out)
+            with pytest.raises(ValueError, match="outside staging"):
+                spk_auto.download_spk_from_horizons(
+                    "2060", 2458849.5, 2462502.5, str(out)
+                )
+        assert out.read_bytes() == b"previous data"
 
     def test_non_at_location_passthrough(self, tmp_path):
         """A non-'@' location is passed through unchanged (line 1602)."""
@@ -1125,8 +1128,10 @@ class TestDownloadSpkFromHorizons:
 
         def fake_download(**kwargs):
             captured.update(kwargs)
-            out.write_bytes(b"x")
-            return str(out)
+            produced = os.path.join(kwargs["path"], "produced.bsp")
+            with open(produced, "wb") as stream:
+                stream.write(b"x")
+            return produced
 
         with patch("libephemeris.spk.download_spk", side_effect=fake_download):
             spk_auto.download_spk_from_horizons(
