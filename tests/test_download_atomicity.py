@@ -365,6 +365,48 @@ class TestSpkCacheDirIsHonoured:
         assert os.path.dirname(path) == str(tmp_path / "data" / "spk")
 
 
+def test_auto_spk_download_preserves_existing_direct_cache_entry(tmp_path, monkeypatch):
+    """The auto-cache rename must not consume a separate direct-download file."""
+    direct = tmp_path / "2060_202001_202501.bsp"
+    direct.write_bytes(b"standalone cached kernel")
+    target = tmp_path / "2060_autocache.bsp"
+    target.write_bytes(b"previous auto-cache kernel")
+    monkeypatch.setattr(spk, "open_url", _horizons_serving(b"replacement SPK"))
+    monkeypatch.setattr(spk, "_is_valid_bsp", lambda path: True)
+
+    result = spk_auto._download_spk_astroquery(
+        "2060", "2020-01-01", "2025-01-01", str(target)
+    )
+
+    assert result == str(target)
+    assert target.read_bytes() == b"replacement SPK"
+    assert direct.read_bytes() == b"standalone cached kernel"
+    assert sorted(path.name for path in tmp_path.iterdir()) == sorted(
+        [direct.name, target.name]
+    )
+
+
+def test_auto_spk_invalid_download_preserves_both_cache_entries(tmp_path, monkeypatch):
+    """Failed structural verification cannot alter either existing filename."""
+    direct = tmp_path / "2060_202001_202501.bsp"
+    direct.write_bytes(b"standalone cached kernel")
+    target = tmp_path / "2060_autocache.bsp"
+    target.write_bytes(b"previous auto-cache kernel")
+    monkeypatch.setattr(spk, "open_url", _horizons_serving(b"invalid SPK"))
+    monkeypatch.setattr(spk, "_is_valid_bsp", lambda path: False)
+
+    with pytest.raises(ValueError, match="failed validation"):
+        spk_auto._download_spk_astroquery(
+            "2060", "2020-01-01", "2025-01-01", str(target)
+        )
+
+    assert target.read_bytes() == b"previous auto-cache kernel"
+    assert direct.read_bytes() == b"standalone cached kernel"
+    assert sorted(path.name for path in tmp_path.iterdir()) == sorted(
+        [direct.name, target.name]
+    )
+
+
 # ---------------------------------------------------------------------------
 # 3. A sealed network policy is reported as such, whatever the cache directory
 # ---------------------------------------------------------------------------

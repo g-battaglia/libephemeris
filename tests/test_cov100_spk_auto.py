@@ -150,11 +150,13 @@ class TestDownloadSpkAstroquery:
     def test_empty_output_dir_uses_dot(self, tmp_path, monkeypatch):
         """Bare filename -> output_dir defaults to '.' (line 342)."""
         monkeypatch.chdir(tmp_path)
-        produced = tmp_path / "out.bsp"
 
         def fake_download(**kwargs):
-            produced.write_bytes(b"x")
-            return str(produced)
+            produced = tmp_path / "out.bsp"
+            produced = os.path.join(kwargs["path"], produced.name)
+            with open(produced, "wb") as stream:
+                stream.write(b"x")
+            return produced
 
         with patch("libephemeris.spk.download_spk", side_effect=fake_download):
             result = spk_auto._download_spk_astroquery(
@@ -164,24 +166,29 @@ class TestDownloadSpkAstroquery:
                 output_path="out.bsp",
             )
         assert result == "out.bsp"
+        assert (tmp_path / "out.bsp").read_bytes() == b"x"
+        assert sorted(path.name for path in tmp_path.iterdir()) == ["out.bsp"]
 
-    def test_no_rename_when_same_path(self, tmp_path):
-        """result_path == output_path skips os.replace (branch 361->364)."""
+    def test_rejects_downloader_path_outside_staging(self, tmp_path):
+        """A misdirected downloader cannot move an unrelated user file."""
         out = str(tmp_path / "same.bsp")
+        with open(out, "wb") as stream:
+            stream.write(b"previous data")
 
         def fake_download(**kwargs):
-            with open(out, "wb") as f:
-                f.write(b"x")
             return out
 
         with patch("libephemeris.spk.download_spk", side_effect=fake_download):
-            result = spk_auto._download_spk_astroquery(
-                body_id="2060",
-                start="2020-01-01",
-                end="2030-01-01",
-                output_path=out,
-            )
-        assert result == out
+            with pytest.raises(ValueError, match="outside staging"):
+                spk_auto._download_spk_astroquery(
+                    body_id="2060",
+                    start="2020-01-01",
+                    end="2030-01-01",
+                    output_path=out,
+                )
+        with open(out, "rb") as stream:
+            assert stream.read() == b"previous data"
+        assert sorted(path.name for path in tmp_path.iterdir()) == ["same.bsp"]
 
     def test_download_failure_wrapped(self, tmp_path):
         """download_spk raising is wrapped in ValueError (lines 366-367)."""

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import tempfile
 import threading
 from typing import Dict, Optional, Union
 
@@ -349,20 +350,27 @@ def _download_spk_astroquery(
     os.makedirs(output_dir, exist_ok=True)
 
     try:
-        # Use the main download_spk function which handles the API correctly
-        result_path = spk.download_spk(
-            body=body_id,
-            start=start,
-            end=end,
-            path=output_dir,
-            center="500@0",
-            overwrite=True,
-        )
-
-        # download_spk names the file with its own convention; callers rely
-        # on the file living at exactly output_path (cache lookups,
-        # registration), so move it there.
-        if os.path.abspath(result_path) != os.path.abspath(output_path):
+        # The direct downloader uses a different final filename. Running it
+        # in output_dir would overwrite an existing direct-download cache
+        # entry before moving that name to output_path, losing the entry.
+        # Stage in the same filesystem, then publish only the verified result
+        # to the auto-cache name. TemporaryDirectory also removes a partial
+        # staging tree when the downloader fails.
+        with tempfile.TemporaryDirectory(prefix=".spk-stage-", dir=output_dir) as stage:
+            result_path = spk.download_spk(
+                body=body_id,
+                start=start,
+                end=end,
+                path=stage,
+                center="500@0",
+                overwrite=True,
+            )
+            if (
+                os.path.dirname(os.path.abspath(result_path)) != os.path.abspath(stage)
+                or os.path.islink(result_path)
+                or not os.path.isfile(result_path)
+            ):
+                raise ValueError("SPK downloader returned a path outside staging")
             os.replace(result_path, output_path)
 
         logger.info("SPK download complete: %s", os.path.basename(output_path))
