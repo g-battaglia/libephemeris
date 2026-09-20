@@ -13,11 +13,12 @@ All algorithms follow Meeus "Astronomical Algorithms" (1998).
 
 Provenance:
     Calendar/Julian-day transforms follow the cited published algorithms;
-    TT/UT1, UTC, leap-second, and fundamental-argument relations follow IERS
-    Conventions (2010) and observed IERS data. Historical Delta-T branches are
-    documented in ``docs/methodology/delta-t.md``. Blend dates, cache use,
-    compatibility signatures, and user-override precedence are project choices;
-    no coefficient is recovered from compatibility output.
+    TT/UT1, UTC, leap-second, and fundamental-argument relations use IERS
+    Conventions (2010) and observed IERS data where available. Historical
+    Delta-T branches are documented in ``docs/methodology/delta-t.md``.
+    Blend dates, cache use, compatibility signatures, the 2035 future-date
+    convention, and user-override precedence are project choices; no
+    coefficient is recovered from compatibility output.
 """
 
 from __future__ import annotations
@@ -647,11 +648,14 @@ def utc_to_jd(
 
     Note:
         - UTC includes leap seconds while UT1 follows Earth's rotation
-        - ``abs(UTC - UT1)`` is always less than 0.9 seconds by definition
         - TT = TAI + 32.184 seconds, where TAI is atomic time
         - For dates before 1972 (when UTC was standardized), the function
           treats the input as UT1 approximation and still provides proper
           TT/UT1 conversion using historical Delta T values
+        - From Gregorian year 2035, the current compatibility convention
+          treats the civil label as UT1. This is not a verified UTC conversion:
+          the date and UTC=UT1 relation are not specified by CGPM Resolution 4
+          (2022), and future UT1-UTC requires independent time-scale data.
 
     Example:
         >>> from libephemeris import utc_to_jd, GREG_CAL
@@ -734,15 +738,12 @@ def utc_to_jd(
         jd_et = jd_ut1 + deltat(jd_ut1)
         return float(jd_et), float(jd_ut1)
 
-    # From 2035 on, leap-second UTC ends: CGPM Resolution 4 (27th CGPM, 2022)
-    # decides that the UT1-UTC tolerance will be increased by or before 2035,
-    # so the leap-second table cannot describe later civil labels. Like the
-    # pre-1972 branch (a handling one external implementation converges to
-    # once Delta T exceeds the frozen TAI-UTC offset), a far-future
-    # civil label is treated as UT1: jd_ut1 is the literal calendar JD and
-    # jd_et = jd_ut1 + Delta T. Keeping Skyfield's frozen-offset UTC chain
-    # here instead would diverge without bound (about -208,000 s in TT by
-    # year 9999).
+    # Legacy future-date convention: interpret Gregorian labels from 2035 as
+    # UT1 and derive TT from Delta T. CGPM Resolution 4 (2022) calls for a
+    # larger permitted UT1-UTC separation in or before 2035; it sets neither
+    # this exact switch date nor UTC=UT1. This branch is not a verified UTC
+    # conversion beyond the announced leap-second and Earth-rotation data.
+    # Primary decision: https://www.bipm.org/en/-/resolution-cgpm-27-4
     if greg_year >= 2035:
         decimal_hour = hour + minute / 60.0 + second / 3600.0
         jd_ut1 = julday(year, month, day, decimal_hour, calendar)
@@ -882,7 +883,9 @@ def jdet_to_utc(
         - TT (Terrestrial Time) is the modern successor to Ephemeris Time (ET)
         - TT = TAI + 32.184 seconds, where TAI is International Atomic Time
         - UTC may include leap seconds (second = 60) on certain dates
-        - Delta-T (TT - UT1) is automatically applied using IERS data
+        - Delta T (TT - UT1) follows the configured user/IERS/model source
+        - For estimated UT1 years from 2035, the current compatibility
+          convention returns UT1 calendar fields, not verified UTC.
 
     Example:
         >>> from libephemeris import jdet_to_utc, utc_to_jd, GREG_CAL
@@ -907,8 +910,8 @@ def jdet_to_utc(
     if revjul(jd_ut1_est, GREG_CAL)[0] < 1972 and not near_utc_epoch:
         return _jd_to_calendar_tuple(jd_ut1_est, calendar)
 
-    # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
-    # mirror utc_to_jd and return the UT1 calendar label directly.
+    # Legacy inverse convention: return estimated UT1 calendar fields from
+    # 2035. This does not establish future UTC or an official switch date.
     if revjul(jd_ut1_est, GREG_CAL)[0] >= 2035:
         return _jd_to_calendar_tuple(jd_ut1_est, calendar)
 
@@ -964,8 +967,9 @@ def jdut1_to_utc(
     Convert Julian Day in UT1 (Universal Time) to UTC date/time.
 
     Converts a Julian Day number in UT1 back to a UTC calendar date and time.
-    The difference between UT1 and UTC is always less than 0.9 seconds by
-    definition (maintained by adding leap seconds to UTC).
+    Historically, leap seconds kept the magnitude of UT1-UTC below 0.9 s.
+    CGPM Resolution 4 (2022) calls for increasing that permitted limit
+    in or before 2035; it does not fix a civil-date switch.
 
     Args:
         jd_ut1: Julian Day number in UT1 (Universal Time)
@@ -982,9 +986,11 @@ def jdut1_to_utc(
 
     Note:
         - UT1 is based on Earth's rotation and is not perfectly uniform
-        - UTC is atomic time adjusted to stay within 0.9s of UT1
+        - UTC has the rate of TAI and an integral TAI-UTC offset
         - The difference DUT1 = UT1 - UTC is published by IERS
         - For high-precision astronomical work, this difference matters
+        - For UT1 calendar years from 2035, the current compatibility
+          convention returns UT1 fields, not verified UTC.
 
     Example:
         >>> from libephemeris import jdut1_to_utc, utc_to_jd, GREG_CAL
@@ -1008,8 +1014,8 @@ def jdut1_to_utc(
     if revjul(jd_ut1, GREG_CAL)[0] < 1972 and not near_utc_epoch:
         return _jd_to_calendar_tuple(jd_ut1, calendar)
 
-    # From 2035 on leap-second UTC ends (CGPM Resolution 4, 27th CGPM, 2022):
-    # mirror utc_to_jd and return the UT1 calendar label directly.
+    # Legacy inverse convention: return UT1 calendar fields from 2035.
+    # The fixed date is not established by CGPM Resolution 4 (2022).
     if revjul(jd_ut1, GREG_CAL)[0] >= 2035:
         return _jd_to_calendar_tuple(jd_ut1, calendar)
 
