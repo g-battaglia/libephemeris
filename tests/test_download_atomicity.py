@@ -131,6 +131,32 @@ def test_network_failure_leaves_existing_file_untouched(tmp_path, monkeypatch):
     assert list(tmp_path.glob("*.download")) == []
 
 
+def test_tier_download_reports_failed_repair_without_touching_existing_file(
+    tmp_path, monkeypatch
+):
+    """The public tier entry point must surface a failed planet-center repair."""
+    dest = tmp_path / "planet_centers_medium.bsp"
+    dest.write_bytes(b"previous data release")
+    monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
+    monkeypatch.setattr(dl, "_is_valid_bsp", lambda path: True)
+    monkeypatch.setattr(dl, "_file_sha256", lambda path: "0" * 64)
+    monkeypatch.setattr(state, "set_precision_tier", lambda tier: None)
+
+    def _offline(*args, **kwargs):
+        raise OSError("network is unreachable")
+
+    def _must_not_continue(**kwargs):
+        raise AssertionError("minor-body downloads started after failed repair")
+
+    monkeypatch.setattr(dl, "download_file", _offline)
+    monkeypatch.setattr(spk_auto, "ensure_all_ephemerides", _must_not_continue)
+
+    with pytest.raises(OSError, match="network is unreachable"):
+        dl.download_for_tier("medium", quiet=True)
+
+    assert dest.read_bytes() == b"previous data release"
+
+
 def test_unexpected_validator_error_leaves_no_temp_file(tmp_path, monkeypatch):
     """A validator is arbitrary caller code and may raise anything.
 

@@ -1045,9 +1045,8 @@ def test_download_for_tier_success(monkeypatch, capsys):
     assert "SPK errors:" in out
 
 
-def test_download_for_tier_pc_warning(monkeypatch, capsys):
-    """planet_centers step failure hits the WARN arm (1276-1280)."""
-    import libephemeris.spk_auto as spk_auto
+def test_download_for_tier_pc_failure(monkeypatch):
+    """A failed planet-center step stops the tier download."""
     from libephemeris import state
 
     monkeypatch.setattr(state, "set_precision_tier", lambda t: None)
@@ -1056,13 +1055,8 @@ def test_download_for_tier_pc_warning(monkeypatch, capsys):
         "_download_planet_centers_for_tier",
         lambda **kw: (_ for _ in ()).throw(ValueError("pc fail")),
     )
-    monkeypatch.setattr(
-        spk_auto, "ensure_all_ephemerides", lambda **kw: {"summary": {}}
-    )
-    result = dl.download_for_tier("medium", quiet=False)
-    err = capsys.readouterr().err
-    assert "[WARN]" in err
-    assert isinstance(result, dict)
+    with pytest.raises(ValueError, match="pc fail"):
+        dl.download_for_tier("medium", quiet=False)
 
 
 def test_download_for_tier_non_dict_summary(monkeypatch, capsys):
@@ -1085,9 +1079,8 @@ def test_download_for_tier_non_dict_summary(monkeypatch, capsys):
     assert "SPK cached:" not in out
 
 
-def test_download_for_tier_pc_warning_quiet(monkeypatch):
-    """planet_centers failure with quiet=True skips the WARN print (arc 1277->1283)."""
-    import libephemeris.spk_auto as spk_auto
+def test_download_for_tier_pc_failure_quiet(monkeypatch):
+    """quiet=True does not hide a planet-center failure."""
     from libephemeris import state
 
     monkeypatch.setattr(state, "set_precision_tier", lambda t: None)
@@ -1096,11 +1089,8 @@ def test_download_for_tier_pc_warning_quiet(monkeypatch):
         "_download_planet_centers_for_tier",
         lambda **kw: (_ for _ in ()).throw(ValueError("pc fail")),
     )
-    monkeypatch.setattr(
-        spk_auto, "ensure_all_ephemerides", lambda **kw: {"summary": {}}
-    )
-    result = dl.download_for_tier("base", quiet=True)
-    assert isinstance(result, dict)
+    with pytest.raises(ValueError, match="pc fail"):
+        dl.download_for_tier("base", quiet=True)
 
 
 def test_download_for_tier_success_quiet(monkeypatch):

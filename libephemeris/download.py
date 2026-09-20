@@ -1425,7 +1425,9 @@ def download_for_tier(
         Dict with summary (same format as ensure_all_ephemerides)
 
     Raises:
-        ValueError: If tier_name is not valid
+        ValueError: If tier_name is invalid or downloaded planet-center data
+            fail verification.
+        OSError: If the planet-center data cannot be downloaded or installed.
     """
     from .state import TIERS, set_precision_tier
 
@@ -1449,21 +1451,15 @@ def download_for_tier(
     if not quiet:
         print("Step 1/2: planet_centers precision data")
 
-    try:
-        _download_planet_centers_for_tier(
-            tier_name=tier_name,
-            force=force,
-            show_progress=show_progress,
-            quiet=quiet,
-        )
-        if not quiet:
-            print("  [OK] planet_centers ready")
-            print()
-    except (OSError, ValueError, KeyError, RuntimeError) as e:
-        if not quiet:
-            print(f"  [WARN] planet_centers: {e}", file=sys.stderr)
-            print("  (non-critical, continuing...)")
-            print()
+    _download_planet_centers_for_tier(
+        tier_name=tier_name,
+        force=force,
+        show_progress=show_progress,
+        quiet=quiet,
+    )
+    if not quiet:
+        print("  [OK] planet_centers ready")
+        print()
 
     # Step 2: Ephemeris file + SPK kernels (via ensure_all_ephemerides)
     if not quiet:
