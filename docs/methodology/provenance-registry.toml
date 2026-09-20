@@ -214,6 +214,11 @@ kind = "project-authored-reviewed-derivation"
 citation = "Exact fixed-state finite-source contact candidate derivation, including nonsingular multiplier roots, the positive singular line, quadratic field extension and core apex; reviewed disconnected contract at validation commit c9f609891aea4c041a642198450e3f6c60ace43a"
 url = "docs/methodology/finite-source-contact-generator.md"
 
+[sources.PROJECT_FINITE_SOURCE_CONTACT_WIRE]
+kind = "project-authored-reviewed-nonnormative-format-candidate"
+citation = "Private B-16 request byte grammar candidate at audit SHA-256 3b22f659e41868e8b09862bb605a77a344c0ea4bb3d456f1e9b8be968b9109b4; high-effort design review SHA-256 e1cb80d805e425a4d3ca3f2563f298eea15f259060c001a7becaeaf40f41bb07; implementation and production protocol remain unapproved"
+url = "docs/methodology/finite-source-contact-wire.md"
+
 [sources.PYTHON_FLINT_EXACT]
 kind = "permissively-licensed-exact-arithmetic-library"
 citation = "python-flint 0.9 fmpq_poly and fmpq_mat exact rational polynomial, factorization and matrix interfaces; MIT-licensed Python bindings to FLINT"
@@ -515,6 +520,16 @@ scientific_content = true
 origin = "Project-authored private exact fixed-state contact candidate generator. It derives rational cone forms, exhausts positive nonsingular and singular multiplier branches plus the core apex, records exact rejection diagnostics and sends any accepted payload to the independently implemented algebraic contact verifier. It has no runtime cap, source receipt, temporal search or public route."
 sources = ["PROJECT_FINITE_SOURCE_CONTACT_GENERATOR", "PYTHON_FLINT_EXACT"]
 documentation = ["docs/methodology/finite-source-contact-generator.md"]
+docstring = "detailed"
+
+[[component]]
+id = "finite-source-contact-request-wire"
+category = "numerical-method"
+paths = ["libephemeris/_finite_source_contact_wire.py"]
+scientific_content = true
+origin = "Project-authored private in-memory exact request encoding and parsing from the independently reviewed, non-normative B-16 wire candidate. It validates canonical signed rationals, external identity equality and reconstructed geometry with explicit per-call byte and integer-bit ceilings. It has no streaming bound, chosen production resource policy, worker, response parser, source receipt, astronomical state or public route."
+sources = ["PROJECT_FINITE_SOURCE_CONTACT_WIRE"]
+documentation = ["docs/methodology/finite-source-contact-wire.md"]
 docstring = "detailed"
 
 [[component]]
