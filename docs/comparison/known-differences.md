@@ -1058,6 +1058,24 @@ search steps over them. Callers who need a window that is robust against that
 step can compare the optimum with `vis_limit_mag` at the Moon's own rise and
 set.
 
+### Geographic observer inputs {#b03-geopos-input-contract}
+
+The ten public eclipse, occultation, and rise/set functions implemented in
+`eclipse.py` use the same observer argument: longitude, latitude and altitude
+in that order. At least three components are required; later components are
+ignored. Numeric strings and booleans are not coordinates. Latitude must be
+finite and within −90° to +90°, longitude finite and within the library's
+documented −180° to +360° input range, and altitude finite. No altitude bound
+is inferred from the ephemeris model.
+
+The argument is checked before any ephemeris search. A missing or malformed
+sequence raises `ValueError`; a nonnumeric component or nonfinite altitude
+raises `InputValidationError`; an invalid latitude or longitude raises
+`CoordinateError`. This makes invalid observer requests fail in the same way
+across the public entry points. It does not change the geometry of valid
+locations or introduce a numerical tolerance. The exact golden case IDs whose
+recorded result changes are owned by the B-03 input-contract register.
+
 ## Validation policy
 
 Direct compatibility runs compare public return values and report pass/fail

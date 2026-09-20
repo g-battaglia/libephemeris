@@ -392,9 +392,11 @@ class TestGeopos:
             rise_trans(JD, 0, libephemeris.CALC_RISE, (12.0,))
 
     def test_rise_trans_not_numeric(self):
-        with pytest.raises(ValueError, match=GEOPOS_TEXT) as excinfo:
+        with pytest.raises(
+            InputValidationError,
+            match="rise_trans: geopos components must be numeric real values",
+        ):
             rise_trans(JD, 0, libephemeris.CALC_RISE, ("a", "b", "c"))
-        assert isinstance(excinfo.value.__cause__, ValueError)
 
     def test_rise_trans_true_hor(self):
         with pytest.raises(ValueError, match=GEOPOS_TEXT):

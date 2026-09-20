@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Tests for lun_eclipse_how function in libephemeris.
 
@@ -8,9 +10,12 @@ Reference data from NASA Eclipse website:
 https://eclipse.gsfc.nasa.gov/lunar.html
 """
 
+from __future__ import annotations
+
 import pytest
 
 from libephemeris import (
+    CoordinateError,
     julday,
     lun_eclipse_when,
     lun_eclipse_how,
@@ -582,26 +587,17 @@ class TestValidationRequirements:
         retflag_correct, attr_correct = lun_eclipse_how(
             jd_max, geopos_lon_first, FLG_SWIEPH
         )
-        retflag_wrong, attr_wrong = lun_eclipse_how(
-            jd_max, geopos_lat_first, FLG_SWIEPH
-        )
-
-        # The Moon position should be very different between these two
-        # LA at correct position should have Moon high in sky
-        # Wrong position (somewhere in SE Australia) would have different altitude
+        # Swapping these fields puts -118.24 in the latitude slot, outside
+        # the geographic domain rather than at another observing site.
+        with pytest.raises(CoordinateError):
+            lun_eclipse_how(jd_max, geopos_lat_first, FLG_SWIEPH)
 
         moon_alt_correct = attr_correct[5]
-        moon_alt_wrong = attr_wrong[5]
 
         # Correct LA should have the eclipse observable (nonzero retflag)
         assert retflag_correct != 0, "Moon should be visible at correct LA position"
         assert moon_alt_correct > 30, (
             f"Moon altitude at correct LA should be high, got {moon_alt_correct}°"
-        )
-
-        # The altitudes should be different
-        assert abs(moon_alt_correct - moon_alt_wrong) > 5, (
-            "Moon altitudes should differ significantly between correct and wrong coord order"
         )
 
     def test_visibility_flag_correctness(self):

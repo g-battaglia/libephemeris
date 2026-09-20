@@ -95,6 +95,7 @@ from .exceptions import (
     InputValidationError,
     LEBCorruptionError,
     UnknownBodyError,
+    validate_coordinates,
 )
 from .planets import calc_ut
 from .shadow_geometry import ShadowGeometry
@@ -167,6 +168,49 @@ _GEOPOS_MESSAGE = (
     "geopos must be a sequence of at least three numbers: geographic "
     "longitude and latitude in degrees, then altitude in metres"
 )
+
+
+def _validated_geopos(
+    geopos: Sequence[float], func_name: str
+) -> tuple[float, float, float]:
+    """Validate and normalize a public eclipse observer position.
+
+    Args:
+        geopos: Longitude, latitude, and altitude, in that order.
+        func_name: Public function name for coordinate diagnostics.
+
+    Returns:
+        Three native Python floats in the input order.
+
+    Raises:
+        ValueError: If the position lacks three positional components.
+        InputValidationError: If a component is not numeric or altitude is
+            non-finite.
+        CoordinateError: If latitude or longitude is invalid.
+    """
+    try:
+        if len(geopos) < 3:
+            raise ValueError(_GEOPOS_MESSAGE)
+        components = (geopos[0], geopos[1], geopos[2])
+    except (TypeError, IndexError, KeyError) as exc:
+        raise ValueError(_GEOPOS_MESSAGE) from exc
+
+    # Numeric strings and booleans are convertible by float(), but are not
+    # physical coordinate values. Reject them before conversion everywhere.
+    if any(isinstance(value, (str, bytes, bytearray, bool)) for value in components):
+        raise InputValidationError(
+            f"{func_name}: geopos components must be numeric real values"
+        )
+    try:
+        lon, lat, altitude = (float(value) for value in components)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise InputValidationError(
+            f"{func_name}: geopos components must be numeric"
+        ) from exc
+    validate_coordinates(lat, lon, func_name)
+    if not math.isfinite(altitude):
+        raise InputValidationError(f"{func_name}: altitude must be finite")
+    return lon, lat, altitude
 
 
 def _is_leb_body_miss(exc: BaseException) -> bool:
@@ -4714,10 +4758,11 @@ def sol_eclipse_when_loc(
     full API contract.
     """
     flags = _strip_one_try_bit(flags)
+    geopos3 = _validated_geopos(geopos, "sol_eclipse_when_loc")
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_when_loc_impl,
         tjdut,
-        geopos,
+        geopos3,
         flags,
         _coerce_backwards(backwards),
     )
@@ -5393,10 +5438,11 @@ def sol_eclipse_how(
     full API contract.
     """
     flags = _strip_one_try_bit(flags)
+    geopos3 = _validated_geopos(geopos, "sol_eclipse_how")
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_how_impl,
         tjdut,
-        geopos,
+        geopos3,
         flags,
     )
 
@@ -5496,10 +5542,11 @@ def sol_eclipse_how_details(
     fallback for partial/custom LEB files. See the impl docstring for the
     full API contract.
     """
+    geopos3 = _validated_geopos(geopos, "sol_eclipse_how_details")
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_how_details_impl,
         tjd_ut,
-        geopos,
+        geopos3,
         ifl,
     )
 
@@ -7089,12 +7136,7 @@ def lun_eclipse_when_loc(
         Tuple of (retflag, tret, attr) matching the reference API.
     """
     flags = _strip_one_try_bit(flags)
-    if len(geopos) < 3:
-        raise ValueError(_GEOPOS_MESSAGE)
-
-    lon = float(geopos[0])
-    lat = float(geopos[1])
-    altitude = float(geopos[2])
+    lon, lat, altitude = _validated_geopos(geopos, "lun_eclipse_when_loc")
 
     return _call_with_leb_skyfield_fallback(
         _lun_eclipse_when_loc_pythonic,
@@ -7349,10 +7391,11 @@ def lun_eclipse_how(
     full API contract.
     """
     flags = _strip_one_try_bit(flags)
+    geopos3 = _validated_geopos(geopos, "lun_eclipse_how")
     return _call_with_leb_skyfield_fallback(
         _lun_eclipse_how_impl,
         tjdut,
-        geopos,
+        geopos3,
         flags,
     )
 
@@ -8023,14 +8066,7 @@ def lun_occult_when_loc(
     _reject_moon_self_occultation(body)
     body = _fold_pseudo_body_to_sun(body)
 
-    # Validate geopos
-    if len(geopos) < 3:
-        raise ValueError(_GEOPOS_MESSAGE)
-
-    # Extract geographic position (reference API uses lon, lat, alt order)
-    lon = geopos[0]
-    lat = geopos[1]
-    altitude = geopos[2]
+    lon, lat, altitude = _validated_geopos(geopos, "lun_occult_when_loc")
 
     # Determine if body is planet ID or star name. Integer fixed-star ids
     # route through the star path like calc_ut / lun_occult_when_glob
@@ -8194,12 +8230,13 @@ def rise_trans(
     Wrapper around :func:`_rise_trans_impl` that applies mode-aware LEB range
     handling for partial/custom files. See the implementation docstring.
     """
+    geopos3 = _validated_geopos(geopos, "rise_trans")
     return _call_with_leb_skyfield_fallback(
         _rise_trans_impl,
         tjdut,
         body,
         rsmi,
-        geopos,
+        geopos3,
         atpress,
         attemp,
         flags,
@@ -8625,12 +8662,13 @@ def rise_trans_true_hor(
     fallback for partial/custom LEB files. See the impl docstring for the
     full API contract.
     """
+    geopos3 = _validated_geopos(geopos, "rise_trans_true_hor")
     return _call_with_leb_skyfield_fallback(
         _rise_trans_true_hor_impl,
         tjdut,
         body,
         rsmi,
-        geopos,
+        geopos3,
         atpress,
         attemp,
         horhgt,
@@ -13237,28 +13275,23 @@ def sol_eclipse_magnitude_at_loc(
             - >= 1.0 for total eclipses
 
     Raises:
-        ValueError: If geopos has wrong length
+        ValueError: If geopos lacks three positional components.
+        InputValidationError: If a component is nonnumeric or altitude is not finite.
+        CoordinateError: If latitude or longitude is invalid.
 
     Example:
         >>> from libephemeris import sol_eclipse_magnitude_at_loc, FLG_SWIEPH
         >>> # Calculate magnitude during April 8, 2024 eclipse from Dallas
         >>> jd = 2460409.28
         >>> dallas_geopos = [-96.797, 32.7767, 0]  # lon, lat, alt
-        >>> magnitude = sol_eclipse_magnitude_at_loc(jd, FLG_SWIEPH, dallas_geopos)
+        >>> magnitude = sol_eclipse_magnitude_at_loc(jd, dallas_geopos, FLG_SWIEPH)
         >>> print(f"Magnitude: {magnitude:.4f}")
 
     References:
         - Reference API: sol_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    # Validate geopos
-    if len(geopos) < 3:
-        raise ValueError(_GEOPOS_MESSAGE)
-
-    # Extract geographic position (longitude first, then latitude - reference API convention)
-    lon = float(geopos[0])
-    lat = float(geopos[1])
-    altitude = float(geopos[2])
+    lon, lat, altitude = _validated_geopos(geopos, "sol_eclipse_magnitude_at_loc")
 
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_magnitude_at_loc_pythonic,
@@ -13515,28 +13548,23 @@ def sol_eclipse_obscuration_at_loc(
             - 1.0 for total eclipse
 
     Raises:
-        ValueError: If geopos has wrong length
+        ValueError: If geopos lacks three positional components.
+        InputValidationError: If a component is nonnumeric or altitude is not finite.
+        CoordinateError: If latitude or longitude is invalid.
 
     Example:
         >>> from libephemeris import sol_eclipse_obscuration_at_loc, FLG_SWIEPH
         >>> # Calculate obscuration during April 8, 2024 eclipse from Dallas
         >>> jd = 2460409.28
         >>> dallas_geopos = [-96.797, 32.7767, 0]  # lon, lat, alt
-        >>> obs = sol_eclipse_obscuration_at_loc(jd, FLG_SWIEPH, dallas_geopos)
+        >>> obs = sol_eclipse_obscuration_at_loc(jd, dallas_geopos, FLG_SWIEPH)
         >>> print(f"Obscuration: {obs:.4f}")
 
     References:
         - Reference API: sol_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    # Validate geopos
-    if len(geopos) < 3:
-        raise ValueError(_GEOPOS_MESSAGE)
-
-    # Extract geographic position (lon first, lat second - reference API convention)
-    lon = float(geopos[0])
-    lat = float(geopos[1])
-    altitude = float(geopos[2])
+    lon, lat, altitude = _validated_geopos(geopos, "sol_eclipse_obscuration_at_loc")
 
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_obscuration_at_loc_pythonic,

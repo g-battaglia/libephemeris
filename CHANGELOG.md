@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Eclipse, local occultation, and rise/set entry points now validate their
+  `geopos` argument consistently before searching: latitude, longitude and
+  altitude must be finite numeric values, with latitude in −90°…+90° and
+  longitude in −180°…+360°. Numeric strings, booleans and invalid coordinates
+  are refused with the documented input errors. Valid observer geometry is
+  unchanged. See `docs/comparison/known-differences.md#b03-geopos-input-contract`.
 - `heliacal_pheno_ut` states the heliacal window from its definition. The two
   horizon crossings that frame the requested event are the disc centres of the
   object and of the Sun (slots 21 and 22) and their difference is the lag
