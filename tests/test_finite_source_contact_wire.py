@@ -297,6 +297,20 @@ def test_geometry_input_and_domain_exceptions_remain_distinct() -> None:
         assert exc.value.outcome is outcome
 
 
+def test_encoder_revalidates_forged_base_geometry_before_returning_bytes() -> None:
+    forged = _geometry(
+        (F(-15), F(10), F(0)),
+        (F(-10), F(10), F(0)),
+        F(2),
+        F(1),
+        (F(1), F(1), F(1)),
+        F(1),
+    )
+    object.__setattr__(forged, "R", F(0))
+    with pytest.raises(ValueError, match="R must be positive"):
+        _encode(forged, _Target.PENUMBRA)
+
+
 def test_invalid_limit_and_call_types_rejected() -> None:
     with pytest.raises(ValueError):
         _ContactWireLimits(13, 8)

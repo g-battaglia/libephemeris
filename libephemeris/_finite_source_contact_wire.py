@@ -132,9 +132,17 @@ def _body(
     policy_sha256: bytes,
     limits: _ContactWireLimits,
 ) -> bytes:
-    """Encode the request body from validated base geometry fields only."""
+    """Encode base fields and revalidate them before releasing the body."""
     if type(geometry) is not _ValidatedGeometry:
         raise TypeError("geometry must be an exact _ValidatedGeometry")
+    B, p, r, m, A, R = (
+        geometry.B,
+        geometry.p,
+        geometry.r,
+        geometry.m,
+        geometry.A,
+        geometry.R,
+    )
     max_body_bytes = limits.max_frame_bytes - _HEADER_BYTES
     body = bytearray()
     for name, digest in (
@@ -144,12 +152,13 @@ def _body(
     ):
         _append(body, _require_digest(digest, name), max_body_bytes)
     _append(body, bytes((_target_tag(target),)), max_body_bytes)
-    for value in geometry.B + geometry.p + (geometry.r, geometry.m):
+    for value in B + p + (r, m):
         _append_fraction(body, value, limits)
-    for row in geometry.A:
+    for row in A:
         for value in row:
             _append_fraction(body, value, limits)
-    _append_fraction(body, geometry.R, limits)
+    _append_fraction(body, R, limits)
+    _ValidatedGeometry(B, p, r, m, A, R)
     return bytes(body)
 
 

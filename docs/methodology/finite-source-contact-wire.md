@@ -35,8 +35,9 @@ unrecognized tags, wrong external identities, and inconsistent length fields.
 ceiling per call. The encoder checks the bit ceiling before making a magnitude
 byte string. The decoder checks declared magnitude size, leading byte and
 actual bit length before converting magnitude bytes into a Python integer.
-It then reconstructs `_ValidatedGeometry` from the six base fields, so cached
-axis, squared axis and inverse metric cannot be transmitted as authority.
+The encoder revalidates the same six base fields before releasing a frame;
+the decoder reconstructs `_ValidatedGeometry` from those fields. Cached axis,
+squared axis and inverse metric cannot be transmitted as authority.
 Wire errors are distinct from invalid geometry and the three existing
 out-of-domain outcomes. The SHA-256 of the whole frame is a request association
 identifier, not authentication of astronomical states, code or a source
