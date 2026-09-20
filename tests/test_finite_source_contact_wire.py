@@ -51,14 +51,18 @@ def _geometry(
     )
 
 
-_SMOOTH = _geometry(
-    (F(-15), F(10), F(0)),
-    (F(-10), F(10), F(0)),
-    F(2),
-    F(1),
-    (F(1), F(1), F(1)),
-    F(1),
-)
+def _new_smooth() -> _ValidatedGeometry:
+    return _geometry(
+        (F(-15), F(10), F(0)),
+        (F(-10), F(10), F(0)),
+        F(2),
+        F(1),
+        (F(1), F(1), F(1)),
+        F(1),
+    )
+
+
+_SMOOTH = _new_smooth()
 
 
 def _encode(geometry: _ValidatedGeometry, target: _Target) -> bytes:
@@ -298,16 +302,30 @@ def test_geometry_input_and_domain_exceptions_remain_distinct() -> None:
 
 
 def test_encoder_revalidates_forged_base_geometry_before_returning_bytes() -> None:
-    forged = _geometry(
-        (F(-15), F(10), F(0)),
-        (F(-10), F(10), F(0)),
-        F(2),
-        F(1),
-        (F(1), F(1), F(1)),
-        F(1),
-    )
+    forged = _new_smooth()
     object.__setattr__(forged, "R", F(0))
     with pytest.raises(ValueError, match="R must be positive"):
+        _encode(forged, _Target.PENUMBRA)
+
+
+@pytest.mark.parametrize(
+    ("numerator", "denominator"),
+    [(-30, 2), (15, -1), (0, 0)],
+)
+def test_encoder_rejects_forged_noncanonical_fraction_in_base_geometry(
+    numerator: int, denominator: int
+) -> None:
+    forged = _new_smooth()
+    object.__setattr__(forged.B[0], "_numerator", numerator)
+    object.__setattr__(forged.B[0], "_denominator", denominator)
+    with pytest.raises(ValueError, match="rational must be reduced"):
+        _encode(forged, _Target.PENUMBRA)
+
+
+def test_encoder_rejects_forged_vector_shape() -> None:
+    forged = _new_smooth()
+    object.__setattr__(forged, "B", forged.B[:2])
+    with pytest.raises(TypeError, match="three-tuple"):
         _encode(forged, _Target.PENUMBRA)
 
 

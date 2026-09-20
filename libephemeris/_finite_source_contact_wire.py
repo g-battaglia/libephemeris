@@ -24,7 +24,7 @@ import math
 from dataclasses import dataclass
 from fractions import Fraction
 
-from ._finite_source_certificates import _Target, _ValidatedGeometry
+from ._finite_source_certificates import _Matrix, _Target, _ValidatedGeometry, _Vector
 
 _MAGIC = b"LEFC1"
 _REQUEST_KIND = 1
@@ -109,12 +109,46 @@ def _append_integer(buffer: bytearray, value: int, limits: _ContactWireLimits) -
 
 def _append_fraction(
     buffer: bytearray, value: Fraction, limits: _ContactWireLimits
-) -> None:
-    """Append an exact reduced Fraction as numerator and denominator."""
+) -> Fraction:
+    """Append and detach one canonical rational after bounded integer writes."""
     if type(value) is not Fraction:
         raise TypeError("wire rational must be an exact Fraction")
-    _append_integer(buffer, value.numerator, limits)
-    _append_integer(buffer, value.denominator, limits)
+    numerator, denominator = value.numerator, value.denominator
+    _append_integer(buffer, numerator, limits)
+    _append_integer(buffer, denominator, limits)
+    if denominator <= 0 or math.gcd(abs(numerator), denominator) != 1:
+        raise ValueError("geometry rational must be reduced with positive denominator")
+    return Fraction(numerator, denominator)
+
+
+def _append_vector(
+    buffer: bytearray,
+    vector: _Vector,
+    limits: _ContactWireLimits,
+) -> _Vector:
+    """Append a three-coordinate vector and return detached rational values."""
+    if type(vector) is not tuple or len(vector) != 3:
+        raise TypeError("geometry vector must be a three-tuple")
+    return (
+        _append_fraction(buffer, vector[0], limits),
+        _append_fraction(buffer, vector[1], limits),
+        _append_fraction(buffer, vector[2], limits),
+    )
+
+
+def _append_matrix(
+    buffer: bytearray,
+    matrix: _Matrix,
+    limits: _ContactWireLimits,
+) -> _Matrix:
+    """Append exactly three vector rows and retain their detached values."""
+    if type(matrix) is not tuple or len(matrix) != 3:
+        raise TypeError("geometry matrix must have three rows")
+    return (
+        _append_vector(buffer, matrix[0], limits),
+        _append_vector(buffer, matrix[1], limits),
+        _append_vector(buffer, matrix[2], limits),
+    )
 
 
 def _target_tag(target: _Target) -> int:
@@ -135,14 +169,6 @@ def _body(
     """Encode base fields and revalidate them before releasing the body."""
     if type(geometry) is not _ValidatedGeometry:
         raise TypeError("geometry must be an exact _ValidatedGeometry")
-    B, p, r, m, A, R = (
-        geometry.B,
-        geometry.p,
-        geometry.r,
-        geometry.m,
-        geometry.A,
-        geometry.R,
-    )
     max_body_bytes = limits.max_frame_bytes - _HEADER_BYTES
     body = bytearray()
     for name, digest in (
@@ -152,12 +178,12 @@ def _body(
     ):
         _append(body, _require_digest(digest, name), max_body_bytes)
     _append(body, bytes((_target_tag(target),)), max_body_bytes)
-    for value in B + p + (r, m):
-        _append_fraction(body, value, limits)
-    for row in A:
-        for value in row:
-            _append_fraction(body, value, limits)
-    _append_fraction(body, R, limits)
+    B = _append_vector(body, geometry.B, limits)
+    p = _append_vector(body, geometry.p, limits)
+    r = _append_fraction(body, geometry.r, limits)
+    m = _append_fraction(body, geometry.m, limits)
+    A = _append_matrix(body, geometry.A, limits)
+    R = _append_fraction(body, geometry.R, limits)
     _ValidatedGeometry(B, p, r, m, A, R)
     return bytes(body)
 
