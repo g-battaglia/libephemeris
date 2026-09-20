@@ -1519,9 +1519,14 @@ def _parse_plain_number(value: str, label: str) -> float:
 
 
 def parse_orbital_elements(filepath: Union[str, Path]) -> List[OrbitalElements]:
-    """Parse the comma-delimited custom orbital-elements text format."""
+    """Parse the comma-delimited custom orbital-elements text format.
+
+    Raises:
+        FileNotFoundError: If the path is missing or names a directory.
+    """
     path = Path(filepath)
-    if not path.exists():
+    # Keep readable special files eligible; is_file() would reject them.
+    if not path.exists() or path.is_dir():
         raise FileNotFoundError(f"Orbital elements file not found: {filepath}")
 
     elements: List[OrbitalElements] = []

@@ -169,6 +169,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `parse_orbital_elements()` again raises `FileNotFoundError` for a directory
+  path, including the empty string (which resolves to `.`). The orbital-parser
+  rewrite had dropped this guard; readable special files remain accepted.
 - `houses_with_fallback()` and `houses_armc_with_fallback()` now preserve the
   reason from construction-level polar refusals that do not carry a numeric
   polar-circle threshold, then return the requested fallback result instead of
