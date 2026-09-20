@@ -169,6 +169,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `OrbitalElements.get_mean_motion()` raises `InputValidationError` for a
+  nonpositive or nonfinite semi-major axis and for an unrepresentable mean
+  motion. The prior zero-axis call leaked `ZeroDivisionError`; a negative axis
+  could produce a complex result. Ordinary positive-axis results are unchanged.
 - `parse_orbital_elements()` again raises `FileNotFoundError` for a directory
   path, including the empty string (which resolves to `.`). The orbital-parser
   rewrite had dropped this guard; readable special files remain accepted.

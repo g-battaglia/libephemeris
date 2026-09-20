@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import ast
 import math
+import sys
 from pathlib import Path
 
 import pytest
 
-from libephemeris.exceptions import UnknownBodyError
+from libephemeris.exceptions import InputValidationError, UnknownBodyError
 from libephemeris.hypothetical import (
     ADMETOS,
     ADMETOS_KEPLERIAN_ELEMENTS,
@@ -474,6 +475,53 @@ def test_synthetic_user_orbit_propagation_is_independent_of_builtins() -> None:
     assert at_epoch[:3] == pytest.approx((0.0, 0.0, 2.0), abs=1e-12)
     assert 0.0 < later[0] < 10.0
     assert later[2] == pytest.approx(2.0, abs=1e-12)
+
+
+def _orbit_with_semi_axis(axis: float) -> OrbitalElements:
+    """Build a direct user element object to test its mean-motion domain."""
+    zero = TPolynomial(0.0)
+    return OrbitalElements(
+        name="Synthetic mean-motion test orbit",
+        epoch_jd=J2000,
+        equinox_jd=J2000,
+        equinox_is_jdate=False,
+        mean_anomaly=zero,
+        semi_axis=axis,
+        eccentricity=zero,
+        arg_perihelion=zero,
+        asc_node=zero,
+        inclination=zero,
+    )
+
+
+@pytest.mark.parametrize("axis", [0.0, -0.0, -1.0, math.nan, math.inf, -math.inf])
+def test_mean_motion_rejects_nonpositive_or_nonfinite_axis(axis: float) -> None:
+    """An unbound or nonreal orbit has no positive Keplerian mean motion."""
+    with pytest.raises(InputValidationError, match="semi-major axis"):
+        _orbit_with_semi_axis(axis).get_mean_motion()
+
+
+@pytest.mark.parametrize("axis", [True, "2", 10**1000])
+def test_mean_motion_rejects_invalid_axis_types(axis: object) -> None:
+    """Dynamic assignments cannot bypass the public method's typed refusal."""
+    elements = _orbit_with_semi_axis(1.0)
+    setattr(elements, "semi_axis", axis)
+    with pytest.raises(InputValidationError, match="semi-major axis"):
+        elements.get_mean_motion()
+
+
+@pytest.mark.parametrize("axis", [1e-220, 1e220])
+def test_mean_motion_rejects_unrepresentable_result(axis: float) -> None:
+    """Binary64 overflow and underflow report the input domain explicitly."""
+    with pytest.raises(InputValidationError, match="not representable"):
+        _orbit_with_semi_axis(axis).get_mean_motion()
+
+
+def test_mean_motion_preserves_representable_subnormal_result() -> None:
+    """A large valid axis can yield a nonzero binary64 subnormal motion."""
+    result = _orbit_with_semi_axis(1e210).get_mean_motion()
+    assert isinstance(result, float)
+    assert 0.0 < result < sys.float_info.min
 
 
 def test_reserved_keplerian_table_accepts_synthetic_elements(

@@ -1002,6 +1002,18 @@ unverified data.
 See [Hypothetical bodies](../methodology/hypothetical-bodies.md) and
 [the missing-models inventory](../methodology/missing-hypothetical-models.md).
 
+#### User orbital-element mean motion {#b04-mean-motion-domain}
+
+`OrbitalElements.get_mean_motion()` evaluates the elliptical two-body relation
+`n = 0.9856076686 / a^(3/2)` degrees per day for a semi-major axis `a` in AU.
+This real, positive result requires a finite, positive `a`; inputs whose
+binary64 result is not representable also raise `InputValidationError`. The
+previous zero-axis call leaked `ZeroDivisionError`, and a negative axis could
+produce a complex value. The registered golden change is the exact
+zero-axis result-kind cell; the three positive-axis cells remain bitwise
+identical. This input-domain correction makes no claim about the accuracy of
+the orbital elements themselves.
+
 ### Constants, names, and return encodings
 
 Public constants, function names, tuple shapes, flag encodings, and error types

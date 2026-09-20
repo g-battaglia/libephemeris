@@ -46,6 +46,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
+from numbers import Real
 from pathlib import Path
 from types import MappingProxyType
 from typing import (
@@ -63,7 +64,8 @@ from typing import (
 
 # NIBIRU..PLUTO_PICKERING are deliberately (re)defined below with their
 # documentation and aliases; constants.py carries the same values.
-from .constants import FICT_OFFSET
+from .constants import B1950, FICT_OFFSET
+from .exceptions import InputValidationError
 
 
 # =============================================================================
@@ -1353,18 +1355,43 @@ class OrbitalElements:
 
         Returns:
             Mean motion in degrees per day.
+
+        Raises:
+            InputValidationError: If the semi-major axis does not define a
+                finite, positive, representable mean motion.
         """
         # Gaussian mean motion for heliocentric orbits:
         # n = k * 180/pi / a^1.5 = 0.9856076686 / a^1.5 deg/day.
         # (Geocentric bodies encode their motion in the mean-anomaly
         # polynomial instead.)
-        return 0.9856076686 / self.semi_axis**1.5
+        axis = self.semi_axis
+        if isinstance(axis, bool) or not isinstance(axis, Real):
+            raise InputValidationError("semi-major axis must be a real number")
+        try:
+            axis = float(axis)
+        except (OverflowError, ValueError) as exc:
+            raise InputValidationError("semi-major axis is not representable") from exc
+        if not math.isfinite(axis) or axis <= 0.0:
+            raise InputValidationError("semi-major axis must be finite and positive")
+
+        try:
+            mean_motion = 0.9856076686 / axis**1.5
+        except OverflowError:
+            # The inverse power can still be representable when the
+            # intermediate positive power overflows binary64.
+            mean_motion = 0.9856076686 * axis**-1.5
+        except ZeroDivisionError as exc:
+            raise InputValidationError("mean motion is not representable") from exc
+
+        if not math.isfinite(mean_motion) or mean_motion <= 0.0:
+            raise InputValidationError("mean motion is not representable")
+        return float(mean_motion)
 
 
 _STANDARD_EPOCHS: Mapping[str, float] = MappingProxyType(
     {
         "J1900": 2415020.0,
-        "B1950": 2433282.42345905,
+        "B1950": B1950,
         "J2000": 2451545.0,
     }
 )
