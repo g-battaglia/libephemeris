@@ -928,21 +928,23 @@ def get_loader() -> Loader:
 def _build_enhanced_timescale() -> Timescale:
     """Build a Timescale with extended historical Delta T coverage.
 
-    Skyfield's built-in ``iers.npz`` provides daily observed Delta T from
-    ~1973 to ~2027.  For earlier dates it falls back to the Stephenson,
-    Morrison & Hohenkerk (2016) cubic spline which is designed for
-    millennial-scale modelling and can deviate from 20th-century
-    observations by up to ~0.7 s (worst case around 1955).
+    Skyfield 1.54's built-in ``iers.npz`` provides a daily Delta T table
+    from 1973 to early 2027. The fields used here do not retain the IERS
+    observed versus predicted status of each row. For earlier dates,
+    Skyfield falls back to the Stephenson, Morrison & Hohenkerk (2016)
+    cubic spline, designed for millennial-scale modelling. It can deviate
+    from 20th-century observations by up to ~0.7 s (worst case around 1955).
 
-    Skyfield also ships ``historic_deltat.npy`` — semi-annual observed
+    Skyfield also ships ``historic_deltat.npy`` — semi-annual historical
     values from 1657 to 1984 compiled from the *Astronomical Almanac*
     (McCarthy & Babcock 1986) — but the current ``build_delta_t()``
     function does not incorporate them.
 
     This function merges the two datasets into a single table that is
-    then passed to ``build_delta_t()``, giving continuous observed
-    coverage from **1657 to ~2027** with a smooth hand-off at the
-    junction (~1973).
+    then passed to ``build_delta_t()``, giving tabulated coverage from
+    **1657 to early 2027** with a smooth hand-off at the junction (~1973).
+    The bundled daily rows cannot support an observed-only accuracy claim
+    without an independent source-status record.
     """
     import numpy as np
     from pathlib import Path
@@ -996,11 +998,11 @@ def get_timescale() -> Timescale:
 
     Note:
         Uses an enhanced timescale that merges Skyfield's bundled
-        historical Delta T observations (1657-1984, from the
-        *Astronomical Almanac*) with the modern IERS daily table
-        (1973-~2027), providing continuous observed Delta T coverage
-        from 1657 onwards.  For dates outside this range, Skyfield's
-        standard Stephenson, Morrison & Hohenkerk (2016) long-term
+        historical Delta T table (1657-1984, from the
+        *Astronomical Almanac*) with the bundled IERS-derived daily table
+        (1973 to early 2027 in Skyfield 1.54). The fields used here do not
+        carry observed/predicted row status. For dates outside this range,
+        Skyfield's standard Stephenson, Morrison & Hohenkerk (2016) long-term
         model is used automatically.
     """
     global _TS
