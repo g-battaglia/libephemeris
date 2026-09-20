@@ -1385,13 +1385,24 @@ def clear_iers_cache() -> None:
         _DELTA_T_DATA_TIMESTAMP = None
 
 
-def delete_iers_cache_files() -> int:
-    """
-    Delete cached IERS data files from disk.
+def delete_iers_cache_files(*, confirm: bool = False) -> int:
+    """Delete cached IERS data files after explicit confirmation.
+
+    The active ``set_iers_cache_dir()`` override determines which directory
+    is affected. Calling without confirmation leaves disk and memory intact.
+
+    Args:
+        confirm: Must be exactly True to delete the files.
 
     Returns:
-        Number of files deleted
+        Number of files deleted.
+
+    Raises:
+        ValueError: If deletion was not explicitly confirmed.
     """
+    if confirm is not True:
+        raise ValueError("Deleting IERS cache files requires confirm=True")
+
     deleted = 0
     cache_dir = _get_cache_dir()
 

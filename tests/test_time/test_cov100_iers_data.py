@@ -1012,6 +1012,27 @@ class TestIersDataRange:
 class TestDeleteCacheFiles:
     """Cover the file deletion loop incl. the OSError arm (1229-1244)."""
 
+    def test_requires_explicit_confirmation(self):
+        """A call without confirmation must preserve both cache and memory."""
+        cache_dir = iers_data._get_cache_dir()
+        filepath = os.path.join(cache_dir, "finals2000A.data")
+        with open(filepath, "w") as cache_file:
+            cache_file.write("existing data")
+        iers_data._IERS_DATA[51544.0] = iers_data.IERSDataPoint(
+            mjd=51544.0,
+            year=2000,
+            month=1,
+            day=1,
+            ut1_utc=0.0,
+        )
+
+        with pytest.raises(ValueError, match="confirm=True"):
+            iers_data.delete_iers_cache_files()
+
+        with open(filepath) as cache_file:
+            assert cache_file.read() == "existing data"
+        assert 51544.0 in iers_data._IERS_DATA
+
     def test_deletes_existing_files(self):
         """Existing cache files are removed and counted."""
         cache_dir = iers_data._get_cache_dir()
@@ -1021,14 +1042,14 @@ class TestDeleteCacheFiles:
             with open(p, "w") as f:
                 f.write("x")
             paths.append(p)
-        deleted = iers_data.delete_iers_cache_files()
+        deleted = iers_data.delete_iers_cache_files(confirm=True)
         assert deleted == 3
         assert all(not os.path.exists(p) for p in paths)
 
     def test_delete_skips_absent_files(self):
         """Files that do not exist are skipped (branch 1234->1232)."""
         # Cache dir exists but contains no cache files -> nothing deleted.
-        deleted = iers_data.delete_iers_cache_files()
+        deleted = iers_data.delete_iers_cache_files(confirm=True)
         assert deleted == 0
 
     def test_remove_oserror_swallowed(self):
@@ -1038,7 +1059,7 @@ class TestDeleteCacheFiles:
             with open(os.path.join(cache_dir, name), "w") as f:
                 f.write("x")
         with mock.patch("os.remove", side_effect=OSError("locked")):
-            deleted = iers_data.delete_iers_cache_files()
+            deleted = iers_data.delete_iers_cache_files(confirm=True)
         assert deleted == 0
 
 
