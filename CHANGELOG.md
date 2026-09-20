@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longitude in −180°…+360°. Numeric strings, booleans and invalid coordinates
   are refused with the documented input errors. Valid observer geometry is
   unchanged. See `docs/comparison/known-differences.md#b03-geopos-input-contract`.
+- `sol_eclipse_max_time`, `calc_eclipse_path_width`, and
+  `planet_occult_when_loc` now apply the same geographic input domain to their
+  separate latitude, longitude, and altitude arguments. Global calculations
+  without an observer and the existing single-coordinate path-width selection
+  remain accepted.
 - `heliacal_pheno_ut` states the heliacal window from its definition. The two
   horizon crossings that frame the requested event are the disc centres of the
   object and of the Sun (slots 21 and 22) and their difference is the lag

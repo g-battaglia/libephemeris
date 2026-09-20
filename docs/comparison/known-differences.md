@@ -1068,9 +1068,19 @@ finite and within −90° to +90°, longitude finite and within the library's
 documented −180° to +360° input range, and altitude finite. No altitude bound
 is inferred from the ephemeris model.
 
-The argument is checked before any ephemeris search. A missing or malformed
-sequence raises `ValueError`; a nonnumeric component or nonfinite altitude
-raises `InputValidationError`; an invalid latitude or longitude raises
+Three other public functions take observer coordinates as separate scalar
+arguments: `sol_eclipse_max_time`, `calc_eclipse_path_width`, and
+`planet_occult_when_loc`. Supplied coordinates follow the same numeric and
+geographic domain and are normalized to native Python floats. The first two
+functions retain their observer-free global calculation when both coordinates
+are omitted. A single supplied coordinate still selects the central-line
+calculation in `calc_eclipse_path_width`; `sol_eclipse_max_time` requires both
+or neither. `planet_occult_when_loc` keeps body-identifier refusals ahead of
+coordinate validation.
+
+The `geopos` argument is checked before any ephemeris search. A missing or
+malformed sequence raises `ValueError`; a nonnumeric component or nonfinite
+altitude raises `InputValidationError`; an invalid latitude or longitude raises
 `CoordinateError`. This makes invalid observer requests fail in the same way
 across the public entry points. It does not change the geometry of valid
 locations or introduce a numerical tolerance. The exact golden case IDs whose

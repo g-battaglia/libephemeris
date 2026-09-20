@@ -103,7 +103,7 @@ class CoordinateError(InputValidationError):
     This exception is raised when latitude or longitude values are outside
     their valid ranges:
     - Latitude: must be in [-90, 90] degrees
-    - Longitude: must be in [-180, 180] degrees
+    - Longitude: must be in [-180, 360] degrees
 
     Attributes:
         message: Human-readable error message

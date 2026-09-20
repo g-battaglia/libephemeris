@@ -50,7 +50,7 @@ import contextlib
 import functools
 import math
 import re
-from typing import Callable, Iterator, NamedTuple, Sequence, Tuple, Union, cast
+from typing import Any, Callable, Iterator, NamedTuple, Sequence, Tuple, Union, cast
 
 from .constants import (
     SUN,
@@ -170,6 +170,31 @@ _GEOPOS_MESSAGE = (
 )
 
 
+def _validated_observer_values(
+    lon: Any,
+    lat: Any,
+    altitude: Any,
+    func_name: str,
+    component_label: str,
+) -> tuple[float, float, float]:
+    """Check three observer values against the shared geographic domain."""
+    values = (lon, lat, altitude)
+    if any(isinstance(value, (str, bytes, bytearray, bool)) for value in values):
+        raise InputValidationError(
+            f"{func_name}: {component_label} must be numeric real values"
+        )
+    try:
+        longitude, latitude, height = (float(value) for value in values)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise InputValidationError(
+            f"{func_name}: {component_label} must be numeric"
+        ) from exc
+    validate_coordinates(latitude, longitude, func_name)
+    if not math.isfinite(height):
+        raise InputValidationError(f"{func_name}: altitude must be finite")
+    return longitude, latitude, height
+
+
 def _validated_geopos(
     geopos: Sequence[float], func_name: str
 ) -> tuple[float, float, float]:
@@ -195,22 +220,25 @@ def _validated_geopos(
     except (TypeError, IndexError, KeyError) as exc:
         raise ValueError(_GEOPOS_MESSAGE) from exc
 
-    # Numeric strings and booleans are convertible by float(), but are not
-    # physical coordinate values. Reject them before conversion everywhere.
-    if any(isinstance(value, (str, bytes, bytearray, bool)) for value in components):
-        raise InputValidationError(
-            f"{func_name}: geopos components must be numeric real values"
-        )
-    try:
-        lon, lat, altitude = (float(value) for value in components)
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise InputValidationError(
-            f"{func_name}: geopos components must be numeric"
-        ) from exc
-    validate_coordinates(lat, lon, func_name)
-    if not math.isfinite(altitude):
-        raise InputValidationError(f"{func_name}: altitude must be finite")
-    return lon, lat, altitude
+    return _validated_observer_values(*components, func_name, "geopos components")
+
+
+def _validated_scalar_location(
+    lat: float,
+    lon: float,
+    altitude: float,
+    func_name: str,
+) -> tuple[float, float, float]:
+    """Validate separate observer coordinates and return native Python floats.
+
+    The scalar-coordinate entry points use the same physical domain as the
+    public ``geopos`` entry points.  Keeping this check at the entry boundary
+    prevents invalid coordinates from reaching either calculation backend.
+    """
+    longitude, latitude, height = _validated_observer_values(
+        lon, lat, altitude, func_name, "observer coordinates"
+    )
+    return latitude, longitude, height
 
 
 def _is_leb_body_miss(exc: BaseException) -> bool:
@@ -3630,6 +3658,10 @@ def sol_eclipse_max_time(
 
     Raises:
         ValueError: If only one of lat/lon is provided (both or neither required)
+        InputValidationError: If a local coordinate is nonnumeric or altitude
+            is nonfinite.
+        CoordinateError: If local latitude or longitude is nonfinite or outside
+            the accepted geographic range.
 
     Precision:
         Sub-second precision (< 1 second) achieved through golden section search
@@ -3682,6 +3714,9 @@ def sol_eclipse_max_time(
     if is_local:
         # Local maximum: find minimum Sun-Moon separation from observer location
         assert lat is not None and lon is not None
+        lat, lon, altitude = _validated_scalar_location(
+            lat, lon, altitude, "sol_eclipse_max_time"
+        )
         return _calc_local_eclipse_max_time(jd_approx, lat, lon, altitude, search_range)
     else:
         # Global maximum: find minimum gamma using Besselian elements
@@ -11711,9 +11746,21 @@ def calc_eclipse_path_width(
     """Calculate the width of the central eclipse path at a location.
 
     Wrapper around :func:`_calc_eclipse_path_width_impl` that adds LEB→Skyfield
-    fallback for partial/custom LEB files. See the impl docstring for the
-    full API contract.
+    fallback for partial/custom LEB files. Supplied observer coordinates are
+    checked before calculation; either omitted coordinate retains the existing
+    central-line selection. See the impl docstring for the full API contract.
     """
+    # Either coordinate may be omitted for the central-line calculation.
+    # Validate every coordinate that was supplied while preserving that public
+    # selection rule and its existing behavior for a single supplied value.
+    checked_lat, checked_lon, _ = _validated_scalar_location(
+        0.0 if lat is None else lat,
+        0.0 if lon is None else lon,
+        0.0,
+        "calc_eclipse_path_width",
+    )
+    lat = None if lat is None else checked_lat
+    lon = None if lon is None else checked_lon
     return _call_with_leb_skyfield_fallback(
         _calc_eclipse_path_width_impl,
         jd,
@@ -14325,6 +14372,48 @@ def planet_occult_when_glob(
 planet_occult_when_glob = planet_occult_when_glob
 
 
+def _validated_planet_occult_location(
+    occulting_planet: int,
+    occulted_planet: int,
+    star_name: str,
+    lat: float,
+    lon: float,
+    altitude: float,
+) -> tuple[float, float, float]:
+    """Preserve body-refusal precedence, then validate the observer site."""
+    from .planets import _PLANET_MAP
+
+    if occulted_planet == 0 and not star_name:
+        raise ValueError(
+            "Specify the occulted body: pass a non-zero occulted_planet id or a "
+            "star_name."
+        )
+    if occulting_planet == SUN:
+        raise ValueError(
+            "The Sun cannot be the occulting body here; use sol_eclipse_when_loc "
+            "for solar eclipses."
+        )
+    if occulting_planet == MOON:
+        raise ValueError(
+            "The Moon cannot be the occulting body here; use lun_occult_when_loc "
+            "for lunar occultations."
+        )
+    if occulting_planet not in _PLANET_MAP:
+        raise ValueError(
+            f"The occulting planet id {occulting_planet} does not denote a planet."
+        )
+    if occulted_planet != 0:
+        if occulted_planet not in _PLANET_MAP:
+            raise ValueError(
+                f"The occulted planet id {occulted_planet} does not denote a planet."
+            )
+        if occulted_planet == occulting_planet:
+            raise ValueError(
+                "The occulting and the occulted planet must be different bodies."
+            )
+    return _validated_scalar_location(lat, lon, altitude, "planet_occult_when_loc")
+
+
 def planet_occult_when_loc(
     jd_start: float,
     occulting_planet: int,
@@ -14338,9 +14427,13 @@ def planet_occult_when_loc(
     """Find the next planetary occultation visible from a specific location.
 
     Wrapper around :func:`_planet_occult_when_loc_impl` that adds LEB→Skyfield
-    fallback for partial/custom LEB files. See the impl docstring for the
-    full API contract.
+    fallback for partial/custom LEB files. Scalar observer coordinates are
+    checked after body identifiers and before the occultation search. See the
+    impl docstring for the full API contract.
     """
+    lat, lon, altitude = _validated_planet_occult_location(
+        occulting_planet, occulted_planet, star_name, lat, lon, altitude
+    )
     return _call_with_leb_skyfield_fallback(
         _planet_occult_when_loc_impl,
         jd_start,
@@ -14427,45 +14520,14 @@ def _planet_occult_when_loc_impl(
     """
     from skyfield.api import wgs84
 
-    from .constants import (
-        SUN,
-        MOON,
-    )
     from .fixed_stars import FIXED_STARS, _resolve_star_id
     from .planets import _PLANET_MAP, get_planet_target
     from .state import get_planets, get_timescale
 
-    if occulted_planet == 0 and not star_name:
-        raise ValueError(
-            "Specify the occulted body: pass a non-zero occulted_planet id or a "
-            "star_name."
-        )
-
-    # Validate planets
-    if occulting_planet == SUN:
-        raise ValueError(
-            "The Sun cannot be the occulting body here; use sol_eclipse_when_loc "
-            "for solar eclipses."
-        )
-    if occulting_planet == MOON:
-        raise ValueError(
-            "The Moon cannot be the occulting body here; use lun_occult_when_loc "
-            "for lunar occultations."
-        )
-    if occulting_planet not in _PLANET_MAP:
-        raise ValueError(
-            f"The occulting planet id {occulting_planet} does not denote a planet."
-        )
-
-    if occulted_planet != 0:
-        if occulted_planet not in _PLANET_MAP:
-            raise ValueError(
-                f"The occulted planet id {occulted_planet} does not denote a planet."
-            )
-        if occulted_planet == occulting_planet:
-            raise ValueError(
-                "The occulting and the occulted planet must be different bodies."
-            )
+    # Direct private callers receive the same guard as the public wrapper.
+    lat, lon, altitude = _validated_planet_occult_location(
+        occulting_planet, occulted_planet, star_name, lat, lon, altitude
+    )
 
     MAX_SEARCH_YEARS = 150
     MAX_GLOBAL_SEARCHES = 100
