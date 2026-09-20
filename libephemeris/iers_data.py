@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """
-IERS data download and parsing for observed Delta T values.
+IERS Earth-orientation and Delta T data download and parsing.
 
 This module provides automatic download and parsing of Earth Orientation
 Parameters (EOP) data from IERS (International Earth Rotation and Reference
@@ -11,8 +11,10 @@ Delta T = TT - UT1, where:
     - TT = Terrestrial Time (atomic time + 32.184s)
     - UT1 = Universal Time (tied to Earth's rotation)
 
-For recent dates (since ~1973), IERS provides observed UT1-UTC values which
-can be used to compute high-precision Delta T values.
+For recent dates (since ~1973), the EOP source contains UT1-UTC
+determinations and predictions. The separate monthly Delta T product has
+lower precision than daily EOP products; this module does not authenticate
+the status or scientific accuracy of locally cached inputs.
 
 Data Sources:
     - IERS finals2000A.data: Earth Orientation Parameters (EOP)
@@ -22,17 +24,19 @@ Data Sources:
     - IERS Leap Seconds: Required to compute Delta T from UT1-UTC
       URL: https://hpiers.obspm.fr/iers/bul/bulc/Leap_Second.dat
 
+    - USNO monthly Delta T: TT-UT1 determinations since 1973
+      URL: https://maia.usno.navy.mil/ser7/deltat.data
+
 References:
     - IERS EOP Data: https://www.iers.org/IERS/EN/DataProducts/EarthOrientationData/eop.html
     - IERS Bulletin A: https://www.iers.org/IERS/EN/Publications/Bulletins/Bulletins.html
 
 Provenance:
-    All Earth-orientation, UT1-UTC, and leap-second observations are parsed from
-    the official public IERS/USNO files identified above. Column positions,
-    units, prediction markers, and ``Delta T = 32.184 + (TAI-UTC) - (UT1-UTC)``
-    follow IERS time-scale definitions. Cache age, mirrors, timeouts, and the
-    packaged last-resort leap-second list are project availability policy; they
-    are versioned and never inferred from another ephemeris.
+    The primary download URLs identify public IERS/USNO products, but a local
+    cache can also contain user-supplied bytes or a backup format. This module
+    does not bind loaded values to an authenticated source snapshot or retain
+    a source/status receipt for Delta T. Cache age, mirrors, timeouts and the
+    packaged last-resort leap-second list are project availability policy.
 """
 
 from __future__ import annotations
@@ -60,7 +64,7 @@ IERS_FINALS_URL_BACKUP = "https://maia.usno.navy.mil/ser7/finals2000A.data"
 IERS_LEAP_SECONDS_URL = "https://hpiers.obspm.fr/iers/bul/bulc/Leap_Second.dat"
 IERS_LEAP_SECONDS_URL_BACKUP = "https://www.ietf.org/timezones/data/leap-seconds.list"
 
-# IERS observed Delta T data (monthly values from 1973-present)
+# Monthly Delta T primary source; the backup uses a distinct EOP format.
 IERS_DELTA_T_URL = "https://maia.usno.navy.mil/ser7/deltat.data"
 IERS_DELTA_T_URL_BACKUP = "https://datacenter.iers.org/data/latestVersion/EOP_14_C04_IAU1980_one_file_1962-now.txt"
 
@@ -85,9 +89,10 @@ class IERSDataPoint:
         year: Calendar year
         month: Calendar month (1-12)
         day: Calendar day (1-31)
-        ut1_utc: UT1-UTC in seconds (observed value)
+        ut1_utc: UT1-UTC in seconds (determination or prediction)
         ut1_utc_err: Error in UT1-UTC (seconds), if available
-        is_prediction: True if this is a prediction, False if observed
+        is_prediction: True for a ``P`` flag; False also covers other or
+            missing flags and does not certify an observed row
     """
 
     mjd: float
@@ -120,7 +125,7 @@ class LeapSecondEntry:
 
 @dataclass
 class DeltaTDataPoint:
-    """An observed Delta T data point from IERS.
+    """A Delta T point parsed from the monthly or backup EOP source.
 
     Attributes:
         mjd: Modified Julian Date
@@ -147,7 +152,7 @@ _IERS_DATA: dict[float, IERSDataPoint] = {}
 # Cached leap seconds: list of LeapSecondEntry, sorted by MJD
 _LEAP_SECONDS: list[LeapSecondEntry] = []
 
-# Cached observed Delta T values: list of DeltaTDataPoint, sorted by MJD
+# Cached Delta T values: list of DeltaTDataPoint, sorted by MJD
 _DELTA_T_DATA: list[DeltaTDataPoint] = []
 
 # Last update timestamps
@@ -431,11 +436,11 @@ def download_leap_seconds(force: bool = False) -> str:
 
 def download_delta_t_data(force: bool = False) -> str:
     """
-    Download the IERS observed Delta T data file.
+    Download the monthly Delta T product or the backup EOP file.
 
-    This file contains observed Delta T (TT - UT1) values from IERS,
-    providing monthly values from 1973 to present. These are the definitive
-    observed values for recent dates, as opposed to computed/predicted values.
+    The primary USNO product contains monthly TT-UT1 determinations since
+    1973. USNO describes it as lower precision than daily EOP products.
+    The backup is a different EOP format from which the parser derives Delta T.
 
     Args:
         force: If True, download even if a cached file exists
@@ -447,11 +452,8 @@ def download_delta_t_data(force: bool = False) -> str:
         ConnectionError: If download fails from all sources
 
     Note:
-        The data file contains observed Delta T values in seconds for the
-        first of each month. Format: YEAR MONTH DAY DELTA_T
-
-        This data is essential for high-precision calculations for recent
-        dates (1973-present).
+        The primary format is YEAR MONTH DAY DELTA_T. A cached file is not
+        authenticated as either source by this function.
     """
     logger = get_logger()
     cache_path = _get_delta_t_cache_path()
@@ -871,10 +873,9 @@ def _parse_delta_t_data(filepath: str) -> list[DeltaTDataPoint]:
                 else:
                     delta_t = col4
 
-                # Sanity bound: observed Delta T is tens of seconds across the
-                # covered epoch (1962-present, ~33-75 s). Reject anything wildly
-                # outside a plausible band so an MJD (or any mis-parsed column)
-                # can never be ingested as Delta T.
+                # This broad plausibility band rejects an MJD mistaken for
+                # Delta T; it does not establish the format or accuracy of
+                # an otherwise plausible parsed value.
                 if not (-500.0 <= delta_t <= 1000.0):
                     continue
 
@@ -1135,6 +1136,10 @@ def get_ut1_utc(mjd: float) -> Optional[float]:
     """
     Get UT1-UTC for a given MJD from IERS data.
 
+    The loaded table can contain both determinations and predictions. This
+    function does not return or filter the row status, including either
+    bracket used for interpolation.
+
     Args:
         mjd: Modified Julian Date
 
@@ -1189,13 +1194,12 @@ def get_ut1_utc(mjd: float) -> Optional[float]:
 
 def get_observed_delta_t(jd: float) -> Optional[float]:
     """
-    Get observed Delta T value directly from IERS deltat.data file.
+    Return Delta T from the loaded primary or backup table.
 
-    This uses the observed Delta T values published by IERS, which are
-    monthly values from 1973 to present. These are the definitive observed
-    values and are more accurate than computing Delta T from UT1-UTC.
-
-    For dates between data points, linear interpolation is used.
+    Despite its retained public name, this function does not certify that
+    the cached file came from the monthly USNO source or that a returned
+    value is more accurate than one derived from daily EOP data. It uses
+    linear interpolation between loaded points.
 
     Args:
         jd: Julian Date (UT1)
@@ -1204,9 +1208,8 @@ def get_observed_delta_t(jd: float) -> Optional[float]:
         Delta T in seconds, or None if data not available for this date
 
     Note:
-        The IERS deltat.data file contains observed Delta T values for the
-        first of each month. This function interpolates between these
-        monthly values.
+        The primary source has monthly entries; the backup uses a distinct
+        EOP format. The loaded table does not retain source identity.
     """
     _ensure_data_loaded()
 
@@ -1251,7 +1254,7 @@ def get_observed_delta_t(jd: float) -> Optional[float]:
 
 def get_observed_delta_t_data_range() -> Optional[tuple[float, float]]:
     """
-    Get the date range covered by observed Delta T data.
+    Get the date range covered by the loaded Delta T table.
 
     Returns:
         Tuple of (jd_start, jd_end), or None if no data loaded
@@ -1271,13 +1274,13 @@ def get_observed_delta_t_data_range() -> Optional[tuple[float, float]]:
 
 def is_observed_delta_t_available(jd: float) -> bool:
     """
-    Check if observed Delta T data is available for a given Julian Date.
+    Check if the loaded Delta T table covers a Julian Date.
 
     Args:
         jd: Julian Date
 
     Returns:
-        True if observed Delta T data covers this date
+        True if the loaded table covers this date; no source/status proof
     """
     _ensure_data_loaded()
 
@@ -1292,11 +1295,11 @@ def is_observed_delta_t_available(jd: float) -> bool:
 
 def get_delta_t_iers(jd: float) -> Optional[float]:
     """
-    Get Delta T from IERS data, using the best available source.
+    Get Delta T from the available loaded IERS/USNO tables.
 
-    This function tries multiple sources in order of preference:
-    1. Observed Delta T values from IERS deltat.data (most accurate for recent dates)
-    2. Computed Delta T from UT1-UTC in finals2000A.data
+    This function tries the loaded Delta T table first, then computes from
+    UT1-UTC in the loaded finals table. This order is implementation policy,
+    not a scientific ranking of the two products' accuracy.
 
     Args:
         jd: Julian Date (UT1)
@@ -1305,13 +1308,13 @@ def get_delta_t_iers(jd: float) -> Optional[float]:
         Delta T in seconds, or None if data not available for this date
 
     Note:
-        The observed Delta T values are preferred because they are the
-        definitive published values. The computed values from UT1-UTC
-        are used as a fallback for dates not covered by the observed data.
+        The fallback passes the numeric UT1 JD directly to a table indexed
+        at UTC epochs; it does not solve for the corresponding UTC argument.
+        Loaded-source identity and prediction status are not checked here.
     """
     _ensure_data_loaded()
 
-    # First try observed Delta T data (preferred source)
+    # First try the loaded Delta T table (implementation preference).
     observed_dt = get_observed_delta_t(jd)
     if observed_dt is not None:
         return observed_dt
