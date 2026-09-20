@@ -1012,8 +1012,8 @@ class TestIersDataRange:
 class TestDeleteCacheFiles:
     """Cover the file deletion loop incl. the OSError arm (1229-1244)."""
 
-    def test_requires_explicit_confirmation(self):
-        """A call without confirmation must preserve both cache and memory."""
+    def test_without_confirmation_previews_without_mutation(self):
+        """A call without confirmation lists files and preserves state."""
         cache_dir = iers_data._get_cache_dir()
         filepath = os.path.join(cache_dir, "finals2000A.data")
         with open(filepath, "w") as cache_file:
@@ -1026,12 +1026,19 @@ class TestDeleteCacheFiles:
             ut1_utc=0.0,
         )
 
-        with pytest.raises(ValueError, match="confirm=True"):
-            iers_data.delete_iers_cache_files()
+        assert iers_data.delete_iers_cache_files() == [filepath]
 
         with open(filepath) as cache_file:
             assert cache_file.read() == "existing data"
         assert 51544.0 in iers_data._IERS_DATA
+
+    def test_preview_does_not_create_cache_directory(self, tmp_path):
+        """Previewing an empty redirected cache leaves disk unchanged."""
+        cache_dir = tmp_path / "not-created"
+        iers_data.set_iers_cache_dir(str(cache_dir))
+
+        assert iers_data.delete_iers_cache_files() == []
+        assert not cache_dir.exists()
 
     def test_deletes_existing_files(self):
         """Existing cache files are removed and counted."""

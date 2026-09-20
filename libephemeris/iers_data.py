@@ -252,14 +252,23 @@ def get_iers_auto_download() -> bool:
 # =============================================================================
 
 
-def _get_cache_dir() -> str:
-    """Get the IERS cache directory, creating it if necessary."""
-    from .state import _get_data_dir
+def _cache_dir_path() -> str:
+    """Resolve the IERS cache directory without creating it."""
+    from .state import _resolve_data_dir
 
     if _IERS_CACHE_DIR is not None:
-        cache_path = os.path.abspath(_IERS_CACHE_DIR)
-    else:
+        return os.path.abspath(_IERS_CACHE_DIR)
+    return os.path.join(_resolve_data_dir(), DEFAULT_CACHE_DIR)
+
+
+def _get_cache_dir() -> str:
+    """Get the IERS cache directory, creating it if necessary."""
+    if _IERS_CACHE_DIR is None:
+        from .state import _get_data_dir
+
         cache_path = os.path.join(_get_data_dir(), DEFAULT_CACHE_DIR)
+    else:
+        cache_path = _cache_dir_path()
 
     if not os.path.exists(cache_path):
         os.makedirs(cache_path, exist_ok=True)
@@ -1385,35 +1394,36 @@ def clear_iers_cache() -> None:
         _DELTA_T_DATA_TIMESTAMP = None
 
 
-def delete_iers_cache_files(*, confirm: bool = False) -> int:
-    """Delete cached IERS data files after explicit confirmation.
+def delete_iers_cache_files(*, confirm: bool = False) -> int | list[str]:
+    """Preview or delete cached IERS data files.
 
     The active ``set_iers_cache_dir()`` override determines which directory
-    is affected. Calling without confirmation leaves disk and memory intact.
+    is affected. Calling without confirmation lists existing target paths
+    without changing disk or memory.
 
     Args:
-        confirm: Must be exactly True to delete the files.
+        confirm: Set to True to delete the listed files.
 
     Returns:
-        Number of files deleted.
-
-    Raises:
-        ValueError: If deletion was not explicitly confirmed.
+        Existing target paths when ``confirm`` is False, or the number of files
+        deleted when ``confirm`` is True.
     """
+    cache_dir = _get_cache_dir() if confirm is True else _cache_dir_path()
+    paths = [
+        os.path.join(cache_dir, filename)
+        for filename in ("finals2000A.data", "leap_seconds.dat", "deltat.data")
+    ]
+    existing = [filepath for filepath in paths if os.path.exists(filepath)]
     if confirm is not True:
-        raise ValueError("Deleting IERS cache files requires confirm=True")
+        return existing
 
     deleted = 0
-    cache_dir = _get_cache_dir()
-
-    for filename in ["finals2000A.data", "leap_seconds.dat", "deltat.data"]:
-        filepath = os.path.join(cache_dir, filename)
-        if os.path.exists(filepath):
-            try:
-                os.remove(filepath)
-                deleted += 1
-            except OSError:
-                pass
+    for filepath in existing:
+        try:
+            os.remove(filepath)
+            deleted += 1
+        except OSError:
+            pass
 
     # Also clear in-memory cache
     clear_iers_cache()
