@@ -70,6 +70,9 @@ Precedence is setter → environment → TOML. `set_tier_routes(None)` restores
 configuration lookup without changing mode. Validation copies records before
 replacing the previous policy and does no file/DB I/O. Changing configuration,
 precision or closing resources is an idle-worker action, not hot reload.
+Resource setters/closers reject changes while any DB/routed calculation owner
+is active, including in another thread. The lifecycle lock never spans remote
+metadata/connection I/O and does not serialize independent calculations.
 
 The automatic network policy seals HTTP and downloads while permitting the
 explicit PostgreSQL transport. Explicit `sealed` also blocks PostgreSQL.
@@ -139,7 +142,11 @@ inside its existing ephemeris lock, then exit it before resetting global state.
 Tracing reports actual `LEB`, `DB` or `Mixed` reductions. Body coverage records
 include serving tier/dataset where known; a DB source never invents a filename.
 For an all-tier record, `jd_start`/`jd_end` are the outer envelope and
-`intervals` retain the actual closed windows. `BodyCoverage.contains()` rejects
+`intervals` retain the actual closed windows. Lunar sampling intersects the
+continuous Moon/Earth windows containing its target; it neither fits across a
+coverage hole nor probes an optional wider tier for a covered local window.
+Legacy sampling/range helpers also own and release their coefficient inputs.
+`BodyCoverage.contains()` rejects
 gaps inside that envelope; numerical/vector evaluation raises the public
 `EphemerisRangeError` rather than evaluating an unsupported edge. Ordinary
 coverage misses still permit only the existing curated local models.

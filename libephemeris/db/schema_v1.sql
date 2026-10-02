@@ -105,14 +105,56 @@ BEGIN
     END IF;
     IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
 END $$;
+-- COPY invokes this once per statement, not once per coefficient segment.
+-- SHARE locks still serialize against publication; deterministic UUID order
+-- avoids reversing lock order when a statement inserts into several versions.
+CREATE OR REPLACE FUNCTION libephemeris.guard_segment_insert() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE id uuid; is_published boolean;
+BEGIN
+    FOR id IN SELECT DISTINCT dataset_id FROM inserted_segments ORDER BY dataset_id
+    LOOP
+        SELECT published INTO is_published FROM libephemeris.datasets
+            WHERE dataset_id = id FOR SHARE;
+        IF is_published THEN
+            RAISE EXCEPTION 'Published ephemeris datasets are immutable';
+        END IF;
+    END LOOP;
+    RETURN NULL;
+END $$;
+CREATE OR REPLACE FUNCTION libephemeris.guard_truncate() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'Ephemeris tables cannot be truncated';
+END $$;
 DO $$
 DECLARE tab text;
 BEGIN
     FOREACH tab IN ARRAY ARRAY['datasets','series','segments','delta_t','stars','sections']
     LOOP
-        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'immutable_' || tab
+        IF tab = 'segments' THEN
+            -- Upgrade the original row-insert guard during explicit schema
+            -- provisioning; the scientific schema/layout remains version 1.
+            DROP TRIGGER IF EXISTS immutable_segments ON libephemeris.segments;
+            CREATE TRIGGER immutable_segments BEFORE UPDATE OR DELETE
+                ON libephemeris.segments FOR EACH ROW
+                EXECUTE FUNCTION libephemeris.guard_publication();
+            IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'immutable_insert_segments'
+                AND tgrelid = 'libephemeris.segments'::regclass) THEN
+                CREATE TRIGGER immutable_insert_segments AFTER INSERT
+                    ON libephemeris.segments REFERENCING NEW TABLE AS inserted_segments
+                    FOR EACH STATEMENT EXECUTE FUNCTION libephemeris.guard_segment_insert();
+            END IF;
+        ELSIF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'immutable_' || tab
             AND tgrelid = ('libephemeris.' || tab)::regclass) THEN
             EXECUTE format('CREATE TRIGGER %I BEFORE INSERT OR UPDATE OR DELETE ON libephemeris.%I FOR EACH ROW EXECUTE FUNCTION libephemeris.guard_publication()', 'immutable_' || tab, tab);
+        END IF;
+    END LOOP;
+    FOREACH tab IN ARRAY ARRAY['schema_version','datasets','series','segments','delta_t','stars','sections']
+    LOOP
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'no_truncate_' || tab
+            AND tgrelid = ('libephemeris.' || tab)::regclass) THEN
+            EXECUTE format('CREATE TRIGGER %I BEFORE TRUNCATE ON libephemeris.%I FOR EACH STATEMENT EXECUTE FUNCTION libephemeris.guard_truncate()', 'no_truncate_' || tab, tab);
         END IF;
     END LOOP;
 END $$;

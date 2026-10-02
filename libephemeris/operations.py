@@ -11,22 +11,56 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from functools import wraps
+import threading
 from typing import Any, Callable, Iterator
 
+_resource_lock = threading.RLock()
+_active_operations = 0
 
-def record_source_failure(error: Exception) -> None:
+
+def _idle_worker_action(function: Callable[..., Any]) -> Callable[..., Any]:
+    """Reject resource mutation while any coefficient owner is active.
+
+    Args:
+        function: Configuration setter or resource-closing entry point.
+
+    Returns:
+        Signature-preserving wrapper holding the lifecycle lock through mutation.
+    """
+
+    @wraps(function)
+    def guarded(*args: Any, **kwargs: Any) -> Any:
+        from .exceptions import ConfigurationError
+
+        with _resource_lock:
+            if _active_operations:
+                raise ConfigurationError(
+                    "Coefficient resources cannot change during a calculation session"
+                )
+            return function(*args, **kwargs)
+
+    return guarded
+
+
+def record_source_failure(error: Exception, *, source: bool = False) -> None:
     """Invalidate the current scope after a fatal storage failure.
 
     Args:
         error: Original fatal error, retained only until scope exit.
+        source: Whether the exception arose at a storage-facing boundary.
     """
     from .db.backend import _operation_state
-    from .exceptions import DBError, NetworkSealedError, RoutingDataError
+    from .exceptions import (
+        ConfigurationError,
+        DBError,
+        NetworkSealedError,
+        RoutingDataError,
+    )
     from .leb_reader import LEBCorruptionError
 
     if isinstance(
         error, (DBError, NetworkSealedError, LEBCorruptionError, RoutingDataError)
-    ):
+    ) or (source and isinstance(error, ConfigurationError)):
         owner = getattr(_operation_state, "owner", None)
         if owner is not None and owner.failure is None:
             owner.failure = error
@@ -61,7 +95,7 @@ def source_guard(function: Callable[..., Any]) -> Callable[..., Any]:
                 )
                 record_source_failure(fatal)
                 raise fatal from error
-            record_source_failure(error)
+            record_source_failure(error, source=True)
             raise
 
     return guarded

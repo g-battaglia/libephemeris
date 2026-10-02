@@ -210,10 +210,12 @@ class EphemerisContext:
         """
         from .state import get_calc_mode
 
-        if get_calc_mode() in ("leb", "db", "routed"):
+        mode = get_calc_mode()
+        if mode in ("leb", "db", "routed"):
             raise RuntimeError(
                 "JPL/SPICE ephemeris access is disabled in calculation mode "
-                "'leb'; use the active LEB reader or a declared analytical model"
+                f"{mode!r}; use the active coefficient reader or a declared "
+                "analytical model"
             )
 
         global _SHARED_PLANETS

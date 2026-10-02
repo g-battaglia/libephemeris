@@ -11,6 +11,7 @@ Provenance:
 
 from __future__ import annotations
 
+import math
 from typing import Any, Callable
 
 from .contract import (
@@ -270,7 +271,18 @@ class DBReader:
         """
         if self._closed:
             raise DBDataError("DB operation reader is closed")
-        return StarEntry(*self._store.star(self.dataset_id, star_id))
+        record = self._store.star(self.dataset_id, star_id)
+        try:
+            valid = (
+                len(record) == 8
+                and record[0] == star_id
+                and all(math.isfinite(value) for value in record[1:])
+            )
+        except (TypeError, ValueError, OverflowError):
+            valid = False
+        if not valid:
+            raise DBDataError("Invalid published star record")
+        return StarEntry(record[0], *(float(value) for value in record[1:]))
 
     def close(self) -> None:
         """Release all ephemeris inputs owned by this operation."""

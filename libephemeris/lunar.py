@@ -1984,6 +1984,56 @@ def calc_osculating_perigee(jd_tt: float) -> Tuple[float, float, float]:
     return longitude, lat, r_perigee
 
 
+def _continuous_lunar_range(
+    body_intervals: list[list[tuple[float, float]]],
+    required_dates: tuple[float, float] | None,
+) -> tuple[float, float]:
+    """Intersect exact windows and choose the component containing the target.
+
+    Args:
+        body_intervals: Detached coverage windows for Moon and Earth.
+        required_dates: Requested sampling endpoints, or None for one interval.
+
+    Returns:
+        A genuinely continuous common interval, never a disjoint envelope.
+
+    Raises:
+        EphemerisRangeError: No common interval contains the target, or a
+            date-less query cannot express disjoint coverage as one interval.
+    """
+    common = [(-math.inf, math.inf)]
+    for windows in body_intervals:
+        merged: list[tuple[float, float]] = []
+        for start, end in sorted(windows):
+            if merged and start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+            else:
+                merged.append((start, end))
+        common = [
+            (max(a, c), min(b, d))
+            for a, b in common
+            for c, d in merged
+            if max(a, c) <= min(b, d)
+        ]
+    target = None
+    if required_dates is not None:
+        low, high = required_dates
+        target = low * 0.5 + high * 0.5
+        for start, end in common:
+            if start <= target <= end:
+                return start, end
+    elif len(common) == 1:
+        return common[0]
+    raise EphemerisRangeError(
+        "No continuous lunar coefficient interval covers the sampling target",
+        requested_jd=target,
+        start_jd=common[0][0] if common else None,
+        end_jd=common[-1][1] if common else None,
+        body_id=1,
+    )
+
+
+@db_operation
 def _get_ephemeris_range(
     required_dates: tuple[float, float] | None = None,
 ) -> Tuple[float, float]:
@@ -2025,26 +2075,29 @@ def _get_ephemeris_range(
             from .inventory import get_reader_body_coverage
 
             if get_calc_mode() == "routed" and required_dates is not None:
-                # Inspect exact sampling endpoints first, not remote inventories.
-                coverages = [
-                    get_reader_body_coverage(reader, body, jd)
+                # Resolve only endpoint sources. Their loaded metadata is enough
+                # to join overlapping tiers without probing optional wider DBs.
+                for body in (1, 14):
+                    for jd in required_dates:
+                        get_reader_body_coverage(reader, body, jd)
+                intervals = [
+                    [
+                        bounds
+                        for source in reader._tier_readers.values()
+                        if (bounds := source.body_coverage(body)) is not None
+                    ]
                     for body in (1, 14)
-                    for jd in required_dates
                 ]
-                if all(
-                    cov is not None and cov.contains(jd)
-                    for cov, jd in zip(coverages, required_dates * 2)
-                ):
-                    return (
-                        min(cov.jd_start for cov in coverages if cov is not None),
-                        max(cov.jd_end for cov in coverages if cov is not None),
-                    )
+                return _continuous_lunar_range(intervals, required_dates)
             moon_cov = get_reader_body_coverage(reader, 1)
             earth_cov = get_reader_body_coverage(reader, 14)
             if moon_cov is not None and earth_cov is not None:
-                return (
-                    max(moon_cov.jd_start, earth_cov.jd_start),
-                    min(moon_cov.jd_end, earth_cov.jd_end),
+                return _continuous_lunar_range(
+                    [
+                        list(cov.intervals or ((cov.jd_start, cov.jd_end),))
+                        for cov in (moon_cov, earth_cov)
+                    ],
+                    required_dates,
                 )
         return (2415020.0, 2471184.0)
 
@@ -2071,6 +2124,7 @@ def _get_ephemeris_range(
         return (2415020.0, 2471184.0)
 
 
+@db_operation
 def _sample_osculating_apogee_with_fallback(
     jd_tt: float,
     half_window_days: float,
@@ -2416,6 +2470,7 @@ def _cubic_spline_interpolate(x: list, y: list, x_eval: float) -> float:
     return result
 
 
+@db_operation
 def _sample_osculating_perigee_with_fallback(
     jd_tt: float,
     half_window_days: float,

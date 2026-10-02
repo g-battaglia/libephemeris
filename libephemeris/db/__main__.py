@@ -38,8 +38,9 @@ def main() -> None:
         parser.error("Set LIBEPHEMERIS_DB_URL or supply --dsn")
 
     # Provisioning is an explicit network action, unlike a calculation.
-    from ..net import set_network_policy
+    from ..net import get_configured_network_policy, set_network_policy
 
+    previous_policy = get_configured_network_policy()
     set_network_policy("allow")
     try:
         with connect_provisioner(arguments.dsn) as connection:
@@ -64,6 +65,8 @@ def main() -> None:
             else "PostgreSQL provisioning failed"
         )
         parser.exit(1, message + "\n")
+    finally:
+        set_network_policy(previous_policy)
 
 
 if __name__ == "__main__":

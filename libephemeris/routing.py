@@ -21,7 +21,7 @@ from uuid import UUID
 
 from .exceptions import ConfigurationError, DBDataError, EphemerisRangeError
 from .leb_composite import CompositeLEBReader, TieredLEBReader
-from .operations import source_guard
+from .operations import _idle_worker_action, source_guard
 
 TIERS = TieredLEBReader.TIER_PRIORITY
 
@@ -141,6 +141,7 @@ def _validate_routes(routes: Mapping[str, Any]) -> dict[str, TierRoute]:
     return result
 
 
+@_idle_worker_action
 def set_tier_routes(
     routes: Mapping[str, TierRoute] | None, *, db_url: str | None = None
 ) -> None:
@@ -315,8 +316,9 @@ def get_local_leb_reader() -> TieredLEBReader | None:
     return TieredLEBReader(local) if local else None
 
 
+@_idle_worker_action
 def close_routing() -> None:
-    """Close persistent file handles when workers are idle; preserve config."""
+    """Close persistent files only without active coefficient owners."""
     from .db.backend import close_db
 
     with _lock:
@@ -642,7 +644,9 @@ class RoutedReader:
             start, end = reader.jd_range
             if start <= jd <= end:
                 try:
-                    return reader.delta_t(jd)
+                    value = reader.delta_t(jd)
+                    self._sources.add(getattr(reader, "source", "LEB"))
+                    return value
                 except ValueError:
                     continue
         raise ValueError(f"No LEB Delta-T data covers JD {jd}")
@@ -661,7 +665,10 @@ class RoutedReader:
 
         for tier in self.routes:
             try:
-                return self._reader(tier).get_star(star_id)
+                reader = self._reader(tier)
+                star = reader.get_star(star_id)
+                self._sources.add(getattr(reader, "source", "LEB"))
+                return star
             except (KeyError, StarNotFoundError):
                 continue
         raise KeyError(f"Star {star_id} not in any installed LEB tier")

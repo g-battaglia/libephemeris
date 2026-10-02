@@ -40,6 +40,7 @@ from skyfield.jpllib import SpiceKernel
 
 from .logging_config import get_logger
 from .net import PolicyAwareLoader as Loader
+from .operations import _idle_worker_action
 
 
 # =============================================================================
@@ -247,6 +248,7 @@ if TYPE_CHECKING:
     from .vendor.spktype21 import SPKType21
 
 
+@_idle_worker_action
 def set_calc_mode(mode: Optional[str]) -> None:
     """Set the calculation mode for the library.
 
@@ -380,6 +382,7 @@ def _allow_jpl_source():
         _JPL_SOURCE_ACCESS.reset(token)
 
 
+@_idle_worker_action
 def set_leb_file(filepath: Optional[str]) -> None:
     """Set the .leb file path for binary ephemeris mode.
 
@@ -1237,6 +1240,7 @@ def get_precision_tier() -> str:
     return _get_current_tier().name
 
 
+@_idle_worker_action
 def set_precision_tier(tier: str) -> None:
     """
     Set the precision tier programmatically.
@@ -1972,6 +1976,7 @@ def reset_session() -> None:
     clear_observer_cache()
 
 
+@_idle_worker_action
 def set_ephe_path(path: Optional[str] = None) -> None:
     """
     Set the path for ephemeris files.
@@ -2353,6 +2358,7 @@ def get_library_path() -> str:
     return _get_data_dir()
 
 
+@_idle_worker_action
 def close() -> None:
     """
     Close all opened ephemeris files and release resources.

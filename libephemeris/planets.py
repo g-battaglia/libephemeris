@@ -512,8 +512,13 @@ def _raise_leb_range_miss(
         if local_coverage is not None and local_coverage.contains(jd):
             return
         body_coverage = local_coverage
-    source_name = "DB" if get_calc_mode() == "db" else "LEB"
-    storage_name = "DB dataset" if source_name == "DB" else "LEB file"
+    mode = get_calc_mode()
+    source_name = {"db": "DB", "leb": "LEB", "routed": "routed"}[mode]
+    storage_name = {
+        "db": "DB dataset",
+        "leb": "LEB file",
+        "routed": "routed coefficient sources",
+    }[mode]
     if body_coverage is None:
         if body_id not in _LEB_STORED_STATE_BODY_IDS:
             return
@@ -3914,8 +3919,9 @@ def _calc_body(
             from .exceptions import Error
 
             raise Error(
-                "planetary-moon SPK access is disabled in calculation mode 'leb'; "
-                "no declared LEB or analytical model serves this body"
+                "planetary-moon SPK access is disabled in calculation mode "
+                f"{get_calc_mode()!r}; no declared coefficient or analytical model "
+                "serves this body"
             )
         result = planetary_moons.calc_moon_position(t, ipl, iflag)
         if result is not None:
@@ -5227,7 +5233,7 @@ def _calc_body(
                     message=(
                         f"Asteroid {ipl - AST_OFFSET} (body ID {ipl}) has no "
                         "curated local model and online/SPK sources are disabled "
-                        "in calculation mode 'leb'."
+                        f"in calculation mode {get_calc_mode()!r}."
                     ),
                     body_id=ipl,
                 )

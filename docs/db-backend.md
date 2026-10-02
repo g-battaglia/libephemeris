@@ -76,7 +76,11 @@ not readable at runtime. After successful bulk publication, provisioning runs
 with stale planner estimates. This is never a runtime write. Failed large COPY
 transactions can leave reclaimable table/WAL space; rollback is not disk compaction. PostgreSQL guards published scientific rows against
 ordinary INSERT/UPDATE/DELETE and validates complete segment inventories before
-publication. A privileged database owner can of course disable triggers; this
+publication. Statement-level TRUNCATE guards also protect every scientific table
+and schema-version marker. Bulk segment INSERT/COPY checks and locks each distinct
+parent once per statement via a transition table; UPDATE/DELETE retain row guards.
+Explicit schema provisioning upgrades these guards idempotently without changing
+the version-1 scientific layout. A privileged owner can disable triggers; this
 is not protection against a malicious administrator.
 
 Give the runtime role only USAGE on the `libephemeris` schema and SELECT on its
@@ -90,7 +94,9 @@ The only persistent backend resources are configuration and a lazy connection
 pool (maximum four connections per process, ten-second acquisition/connect and
 statement timeouts). Create workers before opening DB pools. An inherited pool
 is rejected after fork rather than reused unsafely. Close/reconfigure while
-workers are idle; an in-flight operation may fail if its pool is closed.
+workers are idle; resource mutation/closing is rejected while a DB/routed
+calculation owner is active, including from another thread. Lifecycle bookkeeping
+never holds its lock across database metadata/connection I/O.
 
 An outer operation owns its reader and inputs. Nested engine calls borrow that
 owner. Inputs are discarded on both success and failure; repeating a request
@@ -140,7 +146,9 @@ file dependencies, not every filesystem read in Python and its dependencies.
 The automatic network policy seals HTTP/downloads in DB mode while permitting
 the explicitly configured PostgreSQL connection through a separate capability.
 Explicit `network_policy=sealed` denies DB connections too. Explicit provisioning
-commands select the allow policy. The connection address is not obtained from
+commands select the allow policy and restore the caller's prior policy on every
+exit. Local artifact I/O errors are classified separately without displaying raw
+driver OSError text that could contain a credential. The address is not obtained from
 an arbitrary fallback service.
 
 Tracing reports `DB` for persisted DB states. Common body coverage reports DB

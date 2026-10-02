@@ -20,6 +20,7 @@ from uuid import UUID
 from .reader import DBReader
 from .store import PostgresStore
 from ..exceptions import ConfigurationError
+from ..operations import _idle_worker_action, _resource_lock
 
 _configuration: tuple[str, str] | None = None
 _store: PostgresStore | None = None
@@ -31,6 +32,7 @@ _lock = threading.RLock()
 _operation_state = threading.local()
 
 
+@_idle_worker_action
 def set_db_config(dsn: str | None, dataset_id: str | None = None) -> None:
     """Select an immutable DB dataset or reset to environment/TOML settings.
 
@@ -116,9 +118,10 @@ def get_store(dsn: str) -> PostgresStore:
         Process-owned lazy pool adapter.
     """
     global _store, _store_dsn
-    with _lock:
-        if _store is None or _store_dsn != dsn:
+    with _resource_lock, _lock:
+        if _store is not None and _store_dsn != dsn:
             close_db()
+        if _store is None:
             _store = PostgresStore(dsn)
             _store_dsn = dsn
         return _store
@@ -138,6 +141,7 @@ class DatabaseOperation:
         previous_reader: Previous Python engine frame source to restore.
         previous_generation: Generation of that frame source.
         previous_has_nutation: Previous frame-source capability.
+        registered: Whether this record holds a process lifecycle lease.
     """
 
     reader: Any = None
@@ -145,6 +149,7 @@ class DatabaseOperation:
     previous_reader: object | None = None
     previous_generation: int = -1
     previous_has_nutation: bool = False
+    registered: bool = False
 
 
 def begin_operation(operation: DatabaseOperation) -> None:
@@ -156,27 +161,39 @@ def begin_operation(operation: DatabaseOperation) -> None:
     Raises:
         DBError: Database configuration, connection or metadata fails.
     """
+    from .. import operations
     from ..state import get_calc_mode
 
-    mode = get_calc_mode()
-    owner = getattr(_operation_state, "owner", None)
-    if owner is not None and owner.failure is not None:
-        raise owner.failure
-    if mode not in ("db", "routed") or owner is not None:
-        return
-    from ..fast_calc import _active_local
+    with _resource_lock:
+        mode = get_calc_mode()
+        owner = getattr(_operation_state, "owner", None)
+        if owner is not None and owner.failure is not None:
+            raise owner.failure
+        if mode not in ("db", "routed") or owner is not None:
+            return
+        from ..fast_calc import _active_local
 
-    operation.previous_reader = getattr(_active_local, "reader", None)
-    operation.previous_generation = getattr(_active_local, "gen", -1)
-    operation.previous_has_nutation = getattr(_active_local, "has_nutation", False)
-    if mode == "routed":
-        from ..routing import RoutedReader, get_tier_routes
+        operations._active_operations += 1
+        operation.registered = True
+        operation.previous_reader = getattr(_active_local, "reader", None)
+        operation.previous_generation = getattr(_active_local, "gen", -1)
+        operation.previous_has_nutation = getattr(_active_local, "has_nutation", False)
+    # The lease blocks mutation, not other calculations. Never hold the
+    # lifecycle lock across DB metadata/connection I/O.
+    try:
+        if mode == "routed":
+            from ..routing import RoutedReader, get_tier_routes
 
-        operation.reader = RoutedReader(*get_tier_routes())
-    else:
-        operation.reader = get_db_reader()
-    _operation_state.reader = operation.reader
-    _operation_state.owner = operation
+            operation.reader = RoutedReader(*get_tier_routes())
+        else:
+            operation.reader = get_db_reader()
+        _operation_state.reader = operation.reader
+        _operation_state.owner = operation
+    except BaseException:
+        with _resource_lock:
+            operations._active_operations -= 1
+            operation.registered = False
+        raise
 
 
 def finish_operation(operation: DatabaseOperation) -> None:
@@ -186,17 +203,24 @@ def finish_operation(operation: DatabaseOperation) -> None:
         operation: Lifetime record passed to begin_operation. Nested borrowers
             do not release their outer owner's inputs. Finishing is idempotent.
     """
-    if operation.reader is None:
+    if not operation.registered:
         return
+    from .. import operations
     from ..fast_calc import _active_local
 
-    _active_local.reader = operation.previous_reader
-    _active_local.gen = operation.previous_generation
-    _active_local.has_nutation = operation.previous_has_nutation
-    _operation_state.reader = None
-    _operation_state.owner = None
-    operation.reader.close()
-    operation.reader = None
+    with _resource_lock:
+        try:
+            _active_local.reader = operation.previous_reader
+            _active_local.gen = operation.previous_generation
+            _active_local.has_nutation = operation.previous_has_nutation
+            _operation_state.reader = None
+            _operation_state.owner = None
+            if operation.reader is not None:
+                operation.reader.close()
+        finally:
+            operation.reader = None
+            operation.registered = False
+            operations._active_operations -= 1
 
 
 def db_operation(function: Callable[..., Any]) -> Callable[..., Any]:
@@ -228,11 +252,12 @@ def db_operation(function: Callable[..., Any]) -> Callable[..., Any]:
     return wrapped
 
 
+@_idle_worker_action
 def close_db() -> None:
     """Release connection resources while preserving explicit configuration.
 
-    Call when workers are idle. In-flight reads may fail if their pool is
-    closed concurrently; this never permits a fallback to another source.
+    Active coefficient owners reject closing, including from another thread.
+    Call only when workers are idle; no concurrent hot reload is supported.
     """
     global _store, _store_dsn
     with _lock:

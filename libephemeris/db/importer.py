@@ -418,10 +418,22 @@ def import_artifacts(
             encoded_tiers = set(path.stem.split("_")) & {"base", "medium", "extended"}
             if encoded_tiers and encoded_tiers != {tier}:
                 raise DBDataError("Cannot mix artifact tiers in one DB dataset")
-            reader = open_leb(str(path))
+            try:
+                reader = open_leb(str(path))
+            except OSError as error:
+                raise DBDataError(
+                    "Coefficient source artifact is unavailable or unreadable"
+                ) from error
             stack.callback(reader.close)
             artifacts.append(Artifact(path, reader))
-        manifest = {"artifacts": [artifact.manifest_record() for artifact in artifacts]}
+        try:
+            manifest = {
+                "artifacts": [artifact.manifest_record() for artifact in artifacts]
+            }
+        except OSError as error:
+            raise DBDataError(
+                "Coefficient source artifact is unavailable or unreadable"
+            ) from error
         with connection.transaction():
             # Serializes two provisioners targeting the same immutable UUID.
             connection.execute(
