@@ -72,10 +72,11 @@ from .leb_format import (
     _madvise_dontneed,
 )
 from .exceptions import LEBCorruptionError
+from .leb_export import LEBExportMixin
 from .leb_reader import _clenshaw, _clenshaw_with_derivative
 
 
-class LEB2Reader:
+class LEB2Reader(LEBExportMixin):
     """Reader for LEB2 compressed .leb2 files (v1 monolithic and v2 chunked).
 
     Same interface as LEBReader.

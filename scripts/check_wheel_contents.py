@@ -90,6 +90,8 @@ FORBIDDEN = (
     re.compile(r"(^|/)tests?/", re.IGNORECASE),
     re.compile(r"(^|/)compare_scripts/", re.IGNORECASE),
     re.compile(r"libephemeris/dev_cli(/|\.py)", re.IGNORECASE),
+    re.compile(r"(^|/)packages(/|$)", re.IGNORECASE),
+    re.compile(r"(^|/)libephemeris_postgres(/|$)", re.IGNORECASE),
     re.compile(r"\.se1$", re.IGNORECASE),
     re.compile(r"sefstars", re.IGNORECASE),
     re.compile(r"seorbel", re.IGNORECASE),
@@ -130,7 +132,18 @@ def _discover_wheel_project_files() -> tuple[str, ...]:
     return tuple(sorted(files))
 
 
-WHEEL_REQUIRED = _discover_wheel_project_files()
+# New core modules may be present in a local checkout before they are staged in
+# git. Keep the package allowlist explicit so the audit still recognizes them
+# as supported wheel payloads while rejecting every other unexpected member.
+_WHEEL_SOURCE_ALLOWLIST = frozenset(
+    {
+        "libephemeris/leb_export.py",
+        "libephemeris/segment_source.py",
+    }
+)
+WHEEL_REQUIRED = tuple(
+    sorted(set(_discover_wheel_project_files()) | _WHEEL_SOURCE_ALLOWLIST)
+)
 WHEEL_METADATA_REQUIRED = (
     f"{EXPECTED_DIST_INFO}/METADATA",
     f"{EXPECTED_DIST_INFO}/WHEEL",
@@ -604,6 +617,13 @@ def _required_payload_hits(
                 (record_name, 0, label)
                 for label in _record_hits(payloads, wheel_file_names)
             )
+        # Keep the core wheel independent from the optional provider package.
+        # This is deliberately checked by both names and bytes: a vendored
+        # compatibility shim must not smuggle its database dependency into the
+        # core distribution.
+        for name, payload in payloads.items():
+            if "libephemeris_postgres" in name.casefold() or b"psycopg" in payload:
+                hits.append((name, 0, "provider-package-or-psycopg"))
     else:
         generated_payloads = {
             f"{EXPECTED_SDIST_ROOT}/{EXPECTED_EGG_INFO}/dependency_links.txt": b"\n",

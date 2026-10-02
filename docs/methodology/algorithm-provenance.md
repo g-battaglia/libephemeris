@@ -293,7 +293,7 @@ the human navigation layer; every row names one registry component.
 | `planetary-moon-spk-runtime` | JPL satellite-kernel positions and center corrections | JPL satellite/NAIF records and IERS frames |
 | `project-moon-theories` | Project implementations of published satellite theories | Lieske E5 and named JPL system solutions |
 | `vendored-tass` | MIT TASS adaptation and periodic-term table | Identified upstream, retained license, and TASS publication |
-| `leb-representation` | Project LEB formats, compression, readers, and evaluation | Clenshaw, IEEE-754, Zstandard, measured error budgets |
+| `leb-representation` | Project LEB formats, compression, readers, segment-source evaluation, and external coefficient routing | Clenshaw, IEEE-754, Zstandard, measured error budgets, and source-contract checks |
 | `astropy-evaluation` | Optional independent comparison bridge | Astropy upstream; diagnostics never become model data |
 | `vendored-spk-type21` | MIT type-21 reader | Exact upstream/version/license/local edits |
 

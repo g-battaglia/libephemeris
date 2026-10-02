@@ -26,13 +26,15 @@ from __future__ import annotations
 
 import os
 import re
+import importlib
+import time
 import threading
 import warnings
 import weakref
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, overload
 from skyfield.api import Topos
 from skyfield.timelib import Timescale
@@ -223,9 +225,13 @@ _IERS_DELTA_T_ENABLED: Optional[bool] = None  # None = check env var
 
 # LEB (binary ephemeris) configuration
 _LEB_FILE: Optional[str] = None  # Path to .leb file
-_LEB_READER: Optional["LEBReader | LEB2Reader | CompositeLEBReader"] = (
-    None  # Cached LEB reader instance
-)
+_LEB_READER: Optional[
+    "LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader"
+] = None
+
+# Tier source configuration is resolved only when a reader is constructed.
+_TIER_SOURCES: dict[str, str | Callable] = {}
+_TIER_SOURCE_FAILURE: tuple[tuple, Exception, float] | None = None
 
 # Horizons API client
 _HORIZONS_CLIENT: Optional["HorizonsClient"] = None
@@ -388,8 +394,9 @@ def set_leb_file(filepath: Optional[str]) -> None:
         >>> pos, _ = calc_ut(2451545.0, SUN, 0)  # uses .leb fast path
         >>> set_leb_file(None)  # disable binary mode
     """
-    global _LEB_FILE, _LEB_READER
+    global _LEB_FILE, _LEB_READER, _TIER_SOURCE_FAILURE
     with _STATE_LOCK:
+        _TIER_SOURCE_FAILURE = None
         if _LEB_READER is not None:
             try:
                 _LEB_READER.close()
@@ -407,6 +414,146 @@ def set_leb_file(filepath: Optional[str]) -> None:
         from .leb_vector import reset_leb_vector_ephemeris
 
         reset_leb_vector_ephemeris()
+
+
+def _resolved_tier_source(tier: str) -> str | Callable | None:
+    """Resolve a factory without importing a provider on the local path."""
+    if tier in _TIER_SOURCES:
+        return _TIER_SOURCES[tier]
+    from ._config_toml import get_str
+
+    value: str | None = os.environ.get(
+        f"LIBEPHEMERIS_TIER_SOURCE_{tier.upper()}", ""
+    ).strip()
+    value = value or get_str(f"tier_source_{tier}") or None
+    return value
+
+
+def get_tier_source(tier: str) -> str | None:
+    """Return the configured factory identity, never provider credentials.
+
+    Args:
+        tier: One of base, medium, extended.
+    """
+    if tier not in TIERS:
+        raise ValueError(f"Unknown tier: {tier!r}")
+    spec = _resolved_tier_source(tier)
+    if callable(spec):
+        module = getattr(spec, "__module__", type(spec).__module__)
+        return f"{module}:{getattr(spec, '__qualname__', type(spec).__name__)}"
+    if spec is not None and not re.fullmatch(
+        r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*", spec
+    ):
+        return "(invalid factory specification)"
+    return spec
+
+
+def set_tier_source(tier: str, spec: str | Callable | None) -> None:
+    """Install an external tier factory and invalidate active reader caches.
+
+    Args:
+        tier: One of base, medium, extended.
+        spec: ``module:factory``, a callable accepting a tier, or None to
+            remove the setter override and resume environment/TOML resolution.
+    """
+    if tier not in TIERS:
+        raise ValueError(f"Unknown tier: {tier!r}")
+    if spec is not None and not callable(spec):
+        if not isinstance(spec, str) or not re.fullmatch(
+            r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*", spec
+        ):
+            raise ValueError("Tier source must be module:factory or a callable")
+    with _STATE_LOCK:
+        if spec is None:
+            _TIER_SOURCES.pop(tier, None)
+        else:
+            _TIER_SOURCES[tier] = spec
+        set_leb_file(_LEB_FILE)
+
+
+def _build_tier_source_reader(specs):
+    """Build the explicitly configured tier tree, failing without fallback."""
+    global _TIER_SOURCE_FAILURE
+    from .exceptions import CoefficientSourceError
+    from .leb_composite import CompositeLEBReader, TieredLEBReader
+    from .leb_groups import LEB2_GROUPS
+    from .segment_source import SegmentSource
+
+    fingerprint = (get_precision_tier(), tuple(specs.items()))
+    failure = _TIER_SOURCE_FAILURE
+    if (
+        failure is not None
+        and failure[0] == fingerprint
+        and time.monotonic() < failure[2]
+    ):
+        # Do not retain or extend tracebacks from earlier failed requests.
+        raise CoefficientSourceError(str(failure[1])) from None
+    tier_readers = {}
+    opened = []
+    try:
+        cores = _discover_reviewed_leb_tier_cores()
+        for tier, spec in specs.items():
+            if spec is None:
+                if tier in cores:
+                    composite = CompositeLEBReader.from_file_with_companions(
+                        cores[tier], pinned_only=True
+                    )
+                    opened.append(composite)
+                    for child in composite._readers:
+                        child._manifest_verified = True
+                    tier_readers[tier] = composite
+                continue
+            factory = spec
+            if isinstance(spec, str):
+                if not re.fullmatch(
+                    r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*", spec
+                ):
+                    raise CoefficientSourceError("Tier source must be module:factory")
+                module, _, name = spec.partition(":")
+                factory = getattr(importlib.import_module(module), name)
+            sources = factory(tier)
+            if not isinstance(sources, Sequence) or not sources:
+                raise CoefficientSourceError(
+                    "Tier factory must return a nonempty sequence"
+                )
+            # Retain every constructed instance for cleanup, even if validation fails.
+            opened.extend(s for s in sources if isinstance(s, SegmentSource))
+            expected = {f"{tier}_{group}.leb2" for group in LEB2_GROUPS}
+            if (
+                any(not isinstance(s, SegmentSource) for s in sources)
+                or len(sources) != len(expected)
+                or {s.artifact_name for s in sources} != expected
+            ):
+                raise CoefficientSourceError(
+                    "Tier factory must supply every canonical group"
+                )
+            sources = sorted(
+                sources,
+                key=lambda s: (s.artifact_name != f"{tier}_core.leb2", s.artifact_name),
+            )
+            tier_readers[tier] = CompositeLEBReader(list(sources))
+        reader = TieredLEBReader(tier_readers)
+        reader._manifest_verified = all(
+            getattr(child, "_manifest_verified", False) for child in reader._readers
+        )
+        _release_when_unused(reader)
+        _maybe_warm_reader(reader)
+        _TIER_SOURCE_FAILURE = None
+        return reader
+    except Exception as exc:
+        for instance in opened:
+            try:
+                instance.close()
+            except Exception:
+                pass
+        message = (
+            str(exc)
+            if isinstance(exc, CoefficientSourceError)
+            else ("Could not initialize configured coefficient source")
+        )
+        error = CoefficientSourceError(message)
+        _TIER_SOURCE_FAILURE = (fingerprint, error, time.monotonic() + 5.0)
+        raise error from None
 
 
 def _matches_pinned_data_file(path: str, manifest_name: str) -> bool:
@@ -752,6 +899,17 @@ def _get_leb_reader_locked(mode):
             from ._config_toml import get_str as _toml_str
 
             path = _toml_str("leb_file")
+
+        # External factories are resolved only on reader construction; the
+        # cached local-file evaluation path is unchanged.
+        priority = ("base", "medium", "extended")
+        eligible = priority[: priority.index(get_precision_tier()) + 1]
+        specs = {tier: _resolved_tier_source(tier) for tier in eligible}
+        if any(spec is not None for spec in specs.values()):
+            if path is None:
+                _LEB_READER = _build_tier_source_reader(specs)
+                return _LEB_READER
+            get_logger().warning("Explicit LEB file overrides configured tier sources")
 
         # Auto-discover if no explicit path configured
         if path is None:
@@ -1217,7 +1375,8 @@ def set_precision_tier(tier: str) -> None:
         'extended'
     """
     global _PRECISION_TIER, _PLANETS, _LEB_READER, _EPHEMERIS_FILE_EXPLICIT
-    global _PLANET_CENTER_CACHE_TIER, _JPL_FALLBACK_ACTIVE
+    global _PLANET_CENTER_CACHE_TIER, _JPL_FALLBACK_ACTIVE, _TIER_SOURCE_FAILURE
+    _TIER_SOURCE_FAILURE = None
     if tier not in TIERS:
         raise ValueError(
             f"Invalid tier: {tier!r}. Must be one of: {list(TIERS.keys())}"
@@ -1253,7 +1412,9 @@ def set_precision_tier(tier: str) -> None:
 
         _fast_calc._reset_active_reader()
         _fast_calc._leb_frame_cache.clear()
+        from .leb_vector import reset_leb_vector_ephemeris
 
+        reset_leb_vector_ephemeris()
         from .cache import clear_caches
 
         clear_caches()
@@ -2361,7 +2522,8 @@ def _close_inner() -> None:
     global _SPK_KERNELS, _SPK_BODY_MAP, _SPK_TYPE21_KERNELS, _AUTO_SPK_DOWNLOAD
     global _SPK_CACHE_DIR, _SPK_DATE_PADDING, _IERS_DELTA_T_ENABLED
     global _PRECISION_TIER
-    global _LEB_FILE, _LEB_READER, _CALC_MODE
+    global _LEB_FILE, _LEB_READER, _CALC_MODE, _TIER_SOURCE_FAILURE
+    _TIER_SOURCE_FAILURE = None
     global _HORIZONS_CLIENT, _HORIZONS_WARNED
     global _PLANET_CENTER_CACHE_TIER
 

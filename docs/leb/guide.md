@@ -1294,12 +1294,18 @@ if reader is not None:
 
 ```python
 # __init__.py
-from .state import set_leb_file, get_leb_reader, set_calc_mode, get_calc_mode
+from libephemeris import (
+    set_leb_file,
+    get_leb_reader,
+    set_calc_mode,
+    get_calc_mode,
+    set_tier_source,
+    get_tier_source,
+)
 ```
 
-All four are accessible as `libephemeris.set_leb_file()`,
-`libephemeris.get_leb_reader()`, `libephemeris.set_calc_mode()`, and
-`libephemeris.get_calc_mode()`.
+These functions are accessible from the package root. External reader
+implementations import `SegmentSource` from `libephemeris.segment_source`.
 
 ---
 
@@ -2157,7 +2163,54 @@ The Clenshaw evaluation functions (`_clenshaw`, `_clenshaw_with_derivative`,
 bounded to 64 entries; evaluation caches are cleared when chunk eviction or
 reader shutdown requires it. Correctness does not rely on GIL atomicity.
 
-### 13.9 Key Modules
+### 13.9 Tier sources
+
+A tier can be supplied by a provider of Chebyshev segments instead of a local
+LEB file. This keeps the evaluation arithmetic in the core while allowing a
+provider to own storage and transport. Configure a source with
+`set_tier_source()` or one of the `LIBEPHEMERIS_TIER_SOURCE_BASE`,
+`LIBEPHEMERIS_TIER_SOURCE_MEDIUM`, and `LIBEPHEMERIS_TIER_SOURCE_EXTENDED`
+environment variables. TOML keys `tier_source_base`, `tier_source_medium`, and
+`tier_source_extended` are the lowest-priority configuration.
+
+The precedence is setter, environment, then TOML. A setter value of `None`
+removes only the setter override and resumes environment/TOML resolution. A
+source for a tier above the active precision tier is ignored. An explicit
+`LIBEPHEMERIS_LEB` path wins over configured sources and emits a warning.
+
+A factory is either a `module:factory` string or a callable with this signature:
+
+```python
+def factory(tier: str) -> Sequence[SegmentSource]: ...
+```
+
+It must return one `SegmentSource` for each canonical group (`core`,
+`asteroids`, `exotics`, and `apogee`). The core is ordered first and companion
+groups are ordered by group name. `artifact_name` must be the canonical
+`{tier}_{group}.leb2` name. `locator` is a credential-free pseudo-URI used only
+to form the diagnostic `path`; `jd_range` is the artifact header range, not a
+union of body ranges. The source metadata uses native `BodyEntry`,
+`NutationHeader`, `StarEntry`, and Delta-T tables. Fetch methods return exact
+stored float sequences and must translate missing rows, corrupt payloads, and
+transport failures into `CoefficientSourceError`.
+
+`CoefficientSourceError` deliberately derives directly from `Exception`. It is
+not a calculation or range error, so a configured provider failure reaches the
+caller instead of being interpreted as an ordinary LEB miss by event searches.
+The source's `close()` clears its evaluation cache and calls `on_close()` but
+must not close provider-owned shared pools. `warm()` and `cool()` are no-ops.
+`get_leb_inventory()` reports the pseudo-path, canonical group, and
+`reviewed` state; a source has no local byte size.
+
+```python
+from libephemeris.segment_source import SegmentSource
+from libephemeris import set_tier_source
+
+set_tier_source("medium", "my_provider:factory")
+# The provider is imported lazily when the reader is first needed.
+```
+
+### 13.10 Key Modules
 
 | Module | Purpose |
 |--------|---------|
@@ -2165,10 +2218,11 @@ reader shutdown requires it. Correctness does not rely on GIL atomicity.
 | `leb2_reader.py` | `LEB2Reader` — v1 full-body and v2 lazy per-chunk decompression |
 | `leb_composite.py` | `CompositeLEBReader` — wraps multiple readers, dispatches by body_id |
 | `leb_reader.py` | `open_leb()` factory — auto-detects LEB1/LEB2 via magic bytes |
+| `segment_source.py` | `SegmentSource` — reader-compatible external segment seam |
 | `scripts/generate_leb2.py` | CLI: `convert`, `convert-all`, `generate`, `verify` |
 | `scripts/test_leb2_precision.py` | Fast precision test: 14 core bodies × 6 flags × N dates per tier |
 
-### 13.10 Generation Workflow
+### 13.11 Generation Workflow
 
 LEB2 files are produced by **converting** existing LEB1 files. The conversion
 applies the compression pipeline (§13.4) to each body's raw coefficients.
@@ -2202,7 +2256,7 @@ LEB1 file, then converts it:
 python scripts/generate_leb2.py generate --tier base --group core -o data/leb2/base_core.leb2
 ```
 
-### 13.11 Commands Reference
+### 13.12 Commands Reference
 
 **leph tasks (developer CLI):**
 
@@ -2243,7 +2297,7 @@ python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
   --reference data/leb/ephemeris_base.leb --samples 500 --group core --tier base
 ```
 
-### 13.12 Compression measurement
+### 13.13 Compression measurement
 
 `base_core.leb2` is bundled in the wheel; reviewed
 medium and extended cores are published as hash-pinned
