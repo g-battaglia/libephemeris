@@ -49,6 +49,9 @@ Provenance:
 
 from __future__ import annotations
 
+from .db.backend import db_operation
+from .state import _get_coefficient_reader
+
 import math
 from typing import Tuple, NamedTuple, Optional, Sequence
 
@@ -2638,9 +2641,7 @@ def _heliacal_ut_pythonic(
         numerical event algorithm or its thresholds.
     """
     # --- LEB fast path ---
-    from .state import get_leb_reader as _get_leb_reader
-
-    _leb_rdr = _get_leb_reader()
+    _leb_rdr = _get_coefficient_reader()
     if _leb_rdr is not None:
         try:
             return _heliacal_ut_leb(
@@ -3566,6 +3567,7 @@ def _heliacal_ut_pythonic(
         return 0.0, -1  # Not found
 
 
+@db_operation
 def heliacal_ut(
     tjdut: float,
     geopos: tuple,
@@ -4140,9 +4142,7 @@ def _heliacal_pheno_ut_pythonic(
           Bruin (1977), Vistas in Astronomy 21, 331-358 (crescent width).
     """
     # --- LEB fast path ---
-    from .state import get_leb_reader as _get_leb_reader
-
-    _leb_rdr = _get_leb_reader()
+    _leb_rdr = _get_coefficient_reader()
     if _leb_rdr is not None:
         try:
             return _heliacal_pheno_ut_leb(
@@ -4561,6 +4561,7 @@ def _heliacal_pheno_ut_pythonic(
     return tuple(float(v) for v in dret), flags
 
 
+@db_operation
 def heliacal_pheno_ut(
     tjdut: float,
     geopos: tuple,
@@ -4627,6 +4628,7 @@ def heliacal_pheno_ut(
     return dret
 
 
+@db_operation
 def vis_limit_mag(
     tjdut: float,
     geopos: tuple,
@@ -4660,9 +4662,7 @@ def vis_limit_mag(
         atmospheric extinction, eye adaptation, and optional optics.
     """
     # --- LEB fast path ---
-    from .state import get_leb_reader as _get_leb_reader
-
-    _leb_rdr = _get_leb_reader()
+    _leb_rdr = _get_coefficient_reader()
     if _leb_rdr is not None:
         try:
             return _vis_limit_mag_leb(

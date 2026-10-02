@@ -55,6 +55,10 @@ del _load_config
 from .constants import *
 from .constants import FLG_SPEED, GREG_CAL, JUL_CAL
 from .constants import __all__ as _CONSTANT_EXPORTS
+from .db import set_db_config
+from .routing import TierRoute, set_tier_routes
+from .operations import calculation_session
+from .inventory import get_runtime_inventory
 from .logging_config import (
     get_logger,
     set_log_level,
@@ -70,6 +74,9 @@ from .tracing import (
 from .exceptions import (
     # Base error class (reference API compatible)
     Error,
+    DBError,
+    DBDataError,
+    RoutingDataError,
     # Category: Input validation errors
     InputValidationError,
     CoordinateError,
@@ -700,6 +707,9 @@ __all__ = [
     "get_trace_results",
     # Exceptions - Base
     "Error",
+    "DBError",
+    "DBDataError",
+    "RoutingDataError",
     # Exceptions - Input Validation Category
     "InputValidationError",
     "CoordinateError",
@@ -835,6 +845,11 @@ __all__ = [
     "get_leb_reader",
     "set_calc_mode",
     "get_calc_mode",
+    "set_db_config",
+    "TierRoute",
+    "set_tier_routes",
+    "calculation_session",
+    "get_runtime_inventory",
     # Network policy and LEB coverage inventory
     "NETWORK_POLICY_ENV",
     "set_network_policy",

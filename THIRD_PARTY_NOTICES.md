@@ -78,6 +78,16 @@ own licenses; they are not part of LibEphemeris's license grant.
 | astropy | BSD-3-Clause | Installed by the `stars` extra for star-catalog tooling; also a development dependency |
 | astroquery | BSD-3-Clause | Installed by the `stars` extra and development environment for catalog/validation scripts; runtime SPK downloads use LibEphemeris's direct JPL Horizons HTTPS client |
 
+## Optional `postgres` extra (not bundled)
+
+The opt-in `libephemeris[postgres]` extra installs Psycopg 3 (`psycopg`,
+`psycopg-binary` and `psycopg-pool`), each declared LGPL-3.0-only by its package
+metadata. The optional driver is used unmodified and imported only for explicit
+PostgreSQL access. It is not included in the core install, the permissive-only
+`all` extra, or vendored in this repository. Binary dependency distributions
+carry their own notices for linked libraries; retain those notices when
+redistributing such distributions.
+
 ## Optional `nbody` extra -- GPL-3.0 (not bundled)
 
 The opt-in `libephemeris[nbody]` extra (deliberately NOT part of

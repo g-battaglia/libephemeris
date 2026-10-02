@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "description": "Synthetic Chebyshev polynomials, not astronomical samples",
+  "series": {
+    "body_id": 0,
+    "coord_type": 0,
+    "segment_count": 1,
+    "jd_start": 10.0,
+    "jd_end": 12.0,
+    "interval_days": 2.0,
+    "degree": 2,
+    "components": 3
+  },
+  "payload_hex": "000000000000f03f0000000000000040000000000000084000000000000010c0000000000000e03f00000000000000000000000000001c4000000000000000000000000000000000",
+  "evaluation": {
+    "jd_tt": 11.0,
+    "position": [-2.0, -4.0, 7.0],
+    "velocity": [2.0, 0.5, 0.0]
+  }
+}

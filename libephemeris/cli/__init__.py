@@ -902,7 +902,9 @@ def config() -> None:
         if cfg:
             click.echo(f"  Values:   {len(cfg)} key(s) loaded")
             for k, v in cfg.items():
-                click.echo(f"            {_d(k)} = {v!r}")
+                # A DSN can carry secrets in URI, query or libpq keyword form.
+                display_value = "<redacted>" if k == "db_url" else v
+                click.echo(f"            {_d(k)} = {display_value!r}")
     click.echo("  Generate: libephemeris init")
     click.echo()
 

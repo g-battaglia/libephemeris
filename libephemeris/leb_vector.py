@@ -17,7 +17,7 @@ Provenance:
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, TypeAlias
 
 import numpy as np
 from skyfield.vectorlib import VectorFunction
@@ -41,8 +41,17 @@ if TYPE_CHECKING:
     from .leb2_reader import LEB2Reader
     from .leb_composite import CompositeLEBReader, TieredLEBReader
     from .leb_reader import LEBReader
+    from .db.reader import DBReader
+    from .routing import RoutedReader
 
-    LEBReaderLike = LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader
+    LEBReaderLike: TypeAlias = (
+        LEBReader
+        | LEB2Reader
+        | CompositeLEBReader
+        | TieredLEBReader
+        | DBReader
+        | RoutedReader
+    )
 else:
     LEBReaderLike = Any
 
@@ -80,7 +89,13 @@ def _eval_reader_body(
         coverage = coverage_fn(body_id) if coverage_fn is not None else None
         if coverage is not None:
             jd_start, jd_end = (float(coverage[0]), float(coverage[1]))
-            if jd_tt < jd_start or jd_tt > jd_end:
+            selected_fn = getattr(reader, "selected_body_reader", None)
+            covered = (
+                selected_fn(body_id, jd_tt) is not None
+                if selected_fn is not None
+                else jd_start <= jd_tt <= jd_end
+            )
+            if not covered:
                 raise EphemerisRangeError(
                     message=(
                         f"Body {body_id} at JD {jd_tt:.6f} is outside active "
@@ -185,7 +200,9 @@ class LEBVectorEphemeris:
             "earth moon barycenter",
             3,
         )
-        if reader.has_body(EARTH) and reader.has_body(MOON):
+        if getattr(reader, "deferred_targets", False) or (
+            reader.has_body(EARTH) and reader.has_body(MOON)
+        ):
             emb = _LEBVectorTarget(
                 self, 3, self._eval_earth_barycenter, "earth barycenter"
             )
@@ -201,7 +218,9 @@ class LEBVectorEphemeris:
         name: str,
         aliases: tuple[str | int, ...],
     ) -> None:
-        if not self.reader.has_body(body_id):
+        if not getattr(
+            self.reader, "deferred_targets", False
+        ) and not self.reader.has_body(body_id):
             self._record_missing(body_id, name, aliases)
             return
 
@@ -233,18 +252,28 @@ class LEBVectorEphemeris:
     def _eval_earth_barycenter(
         self, jd_tt: float
     ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+        """Combine stored Earth and Moon states into their barycenter.
+
+        Args:
+            jd_tt: Epoch in Julian days TT.
+
+        Returns:
+            Three-component barycentric position and velocity in AU/AU-day.
+        """
         earth_pos, earth_vel = _eval_reader_body(self.reader, EARTH, jd_tt)
         moon_pos, moon_vel = _eval_reader_body(self.reader, MOON, jd_tt)
         weight = 1.0 / (_EMRAT + 1.0)
+        position = tuple(
+            earth_pos[index] + (moon_pos[index] - earth_pos[index]) * weight
+            for index in range(3)
+        )
+        velocity = tuple(
+            earth_vel[index] + (moon_vel[index] - earth_vel[index]) * weight
+            for index in range(3)
+        )
         return (
-            tuple(
-                earth_pos[index] + (moon_pos[index] - earth_pos[index]) * weight
-                for index in range(3)
-            ),
-            tuple(
-                earth_vel[index] + (moon_vel[index] - earth_vel[index]) * weight
-                for index in range(3)
-            ),
+            (position[0], position[1], position[2]),
+            (velocity[0], velocity[1], velocity[2]),
         )
 
     @staticmethod
@@ -287,6 +316,9 @@ _CACHED_EPHEMERIS: LEBVectorEphemeris | None = None
 def get_leb_vector_ephemeris(reader: LEBReaderLike) -> LEBVectorEphemeris:
     """Return the process-cached vector adapter for an active reader."""
     global _CACHED_READER, _CACHED_EPHEMERIS
+    # DB readers own transient inputs and must never enter the global slot.
+    if not getattr(reader, "cacheable", True):
+        return LEBVectorEphemeris(reader)
     if _CACHED_READER is reader and _CACHED_EPHEMERIS is not None:
         return _CACHED_EPHEMERIS
     with _CACHE_LOCK:

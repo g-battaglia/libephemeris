@@ -231,10 +231,10 @@ _LEB_READER: Optional["LEBReader | LEB2Reader | CompositeLEBReader"] = (
 _HORIZONS_CLIENT: Optional["HorizonsClient"] = None
 _HORIZONS_WARNED: bool = False
 
-# Calculation mode: "auto" (default), "skyfield", "leb", or "horizons"
+# Calculation mode: existing auto/JPL/LEB/API choices plus explicit db/routed.
 _CALC_MODE: Optional[str] = None  # None = check env var
 _CALC_MODE_ENV_VAR = "LIBEPHEMERIS_MODE"
-_VALID_CALC_MODES = ("auto", "skyfield", "leb", "horizons")
+_VALID_CALC_MODES = ("auto", "skyfield", "leb", "horizons", "db", "routed")
 _JPL_SOURCE_ACCESS: ContextVar[bool] = ContextVar(
     "libephemeris_jpl_source_access", default=False
 )
@@ -261,12 +261,16 @@ def set_calc_mode(mode: Optional[str]) -> None:
       RuntimeError if none can be resolved. LEB remains the sole persistent
       ephemeris source; only explicitly traced local analytical or Keplerian
       models are allowed for curated bodies without a meaningful LEB channel.
+    - ``"db"``: Require an explicitly configured, published PostgreSQL dataset.
+      Persistent ephemeris states come only from the DB; no file/API fallback.
+    - ``"routed"``: Resolve explicit tier routes using native body/date coverage.
+      Local file inputs and immutable DB datasets are the only stored sources.
     - ``"horizons"``: Always use NASA JPL Horizons API (requires internet).
       Bodies not supported by Horizons fall through to Skyfield.
 
     Args:
-        mode: One of ``"auto"``, ``"skyfield"``, ``"leb"``, ``"horizons"``,
-              or None to reset to environment variable / default.
+        mode: One of ``"auto"``, ``"skyfield"``, ``"leb"``, ``"horizons"``, ``"db"``,
+              ``"routed"``, or None to reset to environment variable / default.
 
     Raises:
         ValueError: If mode is not a valid mode string.
@@ -290,7 +294,11 @@ def set_calc_mode(mode: Optional[str]) -> None:
                 f"Invalid mode: {mode!r}. Must be one of: {list(_VALID_CALC_MODES)}"
             )
     with _STATE_LOCK:
-        _CALC_MODE = mode
+        if _CALC_MODE != mode:
+            _CALC_MODE = mode
+            from .cache import clear_caches
+
+            clear_caches()
 
 
 def get_calc_mode() -> str:
@@ -407,6 +415,9 @@ def set_leb_file(filepath: Optional[str]) -> None:
         from .leb_vector import reset_leb_vector_ephemeris
 
         reset_leb_vector_ephemeris()
+        from .cache import clear_caches
+
+        clear_caches()
 
 
 def _matches_pinned_data_file(path: str, manifest_name: str) -> bool:
@@ -726,13 +737,46 @@ def get_leb_reader() -> Optional[
 
     # Forced non-LEB backends must bypass even an already-open reader. Keep
     # the cached reader alive so switching back to auto/leb can reuse it.
-    if mode in ("skyfield", "horizons"):
+    if mode in ("skyfield", "horizons", "db"):
         return None
+    if mode == "routed":
+        from .routing import get_local_leb_reader
+
+        return get_local_leb_reader()
 
     if _LEB_READER is None:
         with _INIT_LOCK:
             return _get_leb_reader_locked(mode)
     return _LEB_READER
+
+
+def _is_coefficient_only_mode() -> bool:
+    """Report whether persistent states must come from a coefficient backend.
+
+    Returns:
+        True for sealed LEB or PostgreSQL operation, False otherwise.
+    """
+    return get_calc_mode() in ("leb", "db", "routed")
+
+
+def _get_coefficient_reader():
+    """Resolve mathematical inputs without altering the file-oriented API.
+
+    Returns:
+        An operation-owned DB reader, an active file reader, or None.
+    """
+    mode = get_calc_mode()
+    if mode == "db":
+        from .db.backend import get_db_reader
+
+        return get_db_reader()
+    if mode == "routed":
+        from .db.backend import _operation_state
+        from .routing import RoutedReader, get_tier_routes
+
+        active = getattr(_operation_state, "reader", None)
+        return active if active is not None else RoutedReader(*get_tier_routes())
+    return get_leb_reader()
 
 
 def _get_leb_reader_locked(mode):
@@ -860,7 +904,7 @@ def get_horizons_client():
     global _HORIZONS_CLIENT, _HORIZONS_WARNED
     mode = get_calc_mode()
 
-    if mode in ("skyfield", "leb"):
+    if mode in ("skyfield", "leb", "db", "routed"):
         return None
 
     if mode == "horizons":
@@ -1428,7 +1472,7 @@ def jpl_fallback_active() -> bool:
     the first calc, before the kernel is lazily opened. Sealed ``leb`` mode never
     opens a JPL kernel, so it never reports a fallback.
     """
-    if get_calc_mode() == "leb":
+    if _is_coefficient_only_mode():
         return False
     # Evaluated from the REQUESTED filename every time. The sticky record set
     # by the resolver used to short-circuit this, because get_planets() then
@@ -1465,9 +1509,9 @@ def get_planets() -> SpiceKernel:
 
         Searches in _EPHEMERIS_PATH if set, then ~/.libephemeris (downloads if missing).
     """
-    if get_calc_mode() == "leb" and not _JPL_SOURCE_ACCESS.get():
+    if _is_coefficient_only_mode() and not _JPL_SOURCE_ACCESS.get():
         raise RuntimeError(
-            "JPL/SPICE ephemeris access is disabled in calculation mode 'leb'; "
+            f"JPL/SPICE ephemeris access is disabled in calculation mode {get_calc_mode()!r}; "
             "use the active LEB reader or a declared analytical model"
         )
 
@@ -1519,8 +1563,8 @@ def _get_computation_ephemeris():
     # ``get_planets()``: otherwise lunar analytical generators that consume
     # vector states would silently sample an already-installed LEB while
     # claiming to validate against the selected DE kernel.
-    if get_calc_mode() == "leb" and not _JPL_SOURCE_ACCESS.get():
-        reader = get_leb_reader()
+    if _is_coefficient_only_mode() and not _JPL_SOURCE_ACCESS.get():
+        reader = _get_coefficient_reader()
         if reader is None:  # get_leb_reader() normally raises in forced mode.
             raise RuntimeError("Calculation mode 'leb' has no active LEB reader")
         from .leb_vector import get_leb_vector_ephemeris
@@ -1556,7 +1600,7 @@ def get_planet_centers() -> Optional[SpiceKernel]:
         scripts/generate_planet_centers_spk.py script and provide <0.001 arcsec
         precision for planet center positions.
     """
-    if get_calc_mode() == "leb":
+    if _is_coefficient_only_mode():
         return None
 
     global _PLANET_CENTERS, _PLANET_CENTERS_TIER
@@ -2365,6 +2409,14 @@ def _close_inner() -> None:
     global _HORIZONS_CLIENT, _HORIZONS_WARNED
     global _PLANET_CENTER_CACHE_TIER
 
+    # DB connections, unlike operation-owned inputs, are reusable resources.
+    from .db.backend import close_db
+
+    close_db()
+    from .routing import close_routing
+
+    close_routing()
+
     # Close the Horizons client if loaded
     if _HORIZONS_CLIENT is not None:
         try:
@@ -2610,6 +2662,8 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
           return the same data since planets and Moon are in the same file.
         - ifno values 2, 3, 4 return empty data as those file types are not
           used by libephemeris.
+        - DB/routed modes have no single active file identity and return the
+          empty record; use get_runtime_inventory() for their declared sources.
         - The ephemeris file must have been loaded (by calling calc_ut or
           get_planets) before this function returns meaningful data.
 
@@ -2623,6 +2677,11 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
     # Only file types 0 (planets) and 1 (moon) are meaningful for JPL ephemeris
     # Types 2, 3, 4 (asteroids, stars) are not applicable
     if ifno not in (0, 1):
+        return ("", 0.0, 0.0, 0)
+
+    if get_calc_mode() in ("db", "routed"):
+        # This API describes one active file. DB/mixed routing has no single
+        # file identity; never report an inactive kernel from an earlier mode.
         return ("", 0.0, 0.0, 0)
 
     # LEB service (sealed mode, or auto mode before any JPL kernel is

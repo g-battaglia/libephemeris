@@ -36,6 +36,7 @@ import warnings
 from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, overload
 
 from .constants import MEAN_NODE, TRUE_NODE
+from .db.backend import db_operation
 from .tracing import (
     _is_active,
     _record,
@@ -209,7 +210,7 @@ class EphemerisContext:
         """
         from .state import get_calc_mode
 
-        if get_calc_mode() == "leb":
+        if get_calc_mode() in ("leb", "db", "routed"):
             raise RuntimeError(
                 "JPL/SPICE ephemeris access is disabled in calculation mode "
                 "'leb'; use the active LEB reader or a declared analytical model"
@@ -277,6 +278,10 @@ class EphemerisContext:
             RuntimeError: Mode is ``leb`` and the configured file could not be
                 opened for another reason.
         """
+        from .state import get_calc_mode
+
+        if get_calc_mode() in ("db", "routed"):
+            return None
         if self._leb_reader is None and self._leb_file is not None:
             try:
                 from .leb_reader import open_leb
@@ -562,6 +567,7 @@ class EphemerisContext:
     # Calculation Methods (delegate to planets.py with context)
     # =========================================================================
 
+    @db_operation
     def calc_ut(
         self, tjd_ut: float, ipl: int, iflag: int
     ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -591,6 +597,7 @@ class EphemerisContext:
         """
         return self._calc_impl(tjd_ut, ipl, iflag, ut=True)
 
+    @db_operation
     def calc(
         self, tjd: float, ipl: int, iflag: int
     ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -857,7 +864,7 @@ class EphemerisContext:
         _ctx_local_reader = reader
         if reader is None:
             # Fall back to global reader if context has no .leb
-            reader = state.get_leb_reader()
+            reader = state._get_coefficient_reader()
 
         # Compatibility contract: Earth is the exact coordinate origin even
         # for a topocentric request. The LEB topocentric reducer would
@@ -911,10 +918,11 @@ class EphemerisContext:
 
                 pos_out = _to_native_floats(result[0])
                 retflag_out = _echo_retflag(result[1] | _implied_retflag_bits(iflag))
+                source = getattr(reader, "source", "LEB")
                 _log_successful_source(
-                    get_logger(), requested_ipl, tjd, "LEB", context=True
+                    get_logger(), requested_ipl, tjd, source, context=True
                 )
-                _record(requested_ipl, "LEB")
+                _record(requested_ipl, source)
                 return pos_out, retflag_out
             except LEBCorruptionError:
                 raise
@@ -1114,6 +1122,7 @@ class EphemerisContext:
 
         return _houses_with_context(tjd_ut, lat, lon, hsys, self)
 
+    @db_operation
     def calc_pctr(
         self, tjd_ut: float, ipl: int, iplctr: int, iflag: int
     ) -> Tuple[Tuple[float, float, float, float, float, float], int]:

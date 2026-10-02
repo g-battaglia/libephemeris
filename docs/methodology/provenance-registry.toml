@@ -219,6 +219,14 @@ category = "infrastructure"
 paths = [
   "libephemeris/_config_toml.py",
   "libephemeris/_dotenv.py",
+  "libephemeris/db/__init__.py",
+  "libephemeris/db/__main__.py",
+  "libephemeris/db/backend.py",
+  "libephemeris/operations.py",
+  "libephemeris/routing.py",
+  "libephemeris/db/policy.py",
+  "libephemeris/db/store.py",
+  "scripts/import_leb_db.py",
   "libephemeris/cache.py",
   "libephemeris/exceptions.py",
   "libephemeris/inventory.py",
@@ -538,6 +546,10 @@ docstring = "detailed"
 id = "leb-representation"
 category = "numerical-method"
 paths = [
+  "libephemeris/db/contract.py",
+  "libephemeris/db/importer.py",
+  "libephemeris/db/kernel.py",
+  "libephemeris/db/reader.py",
   "libephemeris/leb2_reader.py",
   "libephemeris/leb_composite.py",
   "libephemeris/leb_compression.py",
@@ -548,7 +560,7 @@ paths = [
 scientific_content = true
 origin = "Project-native Chebyshev ephemeris layouts, readers, chunking, and compression. Published Clenshaw, IEEE-754, and Zstandard foundations are separated from project interval/bit/error decisions."
 sources = ["CLENSHAW_1955", "IEEE_754", "ZSTANDARD", "JPL_DE"]
-documentation = ["docs/leb/algorithms.md", "docs/leb/guide.md", "docs/leb/base-core-provenance.md"]
+documentation = ["docs/leb/algorithms.md", "docs/leb/guide.md", "docs/leb/base-core-provenance.md", "docs/db-backend.md"]
 docstring = "detailed"
 
 [[component]]

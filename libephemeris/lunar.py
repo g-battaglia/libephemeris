@@ -49,6 +49,7 @@ from .mean_lunar_apse import (
     _mean_lunar_node_position_unchecked,
     lunar_delaunay_arguments,
 )
+from .db.backend import db_operation
 from .state import _get_computation_ephemeris, get_planets, get_timescale
 from .exceptions import EphemerisRangeError
 
@@ -1536,6 +1537,7 @@ def _check_meeus_range(T: float) -> None:
         )
 
 
+@db_operation
 def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
     """
         Calculate True (osculating) Lunar Node using orbital mechanics approach.
@@ -1734,6 +1736,7 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
     return node_lon, 0.0, dist
 
 
+@db_operation
 def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     """
     Calculate True Lilith (osculating lunar apogee).
@@ -1869,6 +1872,7 @@ def calc_true_lilith_orbital_elements(jd_tt: float) -> Tuple[float, float, float
     return calc_true_lilith(jd_tt)
 
 
+@db_operation
 def calc_osculating_perigee(jd_tt: float) -> Tuple[float, float, float]:
     """
     Calculate the osculating lunar perigee directly from orbital mechanics.
@@ -1980,7 +1984,9 @@ def calc_osculating_perigee(jd_tt: float) -> Tuple[float, float, float]:
     return longitude, lat, r_perigee
 
 
-def _get_ephemeris_range() -> Tuple[float, float]:
+def _get_ephemeris_range(
+    required_dates: tuple[float, float] | None = None,
+) -> Tuple[float, float]:
     """
     Get the valid Julian Date range for the current ephemeris.
 
@@ -1997,7 +2003,11 @@ def _get_ephemeris_range() -> Tuple[float, float]:
         LEB reader (Moon/Earth channel intersection) instead of opening the
         JPL kernel, mirroring ``_get_computation_ephemeris``.
     """
-    from .state import _JPL_SOURCE_ACCESS, get_calc_mode, get_leb_reader
+    from .state import (
+        _JPL_SOURCE_ACCESS,
+        get_calc_mode,
+        _get_coefficient_reader as get_leb_reader,
+    )
 
     # _JPL_SOURCE_ACCESS is the sanctioned provisioning window of
     # state._allow_jpl_source(): only offline LEB GENERATORS enter it (their
@@ -2006,7 +2016,7 @@ def _get_ephemeris_range() -> Tuple[float, float]:
     # With no reader/coverage the generic fallback below is a conservative
     # SUBSET of every tier's real coverage (it under-promises; an actual
     # out-of-coverage computation still raises its typed error later).
-    if get_calc_mode() == "leb" and not _JPL_SOURCE_ACCESS.get():
+    if get_calc_mode() in ("leb", "db", "routed") and not _JPL_SOURCE_ACCESS.get():
         try:
             reader = get_leb_reader()
         except RuntimeError:
@@ -2014,6 +2024,21 @@ def _get_ephemeris_range() -> Tuple[float, float]:
         if reader is not None:
             from .inventory import get_reader_body_coverage
 
+            if get_calc_mode() == "routed" and required_dates is not None:
+                # Inspect exact sampling endpoints first, not remote inventories.
+                coverages = [
+                    get_reader_body_coverage(reader, body, jd)
+                    for body in (1, 14)
+                    for jd in required_dates
+                ]
+                if all(
+                    cov is not None and cov.contains(jd)
+                    for cov, jd in zip(coverages, required_dates * 2)
+                ):
+                    return (
+                        min(cov.jd_start for cov in coverages if cov is not None),
+                        max(cov.jd_end for cov in coverages if cov is not None),
+                    )
             moon_cov = get_reader_body_coverage(reader, 1)
             earth_cov = get_reader_body_coverage(reader, 14)
             if moon_cov is not None and earth_cov is not None:
@@ -2075,7 +2100,9 @@ def _sample_osculating_apogee_with_fallback(
             - target_idx: Index of the sample closest to jd_tt
     """
     # Get ephemeris range
-    min_jd, max_jd = _get_ephemeris_range()
+    min_jd, max_jd = _get_ephemeris_range(
+        (jd_tt - half_window_days, jd_tt + half_window_days)
+    )
 
     # Check if symmetric window is within range
     if jd_tt - half_window_days >= min_jd and jd_tt + half_window_days <= max_jd:
@@ -2425,7 +2452,9 @@ def _sample_osculating_perigee_with_fallback(
             - target_idx: Index of the sample closest to jd_tt
     """
     # Get ephemeris range
-    min_jd, max_jd = _get_ephemeris_range()
+    min_jd, max_jd = _get_ephemeris_range(
+        (jd_tt - half_window_days, jd_tt + half_window_days)
+    )
 
     # Check if symmetric window is within range
     if jd_tt - half_window_days >= min_jd and jd_tt + half_window_days <= max_jd:

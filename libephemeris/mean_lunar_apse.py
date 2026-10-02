@@ -70,6 +70,12 @@ def _active_ephemeris_range() -> tuple[str | None, float, float]:
     """
     from .state import get_calc_mode, get_current_file_data, get_leb_reader, get_planets
 
+    mode = get_calc_mode()
+    if mode in ("db", "routed"):
+        # Analytic validity is independent of persisted data and of any JPL
+        # kernel retained from an earlier mode. Do not inspect file metadata.
+        return None, 0.0, 0.0
+
     path, start_jd, end_jd, _ = get_current_file_data(0)
     # Honor the range only when it belongs to a JPL kernel. Since the
     # provenance fix that made get_current_file_data() report the concrete
@@ -82,8 +88,6 @@ def _active_ephemeris_range() -> tuple[str | None, float, float]:
     _is_leb_source = bool(path) and path.endswith((".leb", ".leb2"))
     if start_jd and end_jd and not _is_leb_source:
         return path, float(start_jd), float(end_jd)
-
-    mode = get_calc_mode()
 
     # Horizons mode has no local-kernel range contract.  These mean points are
     # evaluated from the analytic IERS arguments above, so asking for their

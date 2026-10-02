@@ -67,6 +67,7 @@ import math
 import warnings
 from typing import Optional, Tuple, TYPE_CHECKING
 
+from .db.backend import db_operation
 from .tracing import (
     _is_active,
     _record,
@@ -497,7 +498,10 @@ def _raise_leb_range_miss(
     from .inventory import get_body_coverage, get_reader_body_coverage
     from .state import get_calc_mode
 
-    if get_calc_mode() != "leb" or body_id not in _LEB_CORE_BODY_IDS:
+    if (
+        get_calc_mode() not in ("leb", "db", "routed")
+        or body_id not in _LEB_CORE_BODY_IDS
+    ):
         return
     _raise_leb_model_window_miss(body_id, jd)
     body_coverage = get_body_coverage(body_id, jd)
@@ -508,22 +512,24 @@ def _raise_leb_range_miss(
         if local_coverage is not None and local_coverage.contains(jd):
             return
         body_coverage = local_coverage
+    source_name = "DB" if get_calc_mode() == "db" else "LEB"
+    storage_name = "DB dataset" if source_name == "DB" else "LEB file"
     if body_coverage is None:
         if body_id not in _LEB_STORED_STATE_BODY_IDS:
             return
         raise UnknownBodyError(
             message=(
                 f"Body {body_id} ({_PLANET_NAMES.get(body_id, 'unnamed')}) is "
-                "not stored in the active LEB file. LEB mode does not silently "
-                "substitute a non-LEB source for a missing core body."
+                f"not stored in the active {storage_name}. {source_name} mode does not silently "
+                f"substitute a non-{source_name} source for a missing core body."
             ),
             body_id=body_id,
         )
     raise EphemerisRangeError(
         message=(
-            f"Body {body_id} at JD {jd:.6f} is outside active LEB coverage range "
+            f"Body {body_id} at JD {jd:.6f} is outside active {source_name} coverage range "
             f"[{body_coverage.jd_start:.6f}, {body_coverage.jd_end:.6f}]. "
-            "LEB mode does not silently substitute a lower-precision source."
+            f"{source_name} mode does not silently substitute a lower-precision source."
         ),
         requested_jd=jd,
         start_jd=body_coverage.jd_start,
@@ -2005,6 +2011,7 @@ def _sidbit_projection_calc(
     return (_to_native_floats(xx), retflag)
 
 
+@db_operation
 def calc_ut(
     tjdut: float, planet: int, flags: int = FLG_SWIEPH | FLG_SPEED
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -2183,10 +2190,10 @@ def calc_ut(
         return result
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader
     from .logging_config import get_logger
 
-    reader = get_leb_reader()
+    reader = _get_coefficient_reader()
     # Degenerate topocentric Earth (compatibility contract): return the exact
     # zero vector (Earth is the coordinate origin; TOPOCTR is echoed but the
     # position stays zero). The Skyfield path already handles this; the LEB
@@ -2207,13 +2214,21 @@ def calc_ut(
             retflag_out = _echo_request_bits(
                 result[1] | _implied_retflag_bits(flags), raw_flags
             )
-            _log_successful_source(get_logger(), requested_planet, tjdut, "LEB")
-            _record(requested_planet, "LEB")
+            source = getattr(reader, "source", "LEB")
+            _log_successful_source(get_logger(), requested_planet, tjdut, source)
+            _record(requested_planet, source)
             return pos_out, retflag_out
         except LEBCorruptionError:
             raise
-        except (KeyError, ValueError) as _leb_err:
+        except (KeyError, ValueError, EphemerisRangeError) as _leb_err:
             _raise_leb_range_miss(planet, tjdut)
+            if (
+                isinstance(_leb_err, EphemerisRangeError)
+                and planet in _LEB_CORE_BODY_IDS
+            ):
+                raise
+            # Typed coverage misses retain the existing curated-model path;
+            # fatal DB/file errors are not caught here.
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback(f"body={planet} jd={tjdut:.1f}", _leb_err)
@@ -2317,6 +2332,7 @@ def calc_ut(
         _dispatch_source.reset(source_token)
 
 
+@db_operation
 def calc(
     tjdet: float, planet: int, flags: int = FLG_SWIEPH | FLG_SPEED
 ) -> tuple[tuple[float, float, float, float, float, float], int]:
@@ -2480,10 +2496,10 @@ def calc(
         return result
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader
     from .logging_config import get_logger
 
-    reader = get_leb_reader()
+    reader = _get_coefficient_reader()
     # Degenerate topocentric Earth: see calc_ut — the contract result is the
     # zero vector; keep this off the LEB fast path.
     if planet == EARTH and (flags & FLG_TOPOCTR):
@@ -2502,13 +2518,20 @@ def calc(
                 _echo_request_bits(result[1] | _implied_retflag_bits(flags), raw_flags),
                 raw_flags,
             )
-            _log_successful_source(get_logger(), requested_planet, tjdet, "LEB")
-            _record(requested_planet, "LEB")
+            source = getattr(reader, "source", "LEB")
+            _log_successful_source(get_logger(), requested_planet, tjdet, source)
+            _record(requested_planet, source)
             return pos_out, retflag_out
         except LEBCorruptionError:
             raise
-        except (KeyError, ValueError) as _leb_err:
+        except (KeyError, ValueError, EphemerisRangeError) as _leb_err:
             _raise_leb_range_miss(planet, tjdet)
+            if (
+                isinstance(_leb_err, EphemerisRangeError)
+                and planet in _LEB_CORE_BODY_IDS
+            ):
+                raise
+            # Only the pre-existing curated models may handle ordinary misses.
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback(f"body={planet} jd={tjdet:.1f}", _leb_err)
@@ -2614,6 +2637,7 @@ def calc(
         _dispatch_source.reset(source_token)
 
 
+@db_operation
 def calc_pctr(
     tjdet: float, planet: int, center: int, flags: int = FLG_SWIEPH | FLG_SPEED
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -2727,7 +2751,13 @@ def calc_pctr(
         from .state import get_calc_mode
         from .logging_config import get_logger
 
-        source = "LEB" if get_calc_mode() == "leb" else "Skyfield"
+        from .state import _get_coefficient_reader
+
+        source = (
+            getattr(_get_coefficient_reader(), "source", "LEB")
+            if get_calc_mode() in ("leb", "db", "routed")
+            else "Skyfield"
+        )
         _log_successful_source(get_logger(), planet, tjdet, source)
         _record(planet, source)
         return result
@@ -3880,7 +3910,7 @@ def _calc_body(
     if planetary_moons.is_planetary_moon(ipl):
         from .state import get_calc_mode
 
-        if get_calc_mode() == "leb":
+        if get_calc_mode() in ("leb", "db", "routed"):
             from .exceptions import Error
 
             raise Error(
@@ -4239,7 +4269,7 @@ def _calc_body(
         # a file. An active LEB reader still serves the vector-resolver Earth
         # evaluation below (<0.001" residual vs the kernel), which is
         # orthogonal to the body source.
-        from .state import get_leb_reader
+        from .state import _get_coefficient_reader as get_leb_reader
 
         # In mode="leb" get_leb_reader() raises when no global LEB resolves.
         # A context calculation may carry its own LEB while the global one is
@@ -5189,7 +5219,7 @@ def _calc_body(
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS or (AST_OFFSET < ipl < FIXSTAR_OFFSET):
         from .state import get_calc_mode
 
-        if get_calc_mode() == "leb":
+        if get_calc_mode() in ("leb", "db", "routed"):
             if ipl not in minor_bodies.MINOR_BODY_ELEMENTS:
                 from .exceptions import UnknownBodyError
 
@@ -6010,6 +6040,7 @@ def _calc_body_pctr_with_context(
         return _calc_body_pctr(t, ipl, iplctr, iflag)
 
 
+@db_operation
 def get_ayanamsa_ut(tjdut: float) -> float:
     """
     Calculate ayanamsa (sidereal offset) for a given Universal Time date.
@@ -6038,8 +6069,8 @@ def get_ayanamsa_ut(tjdut: float) -> float:
     # sid_t0 verbatim) and let the two agree.
     _user_ut = sid_mode == SIDM_USER and bool(_get_sidereal_bits() & SIDBIT_USER_UT)
 
-    # --- LEB fast path: compute ayanamsa from precomputed data ---
-    from .state import get_leb_reader
+    # --- Coefficient fast path: file or database inputs ---
+    from .state import _get_coefficient_reader as get_leb_reader
 
     reader = get_leb_reader()
     if reader is not None and not _user_ut:
@@ -6400,6 +6431,7 @@ def _mula_wilhelm_longitude(
     )
 
 
+@db_operation
 def _get_star_position_ecliptic(
     star: StarData,
     tjd_tt: float,
@@ -6434,10 +6466,19 @@ def _get_star_position_ecliptic(
     # Under nonut the true obliquity argument is unused: normalize it so
     # the node cache key does not vary with the caller's request date.
     eps_key = 0.0 if nonut else eps_true
+    from .state import get_calc_mode
+
+    # DB-derived anchors must not enter the process-wide exact/node LRU.
+    # Retain the same interpolation and astronomy; only input lifetime differs.
+    use_cache = get_calc_mode() not in ("db", "routed")
 
     if not geometric and not nogdefl:
         # Deflection is active and cannot be interpolated: evaluate exactly.
         try:
+            if not use_cache:
+                return _star_position_ecliptic_uncached(
+                    star, tjd_tt, eps_key, nonut, geometric, noaberr, nogdefl
+                )
             return _star_position_ecliptic_cached(
                 star.ra_j2000,
                 star.dec_j2000,
@@ -6463,6 +6504,18 @@ def _get_star_position_ecliptic(
     base = math.floor(tjd_tt / (2.0 * h)) * (2.0 * h)
 
     def _node(jd_node: float) -> float:
+        """Evaluate one interpolation node under the selected ownership policy.
+
+        Args:
+            jd_node: Grid epoch in Julian days TT.
+
+        Returns:
+            Anchor longitude in degrees, without a persistent cache in DB mode.
+        """
+        if not use_cache:
+            return _star_position_ecliptic_uncached(
+                star, jd_node, eps_key, nonut, geometric, noaberr, nogdefl
+            )
         return _star_position_ecliptic_cached(
             star.ra_j2000,
             star.dec_j2000,
@@ -7326,6 +7379,7 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
     set_sid_mode(base_mode, t0, ayan_t0)
 
 
+@db_operation
 def get_ayanamsa(tjdet: float) -> float:
     """
     Calculate ayanamsa for a given Ephemeris Time (ET/TT) date.
@@ -7401,6 +7455,7 @@ def _ayanamsa_ex_retflag(flags: int, sid_mode: int) -> int:
     return retflag
 
 
+@db_operation
 def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     """
     Calculate ayanamsa with extended flags for Ephemeris Time.
@@ -7435,6 +7490,7 @@ def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     return (_ayanamsa_ex_retflag(flags, sid_mode), float(ayanamsa))
 
 
+@db_operation
 def get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
     """
     Calculate ayanamsa with extended flags for Universal Time.
@@ -7967,6 +8023,7 @@ def _nodaps_sidereal_frame_projection(
     return tuple(_project(pt) for pt in sub)
 
 
+@db_operation
 def nod_aps_ut(
     tjdut: float,
     planet: int,
@@ -8032,6 +8089,7 @@ def nod_aps_ut(
     )
 
 
+@db_operation
 def nod_aps(
     tjdet: float,
     planet: int,
@@ -9160,6 +9218,7 @@ def _calc_nod_aps(
     return (xnasc, xndsc, xperi, xaphe)
 
 
+@db_operation
 def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for a celestial body.
@@ -9238,6 +9297,7 @@ def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, 
     return _calc_orbital_elements(t, planet, flags)
 
 
+@db_operation
 def get_orbital_elements_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for Universal Time.
@@ -9982,6 +10042,7 @@ def _orbital_elements_from_ecliptic_state(
     return elements_50
 
 
+@db_operation
 def orbit_max_min_true_distance(
     tjdet: float, planet: int, flags: int
 ) -> Tuple[float, float, float]:
@@ -10746,7 +10807,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         ValueError: If the date is outside the LEB coverage.
     """
     from . import fast_calc
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader as get_leb_reader
     from .utils import angular_separation
 
     # Built-in asteroids requested via the AST_OFFSET + number alias resolve to
@@ -11056,6 +11117,7 @@ def _degenerate_pheno(planet: int) -> "Tuple[float, ...] | None":
     return None
 
 
+@db_operation
 def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Universal Time.
@@ -11096,7 +11158,7 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
         return _degenerate
 
     # --- LEB fast path ---
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader as get_leb_reader
 
     _unsupported_pheno_flags = FLG_NOABERR | FLG_NOGDEFL
     reader = get_leb_reader()
@@ -11116,6 +11178,7 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
     return _calc_pheno(t, planet, flags)
 
 
+@db_operation
 def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Ephemeris Time (TT/ET).
@@ -11140,7 +11203,7 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
         return _degenerate
 
     # --- LEB fast path ---
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader as get_leb_reader
 
     _unsupported_pheno_flags_tt = FLG_NOABERR | FLG_NOGDEFL
     reader = get_leb_reader()

@@ -100,13 +100,9 @@ _LEGACY_REEXPORTED_PLANET_IDS = (
 )
 
 if TYPE_CHECKING:
-    from typing import Protocol, Union
+    from typing import Protocol
 
-    from .leb2_reader import LEB2Reader
-    from .leb_composite import CompositeLEBReader, TieredLEBReader
-    from .leb_reader import LEBReader
-
-    LEBReaderLike = Union[LEBReader, LEB2Reader, CompositeLEBReader, TieredLEBReader]
+    from .leb_vector import LEBReaderLike
 
     class _DeflectorSource(Protocol):
         """Structural type for anything that can supply deflector states.
@@ -906,11 +902,22 @@ def _get_leb_frame_data(
     Returns:
         Same (pn_mat, dpsi, deps, eps_true_rad) as _get_skyfield_frame_data.
     """
+    resolve_frame = getattr(reader, "frame_reader", None)
+    if resolve_frame is not None:
+        serving = resolve_frame(jd_tt)
+        if serving is None:
+            return _get_skyfield_frame_data(jd_tt)
+        return _get_leb_frame_data(serving, jd_tt)
+
     # Keyed by (reader identity, jd): per-context readers may carry
     # different nutation tables, and a reader swap must not serve stale
     # frame data.
     _cache_key = (id(reader), jd_tt)
-    cached = _leb_frame_cache.get(_cache_key)
+    cacheable = getattr(reader, "cacheable", True)
+    frame_cache = (
+        _leb_frame_cache if cacheable else getattr(reader, "_frame_cache", None)
+    )
+    cached = frame_cache.get(_cache_key) if frame_cache is not None else None
     if cached is not None:
         return cached
 
@@ -924,9 +931,10 @@ def _get_leb_frame_data(
     result = (pn_mat, dpsi, deps, eps_true_rad)
 
     # Cache with bounded size
-    if len(_leb_frame_cache) >= _LEB_FRAME_CACHE_MAX:
-        _leb_frame_cache.clear()
-    _leb_frame_cache[_cache_key] = result
+    if frame_cache is not None:
+        if len(frame_cache) >= _LEB_FRAME_CACHE_MAX:
+            frame_cache.clear()
+        frame_cache[_cache_key] = result
 
     return result
 
@@ -985,8 +993,14 @@ def _frame_data(
 
     Uses the thread-local active reader set by _fast_calc_core().
     """
-    if _active_has_nutation():
-        return _get_leb_frame_data(_active_local.reader, jd_tt)
+    active = getattr(_active_local, "reader", None)
+    routed_frame = getattr(active, "frame_reader", None)
+    if (
+        getattr(_active_local, "gen", -1) == _active_generation
+        and routed_frame is not None
+    ) or _active_has_nutation():
+        assert active is not None
+        return _get_leb_frame_data(active, jd_tt)
     return _get_skyfield_frame_data(jd_tt)
 
 
@@ -2193,7 +2207,7 @@ def _escalate_sealed_range_miss(
 
     from .state import get_calc_mode
 
-    if get_calc_mode() != "leb":
+    if get_calc_mode() not in ("leb", "db", "routed"):
         return None
     # Core bodies (Sun..mean Apogee, Earth) are handled downstream by
     # planets._raise_leb_range_miss, which emits the canonical sealed-mode
@@ -2562,6 +2576,12 @@ def _fast_calc_core(
     Returns:
         ((lon, lat, dist, dlon, dlat, ddist), iflag)
     """
+    # DB readers can aggregate inputs here without duplicating time/flag
+    # normalization. File readers do not implement this optional hook.
+    prepare = getattr(reader, "prepare", None)
+    if prepare is not None:
+        prepare(jd_tt, ipl, iflag)
+
     # Set active reader for frame data dispatch (avoids threading reader
     # through every coordinate-transform helper).
     _set_active_reader(reader)

@@ -72,6 +72,18 @@ class Error(Exception):
     pass
 
 
+class RoutingDataError(Error):
+    """A declared routed file source failed; never a coverage fallback signal."""
+
+
+class DBError(Error):
+    """Database provisioning or transport failure; never a fallback signal."""
+
+
+class DBDataError(DBError):
+    """Invalid schema, unpublished dataset or missing/corrupt coefficient data."""
+
+
 # =============================================================================
 # CATEGORY: INPUT VALIDATION ERRORS
 # =============================================================================
@@ -1072,9 +1084,9 @@ def validate_jd_range(
             body_name=body_name,
         )
 
-    if state.get_calc_mode() == "leb":
+    if state._is_coefficient_only_mode():
         if body_id is None:
-            reader = state.get_leb_reader()
+            reader = state._get_coefficient_reader()
             if reader is None:
                 return
             path = str(getattr(reader, "path", ""))

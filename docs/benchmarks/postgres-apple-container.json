@@ -1,0 +1,716 @@
+{
+  "transport": {
+    "bit_exact_payloads": 1032414,
+    "hashed_series": 54,
+    "full_hash_seconds": 1.7305759160080925,
+    "reader_evaluations": 1350,
+    "stars": 1447,
+    "delta_t_epochs": 5
+  },
+  "public_matrix": {
+    "cases": 6454,
+    "successful": 6448,
+    "matching_errors": {
+      "EphemerisRangeError": 4,
+      "UnknownBodyError": 2
+    },
+    "max_absolute_difference": 0.0,
+    "db_seconds": 3.6272552080336027,
+    "file_reads_blocked": true,
+    "ownership_checked_after_every_case": true
+  },
+  "advanced_api": {
+    "cases": 16,
+    "matching_errors": [],
+    "max_absolute_difference": 0.0
+  },
+  "latency": {
+    "leb1": {
+      "mars_same_epoch": {
+        "n": 300,
+        "median_ms": 0.022416,
+        "p95_ms": 0.024333,
+        "p99_ms": 0.033333,
+        "mean_ms": 0.023423856666666666
+      },
+      "mars_varying_epoch": {
+        "n": 300,
+        "median_ms": 0.1668125,
+        "p95_ms": 0.353083,
+        "p99_ms": 0.450625,
+        "mean_ms": 0.19181906333333332
+      },
+      "chart10_varying_epoch": {
+        "n": 100,
+        "median_ms": 0.9048335,
+        "p95_ms": 1.440833,
+        "p99_ms": 1.634625,
+        "mean_ms": 0.9201482900000001
+      },
+      "first_request_after_close": {
+        "n": 10,
+        "median_ms": 1.663646,
+        "p95_ms": 1.876416,
+        "p99_ms": 1.876416,
+        "mean_ms": 1.7048333999999998
+      }
+    },
+    "leb2": {
+      "mars_same_epoch": {
+        "n": 300,
+        "median_ms": 0.021292,
+        "p95_ms": 0.035,
+        "p99_ms": 0.038791,
+        "mean_ms": 0.02320468666666667
+      },
+      "mars_varying_epoch": {
+        "n": 300,
+        "median_ms": 0.1448545,
+        "p95_ms": 0.170667,
+        "p99_ms": 0.183,
+        "mean_ms": 0.14589806
+      },
+      "chart10_varying_epoch": {
+        "n": 100,
+        "median_ms": 0.688521,
+        "p95_ms": 0.947709,
+        "p99_ms": 1.156083,
+        "mean_ms": 0.71265625
+      },
+      "first_request_after_close": {
+        "n": 10,
+        "median_ms": 2.439083,
+        "p95_ms": 2.677667,
+        "p99_ms": 2.677667,
+        "mean_ms": 2.9207916000000003
+      }
+    },
+    "db_full": {
+      "mars_same_epoch": {
+        "n": 300,
+        "median_ms": 0.921125,
+        "p95_ms": 1.115917,
+        "p99_ms": 1.235875,
+        "mean_ms": 0.9387790266666666
+      },
+      "mars_varying_epoch": {
+        "n": 300,
+        "median_ms": 1.047604,
+        "p95_ms": 1.34475,
+        "p99_ms": 1.986625,
+        "mean_ms": 1.0646839066666667
+      },
+      "chart10_varying_epoch": {
+        "n": 100,
+        "median_ms": 9.384958,
+        "p95_ms": 11.94075,
+        "p99_ms": 14.627042,
+        "mean_ms": 9.73155088
+      },
+      "chart10_explicit_operation": {
+        "n": 100,
+        "median_ms": 4.7130415,
+        "p95_ms": 5.534292,
+        "p99_ms": 6.037875,
+        "mean_ms": 4.70898121
+      },
+      "first_request_after_close": {
+        "n": 10,
+        "median_ms": 10.045021,
+        "p95_ms": 10.857417,
+        "p99_ms": 10.857417,
+        "mean_ms": 9.8656501
+      }
+    },
+    "db_core": {
+      "mars_same_epoch": {
+        "n": 300,
+        "median_ms": 1.034417,
+        "p95_ms": 1.24925,
+        "p99_ms": 1.68575,
+        "mean_ms": 1.0367458566666667
+      },
+      "mars_varying_epoch": {
+        "n": 300,
+        "median_ms": 0.9505835,
+        "p95_ms": 1.54275,
+        "p99_ms": 2.133416,
+        "mean_ms": 1.0380367933333334
+      },
+      "chart10_varying_epoch": {
+        "n": 100,
+        "median_ms": 9.560354,
+        "p95_ms": 11.923416,
+        "p99_ms": 14.186083,
+        "mean_ms": 9.7921217
+      },
+      "chart10_explicit_operation": {
+        "n": 100,
+        "median_ms": 3.8937085,
+        "p95_ms": 4.937,
+        "p99_ms": 5.011834,
+        "mean_ms": 4.12102875
+      },
+      "first_request_after_close": {
+        "n": 10,
+        "median_ms": 9.0989165,
+        "p95_ms": 9.349209,
+        "p99_ms": 9.349209,
+        "mean_ms": 9.1026498
+      }
+    },
+    "leb2_medium": {
+      "mars_same_epoch": {
+        "n": 300,
+        "median_ms": 0.022125,
+        "p95_ms": 0.023542,
+        "p99_ms": 0.0305,
+        "mean_ms": 0.02288956
+      },
+      "mars_varying_epoch": {
+        "n": 300,
+        "median_ms": 0.147021,
+        "p95_ms": 0.16825,
+        "p99_ms": 0.191459,
+        "mean_ms": 0.14744737333333333
+      },
+      "chart10_varying_epoch": {
+        "n": 100,
+        "median_ms": 0.692563,
+        "p95_ms": 0.846875,
+        "p99_ms": 1.187041,
+        "mean_ms": 0.71810625
+      },
+      "first_request_after_close": {
+        "n": 10,
+        "median_ms": 4.612979,
+        "p95_ms": 4.679458,
+        "p99_ms": 4.679458,
+        "mean_ms": 4.6369415
+      }
+    },
+    "db_medium": {
+      "mars_same_epoch": {
+        "n": 300,
+        "median_ms": 0.95,
+        "p95_ms": 1.054666,
+        "p99_ms": 1.108167,
+        "mean_ms": 0.9516573566666667
+      },
+      "mars_varying_epoch": {
+        "n": 300,
+        "median_ms": 0.7407705,
+        "p95_ms": 1.39575,
+        "p99_ms": 2.163125,
+        "mean_ms": 0.8886076266666667
+      },
+      "chart10_varying_epoch": {
+        "n": 100,
+        "median_ms": 8.850854,
+        "p95_ms": 11.302292,
+        "p99_ms": 12.182292,
+        "mean_ms": 8.650757480000001
+      },
+      "chart10_explicit_operation": {
+        "n": 100,
+        "median_ms": 4.231,
+        "p95_ms": 4.432833,
+        "p99_ms": 5.331458,
+        "mean_ms": 4.239226700000001
+      },
+      "first_request_after_close": {
+        "n": 10,
+        "median_ms": 8.5689375,
+        "p95_ms": 9.205875,
+        "p99_ms": 9.205875,
+        "mean_ms": 8.543204099999999
+      }
+    }
+  },
+  "concurrency_1": {
+    "n": 400,
+    "median_ms": 0.8272705,
+    "p95_ms": 1.1335,
+    "p99_ms": 1.360417,
+    "mean_ms": 0.895585485,
+    "requests_per_second": 1107.7942673253579,
+    "pool": {
+      "requests_num": 802,
+      "requests_queued": 1,
+      "connections_num": 1,
+      "connections_ms": 4,
+      "requests_wait_ms": 4,
+      "usage_ms": 4,
+      "pool_min": 0,
+      "pool_max": 4,
+      "pool_size": 1,
+      "pool_available": 1,
+      "requests_waiting": 0
+    }
+  },
+  "concurrency_4": {
+    "n": 400,
+    "median_ms": 1.560604,
+    "p95_ms": 2.247167,
+    "p99_ms": 3.006334,
+    "mean_ms": 1.6212323874999999,
+    "requests_per_second": 2450.4955333733956,
+    "pool": {
+      "requests_num": 1604,
+      "requests_queued": 44,
+      "connections_num": 4,
+      "connections_ms": 16,
+      "requests_wait_ms": 15,
+      "usage_ms": 72,
+      "pool_min": 0,
+      "pool_max": 4,
+      "pool_size": 4,
+      "pool_available": 4,
+      "requests_waiting": 0
+    }
+  },
+  "concurrency_8": {
+    "n": 400,
+    "median_ms": 3.274709,
+    "p95_ms": 3.921916,
+    "p99_ms": 8.955584,
+    "mean_ms": 3.3819944775,
+    "requests_per_second": 2334.3941809844127,
+    "pool": {
+      "requests_num": 2406,
+      "requests_queued": 840,
+      "connections_num": 4,
+      "connections_ms": 16,
+      "requests_wait_ms": 327,
+      "usage_ms": 119,
+      "pool_min": 0,
+      "pool_max": 4,
+      "pool_size": 4,
+      "pool_available": 4,
+      "requests_waiting": 0
+    }
+  },
+  "concurrency_16": {
+    "n": 400,
+    "median_ms": 6.6499995,
+    "p95_ms": 7.263125,
+    "p99_ms": 7.598625,
+    "mean_ms": 6.5372989825,
+    "requests_per_second": 2376.898326179293,
+    "pool": {
+      "requests_num": 3208,
+      "requests_queued": 1629,
+      "connections_num": 4,
+      "connections_ms": 16,
+      "requests_wait_ms": 1938,
+      "usage_ms": 135,
+      "pool_min": 0,
+      "pool_max": 4,
+      "pool_size": 4,
+      "pool_available": 4,
+      "requests_waiting": 0
+    }
+  },
+  "faults": {
+    "idempotent_import_seconds": 0.15493287501158193,
+    "failed_import_rolled_back": true,
+    "publication_immutable": true,
+    "runtime_role_has_no_write_permissions": true,
+    "pool_readonly_and_10s_statement_timeout": true,
+    "explicit_sealed_blocks_db": true,
+    "corrupt_truncated_fails_closed_and_recovers": true,
+    "corrupt_nonfinite_fails_closed_and_recovers": true,
+    "corrupt_missing_fails_closed_and_recovers": true,
+    "pool_exhaustion_timeout_seconds": 10.003261999983806,
+    "blocked_query_timeout_seconds": 10.001867165963631,
+    "unpublished_and_absent_datasets_rejected": true,
+    "long_scan_segments": 1000,
+    "max_retained_input_segments": 256,
+    "server_down_fails_closed_seconds": 0.0011296249576844275,
+    "server_restart_same_dataset_recovers": true
+  },
+  "context_isolation": {
+    "contexts": 4,
+    "requests": 400,
+    "threads": 8,
+    "max_absolute_difference": 0.0
+  },
+  "tiers": {
+    "medium": {
+      "source_bytes": 37276175,
+      "import_seconds": 5.570062665967271,
+      "segment_rows": 508493,
+      "payload_bytes": 170150528,
+      "reader_evaluations": 495,
+      "public_cases": 99,
+      "years": [
+        1600,
+        2000,
+        2600
+      ],
+      "max_absolute_difference": 0.0
+    },
+    "extended": {
+      "source_bytes": 1153900064,
+      "import_seconds": 167.6475032090093,
+      "segment_rows": 14048478,
+      "payload_bytes": 4700863552,
+      "reader_evaluations": 495,
+      "public_cases": 198,
+      "years": [
+        -12000,
+        -5000,
+        0,
+        2000,
+        10000,
+        17000
+      ],
+      "max_absolute_difference": 0.0
+    }
+  },
+  "query_profile": {
+    "mars": {
+      "queries": 2,
+      "metadata_queries": 1,
+      "segment_queries": 1,
+      "segment_rows": 18,
+      "coefficient_bytes": 5856,
+      "total_ms": 1.57525,
+      "sql_roundtrip_ms": 1.189792
+    },
+    "chart10": {
+      "queries": 20,
+      "metadata_queries": 10,
+      "segment_queries": 10,
+      "segment_rows": 171,
+      "coefficient_bytes": 55536,
+      "total_ms": 13.779833,
+      "sql_roundtrip_ms": 11.053877
+    },
+    "chart10_scoped": {
+      "queries": 9,
+      "metadata_queries": 1,
+      "segment_queries": 8,
+      "segment_rows": 36,
+      "coefficient_bytes": 11904,
+      "total_ms": 5.2815,
+      "sql_roundtrip_ms": 3.224376
+    },
+    "select1_roundtrip": {
+      "n": 300,
+      "median_ms": 0.1245205,
+      "p95_ms": 0.226542,
+      "p99_ms": 0.27075,
+      "mean_ms": 0.13332374333333336
+    },
+    "index_plan": [
+      {
+        "Plan": {
+          "Node Type": "Nested Loop",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Join Type": "Inner",
+          "Startup Cost": 0.57,
+          "Total Cost": 25.78,
+          "Plan Rows": 1,
+          "Plan Width": 348,
+          "Actual Startup Time": 0.267,
+          "Actual Total Time": 0.826,
+          "Actual Rows": 3,
+          "Actual Loops": 1,
+          "Inner Unique": true,
+          "Shared Hit Blocks": 9,
+          "Shared Read Blocks": 6,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Shared I/O Read Time": 0.763,
+          "Shared I/O Write Time": 0.0,
+          "Local I/O Read Time": 0.0,
+          "Local I/O Write Time": 0.0,
+          "Temp I/O Read Time": 0.0,
+          "Temp I/O Write Time": 0.0,
+          "Plans": [
+            {
+              "Node Type": "Function Scan",
+              "Parent Relationship": "Outer",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Alias": "k",
+              "Startup Cost": 0.01,
+              "Total Cost": 0.03,
+              "Plan Rows": 3,
+              "Plan Width": 8,
+              "Actual Startup Time": 0.004,
+              "Actual Total Time": 0.005,
+              "Actual Rows": 3,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0,
+              "Shared I/O Read Time": 0.0,
+              "Shared I/O Write Time": 0.0,
+              "Local I/O Read Time": 0.0,
+              "Local I/O Write Time": 0.0,
+              "Temp I/O Read Time": 0.0,
+              "Temp I/O Write Time": 0.0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Parent Relationship": "Inner",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "segments_pkey",
+              "Relation Name": "segments",
+              "Alias": "s",
+              "Startup Cost": 0.56,
+              "Total Cost": 8.58,
+              "Plan Rows": 1,
+              "Plan Width": 348,
+              "Actual Startup Time": 0.272,
+              "Actual Total Time": 0.272,
+              "Actual Rows": 1,
+              "Actual Loops": 3,
+              "Index Cond": "((dataset_id = '6d9289e9-de65-4d03-9b05-ff3f94b09d14'::uuid) AND (body_id = k.body_id) AND (segment_index = k.segment_index))",
+              "Rows Removed by Index Recheck": 0,
+              "Shared Hit Blocks": 9,
+              "Shared Read Blocks": 6,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0,
+              "Shared I/O Read Time": 0.763,
+              "Shared I/O Write Time": 0.0,
+              "Local I/O Read Time": 0.0,
+              "Local I/O Write Time": 0.0,
+              "Temp I/O Read Time": 0.0,
+              "Temp I/O Write Time": 0.0
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 195,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Shared I/O Read Time": 0.0,
+          "Shared I/O Write Time": 0.0,
+          "Local I/O Read Time": 0.0,
+          "Local I/O Write Time": 0.0,
+          "Temp I/O Read Time": 0.0,
+          "Temp I/O Write Time": 0.0
+        },
+        "Planning Time": 0.301,
+        "Triggers": [],
+        "Execution Time": 0.843
+      }
+    ],
+    "database_bytes_all_tiers": 7834203827
+  },
+  "soak": {
+    "1": {
+      "n": 10000,
+      "median_ms": 0.8150835,
+      "p95_ms": 1.066333,
+      "p99_ms": 1.176417,
+      "mean_ms": 0.8605698546,
+      "seconds": 8.650037042039912,
+      "requests_per_second": 1156.0644135278442
+    },
+    "4": {
+      "n": 10000,
+      "median_ms": 1.5325835,
+      "p95_ms": 2.171417,
+      "p99_ms": 2.484334,
+      "mean_ms": 1.5684143584,
+      "seconds": 3.9292603329522535,
+      "requests_per_second": 2545.0082592227964
+    },
+    "16": {
+      "n": 10000,
+      "median_ms": 6.4922915,
+      "p95_ms": 7.2145,
+      "p99_ms": 8.470166,
+      "mean_ms": 6.617788403,
+      "seconds": 4.1431084999931045,
+      "requests_per_second": 2413.6466616832854
+    }
+  },
+  "replicas": {
+    "processes": 4,
+    "requests": 8000,
+    "seconds_including_startup": 2.049435499997344,
+    "requests_per_second_including_startup": 3903.5139188378303,
+    "workers": [
+      {
+        "requests": 2000,
+        "seconds": 1.357259750016965,
+        "pool": {
+          "requests_num": 4002,
+          "requests_queued": 1,
+          "connections_num": 1,
+          "connections_ms": 7,
+          "requests_wait_ms": 7,
+          "usage_ms": 5,
+          "pool_min": 0,
+          "pool_max": 4,
+          "pool_size": 1,
+          "pool_available": 1,
+          "requests_waiting": 0
+        }
+      },
+      {
+        "requests": 2000,
+        "seconds": 1.3591793330269866,
+        "pool": {
+          "requests_num": 4002,
+          "requests_queued": 1,
+          "connections_num": 1,
+          "connections_ms": 7,
+          "requests_wait_ms": 7,
+          "usage_ms": 4,
+          "pool_min": 0,
+          "pool_max": 4,
+          "pool_size": 1,
+          "pool_available": 1,
+          "requests_waiting": 0
+        }
+      },
+      {
+        "requests": 2000,
+        "seconds": 1.3564345829654485,
+        "pool": {
+          "requests_num": 4002,
+          "requests_queued": 1,
+          "connections_num": 1,
+          "connections_ms": 6,
+          "requests_wait_ms": 6,
+          "usage_ms": 5,
+          "pool_min": 0,
+          "pool_max": 4,
+          "pool_size": 1,
+          "pool_available": 1,
+          "requests_waiting": 0
+        }
+      },
+      {
+        "requests": 2000,
+        "seconds": 1.3524589579901658,
+        "pool": {
+          "requests_num": 4002,
+          "requests_queued": 1,
+          "connections_num": 1,
+          "connections_ms": 6,
+          "requests_wait_ms": 7,
+          "usage_ms": 5,
+          "pool_min": 0,
+          "pool_max": 4,
+          "pool_size": 1,
+          "pool_available": 1,
+          "requests_waiting": 0
+        }
+      }
+    ]
+  },
+  "events": {
+    "sol_eclipse_when_glob": {
+      "leb": {
+        "n": 5,
+        "median_ms": 19.547375,
+        "p95_ms": 19.58675,
+        "p99_ms": 19.58675,
+        "mean_ms": 22.680825
+      },
+      "db": {
+        "n": 5,
+        "median_ms": 42.236291,
+        "p95_ms": 42.973833,
+        "p99_ms": 42.973833,
+        "mean_ms": 42.9925914
+      }
+    },
+    "lun_eclipse_when": {
+      "leb": {
+        "n": 5,
+        "median_ms": 10.577333,
+        "p95_ms": 10.671458,
+        "p99_ms": 10.671458,
+        "mean_ms": 12.0929834
+      },
+      "db": {
+        "n": 5,
+        "median_ms": 27.389166,
+        "p95_ms": 27.612583,
+        "p99_ms": 27.612583,
+        "mean_ms": 28.924474800000002
+      }
+    }
+  },
+  "all_tier_payload_hashes": {
+    "medium": {
+      "bit_exact_payloads": 508493,
+      "series": 15,
+      "seconds": 0.8977939590113238
+    },
+    "extended": {
+      "bit_exact_payloads": 14048478,
+      "series": 15,
+      "seconds": 21.22921729099471
+    }
+  },
+  "environment": {
+    "date": "2026-09-30",
+    "client_cpu": "Apple M5 Pro",
+    "client_logical_cpus": 18,
+    "client_memory_gib": 48,
+    "macos": "26.5.2",
+    "python": "3.12.13",
+    "libephemeris": "3.2.1",
+    "psycopg": "3.3.6",
+    "apple_container_cli": "1.0.0",
+    "postgresql": "17.11",
+    "container_cpus": 2,
+    "container_memory_gib": 2,
+    "shared_buffers": "256MB",
+    "max_connections": 80,
+    "runtime_pool_max": 4
+  },
+  "base_import": {
+    "import_seconds": 7.1130774159682915,
+    "database_bytes": 504668687,
+    "payload_bytes": 374311728,
+    "segment_rows": 1032414
+  },
+  "integration_tests": {
+    "selection": "tests/test_db",
+    "passed": 99
+  },
+  "cleanup": {
+    "dedicated_container_deleted": true,
+    "existing_containers_untouched": true,
+    "ephemeris_files_unchanged": true
+  }
+}

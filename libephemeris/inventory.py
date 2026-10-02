@@ -18,10 +18,16 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from .db.backend import db_operation
+
 
 @dataclass(frozen=True, slots=True)
 class BodyCoverage:
-    """Coverage contract for one body from the active calculation source."""
+    """Body coverage with envelope bounds and optional exact closed intervals.
+
+    ``intervals`` are detached metadata, never reader callbacks. Legacy direct
+    construction without intervals retains single-interval semantics.
+    """
 
     body_id: int
     source: str
@@ -31,10 +37,15 @@ class BodyCoverage:
     data_file: str | None
     group: str | None
     reviewed: bool
+    tier: str | None = None
+    dataset_id: str | None = None
+    intervals: tuple[tuple[float, float], ...] = ()
 
     def contains(self, jd: float) -> bool:
-        """Return whether ``jd`` is inside this body's closed interval."""
-        return self.jd_start <= float(jd) <= self.jd_end
+        """Check actual closed intervals, not gaps inside their outer envelope."""
+        epoch = float(jd)
+        intervals = self.intervals or ((self.jd_start, self.jd_end),)
+        return any(start <= epoch <= end for start, end in intervals)
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation."""
@@ -169,6 +180,7 @@ def _serving_reader(reader: Any, body_id: int, jd: float | None = None) -> Any |
     return reader if getattr(reader, "has_body", lambda _body: False)(body_id) else None
 
 
+@db_operation
 def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | None:
     """Return active LEB coverage for ``body_id`` and optionally ``jd``.
 
@@ -186,8 +198,9 @@ def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | N
     (``FLG_TRUEPOS`` works from the boundary itself). Artifacts generated
     with the one-day tier margin absorb this entirely.  With a
     date-aware tiered reader, a covered ``jd`` reports the concrete selected
-    tier file; a date outside every stored interval reports the union coverage
-    without pretending that one file served the request.
+    tier file; a date outside every stored interval reports the outer envelope
+    and exact ``intervals``, without pretending that gaps are covered or that
+    one file served the request.
 
     Args:
         body_id: Body identifier in the public numbering.
@@ -203,10 +216,10 @@ def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | N
     if 40 <= body_id <= 58:
         return None
 
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader
 
     try:
-        reader = get_leb_reader()
+        reader = _get_coefficient_reader()
     except RuntimeError:
         return None
     if reader is None:
@@ -266,16 +279,57 @@ def get_reader_body_coverage(
         else False
     )
     reviewed = serving_reviewed or bool(getattr(reader, "_manifest_verified", False))
+    source = getattr(serving, "source", getattr(reader, "source", "LEB"))
+    serving_tier = getattr(serving, "tier", None)
+    serving_dataset = getattr(serving, "dataset_id", None)
+    if hasattr(reader, "routes") and selected is None:
+        # A date-less/all-tier envelope is not the coverage of the priority
+        # file or one dataset. Metadata is already loaded by body_coverage.
+        candidates = []
+        for candidate in reader._tier_readers.values():
+            if candidate.has_body(body_id):
+                resolve = getattr(candidate, "body_reader", None)
+                candidates.append(resolve(body_id) if resolve else candidate)
+        sources = {getattr(candidate, "source", "LEB") for candidate in candidates}
+        source = "Mixed" if len(sources) > 1 else next(iter(sources), source)
+        reviewed = bool(candidates) and all(
+            getattr(candidate, "_manifest_verified", False) for candidate in candidates
+        )
+        serving_tier = (
+            getattr(candidates[0], "tier", None) if len(candidates) == 1 else None
+        )
+        serving_dataset = (
+            getattr(candidates[0], "dataset_id", None) if len(candidates) == 1 else None
+        )
+    # A date-less tier envelope can contain genuine holes. Retain detached
+    # intervals so diagnostics remain exact without keeping an operation reader.
+    intervals: tuple[tuple[float, float], ...] = ((float(bounds[0]), float(bounds[1])),)
+    tier_readers = getattr(coverage_owner, "_tier_readers", None)
+    if selected_fn is not None and selected is None and tier_readers is not None:
+        intervals = tuple(
+            sorted(
+                (float(window[0]), float(window[1]))
+                for candidate in tier_readers.values()
+                if (window := candidate.body_coverage(int(body_id))) is not None
+            )
+        )
     path_str = str(path) if path is not None else None
     return BodyCoverage(
         body_id=int(body_id),
-        source="LEB",
-        precision_class=_leb_precision_class(int(body_id), path_str, reviewed=reviewed),
+        source=source,
+        precision_class=_leb_precision_class(
+            int(body_id),
+            path_str or (f"{serving_tier}_dataset" if serving_tier else None),
+            reviewed=reviewed,
+        ),
         jd_start=float(bounds[0]),
         jd_end=float(bounds[1]),
         data_file=path_str,
         group=_group_from_path(path_str),
         reviewed=reviewed,
+        tier=serving_tier,
+        dataset_id=serving_dataset,
+        intervals=intervals,
     )
 
 
@@ -368,6 +422,129 @@ def inspect_leb_file(path: str | os.PathLike[str]) -> dict[str, Any]:
         reader.close()
 
 
+def get_runtime_inventory(tier: str | None = None) -> dict[str, Any]:
+    """Probe declared sources up to a required tier, without retaining DB inputs.
+
+    This explicit readiness operation may contact PostgreSQL. Ordinary local
+    calculations do not use it. Connection strings and driver errors are never
+    included. Non-routed modes retain the file inventory contract.
+
+    Args:
+        tier: Required tier ceiling; defaults to configured precision.
+
+    Returns:
+        Redacted source records and readiness with per-body coverage.
+    """
+    from .state import get_calc_mode, get_precision_tier
+    from .operations import calculation_session
+    from .routing import (
+        RoutedReader,
+        TIERS,
+        get_tier_routes,
+        manifest_reviewed,
+        manifest_groups,
+    )
+    from .db.backend import get_db_reader
+    from .exceptions import DBError, ConfigurationError, RoutingDataError
+
+    mode = get_calc_mode()
+    if mode not in ("db", "routed"):
+        return get_leb_inventory()
+    required = tier or get_precision_tier()
+    if required not in TIERS:
+        raise ValueError("Unknown runtime inventory tier")
+    result: dict[str, Any] = {
+        "mode": mode,
+        "precision_tier": required,
+        "ready": False,
+        "sources": [],
+        "files": [],
+        "body_count": 0,
+    }
+    probe = None
+    try:
+        with calculation_session():
+            if mode == "routed":
+                routes, url = get_tier_routes()
+                eligible = TIERS[: TIERS.index(required) + 1]
+                if required not in routes:
+                    raise ConfigurationError("Required runtime tier is not configured")
+                probe = RoutedReader(
+                    {t: r for t, r in routes.items() if t in eligible}, url
+                )
+                readers = [(t, probe._reader(t)) for t in probe.routes]
+            else:
+                reader = get_db_reader()
+                dataset_info = getattr(reader._store, "dataset_info", None)
+                if dataset_info is None:
+                    raise ConfigurationError(
+                        "DB store does not expose publication identity"
+                    )
+                declared, manifest = dataset_info(reader.dataset_id)
+                if declared not in TIERS or TIERS.index(declared) < TIERS.index(
+                    required
+                ):
+                    raise ConfigurationError(
+                        "DB dataset does not satisfy required tier"
+                    )
+                reader.tier = declared
+                reader._manifest_verified = manifest_reviewed(manifest)
+                reader.artifact_groups = manifest_groups(manifest, declared)
+                readers = [(declared, reader)]
+            body_ids: set[int] = set()
+            for name, reader in readers:
+                bodies = [
+                    cov.to_dict()
+                    for b in reader._bodies
+                    if (cov := get_reader_body_coverage(reader, b)) is not None
+                ]
+                body_ids.update(b["body_id"] for b in bodies)
+                groups = getattr(reader, "artifact_groups", ())
+                if getattr(reader, "source", "LEB") == "LEB":
+                    groups = sorted(
+                        {
+                            _group_from_path(str(r.path))
+                            for r in getattr(reader, "_readers", (reader,))
+                        }
+                        - {None}
+                    )
+                result["sources"].append(
+                    {
+                        "tier": name,
+                        "groups": list(groups),
+                        "reviewed": bool(getattr(reader, "_manifest_verified", False))
+                        if getattr(reader, "source", "LEB") == "DB"
+                        else all(
+                            getattr(r, "_manifest_verified", False)
+                            for r in getattr(reader, "_readers", (reader,))
+                        ),
+                        "source": getattr(reader, "source", "LEB"),
+                        "dataset_id": getattr(reader, "dataset_id", None),
+                        "bodies": bodies,
+                    }
+                )
+                if getattr(reader, "source", "LEB") == "LEB":
+                    result["files"].extend(
+                        {**_reader_file_info(r, inherited_verified=False), "tier": name}
+                        for r in getattr(reader, "_readers", (reader,))
+                    )
+            result["body_count"] = len(body_ids)
+            result["ready"] = True
+    except (
+        DBError,
+        ConfigurationError,
+        RoutingDataError,
+        OSError,
+        ValueError,
+        RuntimeError,
+    ) as error:
+        result["error"] = type(error).__name__
+    finally:
+        if probe is not None:
+            probe.close()
+    return result
+
+
 __all__ = [
     "BodyCoverage",
     "RuntimeDataRequirement",
@@ -375,5 +552,6 @@ __all__ = [
     "get_body_coverage",
     "get_leb_inventory",
     "get_runtime_data_requirements",
+    "get_runtime_inventory",
     "inspect_leb_file",
 ]

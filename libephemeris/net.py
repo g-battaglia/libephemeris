@@ -8,8 +8,8 @@ SPK generation, SBDB lookups, IERS refreshes and Skyfield's implicit kernel
 download could still leave the process.  This module is the choke point that
 makes the contract explicit and testable.
 
-The default policy is ``"auto"``: LEB mode is sealed and every other mode is
-allowed.  ``"sealed"`` and ``"allow"`` are explicit process overrides.  The
+The default policy is ``"auto"``: LEB mode is sealed; DB mode permits only
+its separately authorized PostgreSQL transport. Other modes allow downloads.  ``"sealed"`` and ``"allow"`` are explicit process overrides.  The
 ``libephemeris download ...`` CLI deliberately selects ``"allow"`` because a
 download command is an explicit provisioning action, not calculation-time
 egress.
@@ -138,7 +138,7 @@ def get_network_policy() -> Literal["allow", "sealed"]:
     # lock-free by design in state.py and is safe from network call sites.
     from .state import get_calc_mode
 
-    return "sealed" if get_calc_mode() == "leb" else "allow"
+    return "sealed" if get_calc_mode() in ("leb", "db", "routed") else "allow"
 
 
 def require_network(purpose: str) -> None:

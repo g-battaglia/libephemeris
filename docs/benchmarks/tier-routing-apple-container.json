@@ -1,0 +1,171 @@
+{
+  "imports": {
+    "extended": {
+      "import_seconds": 370.6239343750058,
+      "artifact_names": [
+        "extended_core.leb2",
+        "extended_asteroids.leb2",
+        "extended_exotics.leb2"
+      ],
+      "omitted_group": "apogee: all-group trial exceeded 600-second budget and rolled back"
+    },
+    "database_bytes": 38257907379,
+    "medium": {
+      "groups": [
+        "core",
+        "asteroids",
+        "exotics",
+        "apogee"
+      ],
+      "import_seconds_rounded": 25.1
+    }
+  },
+  "limitations": [
+    "Extended DB contains core/asteroids/exotics, not apogee: a complete four-group import exceeded the 600 s trial budget and rolled back.",
+    "Local warmed-pool timings; no Railway/TLS or production capacity claim.",
+    "Explicit file tier adapter uses exactly the same artifacts as each DB import.",
+    "Database size includes dead space from the rolled-back all-group trial; not a steady-state storage estimate."
+  ],
+  "public_matrix": {
+    "cases": 1170,
+    "identical_successes": 1170,
+    "matching_errors": 0
+  },
+  "modern_local_queries": 0,
+  "local_inventory_reviewed": true,
+  "multi_tier_scope_cleanup": true,
+  "kerykeion_parity": {
+    "2000": {
+      "same_chart_values": true,
+      "source": "LEB"
+    },
+    "1600": {
+      "same_chart_values": true,
+      "source": "DB"
+    },
+    "1000": {
+      "same_chart_values": true,
+      "source": "DB"
+    }
+  },
+  "station_search_parity": [
+    {
+      "label": "modern",
+      "same_values": true,
+      "station_count": 0,
+      "queries": 0
+    },
+    {
+      "label": "historical",
+      "same_values": true,
+      "station_count": 1,
+      "queries": 12
+    },
+    {
+      "label": "base-boundary",
+      "same_values": true,
+      "station_count": 2,
+      "queries": 4
+    }
+  ],
+  "benchmark": {
+    "leb_chart_2000": {
+      "n": 100,
+      "median_ms": 1.750708,
+      "p95_ms": 1.927084,
+      "queries_per_chart": 0.0,
+      "coefficient_payload_bytes_per_chart": 0.0
+    },
+    "leb_chart_1600": {
+      "n": 100,
+      "median_ms": 1.8252295,
+      "p95_ms": 2.0755,
+      "queries_per_chart": 0.0,
+      "coefficient_payload_bytes_per_chart": 0.0
+    },
+    "leb_chart_1000": {
+      "n": 100,
+      "median_ms": 1.944146,
+      "p95_ms": 2.0715,
+      "queries_per_chart": 0.0,
+      "coefficient_payload_bytes_per_chart": 0.0
+    },
+    "leb_mars_modern": {
+      "n": 300,
+      "median_ms": 0.196542,
+      "p95_ms": 0.226458,
+      "queries_per_call": 0.0
+    },
+    "leb_station_search_1600": {
+      "n": 10,
+      "median_ms": 8.170041,
+      "p95_ms": 8.26,
+      "queries_per_search": 0.0,
+      "coefficient_payload_bytes_per_search": 0.0
+    },
+    "routed_chart_2000": {
+      "n": 100,
+      "median_ms": 2.7575835,
+      "p95_ms": 2.980125,
+      "queries_per_chart": 0.0,
+      "coefficient_payload_bytes_per_chart": 0.0
+    },
+    "routed_chart_1600": {
+      "n": 100,
+      "median_ms": 9.3016455,
+      "p95_ms": 10.188541,
+      "queries_per_chart": 10.05,
+      "coefficient_payload_bytes_per_chart": 11920.8
+    },
+    "routed_chart_1000": {
+      "n": 100,
+      "median_ms": 10.444312499999999,
+      "p95_ms": 11.219459,
+      "queries_per_chart": 12.05,
+      "coefficient_payload_bytes_per_chart": 11984.8
+    },
+    "routed_mars_modern": {
+      "n": 300,
+      "median_ms": 0.24145850000000002,
+      "p95_ms": 0.261083,
+      "queries_per_call": 0.0
+    },
+    "routed_station_search_1600": {
+      "n": 10,
+      "median_ms": 18.578021,
+      "p95_ms": 18.887083,
+      "queries_per_search": 12.0,
+      "coefficient_payload_bytes_per_search": 13360.0
+    },
+    "db_chart_1600": {
+      "n": 100,
+      "median_ms": 7.6248955,
+      "p95_ms": 8.315625,
+      "queries_per_chart": 9.05,
+      "coefficient_payload_bytes_per_chart": 11920.8
+    }
+  },
+  "explicit_sealed_blocks_only_remote": true,
+  "fault_validation": {
+    "real_base_readiness": true,
+    "real_medium_readiness": true,
+    "incomplete_extended_apogee_rejected_by_gate": true,
+    "truncated_data_fatal_and_local_base_survives": true,
+    "missing_data_fatal_and_local_base_survives": true,
+    "outage_error_seconds": 0.001605624973308295,
+    "container_outage_preserves_base_and_returns_503": true,
+    "restart_recovers_exactly": true
+  },
+  "environment": {
+    "host": "Apple M5 Pro, 48 GiB, macOS 26.5.2",
+    "container": "Apple Container, PostgreSQL 17, 2 CPUs / 2 GiB",
+    "client_python": "3.12.13 (Kerykeion benchmark); 3.12.12 (API fault check)",
+    "psycopg": "3.3.6",
+    "warm_pools": true,
+    "coefficient_payload_bytes_exclude_protocol_and_metadata": true
+  },
+  "additional_local_parity": {
+    "nonut_and_local_models": 138,
+    "fixed_star_flag_combinations": 4
+  }
+}

@@ -71,7 +71,7 @@ another implementation's expression.
 - **IAU + Vondrák 2011 standards** - long-term precession and of-date mean obliquity (Vondrák 2011, valid ±200,000 years), nutation (IAU 2006/2000A) via the official ERFA library
 - **Latest-reconstruction Delta T (TT−UT1)** - IERS-observed values for the atomic-clock era and the most recent published reconstruction of Earth's rotation from ancient eclipse records (Stephenson, Morrison & Hohenkerk 2016 with the Morrison et al. 2021 update) for historical dates; the default realization keeps positions and house angles consistent, while explicit ΔT overrides have a documented Skyfield-mode exception ([details](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/delta-t.md))
 - **Source-based validation** - numerical checks use NASA JPL states, ERFA/IAU standards, cited literature, and mathematical invariants ([methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/independence.md))
-- **Four backends, one API** - Skyfield, LEB (~14x speedup), Horizons API, and adaptive auto mode through the same `calc_ut()` interface
+- **Six modes, one API** - Skyfield, LEB (~14x speedup), PostgreSQL, explicit tier routing, Horizons API, and adaptive auto mode through the same `calc_ut()` interface
 - **25 house systems (26 codes); all 47 predefined sidereal modes operational,
   plus the user-defined mode, with per-mode source/audit status**
 - **Physical planet centers when covered** - outer planets use JPL center segments when available and the explicit system barycenter otherwise
@@ -177,9 +177,9 @@ reference-free invariants.
 
 ---
 
-## Four Backends, One API
+## Six Modes, One API
 
-Choose your trade-off between speed, locality, and setup. The same `calc_ut()` interface works across all four modes, from zero-install Horizons lookups to precomputed LEB throughput.
+Choose your trade-off between speed, locality, and setup. The same `calc_ut()` interface works across all six modes, from zero-install Horizons lookups to precomputed LEB throughput.
 
 | Mode | Backend | Speed | Use case |
 |------|---------|-------|----------|
@@ -187,11 +187,18 @@ Choose your trade-off between speed, locality, and setup. The same `calc_ut()` i
 | `"skyfield"` | JPL DE440/DE441 via Skyfield | order of 1 ms/call | High-precision local JPL workflow |
 | `"leb"` | Sealed LEB plus declared local models | order of 100 µs/call | Offline, source-pure repeated calculations; never opens JPL/BSP |
 | `"horizons"` | NASA JPL Horizons REST API | ~300 ms | No local ephemeris files required |
+| `"db"` | Published PostgreSQL coefficient dataset | network-dependent | Stateless replicas without ephemeris files or cross-request data caches |
+| `"routed"` | Explicit per-tier LEB/PostgreSQL policy | source-dependent | Local base with remote wider tiers; no implicit DB selection in `auto` |
 
 ```python
 from libephemeris import set_calc_mode
 set_calc_mode("leb")  # or via env: LIBEPHEMERIS_MODE=leb
 ```
+
+PostgreSQL mode is opt-in via `libephemeris[postgres]`; provision a dataset and
+configure its connection/UUID before selecting `db`. See the
+[DB backend guide and coefficient contract](docs/db-backend.md). For mixed tiers and
+synchronous cross-call input ownership, see [tier routing and calculation sessions](docs/tier-routing.md).
 
 ---
 

@@ -205,6 +205,12 @@ def get_cached_observer_at(observer, t):
     Returns:
         Skyfield position object (Geocentric, Barycentric, etc.)
     """
+    from .state import get_calc_mode
+
+    # Observer vectors in DB mode retain operation-owned coefficients. Do not
+    # keep either the observer or its computed state in the process cache.
+    if get_calc_mode() in ("db", "routed"):
+        return observer.at(t)
     key = (id(observer), float(t.tt))
     entry = _observer_at_cache.get(key)
     # Validate that the cached observer is the *same* object, not just
@@ -260,6 +266,11 @@ def clear_caches() -> None:
         _leb_frame_cache.clear()
     except ImportError:
         pass
+
+    # Besselian geometry depends on the active Sun/Moon states, not just time.
+    from . import eclipse
+
+    eclipse._BESSELIAN_CACHE.clear()
 
     # Clear the refraction atmosphere-profile cache. The cached profile is
     # keyed by (altitude, pressure, temperature, lapse_rate); clearing on

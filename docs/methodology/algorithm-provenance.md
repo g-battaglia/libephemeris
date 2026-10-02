@@ -242,6 +242,19 @@ Quadrature order, numerical inversion tolerances, and user weather defaults are
 project choices, labelled as such. They must not be described as measured laws
 or silently promoted to universal constants.
 
+### PostgreSQL coefficient storage
+
+`libephemeris/db/` is project-authored storage/transport infrastructure over
+native LEB coefficients. It reuses the existing Clenshaw implementation and
+preserves decoded IEEE-754 binary64 payloads without further truncation,
+resampling or fitting. Schema/publication policy, operation ownership and
+batched SQL selection introduce no astronomical model. Offline imports retain
+artifact hashes and scientific metadata. See [DB contract](../db-backend.md).
+`routing.py` and `operations.py` are likewise project-authored infrastructure:
+the closed-interval selector preserves existing tier precedence, while scoped
+ownership introduces no fitting, smoothing, temporal model or astronomical
+constants. See [tier routing](../tier-routing.md).
+
 ### LEB and LEB2 numerical representation
 
 LEB/LEB2 is original project architecture. Its scientific inputs retain the

@@ -58,6 +58,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Explicit opt-in; the driver and pool are imported only for DB access.
+postgres = ["psycopg[binary,pool]>=3.2,<4"]
 # Star catalog building (scripts/build_star_catalog_v2.py)
 stars = [
     "astropy>=5.0.0",
@@ -137,6 +139,7 @@ packages = [
     "libephemeris.contrib",
     "libephemeris.data",
     "libephemeris.data.leb2",
+    "libephemeris.db",
     "libephemeris.moon_theories",
     "libephemeris.vendor",
 ]
@@ -146,6 +149,7 @@ libephemeris = [
     "py.typed",
     "data/fictitious_orbits.csv",
     "data/leb2/base_core.leb2",
+    "db/*.sql",
 ]
 
 # ---------------------------------------------------------------------------

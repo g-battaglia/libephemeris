@@ -71,6 +71,8 @@ Provenance:
 
 from __future__ import annotations
 
+from .db.backend import db_operation
+
 import math
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -2298,7 +2300,7 @@ def _calc_star_position_leb(
         _vec3_dist,
         _vec3_sub,
     )
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader as get_leb_reader
 
     reader = get_leb_reader()
     if reader is None:
@@ -2483,6 +2485,7 @@ def _calc_star_position_skyfield(
     )
 
 
+@db_operation
 def calc_fixed_star_position(
     star_id: int,
     jd_tt: float,
@@ -2548,7 +2551,7 @@ def _calc_fixed_star_position_with_source(
     center: int = 0,
 ) -> tuple[Tuple[float, float, float], str]:
     """Return a fixed-star position together with its actual backend tag."""
-    from .state import get_calc_mode, get_leb_reader
+    from .state import get_calc_mode, _get_coefficient_reader as get_leb_reader
 
     # The direct LEB star path is geocentric. Topocentric requests reuse the
     # Skyfield vector algorithm, backed by LEB states in sealed LEB mode.
@@ -2557,7 +2560,7 @@ def _calc_fixed_star_position_with_source(
             position = _calc_star_position_leb(
                 star_id, jd_tt, noaberr, nogdefl, j2000_frame, center
             )
-            return position, "LEB"
+            return position, getattr(get_leb_reader(), "source", "LEB")
         except LEBCorruptionError:
             raise
         except (KeyError, ValueError) as _leb_err:
@@ -2570,7 +2573,11 @@ def _calc_fixed_star_position_with_source(
         position = _calc_star_position_skyfield(
             star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo, center=center
         )
-        source = "LEB" if get_calc_mode() == "leb" else "Skyfield"
+        source = (
+            getattr(get_leb_reader(), "source", "LEB")
+            if get_calc_mode() in ("leb", "db", "routed")
+            else "Skyfield"
+        )
         return position, source
     except SkyfieldRangeError as e:
         # Wrap once here: every star entry point (fixstar_ut, fixstar,
@@ -2580,6 +2587,7 @@ def _calc_fixed_star_position_with_source(
         raise _wrap_ephemeris_range_error(e, jd_tt) from e
 
 
+@db_operation
 def calc_fixed_star_velocity(
     star_id: int,
     jd_tt: float,
@@ -3429,6 +3437,7 @@ def _sidbit_star_call(
     return result
 
 
+@db_operation
 def fixstar_ut(
     star: str, tjdut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
@@ -3622,6 +3631,7 @@ def _batch_fixstars_via_single(
     return tuple(results)
 
 
+@db_operation
 def batch_fixstars_ut(
     stars: Sequence[str],
     tjdut: float,
@@ -3705,7 +3715,7 @@ def batch_fixstars_ut(
     if not resolved:
         return tuple(results)
 
-    from .state import get_leb_reader, get_timescale
+    from .state import _get_coefficient_reader as get_leb_reader, get_timescale
 
     noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
     nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
@@ -3769,7 +3779,7 @@ def batch_fixstars_ut(
 
     if _leb_ok:
         for _index, star_id, _canonical_name in resolved:
-            _record_fixed_star_success(star_id, jd_tt, "LEB")
+            _record_fixed_star_success(star_id, jd_tt, getattr(reader, "source", "LEB"))
         return tuple(results)
 
     # Shared vector path. In sealed LEB mode its state vectors come from the
@@ -3837,7 +3847,11 @@ def batch_fixstars_ut(
                 continue
             raise Error(str(e)) from e
 
-    trace_source = "LEB" if get_calc_mode() == "leb" else "Skyfield"
+    trace_source = (
+        getattr(get_leb_reader(), "source", "LEB")
+        if get_calc_mode() in ("leb", "db", "routed")
+        else "Skyfield"
+    )
     for index, star_id, _canonical_name in resolved:
         if results[index] is not None:
             _record_fixed_star_success(star_id, jd_tt, trace_source)
@@ -3847,6 +3861,7 @@ def batch_fixstars_ut(
 batch_fixstars_ut = batch_fixstars_ut
 
 
+@db_operation
 def fixstar(
     star: str, tjdet: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
@@ -4055,6 +4070,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     return None, f"could not find star name {skey}"
 
 
+@db_operation
 def fixstar2_ut(
     star: str, tjdut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
@@ -4149,6 +4165,7 @@ def fixstar2_ut(
         raise Error(str(e)) from e
 
 
+@db_operation
 def fixstar2(
     star: str, tjdet: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:

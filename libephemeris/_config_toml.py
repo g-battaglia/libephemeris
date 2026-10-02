@@ -87,6 +87,9 @@ _VALID_KEYS: Dict[str, type] = {
     "mode": str,
     "ephemeris": str,
     "leb_file": str,
+    "db_url": str,
+    "db_dataset": str,
+    "tier_routes": dict,
     "data_dir": str,
     "log_level": str,
     "auto_spk": bool,
@@ -188,6 +191,16 @@ def load_config(
     if not isinstance(section, dict):
         _CONFIG_LOADED = True
         return False
+
+    # New explicit routing must fail closed rather than silently discard an
+    # invalid table. Existing permissive handling of older keys stays intact.
+    if "tier_routes" in section:
+        from .routing import _validate_routes
+        from .exceptions import ConfigurationError
+
+        _validate_routes(section["tier_routes"])
+        if "db_url" in section and not isinstance(section["db_url"], str):
+            raise ConfigurationError("Routed db_url must be a string")
 
     # Validate and store only known keys with correct types
     validated: Dict[str, Any] = {}

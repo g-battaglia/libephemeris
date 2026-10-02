@@ -46,6 +46,8 @@ Provenance:
 
 from __future__ import annotations
 
+from .db.backend import db_operation
+
 import contextlib
 import functools
 import math
@@ -138,9 +140,9 @@ _ACTIVE_LEB_READER = object()
 
 def _get_leb_reader_safe():
     """Return LEB reader or None. Wraps get_leb_reader for eclipse dispatch."""
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader
 
-    return get_leb_reader()
+    return _get_coefficient_reader()
 
 
 def _is_leb_out_of_range(exc: BaseException) -> bool:
@@ -163,7 +165,7 @@ _LEB_RANGE_MISS_RE = re.compile(
 )
 _LEB_RANGE_MISS_BODY_RE = re.compile(r"for body (?P<body>\d+)")
 _LEB_BODY_MISS_RE = re.compile(
-    r"Body (?P<body>-?\d+) not in (?:any )?(?:LEB file|installed LEB tier)"
+    r"Body (?P<body>-?\d+) not in (?:any )?(?:LEB file|installed LEB tier|DB dataset)"
 )
 
 
@@ -200,12 +202,16 @@ def _raise_if_sealed_leb_miss(exc: BaseException) -> None:
     In every other mode the function returns without raising so each call
     site keeps its own fallback policy (Skyfield retry, fallback logging).
     """
-    if get_calc_mode() != "leb":
+    if get_calc_mode() not in ("leb", "db", "routed"):
         return
     from .exceptions import EphemerisRangeError, UnknownBodyError
 
     text = str(exc)
-    sealed_note = "LEB mode does not silently substitute a lower-precision source."
+    source_name = "DB" if get_calc_mode() == "db" else "LEB"
+    storage_name = "DB dataset" if source_name == "DB" else "LEB file"
+    sealed_note = (
+        f"{source_name} mode does not silently substitute a lower-precision source."
+    )
     if _is_leb_out_of_range(exc):
         range_match = _LEB_RANGE_MISS_RE.search(text)
         body_match = _LEB_RANGE_MISS_BODY_RE.search(text)
@@ -221,14 +227,15 @@ def _raise_if_sealed_leb_miss(exc: BaseException) -> None:
         raise UnknownBodyError(
             message=(
                 f"Body {body_miss['body']} is not stored in the active "
-                f"LEB file. LEB mode does not silently substitute a "
-                f"non-LEB source for a missing body."
+                f"{storage_name}. {source_name} mode does not silently substitute a "
+                f"non-{source_name} source for a missing body."
             ),
             body_id=int(body_miss["body"]),
         ) from exc
     raise exc
 
 
+@db_operation
 def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
     """Run ``impl(reader=...)`` with mode-aware range handling.
 
@@ -1764,6 +1771,7 @@ def _get_moon_node_distance(jd: float, moon_lon: float) -> float:
     return min(dist_to_north, dist_to_south)
 
 
+@db_operation
 def _calc_gamma(jd: float) -> float:
     """
     Calculate the gamma parameter (sqrt(x² + y²)) at given JD using Besselian elements.
@@ -1779,7 +1787,7 @@ def _calc_gamma(jd: float) -> float:
     Returns:
         Gamma value in Earth equatorial radii
     """
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader as get_leb_reader
 
     AU_TO_KM = 149597870.7
 
@@ -2602,6 +2610,7 @@ def _calculate_eclipse_phases(
     return _calculate_eclipse_phases_besselian(jd_max, eclipse_type)
 
 
+@db_operation
 def sol_eclipse_max_time(
     jd_approx: float,
     lat: float | None = None,
@@ -2755,6 +2764,7 @@ def _calc_global_eclipse_max_time(
     return jd_max, gamma_at_max
 
 
+@db_operation
 def _calc_local_eclipse_max_time(
     jd_approx: float,
     lat: float,
@@ -2775,7 +2785,7 @@ def _calc_local_eclipse_max_time(
     Returns:
         Tuple of (jd_maximum, min_separation_degrees)
     """
-    from .state import get_leb_reader
+    from .state import _get_coefficient_reader as get_leb_reader
 
     reader = get_leb_reader()
 
@@ -3150,6 +3160,7 @@ def _strip_one_try_bit(flags: int) -> int:
     return flags & ~ECL_ONE_TRY
 
 
+@db_operation
 def sol_eclipse_when_glob(
     tjdut: float,
     flags: int = FLG_SWIEPH,
@@ -3763,6 +3774,7 @@ def _sol_eclipse_when_loc_pythonic(
 _sol_eclipse_when_loc_legacy = _sol_eclipse_when_loc_pythonic
 
 
+@db_operation
 def sol_eclipse_when_loc(
     tjdut: float,
     geopos: "Sequence[float]",
@@ -4230,6 +4242,7 @@ def _sol_eclipse_where_pythonic(
     return sol_eclipse_where(jd, flags)
 
 
+@db_operation
 def sol_eclipse_where(
     tjdut: float,
     flags: int = FLG_SWIEPH,
@@ -4334,6 +4347,7 @@ def _sol_eclipse_how_pythonic(
     return sol_eclipse_how(jd, geopos, flags)
 
 
+@db_operation
 def sol_eclipse_how(
     tjdut: float,
     geopos: Sequence[float],
@@ -4433,6 +4447,7 @@ def _sol_eclipse_how_impl(
     return retflag, tuple(attr_list)
 
 
+@db_operation
 def sol_eclipse_how_details(
     tjd_ut: float,
     geopos: Sequence[float],
@@ -5773,6 +5788,7 @@ def _lun_eclipse_when_pythonic(
     )
 
 
+@db_operation
 def lun_eclipse_when(
     tjdut: float,
     flags: int = FLG_SWIEPH,
@@ -6011,6 +6027,7 @@ def _lun_eclipse_when_loc_pythonic(
     )
 
 
+@db_operation
 def lun_eclipse_when_loc(
     tjdut: float,
     geopos: "Sequence[float]",
@@ -6280,6 +6297,7 @@ def _lun_eclipse_how_pythonic(
     return eclipse_type, attr
 
 
+@db_operation
 def lun_eclipse_how(
     tjdut: float,
     geopos: Sequence[float],
@@ -6422,6 +6440,7 @@ def _fold_pseudo_body_to_sun(body: "int | str") -> "int | str":
 
 
 @_illegal_body_contract
+@db_operation
 def lun_occult_when_glob(
     tjdut: float,
     body: "int | str",
@@ -6915,6 +6934,7 @@ def _lun_occult_when_loc_pythonic(
 
 
 @_illegal_body_contract
+@db_operation
 def lun_occult_when_loc(
     tjdut: float,
     body: "int | str",
@@ -7061,6 +7081,7 @@ _lun_occult_where_internal = _lun_occult_where_pythonic
 
 
 @_illegal_body_contract
+@db_operation
 def lun_occult_where(
     tjdut: float,
     body: "int | str" = 0,
@@ -9133,7 +9154,8 @@ def _besselian_core(
     from .time_utils import sidtime
 
     key = (round(jd, 9), flags & 0xFF)
-    cached = _BESSELIAN_CACHE.get(key)
+    cacheable = get_calc_mode() not in ("db", "routed")
+    cached = _BESSELIAN_CACHE.get(key) if cacheable else None
     if cached is not None:
         return cached
 
@@ -9198,9 +9220,11 @@ def _besselian_core(
     l2 = z * tan_f2 - k_umb / cos_f2
 
     result = (x, y, math.degrees(d_rad), mu_deg, l1, l2, tan_f1, tan_f2, z)
-    if len(_BESSELIAN_CACHE) > 512:
-        _BESSELIAN_CACHE.clear()
-    _BESSELIAN_CACHE[key] = result
+    # Remote scientific results belong to the operation, not a global cache.
+    if cacheable:
+        if len(_BESSELIAN_CACHE) > 512:
+            _BESSELIAN_CACHE.clear()
+        _BESSELIAN_CACHE[key] = result
     return result
 
 
@@ -13765,6 +13789,7 @@ def lun_eclipse_gamma(
     return _lun_eclipse_gamma_pythonic(tjd_ut, ifl)
 
 
+@db_operation
 def planet_occult_when_glob(
     tjdut: float,
     occulting_planet: int,
@@ -14149,6 +14174,7 @@ def planet_occult_when_glob(
 planet_occult_when_glob = planet_occult_when_glob
 
 
+@db_operation
 def planet_occult_when_loc(
     jd_start: float,
     occulting_planet: int,
