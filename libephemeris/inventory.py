@@ -207,7 +207,7 @@ def get_body_coverage(body_id: int, jd: float | None = None) -> BodyCoverage | N
 
     try:
         reader = get_leb_reader()
-    except Exception:
+    except RuntimeError:
         return None
     if reader is None:
         return None
@@ -334,7 +334,7 @@ def get_leb_inventory() -> dict[str, Any]:
     }
     try:
         reader = get_leb_reader()
-    except Exception as exc:
+    except RuntimeError as exc:
         result["error"] = str(exc)
         return result
     if reader is None:

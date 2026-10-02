@@ -17,7 +17,7 @@ Provenance:
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any, Callable, TypeAlias
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 from skyfield.vectorlib import VectorFunction
@@ -42,9 +42,9 @@ if TYPE_CHECKING:
     from .leb_composite import CompositeLEBReader, TieredLEBReader
     from .leb_reader import LEBReader
 
-    LEBReaderLike: TypeAlias = LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader
+    LEBReaderLike = LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader
 else:
-    LEBReaderLike: TypeAlias = Any
+    LEBReaderLike = Any
 
 
 _EMRAT = 81.3005691
@@ -236,7 +236,7 @@ class LEBVectorEphemeris:
         earth_pos, earth_vel = _eval_reader_body(self.reader, EARTH, jd_tt)
         moon_pos, moon_vel = _eval_reader_body(self.reader, MOON, jd_tt)
         weight = 1.0 / (_EMRAT + 1.0)
-        return (  # type: ignore[return-value]
+        return (
             tuple(
                 earth_pos[index] + (moon_pos[index] - earth_pos[index]) * weight
                 for index in range(3)

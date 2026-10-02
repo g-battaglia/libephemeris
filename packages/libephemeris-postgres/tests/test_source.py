@@ -13,6 +13,21 @@ from libephemeris_postgres.source import (
 )
 
 
+@pytest.mark.parametrize("configured", [" MEDIUM, extended, ", "medium,,extended"])
+def test_remote_tier_selection_ignores_empty_items(monkeypatch, configured):
+    import libephemeris_postgres as provider
+    from pathlib import Path
+
+    core = Path(__file__).resolve().parents[3] / "libephemeris/data/leb2/base_core.leb2"
+    monkeypatch.setenv("LIBEPHEMERIS_PG_TIERS", configured)
+    monkeypatch.setattr(provider, "get_precision_tier", lambda: "base")
+    monkeypatch.setattr(
+        provider, "_discover_reviewed_leb_tier_cores", lambda: {"base": str(core)}
+    )
+    with provider.open_reader() as reader:
+        assert reader.eval_body(0, 2451545.0)
+
+
 @pytest.fixture
 def storage(monkeypatch):
     data = bytes(range(256)) * (BLOCK_SIZE // 256 * 3) + b"last"

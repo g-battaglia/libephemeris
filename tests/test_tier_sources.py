@@ -16,13 +16,20 @@ from libephemeris.leb2_reader import LEB2Reader
 _DATA = Path(__file__).parents[1] / "libephemeris" / "data" / "leb2" / "base_core.leb2"
 
 
-class BytesSource(bytes):
-    closed = False
+class BytesSource:
+    def __init__(self, data):
+        self.data = data
+        self.closed = False
+        self.reads = []
+
+    def __len__(self):
+        return len(self.data)
 
     def __getitem__(self, key):
         if self.closed:
             raise SourceFailure("source unavailable")
-        return super().__getitem__(key)
+        self.reads.append(key)
+        return self.data[key]
 
     def close(self):
         self.closed = True
@@ -52,6 +59,42 @@ def test_original_bytes_match_native_states_and_boundaries():
     assert source.closed
 
 
+def test_metadata_reads_are_batched():
+    source = BytesSource(_DATA.read_bytes())
+    with LEB2Reader("memory", source) as reader:
+        # Header, directory, bodies, nutation, Delta-T header/table, stars,
+        # and two reads per body's chunk index, regardless of entry count.
+        assert len(source.reads) <= 7 + 2 * len(reader._bodies)
+
+
+@pytest.mark.parametrize("mode", ["skyfield", "horizons"])
+def test_forced_backend_does_not_load_factory(monkeypatch, mode):
+    ephe.set_leb_file(None)
+    monkeypatch.setenv("LIBEPHEMERIS_LEB_SOURCE", "test_source:open_reader")
+    monkeypatch.setattr(state, "get_calc_mode", lambda: mode)
+
+    def unexpected(_):
+        pytest.fail("Factory imported for a forced non-LEB backend")
+
+    monkeypatch.setattr(state.importlib, "import_module", unexpected)
+    assert state.get_leb_reader() is None
+
+
+def test_explicit_file_takes_precedence_over_factory(monkeypatch):
+    monkeypatch.setenv("LIBEPHEMERIS_LEB_SOURCE", "test_source:open_reader")
+    monkeypatch.setattr(state, "get_calc_mode", lambda: "leb")
+
+    def unexpected(_):
+        pytest.fail("Factory imported despite an explicit local file")
+
+    monkeypatch.setattr(state.importlib, "import_module", unexpected)
+    ephe.set_leb_file(str(_DATA))
+    try:
+        assert state.get_leb_reader().eval_body(0, 2451545.0)
+    finally:
+        ephe.set_leb_file(None)
+
+
 @pytest.mark.parametrize("mode", ["leb", "auto"])
 def test_factory_is_lazy_cached_and_failure_propagates(monkeypatch, mode):
     ephe.set_leb_file(None)
@@ -79,7 +122,8 @@ def test_factory_is_lazy_cached_and_failure_propagates(monkeypatch, mode):
     with pytest.raises(SourceFailure) as error:
         state.get_leb_reader()
     assert error.value is failure
-    assert ephe.get_leb_inventory()["error"] == "source unavailable"
+    with pytest.raises(SourceFailure):
+        ephe.get_leb_inventory()
 
 
 def test_tier_change_replaces_reader_and_vector_adapter(monkeypatch):

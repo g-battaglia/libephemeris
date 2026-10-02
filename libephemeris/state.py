@@ -24,9 +24,9 @@ Provenance:
 
 from __future__ import annotations
 
+import importlib
 import os
 import re
-import importlib
 import threading
 import warnings
 import weakref

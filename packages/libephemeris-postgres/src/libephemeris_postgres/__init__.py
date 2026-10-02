@@ -25,6 +25,7 @@ def open_reader() -> TieredLEBReader:
         for value in os.environ.get("LIBEPHEMERIS_PG_TIERS", "medium,extended").split(
             ","
         )
+        if value.strip()
     }
     opened = []
     tiers: dict[str, CompositeLEBReader] = {}
