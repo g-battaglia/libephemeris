@@ -5,7 +5,8 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 
 
 class ProviderConfigError(Exception):
@@ -16,7 +17,7 @@ class ProviderConfigError(Exception):
 class RuntimeConfig:
     """Runtime settings read from environment variables."""
 
-    dsn: str
+    dsn: str = field(repr=False)
     pool_max: int = 2
     timeout_seconds: float = 5.0
     cache_pages: int = 1024
@@ -39,8 +40,8 @@ def _positive_float(name: str, default: float) -> float:
         parsed = float(value)
     except ValueError as exc:
         raise ProviderConfigError(f"{name} must be a number") from exc
-    if parsed <= 0:
-        raise ProviderConfigError(f"{name} must be positive")
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise ProviderConfigError(f"{name} must be finite and positive")
     return parsed
 
 
