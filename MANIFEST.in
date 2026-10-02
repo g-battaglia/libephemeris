@@ -14,6 +14,9 @@ include libephemeris/data/leb2/base_core.leb2
 # pyproject metadata) would otherwise pull these .py files into the wheel
 # as package data even though the package is not declared.
 prune libephemeris/dev_cli
+# The in-repository provider is a separate distribution and must not enter
+# libephemeris source or wheel artifacts.
+prune packages
 
 exclude tests/*
 exclude compare_scripts/*

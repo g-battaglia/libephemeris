@@ -24,6 +24,7 @@ Provenance:
 
 from __future__ import annotations
 
+import importlib
 import os
 import re
 import threading
@@ -752,6 +753,13 @@ def _get_leb_reader_locked(mode):
             from ._config_toml import get_str as _toml_str
 
             path = _toml_str("leb_file")
+
+        source = os.environ.get("LIBEPHEMERIS_LEB_SOURCE", "").strip()
+        if path is None and source:
+            module, name = source.split(":")
+            _LEB_READER = getattr(importlib.import_module(module), name)()
+            _release_when_unused(_LEB_READER)
+            return _LEB_READER
 
         # Auto-discover if no explicit path configured
         if path is None:

@@ -30,7 +30,7 @@ import os
 import struct
 import threading
 from bisect import bisect_right
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .leb_compression import decompress_body
 from .leb_format import (
@@ -85,20 +85,22 @@ class LEB2Reader:
             pos, vel = reader.eval_body(SUN, jd_tt)
     """
 
-    def __init__(self, path: str) -> None:
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"LEB file not found: {path}")
-
+    def __init__(self, path: str, data: Any = None) -> None:
         self._path = path
-        self._file = open(path, "rb")
-        try:
-            self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
-        except (ValueError, OSError):
-            # 0-byte stub (interrupted download) raises "cannot mmap an empty
-            # file"; close the fd before propagating (close() below cannot run
-            # yet -- _decomp_lock/_mm are not set at this point).
-            self._file.close()
-            raise
+        self._file = None
+        self._mm = data
+        if data is None:
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"LEB file not found: {path}")
+            self._file = open(path, "rb")
+            try:
+                self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+            except (ValueError, OSError):
+                # 0-byte stub (interrupted download) raises "cannot mmap an empty
+                # file"; close the fd before propagating (close() below cannot run
+                # yet -- _decomp_lock/_mm are not set at this point).
+                self._file.close()
+                raise
         self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
         self._chunk_cache: Dict[
             Tuple[int, int], bytes
@@ -120,7 +122,7 @@ class LEB2Reader:
 
         try:
             self._parse()
-        except (struct.error, IndexError, KeyError) as exc:
+        except (struct.error, IndexError, KeyError, LEBCorruptionError) as exc:
             # Normalize truncated/corrupted-file failures to ValueError so
             # validation and the Skyfield fallback see one failure type.
             self.close()
@@ -130,7 +132,8 @@ class LEB2Reader:
             raise
 
     def _parse(self) -> None:
-        self._header = read_header(self._mm, 0)
+        read = self._read_blob
+        self._header = read_header(read(0, HEADER_SIZE, "header"), 0)
         if self._header.magic != LEB2_MAGIC:
             raise ValueError(
                 f"Invalid LEB2 magic: {self._header.magic!r} (expected {LEB2_MAGIC!r})"
@@ -154,9 +157,13 @@ class LEB2Reader:
 
         # Parse section directory
         self._sections: Dict[int, SectionEntry] = {}
+        directory = read(
+            HEADER_SIZE,
+            self._header.section_count * SECTION_DIR_SIZE,
+            "section directory",
+        )
         for i in range(self._header.section_count):
-            offset = HEADER_SIZE + i * SECTION_DIR_SIZE
-            sec = read_section_dir(self._mm, offset)
+            sec = read_section_dir(directory, i * SECTION_DIR_SIZE)
             self._sections[sec.section_id] = sec
 
         # Parse body index (CompressedBodyEntry, 68 bytes each)
@@ -169,9 +176,15 @@ class LEB2Reader:
                 sec.size,
                 "LEB2 body index",
             )
+            index = read(
+                sec.offset,
+                self._header.body_count * COMPRESSED_BODY_ENTRY_SIZE,
+                "body index",
+            )
             for i in range(self._header.body_count):
-                offset = sec.offset + i * COMPRESSED_BODY_ENTRY_SIZE
-                entry = read_compressed_body_entry(self._mm, offset)
+                entry = read_compressed_body_entry(
+                    index, i * COMPRESSED_BODY_ENTRY_SIZE
+                )
                 self._bodies[entry.body_id] = entry
 
         # For v2: parse chunk indices for each body
@@ -184,7 +197,10 @@ class LEB2Reader:
         self._nutation_data_offset: int = 0
         if SECTION_NUTATION in self._sections:
             sec = self._sections[SECTION_NUTATION]
-            self._nutation = read_nutation_header(self._mm, sec.offset)
+            self._nutation = read_nutation_header(
+                read(sec.offset, NUTATION_HEADER_SIZE, "nutation header"),
+                0,
+            )
             self._nutation_data_offset = sec.offset + NUTATION_HEADER_SIZE
 
         # Parse Delta-T table (uncompressed, same as LEB1)
@@ -192,7 +208,10 @@ class LEB2Reader:
         self._delta_t_vals: List[float] = []
         if SECTION_DELTA_T in self._sections:
             sec = self._sections[SECTION_DELTA_T]
-            n_entries, _ = struct.unpack_from(DELTA_T_HEADER_FMT, self._mm, sec.offset)
+            n_entries, _ = struct.unpack(
+                DELTA_T_HEADER_FMT,
+                read(sec.offset, DELTA_T_HEADER_SIZE, "Delta-T header"),
+            )
             # Same corrupted-count guard as the chunk index: an inflated
             # n_entries would otherwise ingest adjacent-section bytes as
             # (jd, deltaT) pairs and silently return wrong TT<->UT1 offsets.
@@ -203,9 +222,11 @@ class LEB2Reader:
                 "LEB2 Delta-T table",
             )
             data_offset = sec.offset + DELTA_T_HEADER_SIZE
+            table = read(data_offset, n_entries * DELTA_T_ENTRY_SIZE, "Delta-T table")
             for i in range(n_entries):
-                off = data_offset + i * DELTA_T_ENTRY_SIZE
-                jd, dt = struct.unpack_from(DELTA_T_ENTRY_FMT, self._mm, off)
+                jd, dt = struct.unpack_from(
+                    DELTA_T_ENTRY_FMT, table, i * DELTA_T_ENTRY_SIZE
+                )
                 self._delta_t_jds.append(jd)
                 self._delta_t_vals.append(dt)
 
@@ -214,15 +235,18 @@ class LEB2Reader:
         if SECTION_STARS in self._sections:
             sec = self._sections[SECTION_STARS]
             n_stars = sec.size // STAR_ENTRY_SIZE
+            catalog = read(sec.offset, n_stars * STAR_ENTRY_SIZE, "star catalog")
             for i in range(n_stars):
-                offset = sec.offset + i * STAR_ENTRY_SIZE
-                star = read_star_entry(self._mm, offset)
+                star = read_star_entry(catalog, i * STAR_ENTRY_SIZE)
                 self._stars[star.star_id] = star
 
     def _parse_chunk_index(self, entry: CompressedBodyEntry) -> List[ChunkEntry]:
         """Parse the chunk index for a v2 body."""
         offset = entry.data_offset
-        chunk_count, _ = read_chunk_index_header(self._mm, offset)
+        read = self._read_blob
+        chunk_count, _ = read_chunk_index_header(
+            read(offset, CHUNK_INDEX_HEADER_SIZE, "chunk index header"), 0
+        )
         offset += CHUNK_INDEX_HEADER_SIZE
 
         # Corrupted-entry guard: an inflated u32 chunk_count (up to ~4e9)
@@ -235,9 +259,10 @@ class LEB2Reader:
             f"LEB2 chunk index (body {entry.body_id})",
         )
 
+        index = read(offset, chunk_count * CHUNK_ENTRY_SIZE, "chunk index")
         chunks = []
         for i in range(chunk_count):
-            chunk = read_chunk_entry(self._mm, offset + i * CHUNK_ENTRY_SIZE)
+            chunk = read_chunk_entry(index, i * CHUNK_ENTRY_SIZE)
             chunks.append(chunk)
         return chunks
 
@@ -632,7 +657,13 @@ class LEB2Reader:
                 f"{byte_offset} (+{seg_size} bytes) is outside the file "
                 f"(size {len(mm)})"
             )
-        coeffs = struct.unpack_from(f"<{n_coeffs}d", mm, byte_offset)
+        try:
+            coeffs = struct.unpack_from(f"<{n_coeffs}d", mm, byte_offset)
+        except TypeError:
+            # External sources provide slices, not the buffer protocol.
+            coeffs = struct.unpack(
+                f"<{n_coeffs}d", mm[byte_offset : byte_offset + seg_size]
+            )
 
         dpsi = _clenshaw(coeffs[0:deg1], tau)
         deps = _clenshaw(coeffs[deg1 : 2 * deg1], tau)

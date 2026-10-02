@@ -2157,6 +2157,18 @@ The Clenshaw evaluation functions (`_clenshaw`, `_clenshaw_with_derivative`,
 bounded to 64 entries; evaluation caches are cleared when chunk eviction or
 reader shutdown requires it. Correctness does not rely on GIL atomicity.
 
+### External file bytes
+
+`LIBEPHEMERIS_LEB_SOURCE=module:factory` lazily loads a zero-argument reader
+factory; an explicit LEB file takes precedence. Call `set_leb_file(None)` or
+restart workers after changing configuration. Providers compose existing
+readers and own storage configuration and transport errors.
+
+`LEB2Reader(path, data=source)` accepts an mmap-like object with `__len__`,
+byte slicing and `close()` for instance resources. Native parsing and evaluation
+are unchanged. The PostgreSQL provider is distributed separately; see
+`packages/libephemeris-postgres/README.md`.
+
 ### 13.9 Key Modules
 
 | Module | Purpose |
