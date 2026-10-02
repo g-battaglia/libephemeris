@@ -146,12 +146,7 @@ def open_tier(
                     (chosen, artifact_no),
                 )
                 stars = {
-                    int(row[0]): StarEntry(
-                        *[
-                            float(value) if index else int(value)
-                            for index, value in enumerate(row)
-                        ]
-                    )
+                    int(row[0]): StarEntry(int(row[0]), *(float(v) for v in row[1:]))
                     for row in cur.fetchall()
                 }
                 result.append(

@@ -131,7 +131,8 @@ def import_files(
                 "SELECT count(*) FROM libephemeris.artifacts WHERE dataset_id = %s",
                 (dataset,),
             )
-            if cur.fetchone()[0] == len(LEB2_GROUPS):
+            count_row = cur.fetchone()
+            if count_row is not None and count_row[0] == len(LEB2_GROUPS):
                 cur.execute(
                     "UPDATE libephemeris.datasets SET complete = true WHERE dataset_id = %s",
                     (dataset,),

@@ -74,7 +74,7 @@ def _verify_one(cur: Any, dataset: str, artifact_no: int, path: Path) -> None:
             != [float(v).hex() for v in reader.delta_t_table[1]]
         ):
             raise ValueError(f"metadata mismatch for {path.name}")
-        entries = list(reader.bodies.items())
+        entries: list[tuple[int, Any]] = list(reader.bodies.items())
         if (
             reader.nutation_header is not None
             and reader.nutation_header.segment_count > 0
