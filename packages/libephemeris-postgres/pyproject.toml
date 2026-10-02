@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+[project]
+name = "libephemeris-postgres"
+version = "0.1.0"
+description = "PostgreSQL coefficient source for LibEphemeris"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-only"
+dependencies = [
+    "libephemeris>=3.3,<4",
+    "psycopg[binary,pool]>=3.2,<4",
+]
+
+[project.scripts]
+libephemeris-postgres = "libephemeris_postgres.__main__:main"
+
+[build-system]
+requires = ["setuptools>=77.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+libephemeris_postgres = ["schema.sql"]
+
+[tool.uv.sources]
+libephemeris = { path = "../..", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["pg_integration: requires an explicitly configured PostgreSQL server"]
+
+[tool.ruff]
+line-length = 88
