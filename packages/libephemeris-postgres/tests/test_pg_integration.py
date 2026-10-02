@@ -1,137 +1,132 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Opt-in integration checks for a disposable PostgreSQL instance."""
+"""Opt-in lifecycle and parity checks on disposable PostgreSQL storage."""
 
 from __future__ import annotations
 
 import os
-import uuid
 from pathlib import Path
 
-from libephemeris.leb_reader import open_leb
-
 import pytest
+from libephemeris import CoefficientSourceError
+from libephemeris.download import DATA_FILES
+from libephemeris.leb2_reader import LEB2Reader
+from libephemeris.leb_groups import LEB2_GROUPS
 
 from libephemeris_postgres import open_tier
-from libephemeris_postgres.importer import import_files
-from libephemeris_postgres.verify import verify_files
 from libephemeris_postgres.__main__ import _schema
+from libephemeris_postgres.importer import upload_files
+from libephemeris_postgres.pool import reset_pool
+from libephemeris_postgres.source import BLOCK_SIZE
 
 psycopg = pytest.importorskip("psycopg")
-
-
-pytestmark = pytest.mark.pg_integration
-
 _DSN = os.environ.get("LIBEPHEMERIS_TEST_PG_URL")
-if not _DSN:
-    pytestmark = [
-        pytest.mark.pg_integration,
-        pytest.mark.skip(reason="LIBEPHEMERIS_TEST_PG_URL is not set"),
-    ]
-
+pytestmark = [
+    pytest.mark.pg_integration,
+    pytest.mark.skipif(not _DSN, reason="Disposable PG URL not set"),
+]
 _ROOT = Path(__file__).resolve().parents[3]
-_CORE = _ROOT / "libephemeris" / "data" / "leb2" / "base_core.leb2"
 
 
-def _four_artifacts(tmp_path: Path) -> list[Path]:
-    """Use the bundled core bytes under each required group name."""
-
-    paths = []
-    for group in ("core", "asteroids", "exotics", "apogee"):
-        target = tmp_path / f"base_{group}.leb2"
-        target.write_bytes(_CORE.read_bytes())
-        paths.append(target)
-    return paths
-
-
-@pytest.mark.skipif(not _DSN, reason="LIBEPHEMERIS_TEST_PG_URL is not set")
-def test_import_resume_verify_and_corruption(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Exercise the complete artifact lifecycle against an explicit test DSN."""
-
-    assert _CORE.exists()
-    monkeypatch.setenv("LIBEPHEMERIS_PG_ADMIN_URL", _DSN)
+def test_upload_resume_verified_bytes_and_reader_parity(monkeypatch):
+    paths = [_ROOT / "data" / "leb2" / f"medium_{group}.leb2" for group in LEB2_GROUPS]
+    if not all(path.exists() for path in paths):
+        pytest.skip("Real medium artifacts are not installed")
     _schema(_DSN)
-    paths = _four_artifacts(tmp_path)
-    dataset = str(uuid.uuid4())
-    import_files(paths, tier="base", dsn=_DSN, dataset_id=dataset)
-    with psycopg.connect(_DSN, autocommit=True) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT count(*) FROM libephemeris.artifacts WHERE dataset_id = %s",
-                (dataset,),
-            )
-            artifact_count = cursor.fetchone()[0]
-            cursor.execute(
-                "SELECT count(*) FROM libephemeris.pages WHERE dataset_id = %s",
-                (dataset,),
-            )
-            page_count = cursor.fetchone()[0]
-    import_files(paths, tier="base", dsn=_DSN, resume=dataset)
-    with psycopg.connect(_DSN, autocommit=True) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT count(*) FROM libephemeris.artifacts WHERE dataset_id = %s",
-                (dataset,),
-            )
-            assert cursor.fetchone()[0] == artifact_count
-            cursor.execute(
-                "SELECT count(*) FROM libephemeris.pages WHERE dataset_id = %s",
-                (dataset,),
-            )
-            assert cursor.fetchone()[0] == page_count
-    verify_files(paths, dataset_id=dataset, dsn=_DSN)
     monkeypatch.setenv("LIBEPHEMERIS_PG_URL", _DSN)
-    monkeypatch.setenv("LIBEPHEMERIS_PG_DATASET_BASE", dataset)
-    sources = open_tier("base")
-    assert len(sources) == 4
-
-    file_reader = open_leb(str(_CORE))
-    try:
-        source = sources[0]
-        for body_id, entry in file_reader.bodies.items():
-            for idx in (0, entry.segment_count // 2, entry.segment_count - 1):
-                assert source.eval_body(
-                    body_id, entry.jd_start + idx * entry.interval_days
-                ) == file_reader.eval_body(
-                    body_id, entry.jd_start + idx * entry.interval_days
-                )
-        for jd, expected in zip(*file_reader.delta_t_table):
-            assert source.delta_t(jd) == expected
-        if file_reader.nutation_header is not None:
-            for jd in (
-                file_reader.nutation_header.jd_start,
-                file_reader.nutation_header.jd_end,
-            ):
-                assert source.eval_nutation(jd) == file_reader.eval_nutation(jd)
-    finally:
-        file_reader.close()
-
-    with psycopg.connect(_DSN, autocommit=True) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "UPDATE libephemeris.pages SET coeffs = set_byte(coeffs, 0, "
-                "get_byte(coeffs, 0) # 255) WHERE dataset_id = %s AND body_id = 0 "
-                "AND page_no = 0",
-                (dataset,),
+    first = paths[0]
+    sha = DATA_FILES[first.name]["sha256"]
+    # Simulate an interrupted upload with its first block already committed.
+    with psycopg.connect(_DSN) as conn:
+        conn.execute(
+            "INSERT INTO libephemeris.files (sha256,name,size) VALUES (%s,%s,%s)",
+            (sha, first.name, first.stat().st_size),
+        )
+        with first.open("rb") as stream:
+            conn.execute(
+                "INSERT INTO libephemeris.blocks VALUES (%s,0,%s)",
+                (sha, stream.read(BLOCK_SIZE)),
             )
-    with pytest.raises(ValueError, match="page mismatch"):
-        verify_files(paths, dataset_id=dataset, dsn=_DSN)
+    upload_files(paths, dsn=_DSN)
+    upload_files(paths, dsn=_DSN)
+    sources = open_tier("medium")
+    try:
+        for path in paths:
+            remote = next(
+                source for source in sources if source.path.endswith(path.name)
+            )
+            with LEB2Reader(str(path)) as local:
+                for body, entry in local._bodies.items():
+                    for jd in (
+                        entry.jd_start,
+                        (entry.jd_start + entry.jd_end) / 2,
+                        entry.jd_end,
+                    ):
+                        assert remote.eval_body(body, jd) == local.eval_body(body, jd)
+                if local.has_nutation():
+                    for jd in (local._nutation.jd_start, local._nutation.jd_end):
+                        assert remote.eval_nutation(jd) == local.eval_nutation(jd)
+                assert remote._delta_t_jds == local._delta_t_jds
+                assert remote._delta_t_vals == local._delta_t_vals
+                assert remote._stars == local._stars
+    finally:
+        for source in sources:
+            source.close()
+        reset_pool()
 
 
-def test_runtime_role_is_read_only() -> None:
-    """Document the optional runtime-role check without requiring credentials."""
+def test_incomplete_pin_is_rejected(monkeypatch):
+    sha = DATA_FILES["medium_core.leb2"]["sha256"]
+    monkeypatch.setenv("LIBEPHEMERIS_PG_URL", _DSN)
+    with psycopg.connect(_DSN) as conn:
+        conn.execute(
+            "UPDATE libephemeris.files SET complete=false WHERE sha256=%s", (sha,)
+        )
+    try:
+        with pytest.raises(CoefficientSourceError):
+            open_tier("medium")
+    finally:
+        with psycopg.connect(_DSN) as conn:
+            conn.execute(
+                "UPDATE libephemeris.files SET complete=true WHERE sha256=%s", (sha,)
+            )
+        reset_pool()
 
-    runtime_dsn = os.environ.get("LIBEPHEMERIS_TEST_PG_RUNTIME_URL")
-    if not runtime_dsn:
-        pytest.skip("LIBEPHEMERIS_TEST_PG_RUNTIME_URL is not set")
-    with psycopg.connect(runtime_dsn, autocommit=True) as connection:
-        with connection.cursor() as cursor:
-            with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
-                cursor.execute(
-                    "CREATE TABLE libephemeris._provider_write_probe (id integer)"
-                )
-            cursor.execute("SET default_transaction_read_only=off")
-            with pytest.raises(psycopg.errors.InsufficientPrivilege):
-                cursor.execute("INSERT INTO libephemeris.schema_version VALUES (1)")
+
+def test_corrupt_incomplete_upload_never_published(tmp_path, monkeypatch):
+    import hashlib
+
+    path = tmp_path / "base_core.leb2"
+    data = b"test-byte-storage" * 5000
+    path.write_bytes(data)
+    sha = hashlib.sha256(data).hexdigest()
+    monkeypatch.setitem(DATA_FILES, path.name, {"sha256": sha})
+    with psycopg.connect(_DSN) as conn:
+        conn.execute(
+            "INSERT INTO libephemeris.files (sha256,name,size) VALUES (%s,%s,%s)",
+            (sha, path.name, len(data)),
+        )
+        conn.execute(
+            "INSERT INTO libephemeris.blocks VALUES (%s,0,%s)", (sha, b"x" * BLOCK_SIZE)
+        )
+    with pytest.raises(CoefficientSourceError, match="checksum"):
+        upload_files([path], dsn=_DSN)
+    with psycopg.connect(_DSN) as conn:
+        assert conn.execute(
+            "SELECT complete FROM libephemeris.files WHERE sha256=%s", (sha,)
+        ).fetchone() == (False,)
+
+
+def test_runtime_role_is_read_only():
+    dsn = os.environ.get("LIBEPHEMERIS_TEST_PG_RUNTIME_URL")
+    if not dsn:
+        pytest.skip("Runtime-role URL not set")
+    with psycopg.connect(dsn, autocommit=True) as conn:
+        with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+            conn.execute("CREATE TABLE libephemeris._write_probe (id int)")
+        conn.execute("SET default_transaction_read_only=off")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute(
+                "INSERT INTO libephemeris.files VALUES (%s,'probe',1,false)",
+                ("0" * 64,),
+            )

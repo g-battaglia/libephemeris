@@ -544,8 +544,7 @@ paths = [
   "libephemeris/leb_format.py",
   "libephemeris/leb_groups.py",
   "libephemeris/leb_reader.py",
-  "libephemeris/leb_export.py",
-  "libephemeris/segment_source.py",
+  "libephemeris/leb2_remote.py",
 ]
 scientific_content = true
 origin = "Project-native Chebyshev ephemeris layouts, readers, chunking, and compression. Published Clenshaw, IEEE-754, and Zstandard foundations are separated from project interval/bit/error decisions."

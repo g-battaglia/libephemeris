@@ -1,68 +1,50 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Environment configuration for the PostgreSQL coefficient source."""
+"""Credential-safe PostgreSQL runtime settings."""
 
 from __future__ import annotations
 
-import os
 import math
+import os
 from dataclasses import dataclass, field
 
-
-class ProviderConfigError(Exception):
-    """Raised when provider configuration is missing or invalid."""
+from libephemeris import CoefficientSourceError
 
 
 @dataclass(frozen=True, slots=True)
 class RuntimeConfig:
-    """Runtime settings read from environment variables."""
+    """Bound the process pool, transport timeout and per-file byte cache."""
 
     dsn: str = field(repr=False)
     pool_max: int = 2
     timeout_seconds: float = 5.0
-    cache_pages: int = 1024
+    cache_blocks: int = 256
 
-
-def _positive_int(name: str, default: int) -> int:
-    value = os.environ.get(name, str(default))
-    try:
-        parsed = int(value)
-    except ValueError as exc:
-        raise ProviderConfigError(f"{name} must be an integer") from exc
-    if parsed <= 0:
-        raise ProviderConfigError(f"{name} must be positive")
-    return parsed
-
-
-def _positive_float(name: str, default: float) -> float:
-    value = os.environ.get(name, str(default))
-    try:
-        parsed = float(value)
-    except ValueError as exc:
-        raise ProviderConfigError(f"{name} must be a number") from exc
-    if not math.isfinite(parsed) or parsed <= 0:
-        raise ProviderConfigError(f"{name} must be finite and positive")
-    return parsed
+    def __post_init__(self) -> None:
+        if not self.dsn or self.pool_max <= 0 or self.cache_blocks <= 0:
+            raise CoefficientSourceError("Missing or invalid PostgreSQL configuration")
+        if not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0:
+            raise CoefficientSourceError(
+                "PostgreSQL timeout must be finite and positive"
+            )
 
 
 def runtime_config() -> RuntimeConfig:
-    """Read and validate runtime settings without exposing the DSN."""
-
-    dsn = os.environ.get("LIBEPHEMERIS_PG_URL", "").strip()
-    if not dsn:
-        raise ProviderConfigError("LIBEPHEMERIS_PG_URL is not configured")
-    return RuntimeConfig(
-        dsn=dsn,
-        pool_max=_positive_int("LIBEPHEMERIS_PG_POOL_MAX", 2),
-        timeout_seconds=_positive_float("LIBEPHEMERIS_PG_TIMEOUT_SECONDS", 5.0),
-        cache_pages=_positive_int("LIBEPHEMERIS_PG_CACHE_PAGES", 1024),
-    )
+    """Read explicit bounds, suppressing malformed values in diagnostics."""
+    try:
+        return RuntimeConfig(
+            os.environ.get("LIBEPHEMERIS_PG_URL", "").strip(),
+            int(os.environ.get("LIBEPHEMERIS_PG_POOL_MAX", "2")),
+            float(os.environ.get("LIBEPHEMERIS_PG_TIMEOUT_SECONDS", "5")),
+            int(os.environ.get("LIBEPHEMERIS_PG_CACHE_BLOCKS", "256")),
+        )
+    except ValueError:
+        raise CoefficientSourceError("Invalid PostgreSQL configuration") from None
 
 
 def admin_dsn(explicit: str | None = None) -> str:
-    """Return the importer DSN, never including it in an error message."""
-
+    """Use administrator credentials only for provisioning."""
     dsn = (explicit or os.environ.get("LIBEPHEMERIS_PG_ADMIN_URL", "")).strip()
     if not dsn:
-        raise ProviderConfigError("PostgreSQL admin URL is not configured")
+        raise CoefficientSourceError("PostgreSQL admin URL is not configured")
     return dsn

@@ -1,178 +1,126 @@
-# SPDX-License-Identifier: AGPL-3.0-only
-# Copyright (c) 2026 Giacomo Battaglia
-"""Focused tests for tier-source configuration and factory validation."""
+"""Focused checks for original-byte readers and the lazy factory hook."""
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import math
+import random
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import libephemeris as ephe
 import libephemeris.state as state
 from libephemeris import CoefficientSourceError, Error
-from libephemeris.leb_format import BodyEntry, COORD_ICRS_BARY
-from libephemeris.segment_source import SegmentSource
+from libephemeris.leb2_reader import LEB2Reader
+from libephemeris.leb2_remote import RemoteLEB2Reader
+
+_DATA = Path(__file__).parents[1] / "libephemeris" / "data" / "leb2" / "base_core.leb2"
 
 
-class _Source(SegmentSource):
-    """Minimal in-memory source used to exercise reader construction."""
+class BytesSource:
+    name = "base_core.leb2"
+    locator = "memory://tests"
 
-    def fetch_body_segment(self, body_id: int, idx: int) -> Sequence[float]:
-        return (float(body_id), 0.0, 0.0)
+    def __init__(self):
+        self.payload = _DATA.read_bytes()
+        self.closed = False
 
-    def fetch_nutation_segment(self, idx: int) -> Sequence[float]:
-        raise CoefficientSourceError("no nutation")
+    def __len__(self):
+        return len(self.payload)
 
+    def read(self, offset, size):
+        if self.closed:
+            raise RuntimeError("private transport details")
+        return self.payload[offset : offset + size]
 
-def _source(tier: str, group: str, body_id: int) -> _Source:
-    """Create one valid source for a canonical group."""
-    return _Source(
-        artifact_name=f"{tier}_{group}.leb2",
-        locator="memory://test",
-        jd_range=(1.0, 3.0),
-        bodies={
-            body_id: BodyEntry(
-                body_id,
-                COORD_ICRS_BARY,
-                1,
-                1.0,
-                3.0,
-                2.0,
-                0,
-                3,
-                0,
-            )
-        },
-        reviewed=group == "core",
-    )
+    def close(self):
+        self.closed = True
 
 
-def _all_sources(tier: str = "medium") -> list[_Source]:
-    """Return all four groups in deliberately non-canonical order."""
-    return [
-        _source(tier, "exotics", 3),
-        _source(tier, "core", 0),
-        _source(tier, "apogee", 2),
-        _source(tier, "asteroids", 1),
-    ]
+def test_original_bytes_match_all_native_states_and_boundaries():
+    source = BytesSource()
+    rng = random.Random(17)
+    with (
+        LEB2Reader(str(_DATA)) as native,
+        RemoteLEB2Reader(source, reviewed=True) as remote,
+    ):
+        for body, entry in native._bodies.items():
+            edge = entry.jd_start + entry.interval_days
+            dates = [
+                entry.jd_start,
+                entry.jd_end,
+                edge,
+                math.nextafter(edge, -math.inf),
+                math.nextafter(edge, math.inf),
+            ]
+            dates += [rng.uniform(entry.jd_start, entry.jd_end) for _ in range(150)]
+            for jd in dates:
+                assert remote.eval_body(body, jd) == native.eval_body(body, jd)
+        for jd in (native._nutation.jd_start, 2451545.0, native._nutation.jd_end):
+            assert remote.eval_nutation(jd) == native.eval_nutation(jd)
+            assert remote.delta_t(jd) == native.delta_t(jd)
+        assert remote._stars == native._stars
+    assert source.closed
 
 
-def test_tier_source_setter_precedes_environment_and_toml(monkeypatch) -> None:
-    """Setter values win, while None restores env/TOML resolution."""
-    monkeypatch.setenv("LIBEPHEMERIS_TIER_SOURCE_MEDIUM", "env.module:factory")
-    monkeypatch.setattr(state, "_TIER_SOURCES", {"medium": "setter.module:factory"})
+@pytest.mark.parametrize("mode", ["leb", "auto"])
+def test_factory_is_lazy_cached_and_failures_do_not_fall_back(monkeypatch, mode):
+    ephe.set_leb_file(None)
+    monkeypatch.delenv("LIBEPHEMERIS_LEB", raising=False)
+    monkeypatch.setenv("LIBEPHEMERIS_LEB_SOURCE", "test_source:open_reader")
+    monkeypatch.setattr(state, "get_calc_mode", lambda: mode)
+    calls = []
+    reader = RemoteLEB2Reader(BytesSource(), reviewed=True)
     monkeypatch.setattr(
-        "libephemeris._config_toml.get_str",
-        lambda key: "toml.module:factory" if key == "tier_source_medium" else None,
+        state.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(open_reader=lambda: calls.append(1) or reader),
     )
-    assert state.get_tier_source("medium") == "setter.module:factory"
-    state._TIER_SOURCES.pop("medium")
-    assert state.get_tier_source("medium") == "env.module:factory"
-    monkeypatch.delenv("LIBEPHEMERIS_TIER_SOURCE_MEDIUM")
-    assert state.get_tier_source("medium") == "toml.module:factory"
-
-
-def test_tier_source_factory_is_ordered_core_first(monkeypatch) -> None:
-    """Factories provide every group and the composite receives canonical order."""
-    sources = _all_sources()
-    monkeypatch.setattr(state, "_discover_reviewed_leb_tier_cores", lambda: {})
-    reader = state._build_tier_source_reader(
-        {"base": None, "medium": lambda _: sources}
+    assert state.get_leb_reader() is reader
+    assert state.get_leb_reader() is reader
+    assert calls == [1]
+    ephe.set_leb_file(None)
+    monkeypatch.setattr(
+        state.importlib,
+        "import_module",
+        lambda _: (_ for _ in ()).throw(RuntimeError("secret")),
     )
-    try:
-        assert [item.artifact_name for item in reader._readers] == [
-            "medium_core.leb2",
-            "medium_apogee.leb2",
-            "medium_asteroids.leb2",
-            "medium_exotics.leb2",
-        ]
-        assert reader._manifest_verified is False
-    finally:
-        reader.close()
+    with pytest.raises(CoefficientSourceError) as error:
+        state.get_leb_reader()
+    assert "secret" not in str(error.value)
 
 
-def test_tier_source_factory_errors_are_wrapped_and_negative_cached(
-    monkeypatch,
-) -> None:
-    """A failing configured provider is retried only after the cooldown."""
-    calls = 0
-
-    def factory(_tier: str):
-        nonlocal calls
-        calls += 1
-        raise RuntimeError("provider unavailable")
-
-    monkeypatch.setattr(state, "_TIER_SOURCE_FAILURE", None)
-    specs = {"medium": factory}
-    with pytest.raises(CoefficientSourceError, match="Could not initialize"):
-        state._build_tier_source_reader(specs)
-    with pytest.raises(CoefficientSourceError, match="Could not initialize"):
-        state._build_tier_source_reader(specs)
-    assert calls == 1
-    monkeypatch.setattr(state, "_TIER_SOURCE_FAILURE", None)
-
-
-def test_invalid_factory_result_is_a_source_error(monkeypatch) -> None:
-    """Missing canonical groups fail closed instead of selecting a fallback."""
-    monkeypatch.setattr(state, "_TIER_SOURCE_FAILURE", None)
-    with pytest.raises(CoefficientSourceError, match="every canonical group"):
-        state._build_tier_source_reader(
-            {"medium": lambda _: [_source("medium", "core", 0)]}
+@pytest.mark.parametrize("operation", ["body", "nutation"])
+def test_transport_and_corruption_are_fatal(operation):
+    source = BytesSource()
+    with RemoteLEB2Reader(source, reviewed=True) as reader:
+        source.closed = True
+        with pytest.raises(CoefficientSourceError):
+            if operation == "body":
+                reader.eval_body(0, 2451545.0)
+            else:
+                reader.eval_nutation(2451545.0)
+    source = BytesSource()
+    with RemoteLEB2Reader(source, reviewed=True) as reader:
+        chunk = reader._chunk_index[0][0]
+        source.payload = (
+            source.payload[: chunk.blob_offset]
+            + b"x" * chunk.compressed_size
+            + source.payload[chunk.blob_offset + chunk.compressed_size :]
         )
-    monkeypatch.setattr(state, "_TIER_SOURCE_FAILURE", None)
+        with pytest.raises(CoefficientSourceError):
+            reader.eval_body(0, chunk.jd_start)
 
 
-def test_public_source_error_is_plain_exception() -> None:
-    """The source error must bypass broad calculation error handlers."""
+def test_short_read_and_bad_header_are_source_failures():
+    source = BytesSource()
+    source.payload = b"bad"
+    with pytest.raises(CoefficientSourceError):
+        RemoteLEB2Reader(source, reviewed=True)
+    assert source.closed
+
+
+def test_public_source_error_is_plain_exception():
     assert CoefficientSourceError.__bases__ == (Exception,)
     assert not isinstance(CoefficientSourceError("x"), Error)
-
-
-def test_unknown_tier_is_rejected() -> None:
-    """Configuration accepts only the three declared precision tiers."""
-    with pytest.raises(ValueError):
-        state.set_tier_source("unknown", None)
-    with pytest.raises(ValueError):
-        state.get_tier_source("unknown")
-
-
-@pytest.mark.parametrize("operation", ["calc_ut", "solcross_ut", "eclipse"])
-def test_configured_fetch_failure_propagates(monkeypatch, operation) -> None:
-    """A configured provider failure is not converted into backend fallback."""
-    import libephemeris as ephe
-    from libephemeris.leb_composite import CompositeLEBReader
-
-    class FailingSource(_Source):
-        def fetch_body_segment(self, body_id: int, idx: int) -> Sequence[float]:
-            raise CoefficientSourceError("configured fetch failed")
-
-    source = FailingSource(
-        artifact_name="medium_core.leb2",
-        locator="memory://failure",
-        jd_range=(2450000.0, 2460000.0),
-        bodies={
-            body_id: BodyEntry(
-                body_id, COORD_ICRS_BARY, 1000, 2450000.0, 2460000.0, 10.0, 0, 3, 0
-            )
-            for body_id in (0, 14)
-        },
-    )
-    reader = CompositeLEBReader([source])
-    monkeypatch.setattr(state, "get_leb_reader", lambda: reader)
-    monkeypatch.setattr(state, "get_calc_mode", lambda: "leb")
-    monkeypatch.setattr(
-        "libephemeris.planets.get_calc_mode", lambda: "leb", raising=False
-    )
-    calls = {
-        "calc_ut": lambda: ephe.calc_ut(2451545.0, 0, 0),
-        "solcross_ut": lambda: ephe.solcross_ut(90.0, 2451545.0),
-        "eclipse": lambda: ephe.sol_eclipse_when_glob(2451545.0),
-    }
-    try:
-        with pytest.raises(CoefficientSourceError, match="configured fetch failed"):
-            calls[operation]()
-    finally:
-        reader.close()
-        from libephemeris import fast_calc
-
-        fast_calc._reset_active_reader()

@@ -794,23 +794,6 @@ def config() -> None:
     click.echo("  Install reviewed groups: libephemeris download leb2-medium")
     click.echo()
 
-    # --- External tier sources ---
-    click.echo(_b("Tier sources"))
-    click.echo("  Resolution: setter -> environment -> TOML")
-    try:
-        from ..state import get_tier_source
-
-        for _tier in ("base", "medium", "extended"):
-            _spec = get_tier_source(_tier) or "(none)"
-            click.echo(f"  {_tier:9s} {_spec}")
-    except Exception:
-        for _tier in ("base", "medium", "extended"):
-            click.echo(f"  {_tier:9s} (unavailable)")
-    click.echo("  Python:   set_tier_source('medium', 'module:factory')")
-    click.echo("  Env vars: LIBEPHEMERIS_TIER_SOURCE_BASE|MEDIUM|EXTENDED")
-    click.echo("  TOML:     tier_source_base|medium|extended")
-    click.echo()
-
     # --- SPK cache ---
     try:
         from ..spk_auto import DEFAULT_AUTO_SPK_DIR

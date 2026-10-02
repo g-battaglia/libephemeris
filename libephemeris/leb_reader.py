@@ -64,7 +64,6 @@ from .leb_format import (
     _madvise_dontneed,
 )
 from .exceptions import FictitiousRuntimeDispatch, LEBCorruptionError
-from .leb_export import LEBExportMixin
 
 
 # =============================================================================
@@ -165,7 +164,7 @@ def _clenshaw_with_derivative(coeffs: tuple, tau: float) -> Tuple[float, float]:
 # =============================================================================
 
 
-class LEBReader(LEBExportMixin):
+class LEBReader:
     """Memory-mapped reader for .leb binary ephemeris files.
 
     Usage:

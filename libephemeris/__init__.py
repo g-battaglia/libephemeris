@@ -188,8 +188,6 @@ from .state import (
     # LEB binary ephemeris mode
     set_leb_file,
     get_leb_reader,
-    set_tier_source,
-    get_tier_source,
     set_calc_mode,
     get_calc_mode,
     set_auto_spk_download,
@@ -836,8 +834,6 @@ __all__ = [
     # LEB backend and calculation mode
     "set_leb_file",
     "get_leb_reader",
-    "set_tier_source",
-    "get_tier_source",
     "CoefficientSourceError",
     "set_calc_mode",
     "get_calc_mode",

@@ -30,7 +30,7 @@ import os
 import struct
 import threading
 from bisect import bisect_right
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .leb_compression import decompress_body
 from .leb_format import (
@@ -72,11 +72,10 @@ from .leb_format import (
     _madvise_dontneed,
 )
 from .exceptions import LEBCorruptionError
-from .leb_export import LEBExportMixin
 from .leb_reader import _clenshaw, _clenshaw_with_derivative
 
 
-class LEB2Reader(LEBExportMixin):
+class LEB2Reader:
     """Reader for LEB2 compressed .leb2 files (v1 monolithic and v2 chunked).
 
     Same interface as LEBReader.
@@ -90,16 +89,21 @@ class LEB2Reader(LEBExportMixin):
         if not os.path.exists(path):
             raise FileNotFoundError(f"LEB file not found: {path}")
 
-        self._path = path
-        self._file = open(path, "rb")
+        file = open(path, "rb")
         try:
-            self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+            mm = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
         except (ValueError, OSError):
             # 0-byte stub (interrupted download) raises "cannot mmap an empty
-            # file"; close the fd before propagating (close() below cannot run
-            # yet -- _decomp_lock/_mm are not set at this point).
-            self._file.close()
+            # file"; close the fd before propagating.
+            file.close()
             raise
+        self._initialize(path, mm, file)
+
+    def _initialize(self, path: str, mm: Any, file: Any) -> None:
+        """Initialize reader state and parse a native or byte-backed file."""
+        self._path = path
+        self._file = file
+        self._mm = mm
         self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
         self._chunk_cache: Dict[
             Tuple[int, int], bytes
@@ -121,7 +125,7 @@ class LEB2Reader(LEBExportMixin):
 
         try:
             self._parse()
-        except (struct.error, IndexError, KeyError) as exc:
+        except (struct.error, IndexError, KeyError, LEBCorruptionError) as exc:
             # Normalize truncated/corrupted-file failures to ValueError so
             # validation and the Skyfield fallback see one failure type.
             self.close()
@@ -131,7 +135,7 @@ class LEB2Reader(LEBExportMixin):
             raise
 
     def _parse(self) -> None:
-        self._header = read_header(self._mm, 0)
+        self._header = read_header(self._read_blob(0, HEADER_SIZE, "LEB2 header"), 0)
         if self._header.magic != LEB2_MAGIC:
             raise ValueError(
                 f"Invalid LEB2 magic: {self._header.magic!r} (expected {LEB2_MAGIC!r})"
@@ -157,7 +161,9 @@ class LEB2Reader(LEBExportMixin):
         self._sections: Dict[int, SectionEntry] = {}
         for i in range(self._header.section_count):
             offset = HEADER_SIZE + i * SECTION_DIR_SIZE
-            sec = read_section_dir(self._mm, offset)
+            sec = read_section_dir(
+                self._read_blob(offset, SECTION_DIR_SIZE, "LEB2 section directory"), 0
+            )
             self._sections[sec.section_id] = sec
 
         # Parse body index (CompressedBodyEntry, 68 bytes each)
@@ -172,7 +178,12 @@ class LEB2Reader(LEBExportMixin):
             )
             for i in range(self._header.body_count):
                 offset = sec.offset + i * COMPRESSED_BODY_ENTRY_SIZE
-                entry = read_compressed_body_entry(self._mm, offset)
+                entry = read_compressed_body_entry(
+                    self._read_blob(
+                        offset, COMPRESSED_BODY_ENTRY_SIZE, "LEB2 body index"
+                    ),
+                    0,
+                )
                 self._bodies[entry.body_id] = entry
 
         # For v2: parse chunk indices for each body
@@ -185,7 +196,12 @@ class LEB2Reader(LEBExportMixin):
         self._nutation_data_offset: int = 0
         if SECTION_NUTATION in self._sections:
             sec = self._sections[SECTION_NUTATION]
-            self._nutation = read_nutation_header(self._mm, sec.offset)
+            self._nutation = read_nutation_header(
+                self._read_blob(
+                    sec.offset, NUTATION_HEADER_SIZE, "LEB2 nutation header"
+                ),
+                0,
+            )
             self._nutation_data_offset = sec.offset + NUTATION_HEADER_SIZE
 
         # Parse Delta-T table (uncompressed, same as LEB1)
@@ -193,7 +209,10 @@ class LEB2Reader(LEBExportMixin):
         self._delta_t_vals: List[float] = []
         if SECTION_DELTA_T in self._sections:
             sec = self._sections[SECTION_DELTA_T]
-            n_entries, _ = struct.unpack_from(DELTA_T_HEADER_FMT, self._mm, sec.offset)
+            n_entries, _ = struct.unpack(
+                DELTA_T_HEADER_FMT,
+                self._read_blob(sec.offset, DELTA_T_HEADER_SIZE, "LEB2 Delta-T header"),
+            )
             # Same corrupted-count guard as the chunk index: an inflated
             # n_entries would otherwise ingest adjacent-section bytes as
             # (jd, deltaT) pairs and silently return wrong TT<->UT1 offsets.
@@ -206,7 +225,10 @@ class LEB2Reader(LEBExportMixin):
             data_offset = sec.offset + DELTA_T_HEADER_SIZE
             for i in range(n_entries):
                 off = data_offset + i * DELTA_T_ENTRY_SIZE
-                jd, dt = struct.unpack_from(DELTA_T_ENTRY_FMT, self._mm, off)
+                jd, dt = struct.unpack(
+                    DELTA_T_ENTRY_FMT,
+                    self._read_blob(off, DELTA_T_ENTRY_SIZE, "LEB2 Delta-T entry"),
+                )
                 self._delta_t_jds.append(jd)
                 self._delta_t_vals.append(dt)
 
@@ -217,13 +239,18 @@ class LEB2Reader(LEBExportMixin):
             n_stars = sec.size // STAR_ENTRY_SIZE
             for i in range(n_stars):
                 offset = sec.offset + i * STAR_ENTRY_SIZE
-                star = read_star_entry(self._mm, offset)
+                star = read_star_entry(
+                    self._read_blob(offset, STAR_ENTRY_SIZE, "LEB2 star catalog"), 0
+                )
                 self._stars[star.star_id] = star
 
     def _parse_chunk_index(self, entry: CompressedBodyEntry) -> List[ChunkEntry]:
         """Parse the chunk index for a v2 body."""
         offset = entry.data_offset
-        chunk_count, _ = read_chunk_index_header(self._mm, offset)
+        chunk_count, _ = read_chunk_index_header(
+            self._read_blob(offset, CHUNK_INDEX_HEADER_SIZE, "LEB2 chunk index header"),
+            0,
+        )
         offset += CHUNK_INDEX_HEADER_SIZE
 
         # Corrupted-entry guard: an inflated u32 chunk_count (up to ~4e9)
@@ -238,7 +265,14 @@ class LEB2Reader(LEBExportMixin):
 
         chunks = []
         for i in range(chunk_count):
-            chunk = read_chunk_entry(self._mm, offset + i * CHUNK_ENTRY_SIZE)
+            chunk = read_chunk_entry(
+                self._read_blob(
+                    offset + i * CHUNK_ENTRY_SIZE,
+                    CHUNK_ENTRY_SIZE,
+                    "LEB2 chunk index",
+                ),
+                0,
+            )
             chunks.append(chunk)
         return chunks
 
@@ -595,8 +629,6 @@ class LEB2Reader(LEBExportMixin):
         """Evaluate nutation angles. Same as LEBReader.eval_nutation()."""
         if self._mm is None:
             raise ValueError("LEB2 reader is closed")
-        # Snapshot against a concurrent close() (see LEBReader.eval_body).
-        mm = self._mm
 
         if self._nutation is None or self._nutation.segment_count <= 0:
             raise ValueError("No nutation data in this LEB file")
@@ -624,16 +656,11 @@ class LEB2Reader(LEBExportMixin):
         n_coeffs = nut.components * deg1
         seg_size = n_coeffs * 8
         byte_offset = self._nutation_data_offset + seg_idx * seg_size
-        # Same corrupted-entry guard as eval_body: struct.unpack_from would
-        # raise struct.error (NOT a ValueError) on a truncated nutation
-        # section and bypass the callers' LEB->Skyfield fallback.
-        if byte_offset < 0 or byte_offset + seg_size > len(mm):
-            raise LEBCorruptionError(
-                f"Corrupted LEB2 nutation entry: coefficient data at offset "
-                f"{byte_offset} (+{seg_size} bytes) is outside the file "
-                f"(size {len(mm)})"
-            )
-        coeffs = struct.unpack_from(f"<{n_coeffs}d", mm, byte_offset)
+        # Read through the byte-source seam so remote nutation remains lazy.
+        coeffs = struct.unpack(
+            f"<{n_coeffs}d",
+            self._read_blob(byte_offset, seg_size, "LEB2 nutation coefficients"),
+        )
 
         dpsi = _clenshaw(coeffs[0:deg1], tau)
         deps = _clenshaw(coeffs[deg1 : 2 * deg1], tau)

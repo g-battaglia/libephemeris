@@ -9,10 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added the tier-source API for supplying reviewed LEB2 segments through a
-  provider factory while preserving the native reader evaluation contract.
-  Sources expose diagnostic inventory metadata and report provider failures as
-  `CoefficientSourceError`.
+- Optional original-byte LEB2 readers and a lazy `LIBEPHEMERIS_LEB_SOURCE`
+  factory hook. Native evaluation is reused; source failures propagate as
+  `CoefficientSourceError`. PostgreSQL storage is a separate distribution.
 
 ## [3.2.1] - 2026-09-05
 

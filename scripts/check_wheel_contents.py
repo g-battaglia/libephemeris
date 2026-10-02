@@ -132,18 +132,7 @@ def _discover_wheel_project_files() -> tuple[str, ...]:
     return tuple(sorted(files))
 
 
-# New core modules may be present in a local checkout before they are staged in
-# git. Keep the package allowlist explicit so the audit still recognizes them
-# as supported wheel payloads while rejecting every other unexpected member.
-_WHEEL_SOURCE_ALLOWLIST = frozenset(
-    {
-        "libephemeris/leb_export.py",
-        "libephemeris/segment_source.py",
-    }
-)
-WHEEL_REQUIRED = tuple(
-    sorted(set(_discover_wheel_project_files()) | _WHEEL_SOURCE_ALLOWLIST)
-)
+WHEEL_REQUIRED = _discover_wheel_project_files()
 WHEEL_METADATA_REQUIRED = (
     f"{EXPECTED_DIST_INFO}/METADATA",
     f"{EXPECTED_DIST_INFO}/WHEEL",

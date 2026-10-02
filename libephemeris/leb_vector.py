@@ -41,11 +41,8 @@ if TYPE_CHECKING:
     from .leb2_reader import LEB2Reader
     from .leb_composite import CompositeLEBReader, TieredLEBReader
     from .leb_reader import LEBReader
-    from .segment_source import SegmentSource
 
-    LEBReaderLike: TypeAlias = (
-        LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader | SegmentSource
-    )
+    LEBReaderLike: TypeAlias = LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader
 else:
     LEBReaderLike: TypeAlias = Any
 
