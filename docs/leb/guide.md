@@ -1294,16 +1294,12 @@ if reader is not None:
 
 ```python
 # __init__.py
-from libephemeris import (
-    set_leb_file,
-    get_leb_reader,
-    set_calc_mode,
-    get_calc_mode,
-)
+from .state import set_leb_file, get_leb_reader, set_calc_mode, get_calc_mode
 ```
 
-These functions are accessible from the package root. External reader
-implementations import `RemoteLEB2Reader` from `libephemeris.leb2_remote`.
+All four are accessible as `libephemeris.set_leb_file()`,
+`libephemeris.get_leb_reader()`, `libephemeris.set_calc_mode()`, and
+`libephemeris.get_calc_mode()`.
 
 ---
 
@@ -2161,26 +2157,19 @@ The Clenshaw evaluation functions (`_clenshaw`, `_clenshaw_with_derivative`,
 bounded to 64 entries; evaluation caches are cleared when chunk eviction or
 reader shutdown requires it. Correctness does not rely on GIL atomicity.
 
-### 13.9 External file bytes
+### External file bytes
 
-`LIBEPHEMERIS_LEB_SOURCE=module:factory` selects a lazily imported,
-zero-argument factory returning a reader. The provider composes local and
-remote tiers using the existing composite readers; the core has no storage or
-tier configuration API. An explicit LEB file path takes precedence. Restart
-workers or call `set_leb_file(None)` after changing source configuration.
+`LIBEPHEMERIS_LEB_SOURCE=module:factory` lazily loads a zero-argument reader
+factory; an explicit LEB file takes precedence. Call `set_leb_file(None)` or
+restart workers after changing configuration. Providers compose existing
+readers and own storage configuration and transport errors.
 
-`RemoteLEB2Reader(source, reviewed=True)` reuses the native LEB2 v2 parser,
-decompression and evaluator. A source exposes a canonical artifact `name`, a
-credential-free `locator`, `__len__`, `read(offset, size) -> bytes`, and
-`close()` for instance resources only. Providers attest manifest integrity
-before marking readers reviewed. Transport, short reads and corrupt compressed
-chunks raise `CoefficientSourceError`, not scientific fallback exceptions.
+`LEB2Reader(path, data=source)` accepts an mmap-like object with `__len__`,
+byte slicing and `close()` for instance resources. Native parsing and evaluation
+are unchanged. The PostgreSQL provider is distributed separately; see
+`packages/libephemeris-postgres/README.md`.
 
-The optional PostgreSQL provider stores original files as content-addressed
-byte blocks. See `packages/libephemeris-postgres/README.md` for provisioning
-and configuration; it is distributed separately from the core library.
-
-### 13.10 Key Modules
+### 13.9 Key Modules
 
 | Module | Purpose |
 |--------|---------|
@@ -2188,11 +2177,10 @@ and configuration; it is distributed separately from the core library.
 | `leb2_reader.py` | `LEB2Reader` — v1 full-body and v2 lazy per-chunk decompression |
 | `leb_composite.py` | `CompositeLEBReader` — wraps multiple readers, dispatches by body_id |
 | `leb_reader.py` | `open_leb()` factory — auto-detects LEB1/LEB2 via magic bytes |
-| `leb2_remote.py` | `RemoteLEB2Reader` — byte-range-backed LEB2 reader |
 | `scripts/generate_leb2.py` | CLI: `convert`, `convert-all`, `generate`, `verify` |
 | `scripts/test_leb2_precision.py` | Fast precision test: 14 core bodies × 6 flags × N dates per tier |
 
-### 13.11 Generation Workflow
+### 13.10 Generation Workflow
 
 LEB2 files are produced by **converting** existing LEB1 files. The conversion
 applies the compression pipeline (§13.4) to each body's raw coefficients.
@@ -2226,7 +2214,7 @@ LEB1 file, then converts it:
 python scripts/generate_leb2.py generate --tier base --group core -o data/leb2/base_core.leb2
 ```
 
-### 13.12 Commands Reference
+### 13.11 Commands Reference
 
 **leph tasks (developer CLI):**
 
@@ -2267,7 +2255,7 @@ python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
   --reference data/leb/ephemeris_base.leb --samples 500 --group core --tier base
 ```
 
-### 13.13 Compression measurement
+### 13.12 Compression measurement
 
 `base_core.leb2` is bundled in the wheel; reviewed
 medium and extended cores are published as hash-pinned

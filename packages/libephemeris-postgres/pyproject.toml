@@ -7,8 +7,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "AGPL-3.0-only"
 dependencies = [
-    "libephemeris>=3.3,<4",
-    "psycopg[binary,pool]>=3.2,<4",
+    "libephemeris>=3.2.1,<4",
+    "psycopg[binary]>=3.2,<4",
 ]
 
 [project.scripts]
@@ -23,9 +23,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-libephemeris_postgres = ["schema.sql"]
 
 [tool.uv.sources]
 libephemeris = { path = "../..", editable = true }

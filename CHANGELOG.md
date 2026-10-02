@@ -9,9 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Optional original-byte LEB2 readers and a lazy `LIBEPHEMERIS_LEB_SOURCE`
-  factory hook. Native evaluation is reused; source failures propagate as
-  `CoefficientSourceError`. PostgreSQL storage is a separate distribution.
+- Lazy `LIBEPHEMERIS_LEB_SOURCE` reader factory and mmap-like LEB2 byte sources.
+  PostgreSQL storage is an optional, separately distributed provider.
 
 ## [3.2.1] - 2026-09-05
 

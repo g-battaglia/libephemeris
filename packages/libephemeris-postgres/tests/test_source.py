@@ -1,14 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 from __future__ import annotations
 
-from contextlib import contextmanager
-from types import SimpleNamespace
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from libephemeris import CoefficientSourceError
 
-from libephemeris_postgres.config import RuntimeConfig, runtime_config
-from libephemeris_postgres.source import BLOCK_SIZE, PgByteSource
+from libephemeris_postgres import db
+from libephemeris_postgres.source import (
+    BLOCK_SIZE,
+    CoefficientSourceError,
+    PgByteSource,
+)
 
 
 @pytest.fixture
@@ -17,47 +19,37 @@ def storage(monkeypatch):
     blocks = {n: data[n * BLOCK_SIZE : (n + 1) * BLOCK_SIZE] for n in range(4)}
     calls = []
 
-    class Connection:
-        def execute(self, sql, params):
-            calls.append(params[1])
-            return SimpleNamespace(
-                fetchall=lambda: [(n, blocks[n]) for n in params[1] if n in blocks]
-            )
+    def query(sql, params):
+        calls.append(params[1])
+        return [(n, blocks[n]) for n in params[1] if n in blocks]
 
-    @contextmanager
-    def connection():
-        yield Connection()
-
-    monkeypatch.setattr(
-        "libephemeris_postgres.source.get_pool",
-        lambda config: SimpleNamespace(connection=connection),
-    )
+    monkeypatch.setattr("libephemeris_postgres.source.query", query)
     return data, blocks, calls
 
 
-def test_read_crosses_blocks_and_keeps_local_payload_with_tiny_cache(storage):
+def test_slices_cache_concurrent_reads_and_close(storage, monkeypatch):
     data, _, calls = storage
-    source = PgByteSource(
-        "medium_core.leb2", "a" * 64, len(data), RuntimeConfig("unused", cache_blocks=1)
-    )
-    assert source.read(10, len(data) - 10) == data[10:]
+    monkeypatch.setattr("libephemeris_postgres.source.CACHE_BLOCKS", 1)
+    source = PgByteSource("a" * 64, len(data))
+    assert source[10 : len(data)] == data[10:]
     assert calls == [[0, 1, 2, 3]]
     assert len(source._blocks) == 1
-    assert source.read(len(data) - 4, 4) == b"last"
+    with ThreadPoolExecutor(8) as workers:
+        assert (
+            list(workers.map(lambda _: source[len(data) - 4 : len(data)], range(32)))
+            == [b"last"] * 32
+        )
     assert len(calls) == 1
     source.close()
     with pytest.raises(CoefficientSourceError):
-        source.read(0, 1)
+        source[0:1]
 
 
-@pytest.mark.parametrize("offset,size", [(-1, 1), (0, -1), (BLOCK_SIZE * 4, 1)])
-def test_invalid_range(storage, offset, size):
+@pytest.mark.parametrize("start,stop", [(-1, 1), (1, 0), (0, BLOCK_SIZE * 4)])
+def test_invalid_range(storage, start, stop):
     data, _, _ = storage
-    source = PgByteSource(
-        "medium_core.leb2", "a" * 64, len(data), RuntimeConfig("unused")
-    )
     with pytest.raises(CoefficientSourceError):
-        source.read(offset, size)
+        PgByteSource("a" * 64, len(data))[start:stop]
 
 
 @pytest.mark.parametrize("bad", [None, b"short"])
@@ -67,32 +59,94 @@ def test_missing_truncated_block_is_fatal(storage, bad):
         del blocks[1]
     else:
         blocks[1] = bad
-    source = PgByteSource(
-        "medium_core.leb2", "a" * 64, len(data), RuntimeConfig("unused")
-    )
     with pytest.raises(CoefficientSourceError):
-        source.read(BLOCK_SIZE, 10)
+        PgByteSource("a" * 64, len(data))[BLOCK_SIZE : BLOCK_SIZE + 10]
 
 
-def test_transport_errors_are_sanitized(storage, monkeypatch):
-    data, _, _ = storage
+def test_remote_chunk_corruption_and_range_errors_remain_distinct(monkeypatch):
+    import math
+    from pathlib import Path
+    from libephemeris.leb2_reader import LEB2Reader
+    from libephemeris_postgres.source import PgLEB2Reader
 
-    def failed_pool(config):
-        raise RuntimeError("postgresql://user:secret@host/db")
-
-    monkeypatch.setattr("libephemeris_postgres.source.get_pool", failed_pool)
-    source = PgByteSource(
-        "medium_core.leb2", "a" * 64, len(data), RuntimeConfig("unused")
+    payload = bytearray(
+        (
+            Path(__file__).resolve().parents[3]
+            / "libephemeris/data/leb2/base_core.leb2"
+        ).read_bytes()
     )
-    with pytest.raises(CoefficientSourceError) as failure:
-        source.read(0, 1)
-    assert "secret" not in str(failure.value)
-    assert failure.value.__suppress_context__
+    with LEB2Reader(
+        str(
+            Path(__file__).resolve().parents[3]
+            / "libephemeris/data/leb2/base_core.leb2"
+        )
+    ) as local:
+        chunk = local._chunk_index[1][0]
+        payload[chunk.blob_offset : chunk.blob_offset + chunk.compressed_size] = (
+            b"x" * chunk.compressed_size
+        )
+    monkeypatch.setattr(
+        "libephemeris_postgres.source.query",
+        lambda sql, params: [
+            (key, bytes(payload[key * BLOCK_SIZE : (key + 1) * BLOCK_SIZE]))
+            for key in params[1]
+        ],
+    )
+    with PgLEB2Reader(
+        "postgres://pin/base_core.leb2", data=PgByteSource("pin", len(payload))
+    ) as reader:
+        with pytest.raises(ValueError):
+            reader.eval_body(1, math.nextafter(reader._bodies[1].jd_start, -math.inf))
+        with pytest.raises(CoefficientSourceError):
+            reader.eval_body(1, reader._bodies[1].jd_start)
+        reader._mm._blocks.clear()
+
+        def unavailable(sql, params):
+            raise CoefficientSourceError("PostgreSQL coefficient source unavailable")
+
+        monkeypatch.setattr("libephemeris_postgres.source.query", unavailable)
+        with pytest.raises(CoefficientSourceError):
+            reader.eval_nutation(reader._nutation.jd_start)
 
 
-def test_config_hides_dsn_and_rejects_nonfinite_timeout(monkeypatch):
+def test_transport_sanitized_reconnect_and_fork(monkeypatch):
+    monkeypatch.setattr(db, "_connection", None)
     monkeypatch.setenv("LIBEPHEMERIS_PG_URL", "postgresql://user:secret@host/db")
-    assert "secret" not in repr(runtime_config())
-    monkeypatch.setenv("LIBEPHEMERIS_PG_TIMEOUT_SECONDS", "nan")
-    with pytest.raises(Exception, match="finite"):
-        runtime_config()
+    calls = []
+
+    class Connection:
+        closed = False
+        failed = False
+
+        def execute(self, sql, params):
+            if self.failed:
+                raise RuntimeError("secret")
+            return self
+
+        def fetchall(self):
+            return [(1,)]
+
+        def close(self):
+            self.closed = True
+
+    def connect(*args, **kwargs):
+        calls.append(Connection())
+        return calls[-1]
+
+    monkeypatch.setattr(db.psycopg, "connect", connect)
+    db.ping()
+    calls[-1].failed = True
+    with pytest.raises(CoefficientSourceError) as failure:
+        db.ping()
+    assert "secret" not in str(failure.value)
+    assert calls[0].closed
+    db.ping()
+    assert len(calls) == 2
+    monkeypatch.setattr(db.os, "close", lambda fd: None)
+    monkeypatch.setattr(Connection, "fileno", lambda self: 123, raising=False)
+    db._after_fork()
+    db.ping()
+    assert len(calls) == 3
+    assert calls[1].closed
+    db._connection.close()
+    db._connection = None

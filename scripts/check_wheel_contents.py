@@ -90,8 +90,6 @@ FORBIDDEN = (
     re.compile(r"(^|/)tests?/", re.IGNORECASE),
     re.compile(r"(^|/)compare_scripts/", re.IGNORECASE),
     re.compile(r"libephemeris/dev_cli(/|\.py)", re.IGNORECASE),
-    re.compile(r"(^|/)packages(/|$)", re.IGNORECASE),
-    re.compile(r"(^|/)libephemeris_postgres(/|$)", re.IGNORECASE),
     re.compile(r"\.se1$", re.IGNORECASE),
     re.compile(r"sefstars", re.IGNORECASE),
     re.compile(r"seorbel", re.IGNORECASE),
@@ -606,13 +604,6 @@ def _required_payload_hits(
                 (record_name, 0, label)
                 for label in _record_hits(payloads, wheel_file_names)
             )
-        # Keep the core wheel independent from the optional provider package.
-        # This is deliberately checked by both names and bytes: a vendored
-        # compatibility shim must not smuggle its database dependency into the
-        # core distribution.
-        for name, payload in payloads.items():
-            if "libephemeris_postgres" in name.casefold() or b"psycopg" in payload:
-                hits.append((name, 0, "provider-package-or-psycopg"))
     else:
         generated_payloads = {
             f"{EXPECTED_SDIST_ROOT}/{EXPECTED_EGG_INFO}/dependency_links.txt": b"\n",

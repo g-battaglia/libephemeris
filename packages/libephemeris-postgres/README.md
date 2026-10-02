@@ -16,14 +16,13 @@ repository root, without a workspace.
 uv pip install \
   'libephemeris-postgres @ git+https://github.com/g-battaglia/libephemeris@TAG#subdirectory=packages/libephemeris-postgres'
 export LIBEPHEMERIS_PG_ADMIN_URL='postgresql://...'
-python -m libephemeris_postgres schema
 python -m libephemeris_postgres upload medium_core.leb2 medium_asteroids.leb2 \
   medium_exotics.leb2 medium_apogee.leb2
-python -m libephemeris_postgres list
 ```
 
-Only names and SHA-256 hashes in the installed LibEphemeris manifest are
-accepted. Upload commits every 256 blocks (16 MiB); rerunning the same command
+Upload creates the schema automatically. Only names and SHA-256 hashes in the
+installed LibEphemeris manifest are accepted. Use the matching feature revision
+for core and provider until the byte-backed reader is released. Upload commits every 256 blocks (16 MiB); rerunning the same command
 resumes missing blocks. A session advisory lock serializes uploads of the same
 hash. Stored bytes are hashed through a server-side streaming cursor before
 publication. Completed files are never modified by the uploader. An incomplete
@@ -51,14 +50,14 @@ The provider composes remote selected tiers and reviewed local unsourced tiers
 through the current precision tier. Base typically remains local. Runtime
 selection uses installed manifest hashes, not dataset UUIDs or mutable aliases.
 
-Optional settings: `LIBEPHEMERIS_PG_POOL_MAX` (2),
-`LIBEPHEMERIS_PG_TIMEOUT_SECONDS` (5), and `LIBEPHEMERIS_PG_CACHE_BLOCKS` (256,
-16 MiB per file). Pools are lazy and process-local; forked children recreate
-them. Byte caches are bounded. One read batches its missing blocks; concurrent
-cold misses can duplicate reads. Closing a reader clears its own cache, not
-the shared pool. Missing/truncated blocks and transport errors propagate as
-`CoefficientSourceError`, without fallback or credential-bearing diagnostics.
+Each process uses one lazy read-only connection, with a 5-second connection and
+statement timeout. Forked children create their own connection. Reads serialize
+on the connection; one slice batches its missing blocks. Each file caches at
+most 256 blocks (16 MiB), clearing the cache when full. Closing a reader clears
+its bytes, not the shared connection. Missing/truncated blocks, damaged chunks
+and transport errors raise the provider's `CoefficientSourceError`, without
+scientific fallback or credential-bearing diagnostics. `ping()` probes the
+transport independently of cached bytes.
 
-Budget connections as
-`replicas * WEB_CONCURRENCY * (1 + active spawned subprocesses) * POOL_MAX`,
+Budget one connection per application worker and active spawned subprocess,
 leaving capacity for maintenance and provisioning.

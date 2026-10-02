@@ -893,16 +893,6 @@ class NetworkSealedError(ConfigurationError, RuntimeError):
         return f"NetworkSealedError({self.message!r}, purpose={self.purpose!r})"
 
 
-class CoefficientSourceError(Exception):
-    """An explicitly configured coefficient source is unavailable or invalid.
-
-    This deliberately does not derive from ``Error``, ``ValueError`` or
-    ``RuntimeError``: event searches interpret those as scientific range or
-    convergence failures. A source failure must reach the caller unchanged,
-    in both sealed and automatic calculation modes.
-    """
-
-
 class LEBCorruptionError(ValueError):
     """A LEB/LEB2 binary ephemeris file is corrupted or truncated.
 

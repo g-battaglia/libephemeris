@@ -8,16 +8,13 @@ import os
 from pathlib import Path
 
 import pytest
-from libephemeris import CoefficientSourceError
 from libephemeris.download import DATA_FILES
 from libephemeris.leb2_reader import LEB2Reader
 from libephemeris.leb_groups import LEB2_GROUPS
 
-from libephemeris_postgres import open_tier
-from libephemeris_postgres.__main__ import _schema
-from libephemeris_postgres.importer import upload_files
-from libephemeris_postgres.pool import reset_pool
-from libephemeris_postgres.source import BLOCK_SIZE
+from libephemeris_postgres import db, open_reader
+from libephemeris_postgres.importer import SCHEMA, upload_files
+from libephemeris_postgres.source import BLOCK_SIZE, CoefficientSourceError
 
 psycopg = pytest.importorskip("psycopg")
 _DSN = os.environ.get("LIBEPHEMERIS_TEST_PG_URL")
@@ -28,11 +25,28 @@ pytestmark = [
 _ROOT = Path(__file__).resolve().parents[3]
 
 
+def reset_connection():
+    if db._connection is not None:
+        db._connection.close()
+        db._connection = None
+
+
+def medium_reader(monkeypatch):
+    import libephemeris
+
+    monkeypatch.setenv("LIBEPHEMERIS_PG_TIERS", "medium")
+    monkeypatch.setenv("LIBEPHEMERIS_PG_URL", _DSN)
+    monkeypatch.setattr(libephemeris.state, "get_precision_tier", lambda: "medium")
+    monkeypatch.setattr("libephemeris_postgres.get_precision_tier", lambda: "medium")
+    return open_reader()
+
+
 def test_upload_resume_verified_bytes_and_reader_parity(monkeypatch):
     paths = [_ROOT / "data" / "leb2" / f"medium_{group}.leb2" for group in LEB2_GROUPS]
     if not all(path.exists() for path in paths):
         pytest.skip("Real medium artifacts are not installed")
-    _schema(_DSN)
+    with psycopg.connect(_DSN) as conn:
+        conn.execute(SCHEMA)
     monkeypatch.setenv("LIBEPHEMERIS_PG_URL", _DSN)
     first = paths[0]
     sha = DATA_FILES[first.name]["sha256"]
@@ -49,7 +63,8 @@ def test_upload_resume_verified_bytes_and_reader_parity(monkeypatch):
             )
     upload_files(paths, dsn=_DSN)
     upload_files(paths, dsn=_DSN)
-    sources = open_tier("medium")
+    composed = medium_reader(monkeypatch)
+    sources = composed._readers
     try:
         for path in paths:
             remote = next(
@@ -72,7 +87,7 @@ def test_upload_resume_verified_bytes_and_reader_parity(monkeypatch):
     finally:
         for source in sources:
             source.close()
-        reset_pool()
+        reset_connection()
 
 
 def test_incomplete_pin_is_rejected(monkeypatch):
@@ -84,13 +99,13 @@ def test_incomplete_pin_is_rejected(monkeypatch):
         )
     try:
         with pytest.raises(CoefficientSourceError):
-            open_tier("medium")
+            medium_reader(monkeypatch)
     finally:
         with psycopg.connect(_DSN) as conn:
             conn.execute(
                 "UPDATE libephemeris.files SET complete=true WHERE sha256=%s", (sha,)
             )
-        reset_pool()
+        reset_connection()
 
 
 def test_corrupt_incomplete_upload_never_published(tmp_path, monkeypatch):

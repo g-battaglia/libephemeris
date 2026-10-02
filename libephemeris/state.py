@@ -224,9 +224,9 @@ _IERS_DELTA_T_ENABLED: Optional[bool] = None  # None = check env var
 
 # LEB (binary ephemeris) configuration
 _LEB_FILE: Optional[str] = None  # Path to .leb file
-_LEB_READER: Optional[
-    "LEBReader | LEB2Reader | CompositeLEBReader | TieredLEBReader"
-] = None
+_LEB_READER: Optional["LEBReader | LEB2Reader | CompositeLEBReader"] = (
+    None  # Cached LEB reader instance
+)
 
 # Horizons API client
 _HORIZONS_CLIENT: Optional["HorizonsClient"] = None
@@ -756,20 +756,10 @@ def _get_leb_reader_locked(mode):
 
         source = os.environ.get("LIBEPHEMERIS_LEB_SOURCE", "").strip()
         if path is None and source:
-            from .exceptions import CoefficientSourceError
-
-            try:
-                module, name = source.split(":")
-                reader = getattr(importlib.import_module(module), name)()
-                if reader is None:
-                    raise TypeError("Source factory returned no reader")
-                _release_when_unused(reader)
-            except Exception:
-                raise CoefficientSourceError(
-                    "Could not initialize configured LEB source"
-                ) from None
-            _LEB_READER = reader
-            return reader
+            module, name = source.split(":")
+            _LEB_READER = getattr(importlib.import_module(module), name)()
+            _release_when_unused(_LEB_READER)
+            return _LEB_READER
 
         # Auto-discover if no explicit path configured
         if path is None:
@@ -1271,9 +1261,7 @@ def set_precision_tier(tier: str) -> None:
 
         _fast_calc._reset_active_reader()
         _fast_calc._leb_frame_cache.clear()
-        from .leb_vector import reset_leb_vector_ephemeris
 
-        reset_leb_vector_ephemeris()
         from .cache import clear_caches
 
         clear_caches()

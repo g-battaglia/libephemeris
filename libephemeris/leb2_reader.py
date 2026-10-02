@@ -85,25 +85,19 @@ class LEB2Reader:
             pos, vel = reader.eval_body(SUN, jd_tt)
     """
 
-    def __init__(self, path: str) -> None:
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"LEB file not found: {path}")
-
-        file = open(path, "rb")
-        try:
-            mm = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
-        except (ValueError, OSError):
-            # 0-byte stub (interrupted download) raises "cannot mmap an empty
-            # file"; close the fd before propagating.
-            file.close()
-            raise
-        self._initialize(path, mm, file)
-
-    def _initialize(self, path: str, mm: Any, file: Any) -> None:
-        """Initialize reader state and parse a native or byte-backed file."""
+    def __init__(self, path: str, data: Any = None) -> None:
         self._path = path
-        self._file = file
-        self._mm = mm
+        self._file = None
+        self._mm = data
+        if data is None:
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"LEB file not found: {path}")
+            self._file = open(path, "rb")
+            try:
+                self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+            except (ValueError, OSError):
+                self._file.close()
+                raise
         self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
         self._chunk_cache: Dict[
             Tuple[int, int], bytes
@@ -135,7 +129,8 @@ class LEB2Reader:
             raise
 
     def _parse(self) -> None:
-        self._header = read_header(self._read_blob(0, HEADER_SIZE, "LEB2 header"), 0)
+        read = self._read_blob
+        self._header = read_header(read(0, HEADER_SIZE, "header"), 0)
         if self._header.magic != LEB2_MAGIC:
             raise ValueError(
                 f"Invalid LEB2 magic: {self._header.magic!r} (expected {LEB2_MAGIC!r})"
@@ -162,7 +157,7 @@ class LEB2Reader:
         for i in range(self._header.section_count):
             offset = HEADER_SIZE + i * SECTION_DIR_SIZE
             sec = read_section_dir(
-                self._read_blob(offset, SECTION_DIR_SIZE, "LEB2 section directory"), 0
+                read(offset, SECTION_DIR_SIZE, "section directory"), 0
             )
             self._sections[sec.section_id] = sec
 
@@ -179,9 +174,7 @@ class LEB2Reader:
             for i in range(self._header.body_count):
                 offset = sec.offset + i * COMPRESSED_BODY_ENTRY_SIZE
                 entry = read_compressed_body_entry(
-                    self._read_blob(
-                        offset, COMPRESSED_BODY_ENTRY_SIZE, "LEB2 body index"
-                    ),
+                    read(offset, COMPRESSED_BODY_ENTRY_SIZE, "body index"),
                     0,
                 )
                 self._bodies[entry.body_id] = entry
@@ -197,9 +190,7 @@ class LEB2Reader:
         if SECTION_NUTATION in self._sections:
             sec = self._sections[SECTION_NUTATION]
             self._nutation = read_nutation_header(
-                self._read_blob(
-                    sec.offset, NUTATION_HEADER_SIZE, "LEB2 nutation header"
-                ),
+                read(sec.offset, NUTATION_HEADER_SIZE, "nutation header"),
                 0,
             )
             self._nutation_data_offset = sec.offset + NUTATION_HEADER_SIZE
@@ -211,7 +202,7 @@ class LEB2Reader:
             sec = self._sections[SECTION_DELTA_T]
             n_entries, _ = struct.unpack(
                 DELTA_T_HEADER_FMT,
-                self._read_blob(sec.offset, DELTA_T_HEADER_SIZE, "LEB2 Delta-T header"),
+                read(sec.offset, DELTA_T_HEADER_SIZE, "Delta-T header"),
             )
             # Same corrupted-count guard as the chunk index: an inflated
             # n_entries would otherwise ingest adjacent-section bytes as
@@ -227,7 +218,7 @@ class LEB2Reader:
                 off = data_offset + i * DELTA_T_ENTRY_SIZE
                 jd, dt = struct.unpack(
                     DELTA_T_ENTRY_FMT,
-                    self._read_blob(off, DELTA_T_ENTRY_SIZE, "LEB2 Delta-T entry"),
+                    read(off, DELTA_T_ENTRY_SIZE, "Delta-T entry"),
                 )
                 self._delta_t_jds.append(jd)
                 self._delta_t_vals.append(dt)
@@ -239,17 +230,15 @@ class LEB2Reader:
             n_stars = sec.size // STAR_ENTRY_SIZE
             for i in range(n_stars):
                 offset = sec.offset + i * STAR_ENTRY_SIZE
-                star = read_star_entry(
-                    self._read_blob(offset, STAR_ENTRY_SIZE, "LEB2 star catalog"), 0
-                )
+                star = read_star_entry(read(offset, STAR_ENTRY_SIZE, "star catalog"), 0)
                 self._stars[star.star_id] = star
 
     def _parse_chunk_index(self, entry: CompressedBodyEntry) -> List[ChunkEntry]:
         """Parse the chunk index for a v2 body."""
         offset = entry.data_offset
+        read = self._read_blob
         chunk_count, _ = read_chunk_index_header(
-            self._read_blob(offset, CHUNK_INDEX_HEADER_SIZE, "LEB2 chunk index header"),
-            0,
+            read(offset, CHUNK_INDEX_HEADER_SIZE, "chunk index header"), 0
         )
         offset += CHUNK_INDEX_HEADER_SIZE
 
@@ -266,11 +255,7 @@ class LEB2Reader:
         chunks = []
         for i in range(chunk_count):
             chunk = read_chunk_entry(
-                self._read_blob(
-                    offset + i * CHUNK_ENTRY_SIZE,
-                    CHUNK_ENTRY_SIZE,
-                    "LEB2 chunk index",
-                ),
+                read(offset + i * CHUNK_ENTRY_SIZE, CHUNK_ENTRY_SIZE, "chunk index"),
                 0,
             )
             chunks.append(chunk)

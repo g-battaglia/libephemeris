@@ -5,14 +5,31 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 from typing import Any
 
-from libephemeris import CoefficientSourceError
 from libephemeris.download import DATA_FILES
 
-from .config import admin_dsn
+from .db import CoefficientSourceError
 from .source import BLOCK_SIZE
+
+SCHEMA = """
+CREATE SCHEMA IF NOT EXISTS libephemeris;
+CREATE TABLE IF NOT EXISTS libephemeris.files (
+  sha256 text PRIMARY KEY CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+  name text NOT NULL,
+  size bigint NOT NULL CHECK (size > 0),
+  complete boolean NOT NULL DEFAULT false
+);
+CREATE TABLE IF NOT EXISTS libephemeris.blocks (
+  sha256 text NOT NULL REFERENCES libephemeris.files,
+  block_no integer NOT NULL CHECK (block_no >= 0),
+  data bytea NOT NULL CHECK (octet_length(data) BETWEEN 1 AND 65536),
+  PRIMARY KEY (sha256, block_no)
+);
+ALTER TABLE libephemeris.blocks ALTER COLUMN data SET STORAGE EXTERNAL;
+"""
 
 
 def upload_files(paths: list[str | Path], *, dsn: str | None = None) -> None:
@@ -31,7 +48,15 @@ def upload_files(paths: list[str | Path], *, dsn: str | None = None) -> None:
                 )
         size = path.stat().st_size
         try:
-            with psycopg.connect(admin_dsn(dsn)) as conn:
+            url = (dsn or os.environ.get("LIBEPHEMERIS_PG_ADMIN_URL", "")).strip()
+            if not url:
+                raise CoefficientSourceError("PostgreSQL admin URL is not configured")
+            with psycopg.connect(url) as conn:
+                conn.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended('libephemeris.schema', 0))"
+                )
+                conn.execute(SCHEMA)
+                conn.commit()
                 # One session lock spans batch commits and concurrent resumptions.
                 conn.execute("SELECT pg_advisory_lock(hashtextextended(%s, 0))", (sha,))
                 conn.execute(

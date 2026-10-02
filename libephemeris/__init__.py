@@ -90,7 +90,6 @@ from .exceptions import (
     # Category: Configuration errors
     ConfigurationError,
     NetworkSealedError,
-    CoefficientSourceError,
     # Validation helpers
     validate_latitude,
     validate_longitude,
@@ -675,7 +674,7 @@ from ._dotenv import load_dotenv
 # Extended astrology helpers submodule
 from . import contrib
 
-__version__ = "3.3.0"
+__version__ = "3.2.1"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0-only"
@@ -834,7 +833,6 @@ __all__ = [
     # LEB backend and calculation mode
     "set_leb_file",
     "get_leb_reader",
-    "CoefficientSourceError",
     "set_calc_mode",
     "get_calc_mode",
     # Network policy and LEB coverage inventory
