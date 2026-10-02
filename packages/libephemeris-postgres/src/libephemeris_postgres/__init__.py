@@ -61,7 +61,7 @@ def open_reader() -> TieredLEBReader:
     """Compose manually selected remote tiers and reviewed local lower tiers."""
     order = ("base", "medium", "extended")
     remote = {
-        value.strip()
+        value.strip().lower()
         for value in os.environ.get("LIBEPHEMERIS_PG_TIERS", "medium,extended").split(
             ","
         )
