@@ -675,6 +675,16 @@ documentation = ["docs/leb/algorithms.md", "docs/leb/guide.md", "docs/leb/base-c
 docstring = "detailed"
 
 [[component]]
+id = "leb-build-orchestration"
+category = "development-tool"
+paths = ["scripts/regenerate_leb.py", "scripts/leb_build/__init__.py", "scripts/leb_build/plan.py", "scripts/leb_build/runner.py", "scripts/leb_build/sources.py", "scripts/leb_build/storage.py", "scripts/leb_build/validation.py"]
+scientific_content = false
+origin = "Project-authored offline orchestration, source attestation, resumable checkpoints and container validation; scientific fitting delegates to the registered LEB generators."
+sources = []
+documentation = ["docs/leb/quickstart.md", "docs/leb/data-v4-validation.md"]
+docstring = "detailed"
+
+[[component]]
 id = "leb-diagnostics"
 category = "verification-tool"
 paths = [

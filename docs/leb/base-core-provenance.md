@@ -6,16 +6,16 @@ repository: the base core.
 ## Core artifact
 
 - Path: `libephemeris/data/leb2/base_core.leb2`
-- Build date: 2026-07-18
-- Size: 10,232,283 bytes
-- SHA-256: `5d708bdbe3e799e0802ba575984e57a3c5e44720dbfa1b4a01cf826640e0cb82`
+- Build date: 2026-10-05
+- Size: 10,232,271 bytes
+- SHA-256: `b891de02f82b68346046da67389fd3713aa81ab299287c632cb20cc396397964`
 - Body IDs: 0–12 and 14
 - Format: LEB2 v2; populated section types 0, 2, 3, 4, and 6
 
-The complete data-v3 matrix, including this artifact, was generated with:
+The complete data-v4 matrix, including this artifact, was generated with:
 
 ```bash
-./regenerate-leb.sh all -q
+uv run python scripts/regenerate_leb.py --output-dir /path/to/new-build
 ```
 
 For the base core, that workflow generated and merged the LEB1 body groups,
@@ -28,13 +28,13 @@ Exact generation-input pins:
 - DE440s SPK SHA-256:
   `c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2`;
 - `scripts/generate_leb.py` SHA-256:
-  `85c8574c9acaea21b91d5dabb856800c29b717a36f1f592eab481da6c45458d5`;
+  `3e169cf0ceca6f8bd8b46db1c8c5e182e6284ead5139f822951ec0427dc266e6`;
 - `scripts/generate_leb2.py` SHA-256:
-  `8db3ff23e1f93d0b8b0af4c5937a2da8a8eb777638164af42b0ab9c210d3c4ea`;
+  `198516d0fd9db6b37d28524167d32c7a1068e911c7fad8ab363f37a753770d48`;
 - `libephemeris/mean_lunar_apse.py` SHA-256:
-  `23285afe9817498b9bdd0f9daa1ea2403c4beb676068af2f20250620cdb55a9b`;
+  `686982d7e570caa9fb64b6463ca6b39ee78cc6bb6744a11c94f03c1e9fdb562e`;
 - `libephemeris/lunar.py` SHA-256:
-  `9bb440497c9cf25f3eb43a3a425f84b940662bbf9bc4f14eb9a28c10529f83dc`.
+  `5f714c40871fcd95c06c1d683230994a5c9c5d6a887d482e5b5f68f2b8ecef94`.
 
 These pins identify the bytes used for this artifact even if later commits
 change a generator or lunar model. The source kernel remains an external JPL
@@ -59,9 +59,8 @@ This record covers every payload in the file, not only the body channels:
   1,862,968 bytes.
 - **Delta T:** `scripts.generate_leb.generate_delta_t()` samples the library's
   default `smh2016`/IERS time model every 30 days. The section contains 3,654
-  samples over JD 2396758.5–2506331.5 and is 58,472 bytes. A fresh generation
-  with no user override and IERS live updates disabled reproduced every stored
-  value bit for bit.
+  samples over JD 2396757.5–2506332.5 and is 58,472 bytes. Generation used no user override and disabled IERS live updates; the input
+  cache hashes are recorded in the build manifest.
 - **Fixed stars:** `scripts.generate_leb.generate_star_catalog()` serializes
   1,447 entries from `libephemeris.star_catalog_gen` and
   `libephemeris.fixed_stars`. Those modules build the catalog independently

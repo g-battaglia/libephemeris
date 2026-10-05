@@ -56,7 +56,7 @@ pip install libephemeris
 
 The PyPI wheel includes the LEB2 base-tier core for the 14 main bodies
 (1850–2150). In `auto` or sealed `leb` mode, install the
-reviewed data-v3 groups cumulatively through your configured tier with:
+reviewed data-v4 groups cumulatively through your configured tier with:
 
 ```bash
 libephemeris download auto

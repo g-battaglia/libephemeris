@@ -93,3 +93,33 @@ def test_auto_mode_prefers_leb_before_other_sources(
 
     assert position[2] > 0.0
     assert traces[eph.SUN] == "LEB"
+
+
+def test_release_manifest_matches_downloads_and_bundled_bytes() -> None:
+    """The wheel and installer must select one internally consistent release."""
+    import hashlib
+    import json
+
+    from libephemeris.download import DATA_FILES, LEB_RELEASES
+    from libephemeris.leb_groups import LEB2_GROUPS
+
+    root = Path(__file__).resolve().parents[1]
+    manifest = json.loads((root / "docs/leb/data-v4-manifest.json").read_text())
+    expected_names = {
+        f"{tier}_{group}.leb2"
+        for tier in ("base", "medium", "extended")
+        for group in LEB2_GROUPS
+    }
+    assert set(manifest["files"]) == expected_names
+    assert LEB_RELEASES.endswith("/" + manifest["release"])
+    for name, artifact in manifest["files"].items():
+        definition = DATA_FILES[name]
+        assert definition["sha256"] == artifact["sha256"]
+        assert definition["size_mb"] == round(artifact["size"] / 1e6, 2)
+        if definition["url"] is not None:
+            assert definition["url"] == f"{LEB_RELEASES}/{name}"
+    bundled = root / "libephemeris/data/leb2/base_core.leb2"
+    with bundled.open("rb") as stream:
+        assert hashlib.file_digest(stream, "sha256").hexdigest() == (
+            manifest["files"][bundled.name]["sha256"]
+        )

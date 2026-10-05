@@ -313,6 +313,7 @@ experiments and retired tools.
 | `lunar-apse-generator` | Physical DE440 apsis passages and IERS basis; deterministic artifact. |
 | `jpl-minor-body-and-center-tools` | Named JPL endpoints and documented state/element transforms. |
 | `experimental-short-period-fit` | Rejected residual-fit experiment; output not shipped or imported. |
+| `leb-build-orchestration` | Offline orchestration, source attestation, atomic checkpoints and structural validation; no new astronomical model. |
 | `leb-generators` | Registered JPL/IAU runtime channels plus measured compression error. |
 | `leb-diagnostics` | Measurement only; thresholds cannot silently become generated coefficients. |
 | `cross-backend-verification` | Project/JPL backend cross-checks; verification only. |

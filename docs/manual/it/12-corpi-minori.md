@@ -79,7 +79,7 @@ Eris: 24.74°
 
 Quando chiedi la posizione di un corpo minore, la libreria prova diversi metodi in ordine, dal più preciso al meno preciso:
 
-**0. LEB precomputato** — Se è caricata un'effemeride binaria LEB che contiene il corpo, vengono usati direttamente i suoi polinomi di Chebyshev precomputati (nessuna connessione, nessuna lettura SPK per chiamata). È il percorso più veloce. Il manifest data-v3 contiene un companion `{tier}_exotics.leb2` per ogni tier; inventario e routing rispettano comunque l'intervallo realmente memorizzato per ciascun corpo. Se manca, è corrotto o la data è esterna a quell'intervallo, la catena prosegue secondo la modalità attiva.
+**0. LEB precomputato** — Se è caricata un'effemeride binaria LEB che contiene il corpo, vengono usati direttamente i suoi polinomi di Chebyshev precomputati (nessuna connessione, nessuna lettura SPK per chiamata). È il percorso più veloce. Il manifest data-v4 contiene un companion `{tier}_exotics.leb2` per ogni tier; inventario e routing rispettano comunque l'intervallo realmente memorizzato per ciascun corpo. Se manca, è corrotto o la data è esterna a quell'intervallo, la catena prosegue secondo la modalità attiva.
 
 **1. Kernel SPK** — Se un file binario JPL (formato SPK/BSP) è registrato per quel corpo, lo usa. Precisione: sub-secondo d'arco. È il metodo gold standard. `get_spk_coverage()` restituisce l'intervallo *utilizzabile* del kernel (JD, TDB): l'intervallo memorizzato meno la banda del tempo-luce all'inizio e lo stencil delle velocità ai due estremi. Dentro quell'intervallo il kernel serve l'epoca oppure solleva `SPKEvaluationError`; la catena seguente si raggiunge solo fuori, con `EphemerisRangeError` a marcare il confine.
 

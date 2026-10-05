@@ -80,11 +80,11 @@ def _is_valid_bsp(filepath: str) -> bool:
         return False
 
 
-# Keep source families on independent immutable releases.  ``data-v3`` is the
+# Keep source families on independent immutable releases.  ``data-v4`` is the
 # complete regenerated LEB2 matrix.  The optional planet-center BSP subsets are
 # unchanged legacy JPL assets and deliberately remain on ``data-v2rc1``; sealed
 # LEB provisioning neither requires nor downloads them.
-LEB_RELEASES = "https://github.com/g-battaglia/libephemeris/releases/download/data-v3"
+LEB_RELEASES = "https://github.com/g-battaglia/libephemeris/releases/download/data-v4"
 PLANET_CENTER_RELEASES = (
     "https://github.com/g-battaglia/libephemeris/releases/download/data-v2rc1"
 )
@@ -92,7 +92,7 @@ PLANET_CENTER_RELEASES = (
 # Data file definitions: (filename, sha256 hash, description)
 DATA_FILES: dict[str, dict[str, Any]] = {
     # Planet-center BSP subsets are unchanged JPL-derived data (not part of the
-    # data-v3 LEB regeneration) and remain pinned to their existing immutable
+    # data-v4 LEB regeneration) and remain pinned to their existing immutable
     # data-v2 release.
     # Legacy destination name kept for API compatibility. It downloads the
     # exact pinned base-tier SPK; there is no unverified legacy release path.
@@ -135,25 +135,25 @@ DATA_FILES: dict[str, dict[str, Any]] = {
         # Ships in every wheel; installed from package resources.
         "url": None,
         "bundled_resource": "data/leb2/base_core.leb2",
-        "sha256": "5d708bdbe3e799e0802ba575984e57a3c5e44720dbfa1b4a01cf826640e0cb82",
+        "sha256": "b891de02f82b68346046da67389fd3713aa81ab299287c632cb20cc396397964",
         "size_mb": 10.23,
         "description": "LEB2 core bodies for 'base' tier (1850-2150)",
         "dest_subdir": "leb",
     },
-    # Medium/extended tier cores from the cumulative data-v3 release,
+    # Medium/extended tier cores from the cumulative data-v4 release,
     # SHA-256-pinned. The bundled base core is generated in the same run and is
-    # byte-identical to its data-v3 release asset.
+    # byte-identical to its data-v4 release asset.
     "medium_core.leb2": {
         "url": f"{LEB_RELEASES}/medium_core.leb2",
-        "sha256": "4d88ec9a79add7e3af9e75ac3ceabe5462a4af440447578a5ccba69a3e0a55b6",
-        "size_mb": 37.28,
+        "sha256": "b74970cc37f8d0316c6a6fc0c72a5690d2b1f38f65352590a70ecb6500c9572d",
+        "size_mb": 37.27,
         "description": "LEB2 core bodies for 'medium' tier (1550-2650)",
         "dest_subdir": "leb",
     },
     "extended_core.leb2": {
         "url": f"{LEB_RELEASES}/extended_core.leb2",
-        "sha256": "ecb8dd43a4934e74324d9c38274a72360ef6821d96607679ef5248d47c9d7afc",
-        "size_mb": 1153.90,
+        "sha256": "2122b11a6b5d19178e54de41cb1d956e4e0fb54331f2c5b7e0dd8991ffb572cf",
+        "size_mb": 1153.12,
         "description": (
             "LEB2 core bodies for 'extended' tier "
             "(exact DE441 interval JD -3100015.5 to 8000016.5)"
@@ -161,7 +161,7 @@ DATA_FILES: dict[str, dict[str, Any]] = {
         "dest_subdir": "leb",
     },
     # Reviewed companion groups. These files are generated from the same
-    # provenance-gated data-v3 run as the cores and are immutable release
+    # provenance-gated data-v4 run as the cores and are immutable release
     # assets. Listing them here makes download and runtime attachment one
     # closed trust unit: a same-named cache file is never accepted unless its
     # SHA-256 matches this manifest.
@@ -169,21 +169,21 @@ DATA_FILES: dict[str, dict[str, Any]] = {
     # from the file (the extended group is intentionally narrower than core).
     "base_asteroids.leb2": {
         "url": f"{LEB_RELEASES}/base_asteroids.leb2",
-        "sha256": "fc46e7e5bc65265d285986eb2e00bc785ed6b1bcb44a21ac11fa45ccef3e53a0",
+        "sha256": "9364f821f09076db3cd3cfc428379e136a0eea80917af692681be405601652d8",
         "size_mb": 2.15,
         "description": "LEB2 major asteroids for 'base' tier",
         "dest_subdir": "leb",
     },
     "medium_asteroids.leb2": {
         "url": f"{LEB_RELEASES}/medium_asteroids.leb2",
-        "sha256": "1c63b9cc2d53421d2ad0cc931c45b721810e11f51fe277b1a179efe0b6e80b20",
+        "sha256": "f7a3784a1e29a1fcc42ad9736f0333bc690535befea008e86a7b799a4a7652d9",
         "size_mb": 6.48,
         "description": "LEB2 major asteroids for 'medium' tier",
         "dest_subdir": "leb",
     },
     "extended_asteroids.leb2": {
         "url": f"{LEB_RELEASES}/extended_asteroids.leb2",
-        "sha256": "63120a77e216c6f6db485658822fb7d0456b0434b7a87c968a4734e1c43d4668",
+        "sha256": "2c9c9f999e22857bc24c0bbfd55e95192739f4984da56a8d19156d8c03e6907c",
         "size_mb": 6.48,
         "description": "LEB2 major asteroids for 'extended' tier (1600-2500)",
         "dest_subdir": "leb",
@@ -191,21 +191,21 @@ DATA_FILES: dict[str, dict[str, Any]] = {
     # Lunar apsides: Osculating Apogee, Interpolated Apogee and Perigee.
     "base_apogee.leb2": {
         "url": f"{LEB_RELEASES}/base_apogee.leb2",
-        "sha256": "9e7193ea0368fbbebae958b0fb3d559326d0a718d35ba5cfeec3b537d3773cbf",
-        "size_mb": 9.78,
+        "sha256": "f76ca7354d18e21e9f4e96f859149f29b0a2f0c19c19e305db1b7dba81f9c616",
+        "size_mb": 9.86,
         "description": "LEB2 lunar apsides for 'base' tier",
         "dest_subdir": "leb",
     },
     "medium_apogee.leb2": {
         "url": f"{LEB_RELEASES}/medium_apogee.leb2",
-        "sha256": "164f6b55a8ccda6302a89d35493fa1a48343cb6767c61b3145c8807e9878d5b8",
-        "size_mb": 36.19,
+        "sha256": "a2f8970cfd08150394556828862f497401f4b47fc7f75e1db7e9c63057324a3a",
+        "size_mb": 35.89,
         "description": "LEB2 lunar apsides for 'medium' tier",
         "dest_subdir": "leb",
     },
     "extended_apogee.leb2": {
         "url": f"{LEB_RELEASES}/extended_apogee.leb2",
-        "sha256": "0cd52efb31b65fe81dab9535c9d74cc3fe1faf1b080d23ecf68980874073e192",
+        "sha256": "9426373afabdfaa1d4fa08c8eb580ff532508f4ff07aa7c4a9ef08ca7ddb193a",
         "size_mb": 1481.19,
         "description": "LEB2 lunar apsides for 'extended' tier",
         "dest_subdir": "leb",
@@ -214,21 +214,21 @@ DATA_FILES: dict[str, dict[str, Any]] = {
     # stored per body; callers must query it rather than assume the tier range.
     "base_exotics.leb2": {
         "url": f"{LEB_RELEASES}/base_exotics.leb2",
-        "sha256": "2acb904c97cb9b330870c9493c7b2dc06dd883bf07184319b99b8314c75b1156",
-        "size_mb": 29.38,
+        "sha256": "e0b5bf4b14b10495c704d553557922f91f3b9db71117e21f1eb4fc0a134f4d1a",
+        "size_mb": 28.24,
         "description": "LEB2 curated minor bodies for 'base' tier",
         "dest_subdir": "leb",
     },
     "medium_exotics.leb2": {
         "url": f"{LEB_RELEASES}/medium_exotics.leb2",
-        "sha256": "5a2892d359e66c6ff0bfdf8b3f096c3129ea40f2952fb6cdc230402537dd4b2f",
+        "sha256": "c549f12032dd2d74ad547ddad43c8335f3fe975121b71d2c1b5f1c4b37ed16b5",
         "size_mb": 92.33,
         "description": "LEB2 curated minor bodies for 'medium' tier",
         "dest_subdir": "leb",
     },
     "extended_exotics.leb2": {
         "url": f"{LEB_RELEASES}/extended_exotics.leb2",
-        "sha256": "bac665ff93faca7dc646a9c639dd2df007baa0fd199fefa4b3124c3cc9e02c0b",
+        "sha256": "8b5094beaacd2a14807f60ddb6867922bdfa757624b6c7404b8fe02baa341d94",
         "size_mb": 234.01,
         "description": "LEB2 curated minor bodies for 'extended' tier",
         "dest_subdir": "leb",
