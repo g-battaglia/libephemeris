@@ -1,7 +1,7 @@
 # LEB (LibEphemeris Binary) — Complete Technical Guide
 
 > **Last verified:** July 2026
-> **Status:** Production-ready formats; the cumulative data-v3 artifact set is a release candidate until all twelve regenerated LEB2 files are published and pinned.
+> **Status:** Production-ready formats. Libephemeris 3.2.2 pins the twelve regenerated LEB2 files in the immutable data-v4 release; see [validation](data-v4-validation.md).
 > **Source of truth:** This document. See also [Algorithms & Theory](algorithms.md) for detailed mathematical foundations.
 > **Quick reference:** [Generation Quickstart](quickstart.md) — step-by-step commands for generating LEB1 and LEB2 files.
 > **Bundled artifact:** [Base-core build provenance](base-core-provenance.md).
@@ -143,7 +143,7 @@ planets.py: calc_ut()
 
 ### Activation
 
-The wheel's reviewed `base_core.leb2` is available automatically. The data-v3
+The wheel's reviewed `base_core.leb2` is available automatically. The data-v4
 manifest defines four files for every tier. An active precision tier is
 cumulative: base opens base, medium opens base+medium, and extended opens all
 three. Every implicitly selected file must be named in the distribution
@@ -2156,18 +2156,6 @@ The Clenshaw evaluation functions (`_clenshaw`, `_clenshaw_with_derivative`,
 `_decomp_lock`. The v2 chunk cache is keyed by `(body_id, chunk_index)` and is
 bounded to 64 entries; evaluation caches are cleared when chunk eviction or
 reader shutdown requires it. Correctness does not rely on GIL atomicity.
-
-### External file bytes
-
-`LIBEPHEMERIS_LEB_SOURCE=module:factory` lazily loads a zero-argument reader
-factory; an explicit LEB file takes precedence. Call `set_leb_file(None)` or
-restart workers after changing configuration. Providers compose existing
-readers and own storage configuration and transport errors.
-
-`LEB2Reader(path, data=source)` accepts an mmap-like object with `__len__`,
-byte slicing and `close()` for instance resources. Native parsing and evaluation
-are unchanged. The PostgreSQL provider is distributed separately; see
-`packages/libephemeris-postgres/README.md`.
 
 ### 13.9 Key Modules
 

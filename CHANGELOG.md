@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.2] - 2026-10-05
+
+### Changed
+
+- Default LEB2 downloads now use the immutable `data-v4` release: twelve freshly
+  generated assets, with updated SHA-256 pins and the matching bundled base core.
+  Base and medium stored coverage gains one day at either end. Existing cached
+  files are replaced, after verification, by the next tier download.
+- The regenerated base minor-body channels track the selected JPL kernels more
+  closely, notably Gonggong. A sampled old/new audit covered 40,113 stored
+  states and 4,928 public API calls, with no new calculation errors.
+- Added the interruptible, resumable `scripts/regenerate_leb.py` workflow with
+  input attestation, per-body checkpoints and bounded-memory merges.
+
+### Known limitations
+
+- The extended Asbolus numerical model retains its existing trajectory and
+  approximately 3.56-arcsecond maximum sampled agreement error against the finite
+  Horizons window. Its declared verification budget is 4 arcseconds; the ordinary
+  direct-source budget remains unchanged. See `docs/leb/data-v4-validation.md`.
+
 ## [Unreleased]
 
 ### Added

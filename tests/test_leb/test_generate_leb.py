@@ -801,3 +801,8 @@ class TestGeneratorValidation:
         )
 
         assert not generate_leb.verify_leb("synthetic.leb", n_samples=1, verbose=False)
+
+
+def test_numerical_model_limit_is_one_arcsecond_except_for_asbolus() -> None:
+    assert generate_leb.NUMERICAL_MODEL_VERIFY_LIMIT_ARCSEC == 1.0
+    assert generate_leb.NUMERICAL_MODEL_VERIFY_LIMIT_OVERRIDES_ARCSEC == {18405: 4.0}

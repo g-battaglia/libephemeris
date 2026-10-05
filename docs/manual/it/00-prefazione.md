@@ -56,7 +56,7 @@ pip install libephemeris
 
 Il pacchetto PyPI include il core LEB2 base per i 14 corpi principali e il
 companion dei corpi di Amburgo (1850–2150). In modalità `auto` o `leb`
-sigillata, installa cumulativamente i gruppi data-v3 verificati fino al tier
+sigillata, installa cumulativamente i gruppi data-v4 verificati fino al tier
 configurato con:
 
 ```bash

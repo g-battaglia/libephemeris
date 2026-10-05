@@ -11,8 +11,112 @@
 uv pip install -e ".[dev]"
 ```
 
+Extended-tier generation also requires the optional N-body dependencies:
+
+```bash
+uv pip install -e ".[dev,nbody]"
+```
+
 For asteroids, JPL Horizons SPK files are needed (downloaded automatically
-during generation if `LIBEPHEMERIS_AUTO_SPK=1`).
+during individual generator commands if `LIBEPHEMERIS_AUTO_SPK=1`).
+
+## Complete isolated build with interruption and resume
+
+Use `scripts/regenerate_leb.py` for a new, dedicated output directory. It builds
+every active tier by default: `base`, `medium`, and `extended`. `.leb` is the
+LEB1 format; a separate `.leb1` copy is unnecessary. The complete set contains
+15 LEB1 exports (four groups and one merged file per tier) and 12 current,
+chunked LEB2 companions. Retired `uranians` files and diagnostic variants are
+excluded. Body coverage follows its actual source, including the declared
+extended-tier exclusions and guarded ASSIST interval.
+
+```bash
+# Preview all phases. No files are created and no source payloads are opened.
+uv run python -B scripts/regenerate_leb.py \
+  --output-dir "$HOME/Data/libephemeris-rebuild/all-001" --dry-run
+
+# Check integrity, imports, local source coverage and free space without writing.
+uv run python -B scripts/regenerate_leb.py \
+  --output-dir "$HOME/Data/libephemeris-rebuild/all-001" --doctor
+
+# Start the complete build. This can take many hours or days.
+uv run python -B scripts/regenerate_leb.py \
+  --output-dir "$HOME/Data/libephemeris-rebuild/all-001"
+
+# After Ctrl+C, shutdown or failure: inherit all settings from the manifest.
+uv run python -B scripts/regenerate_leb.py \
+  --output-dir "$HOME/Data/libephemeris-rebuild/all-001" --resume
+
+# Read recorded progress without starting or revalidating calculations.
+uv run python -B scripts/regenerate_leb.py \
+  --output-dir "$HOME/Data/libephemeris-rebuild/all-001" --status
+```
+
+The runner is POSIX-only (macOS/Linux), sequential, and offline. Provision local
+DE440s/DE440/DE441, wide minor-body SPKs, and extended ASSIST data using the
+existing download utilities before starting. A short SPK around J2000 alone
+cannot support the subsequent extended-body verification. Use `--data-dir` and
+`--spk-dir` for explicit source locations; their defaults follow the existing
+LibEphemeris configuration. The build itself disables user calculation/model
+overrides, selects Skyfield sources, and seals all network access.
+
+First execution requires a new or empty directory outside the checkout and
+source caches. Existing output requires a compatible manifest and `--resume`.
+The command refuses symlinked managed paths, overlapping source/destination
+directories, changed inputs, and concurrent runners. It never updates bundled
+data, installed runtime files, release hashes, or the Bash workflow's output.
+
+The directory contains:
+
+```text
+manifest.json                   Settings, frozen inputs, per-phase state and logs
+checksums.sha256                 Final exports, written after every phase passes
+.lock                           Persistent inode; never delete while a worker runs
+work/<tier>/body_<id>.leb        Reusable per-body generation checkpoints
+leb/ephemeris_<tier>_<group>.leb LEB1 group exports with auxiliary data
+leb/ephemeris_<tier>.leb         Complete LEB1 exports
+leb2/<tier>_<group>.leb2         Four distribution companions per tier
+logs/<job-id>-<attempt>.log      Separate log for each attempt
+```
+
+Generation and verification are separate phases. A verification failure leaves
+the generated coefficients reusable, while dependent merge/conversion phases
+remain blocked. Resume rechecks stored inventories, bounds and SHA-256 hashes;
+corrupt or missing checkpoints invalidate their dependent phases. It does not
+adopt unregistered files or unfinished staging files. Source/code/environment
+changes require a new build directory. Unknown files are retained, including
+temporary files orphaned by an uncatchable crash.
+
+Ctrl+C and SIGTERM stop and wait for the active worker before returning. An
+inherited kernel lock remains held by a surviving worker if the parent is killed
+with SIGKILL. Resume retries the incomplete **body or phase**; it does not resume
+inside a body's fitting or N-body integration. Per-body generation and streaming
+merge reduce memory pressure, but fitting and LEB2 conversion still allocate
+arrays/buffers for the active job.
+
+Select fewer tiers with `--tiers base,medium` and change verification sample
+counts with `--verify-samples` / `--leb2-verify-samples` on the initial invocation.
+Their defaults are 500 / 200 per body. Resume inherits these settings and rejects
+incompatible overrides. To deliberately regenerate a failed body's coefficients,
+invalidate its generation phase and descendants:
+
+```bash
+uv run python -B scripts/regenerate_leb.py \
+  --output-dir "$HOME/Data/libephemeris-rebuild/all-001" \
+  --resume --rerun extended.body.16.generate
+```
+
+Exit status is 0 for success, 1 for failure, 130 for handled SIGINT, and 143 for
+handled SIGTERM. A failed provenance check prevents any generation; resolve its
+reported paths separately without weakening the gate. There is no skip-verifier,
+install, upload, or forced fingerprint-bypass option.
+
+The entry point is intentionally separate from `leph` for now. Its reusable
+modules live under `scripts/leb_build/`: `plan`, `storage`, `sources`, `validation`,
+and `runner`. Future CLI integration can call the same workflow rather than
+duplicate its checkpoint logic.
+
+## Existing Bash workflow
 
 For a release-quality regeneration, use the repository entrypoint rather than
 invoking individual groups by hand:
@@ -249,7 +353,7 @@ file. Exact SHA-256-pinned medium and extended cores
 are available through the compatibility commands `libephemeris download
 leb-medium` and `leb-extended` (or the corresponding `leb2-*` modular
 commands). The asteroids, exotics, and apogee companions are published and
-SHA-256-pinned in the same data-v3 manifest; the tier download installs
+SHA-256-pinned in the same data-v4 manifest; the tier download installs
 them alongside each core.
 
 ---
