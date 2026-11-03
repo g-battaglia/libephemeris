@@ -9,6 +9,8 @@
 - Keep the Unix-only optional fingerprint capture out of Windows test builds,
   and use portable timeout cleanup for the threaded minor-body subprocess test.
 - Check Windows Rust test-target compilation in CI without executing Rust tests.
+- Test the live UTC clock against the precise Windows clock, rather than the
+  coarser clock in CPython 3.12, keeping strict before/after bounds.
 
 
 ## 4.0.0b1 (Python) · 1.0.0-beta.1 (Rust core) — Unreleased

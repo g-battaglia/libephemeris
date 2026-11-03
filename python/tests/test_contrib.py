@@ -2,6 +2,7 @@
 from data_paths import CORE_LEB
 
 import math
+import os
 import time
 from pathlib import Path
 import libephemeris as eph
@@ -57,11 +58,39 @@ def test_houses_stars_and_sampled_walks_use_shared_engine():
     assert contrib.next_retro(2,2451545.0)>2451545.0
 
 
-def test_clock_is_a_live_utc_julian_day_and_containers_are_plain():
-    before=time.time()/86400+2440587.5
-    result=contrib.jdnow()
-    after=time.time()/86400+2440587.5
-    assert before<=result<=after
+@pytest.fixture
+def utc_wall_clock():
+    """Independent precise UTC reference, including CPython 3.12 on Windows."""
+    if os.name != "nt":
+        return time.time
+
+    import ctypes
+    from ctypes import wintypes
+
+    # Python time.time() used the coarse Win32 clock until Python 3.13:
+    # https://docs.python.org/3.13/library/time.html#time.time
+    # Rust SystemTime uses the precise clock. Query that OS reference directly
+    # instead of loosening the interval assertion to accommodate clock skew.
+    clock = ctypes.WinDLL("kernel32", use_last_error=True).GetSystemTimePreciseAsFileTime
+    clock.argtypes = (ctypes.POINTER(wintypes.FILETIME),)
+    clock.restype = None
+
+    def seconds():
+        stamp = wintypes.FILETIME()
+        clock(ctypes.byref(stamp))
+        ticks = (stamp.dwHighDateTime << 32) | stamp.dwLowDateTime
+        # FILETIME counts 100-ns ticks since 1601-01-01, not the Unix epoch.
+        return (ticks - 116444736000000000) / 10000000
+
+    return seconds
+
+
+def test_clock_is_a_live_utc_julian_day_and_containers_are_plain(utc_wall_clock):
+    for _ in range(32):
+        before=utc_wall_clock()/86400+2440587.5
+        result=contrib.jdnow()
+        after=utc_wall_clock()/86400+2440587.5
+        assert before<=result<=after
     user=contrib.User();user.label="example"
     data=contrib.Data();data.value=1.0
     assert user.label=="example" and data.value==1.0
