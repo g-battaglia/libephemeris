@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — cross-platform fixes
+## 4.0.0b1 (Python) · 1.0.0-beta.2 (Rust crates) — Candidate
 
 - Discover the native user profile when `HOME` is absent, including Windows
   `USERPROFILE`, while preserving an explicit nonempty `HOME` override.
@@ -11,9 +11,13 @@
 - Check Windows Rust test-target compilation in CI without executing Rust tests.
 - Test the live UTC clock against the precise Windows clock, rather than the
   coarser clock in CPython 3.12, keeping strict before/after bounds.
+- Preserve Python's unused PyPI version `4.0.0b1`, pin its source links to the
+  new `python-v4.0.0b1` tag, and prepare Rust package versions `1.0.0-beta.2`.
+  Existing tags, registry artifacts, scientific models and coefficient bytes
+  are unchanged.
 
 
-## 4.0.0b1 (Python) · 1.0.0-beta.1 (Rust core) — Unreleased
+## Native rewrite baseline · 1.0.0-beta.1 (Rust crates)
 
 See the [beta release notes](RELEASE_NOTES.md) for the full rewrite and migration overview.
 

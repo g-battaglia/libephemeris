@@ -35,7 +35,7 @@ def test_source_links_keep_book_links_but_resolve_project_files():
     CONFIG.source_links(app, "docs/README", source)
     assert source == [
         "[book](python.md) [manual](../beginners-manual/en/README.md) "
-        f"[root](https://github.com/g-battaglia/libephemeris/blob/v{CONFIG.release}/README.md#first-calculation)"
+        f"[root](https://github.com/g-battaglia/libephemeris/blob/{CONFIG.source_ref}/README.md#first-calculation)"
     ]
 
 

@@ -14,7 +14,7 @@ license-files = ["COPYING"]
 
 [project.urls]
 Repository = "https://github.com/g-battaglia/libephemeris"
-Documentation = "https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/tools/leb_generation/README.md"
+Documentation = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b1/tools/leb_generation/README.md"
 
 [project.scripts]
 libephemeris-generate = "leb_generation.cli:main"

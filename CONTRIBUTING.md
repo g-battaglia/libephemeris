@@ -109,9 +109,11 @@ build the extracted core and rebuild a wheel from the sdist. Verify licenses,
 notices, stubs, entry points, bundled data and beginner manuals. Caches, local
 repositories and scientific comparison environments must not ship.
 
-Publication needs explicit maintainer approval: data crate first, then its
-exact dependent core, then wheels/sdist and optional tools. Verify registry
-installs separately; dry runs do not establish registry acceptance. Use distinct
+Publication needs explicit maintainer approval. For a coordinated registry
+release, publish the data crate first, then its exact dependent core, then
+Python and optional tools. Python wheels/sdist contain the Rust sources or
+compiled engine and can be released independently without uploading crates.
+Verify registry installs separately; dry runs do not establish acceptance. Use distinct
 Rust/Python tags and new prerelease versions for corrections, never overwrite
 published artifacts. Do not expose credentials in logs.
 

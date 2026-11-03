@@ -1,6 +1,6 @@
 [package]
 name = "libephemeris-core-data"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.2"
 edition = "2024"
 rust-version = "1.86"
 license = "AGPL-3.0"

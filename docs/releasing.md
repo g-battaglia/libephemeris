@@ -8,7 +8,8 @@ A PyPI release is five files built from **one commit**:
 | macOS arm64 wheel and sdist | a maintainer's Mac |
 
 `tools/release/prepare_pypi_release.py` collects, tests and checks all five
-files. It never tags or uploads: publication is manual.
+files and writes a separate `publish.sh`. Preparation never tags or uploads;
+the final publication command is an explicit maintainer action.
 
 ## Once per machine
 
@@ -24,12 +25,12 @@ data from `~/.libephemeris` or `LIBEPHEMERIS_TEST_DATA_DIR`, as usual.
 
 ## 1. Prepare the release commit
 
-1. Set the version in `python/Cargo.toml`, then run `cargo update --workspace`
-   to update `Cargo.lock`. Cargo `4.0.0-beta.2` becomes Python `4.0.0b2`.
-2. Point the version-pinned GitHub links to the new tag, `v<python-version>`:
-   READMEs, `[project.urls]` in `pyproject.toml` and `TAG` in
-   `tools/tests/test_release_links.py`. `git grep -nF <old-version>` finds them.
-   The script reads the tag from the `Documentation` URL.
+1. Choose unused registry versions. This candidate keeps Python `4.0.0b1`
+   (Cargo `4.0.0-beta.1`) and prepares Rust crates `1.0.0-beta.2`. Review the
+   exact dependencies and `Cargo.lock`; scientific data-v4 bytes stay unchanged.
+2. Pin README/project source links to `python-v4.0.0b1`, not the already frozen
+   `v4.0.0b1`. The script and Sphinx read the source tag from the `Documentation`
+   URL in `pyproject.toml`; release-link tests must agree.
 3. Update `CHANGELOG.md`, run the [local checks](../CONTRIBUTING.md#build-and-test-locally),
    commit and push. The push starts CI.
 
@@ -42,36 +43,35 @@ data from `~/.libephemeris` or `LIBEPHEMERIS_TEST_DATA_DIR`, as usual.
 The script stops at the first problem. It:
 
 1. requires a clean, pushed HEAD and a tag that does not exist on another commit;
-2. builds the macOS wheel and the sdist, runs `python/tests` on the installed
-   wheel with Python 3.12 and 3.14, and builds the extension again from the sdist;
+2. builds macOS/sdist, provisions the same pinned public inputs as CI, runs
+   `python/tests` on Python 3.12/3.14 and on a locked, offline sdist rebuild;
 3. waits for the CI run of HEAD and accepts each CI wheel only if its report has
    the same commit, version and checksum, and passing tests;
 4. runs `twine check --strict` and `tools/release/check_archives.py`;
-5. writes the files to `target/pypi-release/<commit>/upload/` with
-   `SHA256SUMS`, then prints the commands for step 3.
+5. writes five files to `target/pypi-release/<commit>/upload/`, plus checksums,
+   provenance, JUnit reports and a separate `publish.sh`.
 
 If CI or a test fails, fix it, commit, push and run the script again.
 Nothing has been published.
 
 ## 3. Publish (manual)
 
-Copy the commands printed by the script; the values below are examples:
+After every check passes, the maintainer freezes the **new** source tag on
+that exact SHA. Never move `v4.0.0b1`. The final operator then runs only the
+command printed by preparation, for example:
 
 ```bash
-cd target/pypi-release/0123456789ab && shasum -a 256 -c SHA256SUMS
-git tag -a v4.0.0b2 0123456789ab -m 'Python 4.0.0b2' && git push origin refs/tags/v4.0.0b2
-read -rsp 'PyPI token: ' UV_PUBLISH_TOKEN && export UV_PUBLISH_TOKEN
-uv publish --trusted-publishing never --check-url https://pypi.org/simple/ upload/*
-unset UV_PUBLISH_TOKEN
+bash target/pypi-release/0123456789ab/publish.sh
 ```
 
-`read -rsp` keeps the token out of the screen and the shell history.
-`--check-url` skips files already on PyPI, so the same command resumes an
-interrupted upload. Check the published release from a clean environment:
+It verifies HEAD, the remote tag and all five file checksums, prompts for the
+PyPI token **locally without echoing it**, and invokes `uv publish`. No token is
+stored. The same files can resume a partial upload with `--check-url`; never
+rebuild them after any file is published. Verify the installed release:
 
 ```bash
 uv run --isolated --no-project --refresh --python 3.12 \
-  --with libephemeris==4.0.0b2 python -c 'import libephemeris; print(libephemeris.__version__)'
+  --with libephemeris==4.0.0b1 python -I -c 'import libephemeris; print(libephemeris.__version__)'
 ```
 
 ## From `main` or from a dedicated branch

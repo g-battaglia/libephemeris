@@ -1,7 +1,7 @@
 # Installation
 
 Python requires **3.12+**. The current candidate is Python `4.0.0b1` and Rust
-`1.0.0-beta.1`. These instructions do not imply that a candidate has already
+`1.0.0-beta.2`. These instructions do not imply that a candidate has already
 been published to a registry.
 
 ## Python wheel
@@ -54,7 +54,7 @@ After registry publication:
 
 ```toml
 [dependencies]
-libephemeris-core = { version = "1.0.0-beta.1", features = ["bundled-data"] }
+libephemeris-core = { version = "1.0.0-beta.2", features = ["bundled-data"] }
 ```
 
 Before publication, use `path = "/path/to/libephemeris/core"` instead of the

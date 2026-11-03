@@ -8,6 +8,7 @@ identify the same candidate before autodoc runs.
 from importlib import metadata
 from pathlib import Path
 import re
+import tomllib
 from urllib.parse import quote, urlsplit
 
 import libephemeris
@@ -19,6 +20,10 @@ release = metadata.version("libephemeris")
 if libephemeris.__version__ != release:
     raise RuntimeError("documentation runtime and installed metadata versions differ")
 version = release
+# A Python version can use a distinct source tag when an earlier Git tag is
+# already immutable. Derive it from the same URL checked by release tooling.
+project_metadata = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
+source_ref = urlsplit(project_metadata["project"]["urls"]["Documentation"]).path.split("/blob/", 1)[1].split("/", 1)[0]
 
 extensions = ["myst_parser", "sphinx.ext.autodoc"]
 source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
@@ -60,7 +65,7 @@ def source_links(app, docname, source):
             raise ValueError(f"invalid source link in {docname}: {target}")
         kind = "tree" if destination.is_dir() else "blob"
         relative = quote(destination.relative_to(root).as_posix())
-        url = f"https://github.com/g-battaglia/libephemeris/{kind}/v{release}/{relative}"
+        url = f"https://github.com/g-battaglia/libephemeris/{kind}/{source_ref}/{relative}"
         if parsed.fragment:
             url += "#" + parsed.fragment
         return match.group(1) + url + match.group(3)

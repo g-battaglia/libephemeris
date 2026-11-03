@@ -16,6 +16,6 @@ It is distinct from other independently identified local datasets.
 Applications normally depend on `libephemeris-core` with `bundled-data`, not
 this crate directly. Project distribution terms are AGPL-3.0; complete license
 and upstream notices accompany the source package. See the canonical
-[source documentation](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/sources.md).
-For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/README.md#license);
+[source documentation](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b1/docs/sources.md).
+For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b1/README.md#license);
 requests are evaluated case by case.

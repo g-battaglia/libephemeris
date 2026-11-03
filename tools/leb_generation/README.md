@@ -19,7 +19,7 @@ need no checkout or v3 installation. Build the separate tools artifacts with:
 uv build --out-dir target/leb-tools tools/leb_generation
 ```
 
-For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/README.md#license);
+For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b1/README.md#license);
 requests are evaluated case by case.
 
 ## Installed generation command

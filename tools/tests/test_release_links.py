@@ -12,7 +12,7 @@ from urllib.parse import unquote, urlsplit
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-TAG = "v4.0.0b1"
+TAG = "python-v4.0.0b1"
 PROJECT_PATH = "/g-battaglia/libephemeris"
 SPEC = importlib.util.spec_from_file_location("release_link_checker", ROOT / "tools/release/check_docs.py")
 CHECKER = importlib.util.module_from_spec(SPEC)
