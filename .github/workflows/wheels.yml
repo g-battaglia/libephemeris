@@ -3,7 +3,7 @@ name: Wheel build and tests
 # No release credentials, registry uploads, repository writes or shared caches.
 on:
   push:
-    branches: [beta-v4, main]
+    branches: [main, beta-v4, 'release/**']
   workflow_dispatch:
 
 permissions:

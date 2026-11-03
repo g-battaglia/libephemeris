@@ -86,10 +86,13 @@ not a prerequisite for installing the shipped assets.
 
 ## Release checklist
 
-Use a clean committed revision, lockfile and explicit interpreter. Versions:
-core/data crates `1.0.0-beta.1`, Python/offline tools `4.0.0b1`; the binding's
-internal Cargo version is `4.0.0-beta.1`. Runtime and installed metadata must
-agree. Package versions are independent of scientific model identifiers.
+PyPI releases follow [Releasing to PyPI](docs/releasing.md). The commands below
+package and check every registry artifact locally.
+
+Use a clean committed revision, lockfile and explicit interpreter. Rust crates
+and the Python package have independent versions; the binding's Cargo version
+`4.0.0-beta.1` becomes Python `4.0.0b1`. Package versions are independent of
+scientific model identifiers. Never move a tag or replace a published version.
 
 ```sh
 cargo package --locked --all-features -p libephemeris-core-data -p libephemeris-core
@@ -114,8 +117,8 @@ published artifacts. Do not expose credentials in logs.
 
 ### Linux and Windows wheels
 
-The [wheel workflow](https://github.com/g-battaglia/libephemeris/actions/workflows/wheels.yml) runs on pushes to `beta-v4`
-and `main`. Manual dispatch becomes available when the workflow is present on
+The [wheel workflow](https://github.com/g-battaglia/libephemeris/actions/workflows/wheels.yml) runs on pushes to `main`,
+`beta-v4` and `release/*`. Manual dispatch becomes available when the workflow is present on
 GitHub's default branch; until v4 is promoted, trigger it by pushing `beta-v4`.
 It runs three native jobs: Ubuntu 24.04 x86_64, Ubuntu 24.04 aarch64 and Windows
 x86_64. Linux builds use manylinux2014 (glibc 2.17); Windows builds use MSVC.
@@ -139,66 +142,6 @@ including ignored native tests, to catch Unix-only compilation assumptions.
 macOS builds, source-install checks and native Rust numerical qualification
 stay local. The workflow guard is a review aid, not a sandbox for arbitrary
 scripts.
-
-For a new release:
-
-1. Run the local checks, update the candidate's versions and version-pinned
-   documentation links, commit it and push `beta-v4`. Do not move existing tags
-   or overwrite versions already published to a registry.
-2. Find and watch the exact run, using the product repository explicitly:
-
-   ```sh
-   gh run list -R g-battaglia/libephemeris --workflow wheels.yml --branch beta-v4
-   gh run watch RUN_ID -R g-battaglia/libephemeris --exit-status
-   gh run view RUN_ID -R g-battaglia/libephemeris --json headSha,conclusion
-   ```
-
-3. Require all three jobs to pass. Review the `-ra` output and JUnit reports:
-   skipped optional-data tests are not verified coverage. Compare every
-   artifact's `reports/build.json` source SHA, version and wheel checksum with
-   the selected run. Failed jobs retain diagnostic reports and any wheel they
-   managed to build; artifact presence alone is not approval to release.
-4. Create the new release tag on that exact successful SHA and push the tag.
-   Download its artifacts locally:
-
-   ```sh
-   gh run download RUN_ID -R g-battaglia/libephemeris -D dist/ci
-   git rev-parse 'NEW_TAG^{commit}'
-   ```
-
-   Replace `RUN_ID` and `NEW_TAG` with the reviewed values. The tag's commit,
-   the run's `headSha` and all artifact source SHAs must agree.
-5. Build and test the macOS arm64 wheel and sdist locally as above. For an
-   Intel macOS wheel, add `x86_64-apple-darwin` with `rustup target add`, build
-   with `maturin build --release --locked --target x86_64-apple-darwin`, and
-   install/test it using a real x86_64 Python under Rosetta. A successful
-   cross-build alone does not count as a runtime test.
-6. Collect only approved wheel/sdist files in a dedicated upload directory.
-   Run `twine check --strict` and `tools/release/check_archives.py` on all of
-   them, including the downloaded Linux/Windows wheels. Keep the downloaded
-   provenance/JUnit reports, but do not upload those reports to PyPI.
-7. After explicit maintainer approval, publish a new data crate first, then its
-   matching core crate; never repeat uploads of already published versions.
-   Use one manual `uv publish` for the approved wheel and sdist files. In Bash,
-   read a PyPI token without echoing it or saving it in shell history:
-
-   ```sh
-   read -rsp 'PyPI token: ' UV_PUBLISH_TOKEN; echo
-   export UV_PUBLISH_TOKEN
-   uv publish --trusted-publishing never dist/upload/*.whl dist/upload/*.tar.gz
-   unset UV_PUBLISH_TOKEN
-   ```
-
-8. Install the explicit prerelease from PyPI in clean environments and run the
-   installed-package smoke checks. Verify Rust registry consumers separately.
-
-The first CI run is diagnostic. Keep `v4.0.0b1` on its existing commit and the
-published `1.0.0-beta.1` crates unchanged. Do not upload a wheel from a later
-commit under that frozen release merely because its version string matches.
-Windows home-directory and test-portability fixes, if needed, belong in a
-subsequent change and new `4.0.0b2` / `1.0.0-beta.2` candidates. Do not mask
-failures with CI-only environment workarounds, test deselection or weakened
-numerical tolerances.
 
 ## Issues and pull requests
 

@@ -37,3 +37,4 @@ material; each chapter links to its translation.
 | Read or generate LEB files | [Binary format](data-format.md) |
 | Upgrade an existing application | [Migration](../MIGRATION.md) |
 | Build, test or contribute | [Contributing](../CONTRIBUTING.md) |
+| Release on PyPI | [Releasing to PyPI](releasing.md) |

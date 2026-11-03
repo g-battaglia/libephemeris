@@ -33,5 +33,8 @@ and technical references.
    data-format
    sources
 
-Build, test and release instructions are in `CONTRIBUTING.md
-<https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/CONTRIBUTING.md>`_.
+.. toctree::
+   :caption: Maintainers
+   :maxdepth: 1
+
+   releasing
