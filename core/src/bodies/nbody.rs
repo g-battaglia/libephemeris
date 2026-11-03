@@ -288,8 +288,8 @@ impl AssistEphemConfig {
         if let Some(directory) = std::env::var_os("ASSIST_DIR") {
             directories.push(directory.into());
         }
-        if let Some(home) = std::env::var_os("HOME") {
-            directories.push(PathBuf::from(home).join(".libephemeris/assist"));
+        if let Some(home) = crate::platform::user_home_directory() {
+            directories.push(home.join(".libephemeris/assist"));
         }
         directories.push(PathBuf::from("data"));
         let find = |names: &[&str]| {

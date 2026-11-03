@@ -51,6 +51,11 @@ Precedence: explicit settings → environment → `.env` → TOML → defaults.
 `reload_configuration()` reacquires captured settings. Existing Sessions and
 retained handles keep their selected resources.
 
+The conventional data root is `.libephemeris` under an explicit nonempty
+`HOME`, or under the native user profile when `HOME` is absent. On Windows,
+this uses `USERPROFILE` and the native profile API, not the working directory.
+`LIBEPHEMERIS_DATA_DIR` remains the explicit data-directory override.
+
 | Variable | Selects |
 | --- | --- |
 | `LIBEPHEMERIS_DATA_DIR` | Data root |

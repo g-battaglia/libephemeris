@@ -705,6 +705,9 @@ mod tests {
     use crate::nbody::CartesianState;
     use std::cell::RefCell;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    // This optional capture records Unix inode/time fingerprints. Portable
+    // integration and numerical contract tests remain enabled on every OS.
+    #[cfg(unix)]
     #[test]
     #[ignore = "three actual owned ASSIST requests; explicit immutable inputs/output required"]
     fn capture_runtime_n16_owned_inputs() {

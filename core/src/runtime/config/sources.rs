@@ -35,9 +35,10 @@ pub struct ConfigurationSources {
 impl ConfigurationSources {
     /// Capture library environment variables and selected configuration files.
     ///
-    /// Reads `LIBEPHEMERIS_*` variables, current directory and `HOME`, then
-    /// delegates file selection to [`Self::load`]. Non-Unicode environment
-    /// entries and unreadable files are ignored. Malformed TOML produces a
+    /// Reads `LIBEPHEMERIS_*` variables, current directory and the user home
+    /// (`HOME` override or native profile), then delegates to [`Self::load`].
+    /// Non-Unicode environment entries and unreadable files are ignored.
+    /// Malformed TOML produces a
     /// retained [`Self::warnings`] entry rather than an error result. No
     /// ephemeris is opened or process environment variable changed.
     pub fn discover() -> Self {
@@ -48,7 +49,7 @@ impl ConfigurationSources {
         Self::load(
             environment,
             std::env::current_dir().ok().as_deref(),
-            std::env::var_os("HOME").map(PathBuf::from),
+            crate::platform::user_home_directory(),
         )
     }
 

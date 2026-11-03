@@ -184,6 +184,8 @@ pub mod perturber;
 pub mod photometry;
 #[path = "bodies/planetary_moons.rs"]
 pub mod planetary_moons;
+#[path = "runtime/platform.rs"]
+mod platform;
 #[path = "positions/mod.rs"]
 pub mod positions;
 #[path = "runtime/profiling.rs"]

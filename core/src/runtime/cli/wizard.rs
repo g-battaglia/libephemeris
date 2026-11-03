@@ -475,15 +475,13 @@ fn format_size_mb(size_mb: f64) -> String {
     }
 }
 
-/// Expand a leading `~/` when `HOME` is a nonempty Unicode environment value.
+/// Expand a leading `~/` using the HOME override or native user profile.
 ///
 /// Return all other paths unchanged; no filesystem access is performed.
 fn expand_tilde(path: &str) -> PathBuf {
     if let Some(rest) = path.strip_prefix("~/") {
-        if let Ok(home) = std::env::var("HOME") {
-            if !home.is_empty() {
-                return PathBuf::from(home).join(rest);
-            }
+        if let Some(home) = crate::platform::user_home_directory() {
+            return home.join(rest);
         }
     }
     PathBuf::from(path)

@@ -6,6 +6,10 @@ use crate::iers::{IersDataSnapshot, IersFileKind};
 use std::collections::BTreeMap;
 use std::path::Path;
 
+#[cfg(all(test, feature = "bundled-data"))]
+#[path = "coverage_tests.rs"]
+mod coverage_tests;
+
 /// Stored-body coverage metadata in TT Julian days.
 ///
 /// An epoch-specific selection can identify a concrete image. An unlabeled
@@ -24,7 +28,7 @@ pub struct BodyCoverageRecord {
     pub jd_start: f64,
     /// Inclusive stored end, TT Julian day.
     pub jd_end: f64,
-    /// Selected file path, absent for a multi-file union without an epoch.
+    /// Input/serving path; absent for unselected unions or unserved runtime dates.
     pub data_file: Option<String>,
     /// Coefficient partition, if known from the path.
     pub group: Option<String>,
@@ -60,6 +64,8 @@ impl From<crate::leb::BodyCoverage> for BodyCoverageRecord {
 /// `jd` is a coefficient TT epoch. A covered epoch selects its real image;
 /// an uncovered epoch retains the stored bounds for diagnostics. Multiple
 /// images without a selected serving interval report an unlabeled union.
+/// Single-image inspection retains the input's identity even outside its
+/// interval; [`Runtime::body_coverage`] clears that label for unserved dates.
 /// Absent bodies and retired fictitious coefficient channels return `None`.
 /// Closed images and malformed coefficient indices propagate their errors.
 pub fn stored_body_coverage(
@@ -611,7 +617,16 @@ impl Runtime {
     /// serving file. `None` means that no active image stores this body.
     pub fn body_coverage(&self, body: i32, jd: Option<f64>) -> Result<Option<BodyCoverageRecord>> {
         let session = self.shared_session()?;
-        stored_body_coverage(session.context().leb_files(), body, jd)
+        let mut coverage = stored_body_coverage(session.context().leb_files(), body, jd)?;
+        if let (Some(record), Some(epoch)) = (coverage.as_mut(), jd) {
+            if !record.contains(epoch) {
+                // A reader identifies its input file even outside its domain;
+                // a runtime must not claim that file actually served the date.
+                record.data_file = None;
+                record.group = None;
+            }
+        }
+        Ok(coverage)
     }
 
     /// File/body metadata of the actual configured stored images; no network.

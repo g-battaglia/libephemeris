@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import signal
 import subprocess
 import sys
 
@@ -121,16 +120,12 @@ def test_installed_minor_precision_chain_in_isolated_environment(verified_files,
         LIBEPHEMERIS_DATA_DIR=str(tmp_path), V4_TEST_DATA=str(verified_files),
         V4_TEST_PRESENT="1" if present else "0",
     )
-    process = subprocess.Popen(
+    # The probe uses threads, not child processes. subprocess.run terminates
+    # and waits for a timed-out probe on both Windows and Unix.
+    process = subprocess.run(
         [sys.executable, "-I", "-c", SCRIPT], cwd=tmp_path, env=environment,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
+        capture_output=True, text=True, timeout=180,
     )
-    try:
-        stdout, stderr = process.communicate(timeout=180)
-    except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
-        process.wait()
-        raise
-    assert process.returncode == 0, stderr
-    result = json.loads(stdout.strip())
+    assert process.returncode == 0, process.stderr
+    result = json.loads(process.stdout.strip())
     assert result == {"source": "ASSIST" if present else "Keplerian", "registered_source": "SPK", "workers": 8}

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — cross-platform fixes
+
+- Discover the native user profile when `HOME` is absent, including Windows
+  `USERPROFILE`, while preserving an explicit nonempty `HOME` override.
+- Runtime coverage queries no longer label an out-of-range date with a serving
+  file; explicit reader inspection still identifies its input image.
+- Keep the Unix-only optional fingerprint capture out of Windows test builds,
+  and use portable timeout cleanup for the threaded minor-body subprocess test.
+- Check Windows Rust test-target compilation in CI without executing Rust tests.
+
+
 ## 4.0.0b1 (Python) · 1.0.0-beta.1 (Rust core) — Unreleased
 
 See the [beta release notes](RELEASE_NOTES.md) for the full rewrite and migration overview.

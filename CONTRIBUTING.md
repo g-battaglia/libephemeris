@@ -133,9 +133,12 @@ Git Bash's `HOME` is removed from child processes so discovery problems seen
 by ordinary PowerShell/cmd users are not hidden.
 
 The workflow has read-only repository permissions and no registry credentials,
-OIDC write permission, publication, repository mutations, Rust tests or shared
-caches. macOS builds, source-install checks and native Rust qualification stay
-local. The workflow guard is a review aid, not a sandbox for arbitrary scripts.
+OIDC write permission, publication, repository mutations, execution of Rust
+tests or shared caches. Windows additionally type-checks all core targets,
+including ignored native tests, to catch Unix-only compilation assumptions.
+macOS builds, source-install checks and native Rust numerical qualification
+stay local. The workflow guard is a review aid, not a sandbox for arbitrary
+scripts.
 
 For a new release:
 

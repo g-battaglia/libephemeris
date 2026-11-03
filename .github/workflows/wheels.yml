@@ -154,6 +154,14 @@ jobs:
           raise SystemExit(1 if failed else 0)
           PY
 
+      # Type-check test-only native code too; ignored tests still have to
+      # compile on Windows. Do not block independent Python diagnostics, and
+      # do not execute the Rust test suite.
+      - name: Check Rust test portability on Windows
+        if: always() && runner.os == 'Windows'
+        shell: bash
+        run: cargo check --locked --all-features --all-targets -p libephemeris-core
+
       - name: Retain diagnostic wheels and reports
         if: always()
         uses: actions/upload-artifact@v4
