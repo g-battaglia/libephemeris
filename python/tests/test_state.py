@@ -1,0 +1,107 @@
+"""Native configuration, resource metadata and deterministic lifecycle checks."""
+from data_paths import CORE_LEB
+
+from pathlib import Path
+import inspect
+
+import libephemeris as eph
+import pytest
+
+FIXTURE = CORE_LEB
+
+
+@pytest.fixture(autouse=True)
+def configured():
+    eph.set_calc_mode("leb")
+    eph.set_precision_tier("base")
+    eph.set_leb_file(str(FIXTURE))
+    eph.set_delta_t_userdef(64.0 / 86400.0)
+    eph.set_iers_delta_t_enabled(False)
+    yield
+    eph.close()
+    eph.set_calc_mode("leb")
+    eph.set_leb_file(str(FIXTURE))
+
+
+def test_setters_and_getters():
+    eph.set_tid_acc(-25.0)
+    assert eph.get_tid_acc() == -25.0
+    eph.set_tid_acc(999999.0)
+    assert eph.get_tid_acc() == eph.TIDAL_DEFAULT
+    eph.set_lapse_rate(0.006)
+    assert eph.get_lapse_rate() == 0.006
+    eph.set_lapse_rate(None)
+    assert eph.get_lapse_rate() == 0.0065
+    eph.set_auto_spk_download(False)
+    assert not eph.get_auto_spk_download()
+    eph.set_strict_precision(False)
+    assert not eph.get_strict_precision()
+    eph.set_spk_cache_dir("cache-test")
+    assert eph.get_spk_cache_dir() == "cache-test"
+    eph.set_spk_date_padding(42)
+    assert eph.get_spk_date_padding() == 42
+    with pytest.raises(ValueError):
+        eph.set_spk_date_padding(-1)
+    assert eph.get_spk_date_padding() == 42
+    assert eph.get_delta_t_userdef() == 64.0 / 86400.0
+    eph.set_delta_t_model("espenak_meeus")
+    assert eph.get_delta_t_model() == "espenak_meeus"
+
+
+def test_tiers_and_signatures():
+    rows = eph.list_tiers()
+    assert [row.name for row in rows] == ["base", "medium", "extended"]
+    assert rows[0].ephemeris_file == "de440s.bsp"
+    assert rows[2].spk_date_range == ("1600-01-01", "2500-01-01")
+    assert eph.get_spk_date_range_for_tier("medium") == ("1850-01-01", "2150-01-01")
+    assert eph.get_spk_date_range_for_tier("extended") == ("1600-01-01", "2500-01-01")
+    with pytest.raises(AttributeError):
+        rows[0].name = "changed"
+    assert list(inspect.signature(eph.PrecisionTier).parameters) == ["name", "ephemeris_file", "spk_date_range", "description"]
+    assert inspect.signature(eph.set_topo).parameters["alt"].default == 0.0
+
+
+def test_reader_ownership_and_real_metadata():
+    first = eph.get_leb_reader()
+    assert first.path == str(FIXTURE)
+    assert first.has_body(0)
+    values, rates = first.eval_body(0, 2451545.0)
+    assert len(values) == len(rates) == 3
+    path, begin, end, number = eph.get_current_file_data(0)
+    assert path == first.path and begin <= 2451545.0 <= end and number == 0
+    expected = eph.calc_ut(2451545.0, 0, 258)
+    first.close()
+    assert first.closed
+    assert eph.calc_ut(2451545.0, 0, 258) == expected
+    assert eph.get_current_file_data(99) == ("", 0.0, 0.0, 0)
+    eph.release_data_cache()
+
+
+def test_horizons_selection_does_not_open_leb(tmp_path):
+    eph.set_leb_file(str(tmp_path / "missing.leb2"))
+    eph.set_calc_mode("horizons")
+    assert eph.get_leb_reader() is None
+    assert eph.get_calc_mode() == "horizons"
+
+
+def test_reload_retains_explicit_overrides(monkeypatch):
+    eph.close()
+    eph.set_calc_mode(None)
+    monkeypatch.setenv("LIBEPHEMERIS_MODE", "horizons")
+    eph.reload_configuration()
+    assert eph.get_calc_mode() == "horizons"
+    eph.set_calc_mode("leb")
+    assert eph.get_calc_mode() == "leb"
+    eph.set_calc_mode(None)
+    assert eph.get_calc_mode() == "horizons"
+    monkeypatch.setenv("LIBEPHEMERIS_MODE", "auto")
+    eph.reload_configuration()
+    assert eph.get_calc_mode() == "auto"
+
+
+def test_tier_constant_contains_typed_native_records():
+    assert list(eph.TIERS) == ["base", "medium", "extended"]
+    for name, tier in eph.TIERS.items():
+        assert isinstance(tier, eph.PrecisionTier)
+        assert tier.name == name
+    assert list(eph.TIERS.values()) == eph.list_tiers()

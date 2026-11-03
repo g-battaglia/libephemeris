@@ -1,320 +1,177 @@
 # LibEphemeris
 
-<div align="left">
-    <img src="https://static.pepy.tech/badge/libephemeris/month" alt="PyPI Downloads">
-    <img src="https://static.pepy.tech/badge/libephemeris/week" alt="PyPI Downloads">
-    <img src="https://static.pepy.tech/personalized-badge/libephemeris?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads/total" alt="PyPI Downloads">
-    <img src="https://img.shields.io/pypi/v/libephemeris.svg" alt="PyPI Version">
-    <img src="https://img.shields.io/pypi/pyversions/libephemeris.svg" alt="Python Versions">
-    <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
-</div>
+**High-precision astrological ephemerides in Rust and Python, built on NASA/JPL data and published astronomical standards.**
 
-A high-precision astronomical ephemeris library for Python, powered by NASA JPL DE440/DE441 ephemerides and IAU 2006/2000A standards.
+**Beta:** Python `4.0.0b1` · Rust `1.0.0-beta.1` · Python 3.12+ · [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/COPYING).
 
-**Drop-in replacement for PySwissEph** - readable Python algorithms, standard debugging, easy deployment on the scientific Python stack (NumPy, Skyfield, pyerfa).
+[Get started](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/README.md#first-calculation) · [Scientific precision](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/README.md#scientific-precision)
+· [Italian manual](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/beginners-manual/it/README.md)
+· [English manual](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/beginners-manual/en/README.md)
+· [Documentation](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/README.md)
+· [v4 beta release notes](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/RELEASE_NOTES.md)
 
-Licensed under the **[GNU Affero General Public License v3.0](LICENSE)**
-([AGPL-3.0-only](LICENSING.md)). Built on NASA JPL DE440/DE441
-ephemerides, IAU/ERFA standards, and cited primary literature. See
-[NOTICE.md](NOTICE.md) for data sources and attribution.
+## Kerykeion ecosystem
 
----
+LibEphemeris is the ephemeris engine in the
+[**Kerykeion ecosystem**](https://github.com/g-battaglia/kerykeion).
+Use LibEphemeris for low-level calculations, Kerykeion for chart data, aspects
+and SVG rendering, or the hosted services below for ready-to-use applications.
 
-## Public-source guarantee
+## Astrologer API
 
-**No astronomical result in LibEphemeris is accepted because it happens to
-match another program, and no unexplained number is treated as scientific
-authority.** Every model, coefficient, catalogue field, and generated table
-must be traceable to public NASA/JPL, IERS, IAU, ESA, or other identified
-scientific data; an independently citable standard, catalogue, or publication;
-an explicitly identified permissively licensed upstream component; or a fully
-stated project convention that is never misrepresented as an observed fact or
-historical author's rule. Primary sources are required whenever the project
-claims to reproduce a particular author's numerical model.
+For commercial closed-source projects, SaaS products and mobile apps,
+[**Astrologer API**](https://www.kerykeion.net/content/astrologer-api/)
+provides hosted astrology calculations and charts without a local installation.
+Subscriptions support Kerykeion development.
 
-When LibEphemeris must choose a numerical tolerance, interpolation grid,
-compression parameter, fallback, or branch convention that a publication does
-not prescribe, the code labels it as a **project-authored choice** and supports
-it with a derivation, error budget, convergence test, or mathematical/physical
-invariant. If a historical model cannot be reconstructed completely from its
-sources, the corresponding body fails closed instead of returning a guessed or
-output-fitted orbit.
+[**Subscribe on RapidAPI**](https://rapidapi.com/gbattaglia/api/astrologer/pricing)
+· [API documentation](https://www.kerykeion.net/content/astrologer-api/)
+· [Coding-agent skill](https://github.com/g-battaglia/Astrologer-API/tree/v5/skills/astrologer-api)
 
-This is an enforced engineering contract, not a general aspiration:
+## Built for astrology
 
-- the [complete algorithm and data provenance map](docs/methodology/algorithm-provenance.md)
-  explains every scientific chain and every project-authored boundary;
-- the [machine-readable registry](docs/methodology/provenance-registry.toml)
-  classifies every runtime module, generator, development script, and shipped
-  scientific asset; and
-- `uv run python scripts/check_algorithm_provenance.py` fails if a module is
-  undocumented, a project-owned top-level function/class lacks a docstring, a
-  scientific component has no source, a generated artifact has no generator,
-  a vendored component lacks its upstream/license, or a citation is replaced
-  by a vague placeholder.
+| Area | Features |
+| --- | --- |
+| **Charts and transits** | Planetary positions, speeds, retrograde motion and angular separations |
+| **Houses and angles** | Placidus, Whole Sign, Equal, Koch and other systems; Ascendant, Midheaven and house positions |
+| **Sidereal astrology** | Lahiri, Fagan–Bradley and other ayanamshas, plus a user-defined mode |
+| **Lunar points** | Mean/true nodes, mean/osculating apogee and interpolated apsides, with distinct definitions |
+| **Events and returns** | Longitude crossings, stations, solar-return building blocks, eclipses and occultations |
+| **Stars and minor bodies** | 1,447-star catalog; supported asteroids, centaurs and trans-Neptunian bodies with suitable data |
+| **Local sky** | Topocentric positions, rise/set/transit, refraction, twilight and visibility models |
 
-Public API compatibility is kept separate from scientific provenance: every
-calculation is derived from published standards and JPL data, independently of
-the compatibility surface. The methodology is described in
-[Independence and Methodology](docs/methodology/independence.md).
+The [cookbook](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/beginners-manual/en/15-cookbook.md) turns these primitives into
+twelve practical recipes. Interpretation and aspect orbs remain application choices.
 
-“Public source” means independently identifiable and citable. Some standards,
-books, and papers retain their publishers' copyright; LibEphemeris uses the
-facts, equations, and definitions they publish and does not copy their prose or
-another implementation's expression.
+## Scientific precision
 
----
+- **Ephemerides:** NASA/JPL DE440/DE441-family kernels and local LEB coefficient products.
+- **Frames:** IAU/IERS conventions, SOFA/ERFA-derived components and Vondrák–Capitaine–Wallace long-term precession.
+- **Clocks:** explicit UTC/UT1/TT handling, Stephenson–Morrison–Hohenkerk (2016) historical Delta-T reconstruction and supported IERS inputs.
+- **Validation:** identified JPL data, published standards, high-precision mathematical constructions and physical invariants—not output matching as a scientific source.
 
-## Features
+The [source register](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/sources.md) documents provenance and separates published
+models from project conventions. Source-incomplete hypothetical models fail
+rather than return invented orbits.
 
-- **NASA JPL DE440/DE441** - modern planetary ephemerides via Skyfield, with full-range DE441 support for deep-history and far-future work
-- **IAU + Vondrák 2011 standards** - long-term precession and of-date mean obliquity (Vondrák 2011, valid ±200,000 years), nutation (IAU 2006/2000A) via the official ERFA library
-- **Latest-reconstruction Delta T (TT−UT1)** - IERS-observed values for the atomic-clock era and the most recent published reconstruction of Earth's rotation from ancient eclipse records (Stephenson, Morrison & Hohenkerk 2016 with the Morrison et al. 2021 update) for historical dates; the default realization keeps positions and house angles consistent, while explicit ΔT overrides have a documented Skyfield-mode exception ([details](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/delta-t.md))
-- **Source-based validation** - numerical checks use NASA JPL states, ERFA/IAU standards, cited literature, and mathematical invariants ([methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/independence.md))
-- **Four backends, one API** - Skyfield, LEB (~14x speedup), Horizons API, and adaptive auto mode through the same `calc_ut()` interface
-- **25 house systems (26 codes); all 47 predefined sidereal modes operational,
-  plus the user-defined mode, with per-mode source/audit status**
-- **Physical planet centers when covered** - outer planets use JPL center segments when available and the explicit system barycenter otherwise
-- **Thread-safe contexts when you need them** - SwissEph-compatible globals for drop-in migration, `EphemerisContext` for concurrent workloads
-- **15,000+ years of coverage** - `base`, `medium`, and `extended` precision tiers from modern use to -13200 / +17191 CE
-- **Readable Python 3.12+** - the ephemeris algorithms are plain, inspectable Python; clean installs across CI, containers, and serverless from prebuilt scientific wheels
-
----
-
-## Why LibEphemeris
-
-Swiss Ephemeris is the industry standard for planetary calculations. But its Python binding (pyswisseph) wraps a large opaque C library - hard to build from source, hard to inspect or debug, tied to a single computation model.
-
-LibEphemeris provides the **same API** with a modern foundation:
-
-- **NASA JPL ephemerides** instead of semi-analytical theory - DE440/DE441 are the latest planetary ephemerides from the Jet Propulsion Laboratory, the same data used for spacecraft navigation.
-- **IAU + Vondrák 2011 standards** - long-term precession and of-date mean obliquity (Vondrák, Capitaine & Wallace 2011, valid ±200,000 years instead of the IAU 2006 polynomial's few centuries), nutation (IAU 2006/2000A), all computed via the official ERFA library (the open-source implementation of IAU SOFA), not custom routines.
-- **Up-to-date Earth-rotation timeline (ΔT)** - the TT↔UT1 conversion uses the *latest* published reconstruction of Earth's rotation from historical eclipse records (Stephenson-Morrison-Hohenkerk 2016 with the Morrison et al. 2021 revision), blended with IERS observations. The default realization is shared by positions and house angles; explicit model/user/IERS overrides affect LEB and Horizons positions but not forced Skyfield-mode positions.
-- **Physical planet centers** - Jupiter, Saturn, Uranus, Neptune, and Pluto use
-  JPL body-center segments where the published satellite kernels cover the
-  requested epoch, with an explicit system-barycenter fallback outside those
-  ranges.
-- **Readable Python algorithms** - plain, inspectable source and standard debugging instead of an opaque C library. Installs from prebuilt wheels (NumPy/Skyfield/pyerfa) across any platform, CI, or serverless environment.
-
-**Switching from pyswisseph?** Your existing code works with minimal changes. [Migration guide](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/migration-guide.md).
-
-### Accuracy over deep time
-
-Because house cusps derive from the long-term Vondrák 2011 model (valid ±200,000 years) and houses and bodies share one obliquity and one ΔT, charts stay correct and internally self-consistent across the whole ±13,000-year ephemeris range, where a truncated precession polynomial drifts by degrees. Cusp *speeds* are computed as the genuine dλ/dt of the full house solution, matching the real cusp motion to **< 0.005 °/day** — including the iteratively-solved Placidus and Koch systems near the polar circle, where an analytic speed approximation can be off by tens to hundreds of °/day.
-
-Methodology: [Long-term sidereal time, precession & cusp speeds](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/sidereal-time-longterm.md). Full head-to-head with Swiss Ephemeris: [Swiss Ephemeris Comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md).
-
-### Intentional divergences from the reference API
-
-LibEphemeris aims for 1:1 API compatibility at the level of function names,
-flags, and slot semantics. A small number of behaviors are deliberately
-different, and all of them follow one criterion: **when a published definition
-or a checkable physical invariant exists, LibEphemeris follows it** — an
-ecliptic frame in which the Sun actually stays at latitude zero, a speed slot
-that is the true derivative of the reported position, an obscuration that
-respects its bounded definition, orbital elements taken from the page where
-their author printed them. Where matching the reference would instead require
-data fitted to another implementation's output, the value is derived from the
-primary source. Every divergence is documented with its rationale in
-[Intentional Divergences](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/intentional-divergences.md);
-the headline items are:
-
-| Area | What LibEphemeris does | Why |
-|------|----------------------|-----|
-| **`SIDEREAL \| J2000` on lunar points** | Honors the flag uniformly for every lunar point (mean, true, osculating, interpolated). | Without it \|TrueNode − MeanNode\| grows without bound away from J2000 — far beyond the ±1.5° physical oscillation. |
-| **Of-date mean obliquity** | Angle between the Vondrák ecliptic and equator poles (self-consistent frame). | A direction on the ecliptic (the Sun) stays at ~0° ecliptic latitude at every epoch; the separately fitted series drifts ~6″ at −3000. |
-| **`deltat_ex` purity** | `deltat_ex()` never mutates `get_tid_acc()`. | Delta-T queries should not have side effects on library state. |
-| **Total-eclipse obscuration** | `attr[2]` reports 1.0 during totality (bounded fraction). | Obscuration is a covered-area fraction \[0, 1\] by its published definition; the disc-area ratio stays derivable as `attr[1] ** 2`. |
-| **Source-audited ayanamshas** | Every mode carries a per-mode evidence status: primary publication, public catalogue/frame geometry, secondary historical attribution, or explicit project convention. | No value is fitted to another implementation's output. Modes without a recovered primary statement are not mislabeled as author transcriptions; all epochs, anchors, propagation rules, and known offsets are documented in the [sidereal-mode inventory](docs/reference/ayanamsha.md). |
-| **House-cusp speeds** | The derivative of the reported cusp position (centered finite difference). Whole Sign cusps report 0.0. | The speed slot is the derivative of the position slot, not a convention-dependent analytic approximation. |
-| **Phase angle** | Light-time-consistent geometry. | Bounded 15–40″ difference on inner planets; elongation identical. |
-| **Historical hypothetical bodies (IDs 40–58)** | Thirteen IDs compute from their primary published sources (Neely 1980, Harrington 1988, Le Verrier 1846, Adams 1846, Lowell 1915, Velichko–Larin 2007 for White Moon/Selena). IDs 48, 49, 54, 55, 57 and 58 keep their names and constants but raise `UnknownBodyError`. | A recognised name is not a numerical model: where no source-complete published definition could be recovered, failing closed is preferable to returning positions that cannot be traced to any source. The field-by-field inventory of what is missing per ID is in [Missing Hypothetical Models](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/missing-hypothetical-models.md). |
-
-Everywhere else the goal is indistinguishability, and it is met: modern-era
-planetary and lunar positions, house cusps, eclipses, rise/set, and the
-majority of sidereal modes agree with the reference API at the sub-arcsecond
-level. The divergences above are documented choices with a stated rationale
-and a measured bound — not accuracy limits. The full comparison methodology
-and per-channel bounds are in
-[Known Differences](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/known-differences.md).
-
----
-
-## Quick Start
-
-```python
-import libephemeris as swe
-from libephemeris.constants import SUN, MOON, FLG_SPEED
-
-jd = swe.julday(2000, 1, 1, 12.0)  # J2000.0
-
-sun, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
-moon, _ = swe.calc_ut(jd, MOON, FLG_SPEED)
-
-print(f"Sun:  {sun[0]:.4f} deg, speed {sun[3]:.4f} deg/day")
-print(f"Moon: {moon[0]:.4f} deg, speed {moon[3]:.4f} deg/day")
-```
-
-```python
-# House cusps (Placidus, Rome)
-cusps, ascmc = swe.houses(swe.julday(2024, 11, 5, 18.0), 41.9028, 12.4964, b"P")
-print(f"ASC: {ascmc[0]:.4f}, MC: {ascmc[1]:.4f}")
-```
-
-For concurrent or multi-threaded workloads, use `EphemerisContext` instead of the module-level global state.
-
-More examples: [Getting Started](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md)
-
----
-
-## Precision
-
-[Precision report](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/precision.md) · [full comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md).
-
-Numerical correctness is established from independent NASA JPL/ERFA sources,
-published defining conditions, explicitly labelled conventions, and
-reference-free invariants.
-
----
-
-## Four Backends, One API
-
-Choose your trade-off between speed, locality, and setup. The same `calc_ut()` interface works across all four modes, from zero-install Horizons lookups to precomputed LEB throughput.
-
-| Mode | Backend | Speed | Use case |
-|------|---------|-------|----------|
-| `"auto"` | LEB -> Horizons -> Skyfield | adaptive | **Default.** Best onboarding; resolves local or remote data transparently |
-| `"skyfield"` | JPL DE440/DE441 via Skyfield | order of 1 ms/call | High-precision local JPL workflow |
-| `"leb"` | Sealed LEB plus declared local models | order of 100 µs/call | Offline, source-pure repeated calculations; never opens JPL/BSP |
-| `"horizons"` | NASA JPL Horizons REST API | ~300 ms | No local ephemeris files required |
-
-```python
-from libephemeris import set_calc_mode
-set_calc_mode("leb")  # or via env: LIBEPHEMERIS_MODE=leb
-```
-
----
+**Numerical precision is not physical accuracy.** Source uncertainty, epoch,
+frame, centre and observer all matter; historical Delta-T can dominate timing
+uncertainty. The documented migration criteria include **0.001″ for angles** and
+**1 second for events** under aligned inputs—not universal accuracy guarantees.
+See [precision and limitations](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/limitations.md) for scope and qualifications.
+Scientific accuracy concerns the calculated quantities, not astrological interpretation.
 
 ## Installation
 
-```bash
-pip install libephemeris
+Once published, install the native beta explicitly:
+
+```sh
+python -m pip install "libephemeris==4.0.0b1"
 ```
 
-Out of the box, the wheel includes the LEB2 base-tier core for the 14 core
-bodies (1850–2150). Mean lunar
-points come from ERFA/IERS arguments;
-interpolated apsides are anchored to the actual JPL DE440 apsis passages
-(documented in the [lunar methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/interpolated-perigee.md)).
-The remaining versioned, SHA-256-pinned data-v3 groups are available through the
-normal tier download commands, while local LEB1 files remain supported.
+Before publication, [build a local wheel](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/installation.md#build-from-source).
+Wheels include the Rust engine and modern base coefficients; NumPy is the Python
+runtime dependency. Additional datasets are separate.
 
-Recommended first-time setup:
+Rust applications use [`libephemeris-core`](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/rust.md) without Python;
+`bundled-data` embeds the base image and `nbody` enables native integration.
 
-```bash
-libephemeris init                 # Optional but recommended interactive config
-libephemeris download auto        # Download exactly what your config needs
-libephemeris status               # Verify installed data and active setup
+## First calculation
+
+Tropical positions and Placidus angles for Rome, **8 April 2024 at 12:00 UTC**,
+plus a sidereal Moon position. Runs offline with the bundled data:
+
+```python
+import libephemeris as ephe
+
+# Fix the data route and clock policy before calculating.
+ephe.set_calc_mode("leb")
+ephe.set_precision_tier("base")
+ephe.set_network_policy("sealed")
+ephe.set_iers_delta_t_enabled(False)
+ephe.set_auto_spk_download(False)
+
+# utc_to_jd returns TT first, UT1 second. calc_ut and houses need UT1.
+jd_tt, jd_ut1 = ephe.utc_to_jd(2024, 4, 8, 12, 0, 0.0)
+signs = (
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+)
+
+positions = {}
+for body, name in ((ephe.SUN, "Sun"), (ephe.MOON, "Moon"), (ephe.MERCURY, "Mercury")):
+    values, returned_flags = ephe.calc_ut(jd_ut1, body, ephe.FLG_SPEED)
+    positions[name] = values
+    longitude, speed = values[0], values[3]
+    sign = signs[int(longitude // 30)]
+    motion = "retrograde" if speed < 0 else "direct"
+    print(f"{name}: {longitude % 30:.4f}° {sign}, {speed:+.4f}°/day ({motion})")
+
+# houses takes latitude, then east-positive longitude; cusps[0] is house one.
+cusps, angles = ephe.houses(jd_ut1, 41.9028, 12.4964, b"P")
+print(f"Ascendant: {angles[0]:.4f}°; Midheaven: {angles[1]:.4f}°")
+
+# A separate context keeps the sidereal choice out of the tropical calculations.
+sidereal = ephe.EphemerisContext()
+sidereal.set_sid_mode(ephe.SIDM_LAHIRI)
+moon_sidereal, _ = sidereal.calc_ut(jd_ut1, ephe.MOON, ephe.FLG_SIDEREAL)
+print(f"Moon, Lahiri sidereal longitude: {moon_sidereal[0]:.4f}°")
 ```
 
-Prefer to install a tier directly? Use one of these:
+Default positions are apparent and geocentric, in degrees and AU. `calc_ut`
+accepts UT1; `calc` accepts TT. Convert local birth times to UTC first.
+[Python conventions](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/python.md) covers units, flags and time-conversion domains.
+Some house systems are undefined at polar latitudes.
 
-```bash
-libephemeris download base         # 1850-2150, lightweight
-libephemeris download medium       # 1550-2650, >300 MB plus SPKs (recommended)
-libephemeris download extended     # DE441 core span; minor-body ranges vary
+For concurrency, use contexts for observer/sidereal state and configure shared
+resources before starting workers. Native calls release the GIL but remain synchronous.
+
+## Data and offline operation
+
+| Mode | Route |
+| --- | --- |
+| `leb` | Local coefficients/models; no implicit JPL or Horizons substitution |
+| `skyfield` | Native Rust JPL/SPK reader; historical name, no Python Skyfield backend |
+| `auto` | Configured resources and provider routing |
+| `horizons` | Explicit JPL Horizons network route |
+
+`sealed` blocks calculation-time acquisition. Provision additional resources explicitly:
+
+```sh
+libephemeris init
+libephemeris download auto
+libephemeris status -vv
 ```
 
-**Optional extras:** `pip install libephemeris[stars]` for star-catalog tooling, `[nbody]` for REBOUND/ASSIST n-body integration (GPL-3.0-or-later components — explicit opt-in), `[all]` for every permissive-licensed runtime extra. [Details](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md#optional-extras).
-
----
+Nominal JPL tiers: **1850–2150** (`base`), **1550–2650** (`medium`),
+**−13200–17191** (`extended`). Check actual per-file/body coverage, including the
+surrounding interval needed for event searches. A wider tier is not an accuracy
+guarantee. Record data versions and calculation settings for reproducibility.
+[Data setup](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/data.md) · [CLI](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/cli.md).
 
 ## Documentation
 
-- [Getting Started](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md) - installation, ephemeris tiers, first calculations
-- [Migration from PySwissEph](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/migration-guide.md) - API mapping, flag compatibility, known divergences
-- [Optional Modules](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/optional-modules.md) - optional backends and extras (star catalog, n-body, SPK kernels)
-- [Precision Tuning](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/precision-tuning.md) - configuring optional dependencies for maximum precision
-- [Computation Tracing](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/tracing.md) - discover which backend computed each body
-- [Complete API Reference](https://github.com/g-battaglia/libephemeris/blob/main/docs/api_reference.rst) - every public function, class, and constant with signatures and examples
-- [Precision Report](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/precision.md) - models chosen and measured accuracy for every calculation
-- [Compatibility Comparison](https://github.com/g-battaglia/libephemeris/blob/main/docs/comparison/index.md) - API semantics, known differences, intentional divergences, and independent validation methodology
-- [Long-term sidereal time, precession & cusp speeds](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/sidereal-time-longterm.md) - why houses and cusp speeds stay correct over ±13,000 years
-- [Delta T (ΔT)](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/delta-t.md) - the multi-era ΔT model (IERS + Stephenson-Morrison-Hohenkerk 2016 / Morrison 2021), why it is piecewise, and the model selector
-- [Flag Reference](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/flags.md) - all supported flags with examples
-- [House Systems](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/house-systems.md) - all 25 systems (26 codes) with full methodology
-- [Ayanamsha Modes](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/ayanamsha.md) - all predefined modes, source-audit status, and user mode
-- [Known Bugs & Limitations](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/known-bugs.md) - active issues and backend limitations
-- [LEB Binary Ephemeris](https://github.com/g-battaglia/libephemeris/blob/main/docs/leb/guide.md) - format, generation, LEB2 compression
-- [Horizons Backend](https://github.com/g-battaglia/libephemeris/blob/main/docs/architecture/horizons-backend.md) - HTTP client, pipeline, precision
-- [Architecture](https://github.com/g-battaglia/libephemeris/blob/main/docs/development/architecture-overview.md) - internal design and data flow
-- [Methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/overview.md) - planet centers, lunar apsides, pyerfa integration
-- [Algorithm and Data Provenance](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/algorithm-provenance.md) - complete module-by-module source map, project-authored choices, generators, and enforcement gate
-- [CLI Reference](https://github.com/g-battaglia/libephemeris/blob/main/CLI.md) - full command reference
-- [Changelog](https://github.com/g-battaglia/libephemeris/blob/main/CHANGELOG.md) - release history
-
----
-
-## Contributing
-
-Every new or materially changed numerical implementation must include an
-in-code `Provenance` section and a record in
-`docs/methodology/provenance-registry.toml`. Cite the defining public source,
-separate source values from project choices, state units/frame/time scale and
-validity limits, and identify the generator for checked-in data. Agreement with
-a compatibility target is never an acceptable source.
-
-```bash
-git clone https://github.com/g-battaglia/libephemeris.git
-cd libephemeris && uv pip install -e ".[dev]"
-poe lint                           # Ruff lint + auto-fix
-uv run python scripts/check_algorithm_provenance.py
-poe test:leb:fast                  # Recommended fast unit suite
-poe test:skyfield:fast             # Skyfield backend unit suite
-```
-
-See [CONTRIBUTING.md](https://github.com/g-battaglia/libephemeris/blob/main/CONTRIBUTING.md)
-for the full workflow, the code style, and the clean-room policy.
-
-By submitting a contribution you agree to the
-[Contributor License Agreement](https://github.com/g-battaglia/libephemeris/blob/main/CONTRIBUTING.md#contributor-license-agreement-cla--copyright-assignment):
-the copyright of your contribution is assigned to the maintainer, who may
-re-license the project under any other terms. The project stays openly
-available under the AGPL for everyone, while the re-licensing option helps
-sustain future development. Your authorship remains acknowledged in the commit
-history, in [AUTHORS](https://github.com/g-battaglia/libephemeris/blob/main/AUTHORS),
-and in the release notes.
-
----
-
-## Part of the Kerykeion Ecosystem
-
-LibEphemeris is the computation engine behind:
-
-- **[Astrologer Studio](https://www.astrologerstudio.com)** — professional online astrology software (in production)
-- **[Kerykeion](https://github.com/g-battaglia/kerykeion)** — Python astrology library (v6 alpha)
-- **[Astrologer API](https://www.kerykeion.net/astrologer-api)** — hosted REST API for astrology data and SVG charts (upcoming)
-
-Learn more at [kerykeion.net](https://kerykeion.net).
-
----
+- **Complete beginner manuals:** [Italiano](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/beginners-manual/it/README.md) · [English](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/beginners-manual/en/README.md)—fifteen chapters and twelve recipes each.
+- **Reference:** [Python](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/python.md) · [Rust](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/rust.md) · [Generated API](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/api_reference.rst) · [Documentation index](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/docs/README.md).
+- **Migration:** [API compatibility and changed behavior](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/MIGRATION.md). Familiar names and flags do not imply identical models or exception handling.
+- **Development:** [Contributing](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/CONTRIBUTING.md) · [Rust core](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/core/README.md) · [Python bindings](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/python/README.md) · [Changelog](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/CHANGELOG.md).
 
 ## License
 
-Licensed under the **[GNU Affero General Public License v3.0](LICENSE)**
-(`AGPL-3.0-only`). See [LICENSING.md](LICENSING.md) for details.
+Code: [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/COPYING). Contributions: [CLA](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/CLA.md).
+External components retain their [own terms](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/THIRD_PARTY_NOTICES.md);
+manuals retain their [original licensing notice](https://github.com/g-battaglia/libephemeris/blob/v4.0.0b1/beginners-manual/README.md#provenance-and-license).
 
-> **Note:** the optional `libephemeris[nbody]` extra pulls in `rebound` and
-> `assist` (GPL-3.0-or-later), which are not part of the core install and are
-> never bundled. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+For inquiries about private licensing, contact Giacomo Battaglia at
+[kerykeion.astrology@gmail.com](mailto:kerykeion.astrology@gmail.com).
+Requests will be evaluated on a case-by-case basis.
 
-### License history
+Project home: [github.com/g-battaglia/libephemeris](https://github.com/g-battaglia/libephemeris).
 
-Pre-releases `v3.0.0rc2` through `v3.0.0rc8` incorrectly declared
-`Apache-2.0` in their PyPI metadata. The relicensing was premature: unresolved
-components prevent an Apache-2.0 grant. Those releases are to be treated as
-**AGPL-3.0-only** and have been yanked from PyPI. All versions from
-`v3.0.0rc10` onward correctly declare `AGPL-3.0-only`.
+## Astrologer Studio
 
-LibEphemeris provides an API-compatible interface — see
-[NOTICE.md](NOTICE.md). "Swiss Ephemeris" is a product of Astrodienst AG.
+Prefer a browser application? [**Astrologer Studio**](https://www.astrologerstudio.com/)
+uses Kerykeion and Astrologer API for astrological calculations and charts—no
+Python installation or ephemeris setup required.
+
+[**Open Astrologer Studio**](https://www.astrologerstudio.com/)

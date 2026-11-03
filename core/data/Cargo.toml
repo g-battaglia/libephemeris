@@ -1,0 +1,10 @@
+[package]
+name = "libephemeris-core-data"
+version = "1.0.0-beta.1"
+edition = "2024"
+rust-version = "1.86"
+license = "AGPL-3.0"
+description = "Immutable bundled base coefficients for the LibEphemeris engine"
+readme = "README.md"
+repository = "https://github.com/g-battaglia/libephemeris"
+include = ["src/lib.rs", "leb2/base_core.leb2", "leb2/data-v4-manifest.json", "leb2/README.md", "README.md", "COPYING", "THIRD_PARTY_NOTICES.md"]
