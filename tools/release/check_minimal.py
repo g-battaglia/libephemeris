@@ -27,6 +27,19 @@ CI_PATHS = (
     "azure-pipelines.yml", "azure-pipelines.yaml", "bitbucket-pipelines.yml",
     ".travis.yml", "appveyor.yml", ".drone.yml", ".woodpecker.yml",
 )
+# This is the sole remote workflow allowed by the product boundary. These
+# checks are guardrails for review, not a sandbox for arbitrary workflow code.
+WHEEL_WORKFLOW = ".github/workflows/wheels.yml"
+WORKFLOW_FORBIDDEN = (
+    (r"\bsecrets\s*(?:\.|\[)", "secret reference"),
+    (r"\bid-token\s*:\s*['\"]?write\b", "OIDC write permission"),
+    (r"\b(?:uv|cargo|maturin)\s+publish\b", "registry publication command"),
+    (r"\btwine\s+upload\b", "registry upload command"),
+    (r"\buses\s*:\s*['\"]?[^\s#]*publish", "publication action"),
+    (r"\b(?:contents|packages|actions)\s*:\s*['\"]?write\b", "write permission"),
+    (r"\bpermissions\s*:\s*['\"]?write-all\b", "write-all permissions"),
+    (r"\bgit\s+(?:push|tag)\b", "repository mutation command"),
+)
 CORE_PATHS = (
     "src/harness", "src/foundation/python_exception*.rs",
     "src/positions/resource_*.rs", "src/positions/operand_spk.rs",
@@ -227,12 +240,27 @@ def package_errors(path: Path) -> list[str]:
     return errors
 
 
-def check(root: Path, phase: str = "P4") -> list[str]:
-    """Return violations in the package, binding and optionally completed core."""
+def workflow_errors(root: Path) -> list[str]:
+    """Permit only the reviewed build/test workflow, never publishing routes."""
     errors = []
     for pattern in CI_PATHS:
-        errors.extend(f"{path}: CI/CD is forbidden; run checks locally"
-                      for path in sorted(root.glob(pattern)))
+        for path in sorted(root.glob(pattern)):
+            if path.relative_to(root).as_posix() != WHEEL_WORKFLOW:
+                errors.append(f"{path}: CI/CD is forbidden; only {WHEEL_WORKFLOW} is allowed")
+                continue
+            # Full-line comments may explain the policy; executable content
+            # must not request credentials, publication or write permissions.
+            text = "\n".join(line for line in path.read_text().splitlines()
+                             if not line.lstrip().startswith("#"))
+            for forbidden, label in WORKFLOW_FORBIDDEN:
+                if re.search(forbidden, text, flags=re.IGNORECASE):
+                    errors.append(f"{path}: build/test-only workflow forbids {label}")
+    return errors
+
+
+def check(root: Path, phase: str = "P4") -> list[str]:
+    """Return violations in the package, binding and optionally completed core."""
+    errors = workflow_errors(root)
     package = root / "python/libephemeris"
     bindings = root / "python/src"
     if not (package / "__init__.py").is_file():

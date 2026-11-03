@@ -58,6 +58,37 @@ class MinimalPackageTests(unittest.TestCase):
                                         for error in checker.check(self.root, phase)))
                 path.unlink()
 
+    def test_only_the_build_test_wheel_workflow_is_allowed(self):
+        workflow = self.root / ".github/workflows/wheels.yml"
+        workflow.parent.mkdir(parents=True)
+        safe = ("name: Wheels\n"
+                "permissions:\n  contents: read\n"
+                "jobs:\n  build:\n    steps:\n"
+                "      - run: maturin build --release --locked\n")
+        workflow.write_text(safe)
+        for phase in ("P0", "P4"):
+            self.assertEqual(checker.check(self.root, phase), [])
+        for code in (
+            "uv publish dist/*", "cargo publish", "maturin publish",
+            "twine upload dist/*", "${{ secrets.PYPI_TOKEN }}",
+            "${{ secrets['PYPI_TOKEN'] }}", "id-token: write",
+            'id-token: "write"', "uses: pypa/gh-action-pypi-publish@v1",
+            "contents: write", "packages: write", "permissions: write-all",
+            "git push origin main", "git tag v4.0.0",
+        ):
+            with self.subTest(code=code):
+                workflow.write_text(safe + "      - run: " + code + "\n")
+                for phase in ("P0", "P4"):
+                    self.assertTrue(any("build/test-only" in error
+                                        for error in checker.check(self.root, phase)))
+
+    def test_policy_comments_do_not_enable_or_block_workflow_operations(self):
+        workflow = self.root / ".github/workflows/wheels.yml"
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text("# Never use uv publish or secrets.PYPI_TOKEN here.\n"
+                            "permissions:\n  contents: read\n")
+        self.assertEqual(checker.check(self.root), [])
+
     def test_local_checks_and_workflow_documentation_are_allowed(self):
         (self.root / "tools").mkdir()
         (self.root / "tools/local-checks.sh").write_text("cargo test\n")
