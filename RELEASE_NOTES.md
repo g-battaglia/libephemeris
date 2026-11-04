@@ -10,7 +10,11 @@ and platform availability must be checked separately from these source notes.
 ## Changes since Python 4.0.0b1
 
 The public IERS cache-age constant now has a concrete integer declaration in
-its Python stub, with a regression against duplicate import bindings. The Python
+its Python stub, with a regression against duplicate import bindings. UTC
+live-clock test references retain integer ticks through the seconds conversion;
+exact-rational checks prevent a false one-ULP interval failure without loosening
+the bounds or changing the runtime clock. Release preparation retries unsettled
+GitHub job metadata without accepting incomplete verification. The Python
 package identity advances independently of Rust core/data. Numerical models,
 coefficient bytes and the previously published releases are unchanged.
 

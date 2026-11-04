@@ -4,6 +4,11 @@
 
 - Give the public IERS cache-age constant a concrete integer type in the Python
   stub, with regression checks against duplicate import bindings.
+- Keep UTC test-reference ticks as integers until conversion to seconds. An
+  exact-rational regression demonstrates the false one-ULP Julian-day bound
+  caused by a premature float cast; the strict live-clock assertion is unchanged.
+- Retry unsettled GitHub job-conclusion metadata before final release checks,
+  while continuing to reject failures and unfinished matrices.
 - Advance only the Python distribution and binding identity. Rust core/data
   remain `1.0.0-beta.2`; scientific models and data-v4 coefficient bytes are
   unchanged. Previously published package files and source tags stay immutable.

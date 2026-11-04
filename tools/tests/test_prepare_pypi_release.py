@@ -40,6 +40,29 @@ def test_ci_gate_requires_the_exact_successful_native_matrix(problem):
             PREPARE.check_ci_run(record, sha)
 
 
+@pytest.mark.parametrize("outcome", ["eventually_successful", "still_pending", "failed_job"])
+def test_ci_monitor_retries_unsettled_job_metadata_without_accepting_it(monkeypatch, outcome):
+    sha = "a" * 40
+    successful = {"headSha": sha, "status": "completed", "conclusion": "success",
+                  "jobs": [{"name": name, "conclusion": "success"} for name in PREPARE.CI_PLATFORMS]}
+    unsettled = json.loads(json.dumps(successful))
+    unsettled["jobs"][0]["conclusion"] = "failure" if outcome == "failed_job" else None
+    records = [unsettled, successful] if outcome == "eventually_successful" else [unsettled] * 3
+    reads = iter(records)
+    watches, sleeps = [], []
+    monkeypatch.setattr(PREPARE.subprocess, "run", lambda command, **kwargs: watches.append(command))
+    monkeypatch.setattr(PREPARE, "output", lambda command: json.dumps(next(reads)))
+    monkeypatch.setattr(PREPARE.time, "sleep", sleeps.append)
+    if outcome == "eventually_successful":
+        assert PREPARE.wait_for_ci("existing-run", sha) == successful
+        assert sleeps == [10]
+    else:
+        with pytest.raises(PREPARE.ReleaseError, match="unfinished" if outcome == "still_pending" else "did not succeed"):
+            PREPARE.wait_for_ci("existing-run", sha)
+    assert all(command[:3] == ["gh", "run", "watch"] for command in watches)
+    assert len(watches) == (2 if outcome == "eventually_successful" else 3 if outcome == "still_pending" else 1)
+
+
 @pytest.mark.parametrize("kind", ["passed", "failure", "error", "skipped", "empty"])
 def test_junit_gate_rejects_failed_empty_or_entirely_skipped_suites(tmp_path, kind):
     suite = ET.Element("testsuite")

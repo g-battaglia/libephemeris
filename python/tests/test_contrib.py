@@ -1,6 +1,7 @@
 """Convenience helpers call native kernels and retain their public layouts."""
 from data_paths import CORE_LEB
 
+from fractions import Fraction
 import math
 import os
 import time
@@ -58,11 +59,34 @@ def test_houses_stars_and_sampled_walks_use_shared_engine():
     assert contrib.next_retro(2,2451545.0)>2451545.0
 
 
+def _seconds_from_ticks(ticks, ticks_per_second):
+    # Keep the integer numerator until division. Converting epoch nanoseconds
+    # to float first loses low bits before computing the seconds ratio.
+    return ticks / ticks_per_second
+
+
+@pytest.mark.parametrize("ticks,frequency", [
+    (1700000000000012432, 1000000000),
+    (-1700000000000012432, 1000000000),
+    (17000000000000124, 10000000),
+])
+def test_wall_clock_reference_rounds_the_integer_ratio_once(ticks, frequency):
+    assert _seconds_from_ticks(ticks, frequency) == float(Fraction(ticks, frequency))
+
+
+def test_premature_float_conversion_can_invalidate_a_strict_julian_interval():
+    ticks = 1700000000000012432
+    reference = float(Fraction(ticks, 1000000000)) / 86400 + 2440587.5
+    premature = (float(ticks) / 1000000000) / 86400 + 2440587.5
+    assert premature - reference == math.ulp(reference)
+    assert _seconds_from_ticks(ticks, 1000000000) / 86400 + 2440587.5 == reference
+
+
 @pytest.fixture
 def utc_wall_clock():
     """Independent precise UTC reference, including CPython 3.12 on Windows."""
     if os.name != "nt":
-        return time.time
+        return lambda: _seconds_from_ticks(time.time_ns(), 1000000000)
 
     import ctypes
     from ctypes import wintypes
@@ -80,7 +104,7 @@ def utc_wall_clock():
         clock(ctypes.byref(stamp))
         ticks = (stamp.dwHighDateTime << 32) | stamp.dwLowDateTime
         # FILETIME counts 100-ns ticks since 1601-01-01, not the Unix epoch.
-        return (ticks - 116444736000000000) / 10000000
+        return _seconds_from_ticks(ticks - 116444736000000000, 10000000)
 
     return seconds
 

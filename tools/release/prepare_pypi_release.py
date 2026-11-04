@@ -148,6 +148,12 @@ def wait_for_ci(run_id: str, sha: str) -> dict:
             time.sleep(10)
             continue
         if record["status"] == "completed":
+            # GitHub can finalize the run before its jobs endpoint publishes
+            # terminal conclusions. Retry that metadata read, never treat a
+            # missing conclusion as success or rebuild the candidate for it.
+            if record["conclusion"] == "success" and any(job.get("conclusion") is None for job in record["jobs"]):
+                time.sleep(10)
+                continue
             check_ci_run(record, sha)
             return record
         time.sleep(10)
