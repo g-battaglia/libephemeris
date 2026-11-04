@@ -2,6 +2,9 @@ from pathlib import Path
 from typing import Any, Optional, Union, Dict, Literal
 import os
 
+# Public native integer; do not hide its type behind an undeclared _core alias.
+DEFAULT_MAX_AGE_DAYS: int
+
 def set_iers_cache_dir(path: Optional[str]) -> None: ...
 def get_iers_cache_dir() -> Optional[str]: ...
 def set_iers_auto_download(enabled: Optional[bool]) -> None: ...
@@ -33,7 +36,6 @@ from libephemeris._core import (
     _module_iers_data_IERS_LEAP_SECONDS_URL_BACKUP as IERS_LEAP_SECONDS_URL_BACKUP,
     _module_iers_data_IERS_DELTA_T_URL as IERS_DELTA_T_URL,
     _module_iers_data_IERS_DELTA_T_URL_BACKUP as IERS_DELTA_T_URL_BACKUP,
-    _module_iers_data_DEFAULT_MAX_AGE_DAYS as DEFAULT_MAX_AGE_DAYS,
 )
 
 class IERSDataPoint:
