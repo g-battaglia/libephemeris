@@ -24,3 +24,9 @@ def test_public_cache_age_has_a_concrete_stub_declaration():
     ]
     assert len(declarations) == 1
     assert ast.unparse(declarations[0].annotation) == "int"
+    import_bindings = [
+        node for node in public_stub.body
+        if isinstance(node, ast.ImportFrom)
+        and any((alias.asname or alias.name) == "DEFAULT_MAX_AGE_DAYS" for alias in node.names)
+    ]
+    assert import_bindings == []
