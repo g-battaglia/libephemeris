@@ -12,14 +12,15 @@ from urllib.parse import unquote, urlsplit
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-TAG = "python-v4.0.0b1"
+TAG = "python-v4.0.0b2"
+UNCHANGED_PACKAGE_TAG = "python-v4.0.0b1"
 PROJECT_PATH = "/g-battaglia/libephemeris"
 SPEC = importlib.util.spec_from_file_location("release_link_checker", ROOT / "tools/release/check_docs.py")
 CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
 
 
-def assert_pinned_destination(target):
+def assert_pinned_destination(target, expected_tag=TAG):
     """Resolve only this project's source links, never fetch third-party pages."""
     parsed = urlsplit(target)
     assert parsed.scheme in {"https", "mailto"}, f"relative or insecure link: {target}"
@@ -31,7 +32,7 @@ def assert_pinned_destination(target):
     if relative[0] not in {"blob", "tree"}:
         return  # Issues and historical releases are not candidate source files.
     kind, reference, path = relative
-    assert reference == TAG, f"unpinned candidate source link: {target}"
+    assert reference == expected_tag, f"unpinned candidate source link: {target}"
     destination = (ROOT / unquote(path)).resolve()
     assert destination.is_relative_to(ROOT)
     assert destination.exists(), f"missing tagged destination: {target}"
@@ -40,16 +41,18 @@ def assert_pinned_destination(target):
         assert unquote(parsed.fragment) in CHECKER.anchors(destination.read_text()), target
 
 
-@pytest.mark.parametrize("name", [
-    "README.md", "core/README.md", "core/data/README.md",
-    "python/README.md", "tools/leb_generation/README.md",
+@pytest.mark.parametrize("name,tag", [
+    ("README.md", TAG), ("python/README.md", TAG),
+    ("core/README.md", UNCHANGED_PACKAGE_TAG),
+    ("core/data/README.md", UNCHANGED_PACKAGE_TAG),
+    ("tools/leb_generation/README.md", UNCHANGED_PACKAGE_TAG),
 ])
-def test_registry_readme_links_are_absolute_and_pin_candidate_source(name):
+def test_registry_readme_links_are_absolute_and_pin_candidate_source(name, tag):
     content = CHECKER.prose((ROOT / name).read_text())
     links = [match.group(1) for match in CHECKER.LINK.finditer(content)]
     assert links, f"no registry description links found: {name}"
     for target in links:
-        assert_pinned_destination(target)
+        assert_pinned_destination(target, tag)
 
 
 def test_registry_documentation_metadata_pins_the_release():
@@ -58,5 +61,5 @@ def test_registry_documentation_metadata_pins_the_release():
     core = tomllib.loads((ROOT / "core/Cargo.toml").read_text())["package"]
     assert_pinned_destination(project["urls"]["Documentation"])
     assert_pinned_destination(project["urls"]["Changelog"])
-    assert_pinned_destination(tools["urls"]["Documentation"])
+    assert_pinned_destination(tools["urls"]["Documentation"], UNCHANGED_PACKAGE_TAG)
     assert core["documentation"] == f"https://docs.rs/libephemeris-core/{core['version']}"

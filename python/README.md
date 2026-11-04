@@ -19,8 +19,8 @@ uv pip install --python .venv/bin/python dist/*.whl
 .venv/bin/python -m pytest python/tests
 ```
 
-Python version **4.0.0b1** is a pre-release. See the shared
-[beginner's manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b1/beginners-manual/en/README.md),
-[migration guide](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b1/MIGRATION.md) and [release instructions](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b1/CONTRIBUTING.md).
-For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b1/README.md#license);
+Python version **4.0.0b2** is a pre-release. See the shared
+[beginner's manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/beginners-manual/en/README.md),
+[migration guide](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/MIGRATION.md) and [release instructions](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/CONTRIBUTING.md).
+For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/README.md#license);
 requests are evaluated case by case.

@@ -36,7 +36,7 @@ def test_distribution_versions_are_deliberately_independent():
     python = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     tools = tomllib.loads((ROOT / "tools/leb_generation/pyproject.toml").read_text())["project"]
     assert core["version"] == data["version"] == "1.0.0-beta.2"
-    assert binding["package"]["version"] == "4.0.0-beta.1"
+    assert binding["package"]["version"] == "4.0.0-beta.2"
     assert binding["dependencies"]["libephemeris-core"]["version"] == "=1.0.0-beta.2"
     assert "version" not in python and python["dynamic"] == ["version"]
     assert tools["version"] == "4.0.0b1"

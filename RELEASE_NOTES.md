@@ -1,11 +1,18 @@
-# LibEphemeris 4.0.0b1 — native Rust rewrite
+# LibEphemeris 4.0.0b2 — native Rust rewrite
 
-**Beta candidate:** Python `4.0.0b1`; Rust core/data `1.0.0-beta.2`.
-Source tag: `python-v4.0.0b1`. The earlier `v4.0.0b1` tag and published Rust
+**Beta candidate:** Python `4.0.0b2`; Rust core/data `1.0.0-beta.2`.
+Source tag: `python-v4.0.0b2`. The earlier `v4.0.0b1` tag and published Rust
 `1.0.0-beta.1` packages remain unchanged. PyPI and crates.io publication are
 separate maintainer operations.
 This is a prerelease, not the promotion of v4 to stable. Registry publication
 and platform availability must be checked separately from these source notes.
+
+## Changes since Python 4.0.0b1
+
+The public IERS cache-age constant now has a concrete integer declaration in
+its Python stub, with a regression against duplicate import bindings. The Python
+package identity advances independently of Rust core/data. Numerical models,
+coefficient bytes and the previously published releases are unchanged.
 
 ## A complete engine rewrite
 

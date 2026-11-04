@@ -25,11 +25,12 @@ data from `~/.libephemeris` or `LIBEPHEMERIS_TEST_DATA_DIR`, as usual.
 
 ## 1. Prepare the release commit
 
-1. Choose unused registry versions. This candidate keeps Python `4.0.0b1`
-   (Cargo `4.0.0-beta.1`) and prepares Rust crates `1.0.0-beta.2`. Review the
+1. Choose unused registry versions. This candidate advances Python to `4.0.0b2`
+   (Cargo `4.0.0-beta.2`) and retains Rust crates `1.0.0-beta.2`. Review the
    exact dependencies and `Cargo.lock`; scientific data-v4 bytes stay unchanged.
-2. Pin README/project source links to `python-v4.0.0b1`, not the already frozen
-   `v4.0.0b1`. The script and Sphinx read the source tag from the `Documentation`
+2. Pin Python README/project source links to `python-v4.0.0b2`, not the frozen
+   `v4.0.0b1` or `python-v4.0.0b1`. Descriptions for unchanged Rust/tools packages
+   retain their existing release-tag links. The script and Sphinx read the source tag from the `Documentation`
    URL in `pyproject.toml`; release-link tests must agree.
 3. Update `CHANGELOG.md`, run the [local checks](../CONTRIBUTING.md#build-and-test-locally),
    commit and push. The push starts CI.
@@ -71,7 +72,7 @@ rebuild them after any file is published. Verify the installed release:
 
 ```bash
 uv run --isolated --no-project --refresh --python 3.12 \
-  --with libephemeris==4.0.0b1 python -I -c 'import libephemeris; print(libephemeris.__version__)'
+  --with libephemeris==4.0.0b2 python -I -c 'import libephemeris; print(libephemeris.__version__)'
 ```
 
 ## From `main` or from a dedicated branch

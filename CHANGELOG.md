@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.0b2 (Python) — Candidate
+
+- Give the public IERS cache-age constant a concrete integer type in the Python
+  stub, with regression checks against duplicate import bindings.
+- Advance only the Python distribution and binding identity. Rust core/data
+  remain `1.0.0-beta.2`; scientific models and data-v4 coefficient bytes are
+  unchanged. Previously published package files and source tags stay immutable.
+
 ## 4.0.0b1 (Python) · 1.0.0-beta.2 (Rust crates) — Candidate
 
 - Discover the native user profile when `HOME` is absent, including Windows
