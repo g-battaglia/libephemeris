@@ -1,9 +1,19 @@
-# LibEphemeris 4.0.0b3 — native Rust rewrite
+# LibEphemeris 4.0.0b4 — native Rust rewrite
 
-**Beta candidate:** Python `4.0.0b3`; Rust core `1.0.0-beta.3`; unchanged data crate `1.0.0-beta.2`.
-Source tag: `python-v4.0.0b3`. Earlier tags and published packages remain immutable.
+**Beta candidate:** Python `4.0.0b4`; Rust core `1.0.0-beta.4`; unchanged data crate `1.0.0-beta.2`.
+Source tag: `python-v4.0.0b4`. Earlier tags and published packages remain immutable.
 This is a prerelease, not the promotion of v4 to stable. Registry publication
 and platform availability must be checked separately from these source notes.
+
+## Empty-path compatibility
+
+An empty explicit path selects the current directory, matching the historic
+Python `abspath("")` behavior. `None` restores default discovery; `"."` remains
+an explicit current-directory selection. Normalization happens in the Rust
+runtime, so Python and Rust callers cannot retain an invalid empty path.
+Repeated empty/dot selections preserve readers. This supersedes the prepared
+b3 interpretation without moving its source tag. Do not upload superseded b3
+artifacts. Numerical formulas and coefficient bytes are unchanged.
 
 ## Changes since Python 4.0.0b2
 

@@ -484,6 +484,8 @@ impl Runtime {
     }
 
     /// Set the explicit JPL search directory, or clear it with `None`.
+    /// An empty path selects `.` (the current directory), matching the historic
+    /// Python `abspath("")` contract instead of retaining an invalid empty path.
     ///
     /// An unchanged path is a no-op. A changed path retires runtime LEB
     /// discovery, optional centers and the current main-image association,
@@ -496,6 +498,13 @@ impl Runtime {
     /// consumers still report missing or invalid required data. No download is
     /// requested by this setter.
     pub fn set_ephe_path(&self, path: Option<PathBuf>) {
+        let path = path.map(|path| {
+            if path.as_os_str().is_empty() {
+                PathBuf::from(".")
+            } else {
+                path
+            }
+        });
         let mut state = self.lock();
         if state.context.paths().jpl_dir == path {
             return;
@@ -1666,6 +1675,31 @@ mod tests {
             drop(before);
             assert!(retired.upgrade().is_none());
         }
+    }
+
+    #[test]
+    fn empty_ephe_path_selects_current_directory_and_none_restores_discovery() {
+        let runtime = Runtime::default();
+        let default = runtime.library_path().unwrap();
+        runtime.set_ephe_path(Some(PathBuf::new()));
+        assert_eq!(
+            runtime.library_path().unwrap(),
+            std::env::current_dir().unwrap()
+        );
+        assert_eq!(
+            runtime.lock().context.paths().jpl_dir,
+            Some(PathBuf::from("."))
+        );
+        runtime.release_data_cache().unwrap();
+        let generation = runtime.leb_reader_generation();
+        runtime.set_ephe_path(Some(PathBuf::from(".")));
+        assert_eq!(runtime.leb_reader_generation(), generation);
+        runtime.set_ephe_path(Some(PathBuf::new()));
+        assert_eq!(runtime.leb_reader_generation(), generation);
+        runtime.set_ephe_path(None);
+        assert_eq!(runtime.library_path().unwrap(), default);
+        assert_eq!(runtime.lock().context.paths().jpl_dir, None);
+        runtime.release_data_cache().unwrap();
     }
 
     #[test]

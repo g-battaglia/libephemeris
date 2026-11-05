@@ -35,10 +35,10 @@ def test_distribution_versions_are_deliberately_independent():
     binding = tomllib.loads((ROOT / "python/Cargo.toml").read_text())
     python = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     tools = tomllib.loads((ROOT / "tools/leb_generation/pyproject.toml").read_text())["project"]
-    assert core["version"] == "1.0.0-beta.3"
+    assert core["version"] == "1.0.0-beta.4"
     assert data["version"] == "1.0.0-beta.2"
-    assert binding["package"]["version"] == "4.0.0-beta.3"
-    assert binding["dependencies"]["libephemeris-core"]["version"] == "=1.0.0-beta.3"
+    assert binding["package"]["version"] == "4.0.0-beta.4"
+    assert binding["dependencies"]["libephemeris-core"]["version"] == "=1.0.0-beta.4"
     assert "version" not in python and python["dynamic"] == ["version"]
     assert tools["version"] == "4.0.0b1"
     assert all(item["license"] == "AGPL-3.0" for item in (core, data, binding["package"], python, tools))

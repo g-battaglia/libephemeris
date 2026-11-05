@@ -397,7 +397,8 @@ fn set_topo(py: Python<'_>, lon: f64, lat: f64, alt: f64) -> PyResult<()> {
         .set_topo(lon, lat, alt)
         .map_err(|error| crate::errors::to_pyerr(py, error))
 }
-/// Set the main-kernel search directory; None or an empty path restores discovery.
+/// Set the main-kernel search directory; None restores default discovery.
+/// An empty path selects the current directory, like "." and historic abspath("").
 ///
 /// An unchanged path preserves resources. A changed path retires default
 /// main/reader/center discovery while active snapshots keep their images;
@@ -406,7 +407,7 @@ fn set_topo(py: Python<'_>, lon: f64, lat: f64, alt: f64) -> PyResult<()> {
 /// ignored here). No directory is created and no download is initiated.
 #[pyfunction(signature = (path=None))]
 fn set_ephe_path(py: Python<'_>, path: Option<PathBuf>) {
-    py.detach(|| runtime().set_ephe_path(path.filter(|path| !path.as_os_str().is_empty())));
+    py.detach(|| runtime().set_ephe_path(path));
 }
 /// Select an explicit main JPL filename string for future acquisition; return None.
 /// No file is opened or validated now. Changed selection retires the current

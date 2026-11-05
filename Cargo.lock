@@ -374,7 +374,7 @@ checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
 name = "libephemeris-core"
-version = "1.0.0-beta.3"
+version = "1.0.0-beta.4"
 dependencies = [
  "chrono",
  "libephemeris-core-data",
@@ -397,7 +397,7 @@ version = "1.0.0-beta.2"
 
 [[package]]
 name = "libephemeris-python"
-version = "4.0.0-beta.3"
+version = "4.0.0-beta.4"
 dependencies = [
  "libephemeris-core",
  "numpy",

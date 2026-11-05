@@ -11,7 +11,7 @@ def test_cli_version_returns_success(monkeypatch, capfd):
     assert cli_main() == 0
     output = capfd.readouterr()
     assert "libephemeris" in output.out.lower()
-    assert "4.0.0b3" in output.out
+    assert "4.0.0b4" in output.out
     assert output.err == ""
 
 

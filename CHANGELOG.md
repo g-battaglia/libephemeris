@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.0b4 (Python) · 1.0.0-beta.4 (Rust core) — Candidate
+
+- Normalize an empty explicit ephemeris path to `.` in the Rust runtime, preserving the historic Python current-directory behavior. `None` restores default discovery. Repeated empty/dot selections preserve readers.
+- Cover lookup, cache release, default restoration and reader-generation identity in both Rust and Python.
+- Supersede the prepared b3 empty-as-default interpretation without moving its source tag. Data bytes, numerical formulas and the data crate version remain unchanged.
+
 ## 4.0.0b3 (Python) · 1.0.0-beta.3 (Rust core) — Candidate
 
 - Release completed file pages after checksum verification on Linux. Explicit reader cooling preserves decoded coefficient caches and never changes the reader strategy.

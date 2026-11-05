@@ -84,12 +84,21 @@ def test_horizons_selection_does_not_open_leb(tmp_path):
     assert eph.get_calc_mode() == "horizons"
 
 
-def test_empty_ephe_path_restores_default_discovery(tmp_path):
+def test_empty_ephe_path_selects_current_directory_and_none_restores_discovery(tmp_path):
+    from pathlib import Path
+
     eph.set_ephe_path(None)
     default = eph.get_library_path()
     eph.set_ephe_path(str(tmp_path))
     assert eph.get_library_path() == str(tmp_path)
     eph.set_ephe_path("")
+    assert eph.get_library_path() == str(Path.cwd())
+    eph.release_data_cache()
+    generation = eph.get_leb_reader_generation()
+    eph.set_ephe_path(".")
+    assert eph.get_library_path() == str(Path.cwd())
+    assert eph.get_leb_reader_generation() == generation
+    eph.set_ephe_path(None)
     assert eph.get_library_path() == default
     eph.release_data_cache()
 
