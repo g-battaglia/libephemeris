@@ -1691,11 +1691,28 @@ mod tests {
             Some(PathBuf::from("."))
         );
         runtime.release_data_cache().unwrap();
+        runtime.set_calc_mode(Some("leb")).unwrap();
+        runtime.set_leb_file(Some(crate::test_data::core_leb_path()));
+        runtime.set_iers_delta_t_enabled(Some(false));
+        let snapshot = runtime.shared_session().unwrap();
+        let reader = runtime.leb_reader().unwrap().unwrap();
+        let expected = runtime
+            .calc_ut(2451545.0, SUN, FLG_SWIEPH | FLG_SPEED)
+            .unwrap();
         let generation = runtime.leb_reader_generation();
-        runtime.set_ephe_path(Some(PathBuf::from(".")));
-        assert_eq!(runtime.leb_reader_generation(), generation);
-        runtime.set_ephe_path(Some(PathBuf::new()));
-        assert_eq!(runtime.leb_reader_generation(), generation);
+        for path in [PathBuf::from("."), PathBuf::new(), PathBuf::from(".")] {
+            runtime.set_ephe_path(Some(path));
+            assert_eq!(runtime.leb_reader_generation(), generation);
+            assert!(Arc::ptr_eq(&snapshot, &runtime.shared_session().unwrap()));
+            assert!(reader.shares_image_with(&runtime.leb_reader().unwrap().unwrap()));
+            assert_eq!(
+                runtime
+                    .calc_ut(2451545.0, SUN, FLG_SWIEPH | FLG_SPEED)
+                    .unwrap(),
+                expected
+            );
+            runtime.release_data_cache().unwrap();
+        }
         runtime.set_ephe_path(None);
         assert_eq!(runtime.library_path().unwrap(), default);
         assert_eq!(runtime.lock().context.paths().jpl_dir, None);

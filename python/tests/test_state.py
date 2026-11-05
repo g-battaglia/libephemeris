@@ -94,10 +94,18 @@ def test_empty_ephe_path_selects_current_directory_and_none_restores_discovery(t
     eph.set_ephe_path("")
     assert eph.get_library_path() == str(Path.cwd())
     eph.release_data_cache()
+    reader = eph.get_leb_reader()
+    expected = eph.calc_ut(2451545.0, 0, 258)
+    expected_vector = reader.eval_body(0, 2451545.0)
     generation = eph.get_leb_reader_generation()
-    eph.set_ephe_path(".")
-    assert eph.get_library_path() == str(Path.cwd())
-    assert eph.get_leb_reader_generation() == generation
+    for path in (".", "", "."):
+        eph.set_ephe_path(path)
+        assert eph.get_library_path() == str(Path.cwd())
+        assert eph.get_leb_reader_generation() == generation
+        assert not reader.closed
+        assert reader.eval_body(0, 2451545.0) == expected_vector
+        assert eph.calc_ut(2451545.0, 0, 258) == expected
+        eph.release_data_cache()
     eph.set_ephe_path(None)
     assert eph.get_library_path() == default
     eph.release_data_cache()
