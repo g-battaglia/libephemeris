@@ -234,14 +234,20 @@ impl PositionalFile {
         let mut hasher = Sha256::new();
         let mut buffer = vec![0; 64 * 1024];
         let mut offset = 0;
+        let mut advice = super::storage::HashCacheAdvice::new(&self.file);
         while offset < self.len() {
             let count = buffer.len().min(self.len() - offset);
             self.read_exact(offset, &mut buffer[..count])?;
             hasher.update(&buffer[..count]);
             offset += count;
+            advice.consumed(offset as u64);
         }
         self.validate_identity()?;
         Ok(crate::download::hex_of(&hasher.finalize()))
+    }
+
+    pub(super) fn release_pages(&self) {
+        super::storage::release_file_cache(&self.file);
     }
 }
 

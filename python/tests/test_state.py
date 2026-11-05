@@ -84,6 +84,45 @@ def test_horizons_selection_does_not_open_leb(tmp_path):
     assert eph.get_calc_mode() == "horizons"
 
 
+def test_empty_ephe_path_restores_default_discovery(tmp_path):
+    eph.set_ephe_path(None)
+    default = eph.get_library_path()
+    eph.set_ephe_path(str(tmp_path))
+    assert eph.get_library_path() == str(tmp_path)
+    eph.set_ephe_path("")
+    assert eph.get_library_path() == default
+    eph.release_data_cache()
+
+
+def test_cooling_never_acquires_missing_readers(tmp_path):
+    eph.close()
+    eph.set_leb_file(str(tmp_path / "missing.leb2"))
+    assert eph.cool_leb_readers() == 0
+
+
+def test_reader_generation_tracks_invalidation_without_acquiring_data(tmp_path):
+    """Metadata caches can detect changed discovery without opening any file."""
+    generation = eph.get_leb_reader_generation()
+    assert eph.get_leb_reader_generation() == generation
+    eph.set_leb_file(str(tmp_path / "missing-generation-fixture.leb2"))
+    changed = eph.get_leb_reader_generation()
+    assert changed != generation
+    assert eph.cool_leb_readers() == 0
+    eph.set_leb_file(str(tmp_path / "missing-generation-fixture.leb2"))
+    assert eph.get_leb_reader_generation() == changed
+
+
+def test_cooling_keeps_live_reader_and_results_valid():
+    first = eph.get_leb_reader()
+    expected = first.eval_body(0, 2451545.0)
+    assert eph.cool_leb_readers(clear_coefficients=False) >= 1
+    assert first.eval_body(0, 2451545.0) == expected
+    assert eph.cool_leb_readers() >= 1
+    assert not first.closed
+    assert first.eval_body(0, 2451545.0) == expected
+    assert eph.cool_leb_readers() >= 1
+
+
 def test_reload_retains_explicit_overrides(monkeypatch):
     eph.close()
     eph.set_calc_mode(None)

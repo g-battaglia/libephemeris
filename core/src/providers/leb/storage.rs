@@ -139,6 +139,9 @@ impl ImageStorage {
     /// Existing borrows remain valid; re-faults read the identical immutable data.
     /// Not guaranteed to release every page, especially with other active readers.
     pub(super) fn release_pages(&self) {
+        if let Self::Positional(file) = self {
+            file.release_pages();
+        }
         if let Self::Mapped { map, file } = self {
             #[cfg(unix)]
             {
@@ -180,6 +183,68 @@ pub(crate) fn release_file_cache(file: &File) {
     let _ = file;
 }
 
+/// Retire only fully consumed pages during a sequential integrity scan.
+/// Advice is best effort and never changes the digest or read error semantics.
+/// Ordinary coefficient reads do not use this helper, preserving their hot cache.
+pub(crate) struct HashCacheAdvice<'a> {
+    file: &'a File,
+    consumed: u64,
+    released: u64,
+}
+
+impl<'a> HashCacheAdvice<'a> {
+    pub(crate) fn new(file: &'a File) -> Self {
+        Self {
+            file,
+            consumed: 0,
+            released: 0,
+        }
+    }
+
+    pub(crate) fn consumed(&mut self, offset: u64) {
+        self.consumed = offset;
+        if self.consumed.saturating_sub(self.released) >= 8 * 1024 * 1024 {
+            self.release();
+        }
+    }
+
+    fn release(&mut self) {
+        #[cfg(target_os = "linux")]
+        {
+            let page = rustix::param::page_size() as u64;
+            let end = self.consumed / page * page;
+            if let Some(len) = std::num::NonZeroU64::new(end.saturating_sub(self.released)) {
+                advise_hash_range(self.file, self.released, len);
+                self.released = end;
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = self.file;
+            self.released = self.consumed;
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn advise_hash_range(file: &File, offset: u64, length: std::num::NonZeroU64) {
+    #[cfg(test)]
+    tests::HASH_ADVICE.with(|ranges| {
+        if let Some(ranges) = ranges.borrow_mut().as_mut() {
+            ranges.push((offset, length.get()));
+        }
+    });
+    let _ = rustix::fs::fadvise(file, offset, Some(length), rustix::fs::Advice::DontNeed);
+}
+
+impl Drop for HashCacheAdvice<'_> {
+    fn drop(&mut self) {
+        // Also release the completed prefix on a failed read, without touching
+        // an unread range or the unaligned tail of the final page.
+        self.release();
+    }
+}
+
 /// Best-effort release of filesystem cache below an explicitly supplied data
 /// directory. No file contents are read, changed or deleted. Directory symlinks
 /// are not descended (no cycles); file symlinks to regular files follow stat/open
@@ -213,6 +278,37 @@ pub fn release_data_cache(directory: &Path) {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    thread_local! {
+        pub(super) static HASH_ADVICE: std::cell::RefCell<Option<Vec<(u64, u64)>>> = const {
+            std::cell::RefCell::new(None)
+        };
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn hash_advice_releases_only_completed_pages_including_on_early_exit() {
+        let file = File::open(crate::test_data::core_leb_path()).unwrap();
+        let page = rustix::param::page_size() as u64;
+        let threshold = 8 * 1024 * 1024;
+        HASH_ADVICE.with(|ranges| *ranges.borrow_mut() = Some(Vec::new()));
+        {
+            let mut advice = HashCacheAdvice::new(&file);
+            advice.consumed(threshold - 1);
+            HASH_ADVICE.with(|ranges| assert!(ranges.borrow().as_ref().unwrap().is_empty()));
+            advice.consumed(threshold);
+            // Model an early read failure after one additional complete page.
+            advice.consumed(threshold + page + 1);
+        }
+        let ranges = HASH_ADVICE.with(|ranges| ranges.borrow_mut().take().unwrap());
+        assert_eq!(ranges, [(0, threshold), (threshold, page)]);
+        assert!(
+            ranges
+                .iter()
+                .all(|(offset, len)| offset % page == 0 && len % page == 0)
+        );
+    }
     #[test]
     fn advice_ranges_use_host_page_alignment_without_overflow() {
         for page in [4096, 16384] {

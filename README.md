@@ -2,13 +2,13 @@
 
 **High-precision astrological ephemerides in Rust and Python, built on NASA/JPL data and published astronomical standards.**
 
-**Beta:** Python `4.0.0b2` · Rust `1.0.0-beta.2` · Python 3.12+ · [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/COPYING).
+**Beta:** Python `4.0.0b3` · Rust `1.0.0-beta.3` · Python 3.12+ · [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/COPYING).
 
-[Get started](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/README.md#first-calculation) · [Scientific precision](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/README.md#scientific-precision)
-· [Italian manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/beginners-manual/it/README.md)
-· [English manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/beginners-manual/en/README.md)
-· [Documentation](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/README.md)
-· [v4 beta release notes](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/RELEASE_NOTES.md)
+[Get started](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/README.md#first-calculation) · [Scientific precision](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/README.md#scientific-precision)
+· [Italian manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/beginners-manual/it/README.md)
+· [English manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/beginners-manual/en/README.md)
+· [Documentation](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/README.md)
+· [v4 beta release notes](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/RELEASE_NOTES.md)
 
 ## Kerykeion ecosystem
 
@@ -40,7 +40,7 @@ Subscriptions support Kerykeion development.
 | **Stars and minor bodies** | 1,447-star catalog; supported asteroids, centaurs and trans-Neptunian bodies with suitable data |
 | **Local sky** | Topocentric positions, rise/set/transit, refraction, twilight and visibility models |
 
-The [cookbook](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/beginners-manual/en/15-cookbook.md) turns these primitives into
+The [cookbook](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/beginners-manual/en/15-cookbook.md) turns these primitives into
 twelve practical recipes. Interpretation and aspect orbs remain application choices.
 
 ## Scientific precision
@@ -50,7 +50,7 @@ twelve practical recipes. Interpretation and aspect orbs remain application choi
 - **Clocks:** explicit UTC/UT1/TT handling, Stephenson–Morrison–Hohenkerk (2016) historical Delta-T reconstruction and supported IERS inputs.
 - **Validation:** identified JPL data, published standards, high-precision mathematical constructions and physical invariants—not output matching as a scientific source.
 
-The [source register](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/sources.md) documents provenance and separates published
+The [source register](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/sources.md) documents provenance and separates published
 models from project conventions. Source-incomplete hypothetical models fail
 rather than return invented orbits.
 
@@ -58,7 +58,7 @@ rather than return invented orbits.
 frame, centre and observer all matter; historical Delta-T can dominate timing
 uncertainty. The documented migration criteria include **0.001″ for angles** and
 **1 second for events** under aligned inputs—not universal accuracy guarantees.
-See [precision and limitations](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/limitations.md) for scope and qualifications.
+See [precision and limitations](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/limitations.md) for scope and qualifications.
 Scientific accuracy concerns the calculated quantities, not astrological interpretation.
 
 ## Installation
@@ -66,14 +66,14 @@ Scientific accuracy concerns the calculated quantities, not astrological interpr
 Once published, install the native beta explicitly:
 
 ```sh
-python -m pip install "libephemeris==4.0.0b2"
+python -m pip install "libephemeris==4.0.0b3"
 ```
 
-Before publication, [build a local wheel](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/installation.md#build-from-source).
+Before publication, [build a local wheel](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/installation.md#build-from-source).
 Wheels include the Rust engine and modern base coefficients; NumPy is the Python
 runtime dependency. Additional datasets are separate.
 
-Rust applications use [`libephemeris-core`](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/rust.md) without Python;
+Rust applications use [`libephemeris-core`](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/rust.md) without Python;
 `bundled-data` embeds the base image and `nbody` enables native integration.
 
 ## First calculation
@@ -120,7 +120,7 @@ print(f"Moon, Lahiri sidereal longitude: {moon_sidereal[0]:.4f}°")
 
 Default positions are apparent and geocentric, in degrees and AU. `calc_ut`
 accepts UT1; `calc` accepts TT. Convert local birth times to UTC first.
-[Python conventions](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/python.md) covers units, flags and time-conversion domains.
+[Python conventions](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/python.md) covers units, flags and time-conversion domains.
 Some house systems are undefined at polar latitudes.
 
 For concurrency, use contexts for observer/sidereal state and configure shared
@@ -147,20 +147,20 @@ Nominal JPL tiers: **1850–2150** (`base`), **1550–2650** (`medium`),
 **−13200–17191** (`extended`). Check actual per-file/body coverage, including the
 surrounding interval needed for event searches. A wider tier is not an accuracy
 guarantee. Record data versions and calculation settings for reproducibility.
-[Data setup](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/data.md) · [CLI](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/cli.md).
+[Data setup](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/data.md) · [CLI](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/cli.md).
 
 ## Documentation
 
-- **Complete beginner manuals:** [Italiano](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/beginners-manual/it/README.md) · [English](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/beginners-manual/en/README.md)—fifteen chapters and twelve recipes each.
-- **Reference:** [Python](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/python.md) · [Rust](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/rust.md) · [Generated API](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/api_reference.rst) · [Documentation index](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/README.md).
-- **Migration:** [API compatibility and changed behavior](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/MIGRATION.md). Familiar names and flags do not imply identical models or exception handling.
-- **Development:** [Contributing](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/CONTRIBUTING.md) · [Rust core](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/core/README.md) · [Python bindings](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/python/README.md) · [Changelog](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/CHANGELOG.md).
+- **Complete beginner manuals:** [Italiano](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/beginners-manual/it/README.md) · [English](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/beginners-manual/en/README.md)—fifteen chapters and twelve recipes each.
+- **Reference:** [Python](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/python.md) · [Rust](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/rust.md) · [Generated API](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/api_reference.rst) · [Documentation index](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/README.md).
+- **Migration:** [API compatibility and changed behavior](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/MIGRATION.md). Familiar names and flags do not imply identical models or exception handling.
+- **Development:** [Contributing](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/CONTRIBUTING.md) · [Rust core](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/core/README.md) · [Python bindings](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/python/README.md) · [Changelog](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/CHANGELOG.md).
 
 ## License
 
-Code: [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/COPYING). Contributions: [CLA](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/CLA.md).
-External components retain their [own terms](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/THIRD_PARTY_NOTICES.md);
-manuals retain their [original licensing notice](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/beginners-manual/README.md#provenance-and-license).
+Code: [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/COPYING). Contributions: [CLA](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/CLA.md).
+External components retain their [own terms](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/THIRD_PARTY_NOTICES.md);
+manuals retain their [original licensing notice](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/beginners-manual/README.md#provenance-and-license).
 
 For inquiries about private licensing, contact Giacomo Battaglia at
 [kerykeion.astrology@gmail.com](mailto:kerykeion.astrology@gmail.com).

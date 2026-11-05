@@ -778,6 +778,50 @@ impl Runtime {
         Ok(())
     }
 
+    /// Cool all retained LEB images without discovering or acquiring new data.
+    /// Active evaluations keep their borrowed coefficients. File cache advice
+    /// uses acquired descriptors, independently of subsequent path configuration.
+    /// With `clear_coefficients=false`, retain the bounded decoded cache for
+    /// warm queries and release only file pages. Returns images visited, not bytes.
+    pub fn cool_leb_readers(&self, clear_coefficients: bool) -> usize {
+        let readers = {
+            let state = self.lock();
+            let mut readers: Vec<LebFile> = Vec::new();
+            for reader in state
+                .reader
+                .iter()
+                .map(|(_, reader)| reader)
+                .chain(state.context.leb_files().iter())
+                .chain(
+                    state
+                        .cached_session
+                        .iter()
+                        .flat_map(|cached| cached.session.context().leb_files().iter()),
+                )
+            {
+                if !readers.iter().any(|seen| seen.shares_image_with(reader)) {
+                    readers.push(reader.clone());
+                }
+            }
+            readers
+        };
+        for reader in &readers {
+            if clear_coefficients {
+                reader.cool();
+            } else {
+                reader.release_file_pages();
+            }
+        }
+        readers.len()
+    }
+
+    /// Opaque invalidation token for caches derived from selected LEB images.
+    /// Changes when discovery is retired, including after provisioning; compare
+    /// for equality only. Does not open readers, scan directories or hash files.
+    pub fn leb_reader_generation(&self) -> u64 {
+        self.lock().reader_generation
+    }
+
     /// Replace the context-local angle cache with owned scalar values.
     pub fn set_angles_cache(&self, values: &HashMap<String, f64>) {
         self.edit().context.set_angles_cache(values);
@@ -1622,6 +1666,80 @@ mod tests {
             drop(before);
             assert!(retired.upgrade().is_none());
         }
+    }
+
+    #[test]
+    fn cooling_visits_distinct_equal_images_but_clones_only_once() {
+        let path = crate::test_data::core_leb_path();
+        let first = LebFile::open(&path).unwrap();
+        let second = LebFile::open(&path).unwrap();
+        assert_eq!(first, second);
+        assert!(!first.shares_image_with(&second));
+        assert!(first.shares_image_with(&first.clone()));
+        let expected = first.eval_body_any(0, 2451545.0).unwrap();
+        assert_eq!(second.eval_body_any(0, 2451545.0).unwrap(), expected);
+        let mut context = EphemerisContext::new();
+        context.attach_leb_file(first.clone());
+        context.attach_leb_file(first.clone());
+        context.attach_leb_file(second.clone());
+        let runtime = Runtime::from_context(context);
+        assert_eq!(runtime.cool_leb_readers(true), 2);
+        assert_eq!(first.chunk_cache_memory().unwrap().0, 0);
+        assert_eq!(second.chunk_cache_memory().unwrap().0, 0);
+        assert_eq!(first.eval_body_any(0, 2451545.0).unwrap(), expected);
+        assert_eq!(second.eval_body_any(0, 2451545.0).unwrap(), expected);
+    }
+
+    #[test]
+    fn cooling_visits_readers_retained_only_by_the_cached_session() {
+        let reader = LebFile::open(&crate::test_data::core_leb_path()).unwrap();
+        let expected = reader.eval_body_any(0, 2451545.0).unwrap();
+        let mut context = EphemerisContext::new();
+        context.attach_leb_file(reader.clone());
+        let session = Arc::new(crate::engine_api::Session::from_context(context));
+        let runtime = Runtime::default();
+        runtime.lock().cached_session = Some(CachedSession {
+            session: Arc::clone(&session),
+            resources: SessionResources::All,
+        });
+        assert!(runtime.lock().reader.is_empty());
+        assert!(runtime.lock().context.leb_files().is_empty());
+        let warm = reader.chunk_cache_memory().unwrap();
+        assert!(warm.0 > 0);
+        assert_eq!(runtime.cool_leb_readers(false), 1);
+        assert_eq!(reader.chunk_cache_memory().unwrap(), warm);
+        assert_eq!(runtime.cool_leb_readers(true), 1);
+        assert_eq!(reader.chunk_cache_memory().unwrap().0, 0);
+        assert!(Arc::ptr_eq(&session, &runtime.shared_session().unwrap()));
+        assert_eq!(reader.eval_body_any(0, 2451545.0).unwrap(), expected);
+    }
+
+    #[test]
+    fn cooling_retains_snapshot_and_never_discovers_readers() {
+        let runtime = Runtime::default();
+        runtime.set_calc_mode(Some("leb")).unwrap();
+        runtime.set_leb_file(Some(PathBuf::from("missing-cooling-fixture.leb2")));
+        assert_eq!(runtime.cool_leb_readers(true), 0);
+        assert_eq!(runtime.cool_leb_readers(false), 0);
+        runtime.set_leb_file(Some(crate::test_data::core_leb_path()));
+        runtime.set_iers_delta_t_enabled(Some(false));
+        let snapshot = runtime.shared_session().unwrap();
+        let reader = snapshot.context().leb_files()[0].clone();
+        let expected = reader.eval_body_any(0, 2451545.0).unwrap();
+        let cache_before = reader.chunk_cache_memory().unwrap();
+        assert!(cache_before.0 > 0);
+        assert_eq!(
+            runtime.cool_leb_readers(false),
+            snapshot.context().leb_files().len()
+        );
+        assert_eq!(reader.chunk_cache_memory().unwrap(), cache_before);
+        assert_eq!(
+            runtime.cool_leb_readers(true),
+            snapshot.context().leb_files().len()
+        );
+        assert_eq!(reader.chunk_cache_memory().unwrap().0, 0);
+        assert!(Arc::ptr_eq(&snapshot, &runtime.shared_session().unwrap()));
+        assert_eq!(reader.eval_body_any(0, 2451545.0).unwrap(), expected);
     }
 
     #[test]

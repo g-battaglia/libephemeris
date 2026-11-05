@@ -1,6 +1,6 @@
 [package]
 name = "libephemeris-core"
-version = "1.0.0-beta.2"
+version = "1.0.0-beta.3"
 edition = "2024"
 rust-version = "1.86"
 license = "AGPL-3.0"
@@ -8,7 +8,7 @@ description = "Astrological ephemerides and astronomical calculation engine in R
 readme = "README.md"
 repository = "https://github.com/g-battaglia/libephemeris"
 homepage = "https://github.com/g-battaglia/libephemeris"
-documentation = "https://docs.rs/libephemeris-core/1.0.0-beta.2"
+documentation = "https://docs.rs/libephemeris-core/1.0.0-beta.3"
 keywords = ["astrology", "ephemeris", "astronomy", "jpl", "astrometry"]
 categories = ["science"]
 

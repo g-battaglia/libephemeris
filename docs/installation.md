@@ -1,7 +1,7 @@
 # Installation
 
-Python requires **3.12+**. The current candidate is Python `4.0.0b2` and Rust
-`1.0.0-beta.2`. These instructions do not imply that a candidate has already
+Python requires **3.12+**. The current candidate is Python `4.0.0b3` and Rust
+`1.0.0-beta.3`. These instructions do not imply that a candidate has already
 been published to a registry.
 
 ## Python wheel
@@ -9,7 +9,7 @@ been published to a registry.
 Once published, select the beta explicitly:
 
 ```sh
-python -m pip install "libephemeris==4.0.0b2"
+python -m pip install "libephemeris==4.0.0b3"
 ```
 
 Before publication, install a locally built wheel using the instructions below.
@@ -54,7 +54,7 @@ After registry publication:
 
 ```toml
 [dependencies]
-libephemeris-core = { version = "1.0.0-beta.2", features = ["bundled-data"] }
+libephemeris-core = { version = "1.0.0-beta.3", features = ["bundled-data"] }
 ```
 
 Before publication, use `path = "/path/to/libephemeris/core"` instead of the
@@ -71,7 +71,7 @@ compiler for Zstandard. From the repository root:
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python maturin==1.9.4
 .venv/bin/maturin build --release --locked --interpreter .venv/bin/python --out dist
-uv pip install --python .venv/bin/python dist/libephemeris-4.0.0b2-*.whl
+uv pip install --python .venv/bin/python dist/libephemeris-4.0.0b3-*.whl
 cargo build --locked -p libephemeris-core --release
 ```
 

@@ -397,7 +397,7 @@ fn set_topo(py: Python<'_>, lon: f64, lat: f64, alt: f64) -> PyResult<()> {
         .set_topo(lon, lat, alt)
         .map_err(|error| crate::errors::to_pyerr(py, error))
 }
-/// Set the main-kernel search directory from str/PathLike; None restores discovery.
+/// Set the main-kernel search directory; None or an empty path restores discovery.
 ///
 /// An unchanged path preserves resources. A changed path retires default
 /// main/reader/center discovery while active snapshots keep their images;
@@ -406,7 +406,7 @@ fn set_topo(py: Python<'_>, lon: f64, lat: f64, alt: f64) -> PyResult<()> {
 /// ignored here). No directory is created and no download is initiated.
 #[pyfunction(signature = (path=None))]
 fn set_ephe_path(py: Python<'_>, path: Option<PathBuf>) {
-    py.detach(|| runtime().set_ephe_path(path));
+    py.detach(|| runtime().set_ephe_path(path.filter(|path| !path.as_os_str().is_empty())));
 }
 /// Select an explicit main JPL filename string for future acquisition; return None.
 /// No file is opened or validated now. Changed selection retires the current
@@ -691,6 +691,20 @@ fn release_data_cache(py: Python<'_>) -> PyResult<()> {
     py.detach(|| runtime().release_data_cache())
         .map_err(|error| crate::errors::to_pyerr(py, error))
 }
+
+/// Cool every acquired LEB image without opening or hashing new readers.
+/// Returns the number of images visited; OS page release remains advisory.
+/// Pass clear_coefficients=False to preserve the bounded warm coefficient cache.
+#[pyfunction(signature = (clear_coefficients=true))]
+fn cool_leb_readers(py: Python<'_>, clear_coefficients: bool) -> usize {
+    py.detach(|| runtime().cool_leb_readers(clear_coefficients))
+}
+/// Return an opaque LEB discovery invalidation token without acquiring data.
+/// Compare for equality only; provisioning and selection changes can retire it.
+#[pyfunction]
+fn get_leb_reader_generation() -> u64 {
+    runtime().leb_reader_generation()
+}
 /// Recapture environment, dotenv and TOML settings for future default calls.
 /// Explicit API overrides still win. Retire default reader/center discovery,
 /// while active snapshots keep their immutable images/settings. Return None;
@@ -751,6 +765,8 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(list_tiers, module)?)?;
     module.add_function(wrap_pyfunction!(get_spk_date_range_for_tier, module)?)?;
     module.add_function(wrap_pyfunction!(release_data_cache, module)?)?;
+    module.add_function(wrap_pyfunction!(cool_leb_readers, module)?)?;
+    module.add_function(wrap_pyfunction!(get_leb_reader_generation, module)?)?;
     module.add_function(wrap_pyfunction!(reload_configuration, module)?)?;
     Ok(())
 }

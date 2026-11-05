@@ -1,6 +1,6 @@
 [package]
 name = "libephemeris-python"
-version = "4.0.0-beta.2"
+version = "4.0.0-beta.3"
 edition = "2024"
 rust-version = "1.86"
 license = "AGPL-3.0"
@@ -18,7 +18,7 @@ crate-type = ["cdylib", "rlib"]
 native-nbody = ["libephemeris-core/native-nbody"]
 
 [dependencies]
-libephemeris-core = { path = "../core", version = "=1.0.0-beta.2", default-features = false, features = ["bundled-data", "nbody", "python-internals"] }
+libephemeris-core = { path = "../core", version = "=1.0.0-beta.3", default-features = false, features = ["bundled-data", "nbody", "python-internals"] }
 pyo3 = { version = "=0.29.3", features = ["abi3-py312"] }
 pyo3-log = "=0.13.4"
 numpy = "=0.29.0"

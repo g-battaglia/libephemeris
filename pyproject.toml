@@ -30,9 +30,9 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/g-battaglia/libephemeris"
 Repository = "https://github.com/g-battaglia/libephemeris"
-Documentation = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/docs/README.md"
+Documentation = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/docs/README.md"
 Issues = "https://github.com/g-battaglia/libephemeris/issues"
-Changelog = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b2/CHANGELOG.md"
+Changelog = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b3/CHANGELOG.md"
 
 [dependency-groups]
 test = ["pytest>=8", { include-group = "generate" }, { include-group = "catalog" }]
