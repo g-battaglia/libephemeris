@@ -7,7 +7,7 @@ from libephemeris import _core
 
 
 def test_package_exports_native_version():
-    assert libephemeris.__version__ == "4.0.0b2"
+    assert libephemeris.__version__ == "4.0.0b3"
     assert libephemeris.__version__ == _core.__version__ == libephemeris.version
     assert libephemeris.__version__ == metadata.version("libephemeris")
 

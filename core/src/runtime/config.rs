@@ -792,6 +792,12 @@ impl Runtime {
                 .iter()
                 .map(|(_, reader)| reader)
                 .chain(state.context.leb_files().iter())
+                .chain(
+                    state
+                        .cached_session
+                        .iter()
+                        .flat_map(|cached| cached.session.context().leb_files().iter()),
+                )
             {
                 if !readers.iter().any(|seen| seen.shares_image_with(reader)) {
                     readers.push(reader.clone());
@@ -1682,6 +1688,30 @@ mod tests {
         assert_eq!(second.chunk_cache_memory().unwrap().0, 0);
         assert_eq!(first.eval_body_any(0, 2451545.0).unwrap(), expected);
         assert_eq!(second.eval_body_any(0, 2451545.0).unwrap(), expected);
+    }
+
+    #[test]
+    fn cooling_visits_readers_retained_only_by_the_cached_session() {
+        let reader = LebFile::open(&crate::test_data::core_leb_path()).unwrap();
+        let expected = reader.eval_body_any(0, 2451545.0).unwrap();
+        let mut context = EphemerisContext::new();
+        context.attach_leb_file(reader.clone());
+        let session = Arc::new(crate::engine_api::Session::from_context(context));
+        let runtime = Runtime::default();
+        runtime.lock().cached_session = Some(CachedSession {
+            session: Arc::clone(&session),
+            resources: SessionResources::All,
+        });
+        assert!(runtime.lock().reader.is_empty());
+        assert!(runtime.lock().context.leb_files().is_empty());
+        let warm = reader.chunk_cache_memory().unwrap();
+        assert!(warm.0 > 0);
+        assert_eq!(runtime.cool_leb_readers(false), 1);
+        assert_eq!(reader.chunk_cache_memory().unwrap(), warm);
+        assert_eq!(runtime.cool_leb_readers(true), 1);
+        assert_eq!(reader.chunk_cache_memory().unwrap().0, 0);
+        assert!(Arc::ptr_eq(&session, &runtime.shared_session().unwrap()));
+        assert_eq!(reader.eval_body_any(0, 2451545.0).unwrap(), expected);
     }
 
     #[test]
