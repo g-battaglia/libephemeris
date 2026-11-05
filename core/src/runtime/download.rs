@@ -350,15 +350,20 @@ pub fn dest_path_for(data_dir: &Path, entry: &AssetEntry) -> PathBuf {
 /// blocks. A plain `io::Result`: hashing is
 /// a local filesystem read, not a protocol outcome.
 pub fn file_sha256(path: &Path) -> std::io::Result<String> {
-    let mut file = File::open(path)?;
+    let file = File::open(path)?;
+    let mut input = &file;
+    let mut advice = crate::leb::HashCacheAdvice::new(&file);
+    let mut consumed = 0;
     let mut hasher = Sha256::new();
     let mut buf = [0u8; 1024 * 1024];
     loop {
-        let n = file.read(&mut buf)?;
+        let n = input.read(&mut buf)?;
         if n == 0 {
             break;
         }
         hasher.update(&buf[..n]);
+        consumed += n as u64;
+        advice.consumed(consumed);
     }
     Ok(hex_of(&hasher.finalize()))
 }
@@ -1906,6 +1911,27 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("scratch dir");
         dir
+    }
+
+    #[test]
+    fn streaming_digest_matches_across_advice_windows_and_partial_tail() {
+        use std::io::Write;
+        let dir = scratch_dir("hash-advice");
+        let path = dir.join("partial-tail.bin");
+        let mut file = File::create(&path).unwrap();
+        let mut expected = Sha256::new();
+        let block = [37u8; 65536];
+        for _ in 0..129 {
+            file.write_all(&block).unwrap();
+            expected.update(block);
+        }
+        file.write_all(b"unaligned tail").unwrap();
+        expected.update(b"unaligned tail");
+        drop(file);
+        let actual = file_sha256(&path);
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(dir).unwrap();
+        assert_eq!(actual.unwrap(), hex_of(&expected.finalize()));
     }
 
     #[test]

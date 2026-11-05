@@ -139,6 +139,9 @@ impl ImageStorage {
     /// Existing borrows remain valid; re-faults read the identical immutable data.
     /// Not guaranteed to release every page, especially with other active readers.
     pub(super) fn release_pages(&self) {
+        if let Self::Positional(file) = self {
+            file.release_pages();
+        }
         if let Self::Mapped { map, file } = self {
             #[cfg(unix)]
             {
@@ -178,6 +181,62 @@ pub(crate) fn release_file_cache(file: &File) {
     let _ = rustix::fs::fadvise(file, 0, None, rustix::fs::Advice::DontNeed);
     #[cfg(not(target_os = "linux"))]
     let _ = file;
+}
+
+/// Retire only fully consumed pages during a sequential integrity scan.
+/// Advice is best effort and never changes the digest or read error semantics.
+/// Ordinary coefficient reads do not use this helper, preserving their hot cache.
+pub(crate) struct HashCacheAdvice<'a> {
+    file: &'a File,
+    consumed: u64,
+    released: u64,
+}
+
+impl<'a> HashCacheAdvice<'a> {
+    pub(crate) fn new(file: &'a File) -> Self {
+        Self {
+            file,
+            consumed: 0,
+            released: 0,
+        }
+    }
+
+    pub(crate) fn consumed(&mut self, offset: u64) {
+        self.consumed = offset;
+        if self.consumed.saturating_sub(self.released) >= 8 * 1024 * 1024 {
+            self.release();
+        }
+    }
+
+    fn release(&mut self) {
+        #[cfg(target_os = "linux")]
+        {
+            let page = rustix::param::page_size() as u64;
+            let end = self.consumed / page * page;
+            if let Some(len) = std::num::NonZeroU64::new(end.saturating_sub(self.released)) {
+                let _ = rustix::fs::fadvise(
+                    self.file,
+                    self.released,
+                    Some(len),
+                    rustix::fs::Advice::DontNeed,
+                );
+                self.released = end;
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = self.file;
+            self.released = self.consumed;
+        }
+    }
+}
+
+impl Drop for HashCacheAdvice<'_> {
+    fn drop(&mut self) {
+        // Also release the completed prefix on a failed read, without touching
+        // an unread range or the unaligned tail of the final page.
+        self.release();
+    }
 }
 
 /// Best-effort release of filesystem cache below an explicitly supplied data

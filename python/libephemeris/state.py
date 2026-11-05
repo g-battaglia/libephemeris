@@ -6,7 +6,7 @@ from ._core import (
     get_iers_delta_t_enabled, get_lapse_rate, get_leb_reader, get_library_path,
     get_precision_tier, get_spk_cache_dir, get_spk_date_padding,
     get_spk_date_range_for_tier, get_strict_precision, get_tid_acc, list_tiers,
-    release_data_cache, reload_configuration, reset_session,
+    release_data_cache, cool_leb_readers, reload_configuration, reset_session,
     set_auto_spk_download, set_calc_mode, set_delta_t_model, set_delta_t_userdef,
     set_ephe_path, set_ephemeris_file, set_iers_delta_t_enabled, set_jpl_file,
     set_lapse_rate, set_leb_file, set_precision_tier, set_spk_cache_dir,

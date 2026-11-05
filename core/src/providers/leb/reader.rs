@@ -2436,7 +2436,7 @@ impl LebFile {
     /// evaluations keep their borrowed words; later queries may decode again.
     /// Retained chunk directories and owned image bytes remain.
     ///
-    /// Mapped backing also receives best-effort page-release advice without
+    /// Mapped and indexed backing receive best-effort page-release advice without
     /// invalidating the mapping. No immediate RSS or filesystem-cache reduction
     /// is guaranteed. Closed handles and repeated cooling are safe.
     pub fn cool(&self) {
@@ -2446,7 +2446,7 @@ impl LebFile {
         }
     }
 
-    /// Advise release of mapped pages and their clean file-cache pages where
+    /// Advise release of mapped/indexed clean file-cache pages where
     /// supported, without clearing retained coefficients. Other backings are
     /// unchanged. Safe on closed handles; other readers may retain or refault
     /// pages. Use [`Self::cool`] to clear coefficients as well.
