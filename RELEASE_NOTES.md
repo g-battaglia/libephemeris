@@ -1,11 +1,20 @@
-# LibEphemeris 4.0.0b2 — native Rust rewrite
+# LibEphemeris 4.0.0b3 — native Rust rewrite
 
-**Beta candidate:** Python `4.0.0b2`; Rust core/data `1.0.0-beta.2`.
-Source tag: `python-v4.0.0b2`. The earlier `v4.0.0b1` tag and published Rust
-`1.0.0-beta.1` packages remain unchanged. PyPI and crates.io publication are
-separate maintainer operations.
+**Beta candidate:** Python `4.0.0b3`; Rust core `1.0.0-beta.3`; unchanged data crate `1.0.0-beta.2`.
+Source tag: `python-v4.0.0b3`. Earlier tags and published packages remain immutable.
 This is a prerelease, not the promotion of v4 to stable. Registry publication
 and platform availability must be checked separately from these source notes.
+
+## Changes since Python 4.0.0b2
+
+Completed checksum ranges are released from the Linux page cache. Explicit
+reader cooling preserves warm decoded coefficients, and owned images are
+identified by shared allocation rather than full byte comparison. Consumers
+can query an opaque reader-generation token to invalidate coverage caches after
+provisioning or configuration changes. Historical regression inputs are bound
+to their original data-v3 image; expected numbers and tolerances are unchanged.
+Numerical models and data-v4 coefficients are unchanged. Reader selection remains
+explicit: this release introduces no process-memory cap or concurrency limit.
 
 ## Changes since Python 4.0.0b1
 

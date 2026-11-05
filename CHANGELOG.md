@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.0b3 (Python) · 1.0.0-beta.3 (Rust core) — Candidate
+
+- Release completed file pages after checksum verification on Linux. Explicit reader cooling preserves decoded coefficient caches and never changes the reader strategy.
+- Deduplicate owned readers by shared image identity without comparing entire file contents.
+- Expose an opaque reader-generation token for consumers to invalidate coverage caches after configuration changes or provisioning.
+- Bind historical numeric regression inputs to their original data-v3 image and digest; expected values and tolerances are unchanged.
+- Retain the unchanged data crate at `1.0.0-beta.2`. No scientific model or data-v4 coefficient changes.
+
 ## 4.0.0b2 (Python) — Candidate
 
 - Give the public IERS cache-age constant a concrete integer type in the Python

@@ -12,7 +12,7 @@ from urllib.parse import unquote, urlsplit
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-TAG = "python-v4.0.0b2"
+TAG = "python-v4.0.0b3"
 UNCHANGED_PACKAGE_TAG = "python-v4.0.0b1"
 PROJECT_PATH = "/g-battaglia/libephemeris"
 SPEC = importlib.util.spec_from_file_location("release_link_checker", ROOT / "tools/release/check_docs.py")
@@ -43,7 +43,7 @@ def assert_pinned_destination(target, expected_tag=TAG):
 
 @pytest.mark.parametrize("name,tag", [
     ("README.md", TAG), ("python/README.md", TAG),
-    ("core/README.md", UNCHANGED_PACKAGE_TAG),
+    ("core/README.md", TAG),
     ("core/data/README.md", UNCHANGED_PACKAGE_TAG),
     ("tools/leb_generation/README.md", UNCHANGED_PACKAGE_TAG),
 ])
