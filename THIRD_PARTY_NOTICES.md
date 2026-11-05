@@ -1,39 +1,42 @@
 # Third-Party Notices
 
-This file inventories third-party software and data that LibEphemeris
-**contains** (vendored or adapted code shipped inside the package) or
-**depends on** (PyPI dependencies installed alongside it), together with
-their licenses. It is maintained as part of the AGPL-3.0 compliance
-process -- see [LICENSING.md](LICENSING.md) and [NOTICE.md](NOTICE.md).
+Project-owned Rust and binding code is licensed AGPL-3.0; the complete
+text is in [COPYING](COPYING). Components below retain their upstream terms.
+The Python package includes base LEB coefficients and generated numerical
+catalog/clock tables. Engine `src/` paths below are relative to `core/`;
+`tools/` paths are workspace-relative. The optional `core/data/` package exports
+the unchanged coefficient bytes without calculation code. Full DE/SPK and ASSIST datasets remain external inputs.
 
-## Code shipped inside the package (vendored / adapted)
+Scientific definitions, upstream software and external datasets are distinct
+attribution and licensing subjects. Citations do not grant rights to upstream
+software or datasets. External NASA/JPL, catalog and observation data retain
+their providers' terms. Conditions on included third-party material apply to
+that material; they do not determine ownership of independently authored
+project code.
 
-| Component | Path | Upstream | License |
-|---|---|---|---|
-| spktype21 0.1.0 | `libephemeris/vendor/spktype21.py` | Shushi Uetsuki (whiskie14142) | MIT |
-| TASS 1.7 port | `libephemeris/moon_theories/tass17.py`, `libephemeris/moon_theories/tass17_data.py` (generated periodic-term tables) | Johannes Gajdosik's Stellarium implementation of Vienne & Duriez TASS 1.7 | MIT |
+## Code and numerical data included in the project
 
-Retained upstream copyright notices:
+| Component | Path | Origin | Terms |
+| --- | --- | --- | --- |
+| TASS 1.7 periodic terms | `src/tables/tass17_tables.rs`, `tools/generators/data/tass17.json` | Johannes Gajdosik's Stellarium implementation of the Vienne–Duriez theory | MIT, retained below |
+| Earth-orientation/precession routines and coefficient tables | `src/time/erfa.rs`, `src/tables/nutation_tables.rs` | ERFA 2.0.1 / IAU SOFA-derived material | BSD-style ERFA conditions, retained below |
+| Nutation and historical/IERS Delta-T numerical tables | `src/tables/iau2000_tables.rs`, `src/tables/smh2016_tables.rs`, `tools/generators/data/iau2000_nutation.npz` | Skyfield bundled data | MIT, retained below |
+| Resolved Cargo dependencies | `licenses/` | Packages recorded in `Cargo.lock` | Individual original texts and notices included |
 
-- spktype21 license: Copyright (c) 2018 The Python Packaging Authority
-  ([upstream license](https://github.com/whiskie14142/spktype21/blob/master/LICENSE.txt)).
-- Stellarium TASS 1.7 implementation: Copyright (c) 2005 Johannes Gajdosik
-  ([upstream file header](https://github.com/Stellarium/stellarium/blob/master/src/core/planetsephems/tass17.c)).
+The TASS tables implement the published Vienne & Duriez (1995, A&A 297,
+588–605) theory with the later IMCCE TASS 1.7 revision. They are generated
+from the attributed numerical snapshot in `tools/generators/data/tass17.json`
+by `tools/generators/gen_tass17_tables.py`. That snapshot retains the exact
+historical v3.2.1 source identity; regeneration requires no v3 checkout or
+execution. Their original MIT attribution is retained. Fixed-star catalog measurements and nomenclature retain their
+Hipparcos, IAU and WGSN provenance in the generated table headers.
 
-Each of these files carries its own `SPDX-License-Identifier` header and
-documents its upstream provenance in the module docstring. They are **not**
-covered by the project's AGPL-3.0 license, but they are all permissively
-(MIT) licensed.
+Retained upstream copyright notice:
 
-The Galilean satellite module (`libephemeris/moon_theories/galilean.py`)
-was, through v2.1.0, adapted from PyMeeus and licensed LGPL-3.0. <!-- provenance-implementation-ok --> It was
-rewritten in June 2026 as an independent implementation of the published
-theory (Lieske, J.H. 1998, "Galilean satellite ephemerides E5", A&AS 129,
-205; Meeus 1998, *Astronomical Algorithms*, ch. 44) and is now owned by
-the project under the AGPL-3.0 license. Theory specification:
-[docs/methodology/galilean-e5-spec.md](docs/methodology/galilean-e5-spec.md).
+- Stellarium TASS 1.7 implementation: Copyright (c) 2005 Johannes
+  Gajdosik.
 
-### MIT license text (spktype21, TASS 1.7 port)
+### MIT license text (TASS 1.7 tables)
 
 > Permission is hereby granted, free of charge, to any person obtaining a
 > copy of this software and associated documentation files (the
@@ -54,90 +57,134 @@ the project under the AGPL-3.0 license. Theory specification:
 > TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 > SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-## Runtime dependencies (installed from PyPI, not redistributed here)
+## ERFA long-term precession
 
-| Package | License | Notes |
-|---|---|---|
-| skyfield | MIT | Ephemeris access, time scales |
-| skyfield-data | MIT | Bundled astronomy data files |
-| jplephem | MIT | Transitive via skyfield; SPK kernel reader |
-| sgp4 | MIT | Transitive via skyfield |
-| numpy | BSD-3-Clause | Transitive |
-| pyerfa | BSD-3-Clause | Bundles the ERFA C library, distributed under the ERFA license (permissive, SOFA-derived, with naming restrictions) |
-| click | BSD-3-Clause | CLI framework |
-| certifi | MPL-2.0 | Used unmodified; MPL file-level copyleft imposes no obligation on LibEphemeris code |
-| zstandard | BSD-3-Clause | LEB2 compression |
+The native Earth-orientation routines and tables include material derived
+from ERFA `ltpecl`, `ltpequ`, `ltp` and `ltpb` v2.0.1 (peeled commit
+`9915ba38c9365f8b0738269b8c2ac1fdd5f8dee3`), whose source is at
+<https://github.com/liberfa/erfa/tree/9915ba38c9365f8b0738269b8c2ac1fdd5f8dee3/src>.
+The published Vondrák coefficients and IAU series are retained in native
+numerical evaluation. Rust validation and arithmetic are adaptations; ERFA
+is not linked at runtime.
+These Earth-orientation components are derived from ERFA/SOFA; they are not
+SOFA itself or an endorsed standards implementation. This attribution does not
+extend to independently authored project components, which retain the crate
+license.
 
-Dependencies are installed from PyPI by the user or installer under their
-own licenses; they are not part of LibEphemeris's license grant.
+### Retained ERFA copyright, conditions and disclaimer
 
-## Optional permissive tooling
+Copyright (C) 2013-2023, NumFOCUS Foundation. All rights reserved.
 
-| Package | License | Notes |
-|---|---|---|
-| astropy | BSD-3-Clause | Installed by the `stars` extra for star-catalog tooling; also a development dependency |
-| astroquery | BSD-3-Clause | Installed by the `stars` extra and development environment for catalog/validation scripts; runtime SPK downloads use LibEphemeris's direct JPL Horizons HTTPS client |
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-## Optional `nbody` extra -- GPL-3.0 (not bundled)
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. Neither the name of the Standards Of Fundamental Astronomy Board, the
+   International Astronomical Union nor the names of its contributors may
+   be used to endorse or promote products derived from this software
+   without specific prior written permission.
 
-The opt-in `libephemeris[nbody]` extra (deliberately NOT part of
-`libephemeris[all]`) installs two **GPL-3.0-or-later** packages used by the
-shipped `rebound_integration.py` module for ephemeris-quality n-body
-propagation of minor bodies:
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
 
-| Package | License | Notes |
-|---|---|---|
-| rebound | GPL-3.0-or-later | N-body integrator; imported lazily, only when the extra is installed |
-| assist | GPL-3.0-or-later | Ephemeris-quality REBOUND extension (JPL small-body integrator) |
+## Historical N-body references
 
-These packages are **not** part of the core install, are **never bundled or
-redistributed** in any LibEphemeris artifact (they are installed separately
-from PyPI under their own GPL license), and are imported only on demand.
-GPL-3.0 and AGPL-3.0 are compatible per their respective Section 13
-provisions; a user who installs `libephemeris[nbody]` forms a combined
-work governed by the AGPL-3.0.
+Earlier project revisions bundled REBOUND 4.6.0 and ASSIST 1.2.3 under
+GPL-3.0-or-later, with their complete license texts and copyright notices.
+REBOUND credits Hanno Rein, Shangfei Liu and the contributors named in its
+source files. ASSIST credits Matthew Holman, Arya Akmal, Hanno Rein and the
+contributors named in its source files. The historical bundled revisions were
+REBOUND `e853676f202355b7c3e62f96501fb2c2d3c8c862` and ASSIST
+`9493cc36d07e5cc13107fe713c67e1139111edd5`. Their notices remain applicable to
+the earlier distributions that contain that code.
 
-## Data sources
+The current N-body implementation is project-owned Rust under AGPL-3.0.
+The REBOUND/ASSIST implementations, FFI adapter and native build requirements
+have been removed from the current sources and distributions. Public API names
+such as `rebound_integration`, `AssistEphemConfig` and the five integrator
+selectors remain for compatibility; their version queries identify the Rust
+implementations. The `nbody` feature enables these capabilities, and
+`native-nbody` remains its compatibility alias. Selected classic-DE and
+asteroid SPK datasets remain external inputs. This change does not alter the
+project license or the terms of other included dependencies.
 
-- **JPL DE440 / DE441** planetary and lunar ephemerides (NASA/JPL/Caltech):
-  publicly distributed scientific data; downloaded at runtime, not bundled.
-- **ESA Hipparcos Catalogue** (ESA SP-1200, 1997) and **van Leeuwen 2007**
-  reduction: star positions and proper motions (facts of nature) compiled
-  into `libephemeris/fixed_stars.py`, with attribution in the module.
-- **IAU Working Group on Star Names** (WGSN) designations.
-- **IERS** Earth-orientation / Delta-T / leap-second tables: public data,
-  fetched at runtime.
-- `libephemeris/data/fictitious_orbits.csv`: 12 transcribed historical
-  element rows. IDs 40-47 come from James Neely, "Orbital Elements for the
-  Transneptunian Planets," *Matrix Magazine* VII (1980), Table I, p. 10;
-  ID 50 comes from Harrington (1988), *AJ* 96, p. 1478; ID 51 from
-  Le Verrier (1846), *Comptes rendus* 23, p. 432 and his longer *Recherches*;
-  ID 52 from Adams (1846), sections 47-48, cross-checked against Gould's 1850
-  Smithsonian report; and ID 53 from Lowell's 1915 memoir, pp. 5, 9, and 105.
-  Project-authored conversions are documented in
-  [the per-body source record](docs/methodology/hypothetical-bodies.md).
-  Source publications retain whatever rights apply to them.
-- **White Moon / Selena (ID 56):** the uniform seven-year rule and its
-  checkpoints are factual inputs reviewed at pp. 17, 18, 20, 29, and 45 of
-  Felix Velichko and Max Larin, *Lilith, Selena, Proserpina: Articles and
-  Ephemerides 1800-2050* (Mir Uranii, 2007), ISBN 5-900191-12-5. No scan or
-  ephemeris table is bundled. LibEphemeris supplies its own explicit first-day
-  TT convention, unwraps uniform motion from the publication's 200-year
-  January baseline, and supplies an IAU-standards-derived display distance;
-  full arithmetic is in the
-  [per-body source record](docs/methodology/hypothetical-bodies.md).
-  IDs 48, 49, 54, 55, 57, and 58 have no bundled numerical model and fail
-  closed; the exact unrecovered fields are listed in the
-  [missing-models inventory](docs/methodology/missing-hypothetical-models.md).
-- `libephemeris/data/leb2/base_core.leb2`: generated by this project from JPL
-  DE440 state data and ERFA/IERS standards-derived abstract lunar channels;
-  its source and build attestation are documented in
-  [docs/leb/base-core-provenance.md](docs/leb/base-core-provenance.md).
+## Skyfield numerical tables
 
-## Development-only tools (not shipped, never linked)
+Only numerical data are retained; Skyfield is not a runtime computation backend.
+The original MIT text below is copied from the installed pinned reference's
+Skyfield distribution license. Table input identities are recorded in their
+generated Rust headers.
+The bundled `tools/generators/data/iau2000_nutation.npz` has the same identity
+as the Skyfield 1.54 dataset recorded in the Rust nutation-table header. The
+available Skyfield 1.55 distribution supplies byte-identical numerical data;
+including it changes neither coefficients nor the runtime model. Offline
+regeneration reads this local file without importing Skyfield or NumPy.
 
-- **pyswisseph** (AGPL-3.0 / Swiss Ephemeris dual license): may be used
-  for ephemeral compatibility comparisons in a separate validation environment.
-  It is not declared among this package's dependencies (including the `dev`
-  extra), is never imported by the shipped package, and is not a runtime
-  dependency. See [NOTICE.md](NOTICE.md) for details.
+### Retained Skyfield MIT license
+
+Copyright © 2013–2018 Brandon Rhodes and available under the MIT license:
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Cargo dependency licenses and notices
+
+`licenses/index.json` inventories all non-workspace
+packages resolved by the current Cargo lockfile, including optional and
+target-specific dependencies. Each entry records the package/version, upstream
+source, declared license expression and paths to its actual copied license,
+copyright, authorship and notice files. Original filenames and text bytes are
+preserved; the index does not choose between alternative licenses.
+
+This includes PyO3 0.29.3, pyo3-log 0.13.4, rust-numpy 0.29.0, serde_json,
+transport/TLS dependencies and the
+bundled Zstandard sources. Their terms remain those in the corresponding
+upstream files. A package's presence in the all-features lockfile does not mean
+that every target or artifact links it.
+
+Regenerate the bundle with `python3 tools/release/package_licenses.py` after a dependency
+change, then run `python3 tools/release/package_licenses.py --check`. The check reads
+Cargo metadata offline and verifies exact upstream text copies for the current
+resolution. `pyproject.toml` includes these files, this notice and the project
+AGPL text in its distribution license-file selection.
+Final wheel/sdist content checks must also inspect the resulting artifacts.
+
+The isolated native allocation regression uses an original project-owned
+system-allocator wrapper under AGPL-3.0. It requires no third-party
+allocation-instrumentation package and is not linked into the runtime library
+or Python extension.
+
+## Project-owned SPK reader
+
+The native DAF/SPK reader (`src/providers/spk/`) is project-owned code written
+against the public NAIF DAF/SPK Required Reading. No third-party SPK reader
+implementation is copied into the crate.

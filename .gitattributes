@@ -1,0 +1,2 @@
+# Source handoffs exclude the separate qualification checkout.
+/libephemeris-validation-python/ export-ignore

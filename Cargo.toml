@@ -1,0 +1,10 @@
+[workspace]
+members = ["core", "core/data", "python"]
+default-members = ["core"]
+resolver = "3"
+
+# Applications own their release profile. Workspace builds keep the qualified
+# portable configuration; no native-CPU or fast-math flags are introduced.
+[profile.release]
+lto = "thin"
+codegen-units = 1

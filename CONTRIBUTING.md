@@ -1,165 +1,154 @@
-# Contributing to LibEphemeris
+# Contributing
 
-Thank you for your interest in contributing to LibEphemeris! Contributions of
-all kinds are welcome: bug reports, feature requests, documentation
-improvements, and code changes.
+Use small, well-commented changes with tests and identified scientific sources.
+Read the [independent implementation policy](docs/sources.md#independent-implementation-policy)
+before changing a numerical model. Contributions follow the [CLA](CLA.md);
+project code is [AGPL-3.0](COPYING).
 
-## Getting Started
+## Workspace
 
-1. Fork the repository and clone it locally:
+- `core/`: Rust engine, tests, examples and optional immutable data crate.
+- `python/`: PyO3 argument/result conversion, imports, stubs and Python tests.
+- `tools/generators/`: reproducible numerical tables and retained snapshots.
+- `tools/leb_generation/`: optional offline ephemeris tools.
+- `tools/release/`: packaging, license and documentation checks.
 
-   ```bash
-   git clone https://github.com/<your-username>/libephemeris.git
-   cd libephemeris
-   ```
+A call enters the Python binding or Rust `api::Session`, uses retained resources
+and native models, and returns owned results/errors. Keep computation and
+configuration in Rust; Python is not a second engine. Public contracts document
+clocks, units, domains and errors. Use rustfmt and the
+[Rust API Guidelines](https://rust-lang.github.io/api-guidelines/).
 
-2. Install the development dependencies (requires [uv](https://docs.astral.sh/uv/)):
+## Build and test locally
 
-   ```bash
-   uv pip install -e ".[dev]"
-   ```
+Follow [installation](docs/installation.md#build-from-source). Use an installed
+wheel, not a stale extension in the checkout. Install the test/docs dependency
+groups with `uv` as needed; select the Python interpreter explicitly.
 
-3. Create a new branch for your changes:
+```sh
+export PYO3_PYTHON="$PWD/.venv/bin/python"
+cargo fmt --all --check
+cargo test --locked --workspace --all-features --no-fail-fast
+cargo test --locked --workspace --all-features --release --no-fail-fast
+cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+RUSTDOCFLAGS='-D warnings' cargo doc --locked --workspace --all-features --no-deps
+.venv/bin/python -m pytest -q -ra python/tests tools/tests python/examples/tests
+.venv/bin/python tools/release/check_minimal.py
+.venv/bin/python tools/release/package_licenses.py --check
+```
 
-   ```bash
-   git checkout -b my-feature
-   ```
+Check Rust 1.86 MSRV, default/no-default features and `bundled-data,nbody`
+consumer builds when changing the Rust surface. Repeat wheel checks in clean
+Python 3.12 and 3.14 environments. Local checks remain the reference. The only
+remote pipeline is [wheels.yml](https://github.com/g-battaglia/libephemeris/actions/workflows/wheels.yml): it builds and
+tests Linux/Windows wheels, without publishing. Other remote pipelines remain
+forbidden by `tools/release/check_minimal.py`.
 
-4. Make your changes, add tests where applicable, and run the targeted suites.
-   Do **not** run the full suite during development — it is very long. Use the
-   fast task suites instead:
+Tests can discover existing assets in `~/.libephemeris`;
+`LIBEPHEMERIS_TEST_DATA_DIR` and `LIBEPHEMERIS_TEST_LEB2` select explicit test
+inputs. The historical topocentric-photometry regression retains its data-v3
+reference words and requires the exact data-v3 base image via
+`LIBEPHEMERIS_TEST_DATA_V3_LEB2` (SHA-256
+`5d708bdbe3e799e0802ba575984e57a3c5e44720dbfa1b4a01cf826640e0cb82`).
+Provision that published asset separately; do not substitute the data-v4 bundle.
+The separate data-v4 regression checks observer and TT/UT contracts without
+replacing historical expected values. Report optional-data skips with `-ra`.
+Do not repin hashes, replace
+production datasets, weaken tolerances, enable fast-math or fit outputs to make
+a test pass. Preserve generator identities and upstream notices. Numerical
+qualification remains separate from product build/tests.
 
-   ```bash
-   poe test:leb:fast                  # Recommended fast unit suite (~1 min)
-   poe test:skyfield:fast             # Skyfield backend unit suite
-   poe test:leb:core                  # Essential subset (~20 s)
-   pytest tests/test_file.py -v       # A single file while iterating
-   ```
+## Documentation
 
-5. Run the linter, the formatter, the type checker, and the provenance gates:
+The manuals are maintained in parallel under `beginners-manual/it` and `en`.
+Preserve their teaching depth; update examples and translations together.
+Run the beginner path with the bundled data and no network. Advanced examples
+must identify their data prerequisites; never call missing-data skips a pass.
 
-   ```bash
-   poe lint
-   poe format
-   poe typecheck
-   uv run python scripts/check_provenance.py
-   uv run python scripts/check_algorithm_provenance.py
-   ```
+```sh
+.venv/bin/python tools/release/check_docs.py
+.venv/bin/python -m pytest -q -ra tools/tests/test_check_docs.py \
+  tools/tests/test_documentation_build.py tools/tests/test_manual_examples.py
+.venv/bin/python -m sphinx -E -W --keep-going -b html -c docs . docs/_build/html
+```
 
-6. Push your branch and open a Pull Request against the `main` branch.
+`tools/release/check_manual.py --data-dir /path/to/data --report /tmp/manual.json`
+runs the books with explicit local assets; `--refresh-output` refreshes only
+successfully executed adjacent transcripts. For pytest, set
+`LIBEPHEMERIS_MANUAL_DATA_DIR=/path/to/data` to include those cases. Online
+acquisition examples are syntax/signature checked, not downloaded by these
+checks.
 
-## Reporting Issues
+Sphinx reads the installed wheel, and includes only docs and manuals from the
+repository root. Build output is not source. For table regeneration, use the
+relevant script under `tools/generators/` and its focused tests; generation is
+not a prerequisite for installing the shipped assets.
 
-- Use the [GitHub Issues](https://github.com/g-battaglia/libephemeris/issues) tracker.
-- Include a clear description of the problem, steps to reproduce, and the
-  expected vs. actual behaviour.
-- If relevant, include the Python version, OS, LibEphemeris version, calculation
-  mode (`auto` / `skyfield` / `leb` / `horizons`), and the data tier in use.
+## Release checklist
 
-## Code Style
+PyPI releases follow [Releasing to PyPI](docs/releasing.md). The commands below
+package and check every registry artifact locally.
 
-- `from __future__ import annotations` at the top of every module.
-- Imports grouped: stdlib, third-party, local (relative imports).
-- Line length 88, Python 3.12+, double quotes, [Ruff](https://docs.astral.sh/ruff/)
-  formatter and linter.
-- Google-style docstrings with `Args` / `Returns` / `Raises`.
-- Naming: `snake_case` functions, `PascalCase` classes,
-  `SCREAMING_SNAKE_CASE` constants, `_underscore` private.
-- Always return native Python floats, never NumPy scalars.
-- The public API keeps 1:1 signature compatibility with the reference
-  ephemeris API; changing a public signature or a flag semantic is a breaking
-  change and needs to be discussed in an issue first.
+Use a clean committed revision, lockfile and explicit interpreter. Rust crates
+and the Python package have independent versions; the binding's Cargo version
+`4.0.0-beta.1` becomes Python `4.0.0b1`. Package versions are independent of
+scientific model identifiers. Never move a tag or replace a published version.
 
-## Provenance Requirements
+```sh
+cargo package --locked --all-features -p libephemeris-core-data -p libephemeris-core
+.venv/bin/maturin build --release --locked --interpreter .venv/bin/python --out dist
+.venv/bin/maturin sdist --out dist
+uv build --out-dir dist/offline-tools tools/leb_generation
+.venv/bin/python -m twine check --strict dist/*.whl dist/*.tar.gz dist/offline-tools/*
+.venv/bin/python tools/release/check_archives.py dist/*.whl dist/*.tar.gz target/package/*.crate
+```
 
-LibEphemeris is a scientific library, and every number it produces must be
-traceable to a public source. For any new or materially changed numerical
-implementation:
+Each compressed crate must be below 10,485,760 bytes. Do not remove data or add
+runtime downloads to fit this limit. Extract archives outside the checkout;
+build the extracted core and rebuild a wheel from the sdist. Verify licenses,
+notices, stubs, entry points, bundled data and beginner manuals. Caches, local
+repositories and scientific comparison environments must not ship.
 
-- Add an in-code `Provenance` section and a matching record in
-  `docs/methodology/provenance-registry.toml`.
-- Cite the defining public source (JPL/IAU documentation, peer-reviewed
-  literature, or primary publication), and state units, reference frame, time
-  scale, and validity limits.
-- Keep source values separate from project choices, and identify the generator
-  for any checked-in data file.
-- Agreement with a compatibility target is **never** an acceptable source for a
-  value.
+Publication needs explicit maintainer approval. For a coordinated registry
+release, publish the data crate first, then its exact dependent core, then
+Python and optional tools. Python wheels/sdist contain the Rust sources or
+compiled engine and can be released independently without uploading crates.
+Verify registry installs separately; dry runs do not establish acceptance. Use distinct
+Rust/Python tags and new prerelease versions for corrections, never overwrite
+published artifacts. Do not expose credentials in logs.
 
-### Clean-room policy
+### Linux and Windows wheels
 
-This project is developed independently of the reference implementation. By
-contributing, you confirm that you have not inspected, retrieved, translated,
-adapted, or copied the reference implementation's source code, source comments,
-documentation prose, algorithms, or data files while preparing your
-contribution, and that no reference-distribution file is part of it. The
-reference API may be used only for ephemeral behavioural comparison — call its
-public API and compare outputs — and those outputs must never be persisted,
-fitted, or committed to this repository.
+The [wheel workflow](https://github.com/g-battaglia/libephemeris/actions/workflows/wheels.yml) runs on pushes to `main`,
+`beta-v4` and `release/*`. Manual dispatch becomes available when the workflow is present on
+GitHub's default branch; until v4 is promoted, trigger it by pushing `beta-v4`.
+It runs three native jobs: Ubuntu 24.04 x86_64, Ubuntu 24.04 aarch64 and Windows
+x86_64. Linux builds use manylinux2014 (glibc 2.17); Windows builds use MSVC.
+If the Linux toolchain cannot build in that image, review an explicit change
+to manylinux_2_28 and document the higher glibc floor. Never just rename a
+wheel to claim compatibility.
 
-## License
+Each job builds one ABI3 wheel with Maturin 1.9.4, installs it in separate
+Python 3.12 and 3.14 virtual environments, and runs `python/tests`. Tests use
+SHA-verified data-v4 base groups through the product CLI and the pinned JPL
+DE440 image. The latter is 119,799,808 bytes, SHA-256
+`a4ce9bf9b3282becc9f4b2ac3cebe03a2ae7599981aabd7265fd8482fff7c4b5`.
+No private harness or local scientific data directory is required. On Windows,
+Git Bash's `HOME` is removed from child processes so discovery problems seen
+by ordinary PowerShell/cmd users are not hidden.
 
-This project is licensed under the **GNU Affero General Public License v3.0**
-(`AGPL-3.0-only`). See the [LICENSE](LICENSE) file for the full text and
-[LICENSING.md](LICENSING.md) for details.
+The workflow has read-only repository permissions and no registry credentials,
+OIDC write permission, publication, repository mutations, execution of Rust
+tests or shared caches. Windows additionally type-checks all core targets,
+including ignored native tests, to catch Unix-only compilation assumptions.
+macOS builds, source-install checks and native Rust numerical qualification
+stay local. The workflow guard is a review aid, not a sandbox for arbitrary
+scripts.
 
-## Contributor License Agreement (CLA) — Copyright Assignment
+## Issues and pull requests
 
-By submitting a pull request or any other contribution to this repository, you
-agree to the following terms in respect of every contribution you have made and
-will make to the project:
-
-1. **Copyright Assignment.** You hereby irrevocably assign to the project
-   maintainer, **Giacomo Battaglia** ("Maintainer"), all right, title, and
-   interest in the copyright of your past, present, and future contributions to
-   this repository. To the extent any such assignment is not effective under
-   applicable law, you instead grant the Maintainer a worldwide, perpetual,
-   irrevocable, royalty-free, exclusive licence to use, reproduce, modify,
-   distribute, sublicense, and re-license those contributions, with the right to
-   grant sublicenses through multiple tiers. The Maintainer in turn grants you a
-   perpetual, worldwide, non-exclusive, royalty-free licence to use and
-   re-license your own contribution for any purpose, so this assignment does not
-   stop you from reusing your own work.
-
-2. **Re-licensing.** The Maintainer may re-license the project — or any part of
-   it, including your contribution — under any other license, whether
-   open-source or proprietary, at their sole discretion.
-
-3. **AGPL Availability.** The project will continue to be publicly available
-   under the AGPL-3.0 license. The copyright assignment enables dual-licensing
-   and commercial offerings that help sustain long-term development.
-
-4. **Moral rights.** To the fullest extent permitted by applicable law, you
-   agree not to assert or enforce, against the Maintainer or its licensees, any
-   moral rights you may hold in your contributions; where such rights are
-   waivable, you waive them. Some jurisdictions (including Italy) treat certain
-   moral rights as inalienable; this clause applies only as far as the law
-   allows.
-
-5. **Attribution.** Your authorship is acknowledged in the Git commit history,
-   in the [AUTHORS](AUTHORS) file, and, where appropriate, in release notes.
-   Copyright assignment does not erase your credit as the original author of
-   your contribution.
-
-6. **Originality & authority.** You represent that each contribution is your
-   original work, that you have the right to assign its copyright (and, where
-   you contribute in the course of employment, that you have your employer's
-   authorization to do so), and that the contribution does not knowingly
-   infringe any third party's rights. If any part of your contribution is
-   subject to a third-party license, you must clearly state this in the pull
-   request.
-
-7. **Governing law.** This agreement is governed by the laws of Italy, without
-   regard to its conflict-of-laws rules, and the courts of the Maintainer's
-   place of residence shall have jurisdiction, without prejudice to any
-   mandatory protections available to you under your local law.
-
-Your agreement is given by your own act of submitting a contribution (as stated
-above). On GitHub, a CLA-bot additionally checks each pull request and comments
-with instructions if your account is not yet recorded as having agreed; this
-automated check runs on GitHub only (it does not run on any mirror).
-
-## Questions?
-
-If you have any questions about contributing or the CLA, feel free to reach out
-at [kerykeion.astrology@gmail.com](mailto:kerykeion.astrology@gmail.com?subject=Contributing%20to%20LibEphemeris).
+Provide a minimal public-API reproduction, versions, OS/architecture, data
+identity and configuration. Explain significant numerical differences with
+independent sources or physical invariants. Keep API changes in
+[MIGRATION.md](MIGRATION.md), not in a running refactoring diary. Preserve
+unrelated work, consumer repositories and production data.

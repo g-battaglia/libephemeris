@@ -1,0 +1,120 @@
+"""Convenience helpers call native kernels and retain their public layouts."""
+from data_paths import CORE_LEB
+
+from fractions import Fraction
+import math
+import os
+import time
+from pathlib import Path
+import libephemeris as eph
+from libephemeris import contrib
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def configured():
+    eph.set_calc_mode("leb")
+    eph.set_precision_tier("base")
+    eph.set_leb_file(str(CORE_LEB))
+    eph.set_iers_delta_t_enabled(False)
+    eph.set_delta_t_userdef(64.0 / 86400.0)
+
+
+def test_scalar_partitions_names_and_aspect_layouts():
+    assert contrib.long2rasi(361.0) == 0
+    assert contrib.long2nakshatra(0.0) == (0,0)
+    assert contrib.rasi_dif(11,0) == 1
+    assert contrib.rasi_dif2(0,11) == -1
+    assert contrib.signtostr(0) == "Aries"
+    assert contrib.house_system_name("SS") == "Unknown"
+    assert contrib.match_aspect(0,0.0,90.0,1,90.5,1.0) == (1,0.5)
+    assert contrib.match_aspect2(0.0,90.5,90.0,1.0) == (1,0.5)
+    assert contrib.match_aspect3(0,0.0,90.0,1,90.5,1.0) == (1,0.5,90.5)
+    assert contrib.match_aspect4(0,0.0,90.0,1,90.5,1.0) == (1,0.5,90.5,90.5)
+    assert contrib.ASWINI == 0 and contrib.REVATHI == 26
+
+
+def test_time_and_coordinate_formats():
+    assert contrib.t2i("12") == (12,0,0)
+    assert contrib.dt2i("2024-03-20T12:34:56.123456+02:00") == (2024,3,20,12,34,56)
+    assert contrib.jd2isostr(2451545.0) == "2000-01-01T12:00:00"
+    assert contrib.geoc2d("N30") == 0.5
+    assert contrib.geoc2d("12S30") == -12.5
+    assert contrib.geolat2c(-12.5) == "12S30"
+    assert contrib.geolon2c(151.2) == "151E12"
+    assert contrib.years_diff("2024-01-01T12:00:00+02:00", "2024-01-01T10:00:00Z") == 0.0
+    assert contrib.years_diff("2024-01-01T00:00:00.100000", "2024-01-01T00:00:00.200000") * (365.25*86400) == pytest.approx(0.1,abs=1e-12)
+
+
+def test_houses_stars_and_sampled_walks_use_shared_engine():
+    assert contrib.raman_houses(2451545.0,12.5,41.9) == eph.houses(2451545.0,41.9,12.5,ord("S"))[0]
+    stars = contrib.saturn_4_stars(2451545.0)
+    assert isinstance(stars,tuple) and len(stars)==4 and all(math.isfinite(value) for value in stars)
+    for name in ("next_aspect","next_aspect2","next_aspect_cusp","next_aspect_cusp2"):
+        jd,residual=getattr(contrib,name)(2,90.0,0.0,2451545.0)
+        assert jd>=2451545.0 and residual<=1.0
+    jd,residual=contrib.next_aspect_with(2,3,0.0,2451545.0)
+    assert jd>=2451545.0 and residual<=1.0
+    assert contrib.next_aspect_with2(2,3,0.0,2451545.0)==(jd,residual)
+    assert contrib.next_retro(2,2451545.0)>2451545.0
+
+
+def _seconds_from_ticks(ticks, ticks_per_second):
+    # Keep the integer numerator until division. Converting epoch nanoseconds
+    # to float first loses low bits before computing the seconds ratio.
+    return ticks / ticks_per_second
+
+
+@pytest.mark.parametrize("ticks,frequency", [
+    (1700000000000012432, 1000000000),
+    (-1700000000000012432, 1000000000),
+    (17000000000000124, 10000000),
+])
+def test_wall_clock_reference_rounds_the_integer_ratio_once(ticks, frequency):
+    assert _seconds_from_ticks(ticks, frequency) == float(Fraction(ticks, frequency))
+
+
+def test_premature_float_conversion_can_invalidate_a_strict_julian_interval():
+    ticks = 1700000000000012432
+    reference = float(Fraction(ticks, 1000000000)) / 86400 + 2440587.5
+    premature = (float(ticks) / 1000000000) / 86400 + 2440587.5
+    assert premature - reference == math.ulp(reference)
+    assert _seconds_from_ticks(ticks, 1000000000) / 86400 + 2440587.5 == reference
+
+
+@pytest.fixture
+def utc_wall_clock():
+    """Independent precise UTC reference, including CPython 3.12 on Windows."""
+    if os.name != "nt":
+        return lambda: _seconds_from_ticks(time.time_ns(), 1000000000)
+
+    import ctypes
+    from ctypes import wintypes
+
+    # Python time.time() used the coarse Win32 clock until Python 3.13:
+    # https://docs.python.org/3.13/library/time.html#time.time
+    # Rust SystemTime uses the precise clock. Query that OS reference directly
+    # instead of loosening the interval assertion to accommodate clock skew.
+    clock = ctypes.WinDLL("kernel32", use_last_error=True).GetSystemTimePreciseAsFileTime
+    clock.argtypes = (ctypes.POINTER(wintypes.FILETIME),)
+    clock.restype = None
+
+    def seconds():
+        stamp = wintypes.FILETIME()
+        clock(ctypes.byref(stamp))
+        ticks = (stamp.dwHighDateTime << 32) | stamp.dwLowDateTime
+        # FILETIME counts 100-ns ticks since 1601-01-01, not the Unix epoch.
+        return _seconds_from_ticks(ticks - 116444736000000000, 10000000)
+
+    return seconds
+
+
+def test_clock_is_a_live_utc_julian_day_and_containers_are_plain(utc_wall_clock):
+    for _ in range(32):
+        before=utc_wall_clock()/86400+2440587.5
+        result=contrib.jdnow()
+        after=utc_wall_clock()/86400+2440587.5
+        assert before<=result<=after
+    user=contrib.User();user.label="example"
+    data=contrib.Data();data.value=1.0
+    assert user.label=="example" and data.value==1.0

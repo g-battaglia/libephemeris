@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "libephemeris-leb-tools"
+version = "4.0.0b1"
+description = "Standalone offline LEB fitting tools for the LibEphemeris v4 Rust engine"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["libephemeris==4.0.0b1", "numpy>=1.26", "zstandard==0.25.0"]
+license = "AGPL-3.0"
+license-files = ["COPYING"]
+
+[project.urls]
+Repository = "https://github.com/g-battaglia/libephemeris"
+Documentation = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b1/tools/leb_generation/README.md"
+
+[project.scripts]
+libephemeris-generate = "leb_generation.cli:main"
+libephemeris-generate-leb = "leb_generation.cli_leb1:main"
+libephemeris-generate-leb2 = "leb_generation.cli_leb2:main"
+
+[tool.setuptools]
+packages = ["leb_generation"]
+package-dir = { leb_generation = "." }
+include-package-data = false
