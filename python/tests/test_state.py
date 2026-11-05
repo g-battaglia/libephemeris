@@ -103,6 +103,8 @@ def test_cooling_never_acquires_missing_readers(tmp_path):
 def test_cooling_keeps_live_reader_and_results_valid():
     first = eph.get_leb_reader()
     expected = first.eval_body(0, 2451545.0)
+    assert eph.cool_leb_readers(clear_coefficients=False) >= 1
+    assert first.eval_body(0, 2451545.0) == expected
     assert eph.cool_leb_readers() >= 1
     assert not first.closed
     assert first.eval_body(0, 2451545.0) == expected

@@ -694,9 +694,10 @@ fn release_data_cache(py: Python<'_>) -> PyResult<()> {
 
 /// Cool every acquired LEB image without opening or hashing new readers.
 /// Returns the number of images visited; OS page release remains advisory.
-#[pyfunction]
-fn cool_leb_readers(py: Python<'_>) -> usize {
-    py.detach(|| runtime().cool_leb_readers())
+/// Pass clear_coefficients=False to preserve the bounded warm coefficient cache.
+#[pyfunction(signature = (clear_coefficients=true))]
+fn cool_leb_readers(py: Python<'_>, clear_coefficients: bool) -> usize {
+    py.detach(|| runtime().cool_leb_readers(clear_coefficients))
 }
 /// Recapture environment, dotenv and TOML settings for future default calls.
 /// Explicit API overrides still win. Retire default reader/center discovery,

@@ -781,8 +781,9 @@ impl Runtime {
     /// Cool all retained LEB images without discovering or acquiring new data.
     /// Active evaluations keep their borrowed coefficients. File cache advice
     /// uses acquired descriptors, independently of subsequent path configuration.
-    /// Returns the number of distinct images visited, not reclaimed byte counts.
-    pub fn cool_leb_readers(&self) -> usize {
+    /// With `clear_coefficients=false`, retain the bounded decoded cache for
+    /// warm queries and release only file pages. Returns images visited, not bytes.
+    pub fn cool_leb_readers(&self, clear_coefficients: bool) -> usize {
         let readers = {
             let state = self.lock();
             let mut readers: Vec<LebFile> = Vec::new();
@@ -799,7 +800,11 @@ impl Runtime {
             readers
         };
         for reader in &readers {
-            reader.cool();
+            if clear_coefficients {
+                reader.cool();
+            } else {
+                reader.release_file_pages();
+            }
         }
         readers.len()
     }
@@ -1655,16 +1660,25 @@ mod tests {
         let runtime = Runtime::default();
         runtime.set_calc_mode(Some("leb")).unwrap();
         runtime.set_leb_file(Some(PathBuf::from("missing-cooling-fixture.leb2")));
-        assert_eq!(runtime.cool_leb_readers(), 0);
+        assert_eq!(runtime.cool_leb_readers(true), 0);
+        assert_eq!(runtime.cool_leb_readers(false), 0);
         runtime.set_leb_file(Some(crate::test_data::core_leb_path()));
         runtime.set_iers_delta_t_enabled(Some(false));
         let snapshot = runtime.shared_session().unwrap();
         let reader = snapshot.context().leb_files()[0].clone();
         let expected = reader.eval_body_any(0, 2451545.0).unwrap();
+        let cache_before = reader.chunk_cache_memory().unwrap();
+        assert!(cache_before.0 > 0);
         assert_eq!(
-            runtime.cool_leb_readers(),
+            runtime.cool_leb_readers(false),
             snapshot.context().leb_files().len()
         );
+        assert_eq!(reader.chunk_cache_memory().unwrap(), cache_before);
+        assert_eq!(
+            runtime.cool_leb_readers(true),
+            snapshot.context().leb_files().len()
+        );
+        assert_eq!(reader.chunk_cache_memory().unwrap().0, 0);
         assert!(Arc::ptr_eq(&snapshot, &runtime.shared_session().unwrap()));
         assert_eq!(reader.eval_body_any(0, 2451545.0).unwrap(), expected);
     }
