@@ -4008,15 +4008,18 @@ mod tests {
                 self.base.serving_entry_snapshot(body)
             }
         }
-        // The scalar reference below was captured on the published distribution.
+        // The scalar reference below was captured on the historical data-v3 distribution.
         // Do not apply that golden value to a different current-data image.
-        let bytes = std::fs::read(crate::test_data::published_core_path())
-            .expect("the published regression fixture must exist");
+        let bytes = std::fs::read(crate::test_data::historical_core_path())
+            .expect("the historical data-v3 regression fixture must exist");
         let hash: String = Sha256::digest(&bytes)
             .iter()
             .map(|b| format!("{b:02x}"))
             .collect();
-        assert_eq!(hash, crate::download::BASE_CORE_SHA256);
+        assert_eq!(
+            hash,
+            "5d708bdbe3e799e0802ba575984e57a3c5e44720dbfa1b4a01cf826640e0cb82"
+        );
         let index = crate::leb::FileIndex::decode(&bytes).unwrap();
         let jd_tt = 2460400.0;
         let request_ut1 = crate::time::default_timescale_ut1_from_tt(jd_tt).unwrap();

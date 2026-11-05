@@ -100,6 +100,18 @@ def test_cooling_never_acquires_missing_readers(tmp_path):
     assert eph.cool_leb_readers() == 0
 
 
+def test_reader_generation_tracks_invalidation_without_acquiring_data(tmp_path):
+    """Metadata caches can detect changed discovery without opening any file."""
+    generation = eph.get_leb_reader_generation()
+    assert eph.get_leb_reader_generation() == generation
+    eph.set_leb_file(str(tmp_path / "missing-generation-fixture.leb2"))
+    changed = eph.get_leb_reader_generation()
+    assert changed != generation
+    assert eph.cool_leb_readers() == 0
+    eph.set_leb_file(str(tmp_path / "missing-generation-fixture.leb2"))
+    assert eph.get_leb_reader_generation() == changed
+
+
 def test_cooling_keeps_live_reader_and_results_valid():
     first = eph.get_leb_reader()
     expected = first.eval_body(0, 2451545.0)

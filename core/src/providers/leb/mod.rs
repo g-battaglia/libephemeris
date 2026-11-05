@@ -812,6 +812,18 @@ impl PartialEq for LebFile {
     }
 }
 
+impl LebFile {
+    /// Compare retained owners without reading image bytes or cache contents.
+    pub(crate) fn shares_image_with(&self, other: &Self) -> bool {
+        self.path == other.path
+            && match (&self.image, &other.image) {
+                (None, None) => true,
+                (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+                _ => false,
+            }
+    }
+}
+
 // Private implementation boundaries; public logical paths remain unchanged.
 mod access;
 mod access_api;

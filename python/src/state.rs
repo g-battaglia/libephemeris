@@ -699,6 +699,12 @@ fn release_data_cache(py: Python<'_>) -> PyResult<()> {
 fn cool_leb_readers(py: Python<'_>, clear_coefficients: bool) -> usize {
     py.detach(|| runtime().cool_leb_readers(clear_coefficients))
 }
+/// Return an opaque LEB discovery invalidation token without acquiring data.
+/// Compare for equality only; provisioning and selection changes can retire it.
+#[pyfunction]
+fn get_leb_reader_generation() -> u64 {
+    runtime().leb_reader_generation()
+}
 /// Recapture environment, dotenv and TOML settings for future default calls.
 /// Explicit API overrides still win. Retire default reader/center discovery,
 /// while active snapshots keep their immutable images/settings. Return None;
@@ -760,6 +766,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(get_spk_date_range_for_tier, module)?)?;
     module.add_function(wrap_pyfunction!(release_data_cache, module)?)?;
     module.add_function(wrap_pyfunction!(cool_leb_readers, module)?)?;
+    module.add_function(wrap_pyfunction!(get_leb_reader_generation, module)?)?;
     module.add_function(wrap_pyfunction!(reload_configuration, module)?)?;
     Ok(())
 }

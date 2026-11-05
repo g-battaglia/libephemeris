@@ -793,7 +793,7 @@ impl Runtime {
                 .map(|(_, reader)| reader)
                 .chain(state.context.leb_files().iter())
             {
-                if !readers.contains(reader) {
+                if !readers.iter().any(|seen| seen.shares_image_with(reader)) {
                     readers.push(reader.clone());
                 }
             }
@@ -807,6 +807,13 @@ impl Runtime {
             }
         }
         readers.len()
+    }
+
+    /// Opaque invalidation token for caches derived from selected LEB images.
+    /// Changes when discovery is retired, including after provisioning; compare
+    /// for equality only. Does not open readers, scan directories or hash files.
+    pub fn leb_reader_generation(&self) -> u64 {
+        self.lock().reader_generation
     }
 
     /// Replace the context-local angle cache with owned scalar values.
@@ -1653,6 +1660,28 @@ mod tests {
             drop(before);
             assert!(retired.upgrade().is_none());
         }
+    }
+
+    #[test]
+    fn cooling_visits_distinct_equal_images_but_clones_only_once() {
+        let path = crate::test_data::core_leb_path();
+        let first = LebFile::open(&path).unwrap();
+        let second = LebFile::open(&path).unwrap();
+        assert_eq!(first, second);
+        assert!(!first.shares_image_with(&second));
+        assert!(first.shares_image_with(&first.clone()));
+        let expected = first.eval_body_any(0, 2451545.0).unwrap();
+        assert_eq!(second.eval_body_any(0, 2451545.0).unwrap(), expected);
+        let mut context = EphemerisContext::new();
+        context.attach_leb_file(first.clone());
+        context.attach_leb_file(first.clone());
+        context.attach_leb_file(second.clone());
+        let runtime = Runtime::from_context(context);
+        assert_eq!(runtime.cool_leb_readers(true), 2);
+        assert_eq!(first.chunk_cache_memory().unwrap().0, 0);
+        assert_eq!(second.chunk_cache_memory().unwrap().0, 0);
+        assert_eq!(first.eval_body_any(0, 2451545.0).unwrap(), expected);
+        assert_eq!(second.eval_body_any(0, 2451545.0).unwrap(), expected);
     }
 
     #[test]

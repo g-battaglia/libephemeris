@@ -214,12 +214,7 @@ impl<'a> HashCacheAdvice<'a> {
             let page = rustix::param::page_size() as u64;
             let end = self.consumed / page * page;
             if let Some(len) = std::num::NonZeroU64::new(end.saturating_sub(self.released)) {
-                let _ = rustix::fs::fadvise(
-                    self.file,
-                    self.released,
-                    Some(len),
-                    rustix::fs::Advice::DontNeed,
-                );
+                advise_hash_range(self.file, self.released, len);
                 self.released = end;
             }
         }
@@ -229,6 +224,17 @@ impl<'a> HashCacheAdvice<'a> {
             self.released = self.consumed;
         }
     }
+}
+
+#[cfg(target_os = "linux")]
+fn advise_hash_range(file: &File, offset: u64, length: std::num::NonZeroU64) {
+    #[cfg(test)]
+    tests::HASH_ADVICE.with(|ranges| {
+        if let Some(ranges) = ranges.borrow_mut().as_mut() {
+            ranges.push((offset, length.get()));
+        }
+    });
+    let _ = rustix::fs::fadvise(file, offset, Some(length), rustix::fs::Advice::DontNeed);
 }
 
 impl Drop for HashCacheAdvice<'_> {
@@ -272,6 +278,37 @@ pub fn release_data_cache(directory: &Path) {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    thread_local! {
+        pub(super) static HASH_ADVICE: std::cell::RefCell<Option<Vec<(u64, u64)>>> = const {
+            std::cell::RefCell::new(None)
+        };
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn hash_advice_releases_only_completed_pages_including_on_early_exit() {
+        let file = File::open(crate::test_data::core_leb_path()).unwrap();
+        let page = rustix::param::page_size() as u64;
+        let threshold = 8 * 1024 * 1024;
+        HASH_ADVICE.with(|ranges| *ranges.borrow_mut() = Some(Vec::new()));
+        {
+            let mut advice = HashCacheAdvice::new(&file);
+            advice.consumed(threshold - 1);
+            HASH_ADVICE.with(|ranges| assert!(ranges.borrow().as_ref().unwrap().is_empty()));
+            advice.consumed(threshold);
+            // Model an early read failure after one additional complete page.
+            advice.consumed(threshold + page + 1);
+        }
+        let ranges = HASH_ADVICE.with(|ranges| ranges.borrow_mut().take().unwrap());
+        assert_eq!(ranges, [(0, threshold), (threshold, page)]);
+        assert!(
+            ranges
+                .iter()
+                .all(|(offset, len)| offset % page == 0 && len % page == 0)
+        );
+    }
     #[test]
     fn advice_ranges_use_host_page_alignment_without_overflow() {
         for page in [4096, 16384] {

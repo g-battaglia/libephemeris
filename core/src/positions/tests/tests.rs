@@ -4920,14 +4920,17 @@ fn leb_vector_edge_preserves_reference_position_flags_and_radial_rate() {
     use crate::time::DeltaTModel;
     use sha2::{Digest, Sha256};
     // Reference words and source data must remain bound to the same image.
-    let path = crate::test_data::published_core_path();
+    let path = crate::test_data::historical_core_path();
     let bytes = std::fs::read(&path)
-        .expect("the published fixture bound to these reference words must exist");
+        .expect("the historical data-v3 fixture bound to these reference words must exist");
     let hash: String = Sha256::digest(&bytes)
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
-    assert_eq!(hash, crate::download::BASE_CORE_SHA256);
+    assert_eq!(
+        hash,
+        "5d708bdbe3e799e0802ba575984e57a3c5e44720dbfa1b4a01cf826640e0cb82"
+    );
     let mut ctx = EphemerisContext::new().with_mode(ProviderMode::SealedLeb);
     ctx.attach_leb_file(LebFile::from_bytes(path.to_string_lossy().into_owned(), bytes).unwrap());
     // Independent pinned position/range-rate values at the first covered
