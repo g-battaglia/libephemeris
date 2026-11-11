@@ -10,8 +10,8 @@ def test_cli_version_returns_success(monkeypatch, capfd):
     monkeypatch.setattr(sys, "argv", ["libephemeris", "--version"])
     assert cli_main() == 0
     output = capfd.readouterr()
-    assert "libephemeris" in output.out.lower()
-    assert "4.0.0b4" in output.out
+    # Exact output rejects a stale beta extension with the same version prefix.
+    assert output.out.strip() == "libephemeris, version 4.0.0"
     assert output.err == ""
 
 

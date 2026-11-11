@@ -22,8 +22,9 @@ clocks, units, domains and errors. Use rustfmt and the
 ## Build and test locally
 
 Follow [installation](docs/installation.md#build-from-source). Use an installed
-wheel, not a stale extension in the checkout. Install the test/docs dependency
-groups with `uv` as needed; select the Python interpreter explicitly.
+wheel, not a stale extension in the checkout. Install pytest and the relevant
+docs/examples/catalog dependencies with `uv`; select the interpreter explicitly.
+Keep the standalone generator test group in its separate environment below.
 
 ```sh
 export PYO3_PYTHON="$PWD/.venv/bin/python"
@@ -32,10 +33,29 @@ cargo test --locked --workspace --all-features --no-fail-fast
 cargo test --locked --workspace --all-features --release --no-fail-fast
 cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 RUSTDOCFLAGS='-D warnings' cargo doc --locked --workspace --all-features --no-deps
-.venv/bin/python -m pytest -q -ra python/tests tools/tests python/examples/tests
+.venv/bin/python -m pytest -q -ra python/tests python/examples/tests
+.venv/bin/python -m pytest -q -ra tools/tests \
+  --ignore-glob='*/test_leb_generation*.py' \
+  --ignore=tools/tests/test_leb_source_generation.py
 .venv/bin/python tools/release/check_minimal.py
 .venv/bin/python tools/release/package_licenses.py --check
 ```
+
+The unchanged standalone LEB tools pin `libephemeris==4.0.0b1` and deliberately
+reject another native version. Do not install that test group into the stable
+wheel environment or relax its producer guard to make a release check pass.
+Run its version-bound CLI/source tests separately:
+
+```sh
+uv venv --python 3.12 .venv-tools
+uv pip install --python .venv-tools/bin/python --group test
+.venv-tools/bin/python -m pytest -q -ra \
+  tools/tests/test_leb_generation*.py tools/tests/test_leb_source_generation.py
+```
+
+Source-generator high-precision reference tests also require an existing mpmath
+validation installation. Supply explicit local JPL/LEB inputs for additional-data
+manual examples; do not treat unavailable-input skips as stable runtime coverage.
 
 Check Rust 1.86 MSRV, default/no-default features and `bundled-data,nbody`
 consumer builds when changing the Rust surface. Repeat wheel checks in clean
@@ -91,8 +111,9 @@ package and check every registry artifact locally.
 
 Use a clean committed revision, lockfile and explicit interpreter. Rust crates
 and the Python package have independent versions; the binding's Cargo version
-`4.0.0-beta.1` becomes Python `4.0.0b1`. Package versions are independent of
-scientific model identifiers. Never move a tag or replace a published version.
+`4.0.0` becomes Python `4.0.0` (and `4.0.0-beta.1` becomes `4.0.0b1` for
+historical prereleases). Package versions are independent of scientific model
+identifiers. Never move a tag or replace a published version.
 
 ```sh
 cargo package --locked --all-features -p libephemeris-core-data -p libephemeris-core

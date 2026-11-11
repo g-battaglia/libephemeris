@@ -1,6 +1,6 @@
 [package]
 name = "libephemeris-core"
-version = "1.0.0-beta.4"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.86"
 license = "AGPL-3.0"
@@ -8,7 +8,7 @@ description = "Astrological ephemerides and astronomical calculation engine in R
 readme = "README.md"
 repository = "https://github.com/g-battaglia/libephemeris"
 homepage = "https://github.com/g-battaglia/libephemeris"
-documentation = "https://docs.rs/libephemeris-core/1.0.0-beta.4"
+documentation = "https://docs.rs/libephemeris-core/1.0.0"
 keywords = ["astrology", "ephemeris", "astronomy", "jpl", "astrometry"]
 categories = ["science"]
 
@@ -20,7 +20,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 # The unchanged image lives in a data-only package so both registry archives
 # fit the upload limit. Optional embedding remains static and zero-copy.
-libephemeris-core-data = { path = "data", version = "=1.0.0-beta.2", optional = true }
+libephemeris-core-data = { path = "data", version = "=1.0.0", optional = true }
 sha2 = "0.11"
 # Consumers resolve their own lockfile; this transport uses ureq's unversioned API.
 ureq = "=3.4.2"

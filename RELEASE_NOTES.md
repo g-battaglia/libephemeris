@@ -1,9 +1,21 @@
-# LibEphemeris 4.0.0b4 — native Rust rewrite
+# LibEphemeris 4.0.0 — native Rust rewrite
 
-**Beta candidate:** Python `4.0.0b4`; Rust core `1.0.0-beta.4`; unchanged data crate `1.0.0-beta.2`.
-Source tag: `python-v4.0.0b4`. Earlier tags and published packages remain immutable.
-This is a prerelease, not the promotion of v4 to stable. Registry publication
-and platform availability must be checked separately from these source notes.
+**Stable release preparation:** Python `4.0.0`; Rust core/data `1.0.0`.
+Source tag: `python-v4.0.0`. Earlier tags and published packages remain immutable.
+Registry publication and platform availability must be checked separately from
+these source notes. Preparing Python packages does not publish Rust crates.
+
+## Promotion from Python 4.0.0b4
+
+The stable preparation retains the b4 numerical implementation, coefficient
+bytes and data-v4 identities. Changes are package identities, exact internal
+version pins, stable metadata, release instructions and identity assertions;
+no numerical tolerance or reference value is changed. The optional offline
+LEB tools retain their existing independent version.
+
+Python still requires 3.12+. The wheel matrix covers macOS ARM64, Linux
+x86_64/aarch64 and Windows x86_64; other platforms need the source toolchain.
+A stable version label does not remove the documented scientific limitations.
 
 ## Empty-path compatibility
 
@@ -130,15 +142,15 @@ bundled; other groups and tiers remain explicit external inputs. Planet-center
 SPK assets retain their separate data-v2rc1 identities. Library version v4 and
 the data-v4 release tag are separate versioning schemes.
 
-## Trying the beta
+## Installing v4
 
 Python requires **3.12+**. Use an available wheel for your OS/architecture, or
 [build a local wheel](docs/installation.md#build-from-source) with the Rust and
 C toolchains. Do not assume that wheels exist for every platform or that a
-source candidate has already been published to PyPI or crates.io.
+source preparation has already been published to PyPI or crates.io.
 
-Once the corresponding registry artifacts are published, select the prerelease
-explicitly rather than relying on an unqualified stable install. For offline
+Once the corresponding registry artifacts are published, select Python 4.0.0
+explicitly to avoid installing an older stable release. For offline
 operation, begin with the bundled base core, choose `leb` mode and seal the
 network. Follow the [installation guide](docs/installation.md) and
 [migration guide](MIGRATION.md) for configuration and first calculations.

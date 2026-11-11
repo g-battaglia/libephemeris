@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.0 (Python) · 1.0.0 (Rust core/data) — Stable preparation
+
+- Promote the qualified Python b4 implementation without changing numerical formulas, data-v4 coefficient bytes, scientific references or tolerances.
+- Align the Python binding, core/data manifests and exact internal pins with the stable identities; preserve all external dependency records.
+- Pin stable source documentation to `python-v4.0.0`, set the Python stable classifier and refresh release/install/migration instructions.
+- Require exact stable identities in the native/Python CLI and release-layout regressions. Optional offline tools retain their independent version.
+- Registry publication remains a separate maintainer action; Python preparation does not upload packages to PyPI or crates.io.
+
 ## 4.0.0b4 (Python) · 1.0.0-beta.4 (Rust core) — Candidate
 
 - Normalize an empty explicit ephemeris path to `.` in the Rust runtime, preserving the historic Python current-directory behavior. `None` restores default discovery. Repeated empty/dot selections preserve readers.

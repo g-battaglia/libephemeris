@@ -1,11 +1,12 @@
 # Migrating from v3 to v4
 
-See the [v4 beta release notes](RELEASE_NOTES.md) for the Rust rewrite,
+See the [v4 release notes](RELEASE_NOTES.md) for the Rust rewrite,
 independent implementation and published data-v4 inventory.
 
 The import remains `import libephemeris`. Calculations now run in Rust through
 PyO3; Python names, argument order, flags and ordinary result layouts remain
-familiar. Use [installation](docs/installation.md) to select the beta explicitly.
+familiar. Python requires 3.12+. Use [installation](docs/installation.md) to
+select 4.0.0 explicitly after publication, or build the prepared source locally.
 
 | Previous assumption | v4 behavior / action |
 | --- | --- |

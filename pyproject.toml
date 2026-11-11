@@ -16,7 +16,7 @@ authors = [
     { name = "Giacomo Battaglia", email = "kerykeion.astrology@gmail.com" },
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
@@ -30,9 +30,9 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/g-battaglia/libephemeris"
 Repository = "https://github.com/g-battaglia/libephemeris"
-Documentation = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b4/docs/README.md"
+Documentation = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/README.md"
 Issues = "https://github.com/g-battaglia/libephemeris/issues"
-Changelog = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b4/CHANGELOG.md"
+Changelog = "https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/CHANGELOG.md"
 
 [dependency-groups]
 test = ["pytest>=8", { include-group = "generate" }, { include-group = "catalog" }]

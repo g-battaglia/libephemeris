@@ -1,15 +1,15 @@
 # Installation
 
-Python requires **3.12+**. The current candidate is Python `4.0.0b4` and Rust
-`1.0.0-beta.4`. These instructions do not imply that a candidate has already
-been published to a registry.
+Python requires **3.12+**. This stable preparation uses Python `4.0.0` and Rust
+core/data `1.0.0`. These instructions do not imply that the packages have already
+been published to PyPI or crates.io; those are separate maintainer actions.
 
 ## Python wheel
 
-Once published, select the beta explicitly:
+After publication, select v4 explicitly:
 
 ```sh
-python -m pip install "libephemeris==4.0.0b4"
+python -m pip install "libephemeris==4.0.0"
 ```
 
 Before publication, install a locally built wheel using the instructions below.
@@ -23,8 +23,10 @@ print(libephemeris.__file__)
 
 A wheel contains the native engine and modern base coefficients; NumPy is its
 Python runtime dependency. It does not include all JPL kernels or data tiers.
-Wheels are platform/architecture-specific. Source installs need the toolchain
-below; an ABI3 wheel does not promise free-threaded Python support.
+The release wheel matrix covers macOS ARM64, manylinux2014 x86_64/aarch64 and
+Windows x86_64. Other platforms, including Intel macOS, require a source build;
+no native wheel is claimed for them. Source installs need the toolchain below;
+an ABI3 wheel does not promise free-threaded Python support.
 
 ## First Python calculation
 
@@ -54,7 +56,7 @@ After registry publication:
 
 ```toml
 [dependencies]
-libephemeris-core = { version = "1.0.0-beta.4", features = ["bundled-data"] }
+libephemeris-core = { version = "1.0.0", features = ["bundled-data"] }
 ```
 
 Before publication, use `path = "/path/to/libephemeris/core"` instead of the
@@ -71,7 +73,7 @@ compiler for Zstandard. From the repository root:
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python maturin==1.9.4
 .venv/bin/maturin build --release --locked --interpreter .venv/bin/python --out dist
-uv pip install --python .venv/bin/python dist/libephemeris-4.0.0b4-*.whl
+uv pip install --python .venv/bin/python dist/libephemeris-4.0.0-*.whl
 cargo build --locked -p libephemeris-core --release
 ```
 

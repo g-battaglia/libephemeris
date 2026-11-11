@@ -1,4 +1,4 @@
-"""Registry descriptions must resolve before the beta is merged into main.
+"""Registry descriptions must resolve before the stable preparation reaches main.
 
 Check tagged links against the local candidate without requiring the tag to
 have been pushed yet. The release process verifies the remote tag separately.
@@ -12,7 +12,7 @@ from urllib.parse import unquote, urlsplit
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-TAG = "python-v4.0.0b4"
+TAG = "python-v4.0.0"
 UNCHANGED_PACKAGE_TAG = "python-v4.0.0b1"
 PROJECT_PATH = "/g-battaglia/libephemeris"
 SPEC = importlib.util.spec_from_file_location("release_link_checker", ROOT / "tools/release/check_docs.py")
@@ -44,7 +44,7 @@ def assert_pinned_destination(target, expected_tag=TAG):
 @pytest.mark.parametrize("name,tag", [
     ("README.md", TAG), ("python/README.md", TAG),
     ("core/README.md", TAG),
-    ("core/data/README.md", UNCHANGED_PACKAGE_TAG),
+    ("core/data/README.md", TAG),
     ("tools/leb_generation/README.md", UNCHANGED_PACKAGE_TAG),
 ])
 def test_registry_readme_links_are_absolute_and_pin_candidate_source(name, tag):

@@ -4,10 +4,11 @@
 lives in `libephemeris_core::api`; native resource configuration and advanced
 integration live in `context`, `config` and `native`.
 
-Version **1.0.0-beta.4** is a pre-release. Once available on the registry:
+Version **1.0.0** prepares the stable Rust core. Registry publication is separate
+from Python wheel publication. Once available on crates.io:
 
 ```sh
-cargo add libephemeris-core@1.0.0-beta.4 --features bundled-data
+cargo add libephemeris-core@1.0.0 --features bundled-data
 ```
 
 From a source checkout's workspace root:
@@ -29,9 +30,9 @@ subdirectory owns the crate manifest, source, Rust integration tests/examples,
 and actual upstream dependency notices. `data/` is the optional dataset crate,
 not another calculation engine or shared API facade.
 
-See the [primary API guide](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b4/docs/rust.md),
-[getting started](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b4/docs/installation.md)
-and [source register](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b4/docs/sources.md).
+See the [primary API guide](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/rust.md),
+[getting started](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/installation.md)
+and [source register](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/sources.md).
 Project distribution terms are AGPL-3.0; complete texts accompany the archive.
-For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0b4/README.md#license);
+For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/README.md#license);
 requests are evaluated case by case.
