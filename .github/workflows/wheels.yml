@@ -1,0 +1,173 @@
+name: Wheel build and tests
+
+# No release credentials, registry uploads, repository writes or shared caches.
+on:
+  push:
+    branches: [main, beta-v4, 'release/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            manylinux: '2014'
+          - platform: linux-aarch64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            manylinux: '2014'
+          - platform: windows-x86_64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            manylinux: ''
+    steps:
+      # Checksum-pinned JSON and license inputs must retain their Git bytes.
+      - name: Preserve source line endings on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Record candidate
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p reports
+          printf 'Commit: %s\nTarget: %s\n' "$(git rev-parse HEAD)" "$TARGET" | tee reports/source.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/setup-python@v5
+        id: python312
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-python@v5
+        id: python314
+        with:
+          python-version: '3.14'
+
+      - name: Build ABI3 wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: '1.9.4'
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --locked --out dist
+
+      - name: Test installed wheel on Python 3.12 and 3.14
+        shell: bash
+        env:
+          PYTHON_312: ${{ steps.python312.outputs.python-path }}
+          PYTHON_314: ${{ steps.python314.outputs.python-path }}
+          TARGET: ${{ matrix.target }}
+          PYTHONUTF8: '1'
+        run: |
+          python - <<'PY'
+          from email.parser import BytesParser
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+          import urllib.request
+          import zipfile
+
+          root = Path.cwd()
+          temporary = Path(os.environ['RUNNER_TEMP'])
+          data = temporary / 'libephemeris-data'
+          reports = root / 'reports'
+          wheel, = (root / 'dist').glob('*.whl')
+          with zipfile.ZipFile(wheel) as archive:
+              name, = [name for name in archive.namelist() if name.endswith('.dist-info/METADATA')]
+              expected = BytesParser().parsebytes(archive.read(name))['Version']
+          record = {
+              'source_sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'target': os.environ['TARGET'],
+              'version': expected,
+              'wheel': wheel.name,
+              'sha256': hashlib.sha256(wheel.read_bytes()).hexdigest(),
+              'tests': {},
+          }
+          report = reports / 'build.json'
+          report.write_text(json.dumps(record, indent=2), encoding='utf-8')
+          failed = False
+          for index, version in enumerate(('3.12', '3.14')):
+              interpreter = os.environ['PYTHON_' + version.replace('.', '')]
+              environment = temporary / ('libephemeris-python' + version)
+              subprocess.run([interpreter, '-m', 'venv', str(environment)], check=True)
+              executable = environment / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+              cli = environment / ('Scripts/libephemeris.exe' if os.name == 'nt' else 'bin/libephemeris')
+              subprocess.run([str(executable), '-m', 'pip', 'install', 'pytest', str(wheel)], check=True)
+              child_env = os.environ.copy()
+              # Git Bash supplies HOME on Windows; do not hide native Windows
+              # discovery bugs that PowerShell/cmd users would encounter.
+              if os.name == 'nt':
+                  child_env.pop('HOME', None)
+              subprocess.run([
+                  str(executable), '-I', '-c',
+                  'from importlib import metadata; from pathlib import Path; import sys; '
+                  'import libephemeris as e; '
+                  'assert sys.version_info[:2] == tuple(map(int, sys.argv[1].split("."))); '
+                  'assert e.__version__ == metadata.version("libephemeris") == sys.argv[2]; '
+                  'assert Path(e.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())',
+                  version, expected,
+              ], cwd=temporary, env=child_env, check=True)
+              if index == 0:
+                  # Reuse the product installer and its immutable data-v4 pins.
+                  subprocess.run([str(cli), 'download', 'leb2-base', '--data-dir', str(data),
+                                  '--no-progress'], env=child_env, cwd=temporary, check=True)
+                  # This public JPL input also enables the direct-SPK tests.
+                  kernel = data / 'de440.bsp'
+                  partial = kernel.with_suffix('.part')
+                  url = 'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440.bsp'
+                  with urllib.request.urlopen(url, timeout=120) as source, partial.open('wb') as output:
+                      shutil.copyfileobj(source, output, length=1024 * 1024)
+                  with partial.open('rb') as source:
+                      digest = hashlib.file_digest(source, 'sha256').hexdigest()
+                  assert partial.stat().st_size == 119799808
+                  assert digest == 'a4ce9bf9b3282becc9f4b2ac3cebe03a2ae7599981aabd7265fd8482fff7c4b5'
+                  partial.replace(kernel)
+              child_env['LIBEPHEMERIS_TEST_DATA_DIR'] = str(data)
+              child_env['LIBEPHEMERIS_TEST_LEB2'] = str(root / 'core/data/leb2/base_core.leb2')
+              result = subprocess.run([
+                  str(executable), '-m', 'pytest', '-q', '-ra', str(root / 'python/tests'),
+                  '--junitxml=' + str(reports / ('pytest-' + version + '.xml')),
+              ], cwd=temporary, env=child_env)
+              record['tests'][version] = {'returncode': result.returncode}
+              report.write_text(json.dumps(record, indent=2), encoding='utf-8')
+              with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf-8') as summary:
+                  summary.write(f'\nPython {version}: pytest exit {result.returncode}; see JUnit and -ra logs.\n')
+              failed |= result.returncode != 0
+          raise SystemExit(1 if failed else 0)
+          PY
+
+      # Type-check test-only native code too; ignored tests still have to
+      # compile on Windows. Do not block independent Python diagnostics, and
+      # do not execute the Rust test suite.
+      - name: Check Rust test portability on Windows
+        if: always() && runner.os == 'Windows'
+        shell: bash
+        run: cargo check --locked --all-features --all-targets -p libephemeris-core
+
+      - name: Retain diagnostic wheels and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.platform }}
+          path: |
+            dist/*.whl
+            reports/
+          if-no-files-found: warn

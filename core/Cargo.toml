@@ -1,0 +1,49 @@
+[package]
+name = "libephemeris-core"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.86"
+license = "AGPL-3.0"
+description = "Astrological ephemerides and astronomical calculation engine in Rust"
+readme = "README.md"
+repository = "https://github.com/g-battaglia/libephemeris"
+homepage = "https://github.com/g-battaglia/libephemeris"
+documentation = "https://docs.rs/libephemeris-core/1.0.0"
+keywords = ["astrology", "ephemeris", "astronomy", "jpl", "astrometry"]
+categories = ["science"]
+
+[package.metadata.docs.rs]
+features = ["bundled-data", "nbody"]
+no-default-features = true
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+# The unchanged image lives in a data-only package so both registry archives
+# fit the upload limit. Optional embedding remains static and zero-copy.
+libephemeris-core-data = { path = "data", version = "=1.0.0", optional = true }
+sha2 = "0.11"
+# Consumers resolve their own lockfile; this transport uses ureq's unversioned API.
+ureq = "=3.4.2"
+log = "0.4"
+serde_json = "=1.0.151"
+chrono = { version = "=0.4.42", default-features = false, features = ["std", "clock"] }
+md-5 = "=0.10.6"
+toml = "0.9"
+zstd = "0.14"
+memmap2 = "=0.9.11"
+zmij = "=1.0.23"
+wide = "=0.7.33"
+
+[dev-dependencies]
+serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "=1.1.5", features = ["fs", "param"] }
+
+[features]
+default = []
+bundled-data = ["dep:libephemeris-core-data"]
+nbody = []
+# Internal implementation bridge, never additional primary Session methods.
+python-internals = []
+native-nbody = ["nbody"]

@@ -1,62 +1,25 @@
-# Python-generated files
+/target
+
+# Separate, private qualification checkout; never ship it with the engine.
+/libephemeris-validation-python/
+.DS_Store
 __pycache__/
-*.py[oc]
-/build/
+*.py[cod]
+.pytest_cache/
+.idea/
+/tools/leb_generation/build/
+/tools/leb_generation/*.egg-info/
+
+# Local build/install products, never source-distribution inputs.
+/.venv/
+/.venv-*/
 /dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-de421.bsp
-stuff
-
-# Hypothesis test database
-.hypothesis/
-
-# Coverage reports
+/build/
+/docs/_build/
+/core/target/
+/core/data/target/
+/python/libephemeris/*.so
+/python/libephemeris/*.pyd
+*.egg-info/
 .coverage
-.coverage.*
-coverage.xml
-htmlcov/
-
-de440.bsp.download4
-de440.bsp.download3
-de440.bsp.download2
-de440.bsp.download
-de440.bsp
-de440s.bsp
-2060_193001_195001.bsp
-2060_180001_220012.bsp
-*.bsp
-implementation_plans
-.opencode/plans
-
-# LEB binary ephemeris files (generated, large)
-data/leb/*.leb
-
-# Root LEB2 outputs are generated and ignored. The only tracked core payload is
-# libephemeris/data/leb2/base_core.leb2; release assets require separate review.
-data/leb2/*.leb2
-
-# Environment files (may contain local paths/config)
-.env
-.env.*
-
-# Secrets / certificates (defense-in-depth)
-*.pem
-*.key
-*.p12
-data/leb/.DS_Store
-data/.DS_Store
-
-# Reference-distribution artifacts are deliberately not ignored: the
-# provenance gate rejects them even when untracked.
-
-# Manual build output (EPUB/PDF)
-docs/build/
-/.opencode
-
-# JS tooling
-node_modules/
-/logs
+/htmlcov/

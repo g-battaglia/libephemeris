@@ -1,0 +1,11 @@
+---
+title: "LibEphemeris — Manual"
+subtitle: "High-precision astronomical calculations with Python"
+author: "Giacomo Battaglia"
+lang: en-US
+date: "2026"
+rights: "LGPL-3.0-only"
+description: |
+  Complete manual for LibEphemeris, a Python library for high-precision
+  astronomical and astrological calculations powered by JPL DE440/DE441
+  ephemerides.

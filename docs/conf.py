@@ -1,142 +1,91 @@
-# Configuration file for the Sphinx documentation builder.
-#
-# For the full list of built-in configuration values, see the documentation:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
+"""Build the current Python documentation against an installed native wheel.
 
-import sys
-import tomllib
+Do not prepend the checkout to sys.path: that can load a stale local extension
+and conceal a broken installation. Package metadata and runtime versions must
+identify the same candidate before autodoc runs.
+"""
+
+from importlib import metadata
 from pathlib import Path
+import re
+import tomllib
+from urllib.parse import quote, urlsplit
 
-from docutils import nodes
-from docutils.parsers.rst import Directive
-from docutils.statemachine import StringList
+import libephemeris
 
-# Add the project root to the path so autodoc can find the modules
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_ROOT))
-
-# -- Project information -----------------------------------------------------
-project = "libephemeris"
-copyright = "2024-2026, Giacomo Battaglia"
+project = "LibEphemeris"
 author = "Giacomo Battaglia"
+copyright = "Giacomo Battaglia"
+release = metadata.version("libephemeris")
+if libephemeris.__version__ != release:
+    raise RuntimeError("documentation runtime and installed metadata versions differ")
+version = release
+# A Python version can use a distinct source tag when an earlier Git tag is
+# already immutable. Derive it from the same URL checked by release tooling.
+project_metadata = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
+source_ref = urlsplit(project_metadata["project"]["urls"]["Documentation"]).path.split("/blob/", 1)[1].split("/", 1)[0]
 
-# pyproject.toml is the packaging source of truth, including in an uninstalled
-# source checkout. Avoid a hard-coded fallback that can drift between releases.
-with (PROJECT_ROOT / "pyproject.toml").open("rb") as pyproject_file:
-    release = tomllib.load(pyproject_file)["project"]["version"]
-version = ".".join(release.split(".")[:2])
-
-# -- General configuration ---------------------------------------------------
-extensions = [
-    "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
-    "sphinx.ext.napoleon",  # Support for Google/NumPy style docstrings
-    "sphinx.ext.viewcode",
-    "sphinx.ext.intersphinx",
-    "myst_parser",  # Support for Markdown files
-]
-
-# Napoleon settings for Google/NumPy style docstrings
-napoleon_google_docstring = True
-napoleon_numpy_docstring = True
-napoleon_include_init_with_doc = True
-napoleon_include_private_with_doc = False
-napoleon_include_special_with_doc = True
-napoleon_use_admonition_for_examples = True
-napoleon_use_admonition_for_notes = True
-napoleon_use_admonition_for_references = True
-napoleon_use_ivar = True
-napoleon_use_param = True
-napoleon_use_rtype = True
-napoleon_preprocess_types = False
-napoleon_type_aliases = None
-napoleon_attr_annotations = True
-
-# Autodoc settings. The API reference derives its public names and signatures
-# from libephemeris.__all__ and the runtime objects.
-autodoc_default_options = {
-    "member-order": "alphabetical",
-    "exclude-members": "__weakref__",
-}
-autodoc_typehints = "description"
-autodoc_typehints_description_target = "documented"
-
-# Autosummary settings
-autosummary_generate = True
-
-# Intersphinx settings (link to external documentation)
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "numpy": ("https://numpy.org/doc/stable/", None),
-}
-
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
-
-# Source file suffixes
-source_suffix = {
-    ".rst": "restructuredtext",
-    ".md": "markdown",
-}
-master_doc = "index"
-
-# MyST parser settings
-myst_enable_extensions = [
-    "colon_fence",  # ::: directive syntax
-    "deflist",  # Definition lists
-    "tasklist",  # Task lists with checkboxes
-]
-myst_heading_anchors = 3  # Add anchors to headings up to level 3
-
-# -- Options for HTML output -------------------------------------------------
+extensions = ["myst_parser", "sphinx.ext.autodoc"]
+source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
+# Both books live beside docs/, so the source root is the repository root.
+# An allowlist prevents worktrees, generated output and private files entering HTML.
+root_doc = "docs/index"
+include_patterns = ["docs/**", "beginners-manual/**"]
+exclude_patterns = ["docs/_build/**", "**/.DS_Store"]
 html_theme = "sphinx_rtd_theme"
-
-# Theme options
-html_theme_options = {
-    "navigation_depth": 4,
-    "collapse_navigation": False,
-    "sticky_navigation": True,
-    "includehidden": True,
-    "titles_only": False,
-}
-
-# -- Options for autodoc -----------------------------------------------------
-# Document classes and functions
+html_theme_options = {"navigation_depth": 3}
+myst_heading_anchors = 4
+myst_enable_extensions = ["colon_fence", "deflist", "tasklist"]
+# Native signatures/docstrings are authoritative; type stubs ship separately.
+autodoc_typehints = "none"
 add_module_names = False
 
 
-class PublicDataDirective(Directive):
-    """Render every non-callable export in ``libephemeris.__all__``."""
+def source_links(app, docname, source):
+    """Resolve out-of-book links against the canonical source repository.
 
-    has_content = False
+    GitHub-readable Markdown also links to root guides, source and numerical
+    reports. Those are not Sphinx documents. Preserve internal book links for
+    MyST, but pin other existing project files to the installed release's tag.
+    No external page is fetched and no missing-link warning is suppressed.
+    """
+    root = Path(app.srcdir).resolve()
+    book_roots = (root / "docs", root / "beginners-manual")
+    origin = Path(app.env.doc2path(docname)).resolve().parent
 
-    def run(self):
-        import libephemeris
+    def replace(match):
+        target = match.group(2)
+        parsed = urlsplit(target)
+        if parsed.scheme or parsed.netloc or not parsed.path:
+            return match.group(0)
+        destination = (origin / parsed.path).resolve()
+        if any(destination.is_relative_to(book) for book in book_roots):
+            return match.group(0)
+        if not destination.is_relative_to(root) or not destination.exists():
+            raise ValueError(f"invalid source link in {docname}: {target}")
+        kind = "tree" if destination.is_dir() else "blob"
+        relative = quote(destination.relative_to(root).as_posix())
+        url = f"https://github.com/g-battaglia/libephemeris/{kind}/{source_ref}/{relative}"
+        if parsed.fragment:
+            url += "#" + parsed.fragment
+        return match.group(1) + url + match.group(3)
 
-        source = self.state.document.current_source
-        rst_lines: list[str] = []
+    source[0] = re.sub(r"(!?\[[^\]]*\]\()([^\s)]+)(\))", replace, source[0])
 
-        for name in libephemeris.__all__:
-            value = getattr(libephemeris, name)
-            if callable(value):
-                continue
 
-            rst_lines.append(f".. py:data:: {name}")
-            rst_lines.append(f"   :type: {type(value).__name__}")
-            if isinstance(value, (str, int, float, bool, type(None))):
-                rst_lines.append(f"   :value: {value!r}")
-            rst_lines.append("")
+def native_help_text(app, what, name, obj, options, lines):
+    """Render native help verbatim rather than misparsing Markdown as RST.
 
-        container = nodes.container()
-        self.state.nested_parse(
-            StringList(rst_lines, source=source), self.content_offset, container
-        )
-        return [container]
+    PyO3 help contains Markdown fences and mathematical notation intended for
+    Python help() and Rust readers. Autodoc still indexes native signatures;
+    a text block preserves every docstring word without altering runtime help.
+    """
+    if lines:
+        lines[:] = [".. code-block:: text", ""] + ["    " + line for line in lines] + [""]
 
 
 def setup(app):
-    app.add_directive("public-data", PublicDataDirective)
-    return {"parallel_read_safe": True}
-
-
-# -- Options for man pages ---------------------------------------------------
-man_pages = [(master_doc, "libephemeris", "libephemeris Documentation", [author], 1)]
+    """Keep source links portable and native help faithful in the HTML book."""
+    app.connect("source-read", source_links)
+    app.connect("autodoc-process-docstring", native_help_text)
+    return {"parallel_read_safe": True, "parallel_write_safe": True}
