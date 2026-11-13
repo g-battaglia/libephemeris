@@ -2,7 +2,7 @@
 
 LibEphemeris supplies astrological ephemerides and astronomical calculations.
 For higher-level chart data and rendering, use [Kerykeion](https://github.com/g-battaglia/kerykeion);
-for hosted calculations, see [Astrologer API](../README.md#astrologer-api).
+for hosted calculations, see [Astrologer API](https://www.kerykeion.net/astrologer-api).
 
 Read the [v4 beta release notes](../RELEASE_NOTES.md) for the Rust rewrite,
 API compatibility and data-v4 migration overview.
