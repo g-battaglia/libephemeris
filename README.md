@@ -263,8 +263,6 @@ below builds on the previous one:
   applications.
   [Subscribe on RapidAPI](https://rapidapi.com/gbattaglia/api/astrologer/pricing)
   · [Coding-agent skill](https://github.com/g-battaglia/Astrologer-API/tree/v5/skills/astrologer-api)
-- **[Astrologer Studio](https://www.astrologerstudio.com/)**: the browser
-  application built on Kerykeion and Astrologer API, for charts with no Python
-  installation or ephemeris setup.
+- **[Astrologer Studio](https://www.astrologerstudio.com/)**:  Professional astrology software, built on LibEphemeris and Kerykeion.
 
 Project home: [github.com/g-battaglia/libephemeris](https://github.com/g-battaglia/libephemeris).
