@@ -624,3 +624,17 @@ Validation on macOS arm64:
   `EphemerisRangeError` in the rebuilt wheel during the run. Both return
   identical results when that call is run alone. Keep this qualification
   open and preserve the sequence captures for reproduction.
+
+The completed local full run compared **2,100,000 calls** and found **70
+differences**. All are `calc_pctr` or context `calc_pctr` results in
+`auto/medium`, each a value on one wheel and an `EphemerisRangeError` on the
+other. There were 35 in each direction. The result does not establish which
+wheel or sequence state is responsible. The captures and comparison JSON
+are in `target/bench/full/`. The gate remains open and the numeric reference
+has not been changed.
+
+The hosted 10,000-call check passed on Linux x86-64, Linux ARM64 and Windows
+x86-64. The [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157)
+is in progress. A sample of the random-date base/leb workload on the published
+wheel put Zstandard decompression and LEB coefficient unpacking at the top of
+the stacks, supporting the cache experiment once qualification is resolved.
