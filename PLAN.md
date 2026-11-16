@@ -1416,7 +1416,15 @@ checks proportional attribution on both architectures.
 Mac random-chart medians were 541.7 → 576.6 µs and consecutive medians
 were 106.8 → 111.4 µs across five independent repeats. The median first
 call moved from 1.49 to 1.92 ms on first use and from 1.45 to 1.95 ms
-with warm pages. Keep the latency trade-off visible during qualification.
+with warm pages.
+
+The follow-up alternated reference, candidate, candidate and reference
+with five repeats of 2,400 charts per run. Random-chart medians were
+583.4 / 585.3 µs for the reference and 584.0 / 586.1 µs for the
+candidate. Consecutive medians were 112.1 / 113.2 and 111.8 / 111.2 µs.
+The initial steady-state slowdown did not recur. Warm-page first-call
+medians were 1.54 / 1.56 ms on the reference and 1.90 / 1.85 ms on the
+candidate. The startup cost remains visible during qualification.
 Raw results are under `target/bench/leb-static-base-snapshot/`.
 
 ## 15. Step 1a experiment
