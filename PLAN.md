@@ -786,6 +786,15 @@ These per-tier installations are distinct from the mixed-installation
 tests used to select an indexed cache budget. Raw Mac snapshots and
 reports are in `target/bench/phase0-macos-memory/`.
 
+The added macOS timing matrix completed for both wheels with five
+independent samples per case. It covers the two wider random-date
+windows, 36 cases for 1/2/4/8 threads and the consecutive workloads,
+and all six first-use and warm-page startup cases. Each time-series
+sample contains 100,000 calls. The pairing was checked for the input
+inventory, seed, effective date range, flags, case order and sample
+counts. These coverage runs shared the machine with RAM and numerical
+qualification. Raw data is under `target/bench/phase0-macos-timing/`.
+
 The unchanged external `leb all` campaign is running sequentially against
 the published and composed wheel overlays with network policy sealed.
 This adds the standalone rounds, verification scripts and parity
