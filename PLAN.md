@@ -1430,8 +1430,12 @@ in each process. In the [Linux follow-up](https://github.com/g-battaglia/libephe
 ARM64 steady summed PSS changed from 38.5 / 72.3 / 133.4 / 258.8 MB
 to 37.2 / 61.2 / 104.0 / 186.0 MB at 1 / 2 / 4 / 8 workers. At
 eight workers anonymous RSS fell from 241.4 to 159.5 MB. The x86-64
-job is still in progress. The base snapshot change is now in PR #87
-for combined qualification.
+steady summed PSS moved from 40.4 / 73.7 / 137.3 / 261.0 MB to
+39.1 / 62.1 / 105.1 / 187.7 MB at the same process counts. At eight
+workers anonymous RSS fell from 242.4 to 160.6 MB. Both Linux runs
+matched all 10,000 smoke cases. The base snapshot change is in PR #87
+for [combined default qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43928262541)
+and [combined 32 MiB and positional qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43928798173).
 Mac random-chart medians were 541.7 → 576.6 µs and consecutive medians
 were 106.8 → 111.4 µs across five independent repeats. The median first
 call moved from 1.49 to 1.92 ms on first use and from 1.45 to 1.95 ms
