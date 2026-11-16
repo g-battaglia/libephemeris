@@ -11,7 +11,10 @@ import urllib.request
 import venv
 
 from bitdiff import PROFILES
-from common import KERNEL_PINS, KERNELS, MODES, ROOT, SATELLITE_KERNEL, TIERS, command, digest
+from common import (
+    KERNEL_PINS, KERNELS, MODES, ROOT, SATELLITE_KERNEL, SCHEMA, TIERS,
+    PrerequisiteError, command, digest, dump,
+)
 
 
 MEMORY_CASES = tuple(f"{mode}/{tier}" for mode in MODES for tier in TIERS)
@@ -22,6 +25,48 @@ def executables(path):
     binaries = path / ("Scripts" if windows else "bin")
     suffix = ".exe" if windows else ""
     return binaries / f"python{suffix}", binaries / f"libephemeris{suffix}"
+
+
+def provision_data(options, root, data, cli, memory_mode, memory_tier):
+    shutil.copyfile(ROOT / "core/data/leb2/base_core.leb2", data / "leb/base_core.leb2")
+    leb_tiers = set()
+    spk_tiers = set()
+    if options.profile == "satellites":
+        spk_tiers.add("medium")
+    elif options.profile != "smoke":
+        leb_tiers.update(TIERS)
+        spk_tiers.update(TIERS)
+    if options.linux_memory or options.linux_startup:
+        if memory_mode != "skyfield":
+            leb_tiers.add(memory_tier)
+        if memory_mode != "leb":
+            spk_tiers.add(memory_tier)
+    for tier in sorted(leb_tiers):
+        print(f"Provisioning the pinned LEB {tier} group", flush=True)
+        subprocess.run([str(cli), "download", f"leb2-{tier}", "--data-dir", str(data),
+                        "--no-progress"], cwd=root, check=True)
+    downloads = []
+    for tier in sorted(spk_tiers):
+        name = KERNELS[tier]
+        downloads.extend((
+            (name, f"https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/{name}"),
+            (f"planet_centers_{tier}.bsp",
+             "https://github.com/g-battaglia/libephemeris/releases/download/data-v2rc1/"
+             f"planet_centers_{tier}.bsp"),
+        ))
+    if options.profile == "satellites":
+        downloads.append((
+            SATELLITE_KERNEL,
+            "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/"
+            f"{SATELLITE_KERNEL}",
+        ))
+    for file_name, url in downloads:
+        print(f"Downloading and verifying {file_name}", flush=True)
+        path = data / file_name
+        with urllib.request.urlopen(url, timeout=120) as src, path.open("wb") as dest:
+            shutil.copyfileobj(src, dest, length=1024 * 1024)
+        if digest(path) != KERNEL_PINS[file_name]:
+            raise PrerequisiteError(f"downloaded {file_name} does not match its pin")
 
 
 def main():
@@ -54,45 +99,14 @@ def main():
         for interpreter, wheel in ((baseline, baseline_wheel), (candidate, candidate_wheel)):
             subprocess.run([str(interpreter), "-m", "pip", "install", str(wheel), "numpy==2.4.6"],
                            cwd=root, check=True)
-        shutil.copyfile(ROOT / "core/data/leb2/base_core.leb2", data / "leb/base_core.leb2")
-        leb_tiers = set()
-        spk_tiers = set()
-        if options.profile == "satellites":
-            spk_tiers.add("medium")
-        elif options.profile != "smoke":
-            leb_tiers.update(TIERS)
-            spk_tiers.update(TIERS)
-        if options.linux_memory or options.linux_startup:
-            if memory_mode != "skyfield":
-                leb_tiers.add(memory_tier)
-            if memory_mode != "leb":
-                spk_tiers.add(memory_tier)
-        for tier in sorted(leb_tiers):
-            print(f"Provisioning the pinned LEB {tier} group", flush=True)
-            subprocess.run([str(cli), "download", f"leb2-{tier}", "--data-dir", str(data),
-                            "--no-progress"], cwd=root, check=True)
-        downloads = []
-        for tier in sorted(spk_tiers):
-            name = KERNELS[tier]
-            downloads.extend((
-                (name, f"https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/{name}"),
-                (f"planet_centers_{tier}.bsp",
-                 "https://github.com/g-battaglia/libephemeris/releases/download/data-v2rc1/"
-                 f"planet_centers_{tier}.bsp"),
-            ))
-        if options.profile == "satellites":
-            downloads.append((
-                SATELLITE_KERNEL,
-                "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/"
-                f"{SATELLITE_KERNEL}",
-            ))
-        for file_name, url in downloads:
-            print(f"Downloading and verifying {file_name}", flush=True)
-            path = data / file_name
-            with urllib.request.urlopen(url, timeout=120) as src, path.open("wb") as dest:
-                shutil.copyfileobj(src, dest, length=1024 * 1024)
-            if digest(path) != KERNEL_PINS[file_name]:
-                raise ValueError(f"downloaded {file_name} does not match its pin")
+        try:
+            provision_data(options, root, data, cli, memory_mode, memory_tier)
+        except (PrerequisiteError, OSError, subprocess.CalledProcessError) as exc:
+            options.output.mkdir(parents=True, exist_ok=True)
+            report = dump({"schema": SCHEMA, "status": "missing_prerequisite", "error": str(exc)})
+            (options.output / "comparison.json").write_text(report + "\n", encoding="utf-8")
+            print(report, file=sys.stderr)
+            return 2
         candidate_commit = command("git", "rev-parse", "HEAD")
         comparison_command = [
             sys.executable, str(ROOT / "tools/bench/bitdiff.py"), "run", "--profile", options.profile,
