@@ -572,18 +572,44 @@ selected from the measured results; none of it needs to be decided now.
 
 ## 14. Phase 0 implementation checklist
 
-- [x] Isolated published and candidate wheel environments, with matching Python
-  and NumPy and recorded extension and wheel SHA-256.
-- [x] Pinned input inventory, provider preflight, timing and memory drivers,
-  and a native timing example.
-- [x] Streaming bit comparison, compressed captures, coverage summary and
-  tests that detect changes to bits, result shape, flags, warnings and errors.
-- [x] Add the 10,000-call PR check and manual full mode to the wheel workflow.
-- [x] Document commands and profiling in [tools/bench/README.md](tools/bench/README.md).
-- [ ] Complete numerical qualification across the wheel matrix and record
-  discrepancies, incomplete checks and consumer test results.
-- [ ] Complete the baseline timing and RAM matrix. Deferring the cache budget
-  selection until both can be compared against these measurements.
+### Reproducible environments and measurements
+
+- [x] Install the published wheel and the rebuilt wheel in separate
+  environments. Record the revision, wheel and extension digests, platform,
+  Python, compiler and build options.
+- [x] Stage pinned inputs into private directories. Record their coverage,
+  use sealed calls with explicit settings, and report unavailable inputs.
+- [x] Share workload requests and JSON formats across a Python driver and
+  a native Rust example. Document timing, memory and native profiling in
+  [tools/bench/README.md](tools/bench/README.md).
+- [x] Collect the macOS timing pairs across all six mode and tier cases,
+  including chart components, 100,000-position series, random date ranges
+  and 1/2/4/8 threads. Record five independent samples and the p95 unit.
+- [ ] Archive all 1/2/4/8-process macOS RAM pairs and the Linux LEB base
+  RAM pair with its released companion files. Keep the available RSS,
+  anonymous, file, peak and proportional counters separate.
+- [ ] Finish the Linux startup matrix for the remaining five mode and tier
+  cases. Compare first use, explicitly warm pages and verified cold pages.
+
+### Numerical and consumer validation
+
+- [x] Generate a deterministic 2,100,000-call corpus and capture it in
+  separate processes. Archive compressed captures, request coverage and
+  raw bitwise results. Probe interval boundaries, state changes, warnings
+  and typed errors. Keep the named satellite comparison as a separate run.
+- [x] Verify that the comparator detects modified binary64 words, signed
+  zeros, NaN payloads, flags, structure, warnings, errors and truncation.
+- [x] Run a 10,000-call PR check and support full manual runs on both
+  Linux architectures and Windows. Keep the macOS verification local.
+- [ ] Pass the full comparison against the published reference on all
+  required platforms. Linux and macOS passed. The Windows published wheel
+  disagrees with independent runs of itself in Auto; the corrected
+  reference and optimized checks are reported separately.
+- [x] Run Rust release tests with `bundled-data,nbody,python-internals`,
+  installed-wheel Python tests and harness tests. Preserve their logs.
+- [ ] Finish the external validation and downstream qualification. Track
+  missing prerequisites and classify candidate failures against the paired
+  published run. Keep the suites and their baselines intact.
 
 Local reports and logs are under `target/bench/`. The first five-repeat
 candidate run on macOS arm64 (Python 3.12, base/leb, 500 charts per repeat)
@@ -810,6 +836,16 @@ Kerykeion's unchanged offline suite passed 13,436 tests with 1,392 skips
 and three deselections. Kerykeion-parity's unchanged source suite passed
 51 tests. Logs are `target/bench/optimized-corrected-kerykeion*.log`.
 
+The unchanged native API consumer suite ran in two independent copies of
+its environment with the published and composed wheels installed. The
+extension SHA-256 was checked before each run. Both wheels had identical
+outcomes on all 106 cases, including the same one failure comparing direct
+wheel results with the engine embedded in the consumer. A direct replay
+captured identical binary64 words and flags from the two standalone
+wheels and the same difference from the embedded engine. Local artifacts
+are `target/bench/astrologer-v7-*-installed.{log,xml}` and
+`target/bench/astrologer-v7-*-direct-probe.json`.
+
 The Windows positional and indexed comparisons started before the
 timeout increase. Their Linux jobs passed. The Windows jobs reached the
 90-minute limit, including the
@@ -952,6 +988,17 @@ The positional candidate is also measured in
 [Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886693099).
 Each case uses 1/2/4/8 processes and 100,000 charts per process.
 
+The [LEB base RAM follow-up with companions](https://github.com/g-battaglia/libephemeris/actions/runs/43903192938)
+and the five remaining Linux startup cases are running. The startup pairs
+cover [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679912),
+[Auto base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679854),
+[Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679339),
+[Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679363)
+and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903680097).
+The LEB medium pair finished on both architectures. It staged four inputs
+and checked zero resident input bytes in every cold sample. Each report
+has one date, one first position and one first chart per fresh process.
+
 The paired Auto medium SPK comparison completed on both Linux
 architectures with identical pinned input manifests. Steady summed PSS
 for the published wheel and the SPK candidate, in decimal MB.
@@ -1003,3 +1050,13 @@ Of 2,034 subsequent-body samples, 646 were in coefficient evaluation or
 the two-word polynomial rate path and 258 were in deflection arithmetic.
 The observations guide the reuse work. The native trace and raw timings
 are under `target/bench/chart-anatomy-profile/`.
+
+The small-budget owned-reader screen uses the composed wheel with the
+released LEB companions. In the completed zero-byte case, steady
+single-worker RSS after 10,000 charts moved from 49.4 to 48.1 MB in base
+and from 87.2 to 85.5 MB in medium. Random-chart medians moved from
+580 to 17,660 µs and from 601 to 19,501 µs respectively. Releasing all
+decoded coefficients between calls is excluded from default selection.
+This screen shared the host with other work. The positive-budget cases
+are in progress. Raw timings and memory snapshots are under
+`target/bench/leb-owned-small-budget-screening/`.
