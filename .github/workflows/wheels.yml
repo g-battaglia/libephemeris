@@ -20,6 +20,10 @@ on:
         type: choice
         options: [smoke, full]
         default: smoke
+      linux_memory:
+        description: Record RSS and PSS with 1, 2, 4 and 8 base LEB processes on Linux
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -175,7 +179,13 @@ jobs:
         env:
           BITDIFF_PROFILE: ${{ inputs.bitdiff_profile || 'smoke' }}
           PYTHON_312: ${{ steps.python312.outputs.python-path }}
-        run: '"$PYTHON_312" tools/bench/wheel_check.py --profile "$BITDIFF_PROFILE" --output reports/bitdiff'
+          BITDIFF_LINUX_MEMORY: ${{ inputs.linux_memory && runner.os == 'Linux' }}
+        run: |
+          args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
+          if [[ "$BITDIFF_LINUX_MEMORY" == true ]]; then
+            args+=(--linux-memory)
+          fi
+          "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 
       # Type-check test-only native code too; ignored tests still have to
       # compile on Windows. Do not block independent Python diagnostics, and
