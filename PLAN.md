@@ -1012,6 +1012,12 @@ Auto base also completed with matching input and workload settings.
 The random-chart median was 1,183 µs on the corrected reference,
 1,066 µs on the default candidate and 943 µs with positional centers.
 Consecutive chart medians were 863, 766 and 606 µs respectively.
+The corresponding Auto medium random-chart medians were 1,229,
+1,254 and 1,110 µs. Consecutive medians were 735, 753 and 636 µs.
+On full Auto medium coverage the random chart medians were
+1,224, 1,222 and 1,063 µs. The default storage changes reduce RAM
+in the paired memory measurements. The timing change depends on
+the workload and the center reader setting.
 The local comparison audit is `target/bench/phase1-composed-timing/comparison.json`.
 Four native hot-stack samples are queued after that sweep. They cover
 base chart components, medium indexed LEB, medium positional Auto and
