@@ -1588,6 +1588,24 @@ differs from the shorter 1900–2100 workload reported above. The
 prototype remains local while a matched-cache comparison isolates
 the storage and cache-policy effects.
 
+The matched-cache wheel (`e526c136`) uses the ordinary 1 MiB
+coefficient cache setting. Its 3,000-chart screen sampled full
+coverage and matched 10,000 calls bit for bit, including the warning.
+At eight processes, summed RSS was 618.6 → 321.6 MB and sampled
+footprint was 493.1 → 195.7 MB. Random-chart median/p95 were
+590.4/619.4 → 619.5/651.5 µs and consecutive median/p95 were
+114.3/119.1 → 119.9/124.8 µs. The warm-page first-call median was
+3.70 → 16.10 ms. The 100,000-chart and 350,000-call runs are in progress.
+
+Qualification found that an explicit 32 MiB process cache could
+panic while attaching the positional snapshot's shared cache.
+The revised local runtime (`a4ca7bd4`) only attempts the snapshot
+through automatic discovery with the legacy cache. Direct opens and
+explicit process-cache settings follow their previous acquisition path.
+The explicit 32 MiB probe and 10,000-call comparison against the
+combined runtime passed, including the warning. The corrected route's
+default-configuration comparison is in progress.
+
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the
 final candidate and a 6 MiB indexed budget. At 1 / 2 / 4 / 8 workers
