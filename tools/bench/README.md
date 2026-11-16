@@ -134,6 +134,9 @@ result. The dump preserves float words, including NaN payloads and signed
 zero, and checks result structure, returned flags and Python warnings.
 Capture files and the coverage/error summary can be retained as CI artifacts.
 Exit status 1 means a difference, and 2 means no completed comparison.
+Missing or incompatible required inputs are reported as
+`missing_prerequisite` in `comparison.json`, including when the
+wheel workflow cannot stage a pinned file or a capture rejects its wheel.
 
 The report lists exact requested flag masks, target IDs grouped by body
 class, and observed center IDs for each mode, tier and position entry

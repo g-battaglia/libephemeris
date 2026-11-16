@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bench"))
 from benchmark import linux_resident_bytes, verify_cold_os_pages  # noqa: E402
 from bitdiff import compare, encode, outcome  # noqa: E402
 from common import ROOT, PrerequisiteError, digest, prepare, rust_source_revisions  # noqa: E402
+import wheel_check  # noqa: E402
 
 
 def capture(path, result, *, truncate=False, api="calc_ut", args=(2451545., 4, 258)):
@@ -123,6 +124,27 @@ def test_staging_keeps_each_run_on_an_independent_inode(tmp_path):
     assert not first.samefile(second)
     assert original.stat().st_ctime_ns == before.st_ctime_ns
     assert digest(first) == digest(second) == inventory["leb/base_core.leb2"]["sha256"]
+
+
+def test_wheel_check_reports_missing_input(tmp_path, monkeypatch):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "candidate.whl").touch()
+    output = tmp_path / "reports"
+    monkeypatch.setattr(wheel_check, "ROOT", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["wheel_check.py", "--output", str(output)])
+    monkeypatch.setattr(wheel_check.venv, "create", lambda *_args, **_kwargs: None)
+
+    def pip(args, *, cwd, check):
+        assert check and args[1:3] == ["-m", "pip"]
+        if args[3] == "download":
+            (cwd / "published.whl").touch()
+
+    monkeypatch.setattr(wheel_check.subprocess, "run", pip)
+    assert wheel_check.main() == 2
+    report = json.loads((output / "comparison.json").read_text())
+    assert report["status"] == "missing_prerequisite"
+    assert "base_core.leb2" in report["error"]
 
 
 def test_rust_source_paths_across_binary_read_boundary(tmp_path):

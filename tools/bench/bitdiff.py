@@ -371,7 +371,10 @@ def run(options):
                         print(line, end="", file=sys.stderr, flush=True)
                     status = worker.wait()
             if status:
-                raise ValueError(f"{role} capture failed ({status}); see {log.name}")
+                message = f"{role} capture failed ({status}); see {log.name}"
+                if status == 3:
+                    raise PrerequisiteError(message)
+                raise ValueError(message)
 
         with ThreadPoolExecutor(max_workers=2) as pool:
             list(pool.map(acquire, ("baseline", "candidate")))
@@ -420,6 +423,8 @@ def main():
         if options.action == "run":
             (options.output / "comparison.json").write_text(dump(result) + "\n", encoding="utf-8")
         print(dump(result), file=sys.stderr)
+        if options.action == "capture" and isinstance(exc, PrerequisiteError):
+            return 3
         return 2
 
 
