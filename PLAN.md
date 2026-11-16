@@ -663,8 +663,9 @@ bytes. A focused reproduction on the published wheel induced that metadata
 change and alternated between a value and `EphemerisRangeError`. The runtime
 bug was originally investigated in [PR #88](https://github.com/g-battaglia/libephemeris/pull/88).
 The consolidated draft includes its correction alongside the optimization
-stack. Its runtime sources and Cargo manifests match the previously
-qualified composed build at `b565e146`.
+stack. The first consolidated runtime matched the qualified build at
+`b565e146`. Later code changes have their own measurement and
+qualification records below.
 
 The harness now copies each input to an independent inode and validates the
 copy. The repeated local full run completed **2,100,000 calls with zero
@@ -1081,14 +1082,29 @@ body, 69.58 µs for the other ten combined and 14.75 µs for houses.
 The LEB and Auto random-date profiles support measuring the decode
 trade-off before prioritizing arithmetic changes. The Skyfield trace
 attributes registration-list allocation and sorting to single-target
-lookups in routing and SPK center selection. An isolated candidate in
-`codex/spk-registration-lookup` scans live mappings for the smallest
-matching signed body key, preserving the selection of the sorted
-list even when several library aliases share a target. Test and measure
-the candidate before adding it to PR #87. Its focused SPK module suite
-passed all 150 tests, including duplicate, replaced and removed aliases.
-The wheel comparison and speed qualification are separate from that
-suite.
+lookups in routing and SPK center selection. The lookup change now in
+draft PR #87 scans live mappings for the smallest matching signed body
+key, preserving the sorted list's choice even when several library
+aliases share a target.
+
+The macOS comparison interleaved reference, candidate, candidate and
+reference. Each run used five fresh processes and 500 charts per case
+in the 1900–2100 window. The two trials per build are shown in µs.
+
+| Workload | Reference medians | Candidate medians |
+| --- | ---: | ---: |
+| Skyfield base, random charts | 1,534.7 / 1,512.8 | 916.5 / 901.8 |
+| Skyfield base, consecutive charts | 1,577.8 / 1,550.9 | 942.3 / 928.6 |
+| Skyfield medium, random charts | 1,618.3 / 1,595.3 | 982.6 / 967.6 |
+| Skyfield medium, consecutive charts | 1,586.7 / 1,573.4 | 943.2 / 934.6 |
+
+The Auto differences were within the observed variation of the repeated
+reference runs. The 150-test SPK suite passed, including duplicate,
+replaced and removed aliases. The named-satellite bit gate matched all
+320 requests with the pinned fixture, including 88 successful
+calculations. Full qualification of this additional change is pending.
+Raw timings and the focused gate are under
+`target/bench/spk-registration-lookup/`.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.
 
