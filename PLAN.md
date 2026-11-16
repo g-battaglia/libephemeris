@@ -1795,13 +1795,40 @@ from 1,295 to 1,387 µs per chart. The mapped inode retained its
 pinned digest and all seals after the initial owner exited and
 another worker continued to hold it.
 
-The controller supplies the owner descriptor for both reports. The
-remaining 1 / 2 / 4-worker repeats are running. A local native
-candidate (`fe894aaf`) tests a read-only sealed mapping using the
-ordinary owned cache. Admission requires the kernel seals and an
-exact match to the original pinned source. The lab passes the
-descriptor path explicitly. Its build and fallback tests are queued.
-Raw files are in `target/bench/linux-medium-lab/`.
+The controller supplied the owner descriptor for the 100,000-chart
+repeats. All worker digests matched the owned path at each process
+count. The table reports decimal MB and includes the owner process
+in the sealed cgroup charges. `file` includes shared memory.
+
+| Workers | Owned → sealed summed worker PSS | Owned → sealed cgroup `anon + file` |
+| ---: | ---: | ---: |
+| 1 | 65.1 → 62.8 | 142.3 → 149.9 |
+| 2 | 119.3 → 78.8 | 194.7 → 164.3 |
+| 4 | 225.2 → 109.2 | 295.4 → 160.9 |
+| 8 | 430.1 → 166.3 | 503.1 → 248.5 |
+
+The four-worker repeat overlapped with the prototype build. Its
+timings are excluded from the latency evaluation.
+
+A local native candidate (`fe894aaf`) built on Linux ARM64 and used
+the ordinary contiguous cache for both storage paths. Admission
+requires the kernel seals and an exact match to the original pinned
+source. With an explicit descriptor supplied by the lab and 3,000
+charts per worker, eight workers used the same sealed inode and
+retained identical position, flag and house bits. Worker PSS was
+431.6 → 163.4 MB and cgroup `anon + file` was 504.6 → 245.9 MB. An
+unsealed file with the exact pinned bytes fell back to owned storage
+and produced the same digest.
+
+A separate 2,000-chart, eight-worker run used a Python lab registry
+to share the descriptor among independently started workers. Exactly
+one worker created the image. After it exited, a replacement reused
+the inode from a live peer and returned the same chart digest. With
+the native evaluator, summed worker PSS was 433.1 → 168.9 MB and
+cgroup `anon + file` was 507.5 → 243.2 MB. This lab has no dedicated
+owner process. The native long run and access checks under an
+unprivileged UID remain open. Raw files are in
+`target/bench/linux-medium-lab/`.
 
 ## 15. Step 1a experiment
 
