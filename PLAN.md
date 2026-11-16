@@ -1174,8 +1174,13 @@ again including all six warning calls. The 32 MiB plus positional
 Windows job is still running.
 The unchanged combined-wheel consumer replays passed on Kerykeion
 (13,436 passed, 1,392 skipped, three deselected), Kerykeion Parity
-(51 passed), and Astrologer Studio (2,139 passed, 43 skipped). The
-remaining combined downstream and scientific replays are open.
+(51 passed), and Astrologer Studio (2,139 passed, 43 skipped).
+The API v6 replay matched every outcome in the installed published
+baseline across all 2,541 test IDs, including 95 setup errors and
+three failures. The API v7 replay matched all 106 installed-baseline
+outcomes, including one failure. The first-line exception messages
+matched for all 99 non-passing cases across the two suites. The
+combined scientific replay remains open.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.
 
@@ -1536,6 +1541,20 @@ and the warning. With 3,000 charts per worker, eight-process summed
 RSS was 618.7 → 376.1 MB and sampled footprint was 492.9 → 194.7 MB.
 The test found no scratch entries left behind after successful acquisition.
 The wheel remains a lab artifact pending an immutability decision.
+
+A second macOS prototype (`cb02fa89`) validates the digest of the
+private clone against the pinned medium release, keeps an unlinked
+read-only descriptor, and uses bounded positional reads with a 6 MiB
+coefficient cache. Explicit contiguous byte borrows materialize and
+verify the image on demand. Acquisition falls back to the owned reader
+when the clone or its pinned digest is unavailable. The two paths
+matched all 10,000 requests and the warning. At eight processes after
+3,000 charts per worker, summed RSS was 618.3 → 446.7 MB and sampled
+footprint was 492.7 → 320.6 MB. Over the 1900–2100 workload, random
+median/p95 were 581.8/614.6 → 519.5/648.4 µs and consecutive
+median/p95 were 113.9/118.9 → 118.6/124.0 µs. Warm-page first-call
+median was 3.67 → 15.95 ms. Full-coverage memory qualification is in
+progress. This prototype remains local.
 
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the
