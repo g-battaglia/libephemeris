@@ -1178,6 +1178,25 @@ base layout does not support a default switch based on RSS. The indexed
 reader and its byte ceiling remain explicit choices. Reports are
 `mixed-{owned,indexed}-100k.json` in the indexed capacity directory.
 
+The [paired Linux memory comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43879751526)
+completed on ARM64 and x86-64 using one identical candidate wheel per
+architecture for both readers. Each run used all eight pinned LEB files
+and 100,000 random charts per process. At eight processes:
+
+| Linux architecture | Tier | Owned → indexed summed PSS | Owned → indexed anonymous RSS |
+| --- | --- | ---: | ---: |
+| ARM64 | base | 254.3 → 229.8 MB | 237.4 → 212.6 MB |
+| ARM64 | medium | 560.4 → 229.1 MB | 543.8 → 212.0 MB |
+| x86-64 | base | 257.4 → 232.2 MB | 238.8 → 213.5 MB |
+| x86-64 | medium | 563.5 → 231.8 MB | 544.9 → 213.2 MB |
+
+The indexed runs used 6 MiB. The artifacts contain per-process peaks,
+file residency and each checkpoint for 1/2/4/8 workers. File-backed RSS
+was similar across readers. At eight processes the medium PSS reduction
+was about 59% on both architectures and the base reduction was about 10%.
+These are memory results for the pinned release layout and sampled epochs.
+The Mac base latency and RSS tradeoffs still apply to default selection.
+
 A follow-up prototype for automatically discovered release files hashes the
 opened descriptor before admitting positional reads (`2c798dd9`).
 Comparing five fresh-process runs, this raised median first-call latency
