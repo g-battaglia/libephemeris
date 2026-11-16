@@ -10,6 +10,7 @@ import tempfile
 import urllib.request
 import venv
 
+from bitdiff import PROFILES
 from common import KERNEL_PINS, ROOT, command, digest
 
 
@@ -22,7 +23,7 @@ def executables(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--profile", choices=("smoke", "full"), default="smoke")
+    parser.add_argument("--profile", choices=PROFILES, default="smoke")
     parser.add_argument("--linux-memory", action="store_true")
     parser.add_argument("--output", type=Path, default=ROOT / "target/bench/wheel-check")
     options = parser.parse_args()
@@ -46,7 +47,7 @@ def main():
             subprocess.run([str(interpreter), "-m", "pip", "install", str(wheel), "numpy==2.4.6"],
                            cwd=root, check=True)
         shutil.copyfile(ROOT / "core/data/leb2/base_core.leb2", data / "leb/base_core.leb2")
-        if options.profile == "full":
+        if options.profile != "smoke":
             for tier, name in (("base", "de440s.bsp"), ("medium", "de440.bsp")):
                 print(f"Provisioning the pinned LEB {tier} group", flush=True)
                 subprocess.run([str(cli), "download", f"leb2-{tier}", "--data-dir", str(data),
@@ -64,14 +65,24 @@ def main():
                     if digest(path) != KERNEL_PINS[file_name]:
                         raise ValueError(f"downloaded {file_name} does not match its pin")
         candidate_commit = command("git", "rev-parse", "HEAD")
-        comparison = subprocess.run([
+        comparison_command = [
             sys.executable, str(ROOT / "tools/bench/bitdiff.py"), "run", "--profile", options.profile,
-            "--data", str(data), "--output", str(options.output.resolve()),
+            "--data", str(data),
             "--baseline", str(baseline), "--baseline-wheel", str(baseline_wheel),
-            "--baseline-commit", "python-v4.0.0", "--candidate", str(candidate),
+            "--baseline-commit", "python-v4.0.0",
+        ]
+        comparison = subprocess.run([
+            *comparison_command, "--output", str(options.output.resolve()), "--candidate", str(candidate),
             "--candidate-wheel", str(candidate_wheel), "--candidate-commit", candidate_commit,
             "--candidate-build-options", "maturin build --release --locked (wheel matrix)",
         ], cwd=root).returncode
+        if options.profile == "auto-edge":
+            control = subprocess.run([
+                *comparison_command, "--output", str(options.output.resolve() / "published-control"),
+                "--candidate", str(baseline), "--candidate-wheel", str(baseline_wheel),
+                "--candidate-commit", "python-v4.0.0",
+            ], cwd=root).returncode
+            return max(comparison, control)
         if comparison or not options.linux_memory:
             return comparison
         for role, interpreter, wheel, commit in (

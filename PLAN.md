@@ -663,6 +663,23 @@ the host with memory qualification, so they establish workload coverage.
 Dedicated performance comparisons use the raw timing samples under
 controlled conditions.
 
+The base-tier macOS memory comparison used one worker per wheel and 100,000
+random-date charts per mode. Published/rebuilt steady RSS was 109.6/108.8 MB
+in `auto` and 190.1/190.2 MB in `skyfield`. Peak RSS was 136.1/135.2 MB
+in `auto` and 190.1/190.2 MB in `skyfield`. Reports and their raw `vmmap`
+snapshots are in `target/bench/base-native-memory-{baseline,candidate}*`.
+
+The [Windows 32 MiB cache run](https://github.com/g-battaglia/libephemeris/actions/runs/43863141515)
+finished all 2,100,000 calls and recorded 537 differences, all in `auto`.
+525 changed between a result and `EphemerisRangeError` in both directions.
+The other 12 were angular output or angular rate changes at Mars dates
+outside the LEB coverage. These retained the same returned flags, distance,
+and radial rate. The focused `auto-edge` profile runs the first 30,000
+requests of each `auto` tier with the full input set. The wheel workflow
+also runs the published wheel twice as a control. The focused profile
+omits the preceding LEB runs in the full sequence. The unchanged-build
+Windows full comparison and diagnosis remain open.
+
 The fresh-process startup report now includes import, first-call and first-
 chart medians and p95s. The warm-page condition explicitly primes the staged
 inputs. First use has only the staging reads. Both controls passed a

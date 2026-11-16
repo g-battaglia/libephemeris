@@ -122,6 +122,12 @@ zero, and checks result structure, returned flags and Python warnings.
 Capture files and the coverage/error summary can be retained as CI artifacts.
 Exit status 1 means a difference, and 2 means no completed comparison.
 
+The manual `auto-edge` profile runs the first 30,000 calls of each
+`auto` tier with pinned LEB companions and SPKs. It omits the LEB and
+Skyfield runs. The wheel workflow also compares the published wheel
+against itself in independent processes and retains the control captures
+in `reports/bitdiff/published-control/`.
+
 Run validation and downstream suites using the candidate wheel in isolated
 consumer environments. Where a consumer lock selects a different build, use
 an isolated import overlay containing only the candidate package and its
