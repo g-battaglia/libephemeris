@@ -904,3 +904,28 @@ sides. Raw profiles are under `target/bench/indexed-sampling/` and the
 comparison and timing reports are under
 `target/bench/indexed-windows-qualification/`. The quiet timing repeat,
 100,000-chart memory confirmation and full corpus are still open.
+
+## 19. Step 1b indexed cache capacity
+
+The indexed reader's 16-entry limit could retain at most 1 MiB of 64 KiB
+coefficient windows, even with an 8 MiB byte budget. The follow-up raises
+only the indexed entry limit to 256. The shared indexed retention ceiling
+and working reservations are still charged by actual coefficient capacity.
+The entry limit bounds map overhead independently of those reservations.
+The 244 LEB tests passed. A targeted regression fills the entry limit and
+then lowers the byte budget, checking both accounting paths.
+
+Screening on macOS arm64, pinned 1900–2100 coverage, same revised wheel
+(`ef47ed5e`) for both readers. Timing uses five 2,000-chart repeats. RSS
+is measured separately after 5,000 charts. Long memory jobs also ran on
+this host, so these are screening measurements.
+
+| Tier | Owned → indexed random median | Owned → indexed consecutive median | Owned → indexed RSS |
+| --- | ---: | ---: | ---: |
+| base | 728.4 → 421.0 µs | 141.0 → 116.9 µs | 49.7 → 46.9 MB |
+| medium | 744.9 → 419.0 µs | 151.9 → 122.9 µs | 87.1 → 46.5 MB |
+
+The candidate matched the 10,000-call indexed smoke corpus. The same-policy
+full comparison with the 4.0.0 wheel and the 100,000-chart memory comparison
+are in progress. A quiet timing repeat is still required to quantify the
+latency change. Reports are under `target/bench/indexed-capacity-qualification/`.
