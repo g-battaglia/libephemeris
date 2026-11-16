@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
 import itertools
 import json
+import os
 import platform
 import math
 from pathlib import Path
@@ -290,6 +291,27 @@ def warm_os_pages(data, names):
                 pass
 
 
+def verify_cold_os_pages(data, names):
+    """Evict and verify the private input copies immediately before startup."""
+    paths = [data / name for name in names]
+    try:
+        for path in paths:
+            with path.open("r+b") as source:
+                os.fsync(source.fileno())
+                os.posix_fadvise(source.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+        probe = subprocess.run(["fincore", "--bytes", "--noheadings", "--output", "RES", *paths],
+                               text=True, capture_output=True, check=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise PrerequisiteError(f"cannot check staged input page residency: {exc}") from exc
+    counts = probe.stdout.split()
+    if len(counts) != len(paths) or not all(value.isdecimal() for value in counts):
+        raise PrerequisiteError("fincore did not report byte residency for every staged input")
+    resident = sum(map(int, counts))
+    if resident:
+        raise PrerequisiteError(f"fincore reported {resident} resident bytes after eviction")
+    return resident
+
+
 def run(options):
     report = {"schema": SCHEMA, "status": "incomplete", "seed": options.seed,
               "runs": [], "site": SITE, "network_policy": "sealed",
@@ -300,8 +322,8 @@ def run(options):
             scratch = Path(tmp)
             data = scratch / "data"
             modes, tiers = options.mode or MODES, options.tier or TIERS
-            if options.cold_condition == "page_cache_cold":
-                raise PrerequisiteError("this driver cannot verify cold OS pages after input hashing")
+            if options.cold_condition == "page_cache_cold" and sys.platform != "linux":
+                raise PrerequisiteError("verified input page eviction requires Linux and fincore")
             report["data"] = prepare(options.data, data, modes, tiers, companions=options.companions)
             if options.native:
                 report["build"] = {"binary": str(options.native), "sha256": digest(options.native),
@@ -349,10 +371,16 @@ def run(options):
                         samples.append(memory_run(args, env, tmp, parallel, raw_dir))
                     else:
                         for _ in range(options.repeats):
+                            resident_bytes = None
                             if workload == "cold_start" and options.cold_condition == "page_cache_warm":
                                 warm_os_pages(data, report["data"])
+                            if workload == "cold_start" and options.cold_condition == "page_cache_cold":
+                                resident_bytes = verify_cold_os_pages(data, report["data"])
                             output = subprocess.check_output(args, env=env, cwd=tmp, text=True)
-                            samples.append(json.loads(output))
+                            sample = json.loads(output)
+                            if resident_bytes is not None:
+                                sample["input_resident_bytes_before_spawn"] = resident_bytes
+                            samples.append(sample)
                     report["runs"].append({
                         "mode": mode, "tier": tier, "workload": workload, "flags": options.flags,
                         "parallelism": parallel, "requests_per_run": count, "date_range": span,
