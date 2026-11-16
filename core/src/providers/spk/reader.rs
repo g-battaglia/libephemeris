@@ -373,10 +373,17 @@ impl SpkRegistry {
     /// Retain automatic offset images and mappings by sharing their owners.
     /// Explicit destination registrations stay authoritative. No I/O occurs.
     pub(crate) fn retain_automatic_centers_from(&mut self, source: &Self) -> Result<()> {
-        for (&target, (key, parent)) in &source.automatic_centers {
-            if self.bodies.contains_key(&target) && !self.automatic_centers.contains_key(&target) {
-                continue;
-            }
+        // Replacing an image clears its previous automatic roles. Select
+        // eligible targets before replacing any image so the other mappings
+        // from that image cannot be mistaken for explicit registrations.
+        let inherited: Vec<_> = source
+            .automatic_centers
+            .iter()
+            .filter(|&(target, _)| {
+                !self.bodies.contains_key(target) || self.automatic_centers.contains_key(target)
+            })
+            .collect();
+        for (&target, (key, parent)) in inherited {
             self.retain_kernel_from(source, key)?;
             self.register_body(target, key, target)?;
             self.automatic_centers
@@ -2602,6 +2609,42 @@ mod acquired_file_ownership_tests {
             .unwrap();
         assert!(!registry.is_automatic_center(599));
         assert_eq!(registry.primary_body_for_coverage(599).unwrap(), 599);
+    }
+
+    #[test]
+    fn replacing_a_shared_center_image_keeps_all_inherited_targets_automatic() {
+        let image = build_image(
+            DafEndian::Little,
+            &[vec![(599, 5), (699, 6), (799, 7)]
+                .into_iter()
+                .map(|(target, center)| SegSpec {
+                    start: 0.0,
+                    end: 86_400.0,
+                    target,
+                    center,
+                    frame: FRAME_J2000,
+                    seg_type: TYPE_CHEBYSHEV_POS,
+                    name: "PLANET CENTER",
+                })
+                .collect()],
+        );
+        let mut destination = SpkRegistry::new();
+        let mut source = SpkRegistry::new();
+        for registry in [&mut destination, &mut source] {
+            registry.register_image("centers", image.clone()).unwrap();
+            registry
+                .register_automatic_planet_centers("centers")
+                .unwrap();
+        }
+        destination.register_image("explicit", image).unwrap();
+        destination.register_body(799, "explicit", 799).unwrap();
+
+        destination.retain_automatic_centers_from(&source).unwrap();
+
+        assert!(destination.is_automatic_center(599));
+        assert!(destination.is_automatic_center(699));
+        assert!(!destination.is_automatic_center(799));
+        assert_eq!(destination.body_info(799).unwrap().kernel, "explicit");
     }
 
     #[test]
