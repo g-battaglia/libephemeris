@@ -1184,7 +1184,9 @@ cases each contain 2,100,000 identical requests per architecture, with
 six matching warning calls. The archived default Windows captures
 were also checked locally and contain 2,100,000 identical requests,
 again including all six warning calls. The 32 MiB plus positional
-Windows job is still running.
+Windows job also completed the full 2,100,000-call comparison with
+zero differences. The job log and installed-wheel tests passed;
+local capture verification is underway.
 The unchanged combined-wheel consumer replays passed on Kerykeion
 (13,436 passed, 1,392 skipped, three deselected), Kerykeion Parity
 (51 passed), and Astrologer Studio (2,139 passed, 43 skipped).
@@ -1193,10 +1195,14 @@ baseline across all 2,541 test IDs, including 95 setup errors and
 three failures. The API v7 replay matched all 106 installed-baseline
 outcomes, including one failure. The first-line exception messages
 matched for all 99 non-passing cases across the two suites. The
-combined scientific replay has completed both pytest lanes with
-identical outcomes on all 21,359 test IDs, including 62 failures and
-147 skips present in the published run. The standalone rounds, verify
-and parity stages remain open.
+combined scientific replay matched the published wheel on all
+21,359 pytest IDs, including the same 62 failures and 147 skips.
+The 273 standalone round status codes and 19 verification status
+codes matched. The 269 available round wrapper records and all 19
+verification wrapper records also matched. Four round timeouts
+recurred in both campaigns. The complete parity result and execution
+record matched. The paired audit is under
+`target/bench/combined-final-candidate/validation-campaign-comparison.json`.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.
 
@@ -1696,7 +1702,18 @@ comparison matches the five randomly generated UUID cases by format
 and version. The API v6 and v7 replays matched all 2,647 outcomes on both
 the preceding wheel and the published wheel, including the messages of
 the 99 existing non-passing cases. The exact wheel's external scientific
-replay follows the preceding wheel's campaign.
+replay is running after the preceding wheel's completed campaign.
+
+A local warm-page acquisition profile (`15e92dbb`) measured one
+private core acquisition per process across 12 repeats for each digest
+buffer size. With the existing 64 KiB buffer, median clone acquisition
+was 0.28 ms, full digest verification 14.95 ms, index parsing 0.02 ms,
+and the complete first call 15.94 ms. At 256 KiB, verification
+was 14.33 ms and the first call 15.32 ms. At 1 MiB these were
+14.26 and 15.25 ms. The draft retains the 64 KiB buffer. The
+remaining first-call cost comes primarily from reading and checking
+the complete pinned digest. Raw samples are in
+`target/bench/leb-medium-private-snapshot/open-profile/`.
 
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the
@@ -1709,7 +1726,9 @@ processes in this comparison. The x86-64 memory run confirmed the result
 at eight workers with 493.6 → 235.5 MB in medium and 187.5 → 236.3 MB
 in base. The archived ARM64 and x86-64 captures each matched 2,100,000
 corrected-reference calls in the indexed and positional configuration,
-with six warning-emitting calls on each side.
+with six warning-emitting calls on each side. The Windows job's
+completed log reports the same 2,100,000-call zero-difference result.
+Its downloaded capture audit is underway.
 
 ## 15. Step 1a experiment
 
