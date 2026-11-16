@@ -1826,8 +1826,22 @@ one worker created the image. After it exited, a replacement reused
 the inode from a live peer and returned the same chart digest. With
 the native evaluator, summed worker PSS was 433.1 → 168.9 MB and
 cgroup `anon + file` was 507.5 → 243.2 MB. This lab has no dedicated
-owner process. The native long run and access checks under an
-unprivileged UID remain open. Raw files are in
+owner process. Running the same check as UID/GID 65534 in the guest
+also confirmed one creator, reuse of the same inode after that worker
+exited, and identical chart digests. PSS was 444.6 → 191.0 MB and
+cgroup `anon + file` was 479.8 → 226.3 MB in that run.
+
+The native 100,000-chart repeat used eight processes per arm and an
+additional descriptor owner for the sealed arm. All worker digests
+matched. Summed worker PSS was 428.6 → 163.3 MB, including 37.3 MB
+of shared memory in the sealed arm. The cgroup sample was 501.6 →
+245.7 MB for `anon + file`, including the descriptor owner. The
+median of per-worker batch averages was 1,275 → 1,269 µs per chart
+in this single run. The first-call median was 13.4 → 34.9 ms. The
+fallback also matched when the descriptor was absent or a correctly
+sealed image of the expected length differed near the end from the
+pinned original. This is a local ARM64 prototype. Automatic discovery
+and validation on the wheel matrix remain open. Raw files are in
 `target/bench/linux-medium-lab/`.
 
 ## 15. Step 1a experiment
