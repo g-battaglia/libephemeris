@@ -284,7 +284,16 @@ fn perform(request: &Request, runtime: &Runtime) -> Result<bool> {
 /// Capture configuration once and apply the CLI directory above configured roots.
 /// No data are opened and the effective network policy is preserved.
 pub(super) fn configured_runtime(directory: Option<&Path>) -> Result<Runtime> {
-    let configured = Runtime::with_sources(ConfigurationSources::discover());
+    configured_runtime_from(
+        directory,
+        Runtime::with_sources(ConfigurationSources::discover()),
+    )
+}
+
+pub(super) fn configured_runtime_from(
+    directory: Option<&Path>,
+    configured: Runtime,
+) -> Result<Runtime> {
     let mut context = configured.effective_context()?;
     if let Some(directory) = directory {
         context.set_jpl_data_dir(Some(directory.to_path_buf()));

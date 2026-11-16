@@ -190,6 +190,19 @@ impl Runtime {
     /// Size/presence is metadata, not scientific validation. Verbosity adds
     /// paths to the text form; JSON always includes them. No downloads occur.
     pub fn data_status_text(&self, as_json: bool, verbose: i32) -> Result<String> {
+        self.data_status_text_with_cache_config(
+            as_json,
+            verbose,
+            self.configured_leb_cache_bytes()?,
+        )
+    }
+
+    pub(crate) fn data_status_text_with_cache_config(
+        &self,
+        as_json: bool,
+        verbose: i32,
+        configured_budget: Option<usize>,
+    ) -> Result<String> {
         let root = self.data_directory()?;
         let context = self.effective_context()?;
         let tier = context.tier().as_name();
@@ -260,9 +273,7 @@ impl Runtime {
         let iers = self.iers_cache_info()?;
         let process_cache = match self.leb_cache_usage() {
             Some((retained, budget, entries)) => Some((retained, budget, entries)),
-            None => self
-                .configured_leb_cache_bytes()?
-                .map(|budget| (0, budget, 0)),
+            None => configured_budget.map(|budget| (0, budget, 0)),
         };
         let cache_status = process_cache.map(|(retained, budget, entries)| {
             json!({"retained_bytes":retained,"budget_bytes":budget,"entries":entries})
