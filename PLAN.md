@@ -659,6 +659,8 @@ The same comparison is now available as `bitdiff.py run --profile satellites`.
 The isolated local runs reproduced the result for both candidate wheels.
 The verified NAIF fixture is provisioned by the
 [supplemental wheel check](https://github.com/g-battaglia/libephemeris/actions/runs/43897311620).
+All 320 calls matched on Windows x86-64 and both Linux architectures,
+with 88 values per capture on each job.
 
 The hosted 10,000-call check passed on Linux x86-64, Linux ARM64 and Windows
 x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157).
@@ -764,15 +766,19 @@ passed the full 2,100,000-call comparison of two independent captures of
 the wheel with the center correction.
 The [optimization check](https://github.com/g-battaglia/libephemeris/actions/runs/43883394649)
 applies the same isolated correction to the reference and optimized wheels
-and uses Rust 1.99.1 for both builds. The comparison with the released
-4.0.0 wheel remains a separate strict run.
+and uses Rust 1.99.1 for both builds. A separate
+[strict run](https://github.com/g-battaglia/libephemeris/actions/runs/43882398843)
+with the unmodified runtime and the published Windows Rust toolchain
+still found 572 differences over 2,100,000 calls on Windows. Both Linux
+jobs passed. The strict Windows gate against the released wheel remains open.
 
 On macOS, the composed optimization stack passed all 2,100,000 calls
 against the corrected reference with both wheels using indexed LEB and
 the candidate using positional centers. Raw captures are in
 `target/bench/corrected-reference-indexed-full-mac/`. The companion
 [Windows owned-reader run](https://github.com/g-battaglia/libephemeris/actions/runs/43884616052)
-uses the same correction and the candidate's 32 MiB process cache.
+used the same correction and the candidate's 32 MiB process cache.
+It passed all 2,100,000 calls with zero differences.
 The corresponding macOS owned-reader comparison also passed 2,100,000
 calls with zero differences. Its report records the 32 MiB cache and
 positional centers as enabled on the optimized wheel. Raw captures are
@@ -941,6 +947,14 @@ for the published wheel and the SPK candidate, in decimal MB.
 At eight processes summed anonymous RSS fell from 4,740.8 to 3,138.1 MB
 on ARM64 and from 4,741.8 to 3,139.1 MB on x86-64. Summed resident file
 pages were 162.2 → 163.7 MB and 193.2 → 193.8 MB respectively.
+
+The Auto medium published/rebuilt control held steady at eight processes,
+4,757.1 → 4,757.0 MB PSS on ARM64 and 4,759.6 → 4,759.6 MB on x86-64.
+With the additional positional center reader enabled, the paired ARM64
+comparison reached 1,550.8 MB PSS from a published 4,757.9 MB.
+In the Skyfield medium paired x86-64 run, the SPK changes reduced PSS
+from 5,290.8 to 2,728.5 MB at eight processes. These are separate pairs
+with the inputs and routing recorded in each report.
 
 For the step 1c investigation, the native profiling example separately
 attributes the first body and the ten subsequent bodies. A base/leb
