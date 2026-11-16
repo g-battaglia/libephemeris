@@ -699,6 +699,18 @@ The focused paired controls and the effect of the center-retention fix
 remain under investigation. The strict bit comparator still fails on any
 observed difference.
 
+The [focused Windows center-retention run](https://github.com/g-battaglia/libephemeris/actions/runs/43878253315)
+completed both 60,000-request comparisons. The same published binary
+produced 594 differences in its self-comparison, including 592 changes
+between values and range errors in both directions and two Mars vectors.
+Between the published wheel and the wheel with the center fix, 1,537
+requests changed from a range error to a value. Of these, 1,509 were
+planet-centric. The other 12 differences were Mars positions and rates
+at the three outside-LEB epochs below. The returned flags, warnings,
+distances and radial rates agreed. This compares the fix with the
+unstable release. The fixed wheel's own repeat is tracked separately.
+The raw captures are in `target/bench/windows-fixed-edge-43878253315/`.
+
 The unchanged rebuild's first 1,400,000 requests also exhibited 544
 differences, all in `auto`. Counts were 534 typed range-error differences
 and ten value differences. That run reached Skyfield medium before the
@@ -775,6 +787,13 @@ and proportional memory counters at all four checkpoints.
 Linux x86-64 likewise recorded 432.5/432.7 MB summed RSS and
 256.4/256.4 MB summed PSS for the two wheels at eight processes.
 [Linux memory run](https://github.com/g-battaglia/libephemeris/actions/runs/43875470097)
+
+The [Linux medium/LEB baseline case](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936)
+completed on ARM64 and x86-64 with its tier-specific release files.
+At eight processes, published/rebuilt summed PSS was 470.8/470.4 MB on
+ARM64 and 472.9/473.1 MB on x86-64. Summed RSS was 614.0/615.5 and
+649.4/649.2 MB respectively. The wheel artifacts contain all four
+checkpoints at 1/2/4/8 processes.
 
 The macOS paired baseline has completed all LEB checkpoints at 1/2/4/8
 processes, with 100,000 random charts per process and the companion files
