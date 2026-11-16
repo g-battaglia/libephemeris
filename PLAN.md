@@ -654,7 +654,11 @@ descriptor coverage. Module positions and the direct moon API used five
 epochs, including segment edges and immediate neighbors, with four flag
 sets. All 320 requests matched bit for bit on the unchanged and composed
 wheels against the published wheel. The published capture contains 88
-values. The command and raw files are under `target/bench/moon-bits/`.
+values. The initial command and raw files are under `target/bench/moon-bits/`.
+The same comparison is now available as `bitdiff.py run --profile satellites`.
+The isolated local runs reproduced the result for both candidate wheels.
+The verified NAIF fixture is provisioned by the
+[supplemental wheel check](https://github.com/g-battaglia/libephemeris/actions/runs/43897311620).
 
 The hosted 10,000-call check passed on Linux x86-64, Linux ARM64 and Windows
 x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157).
@@ -756,7 +760,8 @@ each request produced identical bits in every repetition and every
 planet-centric call returned a value.
 
 The [Windows fixed-wheel repeat](https://github.com/g-battaglia/libephemeris/actions/runs/43882915978)
-compares two independent captures of the wheel with the center correction.
+passed the full 2,100,000-call comparison of two independent captures of
+the wheel with the center correction.
 The [optimization check](https://github.com/g-battaglia/libephemeris/actions/runs/43883394649)
 applies the same isolated correction to the reference and optimized wheels
 and uses Rust 1.99.1 for both builds. The comparison with the released
@@ -905,7 +910,9 @@ private staged inputs and verifies zero resident pages directly through
 per-page presence bit. A failed cold prerequisite retains an explicit
 report and the driver continues the other startup measurements.
 The [revised startup workflow](https://github.com/g-battaglia/libephemeris/actions/runs/43895329805)
-uses direct residency checks on both Linux architectures.
+completed the published/rebuilt base/LEB measurements on Linux x86-64 and
+ARM64. All five cold samples per build and architecture recorded zero
+resident input bytes immediately before spawning the measured process.
 
 The remaining baseline PSS and anonymous/file splits run as separate
 Linux cases for [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),
@@ -919,6 +926,21 @@ and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/4
 The positional candidate is also measured in
 [Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886693099).
 Each case uses 1/2/4/8 processes and 100,000 charts per process.
+
+The paired Auto medium SPK comparison completed on both Linux
+architectures with identical pinned input manifests. Steady summed PSS
+for the published wheel and the SPK candidate, in decimal MB.
+
+| Processes | ARM64 published → candidate | x86-64 published → candidate |
+| ---: | ---: | ---: |
+| 1 | 601.0 → 400.0 | 602.8 → 403.0 |
+| 2 | 1,198.2 → 796.2 | 1,198.5 → 798.2 |
+| 4 | 2,385.5 → 1,583.3 | 2,386.9 → 1,585.8 |
+| 8 | 4,757.9 → 3,154.9 | 4,760.3 → 3,157.7 |
+
+At eight processes summed anonymous RSS fell from 4,740.8 to 3,138.1 MB
+on ARM64 and from 4,741.8 to 3,139.1 MB on x86-64. Summed resident file
+pages were 162.2 → 163.7 MB and 193.2 → 193.8 MB respectively.
 
 For the step 1c investigation, the native profiling example separately
 attributes the first body and the ten subsequent bodies. A base/leb
