@@ -1034,10 +1034,22 @@ The 32 MiB pool improved the batch average at all four thread counts in
 this window. The default and 32 MiB owned pool reached their best result
 at four threads on this machine. The indexed reader's shared decode gate
 serializes cold scratch reservations. The timings alone cannot attribute
-the scaling to that gate. A separate worker-sampling run compares the
+the scaling to that gate. A separate worker-sampling run compared the
 indexed medium path at one and eight threads and the owned alternatives
-at eight. It is queued after the other local measurements, with the
-provenance and traces under `target/bench/leb-thread-profile/`.
+at eight. The provenance and traces are under
+`target/bench/leb-thread-profile/`.
+The four contention samples completed over 64,000 random medium-tier
+charts per batch. At eight threads, mutex waits accounted for
+1,961 of 15,968 sampled worker frames with legacy retention,
+8,445 of 16,384 with the 32 MiB owned pool, and 13,978 of 16,904
+with the 6 MiB indexed reader. The one-thread indexed control had none
+of these mutex waits. The dominant indexed caller was the coefficient
+path containing the cold decode gate. With the 32 MiB pool, the most
+frequent caller was chunk directory lookup (4,816 wait samples).
+An isolated shared-read directory experiment passed 244 bundled LEB
+tests, including single publication under concurrent first access.
+Its paired thread timing is queued under
+`target/bench/leb-shared-directory-read/`.
 
 Auto base also completed with matching input and workload settings.
 The random-chart median was 1,183 µs on the corrected reference,
@@ -1103,6 +1115,8 @@ reference runs. The 150-test SPK suite passed, including duplicate,
 replaced and removed aliases. The named-satellite bit gate matched all
 320 requests with the pinned fixture, including 88 successful
 calculations. Full qualification of this additional change is pending.
+The [full corrected-reference matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43921283876)
+is running on the revision with the lookup change.
 Raw timings and the focused gate are under
 `target/bench/spk-registration-lookup/`.
 Raw samples, traces, build hash and pinned inputs are under
@@ -1317,8 +1331,11 @@ audit. Each used 100,000 charts per worker at 1/2/4/8 processes.
 Commands and artifacts are under `target/bench/owned-cache-ram-matrix/`.
 The sweep reports macOS process measurements separately from Linux PSS.
 A [hosted LEB medium run](https://github.com/g-battaglia/libephemeris/actions/runs/43918300315)
-compares the published release with the 32 MiB candidate using Linux PSS
-at the same four process counts.
+compared the published release with the 32 MiB candidate using Linux PSS
+at the same four process counts. Both architectures passed the covered
+10,000-call smoke and matching-data checks. At eight processes summed
+PSS increased from 475.2 to 671.2 MB on ARM64 and from 477.4 to
+673.8 MB on x86-64. The increase largely appears in anonymous RSS.
 
 RSS and sampled physical footprint increased at every process count in
 both tiers for all four budgets. Values below represent eight processes,
