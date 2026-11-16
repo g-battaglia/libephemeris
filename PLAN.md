@@ -1627,6 +1627,29 @@ qualify it for the default despite the measured first-use and chart
 latency cost. Default medium memory on the other platforms remains
 open.
 
+The local wheel at `17c32b93` matched 350,000 LEB medium calls in
+the default configuration and 10,000 with the explicit 32 MiB pool,
+including the warning in both comparisons. The automatic discovery
+probe began with 8.45 MB of resident malloc regions after the first
+call, versus 45.60 MB on the scratch fallback and 46.10 MB with an
+explicit path. The Rust suite passed 3,248 library tests plus
+integration and documentation tests. The three data-dependent
+snapshot tests also passed separately. The wheel passed 1,486 Python
+tests with the repository's bundled base fixture, as used in the
+wheel workflow, and all 18 harness tests. The out-of-range inventory
+test has the same existing reviewed-label failure on the preceding
+wheel and this wheel when pointed at the separately installed v4
+base core. Neither the installed data nor the test was modified.
+
+The interleaved five-repeat screen comparing the matched-cache
+prototype directly with PyPI 4.0.0 measured random and consecutive
+medians of 602.9 → 633.1 and 114.9 → 120.0 µs over full coverage.
+The same wheel's scratch fallback measured 600.7 and 114.5 µs.
+Warm-page first-call medians were 3.79 ms for PyPI and 3.76 →
+20.07 ms in the fallback/snapshot comparison. The final commit's
+full corrected-reference corpus and 100,000-chart memory comparison
+are in progress.
+
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the
 final candidate and a 6 MiB indexed budget. At 1 / 2 / 4 / 8 workers
