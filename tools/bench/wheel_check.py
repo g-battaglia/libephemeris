@@ -118,6 +118,8 @@ def main():
             ]
             if role == "candidate" and options.candidate_cache_mib is not None:
                 benchmark.extend(("--leb-cache-mib", str(options.candidate_cache_mib)))
+            if role == "candidate" and options.candidate_positional_centers:
+                benchmark.append("--positional-centers")
             subprocess.run(benchmark, cwd=root, check=True)
         return 0
 
