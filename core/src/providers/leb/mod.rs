@@ -80,7 +80,7 @@ mod bundled;
 #[cfg(feature = "bundled-data")]
 pub use bundled::bundled_base_core;
 #[cfg(feature = "bundled-data")]
-pub(crate) use bundled::bundled_base_core_with_process_cache;
+pub(crate) use bundled::{bundled_base_core_with_process_cache, exact_installed_base};
 
 /// Common header size in bytes (`<4sIIIdddI20s`).
 pub const HEADER_SIZE: usize = 64;
