@@ -51,10 +51,10 @@ Consequences:
 ### 1.3 Engineering rules
 
 - Minimal code, explicit data, few abstractions.
-- One step per PR, each with benchmark results before and after and a
-  bit-identity report.
+- Keep implementation steps reviewable by commit in PR #87. Record before
+  and after measurements and bit-identity evidence for each step.
 - Comments, tests, commits and docs in English.
-- Downstream consumer suites are run unchanged after every merged step.
+- Run the downstream consumer suites unchanged on the composed candidate.
 
 ### 1.4 RAM reduction is an acceptance requirement
 
@@ -820,6 +820,9 @@ still found 572 differences over 2,100,000 calls on Windows. The
 archived captures replayed to 566 value/range-error transitions and six
 value differences, all in Auto, with zero warning changes. Both Linux jobs
 passed. The strict Windows gate against the released wheel remains open.
+The wheel workflow on PR #87 supports reproducing the separate corrected
+comparison via `bitdiff_profile=full` and `corrected_spk_reference=true`.
+The default selection still compares against the published wheel.
 
 On macOS, the composed optimization stack passed all 2,100,000 calls
 against the corrected reference with both wheels using indexed LEB and

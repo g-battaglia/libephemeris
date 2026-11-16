@@ -191,6 +191,12 @@ Set the manual workflow's `rust_toolchain` to `1.99.1` to build with the
 toolchain identified in the published Windows 4.0.0 wheel.
 Each wheel report records any Rust source revisions embedded in the
 extension. The host's `rustc -Vv` is recorded independently.
+For a separate full comparison against the pinned SPK correction, select
+`bitdiff_profile=full` and `corrected_spk_reference=true`. The workflow
+builds the corrected 4.0.0 reference and the candidate with the selected
+toolchain on every runner and retains both wheels and complete captures.
+Leave the option disabled for the strict comparison against the published
+4.0.0 wheel. The PR smoke check uses that published wheel.
 The full manual matrix allows 150 minutes per job. Smoke and focused
 comparisons retain the 90-minute cap.
 

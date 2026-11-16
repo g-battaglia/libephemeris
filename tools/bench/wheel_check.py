@@ -74,6 +74,8 @@ def provision_data(options, root, data, cli, memory_mode, memory_tier):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=PROFILES, default="smoke")
+    parser.add_argument("--reference-wheel", type=lambda p: Path(p).resolve())
+    parser.add_argument("--reference-commit")
     parser.add_argument("--candidate-cache-mib", type=int)
     parser.add_argument("--candidate-positional-centers", action="store_true")
     parser.add_argument("--leb-reader", choices=("owned", "indexed"))
@@ -83,6 +85,8 @@ def main():
     parser.add_argument("--linux-memory-case", choices=MEMORY_CASES, default="leb/base")
     parser.add_argument("--output", type=Path, default=ROOT / "target/bench/wheel-check")
     options = parser.parse_args()
+    if bool(options.reference_wheel) != bool(options.reference_commit):
+        parser.error("--reference-wheel and --reference-commit must be supplied together")
     if (options.linux_memory or options.linux_startup or options.indexed_memory) and sys.platform != "linux":
         parser.error("memory and startup qualification need Linux")
     memory_mode, memory_tier = options.linux_memory_case.split("/")
@@ -97,13 +101,18 @@ def main():
             venv.create(path, with_pip=True)
         baseline, cli = executables(baseline_path)
         candidate, _ = executables(candidate_path)
-        subprocess.run([str(baseline), "-m", "pip", "download", "--only-binary=:all:", "--no-deps",
-                        "--dest", str(root), "libephemeris==4.0.0"], cwd=root, check=True)
-        baseline_wheel, = root.glob("*.whl")
-        for interpreter, wheel in ((baseline, baseline_wheel), (candidate, candidate_wheel)):
-            subprocess.run([str(interpreter), "-m", "pip", "install", str(wheel), "numpy==2.4.6"],
-                           cwd=root, check=True)
         try:
+            baseline_wheel = options.reference_wheel
+            baseline_commit = options.reference_commit or "python-v4.0.0"
+            if baseline_wheel is None:
+                subprocess.run([str(baseline), "-m", "pip", "download", "--only-binary=:all:", "--no-deps",
+                                "--dest", str(root), "libephemeris==4.0.0"], cwd=root, check=True)
+                baseline_wheel, = root.glob("*.whl")
+            elif not baseline_wheel.is_file():
+                raise PrerequisiteError(f"reference wheel does not exist: {baseline_wheel}")
+            for interpreter, wheel in ((baseline, baseline_wheel), (candidate, candidate_wheel)):
+                subprocess.run([str(interpreter), "-m", "pip", "install", str(wheel), "numpy==2.4.6"],
+                               cwd=root, check=True)
             provision_data(options, root, data, cli, memory_mode, memory_tier)
         except (PrerequisiteError, OSError, subprocess.CalledProcessError) as exc:
             options.output.mkdir(parents=True, exist_ok=True)
@@ -116,8 +125,11 @@ def main():
             sys.executable, str(ROOT / "tools/bench/bitdiff.py"), "run", "--profile", options.profile,
             "--data", str(data),
             "--baseline", str(baseline), "--baseline-wheel", str(baseline_wheel),
-            "--baseline-commit", "python-v4.0.0",
+            "--baseline-commit", baseline_commit,
         ]
+        if options.reference_wheel is not None:
+            comparison_command.extend(("--baseline-build-options",
+                                       "maturin build --release --locked (corrected reference)"))
         if options.leb_reader:
             comparison_command.extend(("--leb-reader", options.leb_reader))
         candidate_args = [
@@ -131,17 +143,18 @@ def main():
             candidate_args.append("--candidate-positional-centers")
         comparison = subprocess.run(candidate_args, cwd=root).returncode
         if options.profile == "auto-edge":
+            control_dir = "reference-control" if options.reference_wheel else "published-control"
             control = subprocess.run([
-                *comparison_command, "--output", str(options.output.resolve() / "published-control"),
+                *comparison_command, "--output", str(options.output.resolve() / control_dir),
                 "--candidate", str(baseline), "--candidate-wheel", str(baseline_wheel),
-                "--candidate-commit", "python-v4.0.0",
+                "--candidate-commit", baseline_commit,
             ], cwd=root).returncode
             comparison = max(comparison, control)
         if comparison or not (options.linux_memory or options.linux_startup or options.indexed_memory):
             return comparison
         diagnostics = 0
         for role, interpreter, wheel, commit in (
-            ("baseline", baseline, baseline_wheel, "python-v4.0.0"),
+            ("baseline", baseline, baseline_wheel, baseline_commit),
             ("candidate", candidate, candidate_wheel, candidate_commit),
         ):
             benchmark = [

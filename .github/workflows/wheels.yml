@@ -21,10 +21,14 @@ on:
         options: [smoke, full, auto-edge, auto-centers, satellites]
         default: smoke
       rust_toolchain:
-        description: Rust toolchain for the candidate wheel
+        description: Rust toolchain for wheels built by this run
         type: choice
         options: ['stable', '1.99.1']
         default: 'stable'
+      corrected_spk_reference:
+        description: Compare against 4.0.0 with the pinned SPK center correction
+        type: boolean
+        default: false
       candidate_cache_mib:
         description: Optional LEB process cache budget for candidate only
         type: string
@@ -116,6 +120,25 @@ jobs:
           manylinux: ${{ matrix.manylinux }}
           args: --release --locked --out dist
 
+      - name: Check out corrected SPK reference
+        if: inputs.corrected_spk_reference
+        uses: actions/checkout@v4
+        with:
+          ref: d86cea0f5ffd62c48987acac2fdb3f834295c7af
+          path: fixed-reference
+          persist-credentials: false
+
+      - name: Build corrected reference ABI3 wheel
+        if: inputs.corrected_spk_reference
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: '1.9.4'
+          rust-toolchain: ${{ inputs.rust_toolchain || 'stable' }}
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          working-directory: fixed-reference
+          args: --release --locked --out dist
+
       - name: Test installed wheel on Python 3.12 and 3.14
         if: github.event_name != 'pull_request'
         shell: bash
@@ -205,10 +228,11 @@ jobs:
           raise SystemExit(1 if failed else 0)
           PY
 
-      - name: Compare wheel outputs with the published release
+      - name: Compare wheel outputs with the selected reference
         shell: bash
         env:
           BITDIFF_PROFILE: ${{ inputs.bitdiff_profile || 'smoke' }}
+          BITDIFF_CORRECTED_REFERENCE: ${{ inputs.corrected_spk_reference }}
           PYTHON_312: ${{ steps.python312.outputs.python-path }}
           BITDIFF_CACHE_MIB: ${{ inputs.candidate_cache_mib }}
           BITDIFF_POSITIONAL_CENTERS: ${{ inputs.candidate_positional_centers }}
@@ -219,6 +243,11 @@ jobs:
           BITDIFF_LINUX_STARTUP: ${{ inputs.linux_startup && runner.os == 'Linux' }}
         run: |
           args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff --linux-memory-case "$BITDIFF_LINUX_MEMORY_CASE")
+          if [[ "$BITDIFF_CORRECTED_REFERENCE" == true ]]; then
+            reference=(fixed-reference/dist/*.whl)
+            args+=(--reference-wheel "${reference[0]}"
+                   --reference-commit "$(git -C fixed-reference rev-parse HEAD)")
+          fi
           if [[ -n "$BITDIFF_CACHE_MIB" ]]; then
             args+=(--candidate-cache-mib "$BITDIFF_CACHE_MIB")
           fi
@@ -254,5 +283,6 @@ jobs:
           name: wheels-${{ matrix.platform }}
           path: |
             dist/*.whl
+            fixed-reference/dist/*.whl
             reports/
           if-no-files-found: warn
