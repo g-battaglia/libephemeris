@@ -96,6 +96,20 @@ images, cache metadata, active borrows, decoder work and other runtime memory
 are additional. Each worker process has its own pool. Compare total RSS
 and throughput on the target workload before choosing a budget.
 
+In one paired test on an Apple M5 Pro using Python 3.12, both settings
+used the same wheel and the pinned LEB core files. The workload used
+sealed LEB mode, random dates in 1900–2100 and speeds. Timings use five
+fresh processes of 1,000 charts. RSS comes from a separate single-worker
+run after 5,000 charts.
+
+| Tier | Median chart, per-image → 32 MiB process pool | RSS, per-image → 32 MiB process pool |
+| --- | ---: | ---: |
+| Base | 536 → 126 µs | 46.7 → 72.5 MB |
+| Medium | 552 → 132 µs | 84.0 → 109.8 MB |
+
+The full timing comparison also covers wider windows and reports p95
+during cache warm-up. [Performance plan and results](../PLAN.md).
+
 ## Large LEB files
 
 `owned` retains a complete immutable snapshot. `indexed` keeps a read-only file
