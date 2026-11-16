@@ -24,6 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=("smoke", "full"), default="smoke")
     parser.add_argument("--candidate-cache-mib", type=int)
+    parser.add_argument("--candidate-positional-centers", action="store_true")
     parser.add_argument("--output", type=Path, default=ROOT / "target/bench/wheel-check")
     options = parser.parse_args()
     candidate_wheel, = (ROOT / "dist").glob("*.whl")
@@ -69,6 +70,8 @@ def main():
         ]
         if options.candidate_cache_mib is not None:
             comparison.extend(("--candidate-cache-mib", str(options.candidate_cache_mib)))
+        if options.candidate_positional_centers:
+            comparison.append("--candidate-positional-centers")
         return subprocess.run(comparison, cwd=root).returncode
 
 

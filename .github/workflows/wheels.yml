@@ -24,6 +24,10 @@ on:
         description: Optional LEB process cache budget for candidate only
         type: string
         default: ''
+      candidate_positional_centers:
+        description: Enable the positional center experiment only on the candidate
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -179,11 +183,15 @@ jobs:
         env:
           BITDIFF_PROFILE: ${{ inputs.bitdiff_profile || 'smoke' }}
           BITDIFF_CACHE_MIB: ${{ inputs.candidate_cache_mib }}
+          BITDIFF_POSITIONAL_CENTERS: ${{ inputs.candidate_positional_centers }}
           PYTHON_312: ${{ steps.python312.outputs.python-path }}
         run: |
           args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
           if [[ -n "$BITDIFF_CACHE_MIB" ]]; then
             args+=(--candidate-cache-mib "$BITDIFF_CACHE_MIB")
+          fi
+          if [[ "$BITDIFF_POSITIONAL_CENTERS" == true ]]; then
+            args+=(--candidate-positional-centers)
           fi
           "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 
