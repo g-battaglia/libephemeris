@@ -572,18 +572,46 @@ selected from the measured results; none of it needs to be decided now.
 
 ## 14. Phase 0 implementation checklist
 
-- [x] Isolated published and candidate wheel environments, with matching Python
-  and NumPy and recorded extension and wheel SHA-256.
-- [x] Pinned input inventory, provider preflight, timing and memory drivers,
-  and a native timing example.
-- [x] Streaming bit comparison, compressed captures, coverage summary and
-  tests that detect changes to bits, result shape, flags, warnings and errors.
-- [x] Add the 10,000-call PR check and manual full mode to the wheel workflow.
-- [x] Document commands and profiling in [tools/bench/README.md](tools/bench/README.md).
-- [ ] Complete numerical qualification across the wheel matrix and record
-  discrepancies, incomplete checks and consumer test results.
-- [ ] Complete the baseline timing and RAM matrix. Deferring the cache budget
-  selection until both can be compared against these measurements.
+### Reproducible environments and measurements
+
+- [x] Install the published wheel and the rebuilt wheel in separate
+  environments. Record the revision, wheel and extension digests, platform,
+  Python, compiler and build options.
+- [x] Stage pinned inputs into private directories. Record their coverage,
+  use sealed calls with explicit settings, and report unavailable inputs.
+- [x] Share workload requests and JSON formats across a Python driver and
+  a native Rust example. Document timing, memory and native profiling in
+  [tools/bench/README.md](tools/bench/README.md).
+- [x] Collect the macOS timing pairs across all six mode and tier cases,
+  including chart components, 100,000-position series, random date ranges
+  and 1/2/4/8 threads. Record five independent samples and the p95 unit.
+- [x] Archive the 1/2/4/8-process macOS RAM pairs across all six cases.
+  Retain per-process RSS, peak RSS, footprint and raw `vmmap` snapshots.
+- [x] Archive the Linux LEB base RAM pair with its released companion
+  files. Keep the available RSS, anonymous, file, peak and proportional
+  counters separate.
+- [ ] Finish the Linux startup matrix for the remaining five mode and tier
+  cases. Compare first use, explicitly warm pages and verified cold pages.
+
+### Numerical and consumer validation
+
+- [x] Generate a deterministic 2,100,000-call corpus and capture it in
+  separate processes. Archive compressed captures, request coverage and
+  raw bitwise results. Probe interval boundaries, state changes, warnings
+  and typed errors. Keep the named satellite comparison as a separate run.
+- [x] Verify that the comparator detects modified binary64 words, signed
+  zeros, NaN payloads, flags, structure, warnings, errors and truncation.
+- [x] Run a 10,000-call PR check and support full manual runs on both
+  Linux architectures and Windows. Keep the macOS verification local.
+- [ ] Pass the full comparison against the published reference on all
+  required platforms. Linux and macOS passed. The Windows published wheel
+  disagrees with independent runs of itself in Auto; the corrected
+  reference and optimized checks are reported separately.
+- [x] Run Rust release tests with `bundled-data,nbody,python-internals`,
+  installed-wheel Python tests and harness tests. Preserve their logs.
+- [ ] Finish the external validation and downstream qualification. Track
+  missing prerequisites and classify candidate failures against the paired
+  published run. Keep the suites and their baselines intact.
 
 Local reports and logs are under `target/bench/`. The first five-repeat
 candidate run on macOS arm64 (Python 3.12, base/leb, 500 charts per repeat)
@@ -659,6 +687,8 @@ The same comparison is now available as `bitdiff.py run --profile satellites`.
 The isolated local runs reproduced the result for both candidate wheels.
 The verified NAIF fixture is provisioned by the
 [supplemental wheel check](https://github.com/g-battaglia/libephemeris/actions/runs/43897311620).
+All 320 calls matched on Windows x86-64 and both Linux architectures,
+with 88 values per capture on each job.
 
 The hosted 10,000-call check passed on Linux x86-64, Linux ARM64 and Windows
 x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157).
@@ -721,6 +751,14 @@ The focused paired controls and the effect of the center-retention fix
 remain under investigation. The strict bit comparator still fails on any
 observed difference.
 
+Replaying the SPK Windows comparison with the complete difference counts
+confirmed 556 changes between values and `EphemerisRangeError`, all on
+planet-centric calls in Auto. Six Auto context position results differed
+with values on both sides. No warnings changed. A replay of the Windows
+owned-reader comparison against the corrected reference again found zero
+differences. Each replay is saved as `replay-with-difference-counts.json`
+in its corresponding local artifact directory.
+
 The [focused Windows center-retention run](https://github.com/g-battaglia/libephemeris/actions/runs/43878253315)
 completed both 60,000-request comparisons. The same published binary
 produced 594 differences in its self-comparison, including 592 changes
@@ -764,15 +802,21 @@ passed the full 2,100,000-call comparison of two independent captures of
 the wheel with the center correction.
 The [optimization check](https://github.com/g-battaglia/libephemeris/actions/runs/43883394649)
 applies the same isolated correction to the reference and optimized wheels
-and uses Rust 1.99.1 for both builds. The comparison with the released
-4.0.0 wheel remains a separate strict run.
+and uses Rust 1.99.1 for both builds. A separate
+[strict run](https://github.com/g-battaglia/libephemeris/actions/runs/43882398843)
+with the unmodified runtime and the published Windows Rust toolchain
+still found 572 differences over 2,100,000 calls on Windows. The
+archived captures replayed to 566 value/range-error transitions and six
+value differences, all in Auto, with zero warning changes. Both Linux jobs
+passed. The strict Windows gate against the released wheel remains open.
 
 On macOS, the composed optimization stack passed all 2,100,000 calls
 against the corrected reference with both wheels using indexed LEB and
 the candidate using positional centers. Raw captures are in
 `target/bench/corrected-reference-indexed-full-mac/`. The companion
 [Windows owned-reader run](https://github.com/g-battaglia/libephemeris/actions/runs/43884616052)
-uses the same correction and the candidate's 32 MiB process cache.
+used the same correction and the candidate's 32 MiB process cache.
+It passed all 2,100,000 calls with zero differences.
 The corresponding macOS owned-reader comparison also passed 2,100,000
 calls with zero differences. Its report records the 32 MiB cache and
 positional centers as enabled on the optimized wheel. Raw captures are
@@ -794,6 +838,25 @@ Kerykeion's unchanged offline suite passed 13,436 tests with 1,392 skips
 and three deselections. Kerykeion-parity's unchanged source suite passed
 51 tests. Logs are `target/bench/optimized-corrected-kerykeion*.log`.
 
+The unchanged native API consumer suite ran in two independent copies of
+its environment with the published and composed wheels installed. The
+extension SHA-256 was checked before each run. Both wheels had identical
+outcomes on all 106 cases, including the same one failure comparing direct
+wheel results with the engine embedded in the consumer. A direct replay
+captured identical binary64 words and flags from the two standalone
+wheels and the same difference from the embedded engine. Local artifacts
+are `target/bench/astrologer-v7-*-installed.{log,xml}` and
+`target/bench/astrologer-v7-*-direct-probe.json`.
+
+The paired upstream API v6 run also produced identical outcomes by
+test ID. Each wheel had 2,439 passes, four skips, three tracing failures
+and 95 setup errors due to missing qualified references for the existing
+dependency pair. The initial launcher used stdin as Python's main module,
+which made spawned workers unable to import their entry point. Both
+qualified runs use the ordinary `python -m pytest` entry point after a
+separate digest check. The unchanged suite and its reference fixtures were
+left intact. Reports are `target/bench/astrologer-v6-*-qualified.{log,xml}`.
+
 The Windows positional and indexed comparisons started before the
 timeout increase. Their Linux jobs passed. The Windows jobs reached the
 90-minute limit, including the
@@ -810,6 +873,15 @@ check. The existing check passed against both wheels when rerun alone.
 The source of the transient inventory change remains unresolved. The
 external standalone rounds and verification commands were outside these
 runs. The full logs are `target/bench/validation-full-leb{,-baseline}.log`.
+
+The later external `leb all` campaigns use the published wheel and the
+composed candidate against the untouched validation checkout at
+`5a2051f2`. Both pytest lanes have finished on both wheels. The JUnit
+inventories contain the same 21,359 case IDs with identical outcomes for
+every ID, including 62 failures and 147 skips on each wheel. The published
+campaign also finished the standalone rounds, verification and parity.
+Those stages produced baseline failures and the composed candidate is
+running the same stages. See `target/bench/validation-complete-*.log`.
 
 On the hosted Linux ARM64 runner, the paired base/LEB comparison completed
 100,000 charts per worker at 1/2/4/8 processes. At eight processes, published
@@ -860,6 +932,14 @@ case at 1/2/4/8 processes. At eight, published/rebuilt summed RSS was
 This pair uses the same input hashes. Its figures are separate from the
 earlier storage screens with different staging layouts.
 
+The two Skyfield pairs complete the macOS RAM matrix. At eight processes,
+published/rebuilt steady summed RSS was 1,538.4/1,530.0 MB in base and
+8,012.9/8,020.1 MB in medium. Summed sampled per-process physical
+footprint was 1,416.5/1,408.2 and 7,897.8/7,901.9 MB respectively.
+All six pairs used matching input manifests and 100,000 charts per
+process. Each kept the four phase checkpoints at 1/2/4/8 workers.
+Group PSS is unavailable on macOS.
+
 The ARM64 portion of the [Linux base/Skyfield run](https://github.com/g-battaglia/libephemeris/actions/runs/43886540807)
 completed with 1249.6/1249.0 MB summed RSS and 1112.2/1111.2 MB summed
 PSS at eight processes. The x86-64 job is a separate measurement.
@@ -872,6 +952,15 @@ sample contains 100,000 calls. The pairing was checked for the input
 inventory, seed, effective date range, flags, case order and sample
 counts. These coverage runs shared the machine with RAM and numerical
 qualification. Raw data is under `target/bench/phase0-macos-timing/`.
+
+The separate Mars sweep completed both builds at all six mode and tier
+pairs with masks 2, 258, 266, 322, 4354 and 33026. Each case retained
+five fresh-process samples of 1,200 consecutive dates. The initial
+heliocentric Skyfield probe misclassified the workload by tracing a
+whole chart. It now traces only Mars for single-position workloads,
+using the requested flags, and keeps the whole-chart trace for chart
+workloads. The paired traces match in
+`target/bench/phase0-seq-position-flags-qualified/`.
 
 The unchanged external `leb all` campaign is running sequentially against
 the published and composed wheel overlays with network policy sealed.
@@ -914,8 +1003,8 @@ completed the published/rebuilt base/LEB measurements on Linux x86-64 and
 ARM64. All five cold samples per build and architecture recorded zero
 resident input bytes immediately before spawning the measured process.
 
-The remaining baseline PSS and anonymous/file splits run as separate
-Linux cases for [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),
+The paired baseline PSS and anonymous/file splits cover
+[LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),
 [Auto base](https://github.com/g-battaglia/libephemeris/actions/runs/43886529057),
 [Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886534322),
 [Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43886540807)
@@ -926,6 +1015,36 @@ and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/4
 The positional candidate is also measured in
 [Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886693099).
 Each case uses 1/2/4/8 processes and 100,000 charts per process.
+
+The [LEB base RAM follow-up with companions](https://github.com/g-battaglia/libephemeris/actions/runs/43903192938)
+completed on both architectures with four matched LEB input hashes.
+The additional Linux startup pairs cover
+[LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679912),
+[Auto base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679854),
+[Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679339),
+[Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679363)
+and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903680097).
+LEB medium, both Auto pairs and Skyfield base have now completed on both
+Linux architectures alongside the earlier LEB base run. The archived
+pairs match their input manifests. Each cold sample reported zero input
+bytes resident before spawning. The newer reports count one date, one
+first position and one first chart per fresh process.
+
+Additional Linux startup measurements compare the published wheel against
+[the SPK storage changes](https://github.com/g-battaglia/libephemeris/actions/runs/43905660043)
+and [the opted-in positional reader](https://github.com/g-battaglia/libephemeris/actions/runs/43905659756).
+Both use Auto medium and keep the first call and first chart separate.
+All four architecture and candidate pairs completed with five fresh
+processes per condition and zero resident input bytes in each cold sample.
+The table shows median first call and first chart in ms, as measured
+within each published/candidate pair.
+
+| Candidate and runner | First use, call | Warm, call | Cold, call | Cold, chart |
+| --- | ---: | ---: | ---: | ---: |
+| SPK storage, ARM64 | 407.76 → 315.76 | 406.53 → 318.96 | 848.53 → 783.91 | 18.95 → 2.34 |
+| SPK storage, x86-64 | 470.23 → 345.74 | 458.40 → 349.74 | 560.35 → 502.27 | 23.58 → 1.81 |
+| Positional reader, ARM64 | 401.49 → 275.13 | 409.49 → 277.40 | 826.50 → 798.04 | 18.54 → 2.20 |
+| Positional reader, x86-64 | 461.28 → 287.73 | 460.82 → 290.88 | 564.27 → 417.50 | 23.52 → 1.74 |
 
 The paired Auto medium SPK comparison completed on both Linux
 architectures with identical pinned input manifests. Steady summed PSS
@@ -942,6 +1061,33 @@ At eight processes summed anonymous RSS fell from 4,740.8 to 3,138.1 MB
 on ARM64 and from 4,741.8 to 3,139.1 MB on x86-64. Summed resident file
 pages were 162.2 → 163.7 MB and 193.2 → 193.8 MB respectively.
 
+The Auto medium published/rebuilt control held steady at eight processes,
+4,757.1 → 4,757.0 MB PSS on ARM64 and 4,759.6 → 4,759.6 MB on x86-64.
+With the additional positional center reader enabled, the paired
+comparison reduced PSS from 4,757.9 to 1,550.8 MB on ARM64 and from
+4,760.2 to 1,553.1 MB on x86-64.
+The paired Skyfield medium runs reduced PSS from 5,288.6 to 2,726.9 MB on
+ARM64 and from 5,290.8 to 2,728.5 MB on x86-64 at eight processes.
+Summed anonymous RSS fell by about 2,562 MB on both architectures.
+These are separate pairs with the inputs and routing recorded in each
+report.
+
+The latest baseline PSS and RSS pairs use identical published/rebuilt
+manifests within each runner. These are the steady summed PSS values in
+decimal MB after 100,000 random charts per process at eight processes.
+The earlier LEB base pair staged just the core. Other LEB and Auto pairs
+include the released companion files for the tested tier.
+
+| Mode and tier | ARM64 published → rebuilt | x86-64 published → rebuilt |
+| --- | ---: | ---: |
+| LEB base, core only | 254.1 → 254.0 | 256.4 → 256.4 |
+| LEB base with companions | 257.2 → 257.2 | 259.5 → 259.5 |
+| LEB medium | 470.8 → 470.4 | 472.9 → 473.1 |
+| Auto base | 1,002.2 → 1,002.2 | 1,004.5 → 1,004.7 |
+| Auto medium | 4,757.1 → 4,757.0 | 4,759.6 → 4,759.6 |
+| Skyfield base | 1,112.2 → 1,111.2 | 1,114.2 → 1,113.6 |
+| Skyfield medium | 5,287.6 → 5,287.2 | 5,289.8 → 5,290.2 |
+
 For the step 1c investigation, the native profiling example separately
 attributes the first body and the ten subsequent bodies. A base/leb
 50,000-chart consecutive run produced medians of 25.5, 75.3 and 16.0 µs
@@ -952,6 +1098,35 @@ Of 2,034 subsequent-body samples, 646 were in coefficient evaluation or
 the two-word polynomial rate path and 258 were in deflection arithmetic.
 The observations guide the reuse work. The native trace and raw timings
 are under `target/bench/chart-anatomy-profile/`.
+
+The step 1b audit checked additional whole-file reads in the native
+runtime. The fixed-star catalog and photometry are compiled tables.
+The native JPL loader selects BSP kernels. Classic DE filename constants
+remain part of the compatibility surface. The optional IERS cache does
+read its three text inputs before parsing. In the local cache their sizes
+were 2,460,544, 1,352 and 13,419 bytes. The sealed benchmark configurations
+disable IERS loading. These paths do not explain the measured whole-image
+SPK or LEB allocations.
+
+The small-budget owned-reader screen uses the composed wheel with the
+released LEB companions. In the completed zero-byte case, steady
+single-worker RSS after 10,000 charts moved from 49.4 to 48.1 MB in base
+and from 87.2 to 85.5 MB in medium. Random-chart medians moved from
+580 to 17,660 µs and from 601 to 19,501 µs respectively. Releasing all
+decoded coefficients between calls is excluded from default selection.
+This screen shared the host with other work. The positive-budget cases
+are in progress. Raw timings and memory snapshots are under
+`target/bench/leb-owned-small-budget-screening/`.
+
+At 1 MiB, random-chart medians were 13.7 ms in base and 15.3 ms in
+medium. At 10,000 charts, steady RSS was 52.0 and 88.0 MB. The process
+pool divides its budget among eight shards and cannot retain complete
+chunks larger than a shard's allowance. The follow-up experiment
+reuses the existing bounded coefficient windows for those chunks.
+The prototype is isolated in `codex/leb-process-cache-windows`.
+Its first build passed 245 LEB Rust tests and matched all 10,000 smoke
+requests with the candidate's 1 MiB cache active. Its paired timing and
+memory screen remains in progress.
 
 ## 15. Step 1a experiment
 
