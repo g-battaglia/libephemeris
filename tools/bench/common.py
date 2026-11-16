@@ -6,6 +6,7 @@ import math
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import struct
 import subprocess
@@ -27,6 +28,7 @@ KERNEL_PINS = {
     "planet_centers_medium.bsp": "d3c34f5efe9223ef588ec59a8c59c1bd6619b0eab5d5e0b35c353d675efe7b4d",
     "de440.bsp": "a4ce9bf9b3282becc9f4b2ac3cebe03a2ae7599981aabd7265fd8482fff7c4b5",
 }
+RUST_SOURCE = re.compile(rb"[/\\]rustc[/\\]([0-9a-f]{40})[/\\]")
 
 
 class PrerequisiteError(Exception):
@@ -36,6 +38,18 @@ class PrerequisiteError(Exception):
 def digest(path):
     with Path(path).open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def rust_source_revisions(path):
+    """Identify remapped Rust source paths embedded in a compiled binary."""
+    revisions = set()
+    tail = b""
+    with Path(path).open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            contents = tail + chunk
+            revisions.update(match.decode("ascii") for match in RUST_SOURCE.findall(contents))
+            tail = contents[-48:]
+    return sorted(revisions)
 
 
 def dump(value):
@@ -74,6 +88,7 @@ def identity(wheel=None, commit=None, build_options=None):
         "libc": platform.libc_ver(),
         "cpu": command("sysctl", "-n", "machdep.cpu.brand_string") or platform.processor(),
         "rustc_on_host": command("rustc", "-Vv"),
+        "rust_source_revisions": rust_source_revisions(extension),
         "commit": commit,
         "build_options": build_options,
         "wheel": wheel_info,
