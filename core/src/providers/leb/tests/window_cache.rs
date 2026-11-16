@@ -1,4 +1,4 @@
-//! Contiguous-image coefficient windows, independent of astronomical data.
+//! Bounded coefficient windows, independent of astronomical data.
 use super::*;
 
 fn shuffled(words: &[u64], segments: u32, degree: u32, components: u32) -> Vec<u8> {
@@ -15,7 +15,7 @@ fn shuffled(words: &[u64], segments: u32, degree: u32, components: u32) -> Vec<u
     bytes
 }
 
-fn image(segments: u32, degree: u32, components: u32, words: &[u64]) -> Vec<u8> {
+pub(in crate::leb) fn image(segments: u32, degree: u32, components: u32, words: &[u64]) -> Vec<u8> {
     fn put<const N: usize>(bytes: &mut [u8], offset: usize, value: [u8; N]) {
         bytes[offset..offset + N].copy_from_slice(&value);
     }
@@ -228,10 +228,6 @@ fn contiguous_windows_share_hits_without_changing_rows_or_scalar_results() {
     assert!(!raw.segment_windows);
     assert!(raw.lock_inner().entries.contains_key(&CacheKey::Body(0, 0)));
     assert!(!LebChunkCache::with_image_byte_budget(1024).segment_windows);
-    assert!(
-        !LebChunkCache::with_indexed_resources(IndexedResources::new(IndexedLimits::default()))
-            .segment_windows
-    );
 }
 
 #[test]

@@ -74,8 +74,9 @@ pub struct LebChunkCache {
     // Additional per-cache metadata: one optional nonzero u64 (8 bytes).
     // Only private immutable-image constructors enable numerical reuse.
     word_image_identity: Option<std::num::NonZeroU64>,
-    // Only owned/static/shared contiguous images use partial decoded windows.
-    // Indexed leases and mmap acquisition retain their original decode route.
+    // Contiguous owned images and positional files can retain bounded
+    // segment windows. Raw slice and, independently, mapped callers use
+    // their original complete-frame entries.
     segment_windows: bool,
     managed: Option<super::process_cache::ManagedCache>,
 }
@@ -180,6 +181,7 @@ impl ChunkCacheInner {
 impl LebChunkCache {
     pub(super) fn with_indexed_resources(resources: Arc<IndexedResources>) -> Self {
         let mut cache = Self::with_image_byte_budget(resources.limits.cache_bytes);
+        cache.segment_windows = true;
         cache.resources = Some(resources);
         cache
     }
@@ -520,7 +522,7 @@ mod cache_tests;
 
 #[cfg(test)]
 #[path = "tests/window_cache.rs"]
-mod window_cache_tests;
+pub(in crate::leb) mod window_cache_tests;
 
 #[cfg(test)]
 mod word_image_identity_tests {
@@ -1456,9 +1458,8 @@ impl FileIndex {
                         offset: 0,
                     })?;
                 let seg_count = chunk.segment_count();
-                if let (Some(memo), LebSource::Slice(_), Ok(key_idx), Some(window)) = (
+                if let (Some(memo), Ok(key_idx), Some(window)) = (
                     cache.filter(|memo| memo.segment_windows),
-                    bytes,
                     u32::try_from(chunk_idx),
                     coefficient_window(entry, local, seg_count),
                 ) {
@@ -1479,10 +1480,12 @@ impl FileIndex {
                                 &what,
                             )?;
                             bytes.check_frame(expected)?;
+                            let allocation =
+                                bytes.reserve_decode(expected, chunk.compressed_size())?;
                             let compressed =
                                 bytes.blob(chunk.blob_offset(), chunk.compressed_size(), &what)?;
-                            // Validate the complete frame before retaining only the
-                            // selected rows. Slice images have no indexed leases.
+                            // The full frame is validated before the selected
+                            // rows take over the working allocation lease.
                             let values = reader::decompress_body_window_words_limited(
                                 &compressed,
                                 expected,
@@ -1492,9 +1495,13 @@ impl FileIndex {
                                 window,
                                 bytes.window_limit(),
                             )?;
+                            let capacity = values.capacity() * std::mem::size_of::<f64>();
+                            drop(compressed);
+                            let allocation =
+                                allocation.map(|lease| lease.retain(capacity)).transpose()?;
                             Ok(TrackedVec {
                                 values,
-                                _allocation: None,
+                                _allocation: allocation,
                             })
                         },
                     )?;
