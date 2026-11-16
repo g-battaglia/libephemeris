@@ -587,7 +587,7 @@ selected from the measured results; none of it needs to be decided now.
   and 1/2/4/8 threads. Record five independent samples and the p95 unit.
 - [x] Archive the 1/2/4/8-process macOS RAM pairs across all six cases.
   Retain per-process RSS, peak RSS, footprint and raw `vmmap` snapshots.
-- [ ] Archive the Linux LEB base RAM pair with its released companion
+- [x] Archive the Linux LEB base RAM pair with its released companion
   files. Keep the available RSS, anonymous, file, peak and proportional
   counters separate.
 - [ ] Finish the Linux startup matrix for the remaining five mode and tier
@@ -1017,8 +1017,9 @@ The positional candidate is also measured in
 Each case uses 1/2/4/8 processes and 100,000 charts per process.
 
 The [LEB base RAM follow-up with companions](https://github.com/g-battaglia/libephemeris/actions/runs/43903192938)
-and the five remaining Linux startup cases are running. The startup pairs
-cover [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679912),
+completed on both architectures with four matched LEB input hashes.
+The additional Linux startup pairs cover
+[LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679912),
 [Auto base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679854),
 [Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679339),
 [Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679363)
@@ -1080,6 +1081,7 @@ include the released companion files for the tested tier.
 | Mode and tier | ARM64 published → rebuilt | x86-64 published → rebuilt |
 | --- | ---: | ---: |
 | LEB base, core only | 254.1 → 254.0 | 256.4 → 256.4 |
+| LEB base with companions | 257.2 → 257.2 | 259.5 → 259.5 |
 | LEB medium | 470.8 → 470.4 | 472.9 → 473.1 |
 | Auto base | 1,002.2 → 1,002.2 | 1,004.5 → 1,004.7 |
 | Auto medium | 4,757.1 → 4,757.0 | 4,759.6 → 4,759.6 |
