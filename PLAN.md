@@ -1153,7 +1153,12 @@ The latest runtime's Rust release suite passed 3,247 library tests with
 the three requested features and the pinned v3 test input. Integration
 and documentation tests passed. The isolated wheel's Python suite
 passed 1,486 tests. The unchanged consumer and external replays are
-running under `target/bench/spk-registration-lookup/current-suites/`.
+under `target/bench/spk-registration-lookup/current-suites/`.
+The SPK revision's scientific replay matched the published comparison
+on all 21,359 pytest IDs, 273 standalone round statuses, 19 verification
+statuses and the complete parity reports. The 269 round wrapper records
+and 19 verification wrapper records also matched; four round timeouts
+recurred in both runs.
 
 The combined default wheel at `39692f97` matched all 2,100,000 macOS
 calls against corrected reference `d86cea0f`. The comparator counted six
@@ -1180,7 +1185,10 @@ baseline across all 2,541 test IDs, including 95 setup errors and
 three failures. The API v7 replay matched all 106 installed-baseline
 outcomes, including one failure. The first-line exception messages
 matched for all 99 non-passing cases across the two suites. The
-combined scientific replay remains open.
+combined scientific replay has completed both pytest lanes with
+identical outcomes on all 21,359 test IDs, including 62 failures and
+147 skips present in the published run. The standalone rounds, verify
+and parity stages remain open.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.
 
@@ -1553,8 +1561,13 @@ matched all 10,000 requests and the warning. At eight processes after
 footprint was 492.7 → 320.6 MB. Over the 1900–2100 workload, random
 median/p95 were 581.8/614.6 → 519.5/648.4 µs and consecutive
 median/p95 were 113.9/118.9 → 118.6/124.0 µs. Warm-page first-call
-median was 3.67 → 15.95 ms. Full-coverage memory qualification is in
-progress. This prototype remains local.
+median was 3.67 → 15.95 ms. Native tests verified that contiguous
+borrows allocate once across reader clones, that the admitted clone
+survives rewriting and truncating its original pathname, and that
+another same-length file with a wrong digest falls back to the
+ordinary reader. Full-coverage memory qualification and the
+350,000-call comparison with the ordinary combined runtime are
+pending. This prototype remains local.
 
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the
