@@ -46,14 +46,16 @@ def main():
         shutil.copyfile(ROOT / "core/data/leb2/base_core.leb2", data / "leb/base_core.leb2")
         if options.profile == "full":
             for tier, name in (("base", "de440s.bsp"), ("medium", "de440.bsp")):
-                subprocess.run([str(cli), "download", f"leb2-{tier}", "--data-dir", str(data)],
-                               cwd=root, check=True)
+                print(f"Provisioning the pinned LEB {tier} group", flush=True)
+                subprocess.run([str(cli), "download", f"leb2-{tier}", "--data-dir", str(data),
+                                "--no-progress"], cwd=root, check=True)
                 for file_name, url in (
                     (name, f"https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/{name}"),
                     (f"planet_centers_{tier}.bsp",
                      "https://github.com/g-battaglia/libephemeris/releases/download/data-v2rc1/"
                      f"planet_centers_{tier}.bsp"),
                 ):
+                    print(f"Downloading and verifying {file_name}", flush=True)
                     path = data / file_name
                     with urllib.request.urlopen(url, timeout=120) as src, path.open("wb") as dest:
                         shutil.copyfileobj(src, dest, length=1024 * 1024)

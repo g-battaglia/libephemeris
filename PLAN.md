@@ -639,10 +639,19 @@ differences**, using the same published and rebuilt wheels as the first run.
 Its captures and comparison JSON are in `target/bench/full-private/`.
 
 The hosted 10,000-call check passed on Linux x86-64, Linux ARM64 and Windows
-x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157);
-the Windows full job is pending. A sample of the random-date base/leb workload on the published
-wheel put Zstandard decompression and LEB coefficient unpacking at the top of
+x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157).
+The Windows job was canceled after the 90-minute job limit elapsed. Its logs
+show all LEB assets provisioned, followed by the cancellation. The
+[diagnostic run](https://github.com/g-battaglia/libephemeris/actions/runs/43867334410)
+adds progress during the corpus capture. A sample of the random-date base/leb workload on the
+published wheel put Zstandard decompression and LEB coefficient unpacking at the top of
 the stacks, supporting the cache experiment once qualification is resolved.
+
+The hosted qualification now reports pinned data provisioning and prints
+each capture's progress by mode and tier every 50,000 calls. The diagnostic
+change passed all nine comparator tests and the 10,000-call macOS smoke
+comparison with zero differences. It leaves the corpus and capture schema
+unchanged.
 
 ## 15. Step 1a experiment
 
