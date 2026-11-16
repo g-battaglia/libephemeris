@@ -80,6 +80,18 @@ competing jobs stopped, including validation jobs, and retain raw samples.
 Use `--series-calls` to change the length of the consecutive single-body
 time series, which defaults to 100,000 calls.
 
+To reproduce the README's published-wheel chart cases, use the prepared
+baseline interpreter and run the base-tier chart workloads in all three
+modes. The report retains medians, p95s and raw timing samples.
+
+```sh
+target/bench/baseline/bin/python tools/bench/benchmark.py \
+  --data "$DATA_DIR" --tier base --window 1900-2100 \
+  --workload seq_chart --workload random_chart --flags 258 --calls 300 --repeats 5 \
+  --wheel target/bench/published/*.whl --commit python-v4.0.0 \
+  --output target/bench/readme-baseline.json
+```
+
 The cold-start workload records import time, first calculation and first
 full chart in each fresh process. With `page_cache_warm`, the driver reads
 all staged inputs immediately before each timed process. With `first_use`,

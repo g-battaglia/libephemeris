@@ -8,8 +8,10 @@ workloads **without changing numerical output**. The work is incremental:
 every phase must justify itself with the results it actually obtains, not
 with a desired final figure.
 
-Status: planning only; no implementation changes. Reported baseline measurements
-must be reproduced in phase 0 before optimisation starts.
+The baseline harness and Phase 1 candidates are in draft pull requests.
+Section 14 tracks the remaining baseline checks and links the measured
+results. Qualification against the published wheel remains open on
+Windows.
 
 ---
 
@@ -802,7 +804,12 @@ passed the full 2,100,000-call comparison of two independent captures of
 the wheel with the center correction.
 The [optimization check](https://github.com/g-battaglia/libephemeris/actions/runs/43883394649)
 applies the same isolated correction to the reference and optimized wheels
-and uses Rust 1.99.1 for both builds. A separate
+and uses Rust 1.99.1 for both builds. The indexed and positional
+configuration of the optimized wheel matched all 2,100,000 requests.
+The same corrected-reference corpus is running on Linux ARM64 and
+x86-64 for [indexed readers](https://github.com/g-battaglia/libephemeris/actions/runs/43909331459)
+and [the 32 MiB owned reader](https://github.com/g-battaglia/libephemeris/actions/runs/43909331865).
+A separate
 [strict run](https://github.com/g-battaglia/libephemeris/actions/runs/43882398843)
 with the unmodified runtime and the published Windows Rust toolchain
 still found 572 differences over 2,100,000 calls on Windows. The
@@ -952,6 +959,12 @@ sample contains 100,000 calls. The pairing was checked for the input
 inventory, seed, effective date range, flags, case order and sample
 counts. These coverage runs shared the machine with RAM and numerical
 qualification. Raw data is under `target/bench/phase0-macos-timing/`.
+
+The README chart table now uses the reproducible base-tier run at
+`target/bench/readme-baseline.json`. Its published LEB medians were
+118 µs for consecutive dates and 606 µs for random dates. The earlier
+timing run measured 171 and 876 µs under different host load. File
+digests, workload parameters and route probes agree across both runs.
 
 The separate Mars sweep completed both builds at all six mode and tier
 pairs with masks 2, 258, 266, 322, 4354 and 33026. Each case retained
@@ -1125,5 +1138,32 @@ chunks larger than a shard's allowance. The follow-up experiment
 reuses the existing bounded coefficient windows for those chunks.
 The prototype is isolated in `codex/leb-process-cache-windows`.
 Its first build passed 245 LEB Rust tests and matched all 10,000 smoke
-requests with the candidate's 1 MiB cache active. Its paired timing and
-memory screen remains in progress.
+requests with the candidate's 1 MiB cache active.
+
+The unmodified process cache at 2 MiB measured 13.4/13.6 ms median
+per random chart in base/medium and 54.2/94.0 MB steady RSS. At 4 MiB,
+these were 0.84/0.84 ms and 62.5/96.7 MB. Both RSS readings follow
+10,000 charts on the same companion-inclusive workload.
+
+In the separate 1 MiB prototype screen, bounded windows improved random
+chart medians from 13.73 to 0.77 ms in base and from 13.60 to 0.77 ms in
+medium. At 1,000 charts, steady RSS moved 49.9 → 47.7 MB and
+87.3 → 85.2 MB. Consecutive chart medians were still about 2.10 ms.
+This screen compares the same small configured budget on both builds.
+The subsequent same-wheel sweep paired 2 and 3 MiB with legacy
+retention. Medians reflect five fresh processes of 1,500 charts each.
+Memory is steady single-worker RSS after 10,000 charts.
+
+| Setting | Base random median | Medium random median | Base RSS | Medium RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Legacy | 599 µs | 599 µs | 49.5 MB | 87.3 MB |
+| 2 MiB windows | 659 µs | 663 µs | 53.4 MB | 90.8 MB |
+| 3 MiB windows | 1,062 µs | 1,073 µs | 59.6 MB | 94.7 MB |
+
+The small-budget variants fail the latency and RAM criteria for a default.
+Keep this prototype outside the draft optimization chain. The medium-only
+follow-up measures authenticated positional acquisition on 1/2/4/8
+workers, each running 100,000 charts. It uses the same managed-reader
+wheel on both sides and retains the existing digest verification.
+Local cache-screen artifacts are under
+`target/bench/leb-process-cache-windows/`.

@@ -46,9 +46,8 @@ Your app consumes LibEphemeris calculations as an external service rather than i
 - **Modern Delta-T.** IERS observations for the modern era and the
   Stephenson–Morrison–Hohenkerk (2016) reconstruction of Earth's rotation for
   historical dates, with UTC, UT1 and TT always kept explicit.
-- **Native speed.** About **9 µs** per planetary position and **11 µs** per
-  Placidus house solution. A complete chart takes about **0.11 ms**, roughly
-  **8× faster than v3**.
+- **Native speed.** Rust calculation kernels and shared coefficient caches.
+  See [performance](#performance) for timed chart workloads by data route.
 - **Offline and reproducible.** The base data ship inside the wheel. A sealed
   network policy, explicit data routes and SHA-256-identified datasets keep
   every result reproducible.
@@ -192,17 +191,22 @@ Calculation kernels, JPL/SPK evaluation, LEB reading and N-body integration all
 run in Rust. Immutable data and decoded caches are shared across contexts
 instead of being rebuilt for each request.
 
-| Operation | v4.0.0 | v3.2.2 |
-| --- | --- | --- |
-| Position with speed, LEB data | ~9 µs | ~82 µs |
-| Position with speed, direct JPL route | ~75 µs | — |
-| Placidus houses | ~11 µs | ~30 µs |
-| Complete chart: Sun–Pluto, true node and houses | **~0.11 ms** | ~0.92 ms |
+| Mode, base tier | Consecutive chart | Random-date chart |
+| --- | ---: | ---: |
+| `leb` | 118 µs | 606 µs |
+| `auto` | 787 µs | 1.07 ms |
+| `skyfield` | 1.64 ms | 1.77 ms |
 
-A single core computes roughly **9,000 complete charts per second** from the
-bundled data. Figures are medians of warmed calls with the published wheels on
-an Apple M5 Pro with CPython 3.12, in sealed LEB mode on identical data; actual
-times depend on workload, data route, cache state and hardware.
+These are medians for the published Python 4.0.0 wheel on an Apple M5 Pro
+with CPython 3.12.13. Each case uses five fresh processes with 300 charts
+per process. A chart computes Sun–Pluto and the true node with
+`FLG_SWIEPH | FLG_SPEED` (258), followed by Placidus houses. The driver uses
+pinned base data, a sealed network policy and the 1900–2100 window.
+Consecutive dates are spaced by 0.37 days. Random dates use a fixed seed.
+The `auto` chart trace used the LEB route for the chart bodies. This mode
+can apply planet-centre corrections and use a different rate calculation.
+See the [benchmark commands](tools/bench/README.md) to reproduce the
+measurements on your data and hardware.
 
 ## Data and offline operation
 
