@@ -1987,7 +1987,11 @@ mod tests {
         let runtime = discovery_runtime(&directory);
         let owned = runtime.session().unwrap();
         let expected = owned.calc(2451545.0, SUN, FLG_SWIEPH | FLG_SPEED).unwrap();
-        assert!(owned.context().leb_files()[0].allocated_image_bytes() > 0);
+        // Owned discovery can use an exact copy from the executable's static data.
+        // The policy distinction is a contiguous immutable snapshot.
+        let snapshot = &owned.context().leb_files()[0];
+        let retained_bytes = snapshot.bytes().unwrap();
+        assert!(!retained_bytes.is_empty());
         let expected_inventory = runtime.leb_inventory().unwrap();
         runtime
             .set_leb_read_policy(Some(LebReadPolicy::Indexed(IndexedLimits::default())))
@@ -2012,7 +2016,11 @@ mod tests {
         runtime
             .set_leb_read_policy(Some(LebReadPolicy::Owned))
             .unwrap();
-        assert!(runtime.session().unwrap().context().leb_files()[0].allocated_image_bytes() > 0);
+        let owned_again = runtime.session().unwrap();
+        assert!(
+            owned_again.context().leb_files()[0].bytes().unwrap() == retained_bytes,
+            "owned policy must restore the same contiguous snapshot"
+        );
         assert_eq!(
             indexed
                 .calc(2451545.0, SUN, FLG_SWIEPH | FLG_SPEED)
