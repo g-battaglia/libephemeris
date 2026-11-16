@@ -1019,8 +1019,22 @@ On full Auto medium coverage the random chart medians were
 1,224, 1,222 and 1,063 µs. The default storage changes reduce RAM
 in the paired memory measurements. The timing change depends on
 the workload and the center reader setting.
+The full sweep passed its input and workload checks for all 60 report
+pairs. Skyfield's default storage changes primarily improve startup.
+The table gives the median in ms, corrected reference → composed build.
+
+| Tier | First call | Chart after first call | First call, warm pages | Chart after first call, warm pages | Random chart | Consecutive chart |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Base | 20.69 → 13.89 | 4.98 → 1.65 | 20.62 → 13.43 | 4.93 → 1.61 | 1.535 → 1.549 | 1.565 → 1.612 |
+| Medium | 105.16 → 80.64 | 10.80 → 1.44 | 104.89 → 84.60 | 10.57 → 1.50 | 1.543 → 1.603 | 1.572 → 1.569 |
+
+At full coverage the Skyfield random-chart median was 1.486 → 1.506 ms
+in base and 1.549 → 1.546 ms in medium. The 3.9% increase in the
+1900–2100 medium random-chart median did not repeat at full coverage.
+The first-use condition includes the mandatory staging reads. Only the
+warm-page trials explicitly prime the data.
 The local comparison audit is `target/bench/phase1-composed-timing/comparison.json`.
-Four native hot-stack samples are queued after that sweep. They cover
+Four native hot-stack samples follow that sweep. They cover
 base chart components, medium indexed LEB, medium positional Auto and
 medium Skyfield. The profiling build, staged-input manifests, requests
 and output will be under `target/bench/phase1-composed-profiles/`.
@@ -1158,6 +1172,16 @@ read its three text inputs before parsing. In the local cache their sizes
 were 2,460,544, 1,352 and 13,419 bytes. The sealed benchmark configurations
 disable IERS loading. These paths do not explain the measured whole-image
 SPK or LEB allocations.
+
+The ordinary sealed LEB position path already requests a planetary or
+lunar subset where the body and flags allow it. Reader acquisition
+inspects partition metadata before deferring irrelevant body-only
+partitions, with the explicit primary and required auxiliary readers
+still attached. The owned LEB reader moves the file buffer into shared
+storage, and bundled base uses static bytes. Removing a second full-file
+copy on those paths therefore offers no equivalent to the SPK change.
+External LEB images still retain their owned buffer. The indexed reader
+and the authenticated positional experiment target that allocation.
 
 The small-budget owned-reader screen uses the composed wheel with the
 released LEB companions. In the completed zero-byte case, steady
