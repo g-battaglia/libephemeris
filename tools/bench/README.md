@@ -134,6 +134,11 @@ zero, and checks result structure, returned flags and Python warnings.
 Capture files and the coverage/error summary can be retained as CI artifacts.
 Exit status 1 means a difference, and 2 means no completed comparison.
 
+The report lists exact requested flag masks, target IDs grouped by body
+class, and observed center IDs for each mode, tier and position entry
+point. This inventory includes requests that returned errors. Re-run
+`bitdiff.py compare` on earlier captures to generate it for those runs.
+
 The manual `auto-edge` profile runs the first 30,000 calls of each
 `auto` tier with pinned LEB companions and SPKs. It omits the LEB and
 Skyfield runs. The wheel workflow also compares the published wheel

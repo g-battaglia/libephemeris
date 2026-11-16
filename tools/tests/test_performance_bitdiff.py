@@ -18,12 +18,12 @@ from bitdiff import compare, encode, outcome  # noqa: E402
 from common import ROOT, PrerequisiteError, digest, prepare, rust_source_revisions  # noqa: E402
 
 
-def capture(path, result, *, truncate=False):
+def capture(path, result, *, truncate=False, api="calc_ut", args=(2451545., 4, 258)):
     build = dict.fromkeys(("platform", "release", "machine", "libc", "python", "cpu"), "test")
     rows = [
         {"schema": 1, "spec": {"expected_count": 1, "matrix": [["leb", "base"]]}, "build": build},
-        ["leb", "base", 0, "calc_ut", [0], result],
-        {"count": 1, "coverage": {"leb/base/calc_ut": 1}},
+        ["leb", "base", 0, api, encode(args), result],
+        {"count": 1, "coverage": {f"leb/base/{api}": 1}},
     ]
     with gzip.open(path, "wt", encoding="utf-8") as file:
         for row in rows[:-1] if truncate else rows:
@@ -65,6 +65,19 @@ def test_incomplete_capture(tmp_path):
     capture(right, {"value": None, "warnings": []}, truncate=True)
     with pytest.raises((ValueError, StopIteration)):
         compare(left, right)
+
+
+def test_position_inventory_uses_captured_requests_including_errors(tmp_path):
+    path = tmp_path / "capture.gz"
+    capture(path, {"error": "libephemeris.EphemerisRangeError", "warnings": []},
+            api="context.calc_pctr", args=(2451545., 9599, 14, 16658))
+    assert compare(path, path)["position_inventory"] == {
+        "leb/base/context.calc_pctr": {
+            "body_ids_by_class": {"planetary_moon": [9599]},
+            "center_ids": [14],
+            "requested_flags": [16658],
+        },
+    }
 
 
 def test_staging_keeps_each_run_on_an_independent_inode(tmp_path):

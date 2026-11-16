@@ -1,7 +1,7 @@
 """Capture and compare installed Python APIs with exact binary64 encoding."""
 
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import gzip
 import itertools
@@ -29,6 +29,22 @@ FLAGS = (
 # Orthodox planets, nodes, apsides, Earth, major asteroids, fictitious,
 # numbered asteroid, planetary moon, ecliptic/nutation and invalid ID.
 BODIES = (*range(23), 40, 55, 10001, 100433, 9599, -1, -9999)
+BODY_CLASSES = {
+    body: name
+    for name, bodies in (
+        ("luminary", (0, 1)),
+        ("planet_or_earth", (*range(2, 10), 14)),
+        ("lunar_node", (10, 11)),
+        ("lunar_apsis", (12, 13, 21, 22)),
+        ("named_minor_body", range(15, 21)),
+        ("fictitious_body", (40, 55)),
+        ("numbered_asteroid", (10001, 100433)),
+        ("planetary_moon", (9599,)),
+        ("ecliptic_nutation", (-1,)),
+        ("invalid_sentinel", (-9999,)),
+    )
+    for body in bodies
+}
 POSITION = ("calc", "calc_ut", "calc_pctr", "context.calc", "context.calc_ut", "context.calc_pctr")
 SITE_ARGS = [SITE[0], SITE[1], SITE[2]]
 SPEED = 258
@@ -229,6 +245,7 @@ def compare(left, right):
         coverage = Counter()
         successes = Counter()
         error_types = Counter()
+        positions = defaultdict(lambda: (set(), set(), set()))
         for i in range(expected):
             row_a, row_b = json.loads(next(a)), json.loads(next(b))
             if not isinstance(row_a, list) or not isinstance(row_b, list):
@@ -237,9 +254,20 @@ def compare(left, right):
                 raise ValueError(f"request identity mismatch: {row_a[:5]} versus {row_b[:5]}")
             if row_a[:3] != [*matrix[i // per_config], i % per_config]:
                 raise ValueError("capture does not cover the declared matrix in order")
-            mode, tier, _, api, _, result = row_a
+            mode, tier, _, api, encoded_args, result = row_a
             key = f"{mode}/{tier}/{api}"
             coverage[key] += 1
+            if api in POSITION:
+                args = encoded_args.get("tuple", []) if isinstance(encoded_args, dict) else []
+                expected_arity = 4 if "pctr" in api else 3
+                if not isinstance(args, list) or len(args) != expected_arity or any(
+                    type(value) is not int for value in args[1:]
+                ):
+                    raise ValueError(f"invalid position arguments at {key}, request {row_a[2]}")
+                bodies, centers, flags = positions[key]
+                bodies.add(args[1])
+                centers.update(args[2:-1])
+                flags.add(args[-1])
             if "value" in result:
                 successes[key] += 1
             else:
@@ -251,10 +279,18 @@ def compare(left, right):
         trailer = {"count": expected, "coverage": dict(coverage)}
         if json.loads(next(a)) != trailer or json.loads(next(b)) != trailer or a.read(1) or b.read(1):
             raise ValueError("invalid capture trailer or unexpected records")
+        position_inventory = {}
+        for key, (bodies, centers, flags) in positions.items():
+            body_ids_by_class = defaultdict(list)
+            for body in sorted(bodies):
+                body_ids_by_class[BODY_CLASSES.get(body, "other_id")].append(body)
+            position_inventory[key] = {"body_ids_by_class": dict(body_ids_by_class),
+                                       "center_ids": sorted(centers), "requested_flags": sorted(flags)}
         return {"schema": SCHEMA, "status": "different" if differences else "identical",
                 "count": expected, "differences": differences, "first_differences": first,
                 "coverage": dict(coverage), "baseline_successes": dict(successes),
                 "baseline_error_types": dict(error_types),
+                "position_inventory": position_inventory,
                 "baseline": header_a["build"], "candidate": header_b["build"]}
 
 

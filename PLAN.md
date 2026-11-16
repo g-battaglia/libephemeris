@@ -638,6 +638,14 @@ copy. The repeated local full run completed **2,100,000 calls with zero
 differences**, using the same published and rebuilt wheels as the first run.
 Its captures and comparison JSON are in `target/bench/full-private/`.
 
+The saved full comparison was replayed to inventory actual position
+requests. It identifies 36 mode/tier/entry-point cases, ten target
+classes and 16,406 distinct requested flag masks across those cases.
+The planet-centric cases use Earth as their center (ID 14). The inventory
+preserves exact masks and includes requests that produced errors.
+The replay still reports zero differences on 2,100,000 requests.
+See `target/bench/full-private/comparison-with-inventory.json`.
+
 The hosted 10,000-call check passed on Linux x86-64, Linux ARM64 and Windows
 x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157).
 The Windows job was canceled after the 90-minute job limit elapsed. Its logs
@@ -804,6 +812,16 @@ respectively. Each pair used identical input hashes, epochs and flags.
 These per-tier installations are distinct from the mixed-installation
 tests used to select an indexed cache budget. Raw Mac snapshots and
 reports are in `target/bench/phase0-macos-memory/`.
+
+The paired macOS Auto base run also completed 1/2/4/8 processes with
+100,000 charts per process. At eight, published/rebuilt summed RSS was
+1199.4/1199.5 MB and sampled physical footprint was 1054.3/1057.2 MB.
+The four-process baseline showed 377.8 MB RSS against 603.1 MB rebuilt,
+with similar footprints of 526.6/523.6 MB. The raw `vmmap` summaries
+record about 191 MiB of writable pages as swapped out for the published
+capture and zero in the rebuilt capture. Both reports retain the original
+measurements and this case is flagged for residency pressure when
+interpreting its RSS.
 
 The added macOS timing matrix completed for both wheels with five
 independent samples per case. It covers the two wider random-date
