@@ -15,6 +15,9 @@ use pressure_victim::CachedStorage;
 /// The bound caps retained coefficient entries, never correctness: every entry is
 /// a pure memo of the owner's borrowed image.
 const MAX_CACHED_CHUNKS: usize = 16;
+// Bound map overhead independently of the indexed coefficient byte budget.
+// With 64 KiB windows, the legacy limit could use only 1 MiB of an 8 MiB budget.
+const MAX_INDEXED_CACHED_CHUNKS: usize = 256;
 
 /// Maximum coefficient allocation retained for one contiguous-image window.
 const MAX_COEFFICIENT_WINDOW_BYTES: usize = 64 * 1024;
@@ -467,14 +470,19 @@ impl LebChunkCache {
                 },
             );
         }
-        if inner.entries.len() < MAX_CACHED_CHUNKS
+        let max_entries = if self.resources.is_some() {
+            MAX_INDEXED_CACHED_CHUNKS
+        } else {
+            MAX_CACHED_CHUNKS
+        };
+        if inner.entries.len() < max_entries
             && size > inner.max_bytes.saturating_sub(inner.resident_bytes)
         {
             if let Some(index) = index {
                 self.compact_first_victim(&mut inner, index, size);
             }
         }
-        while inner.entries.len() >= MAX_CACHED_CHUNKS
+        while inner.entries.len() >= max_entries
             || size > inner.max_bytes.saturating_sub(inner.resident_bytes)
         {
             inner.evict_oldest();
