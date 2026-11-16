@@ -559,7 +559,7 @@ The owner can overrule any of them.
 
 | Question | Decision |
 | --- | --- |
-| Cache budget | 64 MiB global per process is an experimental value, not the release default. Compare the current default with 16/32/64/128 MiB; select the smallest budget justified by latency and actual RAM use, including multiple workers. Whole-tier retention is an explicit option after decoded sizes are measured. |
+| Cache budget | Keep legacy retention as the default. All four process-pool budgets raised measured RAM at every macOS process count. Offer 32 MiB explicitly for the measured narrow-window throughput gain. Medium full-coverage latency and the increase in RAM remain trade-offs. |
 | RAM acceptance | Demonstrate lower RAM on representative workloads against phase 0; report steady-state, peak and multi-process memory per mode. Faster execution with higher RAM is a trade-off, not completion of the memory objective. |
 | Large kernels | Positional reads with a bounded cache first. Mapping only if measurements show a benefit worth the immutability work. |
 | Persistent decoded store | Deferred to the results of phase 1. Worth pursuing mainly if start-up and total memory across processes remain a problem. |
@@ -1294,28 +1294,34 @@ check also increased first-call time in the earlier startup trial.
 Keep automatic positional acquisition experimental.
 Raw results are in `target/bench/managed-leb-medium-follow-up/`.
 
-The full owned-reader RAM sweep queues legacy retention and 16/32/64/128
+The full owned-reader RAM sweep measured legacy retention and 16/32/64/128
 MiB on both LEB tiers after the local timing and profiling commands.
-It uses 100,000 charts per worker at 1/2/4/8 processes.
+All 40 cases passed the local build, data, workload and checkpoint
+audit. Each used 100,000 charts per worker at 1/2/4/8 processes.
 Commands and artifacts are under `target/bench/owned-cache-ram-matrix/`.
-The legacy-control report passed the local manifest and checkpoint
-comparison. At eight processes on macOS arm64, steady summed RSS was
-458.9 MB for base and 758.5 MB for medium. Summed sampled physical
-footprint was 277.5 and 608.6 MB. The sweep reports macOS process
-measurements separately from Linux PSS. A [hosted LEB medium run](https://github.com/g-battaglia/libephemeris/actions/runs/43918300315)
+The sweep reports macOS process measurements separately from Linux PSS.
+A [hosted LEB medium run](https://github.com/g-battaglia/libephemeris/actions/runs/43918300315)
 compares the published release with the 32 MiB candidate using Linux PSS
 at the same four process counts.
 
-The matched 16 MiB report passed the same audit. Retention was 16.07 MB
-per worker at steady state. RSS and sampled physical footprint increased
-at every process count in both tiers. Values below are decimal MB.
+RSS and sampled physical footprint increased at every process count in
+both tiers for all four budgets. Values below represent eight processes,
+in decimal MB. The sum of each process's lifetime peak RSS equaled the
+steady summed RSS in these eight-process cases. Peaks need not coincide.
 
-| Tier, eight processes | Steady summed RSS, legacy → 16 MiB | Summed sampled footprint, legacy → 16 MiB |
-| --- | ---: | ---: |
-| Base | 458.9 → 843.6 | 277.5 → 485.0 |
-| Medium | 758.5 → 1,138.1 | 608.6 → 816.1 |
+| Pool budget | Base summed RSS | Base summed footprint | Medium summed RSS | Medium summed footprint | Retained coefficients per worker |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Legacy | 458.9 | 277.5 | 758.5 | 608.6 | — |
+| 16 MiB | 843.6 | 485.0 | 1,138.1 | 816.1 | 16.07 |
+| 32 MiB | 627.8 | 502.0 | 921.6 | 796.1 | 24.72 |
+| 64 MiB | 626.0 | 500.3 | 920.9 | 795.4 | 24.72 |
+| 128 MiB | 625.9 | 500.2 | 924.2 | 798.7 | 24.72 |
 
-The single-process base `vmmap` sample also shows regions classified as
+The 32 MiB budget was the smallest that reached the narrow-window latency
+plateau. Increasing it retained no extra decoded data in this workload.
+The existing default meets the lower-RAM preference for the cache choice.
+Lower RAM than Phase 0 for default LEB remains a separate requirement.
+The 16 MiB single-process base `vmmap` sample shows regions classified as
 `MALLOC_SMALL (empty)` with 2.8 → 24.7 MiB resident. This is allocator
 residency outside the decoded retention count. It does not identify
 which allocations caused it. An isolated owned-reader prototype reuses
@@ -1324,12 +1330,25 @@ It keeps the indexed working-budget path and streaming fallback. Its
 243 LEB Rust tests passed. The paired timing and RAM screen is queued
 under `target/bench/leb-decode-buffer/`.
 
+A second isolated candidate keeps ordinary ownership semantics for
+discovered base-tier data. It compares the opened `base_core.leb2`
+stream with the static bytes already bundled in the executable, through
+EOF. An exact match uses those immutable bytes with the discovered
+pathname and a fresh cache. Other inputs keep the ordinary acquisition
+path, including explicit files and indexed readers. This could reduce
+physical memory across processes without relaxing the immutable snapshot
+contract. The 245 bundled LEB tests passed, including an exact match,
+same-size replacement and explicit-file control. The local bit gate,
+startup and process memory pairs are queued under
+`target/bench/leb-static-base-snapshot/`.
+
 ## 15. Step 1a experiment
 
 An opt-in process pool retains whole decoded chunks across runtime-owned LEB
 images. Each shard evicts its least recently used entries by byte capacity.
-Explicit indexed readers retain their existing resource policy. The legacy
-default stays in place pending the combined latency and RAM measurements.
+Explicit indexed readers retain their existing resource policy. Legacy
+retention remains the default based on the combined latency and RAM
+measurements recorded in Section 14.
 
 Mac arm64, 1900–2100 random charts, five repeats of 1,000; RSS after a separate
 5,000-chart run. All rows use the same rebuilt wheel and pinned input bytes.
@@ -1358,7 +1377,8 @@ measuring the two changes together before selecting a default.
 - [ ] Finish [cross-platform qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43863141515).
 - [x] Measure 100,000-chart process memory and 1/2/4/8 thread throughput.
 - [ ] Re-profile cold misses and quantify decoder context reuse and workspace.
-- [ ] Select a default after the data access changes and RAM acceptance check.
+- [x] Select legacy retention as the default after the paired latency and
+  memory measurements. Keep 32 MiB available as an explicit option.
 
 The 32 MiB base/leb run retained roughly 24.7 MB of coefficient words per
 worker after 100,000 charts. Summed RSS was 76.4, 152.4, 305.4 and 626.9 MB
