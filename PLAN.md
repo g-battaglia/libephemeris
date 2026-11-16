@@ -1144,7 +1144,9 @@ replaced and removed aliases. The named-satellite bit gate matched all
 calculations. The isolated macOS lookup comparison against the preceding
 composed build matched all 2,100,000 calls, with 350,000 per mode and tier.
 The [full corrected-reference matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43921283876)
-is running on the revision with the lookup change.
+on the revision with the lookup change matched all 2,100,000 calls on
+Windows x86-64 and both Linux architectures. The archived comparison
+reports and capture trailers were checked locally.
 Raw timings and both local gates are under
 `target/bench/spk-registration-lookup/`.
 The latest runtime's Rust release suite passed 3,247 library tests with
@@ -1162,6 +1164,12 @@ tests after the policy-switch test was updated to check contiguous
 bytes instead of requiring a heap copy. Integration and documentation
 tests passed. The wheel passed all 1,486 Python tests. Raw output is in
 `target/bench/combined-final-candidate/`.
+The archived Linux captures for the combined
+[default](https://github.com/g-battaglia/libephemeris/actions/runs/43928262541)
+and [32 MiB plus positional](https://github.com/g-battaglia/libephemeris/actions/runs/43928798173)
+cases each contain 2,100,000 identical requests per architecture, with
+six matching warning calls. The Windows jobs for these revisions are
+still running.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.
 
@@ -1483,10 +1491,20 @@ every process count. The figures are steady sums in decimal MB.
 | 4 | 220.2 → 99.5 | 180.8 → 27.6 |
 | 8 | 441.5 → 199.9 | 358.4 → 54.4 |
 
-An isolated wheel now exercises the same snapshot mechanism through the
-normal discovery path with the companion files installed. Measurements
-and the source-isolation test are running. Default medium RAM remains
-open. Raw files are under `target/bench/leb-medium-private-snapshot/`.
+Truncating a separately staged source after acquisition preserved all
+1,200 native charts for both the owned and clone readers. All output
+digests matched the unmodified-source control.
+
+The isolated wheel exercises the same snapshot through ordinary
+discovery with the companion files installed. It matched 10,000
+requests including the sidereal warning. After 3,000 charts per worker,
+eight-process summed RSS was 618.6 → 375.2 MB and sampled footprint
+was 493.8 → 194.8 MB. In this screen, random-chart medians were
+581.3 → 582.3 µs and consecutive medians were 113.8 → 113.5 µs.
+The warm-page first-call median was 3.85 → 2.35 ms and the subsequent
+first-chart median was 0.60 → 2.15 ms. The 100,000-chart discovery
+comparison is running. Default medium RAM remains open. Raw files
+are under `target/bench/leb-medium-private-snapshot/`.
 
 ## 15. Step 1a experiment
 
