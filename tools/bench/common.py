@@ -183,22 +183,22 @@ def prepare(source, destination, modes, tiers, *, companions=False):
         path = source / name
         if not path.is_file():
             raise PrerequisiteError(f"missing input: {path}")
-        sha = digest(path)
+        target = destination / name
+        target.parent.mkdir(exist_ok=True, parents=True)
+        # A hard link changes the original inode's ctime, including while
+        # another benchmark is using it. The engine tracks that metadata on
+        # its SPK image hints. Each run must own independent input inodes.
+        shutil.copyfile(path, target)
+        sha = digest(target)
         if name.endswith(".leb2"):
             expected = manifest[path.name]["sha256"]
             if sha != expected:
                 raise PrerequisiteError(f"data-v4 SHA-256 mismatch: {path}")
-            coverage = leb_index(path)
+            coverage = leb_index(target)
         else:
             if name in KERNEL_PINS and sha != KERNEL_PINS[name]:
                 raise PrerequisiteError(f"SPK SHA-256 mismatch: {path}")
-            coverage = {"segments_tdb": spk_index(path)}
-        target = destination / name
-        target.parent.mkdir(exist_ok=True, parents=True)
-        try:
-            os.link(path, target)
-        except OSError:
-            shutil.copyfile(path, target)
-        inventory[name] = {"path": str(path.resolve()), "sha256": sha, "bytes": path.stat().st_size,
+            coverage = {"segments_tdb": spk_index(target)}
+        inventory[name] = {"path": str(path.resolve()), "sha256": sha, "bytes": target.stat().st_size,
                            "coverage": coverage}
     return inventory

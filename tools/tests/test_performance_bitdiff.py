@@ -4,6 +4,7 @@ import copy
 import gzip
 import json
 from pathlib import Path
+import shutil
 import struct
 import sys
 
@@ -11,6 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bench"))
 from bitdiff import compare, encode, outcome  # noqa: E402
+from common import ROOT, digest, prepare  # noqa: E402
 
 
 def capture(path, result, *, truncate=False):
@@ -60,3 +62,19 @@ def test_incomplete_capture(tmp_path):
     capture(right, {"value": None, "warnings": []}, truncate=True)
     with pytest.raises((ValueError, StopIteration)):
         compare(left, right)
+
+
+def test_staging_keeps_each_run_on_an_independent_inode(tmp_path):
+    source = tmp_path / "source"
+    original = source / "leb/base_core.leb2"
+    original.parent.mkdir(parents=True)
+    shutil.copyfile(ROOT / "core/data/leb2/base_core.leb2", original)
+    before = original.stat()
+    inventory = prepare(source, tmp_path / "one", ("leb",), ("base",))
+    prepare(source, tmp_path / "two", ("leb",), ("base",))
+    first = tmp_path / "one/leb/base_core.leb2"
+    second = tmp_path / "two/leb/base_core.leb2"
+    assert not first.samefile(original)
+    assert not first.samefile(second)
+    assert original.stat().st_ctime_ns == before.st_ctime_ns
+    assert digest(first) == digest(second) == inventory["leb/base_core.leb2"]["sha256"]
