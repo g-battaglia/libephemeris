@@ -22,11 +22,13 @@ J2000 = 2451545.0
 SITE = (12.5, 41.9, 50.0)
 MANIFEST = ROOT / "core/data/leb2/data-v4-manifest.json"
 KERNELS = {"base": "de440s.bsp", "medium": "de440.bsp"}
+SATELLITE_KERNEL = "plu017.bsp"
 KERNEL_PINS = {
     "de440s.bsp": "c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2",
     "planet_centers_base.bsp": "a9ec744ff412b095129166587ea0814f81c850faebf92586a738cb5dc103c92a",
     "planet_centers_medium.bsp": "d3c34f5efe9223ef588ec59a8c59c1bd6619b0eab5d5e0b35c353d675efe7b4d",
     "de440.bsp": "a4ce9bf9b3282becc9f4b2ac3cebe03a2ae7599981aabd7265fd8482fff7c4b5",
+    SATELLITE_KERNEL: "419eb90ad2ce723f8f61e2416c2ce9f01307de51d492ba268926a30cdf359bc0",
 }
 RUST_SOURCE = re.compile(rb"[/\\]rustc[/\\]([0-9a-f]{40})[/\\]")
 
@@ -181,10 +183,10 @@ def spk_index(path):
         return segments
 
 
-def prepare(source, destination, modes, tiers, *, companions=False):
+def prepare(source, destination, modes, tiers, *, companions=False, satellites=False):
     """Stage a whitelist so unrelated local files cannot affect routing."""
     manifest = json.loads(MANIFEST.read_text())["files"]
-    names = set()
+    names = {SATELLITE_KERNEL} if satellites else set()
     for tier in tiers:
         if {"leb", "auto"}.intersection(modes):
             names.add(f"leb/{tier}_core.leb2")
