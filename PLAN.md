@@ -722,6 +722,13 @@ applies the same isolated correction to the reference and optimized wheels
 and uses Rust 1.99.1 for both builds. The comparison with the released
 4.0.0 wheel remains a separate strict run.
 
+On macOS, the composed optimization stack passed all 2,100,000 calls
+against the corrected reference with both wheels using indexed LEB and
+the candidate using positional centers. Raw captures are in
+`target/bench/corrected-reference-indexed-full-mac/`. The companion
+[Windows owned-reader run](https://github.com/g-battaglia/libephemeris/actions/runs/43884616052)
+uses the same correction and the candidate's 32 MiB process cache.
+
 The full external Swiss comparison ran the fast and slow pytest lanes
 against both wheel overlays with network policy sealed. Each run evaluated
 21,359 cases. Both had 147 skips and the same 62 failing case IDs. The
