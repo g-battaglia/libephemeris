@@ -28,11 +28,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=PROFILES, default="smoke")
     parser.add_argument("--linux-memory", action="store_true")
+    parser.add_argument("--linux-startup", action="store_true")
     parser.add_argument("--linux-memory-case", choices=MEMORY_CASES, default="leb/base")
     parser.add_argument("--output", type=Path, default=ROOT / "target/bench/wheel-check")
     options = parser.parse_args()
-    if options.linux_memory and sys.platform != "linux":
-        parser.error("--linux-memory needs Linux /proc memory accounting")
+    if (options.linux_memory or options.linux_startup) and sys.platform != "linux":
+        parser.error("--linux-memory and --linux-startup require Linux")
     memory_mode, memory_tier = options.linux_memory_case.split("/")
     candidate_wheel, = (ROOT / "dist").glob("*.whl")
     with tempfile.TemporaryDirectory(prefix="ephemeris-wheel-check-") as tmp:
@@ -54,7 +55,7 @@ def main():
         shutil.copyfile(ROOT / "core/data/leb2/base_core.leb2", data / "leb/base_core.leb2")
         if options.profile != "smoke":
             leb_tiers = spk_tiers = TIERS
-        elif options.linux_memory:
+        elif options.linux_memory or options.linux_startup:
             leb_tiers = (memory_tier,) if memory_mode != "skyfield" else ()
             spk_tiers = (memory_tier,) if memory_mode != "leb" else ()
         else:
@@ -96,19 +97,27 @@ def main():
                 "--candidate-commit", "python-v4.0.0",
             ], cwd=root).returncode
             comparison = max(comparison, control)
-        if comparison or not options.linux_memory:
+        if comparison or not (options.linux_memory or options.linux_startup):
             return comparison
         for role, interpreter, wheel, commit in (
             ("baseline", baseline, baseline_wheel, "python-v4.0.0"),
             ("candidate", candidate, candidate_wheel, candidate_commit),
         ):
-            subprocess.run([
+            benchmark = [
                 str(interpreter), str(ROOT / "tools/bench/benchmark.py"),
                 "--data", str(data), "--wheel", str(wheel), "--commit", commit,
-                "--workload", "memory", "--mode", memory_mode, "--tier", memory_tier,
-                "--companions",
-                "--output", str(options.output.resolve() / f"{role}-memory.json"),
-            ], cwd=root, check=True)
+                "--mode", memory_mode, "--tier", memory_tier, "--companions",
+            ]
+            if options.linux_memory:
+                subprocess.run([*benchmark, "--workload", "memory",
+                                "--output", str(options.output.resolve() / f"{role}-memory.json")],
+                               cwd=root, check=True)
+            if options.linux_startup:
+                for condition in ("first_use", "page_cache_warm", "page_cache_cold"):
+                    subprocess.run([
+                        *benchmark, "--workload", "cold_start", "--cold-condition", condition,
+                        "--output", str(options.output.resolve() / f"{role}-{condition}.json"),
+                    ], cwd=root, check=True)
         return 0
 
 

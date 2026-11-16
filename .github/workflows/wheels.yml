@@ -30,10 +30,14 @@ on:
         type: boolean
         default: false
       linux_memory_case:
-        description: Mode and tier for the Linux memory comparison
+        description: Mode and tier for the Linux memory and startup comparisons
         type: choice
         options: [leb/base, leb/medium, auto/base, auto/medium, skyfield/base, skyfield/medium]
         default: leb/base
+      linux_startup:
+        description: Record first use, warm pages and verified cold pages on Linux
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -192,10 +196,14 @@ jobs:
           PYTHON_312: ${{ steps.python312.outputs.python-path }}
           BITDIFF_LINUX_MEMORY: ${{ inputs.linux_memory && runner.os == 'Linux' }}
           BITDIFF_LINUX_MEMORY_CASE: ${{ inputs.linux_memory_case || 'leb/base' }}
+          BITDIFF_LINUX_STARTUP: ${{ inputs.linux_startup && runner.os == 'Linux' }}
         run: |
-          args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
+          args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff --linux-memory-case "$BITDIFF_LINUX_MEMORY_CASE")
           if [[ "$BITDIFF_LINUX_MEMORY" == true ]]; then
-            args+=(--linux-memory --linux-memory-case "$BITDIFF_LINUX_MEMORY_CASE")
+            args+=(--linux-memory)
+          fi
+          if [[ "$BITDIFF_LINUX_STARTUP" == true ]]; then
+            args+=(--linux-startup)
           fi
           "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 
