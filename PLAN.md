@@ -929,3 +929,18 @@ The candidate matched the 10,000-call indexed smoke corpus. The same-policy
 full comparison with the 4.0.0 wheel and the 100,000-chart memory comparison
 are in progress. A quiet timing repeat is still required to quantify the
 latency change. Reports are under `target/bench/indexed-capacity-qualification/`.
+
+## Step 1c reference obliquity
+
+The native chart profile showed the two-word sine/cosine accounting for
+327 of 692 first-body samples. The fixed Vondrak reference rotation is
+now acquired once, using the same trigonometric function and arguments.
+All 23 frame-velocity tests passed. The isolated wheel matched all 10,000
+published-protocol smoke inputs against its parent.
+
+Mac arm64, base/leb, legacy coefficient retention, five fresh processes
+with 5,000 consecutive dates. The same pinned bytes were used in both
+builds. The first-body median moved from 24.33 to 23.88 µs and complete
+chart median from 110.92 to 110.42 µs. The median for the ten subsequent
+bodies stayed at 71.71 µs. The raw results in
+`target/bench/frame-constant-qualification/` qualify this small reuse.
