@@ -1184,9 +1184,9 @@ cases each contain 2,100,000 identical requests per architecture, with
 six matching warning calls. The archived default Windows captures
 were also checked locally and contain 2,100,000 identical requests,
 again including all six warning calls. The 32 MiB plus positional
-Windows job also completed the full 2,100,000-call comparison with
-zero differences. The job log and installed-wheel tests passed;
-local capture verification is underway.
+Windows archives also contain 2,100,000 identical requests and six
+matching warning calls. The archived pytest reports contain 1,454
+passes and 32 skips per Python version, on both 3.12 and 3.14.
 The unchanged combined-wheel consumer replays passed on Kerykeion
 (13,436 passed, 1,392 skipped, three deselected), Kerykeion Parity
 (51 passed), and Astrologer Studio (2,139 passed, 43 skipped).
@@ -1702,7 +1702,9 @@ comparison matches the five randomly generated UUID cases by format
 and version. The API v6 and v7 replays matched all 2,647 outcomes on both
 the preceding wheel and the published wheel, including the messages of
 the 99 existing non-passing cases. The exact wheel's external scientific
-replay is running after the preceding wheel's completed campaign.
+replay has matched all 21,359 published pytest outcomes, with identical
+fixture digests and harness settings. The standalone stages are in
+progress. Their comparison is queued against the same published run.
 
 A local warm-page acquisition profile (`15e92dbb`) measured one
 private core acquisition per process across 12 repeats for each digest
@@ -1726,9 +1728,10 @@ processes in this comparison. The x86-64 memory run confirmed the result
 at eight workers with 493.6 → 235.5 MB in medium and 187.5 → 236.3 MB
 in base. The archived ARM64 and x86-64 captures each matched 2,100,000
 corrected-reference calls in the indexed and positional configuration,
-with six warning-emitting calls on each side. The Windows job's
-completed log reports the same 2,100,000-call zero-difference result.
-Its downloaded capture audit is underway.
+with six warning-emitting calls on each side. The verified Windows
+archives also contain 2,100,000 identical requests and six matching
+warning calls. The archived Windows pytest reports contain 1,454
+passes and 32 skips on both Python versions.
 
 ## 15. Step 1a experiment
 
