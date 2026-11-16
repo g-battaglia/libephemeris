@@ -42,7 +42,16 @@ on:
         type: boolean
         default: false
       linux_memory:
-        description: Record RSS and PSS with 1, 2, 4 and 8 base LEB processes on Linux
+        description: Record RSS and PSS with 1, 2, 4 and 8 processes on Linux
+        type: boolean
+        default: false
+      linux_memory_case:
+        description: Mode and tier for the Linux memory and startup comparisons
+        type: choice
+        options: [leb/base, leb/medium, auto/base, auto/medium, skyfield/base, skyfield/medium]
+        default: leb/base
+      linux_startup:
+        description: Record first use, warm pages and verified cold pages on Linux
         type: boolean
         default: false
 
@@ -206,8 +215,10 @@ jobs:
           BITDIFF_INDEXED_LEB: ${{ inputs.compare_indexed_leb }}
           BITDIFF_INDEXED_MEMORY: ${{ inputs.indexed_memory && runner.os == 'Linux' }}
           BITDIFF_LINUX_MEMORY: ${{ inputs.linux_memory && runner.os == 'Linux' }}
+          BITDIFF_LINUX_MEMORY_CASE: ${{ inputs.linux_memory_case || 'leb/base' }}
+          BITDIFF_LINUX_STARTUP: ${{ inputs.linux_startup && runner.os == 'Linux' }}
         run: |
-          args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
+          args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff --linux-memory-case "$BITDIFF_LINUX_MEMORY_CASE")
           if [[ -n "$BITDIFF_CACHE_MIB" ]]; then
             args+=(--candidate-cache-mib "$BITDIFF_CACHE_MIB")
           fi
@@ -222,6 +233,9 @@ jobs:
           fi
           if [[ "$BITDIFF_LINUX_MEMORY" == true ]]; then
             args+=(--linux-memory)
+          fi
+          if [[ "$BITDIFF_LINUX_STARTUP" == true ]]; then
+            args+=(--linux-startup)
           fi
           "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 

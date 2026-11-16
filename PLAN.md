@@ -687,6 +687,52 @@ These identify the compiler and standard library difference independently
 of the runner's current `rustc -Vv`. The optional wheel workflow toolchain
 matches the published build for a controlled rerun.
 
+The separate [SPK storage Windows run](https://github.com/g-battaglia/libephemeris/actions/runs/43867334424)
+completed 2,100,000 calls with 562 differences. Comparing the two published
+4.0.0 captures from the cache and SPK runs against each other also completed
+2,100,000 calls. They used the same extension SHA-256, reported platform
+and Python, input hashes and request sequence. The published wheel
+disagreed with itself on 546 `auto` requests: 536 value/range-error
+changes and ten cases with values on both sides. This cross-run control
+establishes that both types of difference can occur before any optimization.
+The focused paired controls and the effect of the center-retention fix
+remain under investigation. The strict bit comparator still fails on any
+observed difference.
+
+The unchanged rebuild's first 1,400,000 requests also exhibited 544
+differences, all in `auto`. Counts were 534 typed range-error differences
+and ten value differences. That run reached Skyfield medium before the
+90-minute job limit and retained partial files. These counts cover only
+the completed LEB and Auto prefixes.
+
+A macOS diagnostic reopened the same center supplement after changing
+only the ctime of a private copy. Across 24 repetitions, the published
+wheel's context calls returned three bit-distinct apparent Mars vectors
+at each of the sampled outside-LEB dates, JD 2396756.5, 2506333.5 and
+2688954.5. With `FLG_NOGDEFL`, each request produced one vector. The
+context's planet-centric call returned both values and range errors.
+With the [center retention correction](https://github.com/g-battaglia/libephemeris/pull/88),
+each request produced identical bits in every repetition and every
+planet-centric call returned a value.
+
+The [Windows fixed-wheel repeat](https://github.com/g-battaglia/libephemeris/actions/runs/43882915978)
+compares two independent captures of the wheel with the center correction.
+The [optimization check](https://github.com/g-battaglia/libephemeris/actions/runs/43883394649)
+applies the same isolated correction to the reference and optimized wheels
+and uses Rust 1.99.1 for both builds. The comparison with the released
+4.0.0 wheel remains a separate strict run.
+
+On macOS, the composed optimization stack passed all 2,100,000 calls
+against the corrected reference with both wheels using indexed LEB and
+the candidate using positional centers. Raw captures are in
+`target/bench/corrected-reference-indexed-full-mac/`. The companion
+[Windows owned-reader run](https://github.com/g-battaglia/libephemeris/actions/runs/43884616052)
+uses the same correction and the candidate's 32 MiB process cache.
+The corresponding macOS owned-reader comparison also passed 2,100,000
+calls with zero differences. Its report records the 32 MiB cache and
+positional centers as enabled on the optimized wheel. Raw captures are
+in `target/bench/corrected-reference-owned-full-mac/`.
+
 The full external Swiss comparison ran the fast and slow pytest lanes
 against both wheel overlays with network policy sealed. Each run evaluated
 21,359 cases. Both had 147 skips and the same 62 failing case IDs. The
@@ -718,7 +764,23 @@ See `target/bench/binding-paired/` for the samples and per-call p95.
 The fresh-process startup report now includes import, first-call and first-
 chart medians and p95s. The warm-page condition explicitly primes the staged
 inputs. First use has only the staging reads. Both controls passed a
-five-repeat base/leb run and rejected the claim of verified cold OS pages.
+five-repeat base/leb run on macOS, where the cold-page condition reports a
+missing prerequisite. On Linux the driver evicts only the staged files
+and verifies zero resident bytes with `fincore` before each cold sample.
+Three tool cases refuse a nonzero count or incomplete probe output.
+
+The remaining baseline PSS and anonymous/file splits run as separate
+Linux cases for [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),
+[Auto base](https://github.com/g-battaglia/libephemeris/actions/runs/43886529057),
+[Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886534322),
+[Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43886540807)
+and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886546316).
+The SPK candidate's Linux counterparts cover
+[Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886630970)
+and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886636910).
+The positional candidate is also measured in
+[Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886693099).
+Each case uses 1/2/4/8 processes and 100,000 charts per process.
 
 For the step 1c investigation, the native profiling example separately
 attributes the first body and the ten subsequent bodies. A base/leb
