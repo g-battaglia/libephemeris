@@ -64,6 +64,7 @@ def test_exact_comparison(tmp_path, change):
     assert identical["difference_counts"] == {}
     different = compare(left, right)
     assert different["differences"] == 1
+    assert different["warning_calls"] == {"baseline": 0, "candidate": int(change == "warning")}
     if change == "warning":
         transitions = {}
     elif change == "error":

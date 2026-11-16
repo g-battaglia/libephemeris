@@ -611,6 +611,10 @@ selected from the measured results; none of it needs to be decided now.
   and typed errors. Keep the named satellite comparison as a separate run.
 - [x] Verify that the comparator detects modified binary64 words, signed
   zeros, NaN payloads, flags, structure, warnings, errors and truncation.
+  The smoke and full request generators now also require a real warning
+  from the sidereal-mode transition and report the count on each wheel.
+  The local 10,000-call release/candidate smoke matched, including one
+  warning-emitting call on each side.
 - [x] Run a 10,000-call PR check and support full manual runs on both
   Linux architectures and Windows. Keep the macOS verification local.
 - [ ] Pass the full comparison against the published reference on all
@@ -1127,10 +1131,11 @@ The Auto differences were within the observed variation of the repeated
 reference runs. The 150-test SPK suite passed, including duplicate,
 replaced and removed aliases. The named-satellite bit gate matched all
 320 requests with the pinned fixture, including 88 successful
-calculations. Full qualification of this additional change is pending.
+calculations. The isolated macOS lookup comparison against the preceding
+composed build matched all 2,100,000 calls, with 350,000 per mode and tier.
 The [full corrected-reference matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43921283876)
 is running on the revision with the lookup change.
-Raw timings and the focused gate are under
+Raw timings and both local gates are under
 `target/bench/spk-registration-lookup/`.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.

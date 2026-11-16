@@ -158,6 +158,10 @@ entry point, body, provider and date. Mode-dependent refusals are compared
 as typed errors. Compare successful coverage per API when interpreting a
 result. The dump preserves float words, including NaN payloads and signed
 zero, and checks result structure, returned flags and Python warnings.
+The sidereal-mode transition in smoke and full includes an unsupported
+projection bit that emits a real warning. The capture requires that
+warning and the comparison reports how many calls emitted warnings on
+each wheel.
 Capture files and the coverage/error summary can be retained as CI artifacts.
 Exit status 1 means a difference, and 2 means no completed comparison.
 Missing or incompatible required inputs are reported as

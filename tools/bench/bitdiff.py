@@ -54,6 +54,7 @@ SPEED = 258
 FULL_PER_CONFIG = 350_000
 SMOKE_COUNT = 10_000
 AUTO_EDGE_COUNT = 30_000
+SID_MODE_WITH_UNSUPPORTED_BIT = 1 | (1 << 29)
 PROFILES = {
     "smoke": (("leb",), ("base",), SMOKE_COUNT),
     "full": (MODES, TIERS, FULL_PER_CONFIG),
@@ -148,7 +149,7 @@ def requests(mode, tier, inventory, count, seed):
     for api in ("set_topo", "set_sid_mode", "set_delta_t_userdef"):
         new, old = {
             "set_topo": ((-74., 40., 10.), SITE),
-            "set_sid_mode": ((1,), (0,)),
+            "set_sid_mode": ((SID_MODE_WITH_UNSUPPORTED_BIT,), (0,)),
             "set_delta_t_userdef": ((0.0007,), (None,)),
         }[api]
         yield api, new
@@ -260,6 +261,9 @@ def capture(options):
             for index, (api, args) in enumerate(itertools.islice(cases, spec["count"])):
                 fn = context_apis[api] if api.startswith("context.") else getattr(eph, api)
                 result = outcome(fn, args)
+                if (api == "set_sid_mode" and args == (SID_MODE_WITH_UNSUPPORTED_BIT,)
+                        and not result["warnings"]):
+                    raise PrerequisiteError("the sidereal-mode warning probe did not emit a warning")
                 if index < 2 and "error" in result:
                     fn(*args)  # Fail loudly if either required preflight call failed.
                 if index == 0 and mode != "skyfield" and build["leb_cache_mib"] is not None:
@@ -301,6 +305,7 @@ def compare(left, right):
         difference_counts = Counter()
         result_transitions = defaultdict(Counter)
         changed_warnings = Counter()
+        warning_calls = Counter()
         positions = defaultdict(lambda: (set(), set(), set()))
         for i in range(expected):
             row_a, row_b = json.loads(next(a)), json.loads(next(b))
@@ -329,6 +334,8 @@ def compare(left, right):
             else:
                 error_types[result["error"]] += 1
             candidate_result = row_b[-1]
+            warning_calls["baseline"] += bool(result["warnings"])
+            warning_calls["candidate"] += bool(candidate_result["warnings"])
             if dump(result) != dump(candidate_result):
                 differences += 1
                 difference_counts[key] += 1
@@ -357,7 +364,8 @@ def compare(left, right):
                           "changed_warnings": changed_warnings[key]}
                     for key, count in difference_counts.items()
                 },
-                "coverage": dict(coverage), "baseline_successes": dict(successes),
+                "coverage": dict(coverage), "warning_calls": dict(warning_calls),
+                "baseline_successes": dict(successes),
                 "baseline_error_types": dict(error_types),
                 "position_inventory": position_inventory,
                 "baseline": header_a["build"], "candidate": header_b["build"]}
