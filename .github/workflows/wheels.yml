@@ -18,8 +18,13 @@ on:
       bitdiff_profile:
         description: Numerical comparison corpus
         type: choice
-        options: [smoke, full]
+        options: [smoke, full, auto-edge, auto-centers]
         default: smoke
+      rust_toolchain:
+        description: Rust toolchain for the candidate wheel
+        type: choice
+        options: ['stable', '1.99.1']
+        default: 'stable'
       candidate_cache_mib:
         description: Optional LEB process cache budget for candidate only
         type: string
@@ -32,9 +37,12 @@ on:
         description: Use the indexed LEB reader on both sides of the comparison
         type: boolean
         default: false
-
       indexed_memory:
         description: Compare owned and 6 MiB indexed RSS and PSS on Linux
+        type: boolean
+        default: false
+      linux_memory:
+        description: Record RSS and PSS with 1, 2, 4 and 8 base LEB processes on Linux
         type: boolean
         default: false
 
@@ -45,7 +53,7 @@ jobs:
   wheels:
     name: ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: ${{ inputs.bitdiff_profile == 'full' && 150 || 90 }}
     strategy:
       fail-fast: false
       matrix:
@@ -94,6 +102,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           maturin-version: '1.9.4'
+          rust-toolchain: ${{ inputs.rust_toolchain || 'stable' }}
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
           args: --release --locked --out dist
@@ -191,11 +200,12 @@ jobs:
         shell: bash
         env:
           BITDIFF_PROFILE: ${{ inputs.bitdiff_profile || 'smoke' }}
+          PYTHON_312: ${{ steps.python312.outputs.python-path }}
           BITDIFF_CACHE_MIB: ${{ inputs.candidate_cache_mib }}
           BITDIFF_POSITIONAL_CENTERS: ${{ inputs.candidate_positional_centers }}
           BITDIFF_INDEXED_LEB: ${{ inputs.compare_indexed_leb }}
           BITDIFF_INDEXED_MEMORY: ${{ inputs.indexed_memory && runner.os == 'Linux' }}
-          PYTHON_312: ${{ steps.python312.outputs.python-path }}
+          BITDIFF_LINUX_MEMORY: ${{ inputs.linux_memory && runner.os == 'Linux' }}
         run: |
           args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
           if [[ -n "$BITDIFF_CACHE_MIB" ]]; then
@@ -209,6 +219,9 @@ jobs:
           fi
           if [[ "$BITDIFF_INDEXED_MEMORY" == true ]]; then
             args+=(--indexed-memory)
+          fi
+          if [[ "$BITDIFF_LINUX_MEMORY" == true ]]; then
+            args+=(--linux-memory)
           fi
           "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 
