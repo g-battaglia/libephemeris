@@ -346,6 +346,8 @@ def run(options):
                     count = options.memory_calls
                 elif workload == "time_series":
                     count = options.series_calls
+                elif workload == "cold_start":
+                    count = 1
                 jds, span = dates(report["data"], tier, mode, workload, count, options.seed, options.window)
                 env = environment(data)
                 for parallel in ((options.workers or (1, 2, 4, 8)) if workload in ("threads", "memory") else (1,)):
@@ -382,6 +384,8 @@ def run(options):
                         "samples": samples, "summary": summarize(samples),
                         "chart_probe_routes": routes.get((mode, tier)),
                         "cold_condition": options.cold_condition if workload == "cold_start" else None,
+                        "startup_steps_per_process": {"calc_ut": 1, "charts": 1}
+                        if workload in ("cold_start", "memory") else None,
                         "input_pages_primed": options.cold_condition == "page_cache_warm"
                         if workload == "cold_start" else None,
                     })

@@ -939,8 +939,8 @@ completed the published/rebuilt base/LEB measurements on Linux x86-64 and
 ARM64. All five cold samples per build and architecture recorded zero
 resident input bytes immediately before spawning the measured process.
 
-The remaining baseline PSS and anonymous/file splits run as separate
-Linux cases for [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),
+The paired baseline PSS and anonymous/file splits cover
+[LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),
 [Auto base](https://github.com/g-battaglia/libephemeris/actions/runs/43886529057),
 [Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886534322),
 [Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43886540807)
@@ -969,13 +969,29 @@ pages were 162.2 → 163.7 MB and 193.2 → 193.8 MB respectively.
 
 The Auto medium published/rebuilt control held steady at eight processes,
 4,757.1 → 4,757.0 MB PSS on ARM64 and 4,759.6 → 4,759.6 MB on x86-64.
-With the additional positional center reader enabled, the paired ARM64
-comparison reached 1,550.8 MB PSS from a published 4,757.9 MB.
+With the additional positional center reader enabled, the paired
+comparison reduced PSS from 4,757.9 to 1,550.8 MB on ARM64 and from
+4,760.2 to 1,553.1 MB on x86-64.
 The paired Skyfield medium runs reduced PSS from 5,288.6 to 2,726.9 MB on
 ARM64 and from 5,290.8 to 2,728.5 MB on x86-64 at eight processes.
 Summed anonymous RSS fell by about 2,562 MB on both architectures.
 These are separate pairs with the inputs and routing recorded in each
 report.
+
+The latest baseline PSS and RSS pairs use identical published/rebuilt
+manifests within each runner. These are the steady summed PSS values in
+decimal MB after 100,000 random charts per process at eight processes.
+The earlier LEB base pair staged just the core. Other LEB and Auto pairs
+include the released companion files for the tested tier.
+
+| Mode and tier | ARM64 published → rebuilt | x86-64 published → rebuilt |
+| --- | ---: | ---: |
+| LEB base, core only | 254.1 → 254.0 | 256.4 → 256.4 |
+| LEB medium | 470.8 → 470.4 | 472.9 → 473.1 |
+| Auto base | 1,002.2 → 1,002.2 | 1,004.5 → 1,004.7 |
+| Auto medium | 4,757.1 → 4,757.0 | 4,759.6 → 4,759.6 |
+| Skyfield base | 1,112.2 → 1,111.2 | 1,114.2 → 1,113.6 |
+| Skyfield medium | 5,287.6 → 5,287.2 | 5,289.8 → 5,290.2 |
 
 For the step 1c investigation, the native profiling example separately
 attributes the first body and the ten subsequent bodies. A base/leb

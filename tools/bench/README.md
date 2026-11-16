@@ -92,6 +92,10 @@ Other hosts report this condition as an unmet prerequisite. [Linux file
 cache advice](https://man7.org/linux/man-pages/man2/posix_fadvise.2.html)
 and [residency probe](https://man7.org/linux/man-pages/man2/mincore.2.html).
 
+Each startup sample uses one date for one position call followed by one
+chart. Memory samples perform the same two startup steps before the
+separately counted random-chart workload.
+
 Linux uses `/proc/PID/status` and `smaps_rollup`. Sum of PSS apportions shared
 pages and is the available estimate of the group's attributable resident
 memory. Sum of RSS double-counts sharing. macOS records `ps` RSS, the OS peak
