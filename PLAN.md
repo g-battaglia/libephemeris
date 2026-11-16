@@ -516,19 +516,27 @@ gets cheaper through phase 1.
 | 1b | Lazy open, no whole-file heap copies | Is mapping needed, or do positional reads suffice? |
 | 1c | Reuse of identical results, copies, hashing | Do savings exist on bodies after the first? |
 | — | Re-measure, re-profile, rewrite the rest of the plan | — |
-| 2 | Batch API | Per-element contract agreed first |
+| 2 | Batch API | Revisit if a measured workload shows significant binding overhead or a separate API need |
 | 3 | Decoded store prototype | Integrity design agreed first |
 | 4 | Lanes, series layout, PGO, early exit | Only items a profile supports |
 | — | Class B | Only on approval |
 
-No final target is set. The expected direction, as hypotheses:
+The phase 1 comparisons give these results:
 
-- random-date chart in `leb` moving from 862 µs towards the consecutive-date
-  cost of ~180 µs through phase 1a;
-- a further reduction below ~157 µs only if phase 1c finds savings on the
-  bodies after the first;
-- anonymous memory in `auto` falling by roughly an order of magnitude through
-  phase 1b.
+- In the macOS LEB 1900–2100 workload, a 32 MiB pool changed random-chart
+  medians from 589.7 to 138.2 µs in base and 591.9 to 149.4 µs in medium
+  against the corrected reference. Broader medium coverage and measured
+  multi-process RAM favor retaining the existing default.
+- In the native LEB base chart profile, medians were 23.38 µs for the
+  first body, 69.58 µs for the other ten and 14.75 µs for houses.
+  Decompression still dominates indexed random charts. The scalar
+  Python/native comparison does not currently justify a batch API for speed.
+- With eight Linux x86-64 workers, medium Auto PSS fell from 4.76 to
+  3.16 GB in the default storage pair and to 1.55 GB in a separate pair
+  with positional centers. Default LEB RAM work remains open.
+- In the paired macOS runs, the SPK lookup change reduced Skyfield chart
+  latency by about 40%. Numerical qualification for the additional change
+  continues in the full matrix.
 
 ---
 
@@ -824,6 +832,11 @@ passed. The strict Windows gate against the released wheel remains open.
 The wheel workflow on PR #87 supports reproducing the separate corrected
 comparison via `bitdiff_profile=full` and `corrected_spk_reference=true`.
 The default selection still compares against the published wheel.
+The [default-configuration corrected comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43918145944)
+at `18ce19be` used legacy LEB retention and the default center reader.
+The archived ARM64 and x86-64 Linux captures each matched all 2,100,000
+requests, with 350,000 per mode and tier. The Windows job is in progress.
+The later SPK lookup change has a separate run in the same PR.
 
 On macOS, the composed optimization stack passed all 2,100,000 calls
 against the corrected reference with both wheels using indexed LEB and
@@ -1360,8 +1373,17 @@ residency outside the decoded retention count. It does not identify
 which allocations caused it. An isolated owned-reader prototype reuses
 the bounded temporary output buffer on the existing direct Zstd path.
 It keeps the indexed working-budget path and streaming fallback. Its
-243 LEB Rust tests passed. The paired timing and RAM screen is queued
-under `target/bench/leb-decode-buffer/`.
+243 LEB Rust tests and the 10,000-call smoke comparison passed. The
+paired macOS screen used five processes of 1,500 charts for timing and
+one process of 100,000 charts for memory. With legacy retention, random
+medians rose from 548.3 to 568.0 µs in base and from 552.3 to 566.5 µs
+in medium. RSS moved from 57.7 to 57.0 MB and from 95.1 to 94.6 MB,
+respectively. Physical footprint grew slightly in both cases.
+At 16 MiB, random medians rose from 216.3 to 225.6 µs in base and from
+217.4 to 232.6 µs in medium. Base RSS increased from 74.8 to 98.1 MB,
+while medium sampled footprint increased from 93.1 to 106.3 MB.
+The experiment is excluded from the draft. Raw timing, memory and
+correctness reports are under `target/bench/leb-decode-buffer/`.
 
 A second isolated candidate keeps ordinary ownership semantics for
 discovered base-tier data. It compares the opened `base_core.leb2`
@@ -1407,9 +1429,14 @@ measuring the two changes together before selecting a default.
 - [x] Ten local Python checks and the Rust pool lifetime/resize test passed.
 - [x] Candidate with 64 MiB matched 10,000 published-wheel calls bit for bit.
 - [x] The macOS 32 MiB full comparison passed 2,100,000 calls with zero differences.
-- [ ] Finish [cross-platform qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43863141515).
+- [x] Qualify the 32 MiB setup against the corrected reference on macOS,
+  both Linux architectures and Windows. Section 14 links the full runs.
+- [ ] Pass strict published-release qualification on Windows. The
+  [original cache trial](https://github.com/g-battaglia/libephemeris/actions/runs/43863141515)
+  includes the released wheel's Auto instability.
 - [x] Measure 100,000-chart process memory and 1/2/4/8 thread throughput.
-- [ ] Re-profile cold misses and quantify decoder context reuse and workspace.
+- [x] Re-profile cold misses and measure decoder context and output-buffer
+  reuse. Both experiments remain outside the draft.
 - [x] Select legacy retention as the default after the paired latency and
   memory measurements. Keep 32 MiB available as an explicit option.
 
