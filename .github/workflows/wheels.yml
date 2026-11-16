@@ -20,6 +20,11 @@ on:
         type: choice
         options: [smoke, full, auto-edge]
         default: smoke
+      rust_toolchain:
+        description: Rust toolchain for the candidate wheel
+        type: choice
+        options: ['stable', '1.99.1']
+        default: 'stable'
       linux_memory:
         description: Record RSS and PSS with 1, 2, 4 and 8 base LEB processes on Linux
         type: boolean
@@ -81,6 +86,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           maturin-version: '1.9.4'
+          rust-toolchain: ${{ inputs.rust_toolchain || 'stable' }}
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
           args: --release --locked --out dist

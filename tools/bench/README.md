@@ -127,6 +127,8 @@ The manual `auto-edge` profile runs the first 30,000 calls of each
 Skyfield runs. The wheel workflow also compares the published wheel
 against itself in independent processes and retains the control captures
 in `reports/bitdiff/published-control/`.
+Set the manual workflow's `rust_toolchain` to `1.99.1` to build with the
+toolchain identified in the published Windows 4.0.0 wheel.
 
 Run validation and downstream suites using the candidate wheel in isolated
 consumer environments. Where a consumer lock selects a different build, use
