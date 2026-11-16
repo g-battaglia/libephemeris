@@ -1306,6 +1306,24 @@ measurements separately from Linux PSS. A [hosted LEB medium run](https://github
 compares the published release with the 32 MiB candidate using Linux PSS
 at the same four process counts.
 
+The matched 16 MiB report passed the same audit. Retention was 16.07 MB
+per worker at steady state. RSS and sampled physical footprint increased
+at every process count in both tiers. Values below are decimal MB.
+
+| Tier, eight processes | Steady summed RSS, legacy → 16 MiB | Summed sampled footprint, legacy → 16 MiB |
+| --- | ---: | ---: |
+| Base | 458.9 → 843.6 | 277.5 → 485.0 |
+| Medium | 758.5 → 1,138.1 | 608.6 → 816.1 |
+
+The single-process base `vmmap` sample also shows regions classified as
+`MALLOC_SMALL (empty)` with 2.8 → 24.7 MiB resident. This is allocator
+residency outside the decoded retention count. It does not identify
+which allocations caused it. An isolated owned-reader prototype reuses
+the bounded temporary output buffer on the existing direct Zstd path.
+It keeps the indexed working-budget path and streaming fallback. Its
+243 LEB Rust tests passed. The paired timing and RAM screen is queued
+under `target/bench/leb-decode-buffer/`.
+
 ## 15. Step 1a experiment
 
 An opt-in process pool retains whole decoded chunks across runtime-owned LEB
