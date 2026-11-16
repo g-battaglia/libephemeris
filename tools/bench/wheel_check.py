@@ -33,6 +33,8 @@ def provision_data(options, root, data, cli, memory_mode, memory_tier):
     spk_tiers = set()
     if options.profile == "satellites":
         spk_tiers.add("medium")
+    elif options.profile == "leb-medium":
+        leb_tiers.add("medium")
     elif options.profile != "smoke":
         leb_tiers.update(TIERS)
         spk_tiers.update(TIERS)
@@ -78,6 +80,7 @@ def main():
     parser.add_argument("--reference-commit")
     parser.add_argument("--candidate-cache-mib", type=int)
     parser.add_argument("--candidate-positional-centers", action="store_true")
+    parser.add_argument("--candidate-shared-leb", action="store_true")
     parser.add_argument("--leb-reader", choices=("owned", "indexed"))
     parser.add_argument("--indexed-memory", action="store_true")
     parser.add_argument("--linux-memory", action="store_true")
@@ -141,6 +144,8 @@ def main():
             candidate_args.extend(("--candidate-cache-mib", str(options.candidate_cache_mib)))
         if options.candidate_positional_centers:
             candidate_args.append("--candidate-positional-centers")
+        if options.candidate_shared_leb:
+            candidate_args.append("--candidate-shared-leb")
         comparison = subprocess.run(candidate_args, cwd=root).returncode
         if options.profile == "auto-edge":
             control_dir = "reference-control" if options.reference_wheel else "published-control"
@@ -168,6 +173,8 @@ def main():
                 benchmark.extend(("--leb-cache-mib", str(options.candidate_cache_mib)))
             if role == "candidate" and options.candidate_positional_centers:
                 benchmark.append("--positional-centers")
+            if role == "candidate" and options.candidate_shared_leb and options.linux_memory_case == "leb/medium":
+                benchmark.append("--shared-leb-medium")
             if options.linux_memory:
                 subprocess.run([*benchmark, "--workload", "memory",
                                 "--output", str(options.output.resolve() / f"{role}-memory.json")],

@@ -22,7 +22,7 @@ import warnings
 
 from common import (
     J2000, KERNELS, MODES, SCHEMA, SEED, SITE, TIERS, PrerequisiteError,
-    command, configure, digest, dump, environment, identity, prepare,
+    command, configure, digest, dump, environment, identity, prepare, shared_medium_identity,
 )
 
 CHART_BODIES = [*range(10), 11]
@@ -104,14 +104,15 @@ def cache_usage(eph):
     return {"retained_bytes": retained, "budget_bytes": limit, "entries": entries}
 
 
-def checkpoint(label, eph):
+def checkpoint(label, eph, shared_image=None):
     peak = None
     if sys.platform in ("darwin", "linux"):
         import resource
         peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         if sys.platform == "linux":
             peak *= 1024
-    emit({"phase": label, "peak_rss_bytes": peak, "process_cache": cache_usage(eph)})
+    emit({"phase": label, "peak_rss_bytes": peak, "process_cache": cache_usage(eph),
+          "shared_image": shared_image})
     if sys.stdin.readline() != "continue\n":
         raise RuntimeError("memory controller stopped")
 
@@ -122,6 +123,7 @@ def worker(path, *, probe=False):
     import libephemeris as eph
     import_ns = time.perf_counter_ns() - start
     jds, workload = spec["dates"], spec["workload"]
+    shared_medium = "LIBEPHEMERIS_LEB_SHARED_DIR" in os.environ
     warnings.simplefilter("ignore")  # Timing excludes warning display.
     if workload == "memory" and not probe:
         checkpoint("after_import", eph)
@@ -142,12 +144,15 @@ def worker(path, *, probe=False):
         expected = "Skyfield" if spec["mode"] == "skyfield" else "LEB"
         if any(routes.get(body) != expected for body in bodies):
             raise PrerequisiteError(f"unexpected provider for {workload}: {routes}")
+        if shared_medium:
+            shared_medium_identity()
         emit({"routes": routes, "process_cache": cache_usage(eph)})
         return
     if workload in ("cold_start", "memory"):
         first = elapsed(eph.calc_ut, jds[0], 4, spec["flags"])
+        shared_image = shared_medium_identity() if shared_medium else None
         if workload == "memory":
-            checkpoint("after_first_call", eph)
+            checkpoint("after_first_call", eph, shared_image)
         first_chart = elapsed(chart, jds[0])
         if workload == "memory":
             checkpoint("after_first_chart", eph)
@@ -158,6 +163,8 @@ def worker(path, *, probe=False):
         return
     op = other.get(workload, chart)
     op(jds[0] - 0.1)  # Warm initialization at a different epoch.
+    if shared_medium:
+        shared_medium_identity()
     if workload == "chart_anatomy":
         samples = []
         for jd in jds:
@@ -200,12 +207,16 @@ def size_bytes(raw):
 
 def snapshot(pid, raw_dir, label):
     values = dict(rss_bytes=None, anon_bytes=None, file_resident_bytes=None,
-                  pss_bytes=None, shared_rss_bytes=None, footprint_bytes=None)
+                  shmem_resident_bytes=None, pss_bytes=None, pss_anon_bytes=None,
+                  pss_file_bytes=None, pss_shmem_bytes=None, shared_rss_bytes=None,
+                  footprint_bytes=None)
     if sys.platform == "linux":
         status = kib_fields(Path(f"/proc/{pid}/status"))
         totals = kib_fields(Path(f"/proc/{pid}/smaps_rollup"))
         values.update(rss_bytes=totals.get("Rss"), pss_bytes=totals.get("Pss"),
-                      anon_bytes=status.get("RssAnon"), file_resident_bytes=status.get("RssFile"))
+                      anon_bytes=status.get("RssAnon"), file_resident_bytes=status.get("RssFile"),
+                      shmem_resident_bytes=status.get("RssShmem"), pss_anon_bytes=totals.get("Pss_Anon"),
+                      pss_file_bytes=totals.get("Pss_File"), pss_shmem_bytes=totals.get("Pss_Shmem"))
         if "Shared_Clean" in totals and "Shared_Dirty" in totals:
             values["shared_rss_bytes"] = totals["Shared_Clean"] + totals["Shared_Dirty"]
     elif sys.platform == "darwin":
@@ -242,13 +253,19 @@ def memory_run(args, env, cwd, workers, raw_dir):
                     raise RuntimeError("memory worker did not reach expected checkpoint")
                 record.update(snapshot(child.pid, raw_dir, phase))
                 readings.append(record)
+            if "LIBEPHEMERIS_LEB_SHARED_DIR" in env and phase == "after_first_call":
+                if len({tuple(record["shared_image"]) for record in readings}) != 1:
+                    raise PrerequisiteError("memory workers did not share a single sealed LEB image")
 
             def aggregate(key):
                 values = [r[key] for r in readings]
                 return sum(values) if all(v is not None for v in values) else None
 
-            phases.append({"phase": phase, "processes": readings, "sum_rss_bytes": aggregate("rss_bytes"),
-                           "sum_pss_bytes": aggregate("pss_bytes")})
+            phases.append({"phase": phase, "processes": readings, **{
+                f"sum_{key}": aggregate(key) for key in (
+                    "rss_bytes", "pss_bytes", "pss_anon_bytes", "pss_file_bytes", "pss_shmem_bytes",
+                )
+            }})
             for child in children:
                 child.stdin.write("continue\n")
                 child.stdin.flush()
@@ -347,6 +364,13 @@ def run(options):
                     encoding="utf-8",
                 )
             modes, tiers = options.mode or MODES, options.tier or TIERS
+            if options.shared_leb_medium:
+                if (sys.platform != "linux" or list(modes) != ["leb"] or list(tiers) != ["medium"]
+                        or options.leb_reader == "indexed" or options.leb_cache_mib is not None
+                        or options.native is not None):
+                    raise PrerequisiteError("shared LEB needs Linux, leb/medium and the ordinary Python reader")
+                shared = scratch / "leb-shared"
+                shared.mkdir(mode=0o700)
             if options.cold_condition == "page_cache_cold" and sys.platform != "linux":
                 raise PrerequisiteError("verified input page eviction requires Linux")
             report["data"] = prepare(options.data, data, modes, tiers, companions=options.companions)
@@ -379,6 +403,8 @@ def run(options):
                     env["LIBEPHEMERIS_CONFIG"] = str(config_path)
                 if options.positional_centers:
                     env["LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS"] = "1"
+                if options.shared_leb_medium:
+                    env["LIBEPHEMERIS_LEB_SHARED_DIR"] = str(shared)
                 position_probe = workload in POSITION_WORKLOADS
                 route_key = (mode, tier, workload if position_probe else "chart")
                 for parallel in ((options.workers or (1, 2, 4, 8)) if workload in ("threads", "memory") else (1,)):
@@ -421,6 +447,7 @@ def run(options):
                         "chart_probe_routes": routes.get(route_key, {}).get("routes") if not position_probe else None,
                         "position_probe_routes": routes.get(route_key, {}).get("routes") if position_probe else None,
                         "leb_cache_mib": options.leb_cache_mib, "leb_reader": options.leb_reader,
+                        "shared_leb_medium": options.shared_leb_medium,
                         "positional_centers": options.positional_centers,
                         "indexed_cache_mib": options.indexed_cache_mib,
                         "cold_condition": options.cold_condition if workload == "cold_start" else None,
@@ -458,6 +485,7 @@ def main():
     cli.add_argument("--leb-reader", choices=("owned", "indexed"))
     cli.add_argument("--indexed-cache-mib", type=int)
     cli.add_argument("--positional-centers", action="store_true")
+    cli.add_argument("--shared-leb-medium", action="store_true")
     cli.add_argument("--mode", choices=MODES, action="append")
     cli.add_argument("--tier", choices=TIERS, action="append")
     cli.add_argument("--workload", choices=WORKLOADS, action="append")

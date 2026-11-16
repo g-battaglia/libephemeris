@@ -18,7 +18,7 @@ on:
       bitdiff_profile:
         description: Numerical comparison corpus
         type: choice
-        options: [smoke, full, auto-edge, auto-centers, satellites]
+        options: [smoke, leb-medium, full, auto-edge, auto-centers, satellites]
         default: smoke
       rust_toolchain:
         description: Rust toolchain for wheels built by this run
@@ -39,6 +39,10 @@ on:
         default: false
       compare_indexed_leb:
         description: Use the indexed LEB reader on both sides of the comparison
+        type: boolean
+        default: false
+      candidate_shared_leb:
+        description: Qualify the sealed medium LEB reader on Linux
         type: boolean
         default: false
       indexed_memory:
@@ -237,6 +241,7 @@ jobs:
           BITDIFF_CACHE_MIB: ${{ inputs.candidate_cache_mib }}
           BITDIFF_POSITIONAL_CENTERS: ${{ inputs.candidate_positional_centers }}
           BITDIFF_INDEXED_LEB: ${{ inputs.compare_indexed_leb }}
+          BITDIFF_SHARED_LEB: ${{ inputs.candidate_shared_leb && runner.os == 'Linux' }}
           BITDIFF_INDEXED_MEMORY: ${{ inputs.indexed_memory && runner.os == 'Linux' }}
           BITDIFF_LINUX_MEMORY: ${{ inputs.linux_memory && runner.os == 'Linux' }}
           BITDIFF_LINUX_MEMORY_CASE: ${{ inputs.linux_memory_case || 'leb/base' }}
@@ -256,6 +261,9 @@ jobs:
           fi
           if [[ "$BITDIFF_INDEXED_LEB" == true ]]; then
             args+=(--leb-reader indexed)
+          fi
+          if [[ "$BITDIFF_SHARED_LEB" == true ]]; then
+            args+=(--candidate-shared-leb)
           fi
           if [[ "$BITDIFF_INDEXED_MEMORY" == true ]]; then
             args+=(--indexed-memory)

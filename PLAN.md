@@ -1759,6 +1759,10 @@ PSS was 67.42 / 127.80 / 245.48 / 477.60 MB versus 67.47 / 127.78 /
 job archive. All x86-64 capture records and trailers were checked.
 The x86-64 installed-wheel tests also had 1,454 passes and 32 skips
 on each Python version.
+The final Windows job completed successfully. Its decoded archive at
+`0319bacb` also matched all 2,100,000 corrected-reference calls and
+six warning-emitting calls. Both Python versions had 1,454 passes and
+32 skips. The strict published-wheel Windows gate remains open.
 
 The Linux lab uses an isolated ARM64 guest and the same installed
 candidate wheel. Its guest filesystem declined reflink creation.
@@ -1879,7 +1883,25 @@ missing, public or symlinked directory, a busy directory lock and an
 incorrect sealed image all fell back to the owned path with identical
 results. Worker PSS was 443.0 → 182.6 MB, and cgroup `anon + file`
 was 514.9 → 254.4 MB. First-call median was 11.1 → 31.0 ms. The
-100,000-chart repeat of this native registry is running.
+100,000-chart repeat matched all worker digests and the lifecycle
+and fallback checks. PSS was 443.4 → 182.9 MB, and cgroup
+`anon + file` was 515.5 → 254.9 MB. The median of per-worker
+batch averages was 1,230 → 1,214 µs per chart in this single run.
+First-call median was 13.6 → 30.9 ms.
+
+PR #87 now includes the opt-in `LIBEPHEMERIS_LEB_SHARED_DIR` path.
+It targets sealed LEB medium with default owned coefficients, based
+on the multiprocess memory gain and the startup tradeoff. Workers
+must share a private runtime directory and an accessible `/proc`
+namespace. The library holds a bounded startup lock while discovering
+or creating the immutable image. Every worker checks its source
+against the pinned bytes. Host-local qualification observed correct
+fallback on missing or unsafe settings and a bounded busy-lock wait.
+The new `leb-medium` numerical profile matched 10,000 requests and
+one warning-emitting call against the preceding wheel. The standard
+benchmark verified the same mapped inode across 1 / 2 / 4 / 8 worker
+counts. Full hosted opt-in qualification and its memory comparison
+remain open.
 
 ## 15. Step 1a experiment
 

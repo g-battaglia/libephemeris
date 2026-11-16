@@ -40,6 +40,9 @@ serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "=1.1.5", features = ["fs", "param"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "=1.1.5", features = ["process"] }
+
 [features]
 default = []
 bundled-data = ["dep:libephemeris-core-data"]

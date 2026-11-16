@@ -837,6 +837,8 @@ pub(crate) use access::LebSource;
 pub use access::{IndexedLimits, LebReadPolicy};
 pub(crate) use resources::IndexedResources;
 use resources::{CoefficientWords, TrackedVec};
+#[cfg(target_os = "linux")]
+mod sealed_snapshot;
 mod storage;
 pub(crate) use storage::HashCacheAdvice;
 pub(crate) use storage::open_regular_file;

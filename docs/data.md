@@ -69,6 +69,7 @@ this uses `USERPROFILE` and the native profile API, not the working directory.
 | `LIBEPHEMERIS_STRICT_PRECISION` | Refuse approximate fallback |
 | `LIBEPHEMERIS_LEB_READER` | `owned` or `indexed` storage |
 | `LIBEPHEMERIS_LEB_CACHE_MB` | Opt-in process budget for decoded owned LEB coefficients, in MiB |
+| `LIBEPHEMERIS_LEB_SHARED_DIR` | Linux opt-in directory for sharing the pinned medium core across processes |
 
 For deterministic offline work, set the network policy to `sealed`, select
 local resources and choose whether to use local IERS data. The
@@ -134,6 +135,19 @@ with the published 4.0.0 wheel. In a same-wheel comparison with the
 ordinary owned path, median random chart time rose from 597 to 626 µs
 and the warm-page first call from 3.7 to 16.2 ms.
 [Measurements and input details](../PLAN.md).
+
+On Linux, a multiprocess deployment can set `LIBEPHEMERIS_LEB_SHARED_DIR`
+to the same existing absolute directory in every worker. Use a dedicated
+local runtime directory owned by the worker UID with permissions `0700`.
+Workers need a shared PID namespace and permission to open peers' file
+descriptors through `/proc`. This applies to the automatically discovered,
+pinned `medium_core.leb2` in sealed LEB mode using the ordinary `owned`
+cache. Explicit input files, indexed readers and configured process pools
+keep their own policies. Each worker verifies its source against the pinned
+image before using the immutable kernel-sealed copy. The last holder's exit
+releases the shared image. Unavailable coordination or failed verification
+falls back to ordinary acquisition. The first calculation includes the
+verification cost.
 
 `owned` retains a complete immutable snapshot. `indexed` keeps a read-only file
 descriptor, indexes and bounded decoded chunks:

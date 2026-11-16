@@ -1980,6 +1980,26 @@ impl LebFile {
         })
     }
 
+    #[cfg(target_os = "linux")]
+    pub(crate) fn try_sealed_linux_medium_snapshot(
+        path: &std::path::Path,
+        shared: &std::path::Path,
+    ) -> Option<Self> {
+        let bytes = super::sealed_snapshot::shared_medium(path, shared)?;
+        let index = FileIndex::decode(bytes.bytes().ok()?).ok()?;
+        Some(Self {
+            path: path.to_string_lossy().into_owned(),
+            image: Some(Arc::new(LebImage {
+                bytes,
+                index,
+                cache: Arc::new(LebChunkCache::with_contiguous_window_byte_budget(
+                    DEFAULT_CHUNK_CACHE_BYTES,
+                )),
+                sha256: std::sync::OnceLock::from(storage::medium_snapshot_digest().to_owned()),
+            })),
+        })
+    }
+
     /// Decode a shared immutable snapshot without copying its byte buffer.
     ///
     /// The caller may retain its `Arc` after a parse failure. Each construction

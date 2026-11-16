@@ -43,7 +43,10 @@ pub(crate) fn open_regular_file(path: &Path) -> std::io::Result<File> {
     Ok(file)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(super) const MEDIUM_CORE_BYTES: u64 = 37_267_685;
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(super) fn medium_snapshot_digest() -> &'static str {
     crate::download::asset_by_name("medium_core.leb2")
         .expect("pinned medium core")
@@ -61,7 +64,6 @@ pub(super) fn open_private_apfs_snapshot(source: &Path) -> std::io::Result<File>
     use std::path::PathBuf;
     use std::{fs, io};
 
-    const MEDIUM_CORE_BYTES: u64 = 37_267_685;
     unsafe extern "C" {
         fn mkdtemp(template: *mut c_char) -> *mut c_char;
         fn fclonefileat(src: c_int, dst_dir: c_int, name: *const c_char, flags: c_int) -> c_int;

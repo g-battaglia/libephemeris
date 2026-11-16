@@ -85,6 +85,16 @@ coefficient bytes at each memory checkpoint. For the numerical comparison,
 Omit these flags for the legacy baseline. `--leb-reader indexed` selects
 the independently budgeted positional LEB reader for comparison.
 
+On Linux, use `bitdiff.py run --profile leb-medium --candidate-shared-leb`
+with the same interpreter, wheel, data and output arguments as the other
+comparisons. The comparison gives the candidate a private registry directory
+and requires its first medium LEB calculation to map the sealed image. The
+full profile also accepts this switch. The wheel workflow dispatch input is
+`candidate_shared_leb` and applies on the two Linux runners. For memory
+and timing, pass `--mode leb --tier medium --shared-leb-medium` to
+`benchmark.py`. The memory report verifies that all measured workers hold the
+same sealed inode.
+
 Use `--series-calls` to change the length of the consecutive single-body
 time series, which defaults to 100,000 calls.
 

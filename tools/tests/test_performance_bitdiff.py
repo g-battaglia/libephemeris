@@ -18,7 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bench"))
 import benchmark  # noqa: E402
 from benchmark import linux_resident_bytes, verify_cold_os_pages  # noqa: E402
 from bitdiff import compare, encode, outcome  # noqa: E402
-from common import ROOT, PrerequisiteError, digest, prepare, rust_source_revisions  # noqa: E402
+from common import (  # noqa: E402
+    ROOT, PrerequisiteError, digest, prepare, rust_source_revisions, shared_medium_identity,
+)
 import wheel_check  # noqa: E402
 
 
@@ -97,6 +99,21 @@ def test_incomplete_capture(tmp_path):
     capture(right, {"value": None, "warnings": []}, truncate=True)
     with pytest.raises((ValueError, StopIteration)):
         compare(left, right)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux shared snapshot mapping")
+def test_shared_medium_mapping_reports_kernel_inode():
+    fd = os.memfd_create("libephemeris-medium", os.MFD_CLOEXEC)
+    try:
+        os.write(fd, b"test image")
+        with mmap.mmap(fd, 0, access=mmap.ACCESS_READ):
+            device, inode = shared_medium_identity()
+            assert inode == os.fstat(fd).st_ino
+            assert device
+    finally:
+        os.close(fd)
+    with pytest.raises(PrerequisiteError, match="did not map"):
+        shared_medium_identity()
 
 
 def test_position_inventory_uses_captured_requests_including_errors(tmp_path):

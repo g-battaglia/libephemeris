@@ -109,6 +109,15 @@ def environment(data):
     return env
 
 
+def shared_medium_identity():
+    """Read the device and inode of the actual sealed mapping on Linux."""
+    for line in Path("/proc/self/maps").read_text().splitlines():
+        fields = line.split(maxsplit=5)
+        if len(fields) == 6 and fields[5] == "/memfd:libephemeris-medium (deleted)":
+            return fields[3], int(fields[4])
+    raise PrerequisiteError("worker did not map the requested sealed LEB image")
+
+
 def configure(eph, mode, tier):
     eph.set_network_policy("sealed")
     eph.set_calc_mode(mode)

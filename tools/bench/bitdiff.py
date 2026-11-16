@@ -18,7 +18,7 @@ import warnings
 
 from common import (
     J2000, KERNELS, MODES, SATELLITE_KERNEL, SCHEMA, SEED, SITE, TIERS,
-    PrerequisiteError, configure, dump, environment, identity, prepare,
+    PrerequisiteError, configure, dump, environment, identity, prepare, shared_medium_identity,
 )
 
 # Public request bits, including flags that may be rejected for particular bodies.
@@ -57,6 +57,7 @@ AUTO_EDGE_COUNT = 30_000
 SID_MODE_WITH_UNSUPPORTED_BIT = 1 | (1 << 29)
 PROFILES = {
     "smoke": (("leb",), ("base",), SMOKE_COUNT),
+    "leb-medium": (("leb",), ("medium",), SMOKE_COUNT),
     "full": (MODES, TIERS, FULL_PER_CONFIG),
     "auto-edge": (("auto",), TIERS, AUTO_EDGE_COUNT),
     "auto-centers": (("auto",), TIERS, SMOKE_COUNT),
@@ -224,6 +225,7 @@ def capture(options):
     build = identity(options.wheel, options.commit, options.build_options)
     build["leb_cache_mib"] = os.environ.get("LIBEPHEMERIS_LEB_CACHE_MB")
     build["leb_reader"] = os.environ.get("LIBEPHEMERIS_LEB_READER")
+    build["shared_leb_medium"] = "LIBEPHEMERIS_LEB_SHARED_DIR" in os.environ
     build["positional_centers"] = (
         os.environ.get("LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS") == "1"
     )
@@ -266,6 +268,8 @@ def capture(options):
                     raise PrerequisiteError("the sidereal-mode warning probe did not emit a warning")
                 if index < 2 and "error" in result:
                     fn(*args)  # Fail loudly if either required preflight call failed.
+                if index == 0 and (mode, tier) == ("leb", "medium") and build["shared_leb_medium"]:
+                    shared_medium_identity()
                 if index == 0 and mode != "skyfield" and build["leb_cache_mib"] is not None:
                     usage = eph.get_leb_cache_usage()
                     if usage is None or usage[1] != int(build["leb_cache_mib"]) * 1024**2:
@@ -376,6 +380,11 @@ def run(options):
     report = options.output / "comparison.json"
     report.unlink(missing_ok=True)
     modes, tiers, count = PROFILES[options.profile]
+    if options.candidate_shared_leb and (
+        sys.platform != "linux" or "leb" not in modes or "medium" not in tiers
+        or options.leb_reader == "indexed" or options.candidate_cache_mib is not None
+    ):
+        raise PrerequisiteError("shared LEB needs Linux, leb/medium coverage and the ordinary cache")
     matrix = list(itertools.product(modes, tiers))
     with tempfile.TemporaryDirectory(prefix="ephemeris-bitdiff-") as tmp:
         data = Path(tmp) / "data"
@@ -388,6 +397,10 @@ def run(options):
             "public": {"data": inventory, "profile": options.profile, "matrix": matrix,
                        "seed": SEED, "expected_count": count * len(matrix)},
         }), encoding="utf-8")
+        shared = Path(tmp) / "leb-shared"
+        if options.candidate_shared_leb:
+            shared.mkdir(mode=0o700)
+
         def acquire(role):
             args = [str(getattr(options, role).absolute()), "-E", "-s", str(Path(__file__).resolve()),
                     "capture", "--role", role, "--spec", str(spec_path),
@@ -403,6 +416,8 @@ def run(options):
                 env["LIBEPHEMERIS_LEB_CACHE_MB"] = str(options.candidate_cache_mib)
             if role == "candidate" and options.candidate_positional_centers:
                 env["LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS"] = "1"
+            if role == "candidate" and options.candidate_shared_leb:
+                env["LIBEPHEMERIS_LEB_SHARED_DIR"] = str(shared)
             with (options.output / f"{role}.log").open("w", encoding="utf-8", buffering=1) as log:
                 with subprocess.Popen(args, cwd=tmp, env=env, stderr=subprocess.PIPE,
                                       encoding="utf-8", errors="replace") as worker:
@@ -436,6 +451,7 @@ def main():
     runner.add_argument("--leb-reader", choices=("owned", "indexed"),
                         help="use this LEB acquisition policy in both processes")
     runner.add_argument("--candidate-positional-centers", action="store_true")
+    runner.add_argument("--candidate-shared-leb", action="store_true")
     for role in ("baseline", "candidate"):
         runner.add_argument(f"--{role}", type=Path, required=True)
         runner.add_argument(f"--{role}-wheel", type=lambda p: Path(p).resolve())

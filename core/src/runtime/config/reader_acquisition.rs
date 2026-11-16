@@ -291,6 +291,22 @@ impl Runtime {
                         {
                             return Ok(image);
                         }
+                        #[cfg(target_os = "linux")]
+                        if pool.is_none()
+                            && matches!(policy, crate::leb::LebReadPolicy::Owned)
+                            && context.leb_file().is_none()
+                            && context.mode() == ProviderMode::SealedLeb
+                            && context.tier() == crate::context::Tier::Medium
+                            && path.file_name().and_then(|name| name.to_str())
+                                == Some("medium_core.leb2")
+                            && let Some(shared) = std::env::var_os("LIBEPHEMERIS_LEB_SHARED_DIR")
+                            && let Some(image) = LebFile::try_sealed_linux_medium_snapshot(
+                                &path,
+                                std::path::Path::new(&shared),
+                            )
+                        {
+                            return Ok(image);
+                        }
                         let image = context.open_leb_file(&path)?;
                         Ok(match &pool {
                             Some(pool) => image.with_process_cache(pool.clone()),
