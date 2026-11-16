@@ -592,8 +592,8 @@ selected from the measured results; none of it needs to be decided now.
 - [x] Archive the Linux LEB base RAM pair with its released companion
   files. Keep the available RSS, anonymous, file, peak and proportional
   counters separate.
-- [ ] Finish the Linux startup matrix for the remaining five mode and tier
-  cases. Compare first use, explicitly warm pages and verified cold pages.
+- [x] Archive the Linux startup matrix for all six mode and tier cases.
+  Compare first use, explicitly warm pages and verified cold pages.
 
 ### Numerical and consumer validation
 
@@ -1045,11 +1045,12 @@ and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/4
 The initial Skyfield medium dispatch stayed queued with zero jobs while
 the cancellation endpoint reported that it had completed. The replacement
 dispatch reached both Linux runners.
-LEB medium, both Auto pairs and Skyfield base have now completed on both
-Linux architectures alongside the earlier LEB base run. The archived
-pairs match their input manifests. Each cold sample reported zero input
-bytes resident before spawning. The newer reports count one date, one
-first position and one first chart per fresh process.
+All six cases completed on both Linux architectures. The archived pairs
+match their input manifests. Each of the 120 cold launches across both
+builds reported zero input bytes resident before spawning. The newer
+reports count one date, one first position and one first chart per fresh
+process. The verified summary is
+`target/bench/linux-startup-matrix-summary.json`.
 
 Additional Linux startup measurements compare the published wheel against
 [the SPK storage changes](https://github.com/g-battaglia/libephemeris/actions/runs/43905660043)
