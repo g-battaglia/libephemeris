@@ -740,8 +740,19 @@ The comparison uses the opening-copy wheel and the on-demand record wheel
 `4c80d771e503c043603365298476fd424f31d5c504ee5778d64fc33336db8385`).
 Raw reports and vmmap output are under
 `target/bench/spk-copy-qualification/`. The new wheel's 2,100,000-call
-comparison is running with the configured LEB cache of 32 MiB. Full-size
-process, thread and cold-start measurements are still open. The next storage
-experiment is positional I/O for managed data under the immutable-data
+comparison passed with zero differences with the configured LEB cache of
+32 MiB. The combined wheel (commit `e76dd9f7`) passed all 1,486 Python tests
+with that setting. Its 10,000-call smoke comparison passed locally and the
+PR wheel checks passed on Linux x86-64, Linux ARM64 and Windows x86-64. The full Rust release
+suite passed 3,241 library tests plus integration and documentation tests
+with `bundled-data,nbody,python-internals` and the pinned data-v3 fixture.
+
+The sealed external planet-center and planet-centric selections ran in
+`auto` and `skyfield` with both wheels. Each run had 34 passes and two
+matching import failures in the legacy planet-map introspection tests.
+The full scientific campaign remains open.
+
+Full-size process, thread and cold-start measurements are still open. The
+next storage experiment is positional I/O for managed data under the immutable-data
 contract. The public owned-image path supplies callers with a stable byte
 slice for the life of the kernel.
