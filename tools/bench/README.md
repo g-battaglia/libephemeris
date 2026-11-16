@@ -63,9 +63,11 @@ The defaults time random charts, consecutive charts and chart components.
 Repeat `--workload` to select other cases. `--window 1550-2650` and
 `--window coverage` probe broader windows. Dates are restricted to the
 intersection of the relevant raw coverage and an interior margin. The report
-records the actual date interval and a Python chart provider trace. A failed
-calculation or unexpected provider fails the run. Use `--companions` to include
-published companion groups. Compare reports using the same options and inputs.
+records the date interval and a Python provider trace. The single-position
+workloads trace the measured Mars call with its actual flags. Chart workloads
+trace all chart bodies. A failed calculation or unexpected provider fails
+the run. Use `--companions` to include published companion groups. Compare
+reports using the same options and inputs.
 
 Each timing repeat is a fresh process. The default is five repeats, with
 median and nearest-rank p95 over pooled individual timings. Thread throughput
@@ -99,6 +101,10 @@ observation.
 Other hosts report this condition as an unmet prerequisite. [Linux file
 cache advice](https://man7.org/linux/man-pages/man2/posix_fadvise.2.html)
 and [residency probe](https://man7.org/linux/man-pages/man2/mincore.2.html).
+
+Each startup sample uses one date for one position call followed by one
+chart. Memory samples perform the same two startup steps before the
+separately counted random-chart workload.
 
 Linux uses `/proc/PID/status` and `smaps_rollup`. Sum of PSS apportions shared
 pages and is the available estimate of the group's attributable resident
@@ -142,11 +148,18 @@ result. The dump preserves float words, including NaN payloads and signed
 zero, and checks result structure, returned flags and Python warnings.
 Capture files and the coverage/error summary can be retained as CI artifacts.
 Exit status 1 means a difference, and 2 means no completed comparison.
+Missing or incompatible required inputs are reported as
+`missing_prerequisite` in `comparison.json`, including when the
+wheel workflow cannot stage a pinned file or a capture rejects its wheel.
 
 The report lists exact requested flag masks, target IDs grouped by body
 class, and observed center IDs for each mode, tier and position entry
 point. This inventory includes requests that returned errors. Re-run
 `bitdiff.py compare` on earlier captures to generate it for those runs.
+On a difference, the report counts all affected requests by mode, tier
+and API, including changes between values and typed errors. The warning
+count can overlap result changes. The report also retains the first ten
+differences with their full requests and outcomes.
 
 The manual `auto-edge` profile runs the first 30,000 calls of each
 `auto` tier with pinned LEB companions and SPKs. It omits the LEB and
