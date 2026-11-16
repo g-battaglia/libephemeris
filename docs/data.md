@@ -138,3 +138,28 @@ Related runtime images share allocation-domain counters; do not sum them once
 per image. Independent opens need not share a budget. These limits do **not**
 bound process RSS, Python/SPK allocations or the OS cache. The static bundled
 image is already zero-copy and is not converted into an indexed file.
+
+### Measured multi-process LEB memory
+
+In sealed LEB mode on Linux, eight processes each calculated 100,000
+random charts with speeds over the covered portion of 1550–2650. The
+same wheel and released companion files were used for both readers.
+The indexed reader used `leb_limits.cache_bytes = 6291456` (6 MiB).
+The table reports steady proportional set size summed across all workers.
+
+| Tier | Linux ARM64, owned → indexed | Linux x86-64, owned → indexed |
+| --- | ---: | ---: |
+| Base | 254.3 → 229.8 MB | 257.4 → 232.2 MB |
+| Medium | 560.4 → 229.1 MB | 563.5 → 231.8 MB |
+
+PSS apportions shared resident pages across processes. The comparable
+macOS base run recorded summed RSS of 455.1 → 515.7 MB. Raw Linux
+artifacts include the 1/2/4/8-worker cases, opening peaks and the
+separate anonymous and file-backed counters.
+[Paired Linux reports](https://github.com/g-battaglia/libephemeris/actions/runs/43879751526).
+
+To run the same comparison from a source checkout, pass `--workload memory
+--window 1550-2650 --companions` to the benchmark driver. Use
+`--leb-reader owned` for one run and `--leb-reader indexed
+--indexed-cache-mib 6` for the other.
+[Benchmark setup](../tools/bench/README.md).
