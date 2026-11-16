@@ -930,6 +930,89 @@ full comparison with the 4.0.0 wheel and the 100,000-chart memory comparison
 are in progress. A quiet timing repeat is still required to quantify the
 latency change. Reports are under `target/bench/indexed-capacity-qualification/`.
 
+The same revised wheel completed 100,000 random charts with the following
+process memory. This longer run supersedes the 5,000-chart memory snapshot
+for selecting a budget.
+
+| Tier | Owned → indexed RSS, default 8 MiB | Owned → indexed footprint |
+| --- | ---: | ---: |
+| base | 57.1 → 65.4 MB | 34.8 → 37.2 MB |
+| medium | 94.8 → 70.4 MB | 75.5 → 43.8 MB |
+
+The base tier requires a smaller budget to meet the RAM target. Use
+`benchmark.py --leb-reader indexed --indexed-cache-mib 2` (or 4, 6, 8)
+to vary the shared indexed ceiling on the same staged data. This writes a
+temporary `leb_limits.cache_bytes` setting for the worker. A timing sweep
+and 100,000-chart base runs at the lower budgets are queued.
+
+The full macOS indexed comparison with the published release passed all
+2,100,000 calls with zero differences. The host had finished the other
+benchmark runs before the following same-wheel timing sweep. Each timing
+cell represents five fresh processes with 3,000 charts each.
+
+| Reader bound | Base random median / p95 | Medium random median / p95 | Base RSS after 100,000 charts |
+| --- | ---: | ---: | ---: |
+| owned | 556.8 / 587.1 µs | 566.1 / 596.9 µs | 57.1 MB |
+| indexed, 2 MiB | 581.8 / 619.4 µs | 591.9 / 629.7 µs | 45.3 MB |
+| indexed, 4 MiB | 567.1 / 621.5 µs | 577.1 / 630.0 µs | 56.0 MB |
+| indexed, 6 MiB | 492.7 / 619.9 µs | 502.2 / 632.0 µs | 48.6 MB |
+| indexed, 8 MiB | 396.4 / 620.0 µs | 401.5 / 630.0 µs | 65.4 MB |
+
+The 6 MiB base configuration reduced peak RSS from 57.1 to 48.6 MB and
+steady physical footprint from 34.8 to 32.8 MB in the single-worker runs.
+Consecutive chart medians rose from 110.6 to 115.0 µs in base and from
+116.4 to 121.6 µs in medium with the 8 MiB budget. These are candidate
+budgets for automatically discovered pinned data, with the random p95 and
+consecutive latency regressions recorded. A repeat with the complete
+companion groups and 1/2/4/8 processes is underway.
+
+Two follow-up experiments left the performance candidate unchanged. The
+paired scalar Vondrak rate loop measured 105.8 → 106.1 µs per consecutive
+chart on `f5530185`, with all 698 relevant Rust tests and 10,000 smoke calls
+passing. Reconstructing coefficient words from pre-sliced byte planes
+(`86f88a06`) measured 478.3 → 511.7 µs per indexed random chart at 6 MiB.
+All 244 LEB tests and the 10,000-call indexed comparison passed. The
+reports are in `target/bench/frame-rate-trig-qualification/` and
+`target/bench/leb-word-unpack-qualification/`.
+
+With both tiers and the released companion groups installed, the same
+wheel completed 100,000 charts per process at an indexed ceiling of 6 MiB.
+This table reports the sum of steady RSS in MB. The sum can count shared
+resident pages more than once.
+
+| Tier | Processes | Owned → indexed RSS |
+| --- | ---: | ---: |
+| base | 1 | 56.3 → 48.6 MB |
+| base | 2 | 114.6 → 116.2 MB |
+| base | 4 | 229.1 → 254.6 MB |
+| base | 8 | 455.1 → 515.7 MB |
+| medium | 1 | 94.7 → 61.8 MB |
+| medium | 2 | 189.4 → 129.3 MB |
+| medium | 4 | 378.2 → 257.6 MB |
+| medium | 8 | 753.6 → 377.1 MB |
+
+For eight medium workers the sum of each process's peak RSS was
+753.6 → 513.4 MB. Peaks can occur at different times. The full provisioned
+base layout does not support a default switch based on RSS. The indexed
+reader and its byte ceiling remain explicit choices. Reports are
+`mixed-{owned,indexed}-100k.json` in the indexed capacity directory.
+
+A follow-up prototype for automatically discovered release files hashes the
+opened descriptor before admitting positional reads (`2c798dd9`).
+Comparing five fresh-process runs, this raised median first-call latency
+from 1.85 to 5.34 ms for base and from 5.73 to 22.62 ms for medium.
+In its separate one-process 100,000-chart comparison, steady RSS moved
+55.4 → 64.4 MB in base and 96.6 → 53.8 MB in medium. The prototype's 10,000
+base LEB calls matched the published wheel. The startup and base RSS
+tradeoffs keep automatic acquisition out of this change. Raw reports are
+in `target/bench/managed-leb-measurement/`.
+
+Source inspection found existing exact-epoch memoization in
+`nut00a_cached_centuries` and existing memoization for the frame matrices.
+The native sidereal wrappers can call nutation twice, but a repeated epoch
+uses the existing series memo. No additional cache is proposed for those
+values.
+
 ## Step 1c reference obliquity
 
 The native chart profile showed the two-word sine/cosine accounting for
@@ -944,3 +1027,7 @@ builds. The first-body median moved from 24.33 to 23.88 µs and complete
 chart median from 110.92 to 110.42 µs. The median for the ten subsequent
 bodies stayed at 71.71 µs. The raw results in
 `target/bench/frame-constant-qualification/` qualify this small reuse.
+
+The full macOS wheel comparison with the published 4.0.0 passed all
+2,100,000 calls with zero differences. Capture files and the report are
+in `target/bench/frame-constant-qualification/full/`.

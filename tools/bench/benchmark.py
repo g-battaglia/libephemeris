@@ -278,6 +278,13 @@ def run(options):
         with tempfile.TemporaryDirectory(prefix="ephemeris-bench-") as tmp:
             scratch = Path(tmp)
             data = scratch / "data"
+            if options.indexed_cache_mib is not None:
+                cache_bytes = options.indexed_cache_mib * 1024**2
+                config_path = scratch / "indexed.toml"
+                config_path.write_text(
+                    f"[libephemeris.leb_limits]\ncache_bytes = {cache_bytes}\n",
+                    encoding="utf-8",
+                )
             modes, tiers = options.mode or MODES, options.tier or TIERS
             if options.cold_condition == "page_cache_cold":
                 raise PrerequisiteError("this driver cannot verify cold OS pages after input hashing")
@@ -303,6 +310,8 @@ def run(options):
                     env["LIBEPHEMERIS_LEB_CACHE_MB"] = str(options.leb_cache_mib)
                 if options.leb_reader is not None:
                     env["LIBEPHEMERIS_LEB_READER"] = options.leb_reader
+                if options.indexed_cache_mib is not None:
+                    env["LIBEPHEMERIS_CONFIG"] = str(config_path)
                 if options.positional_centers:
                     env["LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS"] = "1"
                 for parallel in ((options.workers or (1, 2, 4, 8)) if workload in ("threads", "memory") else (1,)):
@@ -337,6 +346,7 @@ def run(options):
                         "chart_probe_routes": routes.get((mode, tier), {}).get("routes"),
                         "leb_cache_mib": options.leb_cache_mib, "leb_reader": options.leb_reader,
                         "positional_centers": options.positional_centers,
+                        "indexed_cache_mib": options.indexed_cache_mib,
                         "cold_condition": options.cold_condition if workload == "cold_start" else None,
                     })
             report["status"] = "complete"
@@ -366,6 +376,7 @@ def main():
     cli.add_argument("--native", type=lambda p: Path(p).resolve())
     cli.add_argument("--leb-cache-mib", type=int)
     cli.add_argument("--leb-reader", choices=("owned", "indexed"))
+    cli.add_argument("--indexed-cache-mib", type=int)
     cli.add_argument("--positional-centers", action="store_true")
     cli.add_argument("--mode", choices=MODES, action="append")
     cli.add_argument("--tier", choices=TIERS, action="append")
@@ -392,6 +403,11 @@ def main():
         cli.error("provide data, output, positive call counts and at least five repetitions")
     if options.leb_cache_mib is not None and (options.leb_cache_mib < 0 or options.leb_reader == "indexed"):
         cli.error("the process cache accepts nonnegative sizes for owned readers")
+    if options.indexed_cache_mib is not None and (
+        options.indexed_cache_mib < 0 or options.leb_reader != "indexed"
+        or options.leb_cache_mib is not None
+    ):
+        cli.error("--indexed-cache-mib needs --leb-reader indexed and a nonnegative limit")
     return run(options)
 
 
