@@ -129,7 +129,8 @@ def leb_index(path):
                            "segments": segments, "boundaries": sorted(set([lower, upper, *rows, *starts]))})
     if not math.isfinite(start) or not math.isfinite(stop) or start >= stop:
         raise PrerequisiteError(f"invalid LEB2 coverage: {path}")
-    return {"range": [start, stop], "bodies": result}
+    return {"range": [start, stop], "bodies": result,
+            "decoded_coefficient_bytes": sum(entry[-1] for entry in entries)}
 
 
 def spk_index(path):

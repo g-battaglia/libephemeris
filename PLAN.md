@@ -593,3 +593,34 @@ single base/leb worker reached approximately **56 MB RSS** and **34 MB physical
 footprint** after 100,000 random-date charts. It used an explicitly staged
 base core. These numbers qualify that specific setup and workload. They do not
 reproduce the original unspecified mixed-use memory workload.
+
+The paired 1900–2100 timing run covered all six mode/tier pairs with five
+repeats of 300 charts each. Base/leb random-chart medians were 876 µs for
+the published wheel and 874 µs for the rebuilt wheel. Hosted timings are
+intentionally advisory. The data-v4 body indexes report 44,544,768 bytes
+(42.5 MiB) of decoded coefficients in the base core and 163,322,016 bytes
+(155.8 MiB) in the medium core, before metadata, other tables, scratch
+space or any per-process duplication.
+
+Validation on macOS arm64:
+
+- The 10,000-call comparison passed. Eight comparator regression tests passed.
+- The Rust release suite passed with `bundled-data,nbody,python-internals`
+  after provisioning the SHA-256-pinned data-v3 input through
+  `LIBEPHEMERIS_TEST_DATA_V3_LEB2`. It includes 3,238 passing library tests
+  plus integration and documentation tests. The installed-wheel Python
+  suite passed 1,482 tests.
+- The external scientific checkout's selected historical calendar lane
+  passed 30 tests. The full external qualification campaign remains open.
+- Kerykeion offline passed 13,436 tests, kerykeion-parity's source suite
+  passed 51, and the Astrologer Studio backend passed 2,139. The Astrologer
+  API suite had missing qualification fixtures for its dependency pair and
+  three tracing failures in the full suite. The same focused tracing suite
+  passed with both wheels, and both wheels lacked the qualification fixtures.
+- The extended macOS corpus found a coverage discrepancy on planet-centric
+  calls in `auto/medium`. For example, at TT JD 2642370.864629844
+  (`0x414428e16eac30d4`), `calc_pctr(jd, 5, 14, 130082)` returned flags
+  114274 with a position on the published wheel and raised
+  `EphemerisRangeError` in the rebuilt wheel during the run. Both return
+  identical results when that call is run alone. Keep this qualification
+  open and preserve the sequence captures for reproduction.

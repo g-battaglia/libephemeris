@@ -111,7 +111,7 @@ def worker(path, *, probe=False):
     import_ns = time.perf_counter_ns() - start
     jds, workload = spec["dates"], spec["workload"]
     warnings.simplefilter("ignore")  # Timing excludes warning display.
-    if workload == "memory":
+    if workload == "memory" and not probe:
         checkpoint("after_import")
     configure(eph, spec["mode"], spec["tier"])
     chart, other, planets = operations(spec, eph)
