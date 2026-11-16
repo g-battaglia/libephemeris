@@ -1393,9 +1393,26 @@ pathname and a fresh cache. Other inputs keep the ordinary acquisition
 path, including explicit files and indexed readers. This could reduce
 physical memory across processes without relaxing the immutable snapshot
 contract. The 245 bundled LEB tests passed, including an exact match,
-same-size replacement and explicit-file control. The local bit gate,
-startup and process memory pairs are queued under
-`target/bench/leb-static-base-snapshot/`.
+same-size replacement and explicit-file control. The macOS smoke gate
+matched 10,000 calls. After 100,000 charts per process, the paired
+measurements gave the following steady sums in decimal MB.
+
+| Processes | RSS, reference → snapshot | Sampled footprint, reference → snapshot |
+| ---: | ---: | ---: |
+| 1 | 57.6 → 57.7 | 38.0 → 24.9 |
+| 2 | 113.2 → 115.2 | 70.6 → 59.6 |
+| 4 | 230.5 → 231.1 | 139.1 → 102.7 |
+| 8 | 459.3 → 459.3 | 276.0 → 206.8 |
+
+At eight workers the sampled footprint after the first chart was
+308.0 → 225.5 MB. Summed RSS includes the executable's resident pages
+in each process. The [Linux follow-up](https://github.com/g-battaglia/libephemeris/actions/runs/43924104899)
+checks proportional attribution on both architectures.
+Mac random-chart medians were 541.7 → 576.6 µs and consecutive medians
+were 106.8 → 111.4 µs across five independent repeats. The median first
+call moved from 1.49 to 1.92 ms on first use and from 1.45 to 1.95 ms
+with warm pages. Keep the latency trade-off visible during qualification.
+Raw results are under `target/bench/leb-static-base-snapshot/`.
 
 ## 15. Step 1a experiment
 
