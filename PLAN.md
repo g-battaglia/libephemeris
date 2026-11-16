@@ -533,7 +533,10 @@ The phase 1 comparisons give these results:
   Python/native comparison does not currently justify a batch API for speed.
 - With eight Linux x86-64 workers, medium Auto PSS fell from 4.76 to
   3.16 GB in the default storage pair and to 1.55 GB in a separate pair
-  with positional centers. Default LEB RAM work remains open.
+  with positional centers. Default LEB reduces memory for the bundled
+  base tier; the authenticated macOS medium path is in the draft.
+  The [latest wheel matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43949734696)
+  includes the Linux default-medium comparison.
 - In the paired macOS runs, the SPK lookup change reduced Skyfield chart
   latency by about 40%. Numerical qualification for the additional change
   continues in the full matrix.
@@ -545,7 +548,9 @@ The phase 1 comparisons give these results:
 Apply these checks to the relevant changes in the consolidated draft.
 Section 14 and the step reports record completed runs and open requirements.
 
-- [ ] Harness results before and after, same machine and data.
+- [x] Harness results before and after, same machine and data. Rechecked
+      60 timing pairs and the 24 macOS baseline memory pairs for matched
+      data, dates, flags, settings, and workload size.
 - [ ] Bit-identity gate: zero differing words, all modes, each platform.
 - [ ] `cargo test`, `pytest python/tests`, golden harness green.
 - [ ] Downstream consumer suites green and untouched.
@@ -1646,9 +1651,33 @@ prototype directly with PyPI 4.0.0 measured random and consecutive
 medians of 602.9 → 633.1 and 114.9 → 120.0 µs over full coverage.
 The same wheel's scratch fallback measured 600.7 and 114.5 µs.
 Warm-page first-call medians were 3.79 ms for PyPI and 3.76 →
-20.07 ms in the fallback/snapshot comparison. The final commit's
-full corrected-reference corpus and 100,000-chart memory comparison
-are in progress.
+20.07 ms in the fallback/snapshot comparison.
+
+The exact macOS wheel at `17c32b93` matched all 2,100,000 calls
+against `d86cea0f` in the full corrected-reference corpus. Each
+mode/tier pair had 350,000 calls and the six warning-emitting calls
+matched. The capture headers and trailers were verified along with
+the comparison report. The [three-platform PR smoke](https://github.com/g-battaglia/libephemeris/actions/runs/43949666788)
+also matched 10,000 calls and the warning against the published wheel
+on Windows and both Linux architectures. The PR merge commit and the
+branch head for that run had identical Git trees. The PR smoke skips
+the installed-wheel pytest suites; the full manual matrix runs them.
+
+The final macOS wheel repeated the same-wheel fallback/snapshot RAM
+comparison on full coverage at 100,000 charts per worker.
+
+| Processes | Steady RSS, fallback → automatic | Sampled footprint, fallback → automatic |
+| ---: | ---: | ---: |
+| 1 | 84.9 → 47.8 MB | 65.4 → 24.9 MB |
+| 2 | 170.0 → 92.6 MB | 131.2 → 51.2 MB |
+| 4 | 335.7 → 191.7 MB | 260.4 → 97.6 MB |
+| 8 | 670.4 → 375.9 MB | 530.4 → 194.2 MB |
+
+At eight workers, the sum of individual peak footprints moved from
+544.9 to 250.0 MB. Random median/p95 moved from 597.0/626.8 to
+626.2/657.2 µs and consecutive median/p95 from 114.4/119.2 to
+119.2/124.2 µs. Warm-page first-call median was 3.66 → 16.19 ms.
+The direct published-wheel memory pair is running.
 
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the
