@@ -1,7 +1,7 @@
 """Capture and compare installed Python APIs with exact binary64 encoding."""
 
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import gzip
 import itertools
@@ -17,7 +17,7 @@ import tempfile
 import warnings
 
 from common import (
-    J2000, KERNELS, MODES, SCHEMA, SEED, SITE, TIERS,
+    J2000, KERNELS, MODES, SATELLITE_KERNEL, SCHEMA, SEED, SITE, TIERS,
     PrerequisiteError, configure, dump, environment, identity, prepare,
 )
 
@@ -27,8 +27,27 @@ FLAGS = (
     8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2228280,
 )
 # Orthodox planets, nodes, apsides, Earth, major asteroids, fictitious,
-# numbered asteroid, planetary moon, ecliptic/nutation and invalid ID.
+# numbered asteroid, unknown satellite ID, ecliptic/nutation and invalid ID.
 BODIES = (*range(23), 40, 55, 10001, 100433, 9599, -1, -9999)
+# Public satellite IDs and their DAF targets. 9051 is Charon's alias.
+SATELLITE_TARGETS = {9051: 901, 9901: 901, 9902: 902, 9903: 903}
+BODY_CLASSES = {
+    body: name
+    for name, bodies in (
+        ("luminary", (0, 1)),
+        ("planet_or_earth", (*range(2, 10), 14)),
+        ("lunar_node", (10, 11)),
+        ("lunar_apsis", (12, 13, 21, 22)),
+        ("named_minor_body", range(15, 21)),
+        ("fictitious_body", (40, 55)),
+        ("numbered_asteroid", (10001, 100433)),
+        ("unresolved_planetary_moon_id", (9599,)),
+        ("planetary_moon", SATELLITE_TARGETS),
+        ("ecliptic_nutation", (-1,)),
+        ("invalid_sentinel", (-9999,)),
+    )
+    for body in bodies
+}
 POSITION = ("calc", "calc_ut", "calc_pctr", "context.calc", "context.calc_ut", "context.calc_pctr")
 SITE_ARGS = [SITE[0], SITE[1], SITE[2]]
 SPEED = 258
@@ -40,6 +59,7 @@ PROFILES = {
     "full": (MODES, TIERS, FULL_PER_CONFIG),
     "auto-edge": (("auto",), TIERS, AUTO_EDGE_COUNT),
     "auto-centers": (("auto",), TIERS, SMOKE_COUNT),
+    "satellites": (("skyfield",), ("medium",), 320),
 }
 
 
@@ -57,6 +77,19 @@ def encode(value):
 
 def position(api, jd, body, flags):
     return api, (jd, body, 14, flags) if "pctr" in api else (jd, body, flags)
+
+
+def satellite_requests(inventory):
+    segments = inventory[SATELLITE_KERNEL]["coverage"]["segments_tdb"]
+    spans = {target: (left, right) for target, _, left, right in segments}
+    for body, target in SATELLITE_TARGETS.items():
+        lower, upper = spans[target]
+        epochs = (J2000, math.nextafter(lower, -math.inf), lower,
+                  upper, math.nextafter(upper, math.inf))
+        for api in ("calc", "calc_ut", "calc_pctr", "calc_moon_position"):
+            for jd in epochs:
+                for flags in (2, SPEED, 16402, 4354):
+                    yield position(api, jd, body, flags)
 
 
 def requests(mode, tier, inventory, count, seed):
@@ -200,18 +233,30 @@ def capture(options):
         print(dump({"schema": SCHEMA, "spec": spec["public"], "build": build}), file=out)
         total = 0
         coverage = Counter()
+        inventory = spec["public"]["data"]
+        data = os.environ["LIBEPHEMERIS_DATA_DIR"]
         for mode, tier in spec["matrix"]:
             print(f"{options.role} {mode}/{tier}: starting {spec['count']:,} calls",
                   file=sys.stderr, flush=True)
             configure(eph, mode, tier)
-            ctx = eph.EphemerisContext(os.environ["LIBEPHEMERIS_DATA_DIR"], KERNELS[tier])
-            ctx.set_topo(*SITE)
-            context_apis = {api: getattr(ctx, api.removeprefix("context.")) for api in POSITION
-                            if api.startswith("context.")}
-            if spec["public"]["profile"] == "auto-centers":
-                cases = auto_center_requests(spec["count"], spec["seed"])
+            if spec["public"]["profile"] == "satellites":
+                eph.set_ephe_path(data)
+                eph.set_ephemeris_file(KERNELS[tier])
+                eph.register_moon_spk(str(Path(data) / SATELLITE_KERNEL))
+                for body in SATELLITE_TARGETS:
+                    if eph.calc_moon_position(J2000, body, SPEED) is None:
+                        raise PrerequisiteError(f"satellite test cannot calculate body {body} at J2000")
+                context_apis = {}
+                cases = satellite_requests(inventory)
             else:
-                cases = requests(mode, tier, spec["public"]["data"], spec["count"], spec["seed"])
+                ctx = eph.EphemerisContext(data, KERNELS[tier])
+                ctx.set_topo(*SITE)
+                context_apis = {api: getattr(ctx, api.removeprefix("context.")) for api in POSITION
+                                if api.startswith("context.")}
+                if spec["public"]["profile"] == "auto-centers":
+                    cases = auto_center_requests(spec["count"], spec["seed"])
+                else:
+                    cases = requests(mode, tier, inventory, spec["count"], spec["seed"])
             for index, (api, args) in enumerate(itertools.islice(cases, spec["count"])):
                 fn = context_apis[api] if api.startswith("context.") else getattr(eph, api)
                 result = outcome(fn, args)
@@ -253,6 +298,7 @@ def compare(left, right):
         coverage = Counter()
         successes = Counter()
         error_types = Counter()
+        positions = defaultdict(lambda: (set(), set(), set()))
         for i in range(expected):
             row_a, row_b = json.loads(next(a)), json.loads(next(b))
             if not isinstance(row_a, list) or not isinstance(row_b, list):
@@ -261,9 +307,20 @@ def compare(left, right):
                 raise ValueError(f"request identity mismatch: {row_a[:5]} versus {row_b[:5]}")
             if row_a[:3] != [*matrix[i // per_config], i % per_config]:
                 raise ValueError("capture does not cover the declared matrix in order")
-            mode, tier, _, api, _, result = row_a
+            mode, tier, _, api, encoded_args, result = row_a
             key = f"{mode}/{tier}/{api}"
             coverage[key] += 1
+            if api in POSITION or api == "calc_moon_position":
+                args = encoded_args.get("tuple", []) if isinstance(encoded_args, dict) else []
+                expected_arity = 4 if "pctr" in api else 3
+                if not isinstance(args, list) or len(args) != expected_arity or any(
+                    type(value) is not int for value in args[1:]
+                ):
+                    raise ValueError(f"invalid position arguments at {key}, request {row_a[2]}")
+                bodies, centers, flags = positions[key]
+                bodies.add(args[1])
+                centers.update(args[2:-1])
+                flags.add(args[-1])
             if "value" in result:
                 successes[key] += 1
             else:
@@ -275,10 +332,18 @@ def compare(left, right):
         trailer = {"count": expected, "coverage": dict(coverage)}
         if json.loads(next(a)) != trailer or json.loads(next(b)) != trailer or a.read(1) or b.read(1):
             raise ValueError("invalid capture trailer or unexpected records")
+        position_inventory = {}
+        for key, (bodies, centers, flags) in positions.items():
+            body_ids_by_class = defaultdict(list)
+            for body in sorted(bodies):
+                body_ids_by_class[BODY_CLASSES.get(body, "other_id")].append(body)
+            position_inventory[key] = {"body_ids_by_class": dict(body_ids_by_class),
+                                       "center_ids": sorted(centers), "requested_flags": sorted(flags)}
         return {"schema": SCHEMA, "status": "different" if differences else "identical",
                 "count": expected, "differences": differences, "first_differences": first,
                 "coverage": dict(coverage), "baseline_successes": dict(successes),
                 "baseline_error_types": dict(error_types),
+                "position_inventory": position_inventory,
                 "baseline": header_a["build"], "candidate": header_b["build"]}
 
 
@@ -290,7 +355,9 @@ def run(options):
     matrix = list(itertools.product(modes, tiers))
     with tempfile.TemporaryDirectory(prefix="ephemeris-bitdiff-") as tmp:
         data = Path(tmp) / "data"
-        inventory = prepare(options.data, data, modes, tiers, companions=options.profile in ("full", "auto-edge"))
+        inventory = prepare(options.data, data, modes, tiers,
+                            companions=options.profile in ("full", "auto-edge"),
+                            satellites=options.profile == "satellites")
         spec_path = Path(tmp) / "spec.json"
         spec_path.write_text(dump({
             "matrix": matrix, "count": count, "seed": SEED,
