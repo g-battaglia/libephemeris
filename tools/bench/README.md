@@ -85,11 +85,12 @@ the input staging reads are the only preparation. Both conditions start
 with empty process-local decoder and coefficient caches. A previously
 decoded persistent store is outside these configurations. On Linux,
 `page_cache_cold` syncs and evicts the private staged inputs before each
-timed process. It requires `fincore` to observe zero resident bytes
-immediately before spawn and records that observation in each sample.
+timed process. It calls `mincore` on private file mappings and requires
+zero resident bytes immediately before spawn. Each sample records that
+observation.
 Other hosts report this condition as an unmet prerequisite. [Linux file
 cache advice](https://man7.org/linux/man-pages/man2/posix_fadvise.2.html)
-and [residency probe](https://man7.org/linux/man-pages/man1/fincore.1.html).
+and [residency probe](https://man7.org/linux/man-pages/man2/mincore.2.html).
 
 Linux uses `/proc/PID/status` and `smaps_rollup`. Sum of PSS apportions shared
 pages and is the available estimate of the group's attributable resident

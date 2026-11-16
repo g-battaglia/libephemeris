@@ -719,6 +719,16 @@ distances and radial rates agreed. This compares the fix with the
 unstable release. The fixed wheel's own repeat is tracked separately.
 The raw captures are in `target/bench/windows-fixed-edge-43878253315/`.
 
+The [Rust 1.99.1 repeat](https://github.com/g-battaglia/libephemeris/actions/runs/43879212102)
+found 562 changes in the published control, all between values and
+range errors. The fixed build produced values for 1,543 old range errors
+plus the same 12 angular output differences. The two corrected
+captures, built with Rust 1.99.1 and 1.100.0, matched bit for bit on all
+60,000 requests. Request sequences and pinned input hashes were checked
+before replay. These runs had different CPU fingerprints. The complete,
+same-runner corrected comparison remains separate. The second capture
+is archived locally in `target/bench/windows-fixed-edge-43879212102/`.
+
 The unchanged rebuild's first 1,400,000 requests also exhibited 544
 differences, all in `auto`. Counts were 534 typed range-error differences
 and ten value differences. That run reached Skyfield medium before the
@@ -803,6 +813,12 @@ ARM64 and 472.9/473.1 MB on x86-64. Summed RSS was 614.0/615.5 and
 649.4/649.2 MB respectively. The wheel artifacts contain all four
 checkpoints at 1/2/4/8 processes.
 
+The [Linux base/Auto baseline case](https://github.com/g-battaglia/libephemeris/actions/runs/43886529057)
+also completed with both wheels and matching inputs. At eight processes,
+published/rebuilt summed PSS was 1002.2/1002.2 MB on ARM64 and
+1004.5/1004.7 MB on x86-64. Summed RSS was 1144.2/1146.4 and
+1179.9/1180.3 MB respectively.
+
 The macOS paired baseline has completed all LEB checkpoints at 1/2/4/8
 processes, with 100,000 random charts per process and the companion files
 for the selected tier. At eight processes, published/rebuilt summed RSS
@@ -857,9 +873,13 @@ The fresh-process startup report now includes import, first-call and first-
 chart medians and p95s. The warm-page condition explicitly primes the staged
 inputs. First use has only the staging reads. Both controls passed a
 five-repeat base/leb run on macOS, where the cold-page condition reports a
-missing prerequisite. On Linux the driver evicts only the staged files
-and verifies zero resident bytes with `fincore` before each cold sample.
-Three tool cases refuse a nonzero count or incomplete probe output.
+missing prerequisite. The [first Linux startup run](https://github.com/g-battaglia/libephemeris/actions/runs/43887347685)
+completed first-use and warm-page measurements on the published x86-64
+wheel. The runner lacked `fincore`. The revised driver evicts only the
+private staged inputs and verifies zero resident pages directly through
+`mincore`. Tests cover nonzero residency, the final partial page and the
+per-page presence bit. A failed cold prerequisite retains an explicit
+report and the driver continues the other startup measurements.
 
 The remaining baseline PSS and anonymous/file splits run as separate
 Linux cases for [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),

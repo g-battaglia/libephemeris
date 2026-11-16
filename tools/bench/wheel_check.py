@@ -99,6 +99,7 @@ def main():
             comparison = max(comparison, control)
         if comparison or not (options.linux_memory or options.linux_startup):
             return comparison
+        diagnostics = 0
         for role, interpreter, wheel, commit in (
             ("baseline", baseline, baseline_wheel, "python-v4.0.0"),
             ("candidate", candidate, candidate_wheel, candidate_commit),
@@ -114,11 +115,12 @@ def main():
                                cwd=root, check=True)
             if options.linux_startup:
                 for condition in ("first_use", "page_cache_warm", "page_cache_cold"):
-                    subprocess.run([
+                    startup = subprocess.run([
                         *benchmark, "--workload", "cold_start", "--cold-condition", condition,
                         "--output", str(options.output.resolve() / f"{role}-{condition}.json"),
-                    ], cwd=root, check=True)
-        return 0
+                    ], cwd=root)
+                    diagnostics = max(diagnostics, abs(startup.returncode))
+        return diagnostics
 
 
 if __name__ == "__main__":

@@ -1,19 +1,21 @@
 """The performance gate must reject changes and incomplete captures."""
 
 import copy
+import ctypes
 import gzip
 import json
+import mmap
 import os
 from pathlib import Path
 import shutil
 import struct
-import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bench"))
-from benchmark import verify_cold_os_pages  # noqa: E402
+from benchmark import linux_resident_bytes, verify_cold_os_pages  # noqa: E402
 from bitdiff import compare, encode, outcome  # noqa: E402
 from common import ROOT, PrerequisiteError, digest, prepare, rust_source_revisions  # noqa: E402
 
@@ -104,13 +106,31 @@ def test_rust_source_paths_across_binary_read_boundary(tmp_path):
     assert rust_source_revisions(binary) == [revision.decode("ascii")]
 
 
-@pytest.mark.parametrize("reported", ["4096\n", "", "0\n0\n"])
-def test_cold_start_refuses_unverified_input_residency(tmp_path, monkeypatch, reported):
+def test_cold_start_refuses_resident_input_pages(tmp_path, monkeypatch):
     (tmp_path / "input").write_bytes(b"sample")
     monkeypatch.setattr(os, "posix_fadvise", lambda *_: None, raising=False)
     monkeypatch.setattr(os, "POSIX_FADV_DONTNEED", 4, raising=False)
-    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: subprocess.CompletedProcess(
-        "fincore", 0, stdout=reported,
-    ))
-    with pytest.raises(PrerequisiteError, match="fincore"):
+
+    def mincore(_address, _length, residency):
+        residency[0] = 1
+        return 0
+
+    monkeypatch.setattr(ctypes, "CDLL", lambda *_args, **_kwargs: SimpleNamespace(mincore=mincore))
+    with pytest.raises(PrerequisiteError, match="resident bytes after eviction"):
         verify_cold_os_pages(tmp_path, ["input"])
+
+
+def test_linux_residency_counts_only_low_bits_and_partial_final_page(tmp_path):
+    length = mmap.PAGESIZE + 1
+    path = tmp_path / "input"
+    path.write_bytes(b"\x00" * length)
+
+    def mincore(address, observed_length, residency):
+        assert address % mmap.PAGESIZE == 0
+        assert observed_length == length
+        assert len(residency) == 2
+        residency[:] = (254, 1)
+        return 0
+
+    with path.open("rb") as stream:
+        assert linux_resident_bytes(stream.fileno(), mincore) == mmap.PAGESIZE
