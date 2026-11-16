@@ -752,7 +752,26 @@ The sealed external planet-center and planet-centric selections ran in
 matching import failures in the legacy planet-map introspection tests.
 The full scientific campaign remains open.
 
-Full-size process, thread and cold-start measurements are still open. The
-next storage experiment is positional I/O for managed data under the immutable-data
-contract. The public owned-image path supplies callers with a stable byte
-slice for the life of the kernel.
+### 100,000-chart memory comparison
+
+Mac arm64, medium tier, one process, random dates in 1900–2100 with seed
+20261116 and legacy LEB coefficient retention. The published 4.0.0 wheel and
+the combined SPK wheel at `e76dd9f7` used the same pinned files and requests.
+Values are decimal MB with one run per configuration.
+
+| Mode | RSS after first call | RSS after 100,000 charts | Peak RSS | Physical footprint after 100,000 charts |
+| --- | ---: | ---: | ---: | ---: |
+| leb | 79.2 → 79.5 | 84.0 → 84.2 | 84.0 → 84.2 | 66.8 → 64.9 |
+| auto | 543.3 → 279.7 | 485.2 → 284.7 | 685.4 → 284.7 | 466.2 → 269.4 |
+| skyfield | 802.1 → 362.1 | 1,002.0 → 362.9 | 1,002.0 → 362.9 | 987.3 → 347.8 |
+
+In a separate same-wheel comparison, the existing indexed LEB reader lowered
+base RSS from 57.0 to 51.5 MB and medium RSS from 94.3 to 52.4 MB after
+100,000 charts. Physical footprint moved from 35.5 to 24.4 MB and from 74.6
+to 26.4 MB respectively. The raw reports and vmmap captures are under
+`target/bench/spk-records-qualification/`. The indexed reader's latency
+and the process and thread matrix are still open before selecting a default.
+
+The next storage experiment is positional I/O for managed data under the
+immutable-data contract. The public owned-image path supplies callers with
+a stable byte slice for the life of the kernel.
