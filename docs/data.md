@@ -119,6 +119,15 @@ preserves the discovered path and gives each admitted image a fresh
 coefficient cache. Explicit paths and indexed readers use their
 configured acquisition policy.
 
+On macOS, automatic discovery in LEB mode can hold the pinned medium core
+as a private APFS clone. The runtime removes the clone's pathname,
+verifies its digest through the retained descriptor, and keeps the
+descriptor for reads. If the clone cannot be
+created and verified, discovery retains the ordinary owned image.
+Explicit paths and configured process caches keep their established
+acquisition path. A Rust caller borrowing the complete image materializes
+the verified contiguous bytes on demand.
+
 `owned` retains a complete immutable snapshot. `indexed` keeps a read-only file
 descriptor, indexes and bounded decoded chunks:
 

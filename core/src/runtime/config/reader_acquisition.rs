@@ -278,10 +278,26 @@ impl Runtime {
                 if let Some((_, image)) = state.reader.iter().find(|(loaded, _)| loaded == &path) {
                     image.clone()
                 } else {
-                    let image = match context.open_leb_file(&path).map(|image| match &pool {
-                        Some(pool) => image.with_process_cache(pool.clone()),
-                        None => image,
-                    }) {
+                    let acquired = (|| {
+                        #[cfg(target_os = "macos")]
+                        if pool.is_none()
+                            && matches!(policy, crate::leb::LebReadPolicy::Owned)
+                            && context.leb_file().is_none()
+                            && context.mode() == ProviderMode::SealedLeb
+                            && context.tier() == crate::context::Tier::Medium
+                            && path.file_name().and_then(|name| name.to_str())
+                                == Some("medium_core.leb2")
+                            && let Some(image) = LebFile::try_private_apfs_snapshot(&path)
+                        {
+                            return Ok(image);
+                        }
+                        let image = context.open_leb_file(&path)?;
+                        Ok(match &pool {
+                            Some(pool) => image.with_process_cache(pool.clone()),
+                            None => image,
+                        })
+                    })();
+                    let image = match acquired {
                         Ok(image) => image,
                         Err(error)
                             if guarded

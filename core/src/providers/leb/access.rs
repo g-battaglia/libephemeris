@@ -100,8 +100,7 @@ pub(crate) struct PositionalFile {
 
 impl PositionalFile {
     pub(super) fn open(path: &Path, resources: Arc<IndexedResources>) -> Result<Self> {
-        let limits = resources.limits;
-        LebReadPolicy::Indexed(limits).validate()?;
+        LebReadPolicy::Indexed(resources.limits).validate()?;
         let file = super::open_regular_file(path).map_err(|error| {
             if error.kind() == io::ErrorKind::NotFound {
                 Error::LebFileNotFound {
@@ -111,6 +110,15 @@ impl PositionalFile {
                 io_error(path.to_string_lossy().as_ref(), error)
             }
         })?;
+        Self::from_file(path, file, resources)
+    }
+
+    pub(super) fn from_file(
+        path: &Path,
+        file: File,
+        resources: Arc<IndexedResources>,
+    ) -> Result<Self> {
+        let limits = resources.limits;
         let identity = file
             .metadata()
             .map_err(|error| io_error(&path.display().to_string(), error))?;
@@ -137,6 +145,19 @@ impl PositionalFile {
 
     pub(super) fn len(&self) -> usize {
         self.identity.len() as usize
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(super) fn materialize_medium_snapshot(&self) -> Result<Vec<u8>> {
+        use sha2::{Digest, Sha256};
+        let mut bytes = vec![0; self.len()];
+        self.read_exact(0, &mut bytes)?;
+        if crate::download::hex_of(&Sha256::digest(&bytes))
+            != super::storage::medium_snapshot_digest()
+        {
+            return Err(corrupt("medium snapshot digest changed", 0));
+        }
+        Ok(bytes)
     }
 
     /// Identity of the descriptor admitted by the indexed reader. Offline

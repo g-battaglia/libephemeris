@@ -1595,7 +1595,16 @@ At eight processes, summed RSS was 618.6 → 321.6 MB and sampled
 footprint was 493.1 → 195.7 MB. Random-chart median/p95 were
 590.4/619.4 → 619.5/651.5 µs and consecutive median/p95 were
 114.3/119.1 → 119.9/124.8 µs. The warm-page first-call median was
-3.70 → 16.10 ms. The 100,000-chart and 350,000-call runs are in progress.
+3.70 → 16.10 ms. It also matched 350,000 calls against the combined
+runtime with the same warning. Over 100,000 charts per worker on full
+coverage, the steady eight-process RSS was 672.8 → 379.8 MB and
+sampled footprint was 523.2 → 197.1 MB. At one, two and four workers
+the footprint was 65.3 → 24.9, 131.0 → 49.2 and 261.9 → 100.3 MB.
+The sum of individual eight-process peak footprints was 547.0 →
+253.7 MB. Full-coverage random median/p95 changed from
+608.3/685.9 to 637.2/708.0 µs and consecutive median/p95 from
+114.6/120.2 to 119.8/125.3 µs. Warm-page first-call median was
+3.83 → 16.32 ms.
 
 Qualification found that an explicit 32 MiB process cache could
 panic while attaching the positional snapshot's shared cache.
@@ -1603,8 +1612,20 @@ The revised local runtime (`a4ca7bd4`) only attempts the snapshot
 through automatic discovery with the legacy cache. Direct opens and
 explicit process-cache settings follow their previous acquisition path.
 The explicit 32 MiB probe and 10,000-call comparison against the
-combined runtime passed, including the warning. The corrected route's
-default-configuration comparison is in progress.
+combined runtime passed, including the warning. The corrected route
+matched all 350,000 default-configuration calls. At first call, the
+resident malloc regions in the automatic acquisition probe measured
+8.2 MB versus 45.5 MB with a forced scratch fallback.
+
+The macOS qualification candidate retains the 1 MiB policy and
+preserves the ordinary reader diagnostics. A verified clone is admitted
+only for the pinned medium core discovered in LEB mode. A failed scratch
+or verification attempt leaves acquisition and errors to the ordinary
+reader. A contiguous byte borrow verifies and materializes the image
+on demand. The reduced steady and peak footprint is the reason to
+qualify it for the default despite the measured first-use and chart
+latency cost. Default medium memory on the other platforms remains
+open.
 
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the

@@ -12,6 +12,11 @@ pub(super) enum ImageStorage {
     /// Shared immutable snapshot retained across strict and Source admission.
     SharedOwned(std::sync::Arc<Vec<u8>>),
     Positional(Box<super::access::PositionalFile>),
+    #[cfg(target_os = "macos")]
+    PrivateSnapshot {
+        file: Box<super::access::PositionalFile>,
+        bytes: std::sync::OnceLock<Vec<u8>>,
+    },
     Mapped {
         map: memmap2::Mmap,
         file: File,
@@ -36,6 +41,97 @@ pub(crate) fn open_regular_file(path: &Path) -> std::io::Result<File> {
         ));
     }
     Ok(file)
+}
+
+#[cfg(target_os = "macos")]
+pub(super) fn medium_snapshot_digest() -> &'static str {
+    crate::download::asset_by_name("medium_core.leb2")
+        .expect("pinned medium core")
+        .sha256()
+}
+
+/// Obtain the snapshot's read-only descriptor and remove its only link.
+#[cfg(target_os = "macos")]
+pub(super) fn open_private_apfs_snapshot(source: &Path) -> std::io::Result<File> {
+    use rustix::fs::{AtFlags, Mode, OFlags, open, openat, unlinkat};
+    use std::ffi::{CString, OsString, c_char, c_int};
+    use std::os::fd::AsRawFd;
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    use std::path::PathBuf;
+    use std::{fs, io};
+
+    const MEDIUM_CORE_BYTES: u64 = 37_267_685;
+    unsafe extern "C" {
+        fn mkdtemp(template: *mut c_char) -> *mut c_char;
+        fn fclonefileat(src: c_int, dst_dir: c_int, name: *const c_char, flags: c_int) -> c_int;
+    }
+    let source = open_regular_file(source)?;
+    if source.metadata()?.len() != MEDIUM_CORE_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "size differs from pinned medium core",
+        ));
+    }
+    let scratch = std::env::temp_dir().join("libephemeris-snapshot.XXXXXX");
+    let mut template = CString::new(scratch.as_os_str().as_bytes())?.into_bytes_with_nul();
+    // SAFETY: the writable buffer is NUL-terminated and ends in six Xs.
+    // mkdtemp atomically reserves the selected name with mode 0700.
+    if unsafe { mkdtemp(template.as_mut_ptr().cast()) }.is_null() {
+        return Err(io::Error::last_os_error());
+    }
+    template.pop();
+    let work = PathBuf::from(OsString::from_vec(template));
+    let result: io::Result<File> = (|| {
+        let read_flags = OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+        let directory = open(&work, read_flags | OFlags::DIRECTORY, Mode::empty())?;
+        // SAFETY: both descriptors are live. The constant NUL-terminated
+        // name resolves inside the newly created directory.
+        let rc = unsafe {
+            fclonefileat(
+                source.as_raw_fd(),
+                directory.as_raw_fd(),
+                c"image".as_ptr(),
+                0,
+            )
+        };
+        if rc != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let clone = (|| {
+            let file = File::from(openat(
+                &directory,
+                c"image",
+                read_flags | OFlags::NONBLOCK,
+                Mode::empty(),
+            )?);
+            let metadata = file.metadata()?;
+            if !metadata.is_file() || metadata.len() != MEDIUM_CORE_BYTES {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid LEB snapshot",
+                ));
+            }
+            file.set_permissions(fs::Permissions::from_mode(0o400))?;
+            unlinkat(&directory, c"image", AtFlags::empty())?;
+            if file.metadata()?.nlink() != 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "LEB snapshot still linked",
+                ));
+            }
+            Ok(file)
+        })();
+        if clone.is_err() {
+            let _ = unlinkat(&directory, c"image", AtFlags::empty());
+        }
+        clone
+    })();
+    let cleanup = fs::remove_dir(&work);
+    if result.is_ok() {
+        cleanup?;
+    }
+    result
 }
 
 impl ImageStorage {
@@ -90,10 +186,27 @@ impl ImageStorage {
             Self::SharedOwned(bytes) => super::LebSource::Slice(bytes),
             Self::Mapped { map, .. } => super::LebSource::Slice(map),
             Self::Positional(file) => super::LebSource::Positional(file),
+            #[cfg(target_os = "macos")]
+            Self::PrivateSnapshot { file, .. } => super::LebSource::Positional(file),
         }
     }
 
     pub(super) fn bytes(&self) -> Result<&[u8]> {
+        #[cfg(target_os = "macos")]
+        if let Self::PrivateSnapshot { file, bytes } = self {
+            if let Some(materialized) = bytes.get() {
+                return Ok(materialized);
+            }
+            let _guard = file
+                .digest_gate
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            if bytes.get().is_none() {
+                let verified = file.materialize_medium_snapshot()?;
+                let _ = bytes.set(verified);
+            }
+            return Ok(bytes.get().expect("verified private snapshot bytes"));
+        }
         match self.source() {
             super::LebSource::Slice(bytes) => Ok(bytes),
             super::LebSource::Positional(_) => Err(Error::LebBytesUnavailable),
@@ -104,11 +217,15 @@ impl ImageStorage {
             Self::Owned(bytes) => bytes.capacity(),
             Self::SharedOwned(bytes) => bytes.capacity(),
             Self::Mapped { .. } | Self::Static(_) | Self::Positional(_) => 0,
+            #[cfg(target_os = "macos")]
+            Self::PrivateSnapshot { bytes, .. } => bytes.get().map_or(0, Vec::capacity),
         }
     }
     pub(super) fn mapped_len(&self) -> usize {
         match self {
             Self::Owned(_) | Self::SharedOwned(_) | Self::Static(_) | Self::Positional(_) => 0,
+            #[cfg(target_os = "macos")]
+            Self::PrivateSnapshot { .. } => 0,
             Self::Mapped { map, .. } => map.len(),
         }
     }
@@ -120,6 +237,8 @@ impl ImageStorage {
             Self::Static(bytes) => super::prefault(bytes, ranges),
             Self::SharedOwned(bytes) => super::prefault(bytes, ranges),
             Self::Positional(_) => {}
+            #[cfg(target_os = "macos")]
+            Self::PrivateSnapshot { .. } => {}
             Self::Mapped { map, .. } => {
                 #[cfg(unix)]
                 for &(offset, size) in ranges {
@@ -140,6 +259,10 @@ impl ImageStorage {
     /// Not guaranteed to release every page, especially with other active readers.
     pub(super) fn release_pages(&self) {
         if let Self::Positional(file) = self {
+            file.release_pages();
+        }
+        #[cfg(target_os = "macos")]
+        if let Self::PrivateSnapshot { file, .. } = self {
             file.release_pages();
         }
         if let Self::Mapped { map, file } = self {

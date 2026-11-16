@@ -1944,6 +1944,42 @@ impl LebFile {
         })
     }
 
+    #[cfg(target_os = "macos")]
+    pub(crate) fn try_private_apfs_snapshot(path: &std::path::Path) -> Option<Self> {
+        let descriptor = storage::open_private_apfs_snapshot(path).ok()?;
+        let limits = IndexedLimits {
+            // The digest admits one release image. Retain the ordinary
+            // owned cache policy and avoid a new shared decode limit.
+            cache_bytes: DEFAULT_CHUNK_CACHE_BYTES,
+            working_bytes: usize::MAX,
+            ..IndexedLimits::default()
+        };
+        let mut file =
+            access::PositionalFile::from_file(path, descriptor, IndexedResources::new(limits))
+                .ok()?;
+        let expected = storage::medium_snapshot_digest();
+        if !file.sha256().is_ok_and(|digest| digest == expected) {
+            return None;
+        }
+        let index = file.read_index().ok()?;
+        file.cache = Arc::new(LebChunkCache::with_contiguous_window_byte_budget(
+            DEFAULT_CHUNK_CACHE_BYTES,
+        ));
+        let cache = Arc::clone(&file.cache);
+        Some(Self {
+            path: path.to_string_lossy().into_owned(),
+            image: Some(Arc::new(LebImage {
+                bytes: storage::ImageStorage::PrivateSnapshot {
+                    file: Box::new(file),
+                    bytes: std::sync::OnceLock::new(),
+                },
+                index,
+                cache,
+                sha256: std::sync::OnceLock::from(expected.to_owned()),
+            })),
+        })
+    }
+
     /// Decode a shared immutable snapshot without copying its byte buffer.
     ///
     /// The caller may retain its `Arc` after a parse failure. Each construction
@@ -2038,7 +2074,7 @@ impl LebFile {
     /// reservations include live decoded words and worst-case cold scratch,
     /// not RSS, OS cache, allocator overhead or caller-owned result vectors.
     pub fn indexed_resource_usage(&self) -> Option<(usize, usize, usize)> {
-        let LebSource::Positional(file) = self.image.as_ref()?.bytes.source() else {
+        let storage::ImageStorage::Positional(file) = &self.image.as_ref()?.bytes else {
             return None;
         };
         Some((
@@ -2245,7 +2281,8 @@ impl LebFile {
 
     /// Borrowed contiguous image bytes, or [`Error::LebReaderClosed`]. Indexed
     /// images return [`Error::LebBytesUnavailable`], never a whole-file copy.
-    /// The borrow cannot outlive its owner; taking it does not fault every page.
+    /// A private runtime snapshot verifies and materializes its bytes on the
+    /// first explicit borrow. The borrow cannot outlive its owner.
     pub fn bytes(&self) -> Result<&[u8]> {
         self.image
             .as_ref()
@@ -2283,7 +2320,7 @@ impl LebFile {
     /// Borrow `size` bytes at absolute byte `offset` from contiguous backing.
     /// Out-of-bounds/unrepresentable ranges return [`Error::LebCorrupt`];
     /// indexed backing returns [`Error::LebBytesUnavailable`]. A closed handle
-    /// returns [`Error::LebReaderClosed`]. No image copy is made.
+    /// returns [`Error::LebReaderClosed`]. See [`Self::bytes`] for the backing.
     pub fn read_range(&self, offset: u64, size: u64) -> Result<&[u8]> {
         let bytes = self.bytes()?;
         read_blob(bytes, offset, size, "LEB partial read")
@@ -2492,6 +2529,113 @@ pub fn open_leb(path: &std::path::Path) -> Result<LebFile> {
 #[cfg(test)]
 mod digest_tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "requires a pinned medium core on the APFS scratch volume"]
+    fn private_medium_snapshot_borrows_verified_contiguous_bytes_on_demand() {
+        let path = std::env::var_os("LIBEPHEMERIS_TEST_MEDIUM_CORE").unwrap();
+        let path = std::path::Path::new(&path);
+        let image = LebFile::try_private_apfs_snapshot(path).unwrap();
+        assert_eq!(image.allocated_image_bytes(), 0);
+        assert_eq!(image.mapped_file_bytes(), 0);
+        assert!(image.indexed_resource_usage().is_none());
+        assert_eq!(image.sha256().unwrap(), storage::medium_snapshot_digest());
+        let expected = std::fs::read(path).unwrap();
+        let clone = image.clone();
+        let first = image.bytes().unwrap();
+        assert_eq!(first, expected);
+        assert_eq!(clone.bytes().unwrap().as_ptr(), first.as_ptr());
+        assert!(image.allocated_image_bytes() >= first.len());
+        assert_eq!(clone.read_range(16, 32).unwrap(), &expected[16..48]);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "requires a pinned medium core and an isolated writable scratch directory"]
+    fn private_medium_snapshot_survives_source_changes_and_refuses_a_wrong_digest() {
+        use std::fs::{self, OpenOptions};
+        use std::io::{Read, Seek, SeekFrom, Write};
+
+        let source = std::env::var_os("LIBEPHEMERIS_TEST_MEDIUM_CORE").unwrap();
+        let scratch = std::env::var_os("LIBEPHEMERIS_TEST_MEDIUM_WORKSPACE").unwrap();
+        let staged = std::path::Path::new(&scratch).join("medium_core.leb2");
+        fs::copy(&source, &staged).unwrap();
+        let snapshot = LebFile::try_private_apfs_snapshot(&staged).unwrap();
+
+        let mut staged_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&staged)
+            .unwrap();
+        let last_byte = SeekFrom::End(-1);
+        staged_file.seek(last_byte).unwrap();
+        let mut original = [0];
+        staged_file.read_exact(&mut original).unwrap();
+        staged_file.seek(last_byte).unwrap();
+        staged_file.write_all(&[original[0] ^ 1]).unwrap();
+        staged_file.sync_all().unwrap();
+        assert!(LebFile::try_private_apfs_snapshot(&staged).is_none());
+        staged_file.set_len(0).unwrap();
+
+        let owned = LebFile::open(std::path::Path::new(&source)).unwrap();
+        for jd in [2_375_000.5, 2_451_545.0, 2_675_000.5] {
+            let (positions, velocities) = snapshot.eval_body_any(4, jd).unwrap();
+            let (expected_positions, expected_velocities) = owned.eval_body_any(4, jd).unwrap();
+            assert!(
+                positions
+                    .into_iter()
+                    .chain(velocities)
+                    .map(f64::to_bits)
+                    .eq(expected_positions
+                        .into_iter()
+                        .chain(expected_velocities)
+                        .map(f64::to_bits))
+            );
+        }
+        assert_eq!(snapshot.bytes().unwrap(), owned.bytes().unwrap());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "requires a pinned medium core on the APFS scratch volume"]
+    fn private_medium_snapshot_matches_owned_words_across_threads() {
+        let path = std::env::var_os("LIBEPHEMERIS_TEST_MEDIUM_CORE").unwrap();
+        let path = std::path::Path::new(&path);
+        for workers in [1, 2, 4, 8] {
+            let snapshot = LebFile::try_private_apfs_snapshot(path).unwrap();
+            let owned = LebFile::open(path).unwrap();
+            let barrier = std::sync::Barrier::new(workers);
+            std::thread::scope(|scope| {
+                for worker in 0..workers {
+                    let (snapshot, owned, barrier) = (&snapshot, &owned, &barrier);
+                    scope.spawn(move || {
+                        barrier.wait();
+                        for sample in 0..128 {
+                            let day = (worker * 27_113 + sample * 19_691) % 390_000;
+                            let jd = 2_287_200.5 + day as f64;
+                            for body in 0..10 {
+                                let (positions, velocities) =
+                                    snapshot.eval_body_any(body, jd).unwrap();
+                                let (expected_positions, expected_velocities) =
+                                    owned.eval_body_any(body, jd).unwrap();
+                                assert!(
+                                    positions
+                                        .into_iter()
+                                        .chain(velocities)
+                                        .map(f64::to_bits)
+                                        .eq(expected_positions
+                                            .into_iter()
+                                            .chain(expected_velocities)
+                                            .map(f64::to_bits))
+                                );
+                            }
+                        }
+                    });
+                }
+            });
+        }
+    }
 
     #[test]
     fn concurrent_clones_share_one_digest_and_new_images_do_not() {
