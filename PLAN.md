@@ -1841,8 +1841,20 @@ in this single run. The first-call median was 13.4 → 34.9 ms. The
 fallback also matched when the descriptor was absent or a correctly
 sealed image of the expected length differed near the end from the
 pinned original. This is a local ARM64 prototype. Automatic discovery
-and validation on the wheel matrix remain open. Raw files are in
-`target/bench/linux-medium-lab/`.
+and validation on the wheel matrix remain open.
+
+An unprivileged repeat with 10,000 full-coverage charts per worker
+used the Python registry and native evaluator, with no separate
+owner process. All chart digests matched. Sampled cgroup charges
+(`anon + file`, MB) for 1 / 2 / 4 / 8 workers were
+143.2 / 196.7 / 303.5 / 517.3 → 143.8 / 160.6 / 194.2 / 261.4.
+At one worker, the median of per-worker batch averages was about
+601 µs for both paths. First-call timing inside the sealed worker
+rose from 6.7 to 17.1 ms. The Python registry added a separate
+22.5 ms including redundant hashing before the Rust verification.
+This supports targeting multiprocess deployments and retaining the
+ordinary path for single-process defaults until the acquisition
+cost can be reduced. Raw files are in `target/bench/linux-medium-lab/`.
 
 ## 15. Step 1a experiment
 
