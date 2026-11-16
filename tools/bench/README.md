@@ -94,6 +94,10 @@ full profile also accepts this switch. The wheel workflow dispatch input is
 and timing, pass `--mode leb --tier medium --shared-leb-medium` to
 `benchmark.py`. The memory report verifies that all measured workers hold the
 same sealed inode.
+The same dispatch checks owner exit, recreation, busy-lock fallback and bad
+sealed bytes on each Linux wheel. To rerun the lifecycle check locally, use
+the installed candidate interpreter with `tools/bench/shared_leb_check.py
+--data "$DATA_DIR" --output target/bench/shared-leb-lifecycle.json`.
 
 Use `--series-calls` to change the length of the consecutive single-body
 time series, which defaults to 100,000 calls.

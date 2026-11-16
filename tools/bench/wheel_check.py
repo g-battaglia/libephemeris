@@ -155,8 +155,17 @@ def main():
                 "--candidate-commit", baseline_commit,
             ], cwd=root).returncode
             comparison = max(comparison, control)
-        if comparison or not (options.linux_memory or options.linux_startup or options.indexed_memory):
+        if comparison:
             return comparison
+        if options.candidate_shared_leb:
+            lifecycle = subprocess.run([
+                str(candidate), str(ROOT / "tools/bench/shared_leb_check.py"), "--data", str(data),
+                "--output", str(options.output.resolve() / "shared-leb-lifecycle.json"),
+            ], cwd=root)
+            if lifecycle.returncode:
+                return lifecycle.returncode
+        if not (options.linux_memory or options.linux_startup or options.indexed_memory):
+            return 0
         diagnostics = 0
         for role, interpreter, wheel, commit in (
             ("baseline", baseline, baseline_wheel, baseline_commit),

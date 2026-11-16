@@ -1900,8 +1900,18 @@ fallback on missing or unsafe settings and a bounded busy-lock wait.
 The new `leb-medium` numerical profile matched 10,000 requests and
 one warning-emitting call against the preceding wheel. The standard
 benchmark verified the same mapped inode across 1 / 2 / 4 / 8 worker
-counts. Full hosted opt-in qualification and its memory comparison
-remain open.
+counts. The [full hosted opt-in run](https://github.com/g-battaglia/libephemeris/actions/runs/43965840168)
+includes both Linux memory comparisons. A repeatable installed-wheel
+lifecycle check uses independent processes and exercises creator exit,
+recreation after the last holder, an occupied lock and incorrect sealed
+bytes. It passed on the unprivileged ARM64 candidate and rejected the
+preceding wheel with sharing unavailable.
+
+The macOS wheel rebuilt after the Linux integration passed 1,486 Python
+tests. Rust on the same source passed 3,248 library tests plus integration
+and 24 documentation tests when configured with the pinned data-v3
+fixture. Reports are under `target/bench/macos-after-linux-sharing/` and
+`target/bench/linux-medium-lab/macos-post-integration-rust-pinned.log`.
 
 ## 15. Step 1a experiment
 
