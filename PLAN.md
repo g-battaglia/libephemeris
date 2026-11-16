@@ -674,7 +674,19 @@ measuring the two changes together before selecting a default.
 - [x] Per-process retention diagnostics and isolated benchmark sweep.
 - [x] Ten local Python checks and the Rust pool lifetime/resize test passed.
 - [x] Candidate with 64 MiB matched 10,000 published-wheel calls bit for bit.
-- [ ] Finish the 32 MiB full numerical comparison and cross-platform checks.
-- [ ] Measure 100,000-chart process memory and 1/2/4/8 thread throughput.
+- [x] The macOS 32 MiB full comparison passed 2,100,000 calls with zero differences.
+- [ ] Finish [cross-platform qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43863141515).
+- [x] Measure 100,000-chart process memory and 1/2/4/8 thread throughput.
 - [ ] Re-profile cold misses and quantify decoder context reuse and workspace.
 - [ ] Select a default after the data access changes and RAM acceptance check.
+
+The 32 MiB base/leb run retained roughly 24.7 MB of coefficient words per
+worker after 100,000 charts. Summed RSS was 76.4, 152.4, 305.4 and 626.9 MB
+for 1, 2, 4 and 8 independent workers. These sums include shared pages.
+The paired thread experiment returned median batch averages of 143, 108, 94
+and 130 µs per chart at 1, 2, 4 and 8 threads (legacy: 557, 348, 264 and
+387 µs). Throughput peaked at four threads in this experiment.
+
+The installed-wheel suite passed 1,485 tests in each of the legacy and
+32 MiB configurations. The standalone CLI regression also verified that
+`status -vv` reports the budget before any coefficient acquisition.
