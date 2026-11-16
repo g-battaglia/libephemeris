@@ -889,6 +889,11 @@ every ID, including 62 failures and 147 skips on each wheel. The published
 campaign also finished the standalone rounds, verification and parity.
 Those stages produced baseline failures and the composed candidate is
 running the same stages. See `target/bench/validation-complete-*.log`.
+At the 272-of-273 checkpoint, all completed standalone exit statuses
+matched. The 269 shared wrapper records also matched in assertion counts,
+failed predicates, call counts, qualifiers and reported errors. The
+remaining round and the candidate's verification and parity still need
+their final paired results.
 
 On the hosted Linux ARM64 runner, the paired base/LEB comparison completed
 100,000 charts per worker at 1/2/4/8 processes. At eight processes, published
@@ -1036,7 +1041,10 @@ The additional Linux startup pairs cover
 [Auto base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679854),
 [Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679339),
 [Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679363)
-and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903680097).
+and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43910066861).
+The initial Skyfield medium dispatch stayed queued with zero jobs while
+the cancellation endpoint reported that it had completed. The replacement
+dispatch reached both Linux runners.
 LEB medium, both Auto pairs and Skyfield base have now completed on both
 Linux architectures alongside the earlier LEB base run. The archived
 pairs match their input manifests. Each cold sample reported zero input
@@ -1161,9 +1169,25 @@ Memory is steady single-worker RSS after 10,000 charts.
 | 3 MiB windows | 1,062 µs | 1,073 µs | 59.6 MB | 94.7 MB |
 
 The small-budget variants fail the latency and RAM criteria for a default.
-Keep this prototype outside the draft optimization chain. The medium-only
-follow-up measures authenticated positional acquisition on 1/2/4/8
-workers, each running 100,000 charts. It uses the same managed-reader
-wheel on both sides and retains the existing digest verification.
-Local cache-screen artifacts are under
-`target/bench/leb-process-cache-windows/`.
+Keep this prototype outside the draft optimization chain. Local
+cache-screen artifacts are under `target/bench/leb-process-cache-windows/`.
+
+The companion-inclusive medium-only follow-up compared authenticated
+positional acquisition with the ordinary owned path, using the same
+experimental wheel on both sides. In a separate check the positional
+path retained a descriptor for the pinned core after serving the Mars
+probe. At eight processes and 100,000 charts per process, summed RSS
+fell from 671.3 to 615.1 MB and summed sampled physical footprint fell
+from 520.4 to 456.5 MB. At one worker RSS fell from 84.4 to 70.4 MB.
+The same-wheel random-chart median rose from 609.1 to 637.7 µs and
+p95 fell from 711.8 to 683.6 µs. The consecutive medians were 115.8
+and 121.2 µs. These separate timing samples used five fresh processes
+of 3,000 charts each over the covered part of 1550–2650. The digest
+check also increased first-call time in the earlier startup trial.
+Keep automatic positional acquisition experimental.
+Raw results are in `target/bench/managed-leb-medium-follow-up/`.
+
+The full owned-reader RAM sweep queues legacy retention and 16/32/64/128
+MiB on both LEB tiers after the local timing and profiling commands.
+It uses 100,000 charts per worker at 1/2/4/8 processes.
+Commands and artifacts are under `target/bench/owned-cache-ram-matrix/`.
