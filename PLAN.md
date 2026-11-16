@@ -687,6 +687,34 @@ These identify the compiler and standard library difference independently
 of the runner's current `rustc -Vv`. The optional wheel workflow toolchain
 matches the published build for a controlled rerun.
 
+The full external Swiss comparison ran the fast and slow pytest lanes
+against both wheel overlays with network policy sealed. Each run evaluated
+21,359 cases. Both had 147 skips and the same 62 failing case IDs. The
+rebuilt wheel had one additional failure in a Chiron SPK input-stability
+check. The existing check passed against both wheels when rerun alone.
+The source of the transient inventory change remains unresolved. The
+external standalone rounds and verification commands were outside these
+runs. The full logs are `target/bench/validation-full-leb{,-baseline}.log`.
+
+On the hosted Linux ARM64 runner, the paired base/LEB comparison completed
+100,000 charts per worker at 1/2/4/8 processes. At eight processes, published
+and rebuilt summed RSS was 397.3/399.9 MB, and their summed PSS was
+254.1/254.0 MB. Each worker retained about 29.6 MB of anonymous RSS.
+The archived reports include each process's anonymous, file-backed, peak
+and proportional memory counters at all four checkpoints.
+Linux x86-64 likewise recorded 432.5/432.7 MB summed RSS and
+256.4/256.4 MB summed PSS for the two wheels at eight processes.
+[Linux memory run](https://github.com/g-battaglia/libephemeris/actions/runs/43875470097)
+
+A paired macOS base/LEB run compared the Python wrapper with the native
+release example using the same dates and pinned inputs. Across five
+fresh-process repeats of 5,000 charts, Python/native consecutive medians
+were 109.5/107.9 µs and random medians were 539.5/545.2 µs. These
+measurements put the consecutive path's observed difference at about
+1.6 µs per chart and show no benefit in the random-date comparison.
+They do not justify a new batch API on the basis of wrapper overhead.
+See `target/bench/binding-paired/` for the samples and per-call p95.
+
 The fresh-process startup report now includes import, first-call and first-
 chart medians and p95s. The warm-page condition explicitly primes the staged
 inputs. First use has only the staging reads. Both controls passed a
