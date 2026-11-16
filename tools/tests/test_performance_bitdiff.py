@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bench"))
 from bitdiff import compare, encode, outcome  # noqa: E402
-from common import ROOT, digest, prepare  # noqa: E402
+from common import ROOT, digest, prepare, rust_source_revisions  # noqa: E402
 
 
 def capture(path, result, *, truncate=False):
@@ -78,3 +78,11 @@ def test_staging_keeps_each_run_on_an_independent_inode(tmp_path):
     assert not first.samefile(second)
     assert original.stat().st_ctime_ns == before.st_ctime_ns
     assert digest(first) == digest(second) == inventory["leb/base_core.leb2"]["sha256"]
+
+
+def test_rust_source_paths_across_binary_read_boundary(tmp_path):
+    binary = tmp_path / "extension"
+    revision = b"58cf8f9c35b355199727627d07ae34a4e2846d67"
+    binary.write_bytes(b"\x00" * (1024 * 1024 - 12) + b"/rustc/" + revision + b"/library"
+                       + b"\x00\\rustc\\" + revision + b"\\library")
+    assert rust_source_revisions(binary) == [revision.decode("ascii")]
