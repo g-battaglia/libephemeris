@@ -37,7 +37,7 @@ jobs:
   wheels:
     name: ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: ${{ inputs.bitdiff_profile == 'full' && 150 || 90 }}
     strategy:
       fail-fast: false
       matrix:
