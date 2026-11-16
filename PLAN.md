@@ -1471,10 +1471,22 @@ A native core-only preflight matched position words, returned flags
 and house output over 1,000 random charts. At one process, steady RSS
 was 48.2 → 19.0 MB and sampled footprint was 41.5 → 5.4 MB. The existing
 mapped reader used a different decoded-window policy in that preflight.
-The follow-up uses the same window policy on both paths for 100,000
-charts at 1/2/4/8 workers. This is a local macOS experiment with
-an explicit core. Default medium memory remains open. Raw files are
-under `target/bench/leb-medium-private-snapshot/`.
+
+The matched-window experiment ran 100,000 random charts per worker
+on the explicit medium core and matched the bitwise output digests at
+every process count. The figures are steady sums in decimal MB.
+
+| Processes | RSS, owned → clone | Sampled footprint, owned → clone |
+| ---: | ---: | ---: |
+| 1 | 55.0 → 24.8 | 45.7 → 7.2 |
+| 2 | 109.6 → 49.6 | 88.7 → 13.9 |
+| 4 | 220.2 → 99.5 | 180.8 → 27.6 |
+| 8 | 441.5 → 199.9 | 358.4 → 54.4 |
+
+An isolated wheel now exercises the same snapshot mechanism through the
+normal discovery path with the companion files installed. Measurements
+and the source-isolation test are running. Default medium RAM remains
+open. Raw files are under `target/bench/leb-medium-private-snapshot/`.
 
 ## 15. Step 1a experiment
 
