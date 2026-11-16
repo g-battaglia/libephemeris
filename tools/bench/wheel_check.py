@@ -11,7 +11,7 @@ import urllib.request
 import venv
 
 from bitdiff import PROFILES
-from common import KERNEL_PINS, KERNELS, MODES, ROOT, TIERS, command, digest
+from common import KERNEL_PINS, KERNELS, MODES, ROOT, SATELLITE_KERNEL, TIERS, command, digest
 
 
 MEMORY_CASES = tuple(f"{mode}/{tier}" for mode in MODES for tier in TIERS)
@@ -54,31 +54,44 @@ def main():
             subprocess.run([str(interpreter), "-m", "pip", "install", str(wheel), "numpy==2.4.6"],
                            cwd=root, check=True)
         shutil.copyfile(ROOT / "core/data/leb2/base_core.leb2", data / "leb/base_core.leb2")
-        if options.profile != "smoke":
-            leb_tiers = spk_tiers = TIERS
-        elif options.linux_memory or options.linux_startup:
-            leb_tiers = (memory_tier,) if memory_mode != "skyfield" else ()
-            spk_tiers = (memory_tier,) if memory_mode != "leb" else ()
-        else:
-            leb_tiers = spk_tiers = ()
-        for tier in leb_tiers:
+        leb_tiers = set()
+        spk_tiers = set()
+        if options.profile == "satellites":
+            spk_tiers.add("medium")
+        elif options.profile != "smoke":
+            leb_tiers.update(TIERS)
+            spk_tiers.update(TIERS)
+        if options.linux_memory or options.linux_startup:
+            if memory_mode != "skyfield":
+                leb_tiers.add(memory_tier)
+            if memory_mode != "leb":
+                spk_tiers.add(memory_tier)
+        for tier in sorted(leb_tiers):
             print(f"Provisioning the pinned LEB {tier} group", flush=True)
             subprocess.run([str(cli), "download", f"leb2-{tier}", "--data-dir", str(data),
                             "--no-progress"], cwd=root, check=True)
-        for tier in spk_tiers:
+        downloads = []
+        for tier in sorted(spk_tiers):
             name = KERNELS[tier]
-            for file_name, url in (
+            downloads.extend((
                 (name, f"https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/{name}"),
                 (f"planet_centers_{tier}.bsp",
                  "https://github.com/g-battaglia/libephemeris/releases/download/data-v2rc1/"
                  f"planet_centers_{tier}.bsp"),
-            ):
-                print(f"Downloading and verifying {file_name}", flush=True)
-                path = data / file_name
-                with urllib.request.urlopen(url, timeout=120) as src, path.open("wb") as dest:
-                    shutil.copyfileobj(src, dest, length=1024 * 1024)
-                if digest(path) != KERNEL_PINS[file_name]:
-                    raise ValueError(f"downloaded {file_name} does not match its pin")
+            ))
+        if options.profile == "satellites":
+            downloads.append((
+                SATELLITE_KERNEL,
+                "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/"
+                f"{SATELLITE_KERNEL}",
+            ))
+        for file_name, url in downloads:
+            print(f"Downloading and verifying {file_name}", flush=True)
+            path = data / file_name
+            with urllib.request.urlopen(url, timeout=120) as src, path.open("wb") as dest:
+                shutil.copyfileobj(src, dest, length=1024 * 1024)
+            if digest(path) != KERNEL_PINS[file_name]:
+                raise ValueError(f"downloaded {file_name} does not match its pin")
         candidate_commit = command("git", "rev-parse", "HEAD")
         comparison_command = [
             sys.executable, str(ROOT / "tools/bench/bitdiff.py"), "run", "--profile", options.profile,
@@ -103,6 +116,7 @@ def main():
             comparison = max(comparison, control)
         if comparison or not (options.linux_memory or options.linux_startup):
             return comparison
+        diagnostics = 0
         for role, interpreter, wheel, commit in (
             ("baseline", baseline, baseline_wheel, "python-v4.0.0"),
             ("candidate", candidate, candidate_wheel, candidate_commit),
@@ -120,11 +134,12 @@ def main():
                                cwd=root, check=True)
             if options.linux_startup:
                 for condition in ("first_use", "page_cache_warm", "page_cache_cold"):
-                    subprocess.run([
+                    startup = subprocess.run([
                         *benchmark, "--workload", "cold_start", "--cold-condition", condition,
                         "--output", str(options.output.resolve() / f"{role}-{condition}.json"),
-                    ], cwd=root, check=True)
-        return 0
+                    ], cwd=root)
+                    diagnostics = max(diagnostics, abs(startup.returncode))
+        return diagnostics
 
 
 if __name__ == "__main__":

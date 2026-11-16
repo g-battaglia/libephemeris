@@ -2,8 +2,10 @@
 
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
+import ctypes
 import itertools
 import json
+import mmap
 import os
 import platform
 import math
@@ -291,24 +293,34 @@ def warm_os_pages(data, names):
                 pass
 
 
+def linux_resident_bytes(fd, mincore):
+    length = os.fstat(fd).st_size
+    pages = (length + mmap.PAGESIZE - 1) // mmap.PAGESIZE
+    residency = (ctypes.c_ubyte * pages)()
+    with mmap.mmap(fd, length, access=mmap.ACCESS_COPY) as view:
+        address = ctypes.addressof(ctypes.c_ubyte.from_buffer(view))
+        if mincore(address, length, residency) != 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+    return sum(value & 1 for value in residency) * mmap.PAGESIZE
+
+
 def verify_cold_os_pages(data, names):
     """Evict and verify the private input copies immediately before startup."""
-    paths = [data / name for name in names]
+    resident = 0
     try:
-        for path in paths:
-            with path.open("r+b") as source:
+        mincore = ctypes.CDLL(None, use_errno=True).mincore
+        mincore.argtypes = (ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_ubyte))
+        mincore.restype = ctypes.c_int
+        for name in names:
+            with (data / name).open("r+b") as source:
                 os.fsync(source.fileno())
                 os.posix_fadvise(source.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
-        probe = subprocess.run(["fincore", "--bytes", "--noheadings", "--output", "RES", *paths],
-                               text=True, capture_output=True, check=True)
-    except (OSError, subprocess.CalledProcessError) as exc:
+                resident += linux_resident_bytes(source.fileno(), mincore)
+    except (AttributeError, OSError, ValueError) as exc:
         raise PrerequisiteError(f"cannot check staged input page residency: {exc}") from exc
-    counts = probe.stdout.split()
-    if len(counts) != len(paths) or not all(value.isdecimal() for value in counts):
-        raise PrerequisiteError("fincore did not report byte residency for every staged input")
-    resident = sum(map(int, counts))
     if resident:
-        raise PrerequisiteError(f"fincore reported {resident} resident bytes after eviction")
+        raise PrerequisiteError(f"mincore reported {resident} resident bytes after eviction")
     return resident
 
 
@@ -323,7 +335,7 @@ def run(options):
             data = scratch / "data"
             modes, tiers = options.mode or MODES, options.tier or TIERS
             if options.cold_condition == "page_cache_cold" and sys.platform != "linux":
-                raise PrerequisiteError("verified input page eviction requires Linux and fincore")
+                raise PrerequisiteError("verified input page eviction requires Linux")
             report["data"] = prepare(options.data, data, modes, tiers, companions=options.companions)
             if options.native:
                 report["build"] = {"binary": str(options.native), "sha256": digest(options.native),
