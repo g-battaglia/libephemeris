@@ -974,3 +974,41 @@ passing. Reconstructing coefficient words from pre-sliced byte planes
 All 244 LEB tests and the 10,000-call indexed comparison passed. The
 reports are in `target/bench/frame-rate-trig-qualification/` and
 `target/bench/leb-word-unpack-qualification/`.
+
+With both tiers and the released companion groups installed, the same
+wheel completed 100,000 charts per process at an indexed ceiling of 6 MiB.
+This table reports the sum of steady RSS in MB. The sum can count shared
+resident pages more than once.
+
+| Tier | Processes | Owned → indexed RSS |
+| --- | ---: | ---: |
+| base | 1 | 56.3 → 48.6 MB |
+| base | 2 | 114.6 → 116.2 MB |
+| base | 4 | 229.1 → 254.6 MB |
+| base | 8 | 455.1 → 515.7 MB |
+| medium | 1 | 94.7 → 61.8 MB |
+| medium | 2 | 189.4 → 129.3 MB |
+| medium | 4 | 378.2 → 257.6 MB |
+| medium | 8 | 753.6 → 377.1 MB |
+
+For eight medium workers the sum of each process's peak RSS was
+753.6 → 513.4 MB. Peaks can occur at different times. The full provisioned
+base layout does not support a default switch based on RSS. The indexed
+reader and its byte ceiling remain explicit choices. Reports are
+`mixed-{owned,indexed}-100k.json` in the indexed capacity directory.
+
+A follow-up prototype for automatically discovered release files hashes the
+opened descriptor before admitting positional reads (`2c798dd9`).
+Comparing five fresh-process runs, this raised median first-call latency
+from 1.85 to 5.34 ms for base and from 5.73 to 22.62 ms for medium.
+In its separate one-process 100,000-chart comparison, steady RSS moved
+55.4 → 64.4 MB in base and 96.6 → 53.8 MB in medium. The prototype's 10,000
+base LEB calls matched the published wheel. The startup and base RSS
+tradeoffs keep automatic acquisition out of this change. Raw reports are
+in `target/bench/managed-leb-measurement/`.
+
+Source inspection found existing exact-epoch memoization in
+`nut00a_cached_centuries` and existing memoization for the frame matrices.
+The native sidereal wrappers can call nutation twice, but a repeated epoch
+uses the existing series memo. No additional cache is proposed for those
+values.
