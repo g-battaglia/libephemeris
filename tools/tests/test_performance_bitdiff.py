@@ -15,9 +15,11 @@ from types import SimpleNamespace
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bench"))
+import benchmark  # noqa: E402
 from benchmark import linux_resident_bytes, verify_cold_os_pages  # noqa: E402
 from bitdiff import compare, encode, outcome  # noqa: E402
 from common import ROOT, PrerequisiteError, digest, prepare, rust_source_revisions  # noqa: E402
+import wheel_check  # noqa: E402
 
 
 def capture(path, result, *, truncate=False, api="calc_ut", args=(2451545., 4, 258)):
@@ -57,8 +59,35 @@ def test_exact_comparison(tmp_path, change):
     left, right = tmp_path / "baseline.gz", tmp_path / "candidate.gz"
     capture(left, original)
     capture(right, changed)
-    assert compare(left, left)["status"] == "identical"
-    assert compare(left, right)["differences"] == 1
+    identical = compare(left, left)
+    assert identical["status"] == "identical"
+    assert identical["difference_counts"] == {}
+    different = compare(left, right)
+    assert different["differences"] == 1
+    if change == "warning":
+        transitions = {}
+    elif change == "error":
+        transitions = {"builtins.ValueError -> builtins.TypeError": 1}
+    else:
+        transitions = {"value -> value": 1}
+    assert different["difference_counts"] == {
+        "leb/base/calc_ut": {
+            "requests": 1,
+            "result_transitions": transitions,
+            "changed_warnings": int(change == "warning"),
+        },
+    }
+
+
+def test_difference_counts_distinguish_value_from_range_error(tmp_path):
+    left, right = tmp_path / "left.gz", tmp_path / "right.gz"
+    error = "libephemeris.EphemerisRangeError"
+    capture(left, {"value": None, "warnings": []})
+    capture(right, {"error": error, "warnings": [["builtins.UserWarning", "changed"]]})
+    forward = compare(left, right)["difference_counts"]["leb/base/calc_ut"]
+    backward = compare(right, left)["difference_counts"]["leb/base/calc_ut"]
+    assert forward == {"requests": 1, "result_transitions": {f"value -> {error}": 1}, "changed_warnings": 1}
+    assert backward == {"requests": 1, "result_transitions": {f"{error} -> value": 1}, "changed_warnings": 1}
 
 
 def test_incomplete_capture(tmp_path):
@@ -96,6 +125,47 @@ def test_staging_keeps_each_run_on_an_independent_inode(tmp_path):
     assert not first.samefile(second)
     assert original.stat().st_ctime_ns == before.st_ctime_ns
     assert digest(first) == digest(second) == inventory["leb/base_core.leb2"]["sha256"]
+
+
+def test_wheel_check_reports_missing_input(tmp_path, monkeypatch):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "candidate.whl").touch()
+    output = tmp_path / "reports"
+    monkeypatch.setattr(wheel_check, "ROOT", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["wheel_check.py", "--output", str(output)])
+    monkeypatch.setattr(wheel_check.venv, "create", lambda *_args, **_kwargs: None)
+
+    def pip(args, *, cwd, check):
+        assert check and args[1:3] == ["-m", "pip"]
+        if args[3] == "download":
+            (cwd / "published.whl").touch()
+
+    monkeypatch.setattr(wheel_check.subprocess, "run", pip)
+    assert wheel_check.main() == 2
+    report = json.loads((output / "comparison.json").read_text())
+    assert report["status"] == "missing_prerequisite"
+    assert "base_core.leb2" in report["error"]
+
+
+@pytest.mark.parametrize("workload, flags, actual_flags", (
+    ("seq_position", 266, 266), ("time_series", 258, 258), ("topo", 258, 33026),
+))
+def test_position_preflight_probes_only_the_measured_route(tmp_path, monkeypatch, capsys,
+                                                         workload, flags, actual_flags):
+    calls = []
+    eph = SimpleNamespace(calc_ut=lambda *args: calls.append(args),
+                          sidtime=None, get_ayanamsa_ut=None,
+                          start_tracing=lambda: SimpleNamespace(reset=lambda: None),
+                          get_trace_results=lambda: {4: "Skyfield"})
+    monkeypatch.setitem(sys.modules, "libephemeris", eph)
+    monkeypatch.setattr(benchmark, "configure", lambda *_: None)
+    spec = tmp_path / "job.json"
+    spec.write_text(json.dumps(dict(mode="skyfield", tier="base", workload=workload,
+                                    dates=[2451545.], flags=flags)))
+    benchmark.worker(spec, probe=True)
+    assert calls == [(2451545., 4, actual_flags)]
+    assert json.loads(capsys.readouterr().out)["routes"] == {"4": "Skyfield"}
 
 
 def test_rust_source_paths_across_binary_read_boundary(tmp_path):
