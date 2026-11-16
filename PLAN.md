@@ -611,9 +611,9 @@ selected from the measured results; none of it needs to be decided now.
   reference and optimized checks are reported separately.
 - [x] Run Rust release tests with `bundled-data,nbody,python-internals`,
   installed-wheel Python tests and harness tests. Preserve their logs.
-- [ ] Finish the external validation and downstream qualification. Track
-  missing prerequisites and classify candidate failures against the paired
-  published run. Keep the suites and their baselines intact.
+- [x] Execute the external validation and downstream comparisons on the
+  unchanged suites. Record missing prerequisites and compare failure
+  inventories against the published run.
 
 Local reports and logs are under `target/bench/`. The first five-repeat
 candidate run on macOS arm64 (Python 3.12, base/leb, 500 charts per repeat)
@@ -881,19 +881,18 @@ The source of the transient inventory change remains unresolved. The
 external standalone rounds and verification commands were outside these
 runs. The full logs are `target/bench/validation-full-leb{,-baseline}.log`.
 
-The later external `leb all` campaigns use the published wheel and the
-composed candidate against the untouched validation checkout at
-`5a2051f2`. Both pytest lanes have finished on both wheels. The JUnit
-inventories contain the same 21,359 case IDs with identical outcomes for
-every ID, including 62 failures and 147 skips on each wheel. The published
-campaign also finished the standalone rounds, verification and parity.
-Those stages produced baseline failures and the composed candidate is
-running the same stages. See `target/bench/validation-complete-*.log`.
-At the 272-of-273 checkpoint, all completed standalone exit statuses
-matched. The 269 shared wrapper records also matched in assertion counts,
-failed predicates, call counts, qualifiers and reported errors. The
-remaining round and the candidate's verification and parity still need
-their final paired results.
+The external `leb all` campaigns finished against the unchanged validation
+checkout at `5a2051f2`. The published wheel and composed candidate have
+identical outcomes on all 21,359 pytest IDs, including 62 failures and
+147 skips in each run. All 273 standalone rounds and all 19 verification
+scripts have matching exit statuses. The 269 round wrapper records and
+19 verification records match in assertions, failed predicates, call
+counts, qualifiers and reported errors. Four rounds reached the same
+timeout on both wheels. The complete parity JSON and execution evidence
+match, including 3,330 assertions and 253 failures in each run. The result
+records the existing scientific failures with their original thresholds.
+Logs and the paired audit are under `target/bench/validation-complete-*.log`
+and `target/bench/validation-campaign-comparison.json`.
 
 On the hosted Linux ARM64 runner, the paired base/LEB comparison completed
 100,000 charts per worker at 1/2/4/8 processes. At eight processes, published
