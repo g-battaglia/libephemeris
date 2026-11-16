@@ -904,3 +904,14 @@ sides. Raw profiles are under `target/bench/indexed-sampling/` and the
 comparison and timing reports are under
 `target/bench/indexed-windows-qualification/`. The quiet timing repeat,
 100,000-chart memory confirmation and full corpus are still open.
+
+A repeat over 3,000 charts per process confirmed the reduction for indexed
+random charts, 845.7 → 609.5 µs in base and 848.8 → 621.8 µs in medium.
+Consecutive medians were 116.2 → 116.8 µs in base and 122.0 → 125.6 µs
+in medium. Other qualification was active on the host in this repeat.
+
+At 100,000 random charts, one indexed worker reached 46.9 MB RSS and
+23.9 MB footprint in base, and 46.7 MB RSS and 24.3 MB footprint in medium.
+The prior indexed reader reached 51.5 and 52.4 MB RSS respectively in the
+same workload. The full indexed [wheel matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43873289950)
+is underway.
