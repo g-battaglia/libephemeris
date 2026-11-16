@@ -848,6 +848,15 @@ wheels and the same difference from the embedded engine. Local artifacts
 are `target/bench/astrologer-v7-*-installed.{log,xml}` and
 `target/bench/astrologer-v7-*-direct-probe.json`.
 
+The paired upstream API v6 run also produced identical outcomes by
+test ID. Each wheel had 2,439 passes, four skips, three tracing failures
+and 95 setup errors due to missing qualified references for the existing
+dependency pair. The initial launcher used stdin as Python's main module,
+which made spawned workers unable to import their entry point. Both
+qualified runs use the ordinary `python -m pytest` entry point after a
+separate digest check. The unchanged suite and its reference fixtures were
+left intact. Reports are `target/bench/astrologer-v6-*-qualified.{log,xml}`.
+
 The Windows positional and indexed comparisons started before the
 timeout increase. Their Linux jobs passed. The Windows jobs reached the
 90-minute limit, including the
@@ -1024,6 +1033,17 @@ Additional Linux startup measurements compare the published wheel against
 [the SPK storage changes](https://github.com/g-battaglia/libephemeris/actions/runs/43905660043)
 and [the opted-in positional reader](https://github.com/g-battaglia/libephemeris/actions/runs/43905659756).
 Both use Auto medium and keep the first call and first chart separate.
+All four architecture and candidate pairs completed with five fresh
+processes per condition and zero resident input bytes in each cold sample.
+The table shows median first call and first chart in ms, as measured
+within each published/candidate pair.
+
+| Candidate and runner | First use, call | Warm, call | Cold, call | Cold, chart |
+| --- | ---: | ---: | ---: | ---: |
+| SPK storage, ARM64 | 407.76 → 315.76 | 406.53 → 318.96 | 848.53 → 783.91 | 18.95 → 2.34 |
+| SPK storage, x86-64 | 470.23 → 345.74 | 458.40 → 349.74 | 560.35 → 502.27 | 23.58 → 1.81 |
+| Positional reader, ARM64 | 401.49 → 275.13 | 409.49 → 277.40 | 826.50 → 798.04 | 18.54 → 2.20 |
+| Positional reader, x86-64 | 461.28 → 287.73 | 460.82 → 290.88 | 564.27 → 417.50 | 23.52 → 1.74 |
 
 The paired Auto medium SPK comparison completed on both Linux
 architectures with identical pinned input manifests. Steady summed PSS
@@ -1077,6 +1097,15 @@ the two-word polynomial rate path and 258 were in deflection arithmetic.
 The observations guide the reuse work. The native trace and raw timings
 are under `target/bench/chart-anatomy-profile/`.
 
+The step 1b audit checked additional whole-file reads in the native
+runtime. The fixed-star catalog and photometry are compiled tables.
+The native JPL loader selects BSP kernels. Classic DE filename constants
+remain part of the compatibility surface. The optional IERS cache does
+read its three text inputs before parsing. In the local cache their sizes
+were 2,460,544, 1,352 and 13,419 bytes. The sealed benchmark configurations
+disable IERS loading. These paths do not explain the measured whole-image
+SPK or LEB allocations.
+
 The small-budget owned-reader screen uses the composed wheel with the
 released LEB companions. In the completed zero-byte case, steady
 single-worker RSS after 10,000 charts moved from 49.4 to 48.1 MB in base
@@ -1093,3 +1122,6 @@ pool divides its budget among eight shards and cannot retain complete
 chunks larger than a shard's allowance. The follow-up experiment
 reuses the existing bounded coefficient windows for those chunks.
 The prototype is isolated in `codex/leb-process-cache-windows`.
+Its first build passed 245 LEB Rust tests and matched all 10,000 smoke
+requests with the candidate's 1 MiB cache active. Its paired timing and
+memory screen remains in progress.
