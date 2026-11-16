@@ -1565,9 +1565,28 @@ median was 3.67 → 15.95 ms. Native tests verified that contiguous
 borrows allocate once across reader clones, that the admitted clone
 survives rewriting and truncating its original pathname, and that
 another same-length file with a wrong digest falls back to the
-ordinary reader. Full-coverage memory qualification and the
-350,000-call comparison with the ordinary combined runtime are
-pending. This prototype remains local.
+ordinary reader. All 350,000 medium/LEB calls against the ordinary
+combined runtime at `39692f97` matched, including the existing warning.
+
+On the full common 1550–2650 coverage, the same wheel ran 100,000
+charts per worker. The table uses steady sums in decimal MB.
+
+| Processes | RSS, owned → positional snapshot | Sampled footprint, owned → positional snapshot |
+| ---: | ---: | ---: |
+| 1 | 84.9 → 65.4 | 65.4 → 31.4 |
+| 2 | 169.8 → 127.6 | 130.9 → 72.1 |
+| 4 | 339.7 → 157.0 | 261.8 → 198.4 |
+| 8 | 668.9 → 523.3 | 525.5 → 238.9 |
+
+At eight workers, the sums of individual process peaks were
+668.9 → 523.3 MB RSS and 543.3 → 396.5 MB footprint. Peaks across
+different processes need not be simultaneous. macOS does not report PSS.
+On full coverage, random median/p95 were 585.4/613.0 → 620.9/654.6 µs
+and consecutive median/p95 were 114.1/119.8 → 118.4/124.0 µs.
+Warm-page first-call median was 3.83 → 16.15 ms. Full-coverage latency
+differs from the shorter 1900–2100 workload reported above. The
+prototype remains local while a matched-cache comparison isolates
+the storage and cache-policy effects.
 
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the
