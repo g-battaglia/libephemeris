@@ -93,11 +93,12 @@ the input staging reads are the only preparation. Both conditions start
 with empty process-local decoder and coefficient caches. A previously
 decoded persistent store is outside these configurations. On Linux,
 `page_cache_cold` syncs and evicts the private staged inputs before each
-timed process. It requires `fincore` to observe zero resident bytes
-immediately before spawn and records that observation in each sample.
+timed process. It calls `mincore` on private file mappings and requires
+zero resident bytes immediately before spawn. Each sample records that
+observation.
 Other hosts report this condition as an unmet prerequisite. [Linux file
 cache advice](https://man7.org/linux/man-pages/man2/posix_fadvise.2.html)
-and [residency probe](https://man7.org/linux/man-pages/man1/fincore.1.html).
+and [residency probe](https://man7.org/linux/man-pages/man2/mincore.2.html).
 
 Linux uses `/proc/PID/status` and `smaps_rollup`. Sum of PSS apportions shared
 pages and is the available estimate of the group's attributable resident
@@ -142,11 +143,25 @@ zero, and checks result structure, returned flags and Python warnings.
 Capture files and the coverage/error summary can be retained as CI artifacts.
 Exit status 1 means a difference, and 2 means no completed comparison.
 
+The report lists exact requested flag masks, target IDs grouped by body
+class, and observed center IDs for each mode, tier and position entry
+point. This inventory includes requests that returned errors. Re-run
+`bitdiff.py compare` on earlier captures to generate it for those runs.
+
 The manual `auto-edge` profile runs the first 30,000 calls of each
 `auto` tier with pinned LEB companions and SPKs. It omits the LEB and
 Skyfield runs. The wheel workflow also compares the published wheel
 against itself in independent processes and retains the control captures
 in `reports/bitdiff/published-control/`.
+
+The manual `satellites` profile compares 320 calls for named Pluto
+satellites and the Charon alias in Skyfield medium. It checks module
+positions, planet-centric positions and the direct moon API at J2000
+and around the segment edges. Local runs use `--profile satellites` and
+expect the pinned `plu017.bsp` next to `de440.bsp` and the medium planet
+centers file in the data directory. The manual workflow fetches and
+verifies the fixture. [NAIF satellite archive](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/).
+
 Set the manual workflow's `rust_toolchain` to `1.99.1` to build with the
 toolchain identified in the published Windows 4.0.0 wheel.
 Each wheel report records any Rust source revisions embedded in the
