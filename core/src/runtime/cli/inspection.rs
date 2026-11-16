@@ -23,6 +23,10 @@ const CONFIG_ENV_VARS: &[(&str, &str)] = &[
     (IERS_DELTA_T_ENV_VAR, "IERS Delta-T override"),
     (NETWORK_POLICY_ENV_VAR, "network policy override"),
     ("LIBEPHEMERIS_LEB", "explicit coefficient image"),
+    (
+        "LIBEPHEMERIS_LEB_CACHE_MB",
+        "process coefficient cache budget in MiB",
+    ),
     ("LIBEPHEMERIS_EPHEMERIS", "main kernel selection"),
     (
         "LIBEPHEMERIS_AUTO_SPK",

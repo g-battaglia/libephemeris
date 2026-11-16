@@ -643,3 +643,38 @@ x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g
 the Windows full job is pending. A sample of the random-date base/leb workload on the published
 wheel put Zstandard decompression and LEB coefficient unpacking at the top of
 the stacks, supporting the cache experiment once qualification is resolved.
+
+## 15. Step 1a experiment
+
+An opt-in process pool retains whole decoded chunks across runtime-owned LEB
+images. Each shard evicts its least recently used entries by byte capacity.
+Explicit indexed readers retain their existing resource policy. The legacy
+default stays in place pending the combined latency and RAM measurements.
+
+Mac arm64, 1900–2100 random charts, five repeats of 1,000; RSS after a separate
+5,000-chart run. All rows use the same rebuilt wheel and pinned input bytes.
+
+| Process budget | Base median | Base RSS | Medium median | Medium RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Legacy | 536 µs | 46.7 MB | 552 µs | 84.0 MB |
+| 8 MiB | 731 µs | 62.9 MB | 743 µs | 94.3 MB |
+| 16 MiB | 234 µs | 66.8 MB | 226 µs | 104.3 MB |
+| 32 MiB | 126 µs | 72.5 MB | 132 µs | 109.8 MB |
+| 64 MiB | 127 µs | 72.6 MB | 132 µs | 110.2 MB |
+| 128 MiB | 129 µs | 72.6 MB | 132 µs | 109.9 MB |
+
+The 32 MiB pool retained 24,720,192 coefficient bytes for this date range.
+It is the smallest tested budget that reached the latency plateau for this
+workload. Every opt-in budget increased RSS here. The separate positional
+reader experiment saved roughly 8 MB in base on a short run, with higher
+latency. These results justify proceeding with lower-copy data access and
+measuring the two changes together before selecting a default.
+
+- [x] Configurable shared budget, whole chunks, per-shard LRU.
+- [x] Per-process retention diagnostics and isolated benchmark sweep.
+- [x] Ten local Python checks and the Rust pool lifetime/resize test passed.
+- [x] Candidate with 64 MiB matched 10,000 published-wheel calls bit for bit.
+- [ ] Finish the 32 MiB full numerical comparison and cross-platform checks.
+- [ ] Measure 100,000-chart process memory and 1/2/4/8 thread throughput.
+- [ ] Re-profile cold misses and quantify decoder context reuse and workspace.
+- [ ] Select a default after the data access changes and RAM acceptance check.

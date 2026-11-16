@@ -258,10 +258,19 @@ impl Runtime {
             })
             .collect();
         let iers = self.iers_cache_info()?;
+        let process_cache = match self.leb_cache_usage() {
+            Some((retained, budget, entries)) => Some((retained, budget, entries)),
+            None => self
+                .configured_leb_cache_bytes()?
+                .map(|budget| (0, budget, 0)),
+        };
+        let cache_status = process_cache.map(|(retained, budget, entries)| {
+            json!({"retained_bytes":retained,"budget_bytes":budget,"entries":entries})
+        });
         let snapshot = json!({"version":crate::identity::distribution_version(),"calc_mode":context.mode().as_calc_mode_name(),
             "precision_tier":tier,"leb_file":context.leb_file().map(|p|p.display().to_string()),
             "data_directory":root.display().to_string(),"de_kernels":main,"planet_centers":centers,
-            "leb1_files":leb1,"leb2_files":leb2,"assist_files":assist_files,
+            "leb1_files":leb1,"leb2_files":leb2,"assist_files":assist_files,"leb_process_cache":cache_status,
             "spk_cache":{"directory":cache.display().to_string(),"file_count":spks.len(),
                 "total_size":spks.iter().filter_map(|row|row["size"].as_u64()).sum::<u64>(),"files":spks},
             "iers_data":{"cache_dir":iers.cache_dir.display().to_string(),"data_points":iers.data_points,
@@ -293,6 +302,12 @@ impl Runtime {
                 output.push('\n');
             }
             if verbose > 1 {
+                match process_cache {
+                    Some((retained, budget, entries)) => output.push_str(&format!(
+                        "LEB process cache: {retained} of {budget} coefficient bytes ({entries} entries)\n"
+                    )),
+                    None => output.push_str("LEB process cache: legacy limits by image\n"),
+                }
                 // List concrete candidates as well as manifest assets: DE,
                 // legacy coefficients and SPKs are not all manifest entries.
                 for section in [

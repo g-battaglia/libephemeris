@@ -20,6 +20,10 @@ on:
         type: choice
         options: [smoke, full]
         default: smoke
+      candidate_cache_mib:
+        description: Optional LEB process cache budget for candidate only
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -174,8 +178,14 @@ jobs:
         shell: bash
         env:
           BITDIFF_PROFILE: ${{ inputs.bitdiff_profile || 'smoke' }}
+          BITDIFF_CACHE_MIB: ${{ inputs.candidate_cache_mib }}
           PYTHON_312: ${{ steps.python312.outputs.python-path }}
-        run: '"$PYTHON_312" tools/bench/wheel_check.py --profile "$BITDIFF_PROFILE" --output reports/bitdiff'
+        run: |
+          args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
+          if [[ -n "$BITDIFF_CACHE_MIB" ]]; then
+            args+=(--candidate-cache-mib "$BITDIFF_CACHE_MIB")
+          fi
+          "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 
       # Type-check test-only native code too; ignored tests still have to
       # compile on Windows. Do not block independent Python diagnostics, and

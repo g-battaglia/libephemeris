@@ -92,14 +92,22 @@ def emit(value):
     print(dump(value), flush=True)
 
 
-def checkpoint(label):
+def cache_usage(eph):
+    get_usage = getattr(eph, "get_leb_cache_usage", None)
+    if get_usage is None or (usage := get_usage()) is None:
+        return None
+    retained, limit, entries = usage
+    return {"retained_bytes": retained, "budget_bytes": limit, "entries": entries}
+
+
+def checkpoint(label, eph):
     peak = None
     if sys.platform in ("darwin", "linux"):
         import resource
         peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         if sys.platform == "linux":
             peak *= 1024
-    emit({"phase": label, "peak_rss_bytes": peak})
+    emit({"phase": label, "peak_rss_bytes": peak, "process_cache": cache_usage(eph)})
     if sys.stdin.readline() != "continue\n":
         raise RuntimeError("memory controller stopped")
 
@@ -112,7 +120,7 @@ def worker(path, *, probe=False):
     jds, workload = spec["dates"], spec["workload"]
     warnings.simplefilter("ignore")  # Timing excludes warning display.
     if workload == "memory" and not probe:
-        checkpoint("after_import")
+        checkpoint("after_import", eph)
     configure(eph, spec["mode"], spec["tier"])
     chart, other, planets = operations(spec, eph)
     if probe:
@@ -125,18 +133,18 @@ def worker(path, *, probe=False):
         expected = "Skyfield" if spec["mode"] == "skyfield" else "LEB"
         if any(routes.get(body) != expected for body in CHART_BODIES):
             raise PrerequisiteError(f"unexpected provider for chart: {routes}")
-        emit(routes)
+        emit({"routes": routes, "process_cache": cache_usage(eph)})
         return
     if workload in ("cold_start", "memory"):
         first = elapsed(eph.calc_ut, jds[0], 4, spec["flags"])
         if workload == "memory":
-            checkpoint("after_first_call")
+            checkpoint("after_first_call", eph)
         first_chart = elapsed(chart, jds[0])
         if workload == "memory":
-            checkpoint("after_first_chart")
+            checkpoint("after_first_chart", eph)
             for jd in jds:
                 chart(jd)
-            checkpoint("steady_state")
+            checkpoint("steady_state", eph)
         emit({"import_ns": import_ns, "first_call_ns": first, "first_chart_ns": first_chart})
         return
     op = other.get(workload, chart)
@@ -291,6 +299,10 @@ def run(options):
                     count = options.memory_calls
                 jds, span = dates(report["data"], tier, mode, workload, count, options.seed, options.window)
                 env = environment(data)
+                if options.leb_cache_mib is not None:
+                    env["LIBEPHEMERIS_LEB_CACHE_MB"] = str(options.leb_cache_mib)
+                if options.leb_reader is not None:
+                    env["LIBEPHEMERIS_LEB_READER"] = options.leb_reader
                 for parallel in ((options.workers or (1, 2, 4, 8)) if workload in ("threads", "memory") else (1,)):
                     spec = {"schema": SCHEMA, "mode": mode, "tier": tier, "workload": workload,
                             "flags": options.flags, "dates": jds, "parallelism": parallel}
@@ -301,9 +313,14 @@ def run(options):
                     if options.native and workload in ("threads", "cold_start", "memory"):
                         raise PrerequisiteError(f"native example does not implement {workload}")
                     if not options.native and (mode, tier) not in routes:
-                        routes[mode, tier] = json.loads(
+                        probe = json.loads(
                             subprocess.check_output([*args, "--probe"], env=env, cwd=tmp, text=True)
                         )
+                        if options.leb_cache_mib is not None and mode != "skyfield":
+                            usage = probe["process_cache"]
+                            if usage is None or usage["budget_bytes"] != options.leb_cache_mib * 1024**2:
+                                raise PrerequisiteError("worker did not activate the requested LEB process cache")
+                        routes[mode, tier] = probe
                     samples = []
                     if workload == "memory":
                         samples.append(memory_run(args, env, tmp, parallel, raw_dir))
@@ -315,7 +332,8 @@ def run(options):
                         "mode": mode, "tier": tier, "workload": workload, "flags": options.flags,
                         "parallelism": parallel, "requests_per_run": count, "date_range": span,
                         "samples": samples, "summary": summarize(samples),
-                        "chart_probe_routes": routes.get((mode, tier)),
+                        "chart_probe_routes": routes.get((mode, tier), {}).get("routes"),
+                        "leb_cache_mib": options.leb_cache_mib, "leb_reader": options.leb_reader,
                         "cold_condition": options.cold_condition if workload == "cold_start" else None,
                     })
             report["status"] = "complete"
@@ -343,6 +361,8 @@ def main():
     cli.add_argument("--commit")
     cli.add_argument("--build-options")
     cli.add_argument("--native", type=lambda p: Path(p).resolve())
+    cli.add_argument("--leb-cache-mib", type=int)
+    cli.add_argument("--leb-reader", choices=("owned", "indexed"))
     cli.add_argument("--mode", choices=MODES, action="append")
     cli.add_argument("--tier", choices=TIERS, action="append")
     cli.add_argument("--workload", choices=WORKLOADS, action="append")
@@ -366,6 +386,8 @@ def main():
             return 3
     if options.data is None or options.output is None or min(options.calls, options.memory_calls) < 1 or options.repeats < 5:
         cli.error("provide data, output, positive call counts and at least five repetitions")
+    if options.leb_cache_mib is not None and (options.leb_cache_mib < 0 or options.leb_reader == "indexed"):
+        cli.error("the process cache accepts nonnegative sizes for owned readers")
     return run(options)
 
 

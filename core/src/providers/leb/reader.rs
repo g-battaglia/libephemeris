@@ -2105,6 +2105,22 @@ impl LebFile {
         Self::from_bytes(key, bytes)
     }
 
+    /// Install the process cache before a newly opened image can be shared.
+    pub(crate) fn with_process_cache(
+        mut self,
+        pool: Arc<super::process_cache::ProcessCache>,
+    ) -> Self {
+        let image = self
+            .image
+            .as_mut()
+            .and_then(Arc::get_mut)
+            .expect("fresh LEB image");
+        Arc::get_mut(&mut image.cache)
+            .expect("fresh LEB cache")
+            .use_process_cache(pool);
+        self
+    }
+
     /// Open a regular immutable file as a read-only mapping and decode its index.
     ///
     /// Mapping avoids a whole-file heap copy; parsing still reads metadata.

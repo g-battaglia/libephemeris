@@ -9,7 +9,7 @@ from ._core import (
     release_data_cache, cool_leb_readers, get_leb_reader_generation, reload_configuration, reset_session,
     set_auto_spk_download, set_calc_mode, set_delta_t_model, set_delta_t_userdef,
     set_ephe_path, set_ephemeris_file, set_iers_delta_t_enabled, set_jpl_file,
-    set_lapse_rate, set_leb_file, set_precision_tier, set_spk_cache_dir,
+    set_lapse_rate, set_leb_file, set_leb_cache_bytes, get_leb_cache_usage, set_precision_tier, set_spk_cache_dir,
     set_spk_date_padding, set_strict_precision, set_tid_acc, set_topo,
 )
 

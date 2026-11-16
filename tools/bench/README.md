@@ -75,6 +75,14 @@ or `--memory-calls` to select a smaller diagnostic run. Threading and process
 memory are measured through the Python binding. Measure performance with
 competing jobs stopped, including validation jobs, and retain raw samples.
 
+For a cache sweep on the candidate, repeat the same workloads with
+`--leb-cache-mib 16`, `32`, `64` and `128`. Each run verifies that the
+worker activated the specified budget and includes the worker's retained
+coefficient bytes at each memory checkpoint. For the numerical comparison,
+`--candidate-cache-mib 64` enables that budget only on the candidate side.
+Omit these flags for the legacy baseline. `--leb-reader indexed` selects
+the independently budgeted positional LEB reader for comparison.
+
 The cold-start workload records import, first calculation and first full
 chart after that calculation. `page_cache_warm` reflects preflight input reads
 and a fresh worker. `first_use` is a fresh process with no additional

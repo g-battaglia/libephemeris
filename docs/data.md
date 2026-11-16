@@ -68,6 +68,7 @@ this uses `USERPROFILE` and the native profile API, not the working directory.
 | `LIBEPHEMERIS_AUTO_SPK` | Automatic minor-body SPK acquisition |
 | `LIBEPHEMERIS_STRICT_PRECISION` | Refuse approximate fallback |
 | `LIBEPHEMERIS_LEB_READER` | `owned` or `indexed` storage |
+| `LIBEPHEMERIS_LEB_CACHE_MB` | Opt-in process budget for decoded owned LEB coefficients, in MiB |
 
 For deterministic offline work, set the network policy to `sealed`, select
 local resources and choose whether to use local IERS data. The
@@ -78,6 +79,22 @@ validated when consumed, not necessarily when set.
 `sealed` controls calculation-time acquisition; deliberately invoking a
 provisioning command requests a download. `allow` permits acquisition but does
 not itself start it. Avoid global configuration changes during concurrent work.
+
+To experiment with more decoded-chunk retention, set
+`LIBEPHEMERIS_LEB_CACHE_MB` before the first LEB calculation or use
+`leb_cache_bytes` under `[libephemeris]` in TOML. The environment value wins
+over TOML. In Python, `set_leb_cache_bytes(bytes)` activates or resizes the
+process pool. Use zero to disable retention and `get_leb_cache_usage()` to
+read retained bytes, the budget and the number of entries. Existing readers
+attached by the caller and the explicit `indexed` policy retain their own
+limits. Without an opt-in the existing per-image defaults apply.
+
+The pool divides the budget over eight independently locked LRU shards.
+Individual chunks bigger than their shard's quota are evaluated without
+retention. The budget counts decoded coefficient vector capacity. File
+images, cache metadata, active borrows, decoder work and other runtime memory
+are additional. Each worker process has its own pool. Compare total RSS
+and throughput on the target workload before choosing a budget.
 
 ## Large LEB files
 

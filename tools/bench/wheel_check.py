@@ -23,6 +23,7 @@ def executables(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=("smoke", "full"), default="smoke")
+    parser.add_argument("--candidate-cache-mib", type=int)
     parser.add_argument("--output", type=Path, default=ROOT / "target/bench/wheel-check")
     options = parser.parse_args()
     candidate_wheel, = (ROOT / "dist").glob("*.whl")
@@ -58,14 +59,17 @@ def main():
                         shutil.copyfileobj(src, dest, length=1024 * 1024)
                     if digest(path) != KERNEL_PINS[file_name]:
                         raise ValueError(f"downloaded {file_name} does not match its pin")
-        return subprocess.run([
+        comparison = [
             sys.executable, str(ROOT / "tools/bench/bitdiff.py"), "run", "--profile", options.profile,
             "--data", str(data), "--output", str(options.output.resolve()),
             "--baseline", str(baseline), "--baseline-wheel", str(baseline_wheel),
             "--baseline-commit", "python-v4.0.0", "--candidate", str(candidate),
             "--candidate-wheel", str(candidate_wheel), "--candidate-commit", command("git", "rev-parse", "HEAD"),
             "--candidate-build-options", "maturin build --release --locked (wheel matrix)",
-        ], cwd=root).returncode
+        ]
+        if options.candidate_cache_mib is not None:
+            comparison.extend(("--candidate-cache-mib", str(options.candidate_cache_mib)))
+        return subprocess.run(comparison, cwd=root).returncode
 
 
 if __name__ == "__main__":

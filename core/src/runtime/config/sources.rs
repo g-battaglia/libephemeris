@@ -254,6 +254,33 @@ impl ConfigurationSources {
         Ok(policy)
     }
 
+    /// Initial opt-in budget for runtime-owned coefficients.
+    pub(super) fn leb_cache_bytes(&self) -> Result<Option<usize>> {
+        let invalid = |value: &str| crate::errors::Error::InvalidLebReader {
+            value: value.to_owned(),
+        };
+        if let Some(value) = self.environment("LIBEPHEMERIS_LEB_CACHE_MB") {
+            return value
+                .trim()
+                .parse::<usize>()
+                .ok()
+                .and_then(|mib| mib.checked_mul(1024 * 1024))
+                .map(Some)
+                .ok_or_else(|| {
+                    invalid("LIBEPHEMERIS_LEB_CACHE_MB requires a nonnegative integer in MiB")
+                });
+        }
+        self.table
+            .get("leb_cache_bytes")
+            .map(|value| {
+                value
+                    .as_integer()
+                    .and_then(|bytes| usize::try_from(bytes).ok())
+                    .ok_or_else(|| invalid("leb_cache_bytes requires a nonnegative integer"))
+            })
+            .transpose()
+    }
+
     /// Native logging threshold from environment, dotenv, TOML and default.
     /// Values use conventional numeric log severity levels, without logging I/O.
     pub fn log_level(&self) -> i32 {

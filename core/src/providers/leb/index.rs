@@ -77,6 +77,7 @@ pub struct LebChunkCache {
     // Only owned/static/shared contiguous images use partial decoded windows.
     // Indexed leases and mmap acquisition retain their original decode route.
     segment_windows: bool,
+    managed: Option<super::process_cache::ManagedCache>,
 }
 
 /// Immutable per-body directories paired with the cache owner's snapshot.
@@ -203,6 +204,7 @@ impl LebChunkCache {
             resources: None,
             word_image_identity: None,
             segment_windows: false,
+            managed: None,
         }
     }
 
@@ -218,6 +220,15 @@ impl LebChunkCache {
         let mut cache = Self::with_image_byte_budget(max_bytes);
         cache.segment_windows = true;
         cache
+    }
+
+    pub(super) fn use_process_cache(&mut self, pool: Arc<super::process_cache::ProcessCache>) {
+        if let Some(image) = self.word_image_identity {
+            self.managed = Some(super::process_cache::ManagedCache::new(pool, image));
+            // Retain complete chunks in the process pool. Windowing could
+            // otherwise decompress the same frame repeatedly for nearby rows.
+            self.segment_windows = false;
+        }
     }
 
     pub(super) fn word_image_identity(&self) -> Option<std::num::NonZeroU64> {
@@ -303,6 +314,9 @@ impl LebChunkCache {
     /// their shared owner and conservative extra map metadata; historical dense
     /// map/Arc overhead remains excluded.
     pub fn memory_usage(&self) -> (usize, usize) {
+        if let Some(cache) = self.managed.as_ref().filter(|cache| cache.enabled()) {
+            return cache.memory_usage();
+        }
         let inner = self.lock_inner();
         (inner.resident_bytes, inner.max_bytes)
     }
@@ -318,6 +332,11 @@ impl LebChunkCache {
             inner.entries.clear();
             inner.resident_bytes = 0;
         }
+        drop(inner);
+        // An explicit per-image override leaves the shared process pool.
+        if let Some(cache) = &self.managed {
+            cache.disable();
+        }
     }
 
     /// Release retained decoded coefficients, without closing the image or resetting
@@ -326,6 +345,9 @@ impl LebChunkCache {
     /// entries. This is not an image reset: never reuse the cache with another
     /// container after clearing.
     pub fn clear(&self) {
+        if let Some(cache) = &self.managed {
+            cache.clear();
+        }
         let mut inner = self.lock_inner();
         inner.entries.clear();
         inner.resident_bytes = 0;
@@ -333,6 +355,9 @@ impl LebChunkCache {
 
     /// `(hits, misses, resident_entries)` for measurement.
     pub fn stats(&self) -> (u64, u64, usize) {
+        if let Some(cache) = self.managed.as_ref().filter(|cache| cache.enabled()) {
+            return cache.stats();
+        }
         let inner = self.lock_inner();
         (inner.hits, inner.misses, inner.entries.len())
     }
@@ -390,6 +415,9 @@ impl LebChunkCache {
         index: Option<&FileIndex>,
         decode: impl FnOnce() -> Result<TrackedVec<f64>>,
     ) -> Result<CachedStorage> {
+        if let Some(cache) = self.managed.as_ref().filter(|cache| cache.enabled()) {
+            return cache.get_or_decode(key, decode).map(CachedStorage::Dense);
+        }
         if let Some(hit) = self.hit(&key) {
             if index.is_some() || matches!(hit, CachedStorage::Dense(_)) {
                 return Ok(hit);

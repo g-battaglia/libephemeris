@@ -170,6 +170,7 @@ def capture(options):
 
     spec = json.loads(options.spec.read_text(encoding="utf-8"))
     build = identity(options.wheel, options.commit, options.build_options)
+    build["leb_cache_mib"] = os.environ.get("LIBEPHEMERIS_LEB_CACHE_MB")
     if options.role == "baseline" and build["version"] != "4.0.0":
         raise PrerequisiteError("baseline interpreter must have the published 4.0.0 wheel")
     part = options.output.with_suffix(".partial")
@@ -189,6 +190,10 @@ def capture(options):
                 result = outcome(fn, args)
                 if index < 2 and "error" in result:
                     fn(*args)  # Fail loudly when an expected supported route cannot calculate Mars.
+                if index == 0 and mode != "skyfield" and build["leb_cache_mib"] is not None:
+                    usage = eph.get_leb_cache_usage()
+                    if usage is None or usage[1] != int(build["leb_cache_mib"]) * 1024**2:
+                        raise PrerequisiteError("candidate did not activate the requested LEB process cache")
                 row = [mode, tier, index, api, encode(args), result]
                 print(dump(row), file=out)
                 coverage[f"{mode}/{tier}/{api}"] += 1
@@ -274,7 +279,10 @@ def run(options):
                 if value is not None:
                     args.extend(["--" + name.replace("_", "-"), str(value)])
             with (options.output / f"{role}.log").open("w", encoding="utf-8") as log:
-                status = subprocess.run(args, cwd=tmp, env=environment(data), stderr=log).returncode
+                env = environment(data)
+                if role == "candidate" and options.candidate_cache_mib is not None:
+                    env["LIBEPHEMERIS_LEB_CACHE_MB"] = str(options.candidate_cache_mib)
+                status = subprocess.run(args, cwd=tmp, env=env, stderr=log).returncode
             if status:
                 raise ValueError(f"{role} capture failed ({status}); see {log.name}")
 
@@ -293,6 +301,7 @@ def main():
     runner.add_argument("--profile", choices=("smoke", "full"), default="smoke")
     runner.add_argument("--data", type=Path, required=True)
     runner.add_argument("--output", type=Path, required=True)
+    runner.add_argument("--candidate-cache-mib", type=int)
     for role in ("baseline", "candidate"):
         runner.add_argument(f"--{role}", type=Path, required=True)
         runner.add_argument(f"--{role}-wheel", type=lambda p: Path(p).resolve())
@@ -311,6 +320,8 @@ def main():
     options = cli.parse_args()
     try:
         if options.action == "run":
+            if options.candidate_cache_mib is not None and options.candidate_cache_mib < 0:
+                cli.error("the candidate cache size must be nonnegative")
             return run(options)
         if options.action == "capture":
             capture(options)
