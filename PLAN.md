@@ -814,4 +814,34 @@ Run the paired benchmark in `tools/bench/benchmark.py` with and without
 For a scalar-only replay, use `bitdiff.py run --profile auto-centers
 --candidate-positional-centers` with the same wheel as both inputs. Raw reports
 and the sampling trace are in `target/bench/spk-positional-qualification/`.
-The all-mode corpus and revised latency measurements are still open.
+The first prototype also matched the published wheel on all 2,100,000
+corpus calls on macOS with the 32 MiB LEB cache enabled. The revised
+wheel (`dd21b595`, SHA-256
+`54628e7c9c84b6cbb069b441905a3ad5bf29ab560b697adb0ad90688c845c5d6`)
+again matched 20,000 focused calls. All 155 SPK tests and 1,486 Python tests
+passed. The revised full corpus and 100,000-chart 1/2/4/8-process runs
+are underway.
+
+| Metric, same revised wheel and setup | Owned | Positional, checks around uncached reads |
+| --- | ---: | ---: |
+| RSS after 5,000 random charts | 274.3 MB | 73.5 MB |
+| Physical footprint after 5,000 random charts | 259.1 MB | 58.1 MB |
+| Median random chart | 1,193 µs | 1,040 µs |
+| p95 random chart | 1,247 µs | 1,093 µs |
+| Median first call with OS pages warm | 75.2 ms | 68.5 ms |
+
+### Existing indexed LEB reader
+
+The separate base and medium `leb` trial used the same revised wheel and data
+for both storage policies, five fresh processes and 2,000 charts per
+timing repeat. The 100,000-chart memory trial above supplies the RSS figures.
+
+| Tier | RSS after 100,000 charts | Median random chart | Median consecutive chart |
+| --- | ---: | ---: | ---: |
+| base | 57.0 → 51.5 MB | 556.5 → 812.0 µs | 110.7 → 114.1 µs |
+| medium | 94.3 → 52.4 MB | 556.6 → 816.2 µs | 116.4 → 121.0 µs |
+
+The indexed policy reduces retained heap, with a roughly 46% cost on this
+random-date workload. The medium memory saving warrants checking a larger
+coefficient cache under the positional reader's live allocation limits.
+No release default has been selected.
