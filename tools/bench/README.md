@@ -75,13 +75,17 @@ or `--memory-calls` to select a smaller diagnostic run. Threading and process
 memory are measured through the Python binding. Measure performance with
 competing jobs stopped, including validation jobs, and retain raw samples.
 
-The cold-start workload records import, first calculation and first full
-chart after that calculation. `page_cache_warm` reflects preflight input reads
-and a fresh worker. `first_use` is a fresh process with no additional
-persistent preparation in 4.0.0. The driver reports `page_cache_cold` as an
-unavailable prerequisite because input hashing warms pages and there is no
-portable way to verify eviction. Do not confuse a fresh process with cold OS
-pages.
+Use `--series-calls` to change the length of the consecutive single-body
+time series, which defaults to 100,000 calls.
+
+The cold-start workload records import time, first calculation and first
+full chart in each fresh process. With `page_cache_warm`, the driver reads
+all staged inputs immediately before each timed process. With `first_use`,
+the input staging reads are the only preparation. Both conditions start
+with empty process-local decoder and coefficient caches. A previously
+decoded persistent store is outside these configurations. The driver
+reports `page_cache_cold` as an unmet prerequisite because it cannot verify
+eviction after validating the inputs.
 
 Linux uses `/proc/PID/status` and `smaps_rollup`. Sum of PSS apportions shared
 pages and is the available estimate of the group's attributable resident

@@ -652,3 +652,18 @@ each capture's progress by mode and tier every 50,000 calls. The diagnostic
 change passed all nine comparator tests and the 10,000-call macOS smoke
 comparison with zero differences. It leaves the corpus and capture schema
 unchanged.
+
+The complementary timing matrix passed on macOS for both isolated wheels.
+Each wheel completed all 42 mode/tier combinations of repeated-date charts,
+time series, houses, sidereal time, ayanamsha, stars and topocentric calls.
+Five fresh processes ran each case, with 100 operations per timing repeat
+and 1,000 calls per series. Reports are
+`target/bench/family-matrix-{baseline,candidate}.json`. These runs shared
+the host with memory qualification, so they establish workload coverage.
+Dedicated performance comparisons use the raw timing samples under
+controlled conditions.
+
+The fresh-process startup report now includes import, first-call and first-
+chart medians and p95s. The warm-page condition explicitly primes the staged
+inputs. First use has only the staging reads. Both controls passed a
+five-repeat base/leb run and rejected the claim of verified cold OS pages.
