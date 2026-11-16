@@ -25,6 +25,7 @@ def main():
     parser.add_argument("--profile", choices=("smoke", "full"), default="smoke")
     parser.add_argument("--candidate-cache-mib", type=int)
     parser.add_argument("--candidate-positional-centers", action="store_true")
+    parser.add_argument("--leb-reader", choices=("owned", "indexed"))
     parser.add_argument("--output", type=Path, default=ROOT / "target/bench/wheel-check")
     options = parser.parse_args()
     candidate_wheel, = (ROOT / "dist").glob("*.whl")
@@ -74,6 +75,8 @@ def main():
             comparison.extend(("--candidate-cache-mib", str(options.candidate_cache_mib)))
         if options.candidate_positional_centers:
             comparison.append("--candidate-positional-centers")
+        if options.leb_reader:
+            comparison.extend(("--leb-reader", options.leb_reader))
         return subprocess.run(comparison, cwd=root).returncode
 
 

@@ -28,6 +28,10 @@ on:
         description: Enable the positional center experiment only on the candidate
         type: boolean
         default: false
+      compare_indexed_leb:
+        description: Use the indexed LEB reader on both sides of the comparison
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -184,6 +188,7 @@ jobs:
           BITDIFF_PROFILE: ${{ inputs.bitdiff_profile || 'smoke' }}
           BITDIFF_CACHE_MIB: ${{ inputs.candidate_cache_mib }}
           BITDIFF_POSITIONAL_CENTERS: ${{ inputs.candidate_positional_centers }}
+          BITDIFF_INDEXED_LEB: ${{ inputs.compare_indexed_leb }}
           PYTHON_312: ${{ steps.python312.outputs.python-path }}
         run: |
           args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
@@ -192,6 +197,9 @@ jobs:
           fi
           if [[ "$BITDIFF_POSITIONAL_CENTERS" == true ]]; then
             args+=(--candidate-positional-centers)
+          fi
+          if [[ "$BITDIFF_INDEXED_LEB" == true ]]; then
+            args+=(--leb-reader indexed)
           fi
           "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 
