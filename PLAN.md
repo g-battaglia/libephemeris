@@ -639,10 +639,19 @@ differences**, using the same published and rebuilt wheels as the first run.
 Its captures and comparison JSON are in `target/bench/full-private/`.
 
 The hosted 10,000-call check passed on Linux x86-64, Linux ARM64 and Windows
-x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157);
-the Windows full job is pending. A sample of the random-date base/leb workload on the published
-wheel put Zstandard decompression and LEB coefficient unpacking at the top of
+x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157).
+The Windows job was canceled after the 90-minute job limit elapsed. Its logs
+show all LEB assets provisioned, followed by the cancellation. The
+[diagnostic run](https://github.com/g-battaglia/libephemeris/actions/runs/43867334410)
+adds progress during the corpus capture. A sample of the random-date base/leb workload on the
+published wheel put Zstandard decompression and LEB coefficient unpacking at the top of
 the stacks, supporting the cache experiment once qualification is resolved.
+
+The hosted qualification now reports pinned data provisioning and prints
+each capture's progress by mode and tier every 50,000 calls. The diagnostic
+change passed all nine comparator tests and the 10,000-call macOS smoke
+comparison with zero differences. It leaves the corpus and capture schema
+unchanged.
 
 ## 15. Step 1a experiment
 
@@ -690,6 +699,24 @@ and 130 µs per chart at 1, 2, 4 and 8 threads (legacy: 557, 348, 264 and
 The installed-wheel suite passed 1,485 tests in each of the legacy and
 32 MiB configurations. The standalone CLI regression also verified that
 `status -vv` reports the budget before any coefficient acquisition.
+
+### Decoder-workspace experiment
+
+The isolated `codex/leb-decoder-workspace` branch reused one direct zstd
+context per thread for owned, bounded, single-frame decoding. Indexed
+resource admissions and the streaming route used the existing decoder
+paths. All 243 LEB tests passed, including recovery from a corrupt frame
+after a successful decode.
+
+Compared with `31f55eee`, the experimental `2f6d6e61` wheel moved random
+chart medians from 555.5 to 553.5 µs in base and 558.2 to 555.1 µs in medium.
+Consecutive medians moved from 110.5 to 110.7 µs and from 115.8 to 116.5 µs.
+These are five independent 2,000-chart repeats per mode and tier on macOS
+arm64 with the legacy coefficient cache. Zstandard reported 95,984 retained
+bytes per decoder. An eight-thread control retained 671,888 bytes across
+seven threads that decoded and returned to zero after those threads joined.
+The timing changes are below 1%. The release candidate keeps its existing
+decoder lifetime. Reports are under `target/bench/leb-workspace-qualification/`.
 
 ## 16. Step 1b opening-copy experiment
 
