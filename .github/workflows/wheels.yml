@@ -4,7 +4,22 @@ name: Wheel build and tests
 on:
   push:
     branches: [main, beta-v4, 'release/**']
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'python/**'
+      - 'tools/bench/**'
+      - 'tools/tests/test_performance_bitdiff.py'
+      - 'Cargo.*'
+      - 'pyproject.toml'
+      - '.github/workflows/wheels.yml'
   workflow_dispatch:
+    inputs:
+      bitdiff_profile:
+        description: Numerical comparison corpus
+        type: choice
+        options: [smoke, full]
+        default: smoke
 
 permissions:
   contents: read
@@ -13,7 +28,7 @@ jobs:
   wheels:
     name: ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -67,6 +82,7 @@ jobs:
           args: --release --locked --out dist
 
       - name: Test installed wheel on Python 3.12 and 3.14
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           PYTHON_312: ${{ steps.python312.outputs.python-path }}
@@ -154,11 +170,18 @@ jobs:
           raise SystemExit(1 if failed else 0)
           PY
 
+      - name: Compare wheel outputs with the published release
+        shell: bash
+        env:
+          BITDIFF_PROFILE: ${{ inputs.bitdiff_profile || 'smoke' }}
+          PYTHON_312: ${{ steps.python312.outputs.python-path }}
+        run: '"$PYTHON_312" tools/bench/wheel_check.py --profile "$BITDIFF_PROFILE" --output reports/bitdiff'
+
       # Type-check test-only native code too; ignored tests still have to
       # compile on Windows. Do not block independent Python diagnostics, and
       # do not execute the Rust test suite.
       - name: Check Rust test portability on Windows
-        if: always() && runner.os == 'Windows'
+        if: always() && runner.os == 'Windows' && github.event_name != 'pull_request'
         shell: bash
         run: cargo check --locked --all-features --all-targets -p libephemeris-core
 

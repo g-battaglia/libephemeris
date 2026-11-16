@@ -8,3 +8,7 @@ resolver = "3"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+[profile.profiling]
+inherits = "release"
+debug = "line-tables-only"

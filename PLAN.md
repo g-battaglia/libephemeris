@@ -569,3 +569,27 @@ The owner can overrule any of them.
 Phase 0, then step 1a (global configurable cache) and step 1b (lazy open and
 positional reads). Everything else stays in this plan as options to be
 selected from the measured results; none of it needs to be decided now.
+
+## 14. Phase 0 implementation checklist
+
+- [x] Isolated published and candidate wheel environments, with matching Python
+  and NumPy and recorded extension and wheel SHA-256.
+- [x] Pinned input inventory, provider preflight, timing and memory drivers,
+  and a native timing example.
+- [x] Streaming bit comparison, compressed captures, coverage summary and
+  tests that detect changes to bits, result shape, flags, warnings and errors.
+- [x] Add the 10,000-call PR check and manual full mode to the wheel workflow.
+- [x] Document commands and profiling in [tools/bench/README.md](tools/bench/README.md).
+- [ ] Complete numerical qualification across the wheel matrix and record
+  discrepancies, incomplete checks and consumer test results.
+- [ ] Complete the baseline timing and RAM matrix. Deferring the cache budget
+  selection until both can be compared against these measurements.
+
+Local reports and logs are under `target/bench/`. The first five-repeat
+candidate run on macOS arm64 (Python 3.12, base/leb, 500 charts per repeat)
+measured **857 µs** per random-date chart and **171 µs** per consecutive-date
+chart, compared with the reported 862 and 180 µs. On the published wheel, a
+single base/leb worker reached approximately **56 MB RSS** and **34 MB physical
+footprint** after 100,000 random-date charts. It used an explicitly staged
+base core. These numbers qualify that specific setup and workload. They do not
+reproduce the original unspecified mixed-use memory workload.
