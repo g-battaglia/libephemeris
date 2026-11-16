@@ -1708,8 +1708,12 @@ and version. The API v6 and v7 replays matched all 2,647 outcomes on both
 the preceding wheel and the published wheel, including the messages of
 the 99 existing non-passing cases. The exact wheel's external scientific
 replay has matched all 21,359 published pytest outcomes, with identical
-fixture digests and harness settings. The standalone stages are in
-progress. Their comparison is queued against the same published run.
+fixture digests and harness settings. The same comparison matched all
+273 standalone round statuses, all 19 verification statuses and both
+parity reports. The wrapper evidence matched for the 269 rounds that
+produced it and all 19 verification cases. Four shared round timeouts
+had no wrapper evidence. The paired report is
+`target/bench/leb-medium-private-snapshot/positional-production/validation-campaign-comparison.json`.
 
 A local warm-page acquisition profile (`15e92dbb`) measured one
 private core acquisition per process across 12 repeats for each digest
@@ -1855,6 +1859,27 @@ rose from 6.7 to 17.1 ms. The Python registry added a separate
 This supports targeting multiprocess deployments and retaining the
 ordinary path for single-process defaults until the acquisition
 cost can be reduced. Raw files are in `target/bench/linux-medium-lab/`.
+
+Five further unprivileged repeats per count (one and eight workers,
+2,000 charts each) removed the duplicate Python digest while retaining
+the Rust admission check. All chart digests matched. At one worker,
+the median registry stage fell to 8.4 ms across these repeats. The
+ordinary and sealed first-call medians, measured after the registry
+stage, were 7.1 and 17.6 ms. At eight workers, the median first-call
+time across the per-run medians was 14.6 → 35.3 ms, again excluding
+the lab registry stage. A native opt-in registry prototype is in
+qualification. It removes the external coordination step by publishing
+live descriptors from the library, and preserves ordinary acquisition
+if the private directory or sealed descriptor cannot be used.
+The first installed-wheel run (`1190ed38`, ARM64, UID 65534) matched
+all eight worker digests over 3,000 full-coverage charts each. One
+worker created the image. A replacement reused it after that worker
+exited. After every holder exited, a fresh worker recreated it. A
+missing, public or symlinked directory, a busy directory lock and an
+incorrect sealed image all fell back to the owned path with identical
+results. Worker PSS was 443.0 → 182.6 MB, and cgroup `anon + file`
+was 514.9 → 254.4 MB. First-call median was 11.1 → 31.0 ms. The
+100,000-chart repeat of this native registry is running.
 
 ## 15. Step 1a experiment
 
