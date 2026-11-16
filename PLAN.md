@@ -806,9 +806,10 @@ The [optimization check](https://github.com/g-battaglia/libephemeris/actions/run
 applies the same isolated correction to the reference and optimized wheels
 and uses Rust 1.99.1 for both builds. The indexed and positional
 configuration of the optimized wheel matched all 2,100,000 requests.
-The same corrected-reference corpus is running on Linux ARM64 and
-x86-64 for [indexed readers](https://github.com/g-battaglia/libephemeris/actions/runs/43909331459)
+The same corrected-reference corpus passed on Linux ARM64 and x86-64
+for [indexed readers](https://github.com/g-battaglia/libephemeris/actions/runs/43909331459)
 and [the 32 MiB owned reader](https://github.com/g-battaglia/libephemeris/actions/runs/43909331865).
+Each configuration matched all 2,100,000 calls on each architecture.
 A separate
 [strict run](https://github.com/g-battaglia/libephemeris/actions/runs/43882398843)
 with the unmodified runtime and the published Windows Rust toolchain
