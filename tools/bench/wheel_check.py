@@ -25,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=PROFILES, default="smoke")
     parser.add_argument("--linux-memory", action="store_true")
+    parser.add_argument("--repeat-candidate", action="store_true")
     parser.add_argument("--output", type=Path, default=ROOT / "target/bench/wheel-check")
     options = parser.parse_args()
     if options.linux_memory and sys.platform != "linux":
@@ -65,18 +66,21 @@ def main():
                     if digest(path) != KERNEL_PINS[file_name]:
                         raise ValueError(f"downloaded {file_name} does not match its pin")
         candidate_commit = command("git", "rev-parse", "HEAD")
+        reference = candidate if options.repeat_candidate else baseline
+        reference_wheel = candidate_wheel if options.repeat_candidate else baseline_wheel
+        reference_commit = candidate_commit if options.repeat_candidate else "python-v4.0.0"
         comparison_command = [
             sys.executable, str(ROOT / "tools/bench/bitdiff.py"), "run", "--profile", options.profile,
             "--data", str(data),
-            "--baseline", str(baseline), "--baseline-wheel", str(baseline_wheel),
-            "--baseline-commit", "python-v4.0.0",
+            "--baseline", str(reference), "--baseline-wheel", str(reference_wheel),
+            "--baseline-commit", reference_commit,
         ]
         comparison = subprocess.run([
             *comparison_command, "--output", str(options.output.resolve()), "--candidate", str(candidate),
             "--candidate-wheel", str(candidate_wheel), "--candidate-commit", candidate_commit,
             "--candidate-build-options", "maturin build --release --locked (wheel matrix)",
         ], cwd=root).returncode
-        if options.profile == "auto-edge":
+        if options.profile == "auto-edge" and not options.repeat_candidate:
             control = subprocess.run([
                 *comparison_command, "--output", str(options.output.resolve() / "published-control"),
                 "--candidate", str(baseline), "--candidate-wheel", str(baseline_wheel),

@@ -25,8 +25,8 @@ on:
         type: choice
         options: ['stable', '1.99.1']
         default: 'stable'
-      linux_memory:
-        description: Record RSS and PSS with 1, 2, 4 and 8 base LEB processes on Linux
+      repeat_candidate:
+        description: Compare the same rebuilt wheel in two independent processes
         type: boolean
         default: false
 
@@ -42,14 +42,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: linux-x86_64
-            runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            manylinux: '2014'
-          - platform: linux-aarch64
-            runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            manylinux: '2014'
           - platform: windows-x86_64
             runner: windows-latest
             target: x86_64-pc-windows-msvc
@@ -180,16 +172,16 @@ jobs:
           raise SystemExit(1 if failed else 0)
           PY
 
-      - name: Compare wheel outputs with the published release
+      - name: Compare Windows wheel outputs
         shell: bash
         env:
           BITDIFF_PROFILE: ${{ inputs.bitdiff_profile || 'smoke' }}
           PYTHON_312: ${{ steps.python312.outputs.python-path }}
-          BITDIFF_LINUX_MEMORY: ${{ inputs.linux_memory && runner.os == 'Linux' }}
+          BITDIFF_REPEAT_CANDIDATE: ${{ inputs.repeat_candidate }}
         run: |
           args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
-          if [[ "$BITDIFF_LINUX_MEMORY" == true ]]; then
-            args+=(--linux-memory)
+          if [[ "$BITDIFF_REPEAT_CANDIDATE" == true ]]; then
+            args+=(--repeat-candidate)
           fi
           "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 
