@@ -733,6 +733,18 @@ calls with zero differences. Its report records the 32 MiB cache and
 positional centers as enabled on the optimized wheel. Raw captures are
 in `target/bench/corrected-reference-owned-full-mac/`.
 
+The composed stack also passed the Rust release suite with
+`bundled-data,nbody,python-internals` and the pinned v3 test fixture.
+It reports 3,246 passing library tests, 18 ignored library tests, and
+passing integration and documentation tests. The installed-wheel Python
+suite passed all 1,486 tests with the bundled test core pinned as in CI.
+The first Python run selected the base core in the user's larger data
+directory and failed the inventory test on the uncovered-date review
+status. The unchanged and optimized wheels both reproduce that focused
+failure with the larger directory selection. Both pass when the explicit
+test core is pinned outside that directory. The raw qualification logs
+are `target/bench/optimized-corrected-{rust,python-pinned}-suite.log`.
+
 The full external Swiss comparison ran the fast and slow pytest lanes
 against both wheel overlays with network policy sealed. Each run evaluated
 21,359 cases. Both had 147 skips and the same 62 failing case IDs. The
