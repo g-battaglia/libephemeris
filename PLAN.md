@@ -639,12 +639,22 @@ differences**, using the same published and rebuilt wheels as the first run.
 Its captures and comparison JSON are in `target/bench/full-private/`.
 
 The saved full comparison was replayed to inventory actual position
-requests. It identifies 36 mode/tier/entry-point cases, ten target
-classes and 16,406 distinct requested flag masks across those cases.
+requests. It identifies 36 mode/tier/entry-point cases, ten target or
+diagnostic categories and 16,406 distinct requested flag masks.
 The planet-centric cases use Earth as their center (ID 14). The inventory
 preserves exact masks and includes requests that produced errors.
 The replay still reports zero differences on 2,100,000 requests.
 See `target/bench/full-private/comparison-with-inventory.json`.
+
+ID 9599 is in the planetary-moon namespace, but has no named satellite
+in the library's public catalog. A supplemental macOS Skyfield medium
+capture registered Charon's alias and three named Pluto satellite IDs
+from the local `plu017.bsp` fixture. Its manifest records the SHA-256 and
+descriptor coverage. Module positions and the direct moon API used five
+epochs, including segment edges and immediate neighbors, with four flag
+sets. All 320 requests matched bit for bit on the unchanged and composed
+wheels against the published wheel. The published capture contains 88
+values. The command and raw files are under `target/bench/moon-bits/`.
 
 The hosted 10,000-call check passed on Linux x86-64, Linux ARM64 and Windows
 x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157).
@@ -839,6 +849,16 @@ capture and zero in the rebuilt capture. Both reports retain the original
 measurements and this case is flagged for residency pressure when
 interpreting its RSS.
 
+For Auto medium, both macOS wheels completed the same companion-inclusive
+case at 1/2/4/8 processes. At eight, published/rebuilt summed RSS was
+4957.6/4959.5 MB and sampled physical footprint was 4814.3/4819.6 MB.
+This pair uses the same input hashes. Its figures are separate from the
+earlier storage screens with different staging layouts.
+
+The ARM64 portion of the [Linux base/Skyfield run](https://github.com/g-battaglia/libephemeris/actions/runs/43886540807)
+completed with 1249.6/1249.0 MB summed RSS and 1112.2/1111.2 MB summed
+PSS at eight processes. The x86-64 job is a separate measurement.
+
 The added macOS timing matrix completed for both wheels with five
 independent samples per case. It covers the two wider random-date
 windows, 36 cases for 1/2/4/8 threads and the consecutive workloads,
@@ -859,6 +879,10 @@ workload with the corrected reference and the default optimized wheel,
 and tests the indexed, process-cache and positional settings on their
 applicable routes. Its commands and reports are under
 `target/bench/phase1-composed-timing/`.
+Four native hot-stack samples are queued after that sweep. They cover
+base chart components, medium indexed LEB, medium positional Auto and
+medium Skyfield. The profiling build, staged-input manifests, requests
+and output will be under `target/bench/phase1-composed-profiles/`.
 
 A paired macOS base/LEB run compared the Python wrapper with the native
 release example using the same dates and pinned inputs. Across five
@@ -880,6 +904,8 @@ private staged inputs and verifies zero resident pages directly through
 `mincore`. Tests cover nonzero residency, the final partial page and the
 per-page presence bit. A failed cold prerequisite retains an explicit
 report and the driver continues the other startup measurements.
+The [revised startup workflow](https://github.com/g-battaglia/libephemeris/actions/runs/43895329805)
+uses direct residency checks on both Linux architectures.
 
 The remaining baseline PSS and anonymous/file splits run as separate
 Linux cases for [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),

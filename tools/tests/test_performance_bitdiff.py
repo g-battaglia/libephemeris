@@ -75,7 +75,7 @@ def test_position_inventory_uses_captured_requests_including_errors(tmp_path):
             api="context.calc_pctr", args=(2451545., 9599, 14, 16658))
     assert compare(path, path)["position_inventory"] == {
         "leb/base/context.calc_pctr": {
-            "body_ids_by_class": {"planetary_moon": [9599]},
+            "body_ids_by_class": {"unresolved_planetary_moon_id": [9599]},
             "center_ids": [14],
             "requested_flags": [16658],
         },

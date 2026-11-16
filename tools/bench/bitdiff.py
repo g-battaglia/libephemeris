@@ -27,7 +27,7 @@ FLAGS = (
     8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2228280,
 )
 # Orthodox planets, nodes, apsides, Earth, major asteroids, fictitious,
-# numbered asteroid, planetary moon, ecliptic/nutation and invalid ID.
+# numbered asteroid, unknown satellite ID, ecliptic/nutation and invalid ID.
 BODIES = (*range(23), 40, 55, 10001, 100433, 9599, -1, -9999)
 BODY_CLASSES = {
     body: name
@@ -39,7 +39,7 @@ BODY_CLASSES = {
         ("named_minor_body", range(15, 21)),
         ("fictitious_body", (40, 55)),
         ("numbered_asteroid", (10001, 100433)),
-        ("planetary_moon", (9599,)),
+        ("unresolved_planetary_moon_id", (9599,)),
         ("ecliptic_nutation", (-1,)),
         ("invalid_sentinel", (-9999,)),
     )
