@@ -776,6 +776,28 @@ Linux x86-64 likewise recorded 432.5/432.7 MB summed RSS and
 256.4/256.4 MB summed PSS for the two wheels at eight processes.
 [Linux memory run](https://github.com/g-battaglia/libephemeris/actions/runs/43875470097)
 
+The macOS paired baseline has completed all LEB checkpoints at 1/2/4/8
+processes, with 100,000 random charts per process and the companion files
+for the selected tier. At eight processes, published/rebuilt summed RSS
+was 450.2/454.3 MB for base and 668.1/665.5 MB for medium. Sampled
+per-process physical footprints summed to 275.6/274.9 and 514.5/521.7 MB
+respectively. Each pair used identical input hashes, epochs and flags.
+These per-tier installations are distinct from the mixed-installation
+tests used to select an indexed cache budget. Raw Mac snapshots and
+reports are in `target/bench/phase0-macos-memory/`.
+
+The unchanged external `leb all` campaign is running sequentially against
+the published and composed wheel overlays with network policy sealed.
+This adds the standalone rounds, verification scripts and parity
+matrix to the external pytest cases. Raw console logs are in
+`target/bench/validation-complete-{published,optimized}.log`.
+The paired Step 1 timing sweep is queued behind the active local
+memory, timing and external-validation processes. It samples each
+workload with the corrected reference and the default optimized wheel,
+and tests the indexed, process-cache and positional settings on their
+applicable routes. Its commands and reports are under
+`target/bench/phase1-composed-timing/`.
+
 A paired macOS base/LEB run compared the Python wrapper with the native
 release example using the same dates and pinned inputs. Across five
 fresh-process repeats of 5,000 charts, Python/native consecutive medians
