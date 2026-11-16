@@ -1097,6 +1097,19 @@ resident pages more than once.
 | medium | 4 | 378.2 → 257.6 MB |
 | medium | 8 | 753.6 → 377.1 MB |
 
+The eight-process repeats at 2 and 4 MiB cover the same mixed installation
+and 100,000 random charts per process:
+
+| Indexed ceiling | Base summed RSS | Medium summed RSS |
+| --- | ---: | ---: |
+| 2 MiB | 419.1 MB | 421.1 MB |
+| 4 MiB | 505.3 MB | 509.4 MB |
+| 6 MiB | 515.7 MB | 377.1 MB |
+
+For base, 2 MiB lowered eight-process RSS by about 8% relative to owned.
+Its separate quiet timing run had about 4.5% higher median chart latency.
+The two additional reports are `mixed-indexed-{2,4}-8x100k.json`.
+
 For eight medium workers the sum of each process's peak RSS was
 753.6 → 513.4 MB. Peaks can occur at different times. The full provisioned
 base layout does not support a default switch based on RSS. The indexed
