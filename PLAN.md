@@ -842,7 +842,7 @@ The default selection still compares against the published wheel.
 The [default-configuration corrected comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43918145944)
 at `18ce19be` used legacy LEB retention and the default center reader.
 The archived ARM64 and x86-64 Linux captures each matched all 2,100,000
-requests, with 350,000 per mode and tier. The Windows job is in progress.
+requests, with 350,000 per mode and tier. The Windows job also passed.
 The later SPK lookup change has a separate run in the same PR.
 
 On macOS, the composed optimization stack passed all 2,100,000 calls
@@ -1152,6 +1152,16 @@ the three requested features and the pinned v3 test input. Integration
 and documentation tests passed. The isolated wheel's Python suite
 passed 1,486 tests. The unchanged consumer and external replays are
 running under `target/bench/spk-registration-lookup/current-suites/`.
+
+The combined default wheel at `39692f97` matched all 2,100,000 macOS
+calls against corrected reference `d86cea0f`. The comparator counted six
+warning-emitting calls on each wheel, with no differences in their
+results. The complete comparison had 350,000 calls per mode and tier.
+Rust release tests on the corresponding runtime passed 3,248 library
+tests after the policy-switch test was updated to check contiguous
+bytes instead of requiring a heap copy. Integration and documentation
+tests passed. The wheel passed all 1,486 Python tests. Raw output is in
+`target/bench/combined-final-candidate/`.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.
 
@@ -1449,6 +1459,22 @@ The initial steady-state slowdown did not recur. Warm-page first-call
 medians were 1.54 / 1.56 ms on the reference and 1.90 / 1.85 ms on the
 candidate. The startup cost remains visible during qualification.
 Raw results are under `target/bench/leb-static-base-snapshot/`.
+
+The medium-tier investigation adds a local lab probe for a file-backed
+snapshot. It opens a separate APFS clone of a verified staged medium
+core in a private directory. It maps the clone read-only and removes
+its path before publishing the reader to the runtime. It retains no
+writable alias. The source and clone are distinct inodes with
+copy-on-write data. [Apple clonefile documentation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/man/man2/clonefile.2)
+
+A native core-only preflight matched position words, returned flags
+and house output over 1,000 random charts. At one process, steady RSS
+was 48.2 → 19.0 MB and sampled footprint was 41.5 → 5.4 MB. The existing
+mapped reader used a different decoded-window policy in that preflight.
+The follow-up uses the same window policy on both paths for 100,000
+charts at 1/2/4/8 workers. This is a local macOS experiment with
+an explicit core. Default medium memory remains open. Raw files are
+under `target/bench/leb-medium-private-snapshot/`.
 
 ## 15. Step 1a experiment
 
