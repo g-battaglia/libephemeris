@@ -83,13 +83,17 @@ coefficient bytes at each memory checkpoint. For the numerical comparison,
 Omit these flags for the legacy baseline. `--leb-reader indexed` selects
 the independently budgeted positional LEB reader for comparison.
 
-The cold-start workload records import, first calculation and first full
-chart after that calculation. `page_cache_warm` reflects preflight input reads
-and a fresh worker. `first_use` is a fresh process with no additional
-persistent preparation in 4.0.0. The driver reports `page_cache_cold` as an
-unavailable prerequisite because input hashing warms pages and there is no
-portable way to verify eviction. Do not confuse a fresh process with cold OS
-pages.
+Use `--series-calls` to change the length of the consecutive single-body
+time series, which defaults to 100,000 calls.
+
+The cold-start workload records import time, first calculation and first
+full chart in each fresh process. With `page_cache_warm`, the driver reads
+all staged inputs immediately before each timed process. With `first_use`,
+the input staging reads are the only preparation. Both conditions start
+with empty process-local decoder and coefficient caches. A previously
+decoded persistent store is outside these configurations. The driver
+reports `page_cache_cold` as an unmet prerequisite because it cannot verify
+eviction after validating the inputs.
 
 Linux uses `/proc/PID/status` and `smaps_rollup`. Sum of PSS apportions shared
 pages and is the available estimate of the group's attributable resident
@@ -125,6 +129,16 @@ result. The dump preserves float words, including NaN payloads and signed
 zero, and checks result structure, returned flags and Python warnings.
 Capture files and the coverage/error summary can be retained as CI artifacts.
 Exit status 1 means a difference, and 2 means no completed comparison.
+
+The manual `auto-edge` profile runs the first 30,000 calls of each
+`auto` tier with pinned LEB companions and SPKs. It omits the LEB and
+Skyfield runs. The wheel workflow also compares the published wheel
+against itself in independent processes and retains the control captures
+in `reports/bitdiff/published-control/`.
+Set the manual workflow's `rust_toolchain` to `1.99.1` to build with the
+toolchain identified in the published Windows 4.0.0 wheel.
+The full manual matrix allows 150 minutes per job. Smoke and focused
+comparisons retain the 90-minute cap.
 
 Run validation and downstream suites using the candidate wheel in isolated
 consumer environments. Where a consumer lock selects a different build, use

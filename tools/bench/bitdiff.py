@@ -34,6 +34,12 @@ SITE_ARGS = [SITE[0], SITE[1], SITE[2]]
 SPEED = 258
 FULL_PER_CONFIG = 350_000
 SMOKE_COUNT = 10_000
+AUTO_EDGE_COUNT = 30_000
+PROFILES = {
+    "smoke": (("leb",), ("base",), SMOKE_COUNT),
+    "full": (MODES, TIERS, FULL_PER_CONFIG),
+    "auto-edge": (("auto",), TIERS, AUTO_EDGE_COUNT),
+}
 
 
 def encode(value):
@@ -261,14 +267,11 @@ def run(options):
     options.output.mkdir(parents=True, exist_ok=True)
     report = options.output / "comparison.json"
     report.unlink(missing_ok=True)
-    full = options.profile == "full"
-    modes = MODES if full else ("leb",)
-    tiers = TIERS if full else ("base",)
-    count = FULL_PER_CONFIG if full else SMOKE_COUNT
+    modes, tiers, count = PROFILES[options.profile]
     matrix = list(itertools.product(modes, tiers))
     with tempfile.TemporaryDirectory(prefix="ephemeris-bitdiff-") as tmp:
         data = Path(tmp) / "data"
-        inventory = prepare(options.data, data, modes, tiers, companions=full)
+        inventory = prepare(options.data, data, modes, tiers, companions=options.profile != "smoke")
         spec_path = Path(tmp) / "spec.json"
         spec_path.write_text(dump({
             "matrix": matrix, "count": count, "seed": SEED,
@@ -309,7 +312,7 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     sub = cli.add_subparsers(dest="action", required=True)
     runner = sub.add_parser("run")
-    runner.add_argument("--profile", choices=("smoke", "full"), default="smoke")
+    runner.add_argument("--profile", choices=PROFILES, default="smoke")
     runner.add_argument("--data", type=Path, required=True)
     runner.add_argument("--output", type=Path, required=True)
     runner.add_argument("--candidate-cache-mib", type=int)

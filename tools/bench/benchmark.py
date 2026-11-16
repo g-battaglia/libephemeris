@@ -257,16 +257,37 @@ def memory_run(args, env, cwd, workers, raw_dir):
 
 
 def summarize(samples):
-    if not samples or "sample_ns" not in samples[0]:
+    if not samples:
         return None
-    raw = list(itertools.chain.from_iterable(row["sample_ns"] for row in samples))
-    columns = zip(*raw) if "columns" in samples[0] else [raw]
+    if "sample_ns" in samples[0]:
+        raw = list(itertools.chain.from_iterable(row["sample_ns"] for row in samples))
+        names = samples[0].get("columns")
+        columns = zip(*raw) if names else [raw]
+        unit = samples[0]["sample_unit"]
+    elif "first_call_ns" in samples[0]:
+        names = ("import", "first_call", "first_chart")
+        columns = ([sample[f"{name}_ns"] for sample in samples] for name in names)
+        unit = "fresh process"
+    else:
+        return None
     result = []
     for values in columns:
         values = sorted(values)
         result.append({"median_ns": statistics.median(values),
                        "p95_ns": values[math.ceil(len(values) * 0.95) - 1]})
-    return {"sample_unit": samples[0]["sample_unit"], "statistics": result}
+    summary = {"sample_unit": unit, "statistics": result}
+    if names:
+        summary["columns"] = names
+    return summary
+
+
+def warm_os_pages(data, names):
+    """Prime the staged inputs immediately before a timed fresh process."""
+    buffer = bytearray(1024 * 1024)
+    for name in names:
+        with (data / name).open("rb", buffering=0) as source:
+            while source.readinto(buffer):
+                pass
 
 
 def run(options):
@@ -294,9 +315,11 @@ def run(options):
                 raw_dir.mkdir(exist_ok=True)
             routes = {}
             for mode, tier, workload in itertools.product(modes, tiers, work):
-                count = SERIES if workload in ("memory", "time_series") else options.calls
+                count = options.calls
                 if workload == "memory":
                     count = options.memory_calls
+                elif workload == "time_series":
+                    count = options.series_calls
                 jds, span = dates(report["data"], tier, mode, workload, count, options.seed, options.window)
                 env = environment(data)
                 if options.leb_cache_mib is not None:
@@ -326,6 +349,8 @@ def run(options):
                         samples.append(memory_run(args, env, tmp, parallel, raw_dir))
                     else:
                         for _ in range(options.repeats):
+                            if workload == "cold_start" and options.cold_condition == "page_cache_warm":
+                                warm_os_pages(data, report["data"])
                             output = subprocess.check_output(args, env=env, cwd=tmp, text=True)
                             samples.append(json.loads(output))
                     report["runs"].append({
@@ -335,6 +360,8 @@ def run(options):
                         "chart_probe_routes": routes.get((mode, tier), {}).get("routes"),
                         "leb_cache_mib": options.leb_cache_mib, "leb_reader": options.leb_reader,
                         "cold_condition": options.cold_condition if workload == "cold_start" else None,
+                        "input_pages_primed": options.cold_condition == "page_cache_warm"
+                        if workload == "cold_start" else None,
                     })
             report["status"] = "complete"
     except subprocess.CalledProcessError as exc:
@@ -371,6 +398,7 @@ def main():
                      default="page_cache_warm")
     cli.add_argument("--calls", type=int, default=1000)
     cli.add_argument("--memory-calls", type=int, default=SERIES)
+    cli.add_argument("--series-calls", type=int, default=SERIES)
     cli.add_argument("--workers", type=int, choices=(1, 2, 4, 8), action="append")
     cli.add_argument("--companions", action="store_true", help="include the released companion groups")
     cli.add_argument("--repeats", type=int, default=5)
@@ -384,7 +412,7 @@ def main():
         except PrerequisiteError as exc:
             print(str(exc), file=sys.stderr)
             return 3
-    if options.data is None or options.output is None or min(options.calls, options.memory_calls) < 1 or options.repeats < 5:
+    if options.data is None or options.output is None or min(options.calls, options.memory_calls, options.series_calls) < 1 or options.repeats < 5:
         cli.error("provide data, output, positive call counts and at least five repetitions")
     if options.leb_cache_mib is not None and (options.leb_cache_mib < 0 or options.leb_reader == "indexed"):
         cli.error("the process cache accepts nonnegative sizes for owned readers")
