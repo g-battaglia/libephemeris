@@ -777,8 +777,10 @@ applies the same isolated correction to the reference and optimized wheels
 and uses Rust 1.99.1 for both builds. A separate
 [strict run](https://github.com/g-battaglia/libephemeris/actions/runs/43882398843)
 with the unmodified runtime and the published Windows Rust toolchain
-still found 572 differences over 2,100,000 calls on Windows. Both Linux
-jobs passed. The strict Windows gate against the released wheel remains open.
+still found 572 differences over 2,100,000 calls on Windows. The
+archived captures replayed to 566 value/range-error transitions and six
+value differences, all in Auto, with zero warning changes. Both Linux jobs
+passed. The strict Windows gate against the released wheel remains open.
 
 On macOS, the composed optimization stack passed all 2,100,000 calls
 against the corrected reference with both wheels using indexed LEB and
@@ -824,6 +826,15 @@ check. The existing check passed against both wheels when rerun alone.
 The source of the transient inventory change remains unresolved. The
 external standalone rounds and verification commands were outside these
 runs. The full logs are `target/bench/validation-full-leb{,-baseline}.log`.
+
+The later external `leb all` campaigns use the published wheel and the
+composed candidate against the untouched validation checkout at
+`5a2051f2`. Both pytest lanes have finished on both wheels. The JUnit
+inventories contain the same 21,359 case IDs with identical outcomes for
+every ID, including 62 failures and 147 skips on each wheel. The published
+campaign also finished the standalone rounds, verification and parity.
+Those stages produced baseline failures and the composed candidate is
+running the same stages. See `target/bench/validation-complete-*.log`.
 
 On the hosted Linux ARM64 runner, the paired base/LEB comparison completed
 100,000 charts per worker at 1/2/4/8 processes. At eight processes, published
@@ -960,9 +971,11 @@ The Auto medium published/rebuilt control held steady at eight processes,
 4,757.1 → 4,757.0 MB PSS on ARM64 and 4,759.6 → 4,759.6 MB on x86-64.
 With the additional positional center reader enabled, the paired ARM64
 comparison reached 1,550.8 MB PSS from a published 4,757.9 MB.
-In the Skyfield medium paired x86-64 run, the SPK changes reduced PSS
-from 5,290.8 to 2,728.5 MB at eight processes. These are separate pairs
-with the inputs and routing recorded in each report.
+The paired Skyfield medium runs reduced PSS from 5,288.6 to 2,726.9 MB on
+ARM64 and from 5,290.8 to 2,728.5 MB on x86-64 at eight processes.
+Summed anonymous RSS fell by about 2,562 MB on both architectures.
+These are separate pairs with the inputs and routing recorded in each
+report.
 
 For the step 1c investigation, the native profiling example separately
 attributes the first body and the ten subsequent bodies. A base/leb
