@@ -144,8 +144,8 @@ image is already zero-copy and is not converted into an indexed file.
 In sealed LEB mode on Linux, eight processes each calculated 100,000
 random charts with speeds over the covered portion of 1550–2650. The
 same wheel and released companion files were used for both readers.
-With `leb_limits.cache_bytes = 6291456` (6 MiB) on the indexed reader,
-the steady proportional set size summed across all workers was:
+The indexed reader used `leb_limits.cache_bytes = 6291456` (6 MiB).
+The table reports steady proportional set size summed across all workers.
 
 | Tier | Linux ARM64, owned → indexed | Linux x86-64, owned → indexed |
 | --- | ---: | ---: |
@@ -157,3 +157,9 @@ macOS base run recorded summed RSS of 455.1 → 515.7 MB. Raw Linux
 artifacts include the 1/2/4/8-worker cases, opening peaks and the
 separate anonymous and file-backed counters.
 [Paired Linux reports](https://github.com/g-battaglia/libephemeris/actions/runs/43879751526).
+
+To run the same comparison from a source checkout, pass `--workload memory
+--window 1550-2650 --companions` to the benchmark driver. Use
+`--leb-reader owned` for one run and `--leb-reader indexed
+--indexed-cache-mib 6` for the other.
+[Benchmark setup](../tools/bench/README.md).
