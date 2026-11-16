@@ -944,3 +944,33 @@ The base tier requires a smaller budget to meet the RAM target. Use
 to vary the shared indexed ceiling on the same staged data. This writes a
 temporary `leb_limits.cache_bytes` setting for the worker. A timing sweep
 and 100,000-chart base runs at the lower budgets are queued.
+
+The full macOS indexed comparison with the published release passed all
+2,100,000 calls with zero differences. The host had finished the other
+benchmark runs before the following same-wheel timing sweep. Each timing
+cell represents five fresh processes with 3,000 charts each.
+
+| Reader bound | Base random median / p95 | Medium random median / p95 | Base RSS after 100,000 charts |
+| --- | ---: | ---: | ---: |
+| owned | 556.8 / 587.1 µs | 566.1 / 596.9 µs | 57.1 MB |
+| indexed, 2 MiB | 581.8 / 619.4 µs | 591.9 / 629.7 µs | 45.3 MB |
+| indexed, 4 MiB | 567.1 / 621.5 µs | 577.1 / 630.0 µs | 56.0 MB |
+| indexed, 6 MiB | 492.7 / 619.9 µs | 502.2 / 632.0 µs | 48.6 MB |
+| indexed, 8 MiB | 396.4 / 620.0 µs | 401.5 / 630.0 µs | 65.4 MB |
+
+The 6 MiB base configuration reduced peak RSS from 57.1 to 48.6 MB and
+steady physical footprint from 34.8 to 32.8 MB in the single-worker runs.
+Consecutive chart medians rose from 110.6 to 115.0 µs in base and from
+116.4 to 121.6 µs in medium with the 8 MiB budget. These are candidate
+budgets for automatically discovered pinned data, with the random p95 and
+consecutive latency regressions recorded. A repeat with the complete
+companion groups and 1/2/4/8 processes is underway.
+
+Two follow-up experiments left the performance candidate unchanged. The
+paired scalar Vondrak rate loop measured 105.8 → 106.1 µs per consecutive
+chart on `f5530185`, with all 698 relevant Rust tests and 10,000 smoke calls
+passing. Reconstructing coefficient words from pre-sliced byte planes
+(`86f88a06`) measured 478.3 → 511.7 µs per indexed random chart at 6 MiB.
+All 244 LEB tests and the 10,000-call indexed comparison passed. The
+reports are in `target/bench/frame-rate-trig-qualification/` and
+`target/bench/leb-word-unpack-qualification/`.
