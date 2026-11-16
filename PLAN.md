@@ -667,3 +667,14 @@ The fresh-process startup report now includes import, first-call and first-
 chart medians and p95s. The warm-page condition explicitly primes the staged
 inputs. First use has only the staging reads. Both controls passed a
 five-repeat base/leb run and rejected the claim of verified cold OS pages.
+
+For the step 1c investigation, the native profiling example separately
+attributes the first body and the ten subsequent bodies. A base/leb
+50,000-chart consecutive run produced medians of 25.5, 75.3 and 16.0 µs
+for the first body, the ten subsequent bodies and houses. This was a
+profiling build with other qualification running on the host.
+Of 692 first-body samples, 327 were in the two-word sine/cosine function.
+Of 2,034 subsequent-body samples, 646 were in coefficient evaluation or
+the two-word polynomial rate path and 258 were in deflection arithmetic.
+The observations guide the reuse work. The native trace and raw timings
+are under `target/bench/chart-anatomy-profile/`.

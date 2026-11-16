@@ -14,6 +14,20 @@ fn elapsed<T>(
     Ok(start.elapsed().as_nanos() as u64)
 }
 
+#[inline(never)]
+fn first_body(runtime: &Runtime, jd: f64, flags: i32) -> Result<(), Box<dyn Error>> {
+    black_box(runtime.calc_ut(jd, 0, flags)?);
+    Ok(())
+}
+
+#[inline(never)]
+fn other_ten_bodies(runtime: &Runtime, jd: f64, flags: i32) -> Result<(), Box<dyn Error>> {
+    for body in [1, 2, 3, 4, 5, 6, 7, 8, 9, 11] {
+        black_box(runtime.calc_ut(jd, body, flags)?);
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let path = std::env::args_os()
         .nth(1)
@@ -50,13 +64,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         Ok::<_, Box<dyn Error>>(())
     };
-    let first_body = [0];
-    let other_bodies = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11];
     let exercise = |jd| {
         match workload {
             "random_chart" | "seq_chart" | "same_date_chart" | "chart_anatomy" => {
-                planets(jd, &first_body)?;
-                planets(jd, &other_bodies)?;
+                first_body(&runtime, jd, flags)?;
+                other_ten_bodies(&runtime, jd, flags)?;
                 house(jd)?;
             }
             "seq_position" | "time_series" => planets(jd, &[4])?,
@@ -83,8 +95,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let jd = date.as_f64().ok_or("expected date")?;
         if workload == "chart_anatomy" {
             samples.push(json!([
-                elapsed(|| planets(jd, &first_body))?,
-                elapsed(|| planets(jd, &other_bodies))?,
+                elapsed(|| first_body(&runtime, jd, flags))?,
+                elapsed(|| other_ten_bodies(&runtime, jd, flags))?,
                 elapsed(|| house(jd))?
             ]));
         } else {
