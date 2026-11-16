@@ -1168,8 +1168,9 @@ The archived Linux captures for the combined
 [default](https://github.com/g-battaglia/libephemeris/actions/runs/43928262541)
 and [32 MiB plus positional](https://github.com/g-battaglia/libephemeris/actions/runs/43928798173)
 cases each contain 2,100,000 identical requests per architecture, with
-six matching warning calls. The Windows jobs for these revisions are
-still running.
+six matching warning calls. The default Windows job also passed. Its
+capture archive is being verified locally. The 32 MiB plus positional
+Windows job is still running.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.
 
@@ -1502,9 +1503,45 @@ eight-process summed RSS was 618.6 → 375.2 MB and sampled footprint
 was 493.8 → 194.8 MB. In this screen, random-chart medians were
 581.3 → 582.3 µs and consecutive medians were 113.8 → 113.5 µs.
 The warm-page first-call median was 3.85 → 2.35 ms and the subsequent
-first-chart median was 0.60 → 2.15 ms. The 100,000-chart discovery
-comparison is running. Default medium RAM remains open. Raw files
-are under `target/bench/leb-medium-private-snapshot/`.
+first-chart median was 0.60 → 2.15 ms.
+
+The discovery comparison completed 100,000 charts per worker with
+the same route probes on both arms. Steady sums are in decimal MB.
+
+| Processes | RSS, owned → clone | Sampled footprint, owned → clone |
+| ---: | ---: | ---: |
+| 1 | 84.7 → 54.5 | 67.2 → 24.7 |
+| 2 | 169.3 → 108.9 | 130.5 → 51.7 |
+| 4 | 338.5 → 217.9 | 264.7 → 102.0 |
+| 8 | 667.6 → 430.4 | 522.7 → 197.2 |
+
+Random medians were 582.0 µs for both arms and consecutive medians
+were 114.0 → 113.4 µs. The warm-page first-call median moved from
+3.81 to 2.47 ms and the subsequent first-chart median from 0.59 to
+2.19 ms. The experiment assumes exclusive access to its scratch
+directory from clone creation through unlink. Whether the runtime
+can establish that invariant for automatic discovery remains open.
+Default medium RAM remains open. Raw files are under
+`target/bench/leb-medium-private-snapshot/`.
+
+A subsequent local wheel (`3a1bb6f5`) tried a fresh scratch directory
+automatically and used the original owned reader when the scratch
+directory was unavailable. The two paths matched all 10,000 requests
+and the warning. With 3,000 charts per worker, eight-process summed
+RSS was 618.7 → 376.1 MB and sampled footprint was 492.9 → 194.7 MB.
+The test found no scratch entries left behind after successful acquisition.
+The wheel remains a lab artifact pending an immutability decision.
+
+The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
+also measured 100,000 charts per process on Linux ARM64 with the
+final candidate and a 6 MiB indexed budget. At 1 / 2 / 4 / 8 workers
+the steady summed PSS for `.leb` medium fell from 77.3 / 138.9 /
+257.5 / 492.7 MB to 34.4 / 64.2 / 122.0 / 232.5 MB. For base it
+moved from 39.1 / 60.8 / 104.6 / 186.3 MB to 34.4 / 65.1 / 122.4 /
+232.4 MB. The existing bundled base reader uses less PSS at multiple
+processes in this comparison. The same ARM64 wheel matched
+2,100,000 corrected-reference calls in the indexed and positional
+configuration, with six warning-emitting calls on each side.
 
 ## 15. Step 1a experiment
 
