@@ -662,6 +662,10 @@ That could cause the reader to admit a new allocation for identical SPK
 bytes. A focused reproduction on the published wheel induced that metadata
 change and alternated between a value and `EphemerisRangeError`. The runtime
 bug has a separate fix in [PR #88](https://github.com/g-battaglia/libephemeris/pull/88).
+The composed qualification includes that fix alongside the optimization
+stack. PR #88 remains independently reviewable. Reproduce the composed
+qualification when integrating the stack so the tested correction is
+present in the final source.
 
 The harness now copies each input to an independent inode and validates the
 copy. The repeated local full run completed **2,100,000 calls with zero
@@ -1034,10 +1038,34 @@ in base and 1.549 → 1.546 ms in medium. The 3.9% increase in the
 The first-use condition includes the mandatory staging reads. Only the
 warm-page trials explicitly prime the data.
 The local comparison audit is `target/bench/phase1-composed-timing/comparison.json`.
-Four native hot-stack samples follow that sweep. They cover
-base chart components, medium indexed LEB, medium positional Auto and
-medium Skyfield. The profiling build, staged-input manifests, requests
-and output will be under `target/bench/phase1-composed-profiles/`.
+All four follow-up native profiles completed, with the same optimized
+source and pinned input manifests. Each trace samples three seconds.
+The symbol counts below are exclusive leaf samples. The macOS summary
+omits leaves observed fewer than five times and the counts are not
+independent timing measurements.
+
+| Workload | Calls or charts | Main-thread samples | Observed hot leaves |
+| --- | ---: | ---: | --- |
+| LEB base, consecutive chart components | 80,000 charts | 2,277 | Two-word sine/cosine (225), polynomial position and rate (201), cached relative velocity source closure (194) |
+| LEB medium, indexed random charts with 6 MiB | 35,000 charts | 2,500 | Zstd sequences (719), LEB window decompression (481), Huffman decoding (268), positional read (57) |
+| Auto medium, random charts with positional centers | 35,000 charts | 2,487 | Zstd sequences (409), LEB window decompression (349), LEB segment evaluation (171), SPK Chebyshev evaluation (138) |
+| Skyfield medium, random charts | 70,000 charts | 2,513 | Allocator free (340) and tiny allocation (210), SPK registration sort (126), SPK Chebyshev evaluation (76) |
+
+The base LEB native chart-component medians were 23.38 µs for the first
+body, 69.58 µs for the other ten combined and 14.75 µs for houses.
+The LEB and Auto random-date profiles support measuring the decode
+trade-off before prioritizing arithmetic changes. The Skyfield trace
+attributes registration-list allocation and sorting to single-target
+lookups in routing and SPK center selection. An isolated candidate in
+`codex/spk-registration-lookup` scans live mappings for the smallest
+matching signed body key, preserving the selection of the sorted
+list even when several library aliases share a target. Test and measure
+the candidate before proposing a draft PR. Its focused SPK module suite
+passed all 150 tests, including duplicate, replaced and removed aliases.
+The wheel comparison and speed qualification are separate from that
+suite.
+Raw samples, traces, build hash and pinned inputs are under
+`target/bench/phase1-composed-profiles/`.
 
 A paired macOS base/LEB run compared the Python wrapper with the native
 release example using the same dates and pinned inputs. Across five
