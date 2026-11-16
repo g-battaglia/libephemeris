@@ -194,6 +194,31 @@ def test_rust_source_paths_across_binary_read_boundary(tmp_path):
     assert rust_source_revisions(binary) == [revision.decode("ascii")]
 
 
+def test_first_use_samples_get_fresh_staged_files(tmp_path, monkeypatch):
+    name = "leb/core.leb2"
+    data = tmp_path / "data"
+    source = data / name
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"same pinned input")
+    env = {"LIBEPHEMERIS_DATA_DIR": str(data), "LIBEPHEMERIS_LEB_READER": "indexed"}
+    staged = []
+
+    def run_worker(_args, *, env, cwd, text):
+        copy = Path(env["LIBEPHEMERIS_DATA_DIR"]) / name
+        staged.append(copy)
+        assert copy.read_bytes() == source.read_bytes()
+        assert not copy.samefile(source)
+        assert env["LIBEPHEMERIS_LEB_READER"] == "indexed"
+        assert cwd == tmp_path and text
+        return '{"first_call_ns": 10}'
+
+    monkeypatch.setattr(benchmark.subprocess, "check_output", run_worker)
+    for _ in range(2):
+        assert benchmark.timed_sample([], env, tmp_path, [name], "first_use") == {"first_call_ns": 10}
+    assert len(set(staged)) == 2 and all(not path.exists() for path in staged)
+    assert env["LIBEPHEMERIS_DATA_DIR"] == str(data)
+
+
 def test_cold_start_refuses_resident_input_pages(tmp_path, monkeypatch):
     (tmp_path / "input").write_bytes(b"sample")
     monkeypatch.setattr(os, "posix_fadvise", lambda *_: None, raising=False)

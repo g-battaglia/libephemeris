@@ -12,6 +12,7 @@ import math
 from pathlib import Path
 import random
 import re
+import shutil
 import statistics
 from datetime import date
 import subprocess
@@ -159,7 +160,8 @@ def worker(path, *, probe=False):
             for jd in jds:
                 chart(jd)
             checkpoint("steady_state", eph)
-        emit({"import_ns": import_ns, "first_call_ns": first, "first_chart_ns": first_chart})
+        emit({"import_ns": import_ns, "first_call_ns": first, "first_chart_ns": first_chart,
+              "shared_image": shared_image})
         return
     op = other.get(workload, chart)
     op(jds[0] - 0.1)  # Warm initialization at a different epoch.
@@ -347,6 +349,31 @@ def verify_cold_os_pages(data, names):
     return resident
 
 
+def timed_sample(args, env, cwd, names, condition):
+    data = Path(env["LIBEPHEMERIS_DATA_DIR"])
+    if condition == "first_use":
+        # A probe or an earlier sample may have warmed the main staged copy.
+        # Give each first-use process its own files, with staging as its only
+        # preparation, and keep copy time outside the measured interval.
+        with tempfile.TemporaryDirectory(prefix="first-use-", dir=cwd) as staged:
+            for name in names:
+                target = Path(staged) / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(data / name, target)
+            sample_env = dict(env, LIBEPHEMERIS_DATA_DIR=staged)
+            return json.loads(subprocess.check_output(args, env=sample_env, cwd=cwd, text=True))
+
+    resident_bytes = None
+    if condition == "page_cache_warm":
+        warm_os_pages(data, names)
+    elif condition == "page_cache_cold":
+        resident_bytes = verify_cold_os_pages(data, names)
+    sample = json.loads(subprocess.check_output(args, env=env, cwd=cwd, text=True))
+    if resident_bytes is not None:
+        sample["input_resident_bytes_before_spawn"] = resident_bytes
+    return sample
+
+
 def run(options):
     report = {"schema": SCHEMA, "status": "incomplete", "seed": options.seed,
               "runs": [], "site": SITE, "network_policy": "sealed",
@@ -429,17 +456,9 @@ def run(options):
                     if workload == "memory":
                         samples.append(memory_run(args, env, tmp, parallel, raw_dir))
                     else:
-                        for _ in range(options.repeats):
-                            resident_bytes = None
-                            if workload == "cold_start" and options.cold_condition == "page_cache_warm":
-                                warm_os_pages(data, report["data"])
-                            if workload == "cold_start" and options.cold_condition == "page_cache_cold":
-                                resident_bytes = verify_cold_os_pages(data, report["data"])
-                            output = subprocess.check_output(args, env=env, cwd=tmp, text=True)
-                            sample = json.loads(output)
-                            if resident_bytes is not None:
-                                sample["input_resident_bytes_before_spawn"] = resident_bytes
-                            samples.append(sample)
+                        condition = options.cold_condition if workload == "cold_start" else None
+                        samples.extend(timed_sample(args, env, tmp, report["data"], condition)
+                                       for _ in range(options.repeats))
                     report["runs"].append({
                         "mode": mode, "tier": tier, "workload": workload, "flags": options.flags,
                         "parallelism": parallel, "requests_per_run": count, "date_range": span,
@@ -454,6 +473,8 @@ def run(options):
                         "startup_steps_per_process": {"calc_ut": 1, "charts": 1}
                         if workload in ("cold_start", "memory") else None,
                         "input_pages_primed": options.cold_condition == "page_cache_warm"
+                        if workload == "cold_start" else None,
+                        "input_files_recreated_per_sample": options.cold_condition == "first_use"
                         if workload == "cold_start" else None,
                     })
             report["status"] = "complete"

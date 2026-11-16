@@ -117,7 +117,8 @@ target/bench/baseline/bin/python tools/bench/benchmark.py \
 The cold-start workload records import time, first calculation and first
 full chart in each fresh process. With `page_cache_warm`, the driver reads
 all staged inputs immediately before each timed process. With `first_use`,
-the input staging reads are the only preparation. Both conditions start
+each process receives its own staged input files. The route probe and
+previous repetitions use different files. Both conditions start
 with empty process-local decoder and coefficient caches. A previously
 decoded persistent store is outside these configurations. On Linux,
 `page_cache_cold` syncs and evicts the private staged inputs before each

@@ -1239,11 +1239,12 @@ measurements put the consecutive path's observed difference at about
 They do not justify a new batch API on the basis of wrapper overhead.
 See `target/bench/binding-paired/` for the samples and per-call p95.
 
-The fresh-process startup report now includes import, first-call and first-
-chart medians and p95s. The warm-page condition explicitly primes the staged
-inputs. First use has only the staging reads. Both controls passed a
-five-repeat base/leb run on macOS, where the cold-page condition reports a
-missing prerequisite. The [first Linux startup run](https://github.com/g-battaglia/libephemeris/actions/runs/43887347685)
+The fresh-process startup report includes import, first-call and first-chart
+medians and p95s. The warm-page condition explicitly primes the staged inputs.
+The early first-use reports had empty process caches and reused the staged
+files between the route probe and repetitions. The revised driver takes a
+fresh private copy for every first-use sample, so only staging can populate
+its input pages before launch. The [first Linux startup run](https://github.com/g-battaglia/libephemeris/actions/runs/43887347685)
 completed first-use and warm-page measurements on the published x86-64
 wheel. The runner lacked `fincore`. The revised driver evicts only the
 private staged inputs and verifies zero resident pages directly through
@@ -1254,6 +1255,21 @@ The [revised startup workflow](https://github.com/g-battaglia/libephemeris/actio
 completed the published/rebuilt base/LEB measurements on Linux x86-64 and
 ARM64. All five cold samples per build and architecture recorded zero
 resident input bytes immediately before spawning the measured process.
+
+All six default mode/tier pairs were repeated in the ARM64 Linux guest
+with the revised `first_use` staging, private ext4 input files, released
+companions and five fresh processes per arm. The installed candidate
+and PyPI wheel used matching inputs and calculation routes. Median
+first-call times in milliseconds follow.
+
+| Mode | Base, PyPI → candidate | Medium, PyPI → candidate |
+| --- | ---: | ---: |
+| LEB | 2.12 → 1.97 | 5.53 → 5.68 |
+| Auto | 38.23 → 30.16 | 183.68 → 150.81 |
+| Skyfield | 29.41 → 17.76 | 154.06 → 97.18 |
+
+The raw samples and p95s are in
+`target/bench/linux-medium-lab/phase1-corrected-first-use-ext4.jsonl`.
 
 The paired baseline PSS and anonymous/file splits cover
 [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),
@@ -1933,6 +1949,19 @@ against PyPI 4.0.0 on each architecture. Python 3.12 and 3.14 each had
 run passed the Windows medium check against PyPI without the Linux
 opt-in, with 10,000 matching calls, one warning call and the same Python
 test counts. Windows Rust test targets type-checked successfully.
+
+Startup on the same ARM64 guest wheel was also measured without an
+existing shared image, using five fresh processes per condition. The
+shared reader created an image on each first call. Medians in ms were
+6.55 → 20.23 at first use, 7.64 → 20.87 with warm pages, and
+10.06 → 24.68 with verified cold pages. Both cold arms recorded zero
+resident input bytes before each process. In an independent seven-pair
+warm-page run with a live owner, the first call was 7.23 → 18.62 ms.
+Every new opt-in worker mapped the owner's inode. The explicit-file,
+indexed-reader and configured-process-cache controls each kept their
+ordinary path and returned the same position bits. Raw files are
+`native-registry-startup-pairs.json` and `shared-live-startup-pair.json`
+under `target/bench/linux-medium-lab/`.
 
 The macOS wheel rebuilt after the Linux integration passed 1,486 Python
 tests. Rust on the same source passed 3,248 library tests plus integration
