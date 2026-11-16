@@ -687,6 +687,18 @@ These identify the compiler and standard library difference independently
 of the runner's current `rustc -Vv`. The optional wheel workflow toolchain
 matches the published build for a controlled rerun.
 
+The separate [SPK storage Windows run](https://github.com/g-battaglia/libephemeris/actions/runs/43867334424)
+completed 2,100,000 calls with 562 differences. Comparing the two published
+4.0.0 captures from the cache and SPK runs against each other also completed
+2,100,000 calls. They used the same extension SHA-256, reported platform
+and Python, input hashes and request sequence. The published wheel
+disagreed with itself on 546 `auto` requests: 536 value/range-error
+changes and ten cases with values on both sides. This cross-run control
+establishes that both types of difference can occur before any optimization.
+The focused paired controls and the effect of the center-retention fix
+remain under investigation. The strict bit comparator still fails on any
+observed difference.
+
 The full external Swiss comparison ran the fast and slow pytest lanes
 against both wheel overlays with network policy sealed. Each run evaluated
 21,359 cases. Both had 147 skips and the same 62 failing case IDs. The
