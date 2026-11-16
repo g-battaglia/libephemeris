@@ -773,9 +773,12 @@ and Python, input hashes and request sequence. The published wheel
 disagreed with itself on 546 `auto` requests: 536 value/range-error
 changes and ten cases with values on both sides. This cross-run control
 establishes that both types of difference can occur before any optimization.
-The focused paired controls and the effect of the center-retention fix
-remain under investigation. The strict bit comparator still fails on any
-observed difference.
+The independent archive replay verifies identical executable and wheel
+digests, and compares every request after removing only the ephemeral
+input staging paths from the comparison headers. Its results for the
+published control, strict rebuild and corrected control are under
+`target/bench/windows-reference-audit.json`. The strict comparator still
+fails on any observed difference.
 
 Replaying the SPK Windows comparison with the complete difference counts
 confirmed 556 changes between values and `EphemerisRangeError`, all on
@@ -1686,8 +1689,14 @@ to 198.3 MB. First-call sampled footprint was 520.5 → 223.3 MB.
 The sum of individual peak footprints fell from 550.2 to 254.5 MB.
 The wheel hashes, routes and four checkpoints are recorded in
 `target/bench/leb-medium-private-snapshot/positional-production/published-memory.json`.
-The downstream and external scientific suites are being replayed on
-this exact wheel. The earlier completed comparisons are recorded above.
+The final wheel also repeated the unchanged downstream suites. Outcomes
+matched the preceding combined wheel on all 14,828 Kerykeion test IDs,
+51 Kerykeion Parity IDs and 2,182 Astrologer Studio IDs. The Studio
+comparison matches the five randomly generated UUID cases by format
+and version. The API v6 and v7 replays matched all 2,647 outcomes on both
+the preceding wheel and the published wheel, including the messages of
+the 99 existing non-passing cases. The exact wheel's external scientific
+replay follows the preceding wheel's campaign.
 
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the
