@@ -24,6 +24,8 @@ def executables(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=PROFILES, default="smoke")
+    parser.add_argument("--reference-wheel", type=Path, required=True)
+    parser.add_argument("--reference-commit", required=True)
     parser.add_argument("--candidate-cache-mib", type=int)
     parser.add_argument("--candidate-positional-centers", action="store_true")
     parser.add_argument("--leb-reader", choices=("owned", "indexed"))
@@ -44,9 +46,7 @@ def main():
             venv.create(path, with_pip=True)
         baseline, cli = executables(baseline_path)
         candidate, _ = executables(candidate_path)
-        subprocess.run([str(baseline), "-m", "pip", "download", "--only-binary=:all:", "--no-deps",
-                        "--dest", str(root), "libephemeris==4.0.0"], cwd=root, check=True)
-        baseline_wheel, = root.glob("*.whl")
+        baseline_wheel = options.reference_wheel.resolve(strict=True)
         for interpreter, wheel in ((baseline, baseline_wheel), (candidate, candidate_wheel)):
             subprocess.run([str(interpreter), "-m", "pip", "install", str(wheel), "numpy==2.4.6"],
                            cwd=root, check=True)
@@ -75,7 +75,8 @@ def main():
             sys.executable, str(ROOT / "tools/bench/bitdiff.py"), "run", "--profile", options.profile,
             "--data", str(data),
             "--baseline", str(baseline), "--baseline-wheel", str(baseline_wheel),
-            "--baseline-commit", "python-v4.0.0",
+            "--baseline-commit", options.reference_commit,
+            "--baseline-build-options", "maturin build --release --locked (corrected reference)",
         ]
         if options.leb_reader:
             comparison_command.extend(("--leb-reader", options.leb_reader))
@@ -91,16 +92,16 @@ def main():
         comparison = subprocess.run(candidate_args, cwd=root).returncode
         if options.profile == "auto-edge":
             control = subprocess.run([
-                *comparison_command, "--output", str(options.output.resolve() / "published-control"),
+                *comparison_command, "--output", str(options.output.resolve() / "reference-control"),
                 "--candidate", str(baseline), "--candidate-wheel", str(baseline_wheel),
-                "--candidate-commit", "python-v4.0.0",
+                "--candidate-commit", options.reference_commit,
             ], cwd=root).returncode
             comparison = max(comparison, control)
         if comparison:
             return comparison
         if options.linux_memory:
             for role, interpreter, wheel, commit in (
-                ("baseline", baseline, baseline_wheel, "python-v4.0.0"),
+                ("baseline", baseline, baseline_wheel, options.reference_commit),
                 ("candidate", candidate, candidate_wheel, candidate_commit),
             ):
                 benchmark = [

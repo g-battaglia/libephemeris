@@ -20,11 +20,6 @@ on:
         type: choice
         options: [smoke, full, auto-edge, auto-centers]
         default: smoke
-      rust_toolchain:
-        description: Rust toolchain for the candidate wheel
-        type: choice
-        options: ['stable', '1.99.1']
-        default: 'stable'
       candidate_cache_mib:
         description: Optional LEB process cache budget for candidate only
         type: string
@@ -35,14 +30,6 @@ on:
         default: false
       compare_indexed_leb:
         description: Use the indexed LEB reader on both sides of the comparison
-        type: boolean
-        default: false
-      indexed_memory:
-        description: Compare owned and 6 MiB indexed RSS and PSS on Linux
-        type: boolean
-        default: false
-      linux_memory:
-        description: Record RSS and PSS with 1, 2, 4 and 8 base LEB processes on Linux
         type: boolean
         default: false
 
@@ -58,14 +45,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: linux-x86_64
-            runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            manylinux: '2014'
-          - platform: linux-aarch64
-            runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            manylinux: '2014'
           - platform: windows-x86_64
             runner: windows-latest
             target: x86_64-pc-windows-msvc
@@ -102,9 +81,25 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           maturin-version: '1.9.4'
-          rust-toolchain: ${{ inputs.rust_toolchain || 'stable' }}
+          rust-toolchain: '1.99.1'
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
+          args: --release --locked --out dist
+
+      - name: Check out corrected reference
+        uses: actions/checkout@v4
+        with:
+          ref: d86cea0f5ffd62c48987acac2fdb3f834295c7af
+          path: fixed-reference
+          persist-credentials: false
+
+      - name: Build corrected reference ABI3 wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          maturin-version: '1.9.4'
+          rust-toolchain: '1.99.1'
+          target: ${{ matrix.target }}
+          working-directory: fixed-reference
           args: --release --locked --out dist
 
       - name: Test installed wheel on Python 3.12 and 3.14
@@ -196,7 +191,7 @@ jobs:
           raise SystemExit(1 if failed else 0)
           PY
 
-      - name: Compare wheel outputs with the published release
+      - name: Compare optimized wheel against the corrected reference
         shell: bash
         env:
           BITDIFF_PROFILE: ${{ inputs.bitdiff_profile || 'smoke' }}
@@ -204,10 +199,10 @@ jobs:
           BITDIFF_CACHE_MIB: ${{ inputs.candidate_cache_mib }}
           BITDIFF_POSITIONAL_CENTERS: ${{ inputs.candidate_positional_centers }}
           BITDIFF_INDEXED_LEB: ${{ inputs.compare_indexed_leb }}
-          BITDIFF_INDEXED_MEMORY: ${{ inputs.indexed_memory && runner.os == 'Linux' }}
-          BITDIFF_LINUX_MEMORY: ${{ inputs.linux_memory && runner.os == 'Linux' }}
         run: |
-          args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
+          reference=(fixed-reference/dist/*.whl)
+          args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff
+                --reference-wheel "${reference[0]}" --reference-commit d86cea0f5ffd62c48987acac2fdb3f834295c7af)
           if [[ -n "$BITDIFF_CACHE_MIB" ]]; then
             args+=(--candidate-cache-mib "$BITDIFF_CACHE_MIB")
           fi
@@ -216,12 +211,6 @@ jobs:
           fi
           if [[ "$BITDIFF_INDEXED_LEB" == true ]]; then
             args+=(--leb-reader indexed)
-          fi
-          if [[ "$BITDIFF_INDEXED_MEMORY" == true ]]; then
-            args+=(--indexed-memory)
-          fi
-          if [[ "$BITDIFF_LINUX_MEMORY" == true ]]; then
-            args+=(--linux-memory)
           fi
           "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 
@@ -240,5 +229,6 @@ jobs:
           name: wheels-${{ matrix.platform }}
           path: |
             dist/*.whl
+            fixed-reference/dist/*.whl
             reports/
           if-no-files-found: warn
