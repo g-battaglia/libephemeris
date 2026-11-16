@@ -120,13 +120,20 @@ coefficient cache. Explicit paths and indexed readers use their
 configured acquisition policy.
 
 On macOS, automatic discovery in LEB mode can hold the pinned medium core
-as a private APFS clone. The runtime removes the clone's pathname,
-verifies its digest through the retained descriptor, and keeps the
-descriptor for reads. If the clone cannot be
-created and verified, discovery retains the ordinary owned image.
-Explicit paths and configured process caches keep their established
-acquisition path. A Rust caller borrowing the complete image materializes
-the verified contiguous bytes on demand.
+as a private APFS clone. The process temporary directory must allow
+cloning on the same filesystem as the ephemeris data. The runtime
+unlinks the clone, verifies its digest, and reads through the retained
+descriptor. Failed clone creation or verification falls back to the
+ordinary owned image. Explicit paths and configured process caches use
+their existing acquisition path. A Rust caller borrowing the complete
+image materializes verified contiguous bytes on demand.
+
+On Apple Silicon, eight processes running 100,000 full-coverage medium
+charts each reduced the sampled footprint from 526 to 198 MB compared
+with the published 4.0.0 wheel. In a same-wheel comparison with the
+ordinary owned path, median random chart time rose from 597 to 626 µs
+and the warm-page first call from 3.7 to 16.2 ms.
+[Measurements and input details](../PLAN.md).
 
 `owned` retains a complete immutable snapshot. `indexed` keeps a read-only file
 descriptor, indexes and bounded decoded chunks:

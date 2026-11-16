@@ -560,7 +560,12 @@ Section 14 and the step reports record completed runs and open requirements.
       totals reported separately; any memory increase is identified as a trade-off.
 - [ ] Phase 1 completion demonstrates RAM reduction against phase 0 as specified
       in section 1.4, with unmet modes/workloads explicitly left outstanding.
-- [ ] No change to model constants, series lengths or arithmetic precision.
+- [x] No change to model constants, series lengths or arithmetic precision.
+      The source diff leaves the data and series kernels intact. LEB cache
+      entries and SPK records retain the decoded binary64 words. The
+      reference-obliquity memo calls the same two-word routine with the
+      same constant. The Auto center-retention correction affects source
+      selection and is qualified separately.
 - [ ] Estimates in this plan replaced by the measured values.
 
 ---
