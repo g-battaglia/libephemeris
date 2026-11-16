@@ -846,8 +846,9 @@ corpus calls on macOS with the 32 MiB LEB cache enabled. The revised
 wheel (`dd21b595`, SHA-256
 `54628e7c9c84b6cbb069b441905a3ad5bf29ab560b697adb0ad90688c845c5d6`)
 again matched 20,000 focused calls. All 155 SPK tests and 1,486 Python tests
-passed. The revised full corpus and 100,000-chart 1/2/4/8-process runs
-are underway.
+passed. The revised wheel also matched all 2,100,000 macOS calls with the
+32 MiB LEB pool, zero differences. The hosted comparison and 100,000-chart
+1/2/4/8-process comparison are underway.
 
 | Metric, same revised wheel and setup | Owned | Positional, checks around uncached reads |
 | --- | ---: | ---: |
