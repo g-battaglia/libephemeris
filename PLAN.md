@@ -984,12 +984,35 @@ the published and composed wheel overlays with network policy sealed.
 This adds the standalone rounds, verification scripts and parity
 matrix to the external pytest cases. Raw console logs are in
 `target/bench/validation-complete-{published,optimized}.log`.
-The paired Step 1 timing sweep is queued behind the active local
-memory, timing and external-validation processes. It samples each
-workload with the corrected reference and the default optimized wheel,
-and tests the indexed, process-cache and positional settings on their
-applicable routes. Its commands and reports are under
+The paired Step 1 timing sweep runs after the baseline memory and
+external-validation processes. It samples each workload with the corrected
+reference and the default optimized wheel, and tests the indexed,
+process-cache and positional settings on their applicable routes. Its
+commands and reports are under
 `target/bench/phase1-composed-timing/`.
+
+The LEB portion completed all 30 report pairs. Both builds use matching
+data, routes, epoch sequences and five fresh processes per case. Random
+chart medians in µs are shown below, with 300 charts per process.
+
+| Tier and window | Corrected reference | Optimized default | Indexed | 32 MiB owned pool |
+| --- | ---: | ---: | ---: | ---: |
+| Base, 1900–2100 | 589.7 | 606.0 | 593.4 | 138.2 |
+| Base, full coverage | 592.9 | 586.1 | 612.1 | 137.4 |
+| Medium, 1900–2100 | 591.9 | 580.6 | 510.6 | 149.4 |
+| Medium, full coverage | 603.5 | 605.3 | 674.7 | 925.5 |
+
+The indexed ceiling is 2 MiB in base and 6 MiB in medium. Across the
+1900–2100 samples, the 32 MiB pool's p95 for the first 100 charts per
+process was 939.2 µs in base and 1,039.6 µs in medium. The last 100
+charts measured 147.7 and 233.6 µs. Medium full coverage still had
+a p95 of 1,074.6 µs in the last 100 charts. Report the date-window and
+warm-up dependence alongside the median speedup.
+Auto base also completed with matching input and workload settings.
+The random-chart median was 1,183 µs on the corrected reference,
+1,066 µs on the default candidate and 943 µs with positional centers.
+Consecutive chart medians were 863, 766 and 606 µs respectively.
+The local comparison audit is `target/bench/phase1-composed-timing/comparison.json`.
 Four native hot-stack samples are queued after that sweep. They cover
 base chart components, medium indexed LEB, medium positional Auto and
 medium Skyfield. The profiling build, staged-input manifests, requests
