@@ -1748,6 +1748,11 @@ On the same data and 100,000 random medium charts per worker over
 67.23 / 126.74 / 242.40 / 475.03 MB on the reference and
 64.67 / 124.77 / 243.13 / 474.47 MB on the candidate. The
 eight-process default footprint was effectively unchanged.
+The x86-64 job's comparison report also records 2,100,000 identical
+calls and six matching warnings. Its 1 / 2 / 4 / 8-worker reference
+PSS was 67.42 / 127.80 / 245.48 / 477.60 MB versus 67.47 / 127.78 /
+245.52 / 477.51 MB on the candidate. Both reports were read from the
+job archive. Full x86-64 capture verification is in progress.
 
 The Linux lab uses an isolated ARM64 guest and the same installed
 candidate wheel. Its guest filesystem declined reflink creation.
@@ -1759,6 +1764,31 @@ private indexed paths matched position, house and flag bits over
 resident cache pages in the private file. These unmapped pages are
 outside process PSS. This screen does not establish a physical-memory
 gain on Linux. Raw evidence is under `target/bench/linux-medium-lab/`.
+
+With 10,000 charts per path, the private indexed copy kept 7.7 MB
+of file pages on 1900–2100 and 35.5 MB on full coverage. Dropping
+pages every 64 charts retained bitwise parity and reduced those
+steady samples to 3.0 and 4.7 MB. The full-coverage batch average
+rose from 610 µs on owned storage to 947 µs with periodic eviction.
+The lab moved on to sharing an immutable image across processes.
+
+A separate local screen used a Linux memfd with write, shrink, grow
+and seal changes disabled by the kernel. Eight freshly executed
+workers opened and independently verified the same inode. All
+position, flag and house bits matched the ordinary reader over
+3,000 full-coverage charts per worker. Summed worker PSS was
+426.7 → 165.8 MB. The container's sampled `anon + file` charges
+were 499.6 → 247.9 MB, including the experiment's owner process.
+The 37.3 MB shared segment is included in `file`. The sealed arm
+uses the stock indexed evaluator with a 1 MiB cache and separately
+holds a read-only mapping to account for its shared pages.
+[Linux file seals](https://man7.org/linux/man-pages/man2/F_ADD_SEALS.2const.html)
+and [cgroup memory counters](https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files).
+
+This remains a lab screen: the controller supplies the owner
+descriptor. The 100,000-chart repeats at 1 / 2 / 4 / 8 workers and
+retention after initial owner exit are running. Raw files are in
+`target/bench/linux-medium-lab/`.
 
 ## 15. Step 1a experiment
 
