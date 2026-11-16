@@ -1671,6 +1671,7 @@ pub use routing::{calc_horizons, calc_horizons_ut};
 pub mod model_acquisition;
 pub use model_acquisition::{AnalyticalModel, AnalyticalModelCallback};
 mod main_image;
+pub(crate) use main_image::automatic_center_candidates;
 pub(crate) use main_image::configured_jpl_fallback_active;
 pub(crate) use main_image::loader_target;
 pub(crate) use main_image::selected_main_file_present;

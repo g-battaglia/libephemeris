@@ -50,7 +50,13 @@ fn chebyshev_directory_end(segment: &ChebSegment) -> Result<f64> {
     };
     if segment.record_words < 2 + components
         || (segment.record_words - 2) % components != 0
-        || segment.n_records.checked_mul(segment.record_words) != Some(segment.words.len())
+        || !segment
+            .n_records
+            .checked_mul(segment.record_words)
+            .is_some_and(|count| match &segment.image_records {
+                Some(image) => image.contains(segment.data_offset, count),
+                None => count == segment.words.len(),
+            })
         || segment.n_records == 0
         || !segment.init_et.is_finite()
         || !segment.int_len.is_finite()
@@ -85,34 +91,46 @@ fn eval_chebyshev_record_with_domain(
     if !offset.is_finite() {
         return Err(Error::NonFiniteArgument { value: offset });
     }
-    let base = index
-        .checked_mul(segment.record_words)
-        .ok_or_else(|| Error::SpkCorrupt {
-            what: "SPK Chebyshev record".to_owned(),
-            offset: segment.data_offset,
-        })?;
-    let rec = segment
-        .words
-        .get(base..base + segment.record_words)
-        .ok_or_else(|| Error::SpkCorrupt {
-            what: "SPK Chebyshev record".to_owned(),
-            offset: segment.data_offset,
-        })?;
     let directory = super::decode::ChebyshevDirectory {
         init_et: segment.init_et,
         int_len: segment.int_len,
         record_words: segment.record_words,
         n_records: segment.n_records,
     };
-    eval_selected_chebyshev_record(
-        &directory,
-        segment.seg_type,
-        rec,
-        index,
-        offset,
-        segment.data_offset + base * 8,
-        seconds,
-    )
+    with_chebyshev_record(segment, index, |record, data_offset| {
+        eval_selected_chebyshev_record(
+            &directory,
+            segment.seg_type,
+            record,
+            index,
+            offset,
+            data_offset,
+            seconds,
+        )
+    })
+}
+
+fn with_chebyshev_record<T>(
+    segment: &ChebSegment,
+    index: usize,
+    evaluate: impl FnOnce(&[f64], usize) -> Result<T>,
+) -> Result<T> {
+    let error = || Error::SpkCorrupt {
+        what: "SPK Chebyshev record".into(),
+        offset: segment.data_offset,
+    };
+    let base = index.checked_mul(segment.record_words).ok_or_else(error)?;
+    let offset = base
+        .checked_mul(8)
+        .and_then(|n| segment.data_offset.checked_add(n))
+        .ok_or_else(error)?;
+    if let Some(image) = &segment.image_records {
+        let record = image.record(offset, segment.record_words)?;
+        evaluate(&record, offset)
+    } else {
+        let end = base.checked_add(segment.record_words).ok_or_else(error)?;
+        evaluate(segment.words.get(base..end).ok_or_else(error)?, offset)
+    }
 }
 
 /// Evaluate one already selected type-2/3 record with the shared arithmetic.
@@ -293,7 +311,6 @@ fn chebyshev_record_at_two_part_jd(
 }
 
 /// Select a record with the same quotient/remainder order as owned reads.
-#[cfg(feature = "nbody")]
 pub(super) fn chebyshev_record_coordinates(
     init_et: f64,
     int_len: f64,
@@ -400,6 +417,7 @@ mod directory_domain_tests {
             record_words: 0,
             n_records: 0,
             words: Vec::new(),
+            image_records: None,
             data_offset: 0,
         };
         for (jd, fraction) in [(f64::NAN, 0.0), (2451545.0, f64::INFINITY)] {
@@ -465,24 +483,25 @@ pub(super) fn chebyshev_record_offsets(
 ) -> Result<(f64, f64)> {
     let (index, _, _, _, _) = chebyshev_record_at_two_part_jd(segment, jd, fraction)?;
     let (_, _, hi, lo) = jd_parts_seconds(jd, fraction)?;
-    let base = index * segment.record_words;
-    let midpoint = segment.words[base];
-    let radius = segment.words[base + 1];
-    if !midpoint.is_finite() || !radius.is_finite() || radius <= 0.0 {
-        return Err(Error::SpkCorrupt {
-            what: "SPK Chebyshev record".to_owned(),
-            offset: segment.data_offset + base * 8,
-        });
-    }
-    let start = segment.init_et + index as f64 * segment.int_len;
-    let end = segment.init_et + (index + 1) as f64 * segment.int_len;
-    let relative = |boundary: f64| ((boundary - hi) - lo) / SECONDS_PER_DAY;
-    let lower = relative(start.max(midpoint - radius));
-    let mut upper = relative(end.min(midpoint + radius));
-    if index + 1 != segment.n_records && end <= midpoint + radius {
-        upper = upper.next_down();
-    }
-    Ok((lower, upper))
+    with_chebyshev_record(segment, index, |words, offset| {
+        let midpoint = words[0];
+        let radius = words[1];
+        if !midpoint.is_finite() || !radius.is_finite() || radius <= 0.0 {
+            return Err(Error::SpkCorrupt {
+                what: "SPK Chebyshev record".into(),
+                offset,
+            });
+        }
+        let start = segment.init_et + index as f64 * segment.int_len;
+        let end = segment.init_et + (index + 1) as f64 * segment.int_len;
+        let relative = |boundary: f64| ((boundary - hi) - lo) / SECONDS_PER_DAY;
+        let lower = relative(start.max(midpoint - radius));
+        let mut upper = relative(end.min(midpoint + radius));
+        if index + 1 != segment.n_records && end <= midpoint + radius {
+            upper = upper.next_down();
+        }
+        Ok((lower, upper))
+    })
 }
 
 /// Offsets in TDB days owned by the selected type21 difference line.
@@ -1013,6 +1032,7 @@ mod primitive_tests {
             record_words: words.len(),
             n_records: 1,
             words,
+            image_records: None,
             data_offset: 0,
         }
     }
@@ -1033,6 +1053,7 @@ mod primitive_tests {
                 record_words: 2 + components,
                 n_records: 2,
                 words,
+                image_records: None,
                 data_offset: 0,
             };
             let at_join = 8.0 / SECONDS_PER_DAY;

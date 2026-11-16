@@ -4208,7 +4208,8 @@ fn native_spk_final_lease_expires_actual_image_index_file_and_cache() {
     assert_eq!(retained_kernel.bytes(), original);
     drop(retained_kernel);
     drop(snapshot);
-    assert_eq!(bytes.strong_count(), 1);
+    // The decoded directory keeps a second lease for on-demand record reads.
+    assert_eq!(bytes.strong_count(), 2);
     assert_eq!(index.strong_count(), 1);
     assert_eq!(file.strong_count(), 1);
     assert_eq!(decoded.strong_count(), 1);

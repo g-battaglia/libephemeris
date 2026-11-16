@@ -41,6 +41,8 @@ def provision_data(options, root, data, cli, memory_mode, memory_tier):
             leb_tiers.add(memory_tier)
         if memory_mode != "leb":
             spk_tiers.add(memory_tier)
+    if options.indexed_memory:
+        leb_tiers.update(TIERS)
     for tier in sorted(leb_tiers):
         print(f"Provisioning the pinned LEB {tier} group", flush=True)
         subprocess.run([str(cli), "download", f"leb2-{tier}", "--data-dir", str(data),
@@ -72,13 +74,17 @@ def provision_data(options, root, data, cli, memory_mode, memory_tier):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=PROFILES, default="smoke")
+    parser.add_argument("--candidate-cache-mib", type=int)
+    parser.add_argument("--candidate-positional-centers", action="store_true")
+    parser.add_argument("--leb-reader", choices=("owned", "indexed"))
+    parser.add_argument("--indexed-memory", action="store_true")
     parser.add_argument("--linux-memory", action="store_true")
     parser.add_argument("--linux-startup", action="store_true")
     parser.add_argument("--linux-memory-case", choices=MEMORY_CASES, default="leb/base")
     parser.add_argument("--output", type=Path, default=ROOT / "target/bench/wheel-check")
     options = parser.parse_args()
-    if (options.linux_memory or options.linux_startup) and sys.platform != "linux":
-        parser.error("--linux-memory and --linux-startup require Linux")
+    if (options.linux_memory or options.linux_startup or options.indexed_memory) and sys.platform != "linux":
+        parser.error("memory and startup qualification need Linux")
     memory_mode, memory_tier = options.linux_memory_case.split("/")
     candidate_wheel, = (ROOT / "dist").glob("*.whl")
     with tempfile.TemporaryDirectory(prefix="ephemeris-wheel-check-") as tmp:
@@ -112,11 +118,18 @@ def main():
             "--baseline", str(baseline), "--baseline-wheel", str(baseline_wheel),
             "--baseline-commit", "python-v4.0.0",
         ]
-        comparison = subprocess.run([
+        if options.leb_reader:
+            comparison_command.extend(("--leb-reader", options.leb_reader))
+        candidate_args = [
             *comparison_command, "--output", str(options.output.resolve()), "--candidate", str(candidate),
             "--candidate-wheel", str(candidate_wheel), "--candidate-commit", candidate_commit,
             "--candidate-build-options", "maturin build --release --locked (wheel matrix)",
-        ], cwd=root).returncode
+        ]
+        if options.candidate_cache_mib is not None:
+            candidate_args.extend(("--candidate-cache-mib", str(options.candidate_cache_mib)))
+        if options.candidate_positional_centers:
+            candidate_args.append("--candidate-positional-centers")
+        comparison = subprocess.run(candidate_args, cwd=root).returncode
         if options.profile == "auto-edge":
             control = subprocess.run([
                 *comparison_command, "--output", str(options.output.resolve() / "published-control"),
@@ -124,7 +137,7 @@ def main():
                 "--candidate-commit", "python-v4.0.0",
             ], cwd=root).returncode
             comparison = max(comparison, control)
-        if comparison or not (options.linux_memory or options.linux_startup):
+        if comparison or not (options.linux_memory or options.linux_startup or options.indexed_memory):
             return comparison
         diagnostics = 0
         for role, interpreter, wheel, commit in (
@@ -136,6 +149,12 @@ def main():
                 "--data", str(data), "--wheel", str(wheel), "--commit", commit,
                 "--mode", memory_mode, "--tier", memory_tier, "--companions",
             ]
+            if options.leb_reader:
+                benchmark.extend(("--leb-reader", options.leb_reader))
+            if role == "candidate" and options.candidate_cache_mib is not None:
+                benchmark.extend(("--leb-cache-mib", str(options.candidate_cache_mib)))
+            if role == "candidate" and options.candidate_positional_centers:
+                benchmark.append("--positional-centers")
             if options.linux_memory:
                 subprocess.run([*benchmark, "--workload", "memory",
                                 "--output", str(options.output.resolve() / f"{role}-memory.json")],
@@ -147,6 +166,18 @@ def main():
                         "--output", str(options.output.resolve() / f"{role}-{condition}.json"),
                     ], cwd=root)
                     diagnostics = max(diagnostics, abs(startup.returncode))
+        if options.indexed_memory:
+            for reader in ("owned", "indexed"):
+                benchmark = [
+                    str(candidate), str(ROOT / "tools/bench/benchmark.py"),
+                    "--data", str(data), "--wheel", str(candidate_wheel), "--commit", candidate_commit,
+                    "--mode", "leb", "--workload", "memory", "--window", "1550-2650",
+                    "--companions", "--leb-reader", reader,
+                    "--output", str(options.output.resolve() / f"{reader}-memory.json"),
+                ]
+                if reader == "indexed":
+                    benchmark.extend(("--indexed-cache-mib", "6"))
+                subprocess.run(benchmark, cwd=root, check=True)
         return diagnostics
 
 

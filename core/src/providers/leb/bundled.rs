@@ -16,21 +16,39 @@ use libephemeris_core_data::BASE_CORE_LEB2 as BASE;
 /// Returned clones retain the immutable data independently of runtime resets.
 pub fn bundled_base_core() -> Result<LebFile> {
     static READER: OnceLock<Result<LebFile>> = OnceLock::new();
-    READER
-        .get_or_init(|| {
-            let file = LebFile::from_static_bytes("bundled/base_core.leb2".into(), BASE)?;
-            // These are the executable's exact static bytes, not a pathname or
-            // filesystem-metadata claim. The test below verifies the build input
-            // against this pin; no caller can seed a digest for another image.
-            file.image
-                .as_ref()
-                .expect("new static image")
-                .sha256
-                .set(crate::download::BASE_CORE_SHA256.to_owned())
-                .expect("new image has no cached digest");
-            Ok(file)
-        })
-        .clone()
+    bundled_reader(&READER, || {
+        LebFile::from_static_bytes("bundled/base_core.leb2".into(), BASE)
+    })
+}
+
+pub(crate) fn bundled_base_core_with_process_cache(
+    pool: std::sync::Arc<super::process_cache::ProcessCache>,
+) -> Result<LebFile> {
+    static READER: OnceLock<Result<LebFile>> = OnceLock::new();
+    bundled_reader(&READER, || {
+        LebFile::from_static_bytes("bundled/base_core.leb2".into(), BASE)
+            .map(|file| file.with_process_cache(pool))
+    })
+}
+
+fn bundled_reader(
+    cell: &'static OnceLock<Result<LebFile>>,
+    open: impl FnOnce() -> Result<LebFile>,
+) -> Result<LebFile> {
+    cell.get_or_init(|| {
+        let file = open()?;
+        // These are the executable's exact static bytes, not a pathname or
+        // filesystem-metadata claim. The test below verifies the build input
+        // against this pin; no caller can seed a digest for another image.
+        file.image
+            .as_ref()
+            .expect("new static image")
+            .sha256
+            .set(crate::download::BASE_CORE_SHA256.to_owned())
+            .expect("new image has no cached digest");
+        Ok(file)
+    })
+    .clone()
 }
 
 #[cfg(test)]

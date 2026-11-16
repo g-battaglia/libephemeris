@@ -165,7 +165,7 @@ def test_position_preflight_probes_only_the_measured_route(tmp_path, monkeypatch
                                     dates=[2451545.], flags=flags)))
     benchmark.worker(spec, probe=True)
     assert calls == [(2451545., 4, actual_flags)]
-    assert json.loads(capsys.readouterr().out) == {"4": "Skyfield"}
+    assert json.loads(capsys.readouterr().out)["routes"] == {"4": "Skyfield"}
 
 
 def test_rust_source_paths_across_binary_read_boundary(tmp_path):

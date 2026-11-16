@@ -193,7 +193,10 @@ pub const TYPE_CHEBYSHEV_POS: i32 = 2;
 /// Used for analytically computed satellites.
 pub const TYPE_CHEBYSHEV_POS_VEL: i32 = 3;
 
-/// Decoded type 2/3 segment: directory plus owned record words.
+const AUTOMATIC_PLANET_CENTERS: [(i32, i32); 5] =
+    [(599, 5), (699, 6), (799, 7), (899, 8), (999, 9)];
+
+/// Decoded type 2/3 segment: directory and access to record words.
 ///
 /// Layout (NAIF SPK Required Reading): `N` records of `RSIZE` words
 /// followed by the 4-word directory `[INIT, INTLEN, RSIZE, N]`.
@@ -209,6 +212,7 @@ pub struct ChebSegment {
     record_words: usize,
     n_records: usize,
     words: Vec<f64>,
+    image_records: Option<records::ImageRecords>,
     data_offset: usize,
 }
 
@@ -351,7 +355,7 @@ pub trait CenterProvider {
 #[derive(Clone)]
 pub struct SpkKernel {
     path: String,
-    bytes: Arc<[u8]>,
+    bytes: Arc<Vec<u8>>,
     endian: DafEndian,
     index: Arc<SpkIndex>,
     source_file: Option<Arc<std::fs::File>>,
@@ -398,10 +402,9 @@ pub struct BodyRegistration {
 /// or unsupported type through its corresponding typed error.
 ///
 /// File registration retains a whole immutable byte image. Registry evaluation
-/// lazily decodes selected segment payloads, retaining both successful decoded
-/// segments and decode failures for that image. This storage has no LEB-style
-/// configurable coefficient budget or per-request eviction: it grows with the
-/// distinct segments decoded, not just the number of loaded kernel bytes.
+/// caches type 2/3 directory results and reads the selected coefficients
+/// through a bounded record cache shared by the image's segments. Type 21
+/// segments retain the decoded payload when first used.
 ///
 /// Cloning shares image/index/decoded storage while copying registration maps.
 /// Removing/replacing kernels or clearing releases this registry's handles;
@@ -415,14 +418,25 @@ pub struct SpkRegistry {
     decoded: HashMap<String, Arc<DecodedSpkCache>>,
     /// Automatically selected center target → (owned image key, system barycenter).
     automatic_centers: HashMap<i32, (String, i32)>,
+    positional_centers: Option<Arc<PositionalCenters>>,
 }
 
-/// Immutable decoded record storage belonging to one installed kernel image.
+/// Directory results and decoded records belonging to one installed kernel image.
 /// Cells initialize independently at first use, preserving record-error timing
 /// while sharing results between readers and exact-image registry clones.
 #[derive(Default)]
 struct DecodedSpkCache {
     entries: Vec<OnceLock<Result<DecodedSpkSegment>>>,
+    records: Arc<records::RecordCache>,
+}
+
+impl DecodedSpkCache {
+    fn for_segments(segments: usize) -> Self {
+        Self {
+            entries: (0..segments).map(|_| OnceLock::new()).collect(),
+            records: Arc::default(),
+        }
+    }
 }
 
 impl std::fmt::Debug for DecodedSpkCache {
@@ -446,6 +460,11 @@ impl PartialEq for SpkRegistry {
         self.kernels == other.kernels
             && self.bodies == other.bodies
             && self.automatic_centers == other.automatic_centers
+            && match (&self.positional_centers, &other.positional_centers) {
+                (None, None) => true,
+                (Some(left), Some(right)) => Arc::ptr_eq(left, right),
+                _ => false,
+            }
     }
 }
 
@@ -776,6 +795,7 @@ mod range_presentation;
 pub use range_presentation::{OwnedSpkRange, RangeImage};
 mod file_image_cache;
 mod reader;
+mod records;
 pub use reader::Type21ReaderCache;
 #[cfg(test)]
 use reader::build_image;
@@ -827,8 +847,8 @@ pub use index::resolve_spk_cache_dir;
 pub use index::spk_coverage_covers_request;
 pub use index::spk_date_range_for_tier;
 pub use index::spk_date_range_for_tier_name;
-#[cfg(feature = "nbody")]
 mod positional;
+pub(crate) use positional::PositionalCenters;
 #[cfg(feature = "nbody")]
 pub(crate) use positional::PositionalChebyshev;
 mod evaluation;

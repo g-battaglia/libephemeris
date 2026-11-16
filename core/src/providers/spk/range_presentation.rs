@@ -17,7 +17,7 @@ pub struct RangeImage {
     pub path: String,
     /// SHA-256 of the acquired bytes as 32 raw bytes, computed at acquisition.
     pub sha256: [u8; 32],
-    bytes: Arc<[u8]>,
+    bytes: Arc<Vec<u8>>,
     kernel: SpkKernel,
 }
 

@@ -24,6 +24,13 @@ def test_cli_help_returns_success(monkeypatch, capfd):
     assert output.err == ""
 
 
+def test_verbose_status_reports_opt_in_cache_budget(monkeypatch, capfd, tmp_path):
+    monkeypatch.setenv("LIBEPHEMERIS_LEB_CACHE_MB", "32")
+    monkeypatch.setattr(sys, "argv", ["libephemeris", "status", "-vv", "--data-dir", str(tmp_path)])
+    assert cli_main() == 0
+    assert "LEB process cache: 0 of 33554432 coefficient bytes" in capfd.readouterr().out
+
+
 @pytest.mark.parametrize("arguments", [[], ["unknown-command"]])
 def test_cli_usage_errors_return_two(monkeypatch, capfd, arguments):
     monkeypatch.setattr(sys, "argv", ["libephemeris", *arguments])

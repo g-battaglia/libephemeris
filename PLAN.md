@@ -1273,3 +1273,442 @@ The full owned-reader RAM sweep queues legacy retention and 16/32/64/128
 MiB on both LEB tiers after the local timing and profiling commands.
 It uses 100,000 charts per worker at 1/2/4/8 processes.
 Commands and artifacts are under `target/bench/owned-cache-ram-matrix/`.
+
+## 15. Step 1a experiment
+
+An opt-in process pool retains whole decoded chunks across runtime-owned LEB
+images. Each shard evicts its least recently used entries by byte capacity.
+Explicit indexed readers retain their existing resource policy. The legacy
+default stays in place pending the combined latency and RAM measurements.
+
+Mac arm64, 1900–2100 random charts, five repeats of 1,000; RSS after a separate
+5,000-chart run. All rows use the same rebuilt wheel and pinned input bytes.
+
+| Process budget | Base median | Base RSS | Medium median | Medium RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Legacy | 536 µs | 46.7 MB | 552 µs | 84.0 MB |
+| 8 MiB | 731 µs | 62.9 MB | 743 µs | 94.3 MB |
+| 16 MiB | 234 µs | 66.8 MB | 226 µs | 104.3 MB |
+| 32 MiB | 126 µs | 72.5 MB | 132 µs | 109.8 MB |
+| 64 MiB | 127 µs | 72.6 MB | 132 µs | 110.2 MB |
+| 128 MiB | 129 µs | 72.6 MB | 132 µs | 109.9 MB |
+
+The 32 MiB pool retained 24,720,192 coefficient bytes for this date range.
+It is the smallest tested budget that reached the latency plateau for this
+workload. Every opt-in budget increased RSS here. The separate positional
+reader experiment saved roughly 8 MB in base on a short run, with higher
+latency. These results justify proceeding with lower-copy data access and
+measuring the two changes together before selecting a default.
+
+- [x] Configurable shared budget, whole chunks, per-shard LRU.
+- [x] Per-process retention diagnostics and isolated benchmark sweep.
+- [x] Ten local Python checks and the Rust pool lifetime/resize test passed.
+- [x] Candidate with 64 MiB matched 10,000 published-wheel calls bit for bit.
+- [x] The macOS 32 MiB full comparison passed 2,100,000 calls with zero differences.
+- [ ] Finish [cross-platform qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43863141515).
+- [x] Measure 100,000-chart process memory and 1/2/4/8 thread throughput.
+- [ ] Re-profile cold misses and quantify decoder context reuse and workspace.
+- [ ] Select a default after the data access changes and RAM acceptance check.
+
+The 32 MiB base/leb run retained roughly 24.7 MB of coefficient words per
+worker after 100,000 charts. Summed RSS was 76.4, 152.4, 305.4 and 626.9 MB
+for 1, 2, 4 and 8 independent workers. These sums include shared pages.
+The paired thread experiment returned median batch averages of 143, 108, 94
+and 130 µs per chart at 1, 2, 4 and 8 threads (legacy: 557, 348, 264 and
+387 µs). Throughput peaked at four threads in this experiment.
+
+The installed-wheel suite passed 1,485 tests in each of the legacy and
+32 MiB configurations. The standalone CLI regression also verified that
+`status -vv` reports the budget before any coefficient acquisition.
+
+### Decoder-workspace experiment
+
+The isolated `codex/leb-decoder-workspace` branch reused one direct zstd
+context per thread for owned, bounded, single-frame decoding. Indexed
+resource admissions and the streaming route used the existing decoder
+paths. All 243 LEB tests passed, including recovery from a corrupt frame
+after a successful decode.
+
+Compared with `31f55eee`, the experimental `2f6d6e61` wheel moved random
+chart medians from 555.5 to 553.5 µs in base and 558.2 to 555.1 µs in medium.
+Consecutive medians moved from 110.5 to 110.7 µs and from 115.8 to 116.5 µs.
+These are five independent 2,000-chart repeats per mode and tier on macOS
+arm64 with the legacy coefficient cache. Zstandard reported 95,984 retained
+bytes per decoder. An eight-thread control retained 671,888 bytes across
+seven threads that decoded and returned to zero after those threads joined.
+The timing changes are below 1%. The release candidate keeps its existing
+decoder lifetime. Reports are under `target/bench/leb-workspace-qualification/`.
+
+## 16. Step 1b opening-copy experiment
+
+The first storage change moves the Vec received by the SPK parser into a
+shared owner. Acquiring a kernel no longer copies the whole Vec into an Arc
+slice. This preserves the public immutable byte view and record evaluator.
+The regression test checks that the parser and its clones retain the original
+buffer address. The earlier digest and weak-owner test still passes.
+
+Mac arm64, medium tier, controlled 1,000-chart samples, default LEB retention:
+
+| Mode | After first call before → after | After 1,000 charts before → after |
+| --- | ---: | ---: |
+| auto | 535.5 → 335.1 MB RSS | 676.6 → 474.8 MB RSS |
+| skyfield | 794.6 → 474.1 MB RSS | 996.0 → 675.5 MB RSS |
+
+This removes the transient full-file copy and the allocator pages it leaves
+resident. The owned kernel image and its decoded segments still consume RAM.
+Positional SPK records and lazy acquisition remain part of step 1b.
+
+The opening-copy wheel (commit `abd6e262`, wheel SHA-256
+`c06461ae417708b565c1eb0121c142cfefe466ba76fd6feb77778abcd06d8348`)
+matched the 4.0.0 wheel on all 2,100,000 macOS arm64 corpus calls with 32 MiB
+of LEB coefficient capacity. The capture is under
+`target/bench/spk-copy-qualification/full/`.
+
+### Decode only the selected SPK record
+
+Registry evaluation now retains type 2 and 3 directory results and decodes
+the selected record from the shared immutable image. Each installed image
+holds at most 128 cached records and 1 MiB of decoded coefficient words.
+Active references, allocation overhead, the raw image and type 21 segments
+are accounted for separately. The 153 SPK tests passed, including a regression
+that compares eager and on-demand evaluation bits across record joins and at
+the closed endpoints.
+
+Mac arm64, medium tier, 1900–2100, legacy LEB retention. One process per
+memory sample with 5,000 random charts. Latency is the pooled median over
+five independent processes with 5,000 charts each.
+
+| Mode | RSS after first call | RSS after 5,000 charts | Physical footprint after 5,000 charts | Median per chart |
+| --- | ---: | ---: | ---: | ---: |
+| auto | 335.3 → 272.3 MB | 475.7 → 274.6 MB | 460.5 → 259.2 MB | 1,172 → 1,189 µs |
+| skyfield | 474.4 → 354.6 MB | 675.8 → 355.4 MB | 660.9 → 340.3 MB | 1,555 → 1,591 µs |
+
+The comparison uses the opening-copy wheel and the on-demand record wheel
+(commit `7009b012`, SHA-256
+`4c80d771e503c043603365298476fd424f31d5c504ee5778d64fc33336db8385`).
+Raw reports and vmmap output are under
+`target/bench/spk-copy-qualification/`. The new wheel's 2,100,000-call
+comparison passed with zero differences with the configured LEB cache of
+32 MiB. The combined wheel (commit `e76dd9f7`) passed all 1,486 Python tests
+with that setting. Its 10,000-call smoke comparison passed locally and the
+PR wheel checks passed on Linux x86-64, Linux ARM64 and Windows x86-64. The full Rust release
+suite passed 3,241 library tests plus integration and documentation tests
+with `bundled-data,nbody,python-internals` and the pinned data-v3 fixture.
+
+The sealed external planet-center and planet-centric selections ran in
+`auto` and `skyfield` with both wheels. Each run had 34 passes and two
+matching import failures in the legacy planet-map introspection tests.
+The full scientific campaign remains open.
+
+### 100,000-chart memory comparison
+
+Mac arm64, medium tier, one process, random dates in 1900–2100 with seed
+20261116 and legacy LEB coefficient retention. The published 4.0.0 wheel and
+the combined SPK wheel at `e76dd9f7` used the same pinned files and requests.
+Values are decimal MB with one run per configuration.
+
+| Mode | RSS after first call | RSS after 100,000 charts | Peak RSS | Physical footprint after 100,000 charts |
+| --- | ---: | ---: | ---: | ---: |
+| leb | 79.2 → 79.5 | 84.0 → 84.2 | 84.0 → 84.2 | 66.8 → 64.9 |
+| auto | 543.3 → 279.7 | 485.2 → 284.7 | 685.4 → 284.7 | 466.2 → 269.4 |
+| skyfield | 802.1 → 362.1 | 1,002.0 → 362.9 | 1,002.0 → 362.9 | 987.3 → 347.8 |
+
+In a separate same-wheel comparison, the existing indexed LEB reader lowered
+base RSS from 57.0 to 51.5 MB and medium RSS from 94.3 to 52.4 MB after
+100,000 charts. Physical footprint moved from 35.5 to 24.4 MB and from 74.6
+to 26.4 MB respectively. The raw reports and vmmap captures are under
+`target/bench/spk-records-qualification/`. The indexed reader's latency
+and the process and thread matrix are still open before selecting a default.
+
+The next storage experiment is positional I/O for managed data under the
+immutable-data contract. The public owned-image path supplies callers with
+a stable byte slice for the life of the kernel.
+
+## 17. Step 1b positional automatic-center prototype
+
+`LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS=1` selects the prototype for
+scalar `auto` calls. It defers acquisition of a published planet-center
+supplement until the first offset request. The open descriptor is scanned
+against the published SHA-256 pin before its summary index can be used.
+Record offsets and split-time Chebyshev evaluation share the existing code.
+Explicit image and complete session APIs retain their owned byte views.
+Native DE reads and PCTR continue through their ordinary acquisition paths.
+
+The first prototype used an identity check before and after every offset
+evaluation. On macOS arm64, medium tier and legacy LEB retention, on the
+same wheel (`503ae7a5`) and data:
+
+| Metric | Owned | Positional, checks on every sample |
+| --- | ---: | ---: |
+| RSS after 5,000 random charts | 274.2 MB | 73.8 MB |
+| Physical footprint after 5,000 random charts | 258.9 MB | 58.4 MB |
+| Median random chart | 1,189 µs | 1,947 µs |
+| Median first call with OS pages warm | 74.7 ms | 69.3 ms |
+
+The focused scalar comparison matched all 20,000 calls across base and
+medium bit for bit. A four-second sample during the `auto/medium` workload
+recorded 1,677 samples in `fstat`. The revision checks the descriptor before
+and after each cache miss. Cache hits use the previously admitted immutable
+words, so a cached result can retain the original value after an external
+in-place write. New reads refuse ordinary changes detected by the descriptor
+size and modification time. This remains dependent on replace-by-rename and
+does not protect against a writer that restores the observed metadata.
+The pinned descriptor survives atomic replacement of its path.
+
+Run the paired benchmark in `tools/bench/benchmark.py` with and without
+`--positional-centers` on the same installed wheel, using
+`--mode auto --tier medium --workload random_chart --workload memory
+--workload cold_start --workers 1 --calls 5000 --memory-calls 5000`.
+For a scalar-only replay, use `bitdiff.py run --profile auto-centers
+--candidate-positional-centers` with the same wheel as both inputs. Raw reports
+and the sampling trace are in `target/bench/spk-positional-qualification/`.
+The first prototype also matched the published wheel on all 2,100,000
+corpus calls on macOS with the 32 MiB LEB cache enabled. The revised
+wheel (`dd21b595`, SHA-256
+`54628e7c9c84b6cbb069b441905a3ad5bf29ab560b697adb0ad90688c845c5d6`)
+again matched 20,000 focused calls. All 155 SPK tests and 1,486 Python tests
+passed. The revised wheel also matched all 2,100,000 macOS calls with the
+32 MiB LEB pool, zero differences. The hosted comparison is underway.
+
+| Metric, same revised wheel and setup | Owned | Positional, checks around uncached reads |
+| --- | ---: | ---: |
+| RSS after 5,000 random charts | 274.3 MB | 73.5 MB |
+| Physical footprint after 5,000 random charts | 259.1 MB | 58.1 MB |
+| Median random chart | 1,193 µs | 1,040 µs |
+| p95 random chart | 1,247 µs | 1,093 µs |
+| Median first call with OS pages warm | 75.2 ms | 68.5 ms |
+
+### Multiprocess memory at 100,000 charts per worker
+
+Mac arm64, medium tier, the revised wheel and pins as above, legacy LEB
+retention. Each worker ran the same 100,000 random dates independently.
+
+| Processes | Owned sum of RSS | Positional sum of RSS | Median physical footprint per process |
+| --- | ---: | ---: | ---: |
+| 1 | 284.5 MB | 84.1 MB | 269.3 → 65.0 MB |
+| 2 | 569.1 MB | 168.5 MB | 269.3 → 65.1 MB |
+| 4 | 1,137.0 MB | 336.3 MB | 269.4 → 65.0 MB |
+| 8 | 2,269.4 MB | 668.1 MB | 268.1 → 66.0 MB |
+
+These are per-process RSS totals, which count shared mappings once per
+process. macOS did not expose PSS for these runs. The footprint column is a
+per-process median. Raw data and vmmap outputs are the two
+`*-memory-workers` reports in `target/bench/spk-positional-qualification/`.
+
+### Existing indexed LEB reader
+
+The separate base and medium `leb` trial used the same revised wheel and data
+for both storage policies, five fresh processes and 2,000 charts per
+timing repeat. The 100,000-chart memory trial above supplies the RSS figures.
+
+| Tier | RSS after 100,000 charts | Median random chart | Median consecutive chart |
+| --- | ---: | ---: | ---: |
+| base | 57.0 → 51.5 MB | 556.5 → 812.0 µs | 110.7 → 114.1 µs |
+| medium | 94.3 → 52.4 MB | 556.6 → 816.2 µs | 116.4 → 121.0 µs |
+
+The indexed policy reduces retained heap, with a roughly 46% cost on this
+random-date workload. The medium memory saving warrants checking a larger
+coefficient cache under the positional reader's live allocation limits.
+No release default has been selected.
+
+## 18. Step 1b coefficient windows for indexed LEB
+
+A four-second profile of `leb/medium` put full-frame
+coefficient reconstruction at the top of the indexed reader profile
+(1,400 samples). `pread` and `fstat` had 86 and 34 samples. The change
+validates and decompresses the full frame but reconstructs and retains
+only the selected window of at most 64 KiB. Positional admission still
+uses the existing frame, compressed-range, window and working limits.
+The retained working lease covers the actual selected word allocation.
+
+All 243 LEB tests passed, including cross-window bit equality and releasing
+the indexed retention and working leases on cooling. The two indexed wheels
+matched all 10,000 smoke calls. The standard installed-wheel Python suite
+passed 1,486 tests. With indexed mode explicit, both Python wheels
+also passed all 1,486 tests.
+
+Initial macOS arm64 screening, matching indexed policies, same pinned data,
+five fresh processes with 1,000 charts each. Auto memory jobs were running
+during the screening, so the timings are preliminary.
+
+| Tier | Full decoded chunks, random | Selected windows, random | Full decoded chunks, consecutive | Selected windows, consecutive |
+| --- | ---: | ---: | ---: | ---: |
+| base | 842.4 µs | 613.1 µs | 117.2 µs | 117.7 µs |
+| medium | 851.1 µs | 623.0 µs | 124.4 µs | 124.1 µs |
+
+Use `benchmark.py --mode leb --leb-reader indexed` with the same pinned set.
+Use `bitdiff.py run --leb-reader indexed` to set the same reader on both
+sides. Raw profiles are under `target/bench/indexed-sampling/` and the
+comparison and timing reports are under
+`target/bench/indexed-windows-qualification/`. The quiet timing repeat,
+100,000-chart memory confirmation and full corpus are still open.
+
+A repeat over 3,000 charts per process confirmed the reduction for indexed
+random charts, 845.7 → 609.5 µs in base and 848.8 → 621.8 µs in medium.
+Consecutive medians were 116.2 → 116.8 µs in base and 122.0 → 125.6 µs
+in medium. Other qualification was active on the host in this repeat.
+
+At 100,000 random charts, one indexed worker reached 46.9 MB RSS and
+23.9 MB footprint in base, and 46.7 MB RSS and 24.3 MB footprint in medium.
+The prior indexed reader reached 51.5 and 52.4 MB RSS respectively in the
+same workload. The full indexed [wheel matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43873289950)
+is underway.
+
+## 19. Step 1b indexed cache capacity
+
+The indexed reader's 16-entry limit could retain at most 1 MiB of 64 KiB
+coefficient windows, even with an 8 MiB byte budget. The follow-up raises
+only the indexed entry limit to 256. The shared indexed retention ceiling
+and working reservations are still charged by actual coefficient capacity.
+The entry limit bounds map overhead independently of those reservations.
+The 244 LEB tests passed. A targeted regression fills the entry limit and
+then lowers the byte budget, checking both accounting paths.
+
+Screening on macOS arm64, pinned 1900–2100 coverage, same revised wheel
+(`ef47ed5e`) for both readers. Timing uses five 2,000-chart repeats. RSS
+is measured separately after 5,000 charts. Long memory jobs also ran on
+this host, so these are screening measurements.
+
+| Tier | Owned → indexed random median | Owned → indexed consecutive median | Owned → indexed RSS |
+| --- | ---: | ---: | ---: |
+| base | 728.4 → 421.0 µs | 141.0 → 116.9 µs | 49.7 → 46.9 MB |
+| medium | 744.9 → 419.0 µs | 151.9 → 122.9 µs | 87.1 → 46.5 MB |
+
+The candidate matched the 10,000-call indexed smoke corpus. The same-policy
+full comparison with the 4.0.0 wheel and the 100,000-chart memory comparison
+are in progress. A quiet timing repeat is still required to quantify the
+latency change. Reports are under `target/bench/indexed-capacity-qualification/`.
+
+The same revised wheel completed 100,000 random charts with the following
+process memory. This longer run supersedes the 5,000-chart memory snapshot
+for selecting a budget.
+
+| Tier | Owned → indexed RSS, default 8 MiB | Owned → indexed footprint |
+| --- | ---: | ---: |
+| base | 57.1 → 65.4 MB | 34.8 → 37.2 MB |
+| medium | 94.8 → 70.4 MB | 75.5 → 43.8 MB |
+
+The base tier requires a smaller budget to meet the RAM target. Use
+`benchmark.py --leb-reader indexed --indexed-cache-mib 2` (or 4, 6, 8)
+to vary the shared indexed ceiling on the same staged data. This writes a
+temporary `leb_limits.cache_bytes` setting for the worker. A timing sweep
+and 100,000-chart base runs at the lower budgets are queued.
+
+The full macOS indexed comparison with the published release passed all
+2,100,000 calls with zero differences. The host had finished the other
+benchmark runs before the following same-wheel timing sweep. Each timing
+cell represents five fresh processes with 3,000 charts each.
+
+| Reader bound | Base random median / p95 | Medium random median / p95 | Base RSS after 100,000 charts |
+| --- | ---: | ---: | ---: |
+| owned | 556.8 / 587.1 µs | 566.1 / 596.9 µs | 57.1 MB |
+| indexed, 2 MiB | 581.8 / 619.4 µs | 591.9 / 629.7 µs | 45.3 MB |
+| indexed, 4 MiB | 567.1 / 621.5 µs | 577.1 / 630.0 µs | 56.0 MB |
+| indexed, 6 MiB | 492.7 / 619.9 µs | 502.2 / 632.0 µs | 48.6 MB |
+| indexed, 8 MiB | 396.4 / 620.0 µs | 401.5 / 630.0 µs | 65.4 MB |
+
+The 6 MiB base configuration reduced peak RSS from 57.1 to 48.6 MB and
+steady physical footprint from 34.8 to 32.8 MB in the single-worker runs.
+Consecutive chart medians rose from 110.6 to 115.0 µs in base and from
+116.4 to 121.6 µs in medium with the 8 MiB budget. These are candidate
+budgets for automatically discovered pinned data, with the random p95 and
+consecutive latency regressions recorded. A repeat with the complete
+companion groups and 1/2/4/8 processes is underway.
+
+Two follow-up experiments left the performance candidate unchanged. The
+paired scalar Vondrak rate loop measured 105.8 → 106.1 µs per consecutive
+chart on `f5530185`, with all 698 relevant Rust tests and 10,000 smoke calls
+passing. Reconstructing coefficient words from pre-sliced byte planes
+(`86f88a06`) measured 478.3 → 511.7 µs per indexed random chart at 6 MiB.
+All 244 LEB tests and the 10,000-call indexed comparison passed. The
+reports are in `target/bench/frame-rate-trig-qualification/` and
+`target/bench/leb-word-unpack-qualification/`.
+
+With both tiers and the released companion groups installed, the same
+wheel completed 100,000 charts per process at an indexed ceiling of 6 MiB.
+This table reports the sum of steady RSS in MB. The sum can count shared
+resident pages more than once.
+
+| Tier | Processes | Owned → indexed RSS |
+| --- | ---: | ---: |
+| base | 1 | 56.3 → 48.6 MB |
+| base | 2 | 114.6 → 116.2 MB |
+| base | 4 | 229.1 → 254.6 MB |
+| base | 8 | 455.1 → 515.7 MB |
+| medium | 1 | 94.7 → 61.8 MB |
+| medium | 2 | 189.4 → 129.3 MB |
+| medium | 4 | 378.2 → 257.6 MB |
+| medium | 8 | 753.6 → 377.1 MB |
+
+The eight-process repeats at 2 and 4 MiB cover the same mixed installation
+and 100,000 random charts per process:
+
+| Indexed ceiling | Base summed RSS | Medium summed RSS |
+| --- | ---: | ---: |
+| 2 MiB | 419.1 MB | 421.1 MB |
+| 4 MiB | 505.3 MB | 509.4 MB |
+| 6 MiB | 515.7 MB | 377.1 MB |
+
+For base, 2 MiB lowered eight-process RSS by about 8% relative to owned.
+Its separate quiet timing run had about 4.5% higher median chart latency.
+The two additional reports are `mixed-indexed-{2,4}-8x100k.json`.
+
+For eight medium workers the sum of each process's peak RSS was
+753.6 → 513.4 MB. Peaks can occur at different times. The full provisioned
+base layout does not support a default switch based on RSS. The indexed
+reader and its byte ceiling remain explicit choices. Reports are
+`mixed-{owned,indexed}-100k.json` in the indexed capacity directory.
+
+The [paired Linux memory comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43879751526)
+completed on ARM64 and x86-64 using one identical candidate wheel per
+architecture for both readers. Each run used all eight pinned LEB files
+and 100,000 random charts per process. At eight processes:
+
+| Linux architecture | Tier | Owned → indexed summed PSS | Owned → indexed anonymous RSS |
+| --- | --- | ---: | ---: |
+| ARM64 | base | 254.3 → 229.8 MB | 237.4 → 212.6 MB |
+| ARM64 | medium | 560.4 → 229.1 MB | 543.8 → 212.0 MB |
+| x86-64 | base | 257.4 → 232.2 MB | 238.8 → 213.5 MB |
+| x86-64 | medium | 563.5 → 231.8 MB | 544.9 → 213.2 MB |
+
+The indexed runs used 6 MiB. The artifacts contain per-process peaks,
+file residency and each checkpoint for 1/2/4/8 workers. File-backed RSS
+was similar across readers. At eight processes the medium PSS reduction
+was about 59% on both architectures and the base reduction was about 10%.
+These are memory results for the pinned release layout and sampled epochs.
+The Mac base latency and RSS tradeoffs still apply to default selection.
+
+A follow-up prototype for automatically discovered release files hashes the
+opened descriptor before admitting positional reads (`2c798dd9`).
+Comparing five fresh-process runs, this raised median first-call latency
+from 1.85 to 5.34 ms for base and from 5.73 to 22.62 ms for medium.
+In its separate one-process 100,000-chart comparison, steady RSS moved
+55.4 → 64.4 MB in base and 96.6 → 53.8 MB in medium. The prototype's 10,000
+base LEB calls matched the published wheel. The startup and base RSS
+tradeoffs keep automatic acquisition out of this change. Raw reports are
+in `target/bench/managed-leb-measurement/`.
+
+Source inspection found existing exact-epoch memoization in
+`nut00a_cached_centuries` and existing memoization for the frame matrices.
+The native sidereal wrappers can call nutation twice, but a repeated epoch
+uses the existing series memo. No additional cache is proposed for those
+values.
+
+## Step 1c reference obliquity
+
+The native chart profile showed the two-word sine/cosine accounting for
+327 of 692 first-body samples. The fixed Vondrak reference rotation is
+now acquired once, using the same trigonometric function and arguments.
+All 23 frame-velocity tests passed. The isolated wheel matched all 10,000
+published-protocol smoke inputs against its parent.
+
+Mac arm64, base/leb, legacy coefficient retention, five fresh processes
+with 5,000 consecutive dates. The same pinned bytes were used in both
+builds. The first-body median moved from 24.33 to 23.88 µs and complete
+chart median from 110.92 to 110.42 µs. The median for the ten subsequent
+bodies stayed at 71.71 µs. The raw results in
+`target/bench/frame-constant-qualification/` qualify this small reuse.
+
+The full macOS wheel comparison with the published 4.0.0 passed all
+2,100,000 calls with zero differences. Capture files and the report are
+in `target/bench/frame-constant-qualification/full/`.

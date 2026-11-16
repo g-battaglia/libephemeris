@@ -36,6 +36,29 @@ fn bits(value: (Vec<f64>, Vec<f64>)) -> (Vec<u64>, Vec<u64>) {
 }
 
 #[test]
+fn indexed_windows_charge_only_retained_words_to_the_live_budget() {
+    let words: Vec<_> = (0..30_000_u32)
+        .map(|word| (f64::from(word) / 32.0).to_bits())
+        .collect();
+    let bytes = crate::leb::index::window_cache_tests::image(5000, 1, 3, &words);
+    let reference = FileIndex::decode(&bytes).unwrap();
+    let temporary = TemporaryImage::new(&bytes);
+    let image = temporary.open();
+
+    for jd in [0.25, 1364.25, 1365.25, 4999.25] {
+        let expected = reference.eval_leb2_body(&bytes, 0, jd).unwrap();
+        assert_eq!(bits(image.eval_leb2_body(0, jd).unwrap()), bits(expected));
+    }
+    let (_, retained, working) = image.indexed_resource_usage().unwrap();
+    assert_eq!(image.chunk_cache_stats().unwrap(), (1, 3, 3));
+    assert!((1..3 * 64 * 1024).contains(&retained));
+    assert_eq!(retained, working);
+    image.cool();
+    let (_, retained, working) = image.indexed_resource_usage().unwrap();
+    assert_eq!((retained, working), (0, 0));
+}
+
+#[test]
 fn every_format_shares_scalar_split_provider_and_composite_words() {
     for bytes in [
         minimal_leb1(),

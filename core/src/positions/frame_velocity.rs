@@ -952,7 +952,9 @@ fn ecliptic_frame_words(jd_tt: f64, flags: i32, dpsi: f64) -> Result<WordMatrix3
         }
     };
     let z = pole_z(p, q);
-    let (s, c) = frame_sin_cos_words(Word::from(VONDRAK_EPS0_RAD))?;
+    static REFERENCE_OBLIQUITY: std::sync::LazyLock<Result<(Word, Word)>> =
+        std::sync::LazyLock::new(|| frame_sin_cos_words(Word::from(VONDRAK_EPS0_RAD)));
+    let (s, c) = (*REFERENCE_OBLIQUITY).clone()?;
     let ecliptic = [p, -q * c - z * s, -q * s + z * c];
     let equator = [x, y, pole_z(x, y)];
     let cross = |a: [Word; 3], b: [Word; 3]| {

@@ -23,6 +23,10 @@ const CONFIG_ENV_VARS: &[(&str, &str)] = &[
     (IERS_DELTA_T_ENV_VAR, "IERS Delta-T override"),
     (NETWORK_POLICY_ENV_VAR, "network policy override"),
     ("LIBEPHEMERIS_LEB", "explicit coefficient image"),
+    (
+        "LIBEPHEMERIS_LEB_CACHE_MB",
+        "process coefficient cache budget in MiB",
+    ),
     ("LIBEPHEMERIS_EPHEMERIS", "main kernel selection"),
     (
         "LIBEPHEMERIS_AUTO_SPK",
@@ -110,13 +114,16 @@ pub(super) fn run_status(
     json: bool,
     verbose: i32,
 ) -> i32 {
-    let outcome =
-        provision::configured_runtime(data_dir.as_deref().map(Path::new)).and_then(|runtime| {
-            if let Some(tier) = tier {
-                runtime.set_precision_tier(tier.name())?;
-            }
-            runtime.data_status_text(json, verbose)
-        });
+    let configured =
+        crate::config::Runtime::with_sources(crate::config::ConfigurationSources::discover());
+    let outcome = configured.configured_leb_cache_bytes().and_then(|budget| {
+        let runtime =
+            provision::configured_runtime_from(data_dir.as_deref().map(Path::new), configured)?;
+        if let Some(tier) = tier {
+            runtime.set_precision_tier(tier.name())?;
+        }
+        runtime.data_status_text_with_cache_config(json, verbose, budget)
+    });
     match outcome {
         Ok(text) => {
             println!("{text}");

@@ -119,7 +119,9 @@ impl Runtime {
         let cached = state
             .center_images
             .as_ref()
-            .is_some_and(|(path, selected, _)| path == &directory && *selected == tier);
+            .is_some_and(|(path, selected, registry)| {
+                path == &directory && *selected == tier && !registry.has_positional_centers()
+            });
         if !cached {
             let mut centers = context;
             centers.spk_registry_mut().clear();
