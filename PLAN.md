@@ -699,6 +699,29 @@ The focused paired controls and the effect of the center-retention fix
 remain under investigation. The strict bit comparator still fails on any
 observed difference.
 
+The unchanged rebuild's first 1,400,000 requests also exhibited 544
+differences, all in `auto`. Counts were 534 typed range-error differences
+and ten value differences. That run reached Skyfield medium before the
+90-minute job limit and retained partial files. These counts cover only
+the completed LEB and Auto prefixes.
+
+A macOS diagnostic reopened the same center supplement after changing
+only the ctime of a private copy. Across 24 repetitions, the published
+wheel's context calls returned three bit-distinct apparent Mars vectors
+at each of the sampled outside-LEB dates, JD 2396756.5, 2506333.5 and
+2688954.5. With `FLG_NOGDEFL`, each request produced one vector. The
+context's planet-centric call returned both values and range errors.
+With the [center retention correction](https://github.com/g-battaglia/libephemeris/pull/88),
+each request produced identical bits in every repetition and every
+planet-centric call returned a value.
+
+The [Windows fixed-wheel repeat](https://github.com/g-battaglia/libephemeris/actions/runs/43882915978)
+compares two independent captures of the wheel with the center correction.
+The [optimization check](https://github.com/g-battaglia/libephemeris/actions/runs/43883394649)
+applies the same isolated correction to the reference and optimized wheels
+and uses Rust 1.99.1 for both builds. The comparison with the released
+4.0.0 wheel remains a separate strict run.
+
 The full external Swiss comparison ran the fast and slow pytest lanes
 against both wheel overlays with network policy sealed. Each run evaluated
 21,359 cases. Both had 147 skips and the same 62 failing case IDs. The
