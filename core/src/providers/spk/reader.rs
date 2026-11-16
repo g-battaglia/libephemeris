@@ -436,10 +436,7 @@ impl SpkRegistry {
         let Some((_, parent)) = self.automatic_centers.get(&body) else {
             return Ok(body);
         };
-        self.registered_bodies()
-            .into_iter()
-            .find(|entry| entry.naif_id == *parent)
-            .map(|entry| entry.body)
+        self.body_for_naif_target(*parent)
             .ok_or(Error::SpkUnregisteredBody { body: *parent })
     }
 
@@ -468,12 +465,10 @@ impl SpkRegistry {
             Err(Error::SpkOutOfRange { .. }) => {}
             Err(error) => return Err(error),
         }
-        let registration = self
-            .registered_bodies()
-            .into_iter()
-            .find(|entry| entry.naif_id == *parent)
+        let body = self
+            .body_for_naif_target(*parent)
             .ok_or(Error::SpkUnregisteredBody { body: *parent })?;
-        self.serving(registration.body)
+        self.serving(body)
     }
 
     /// Resolve the registered target and its optional offset coverage together.
@@ -692,6 +687,14 @@ impl SpkRegistry {
             .collect();
         out.sort_by_key(|r| r.body);
         out
+    }
+
+    /// Match the first alias in the body-key order of `registered_bodies`.
+    pub(crate) fn body_for_naif_target(&self, target: i32) -> Option<i32> {
+        self.bodies
+            .iter()
+            .filter_map(|(&body, (_, naif_id))| (*naif_id == target).then_some(body))
+            .min()
     }
 
     /// Drop the kernel image stored under `path` together with every
@@ -1091,12 +1094,8 @@ impl SpkRegistry {
                 return Ok(offsets);
             }
             if kernel.index().segments_for(center).next().is_none() {
-                if let Some(entry) = self
-                    .registered_bodies()
-                    .into_iter()
-                    .find(|entry| entry.naif_id == center)
-                {
-                    (kernel, target) = self.serving(entry.body)?;
+                if let Some(body) = self.body_for_naif_target(center) {
+                    (kernel, target) = self.serving(body)?;
                     continue;
                 }
             }
@@ -1280,12 +1279,8 @@ impl SpkRegistry {
                 break;
             }
             if kernel.index().segments_for(center).next().is_none() {
-                if let Some(entry) = self
-                    .registered_bodies()
-                    .into_iter()
-                    .find(|entry| entry.naif_id == center)
-                {
-                    (kernel, target) = self.serving(entry.body)?;
+                if let Some(body) = self.body_for_naif_target(center) {
+                    (kernel, target) = self.serving(body)?;
                     continue;
                 }
             }

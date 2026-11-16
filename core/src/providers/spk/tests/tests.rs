@@ -2296,6 +2296,30 @@ fn registry_with_const(body: i32, target: i32, pos: [f64; 3]) -> (SpkRegistry, S
 }
 
 #[test]
+fn naif_target_lookup_uses_the_lowest_current_body_alias() {
+    let mut registry = SpkRegistry::new();
+    registry
+        .register_image("mars", const_image(499, CENTER_SSB, [5.0, -7.0, 11.0]))
+        .unwrap();
+    registry
+        .register_image("venus", const_image(299, CENTER_SSB, [3.0, 4.0, 5.0]))
+        .unwrap();
+    for body in [499, -10, 4] {
+        registry.register_body(body, "mars", 499).unwrap();
+    }
+
+    assert_eq!(registry.body_for_naif_target(499), Some(-10));
+    assert_eq!(registry.body_for_naif_target(299), None);
+    registry.register_body(-10, "venus", 299).unwrap();
+    assert_eq!(registry.body_for_naif_target(499), Some(4));
+    assert_eq!(registry.body_for_naif_target(299), Some(-10));
+    registry.unregister_body(4);
+    assert_eq!(registry.body_for_naif_target(499), Some(499));
+    registry.remove_kernel("mars");
+    assert_eq!(registry.body_for_naif_target(499), None);
+}
+
+#[test]
 fn registry_body_lifecycle_and_list() {
     let mut reg = SpkRegistry::new();
     assert!(reg.is_empty());

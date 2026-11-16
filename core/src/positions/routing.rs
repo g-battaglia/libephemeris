@@ -1823,10 +1823,9 @@ pub(super) fn local_jpl_target(leg: &JplLeg<'_>, body: i32) -> Result<i32> {
             return Err(Error::UnknownBody { body_id: body });
         }
     };
-    let registrations = leg.registry().registered_bodies();
     for target in candidates {
-        if let Some(entry) = registrations.iter().find(|entry| entry.naif_id == *target) {
-            return Ok(entry.body);
+        if let Some(body) = leg.registry().body_for_naif_target(*target) {
+            return Ok(body);
         }
     }
     Err(Error::SpkUnregisteredBody { body })
