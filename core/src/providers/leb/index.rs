@@ -2,7 +2,7 @@
 //! Public entry points and types are exposed through the parent API.
 
 use super::*;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
 
 #[path = "pressure_victim.rs"]
 mod pressure_victim;
@@ -72,7 +72,7 @@ pub const DEFAULT_CHUNK_CACHE_BYTES: usize = 1024 * 1024;
 /// oversized chunks can be evaluated without retention.
 pub struct LebChunkCache {
     inner: Mutex<ChunkCacheInner>,
-    chunk_indexes: Mutex<ChunkIndexCacheInner>,
+    chunk_indexes: RwLock<ChunkIndexCacheInner>,
     resources: Option<Arc<IndexedResources>>,
     // Additional per-cache metadata: one optional nonzero u64 (8 bytes).
     // Only private immutable-image constructors enable numerical reuse.
@@ -205,7 +205,7 @@ impl LebChunkCache {
                 max_bytes,
                 ..ChunkCacheInner::default()
             }),
-            chunk_indexes: Mutex::new(ChunkIndexCacheInner::default()),
+            chunk_indexes: RwLock::new(ChunkIndexCacheInner::default()),
             resources: None,
             word_image_identity: None,
             segment_windows: false,
@@ -243,15 +243,15 @@ impl LebChunkCache {
     /// Retained directory vector capacities, excluding map/Arc/allocator overhead.
     /// No parsing, file reads or hashing occur; coefficient budgets are independent.
     pub(crate) fn retained_chunk_index_bytes(&self) -> usize {
-        self.lock_chunk_indexes().resident_bytes
+        self.read_chunk_indexes().resident_bytes
     }
 
     /// Lock directory metadata without holding the coefficient guard.
     /// As with the coefficient guard, recover poisoning rather than invalidate
     /// an otherwise usable immutable snapshot.
-    fn lock_chunk_indexes(&self) -> MutexGuard<'_, ChunkIndexCacheInner> {
+    fn read_chunk_indexes(&self) -> RwLockReadGuard<'_, ChunkIndexCacheInner> {
         self.chunk_indexes
-            .lock()
+            .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
@@ -264,7 +264,14 @@ impl LebChunkCache {
         entry: &BodyEntry,
         body_id: i32,
     ) -> Result<Arc<TrackedVec<ChunkEntry>>> {
-        let mut inner = self.lock_chunk_indexes();
+        if let Some(chunks) = self.read_chunk_indexes().entries.get(&body_id) {
+            return Ok(Arc::clone(chunks));
+        }
+        let mut inner = self
+            .chunk_indexes
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // A concurrent miss may have published the directory before the write lock.
         if let Some(chunks) = inner.entries.get(&body_id) {
             return Ok(Arc::clone(chunks));
         }
@@ -310,7 +317,7 @@ impl LebChunkCache {
     /// Test-only initialization evidence; never changes public coefficient counters.
     #[cfg(test)]
     pub(super) fn chunk_index_test_stats(&self) -> (usize, usize) {
-        let inner = self.lock_chunk_indexes();
+        let inner = self.read_chunk_indexes();
         (inner.parse_calls, inner.entries.len())
     }
 
