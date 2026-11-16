@@ -111,11 +111,10 @@ impl WeakFileImage {
         let owner = self.owner.upgrade()?;
         let bytes = owner.bytes.upgrade()?;
         let index = owner.index.upgrade()?;
-        let decoded = self.decoded.upgrade().unwrap_or_else(|| {
-            Arc::new(DecodedSpkCache {
-                entries: (0..index.len()).map(|_| OnceLock::new()).collect(),
-            })
-        });
+        let decoded = self
+            .decoded
+            .upgrade()
+            .unwrap_or_else(|| Arc::new(DecodedSpkCache::for_segments(index.len())));
         let mut source = SpkRegistry::new();
         source.kernels.insert(
             key.to_owned(),

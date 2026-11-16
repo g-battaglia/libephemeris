@@ -259,9 +259,7 @@ impl SpkRegistry {
     /// still fail.
     pub fn register_image(&mut self, path: &str, bytes: Vec<u8>) -> Result<()> {
         let kernel = SpkKernel::decode(path, bytes)?;
-        let cache = DecodedSpkCache {
-            entries: (0..kernel.index.len()).map(|_| OnceLock::new()).collect(),
-        };
+        let cache = DecodedSpkCache::for_segments(kernel.index.len());
         self.automatic_centers.retain(|_, (key, _)| key != path);
         self.decoded.insert(path.to_string(), Arc::new(cache));
         self.kernels.insert(path.to_string(), kernel);
@@ -643,9 +641,7 @@ impl SpkRegistry {
     /// consumed; no body registration or numerical sample is manufactured.
     pub fn retain_owned_kernel(&mut self, kernel: SpkKernel) {
         let key = kernel.path.clone();
-        let cache = DecodedSpkCache {
-            entries: (0..kernel.index.len()).map(|_| OnceLock::new()).collect(),
-        };
+        let cache = DecodedSpkCache::for_segments(kernel.index.len());
         self.automatic_centers.retain(|_, (path, _)| path != &key);
         self.decoded.insert(key.clone(), Arc::new(cache));
         self.kernels.insert(key, kernel);
@@ -749,7 +745,7 @@ impl SpkRegistry {
         })?;
         let result = cache.entries[at].get_or_init(|| match segment.descriptor.seg_type {
             TYPE_CHEBYSHEV_POS | TYPE_CHEBYSHEV_POS_VEL => {
-                decode_chebyshev(kernel.bytes(), segment, kernel.endian())
+                super::decode::decode_chebyshev_image(kernel, segment, cache)
                     .map(DecodedSpkSegment::Chebyshev)
             }
             TYPE_EMDA => {
@@ -2501,6 +2497,42 @@ mod acquired_file_ownership_tests {
                     .0
                     < 0.0
             );
+        }
+    }
+
+    #[test]
+    fn cached_record_reads_match_eager_decoding_bitwise() {
+        for data_type in [2, 3] {
+            let registry = relative_polynomial_registry(data_type);
+            let kernel = registry.kernel("relative-polynomial").unwrap();
+            let segment = kernel.index().all_segments().next().unwrap();
+            let eager = decode_chebyshev(kernel.bytes(), segment, kernel.endian()).unwrap();
+            let DecodedSpkSegment::Chebyshev(lazy) =
+                registry.cached_segment(kernel, segment).unwrap()
+            else {
+                panic!("expected a Chebyshev segment");
+            };
+            assert!(lazy.words.is_empty());
+            assert!(lazy.image_records.is_some());
+            let delta = 2.0_f64.powi(-40);
+            for fraction in [-2.0, -1.5, -delta, 0.0, delta, 1.5, 2.0] {
+                let bits = |segment| {
+                    let (state, interior, tangent) =
+                        evaluation::eval_chebyshev_two_part_jd_with_domain(
+                            segment,
+                            J2000_JD_TDB,
+                            fraction,
+                        )
+                        .unwrap();
+                    (
+                        state.position_km.map(f64::to_bits),
+                        state.velocity_km_s.map(f64::to_bits),
+                        interior,
+                        tangent.map(|value| value.map(f64::to_bits)),
+                    )
+                };
+                assert_eq!(bits(lazy), bits(&eager));
+            }
         }
     }
 
