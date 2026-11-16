@@ -847,8 +847,7 @@ wheel (`dd21b595`, SHA-256
 `54628e7c9c84b6cbb069b441905a3ad5bf29ab560b697adb0ad90688c845c5d6`)
 again matched 20,000 focused calls. All 155 SPK tests and 1,486 Python tests
 passed. The revised wheel also matched all 2,100,000 macOS calls with the
-32 MiB LEB pool, zero differences. The hosted comparison and 100,000-chart
-1/2/4/8-process comparison are underway.
+32 MiB LEB pool, zero differences. The hosted comparison is underway.
 
 | Metric, same revised wheel and setup | Owned | Positional, checks around uncached reads |
 | --- | ---: | ---: |
@@ -857,6 +856,23 @@ passed. The revised wheel also matched all 2,100,000 macOS calls with the
 | Median random chart | 1,193 µs | 1,040 µs |
 | p95 random chart | 1,247 µs | 1,093 µs |
 | Median first call with OS pages warm | 75.2 ms | 68.5 ms |
+
+### Multiprocess memory at 100,000 charts per worker
+
+Mac arm64, medium tier, the revised wheel and pins as above, legacy LEB
+retention. Each worker ran the same 100,000 random dates independently.
+
+| Processes | Owned sum of RSS | Positional sum of RSS | Median physical footprint per process |
+| --- | ---: | ---: | ---: |
+| 1 | 284.5 MB | 84.1 MB | 269.3 → 65.0 MB |
+| 2 | 569.1 MB | 168.5 MB | 269.3 → 65.1 MB |
+| 4 | 1,137.0 MB | 336.3 MB | 269.4 → 65.0 MB |
+| 8 | 2,269.4 MB | 668.1 MB | 268.1 → 66.0 MB |
+
+These are per-process RSS totals, which count shared mappings once per
+process. macOS did not expose PSS for these runs. The footprint column is a
+per-process median. Raw data and vmmap outputs are the two
+`*-memory-workers` reports in `target/bench/spk-positional-qualification/`.
 
 ### Existing indexed LEB reader
 
