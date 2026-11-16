@@ -1677,7 +1677,17 @@ At eight workers, the sum of individual peak footprints moved from
 544.9 to 250.0 MB. Random median/p95 moved from 597.0/626.8 to
 626.2/657.2 µs and consecutive median/p95 from 114.4/119.2 to
 119.2/124.2 µs. Warm-page first-call median was 3.66 → 16.19 ms.
-The direct published-wheel memory pair is running.
+
+The direct comparison staged the same inputs and dates for the
+published PyPI 4.0.0 wheel and the exact `17c32b93` wheel. At eight
+processes and 100,000 full-coverage charts per worker, steady summed
+RSS fell from 674.1 to 380.5 MB and sampled footprint from 526.4
+to 198.3 MB. First-call sampled footprint was 520.5 → 223.3 MB.
+The sum of individual peak footprints fell from 550.2 to 254.5 MB.
+The wheel hashes, routes and four checkpoints are recorded in
+`target/bench/leb-medium-private-snapshot/positional-production/published-memory.json`.
+The downstream and external scientific suites are being replayed on
+this exact wheel. The earlier completed comparisons are recorded above.
 
 The [combined indexed qualification](https://github.com/g-battaglia/libephemeris/actions/runs/43929882577)
 also measured 100,000 charts per process on Linux ARM64 with the
