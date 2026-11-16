@@ -653,6 +653,84 @@ change passed all nine comparator tests and the 10,000-call macOS smoke
 comparison with zero differences. It leaves the corpus and capture schema
 unchanged.
 
+The complementary timing matrix passed on macOS for both isolated wheels.
+Each wheel completed all 42 mode/tier combinations of repeated-date charts,
+time series, houses, sidereal time, ayanamsha, stars and topocentric calls.
+Five fresh processes ran each case, with 100 operations per timing repeat
+and 1,000 calls per series. Reports are
+`target/bench/family-matrix-{baseline,candidate}.json`. These runs shared
+the host with memory qualification, so they establish workload coverage.
+Dedicated performance comparisons use the raw timing samples under
+controlled conditions.
+
+The base-tier macOS memory comparison used one worker per wheel and 100,000
+random-date charts per mode. Published/rebuilt steady RSS was 109.6/108.8 MB
+in `auto` and 190.1/190.2 MB in `skyfield`. Peak RSS was 136.1/135.2 MB
+in `auto` and 190.1/190.2 MB in `skyfield`. Reports and their raw `vmmap`
+snapshots are in `target/bench/base-native-memory-{baseline,candidate}*`.
+
+The [Windows 32 MiB cache run](https://github.com/g-battaglia/libephemeris/actions/runs/43863141515)
+finished all 2,100,000 calls and recorded 537 differences, all in `auto`.
+525 changed between a result and `EphemerisRangeError` in both directions.
+The other 12 were angular output or angular rate changes at Mars dates
+outside the LEB coverage. These retained the same returned flags, distance,
+and radial rate. The focused `auto-edge` profile runs the first 30,000
+requests of each `auto` tier with the full input set. The wheel workflow
+also runs the published wheel twice as a control. The focused profile
+omits the preceding LEB runs in the full sequence. The unchanged-build
+Windows full comparison and diagnosis remain open.
+
+The exact Windows wheel binaries embed Rust standard-library source
+revisions `58cf8f9c35b355199727627d07ae34a4e2846d67` (published, 1.99.1)
+and `0ef1bc386059596dada8fb65b50425aab2ea637a` (candidate, 1.100.0).
+These identify the compiler and standard library difference independently
+of the runner's current `rustc -Vv`. The optional wheel workflow toolchain
+matches the published build for a controlled rerun.
+
+The full external Swiss comparison ran the fast and slow pytest lanes
+against both wheel overlays with network policy sealed. Each run evaluated
+21,359 cases. Both had 147 skips and the same 62 failing case IDs. The
+rebuilt wheel had one additional failure in a Chiron SPK input-stability
+check. The existing check passed against both wheels when rerun alone.
+The source of the transient inventory change remains unresolved. The
+external standalone rounds and verification commands were outside these
+runs. The full logs are `target/bench/validation-full-leb{,-baseline}.log`.
+
+On the hosted Linux ARM64 runner, the paired base/LEB comparison completed
+100,000 charts per worker at 1/2/4/8 processes. At eight processes, published
+and rebuilt summed RSS was 397.3/399.9 MB, and their summed PSS was
+254.1/254.0 MB. Each worker retained about 29.6 MB of anonymous RSS.
+The archived reports include each process's anonymous, file-backed, peak
+and proportional memory counters at all four checkpoints.
+Linux x86-64 likewise recorded 432.5/432.7 MB summed RSS and
+256.4/256.4 MB summed PSS for the two wheels at eight processes.
+[Linux memory run](https://github.com/g-battaglia/libephemeris/actions/runs/43875470097)
+
+A paired macOS base/LEB run compared the Python wrapper with the native
+release example using the same dates and pinned inputs. Across five
+fresh-process repeats of 5,000 charts, Python/native consecutive medians
+were 109.5/107.9 µs and random medians were 539.5/545.2 µs. These
+measurements put the consecutive path's observed difference at about
+1.6 µs per chart and show no benefit in the random-date comparison.
+They do not justify a new batch API on the basis of wrapper overhead.
+See `target/bench/binding-paired/` for the samples and per-call p95.
+
+The fresh-process startup report now includes import, first-call and first-
+chart medians and p95s. The warm-page condition explicitly primes the staged
+inputs. First use has only the staging reads. Both controls passed a
+five-repeat base/leb run and rejected the claim of verified cold OS pages.
+
+For the step 1c investigation, the native profiling example separately
+attributes the first body and the ten subsequent bodies. A base/leb
+50,000-chart consecutive run produced medians of 25.5, 75.3 and 16.0 µs
+for the first body, the ten subsequent bodies and houses. This was a
+profiling build with other qualification running on the host.
+Of 692 first-body samples, 327 were in the two-word sine/cosine function.
+Of 2,034 subsequent-body samples, 646 were in coefficient evaluation or
+the two-word polynomial rate path and 258 were in deflection arithmetic.
+The observations guide the reuse work. The native trace and raw timings
+are under `target/bench/chart-anatomy-profile/`.
+
 ## 15. Step 1a experiment
 
 An opt-in process pool retains whole decoded chunks across runtime-owned LEB
@@ -846,8 +924,8 @@ corpus calls on macOS with the 32 MiB LEB cache enabled. The revised
 wheel (`dd21b595`, SHA-256
 `54628e7c9c84b6cbb069b441905a3ad5bf29ab560b697adb0ad90688c845c5d6`)
 again matched 20,000 focused calls. All 155 SPK tests and 1,486 Python tests
-passed. The revised full corpus and 100,000-chart 1/2/4/8-process runs
-are underway.
+passed. The revised wheel also matched all 2,100,000 macOS calls with the
+32 MiB LEB pool, zero differences. The hosted comparison is underway.
 
 | Metric, same revised wheel and setup | Owned | Positional, checks around uncached reads |
 | --- | ---: | ---: |
@@ -856,6 +934,23 @@ are underway.
 | Median random chart | 1,193 µs | 1,040 µs |
 | p95 random chart | 1,247 µs | 1,093 µs |
 | Median first call with OS pages warm | 75.2 ms | 68.5 ms |
+
+### Multiprocess memory at 100,000 charts per worker
+
+Mac arm64, medium tier, the revised wheel and pins as above, legacy LEB
+retention. Each worker ran the same 100,000 random dates independently.
+
+| Processes | Owned sum of RSS | Positional sum of RSS | Median physical footprint per process |
+| --- | ---: | ---: | ---: |
+| 1 | 284.5 MB | 84.1 MB | 269.3 → 65.0 MB |
+| 2 | 569.1 MB | 168.5 MB | 269.3 → 65.1 MB |
+| 4 | 1,137.0 MB | 336.3 MB | 269.4 → 65.0 MB |
+| 8 | 2,269.4 MB | 668.1 MB | 268.1 → 66.0 MB |
+
+These are per-process RSS totals, which count shared mappings once per
+process. macOS did not expose PSS for these runs. The footprint column is a
+per-process median. Raw data and vmmap outputs are the two
+`*-memory-workers` reports in `target/bench/spk-positional-qualification/`.
 
 ### Existing indexed LEB reader
 
