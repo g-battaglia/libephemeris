@@ -643,3 +643,9 @@ x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g
 the Windows full job is pending. A sample of the random-date base/leb workload on the published
 wheel put Zstandard decompression and LEB coefficient unpacking at the top of
 the stacks, supporting the cache experiment once qualification is resolved.
+
+The hosted qualification now reports pinned data provisioning and prints
+each capture's progress by mode and tier every 50,000 calls. The diagnostic
+change passed all nine comparator tests and the 10,000-call macOS smoke
+comparison with zero differences. It leaves the corpus and capture schema
+unchanged.

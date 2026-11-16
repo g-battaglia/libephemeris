@@ -178,6 +178,8 @@ def capture(options):
         total = 0
         coverage = Counter()
         for mode, tier in spec["matrix"]:
+            print(f"{options.role} {mode}/{tier}: starting {spec['count']:,} calls",
+                  file=sys.stderr, flush=True)
             configure(eph, mode, tier)
             ctx = eph.EphemerisContext(os.environ["LIBEPHEMERIS_DATA_DIR"], KERNELS[tier])
             ctx.set_topo(*SITE)
@@ -193,6 +195,9 @@ def capture(options):
                 print(dump(row), file=out)
                 coverage[f"{mode}/{tier}/{api}"] += 1
                 total += 1
+                if (index + 1) % 50_000 == 0 or index + 1 == spec["count"]:
+                    print(f"{options.role} {mode}/{tier}: {index + 1:,}/{spec['count']:,} calls",
+                          file=sys.stderr, flush=True)
         print(dump({"count": total, "coverage": dict(coverage)}), file=out)
     part.replace(options.output)
 
@@ -273,13 +278,19 @@ def run(options):
                 value = getattr(options, f"{role}_{name}")
                 if value is not None:
                     args.extend(["--" + name.replace("_", "-"), str(value)])
-            with (options.output / f"{role}.log").open("w", encoding="utf-8") as log:
-                status = subprocess.run(args, cwd=tmp, env=environment(data), stderr=log).returncode
+            with (options.output / f"{role}.log").open("w", encoding="utf-8", buffering=1) as log:
+                with subprocess.Popen(args, cwd=tmp, env=environment(data), stderr=subprocess.PIPE,
+                                      encoding="utf-8", errors="replace") as worker:
+                    for line in worker.stderr:
+                        log.write(line)
+                        print(line, end="", file=sys.stderr, flush=True)
+                    status = worker.wait()
             if status:
                 raise ValueError(f"{role} capture failed ({status}); see {log.name}")
 
         with ThreadPoolExecutor(max_workers=2) as pool:
             list(pool.map(acquire, ("baseline", "candidate")))
+    print("Comparing the completed captures", file=sys.stderr, flush=True)
     result = compare(options.output / "baseline.jsonl.gz", options.output / "candidate.jsonl.gz")
     report.write_text(dump(result) + "\n", encoding="utf-8")
     print(f"{result['status']}: {result['count']} calls, {result['differences']} differences")
