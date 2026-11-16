@@ -91,9 +91,13 @@ full chart in each fresh process. With `page_cache_warm`, the driver reads
 all staged inputs immediately before each timed process. With `first_use`,
 the input staging reads are the only preparation. Both conditions start
 with empty process-local decoder and coefficient caches. A previously
-decoded persistent store is outside these configurations. The driver
-reports `page_cache_cold` as an unmet prerequisite because it cannot verify
-eviction after validating the inputs.
+decoded persistent store is outside these configurations. On Linux,
+`page_cache_cold` syncs and evicts the private staged inputs before each
+timed process. It requires `fincore` to observe zero resident bytes
+immediately before spawn and records that observation in each sample.
+Other hosts report this condition as an unmet prerequisite. [Linux file
+cache advice](https://man7.org/linux/man-pages/man2/posix_fadvise.2.html)
+and [residency probe](https://man7.org/linux/man-pages/man1/fincore.1.html).
 
 Linux uses `/proc/PID/status` and `smaps_rollup`. Sum of PSS apportions shared
 pages and is the available estimate of the group's attributable resident
@@ -109,6 +113,8 @@ and choose a `linux_memory_case` such as `auto/medium`. The selected
 mode and tier run against the published and rebuilt wheels with 1, 2, 4
 and 8 workers and 100,000 charts per worker. Pinned companion inputs
 are staged for LEB and Auto. Raw Linux reports are in the wheel artifacts.
+Enable `linux_startup` to measure all three startup conditions on the
+selected case.
 
 ## Bit identity
 

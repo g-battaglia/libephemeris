@@ -728,6 +728,10 @@ the candidate using positional centers. Raw captures are in
 `target/bench/corrected-reference-indexed-full-mac/`. The companion
 [Windows owned-reader run](https://github.com/g-battaglia/libephemeris/actions/runs/43884616052)
 uses the same correction and the candidate's 32 MiB process cache.
+The corresponding macOS owned-reader comparison also passed 2,100,000
+calls with zero differences. Its report records the 32 MiB cache and
+positional centers as enabled on the optimized wheel. Raw captures are
+in `target/bench/corrected-reference-owned-full-mac/`.
 
 The full external Swiss comparison ran the fast and slow pytest lanes
 against both wheel overlays with network policy sealed. Each run evaluated
@@ -760,7 +764,23 @@ See `target/bench/binding-paired/` for the samples and per-call p95.
 The fresh-process startup report now includes import, first-call and first-
 chart medians and p95s. The warm-page condition explicitly primes the staged
 inputs. First use has only the staging reads. Both controls passed a
-five-repeat base/leb run and rejected the claim of verified cold OS pages.
+five-repeat base/leb run on macOS, where the cold-page condition reports a
+missing prerequisite. On Linux the driver evicts only the staged files
+and verifies zero resident bytes with `fincore` before each cold sample.
+Three tool cases refuse a nonzero count or incomplete probe output.
+
+The remaining baseline PSS and anonymous/file splits run as separate
+Linux cases for [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886523936),
+[Auto base](https://github.com/g-battaglia/libephemeris/actions/runs/43886529057),
+[Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886534322),
+[Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43886540807)
+and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886546316).
+The SPK candidate's Linux counterparts cover
+[Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886630970)
+and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886636910).
+The positional candidate is also measured in
+[Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43886693099).
+Each case uses 1/2/4/8 processes and 100,000 charts per process.
 
 For the step 1c investigation, the native profiling example separately
 attributes the first body and the ten subsequent bodies. A base/leb
