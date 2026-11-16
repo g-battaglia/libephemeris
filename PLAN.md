@@ -1015,6 +1015,29 @@ process was 939.2 µs in base and 1,039.6 µs in medium. The last 100
 charts measured 147.7 and 233.6 µs. Medium full coverage still had
 a p95 of 1,074.6 µs in the last 100 charts. Report the date-window and
 warm-up dependence alongside the median speedup.
+
+The same sweep also measured 300 random charts per batch at each thread
+count, in five fresh processes per case. The table gives the median of
+the batch averages in µs per chart.
+
+| LEB tier and reader | 1 thread | 2 threads | 4 threads | 8 threads |
+| --- | ---: | ---: | ---: | ---: |
+| Base, optimized default | 561.9 | 353.7 | 265.5 | 389.9 |
+| Base, 32 MiB owned pool | 188.1 | 130.7 | 105.8 | 153.8 |
+| Base, 2 MiB indexed | 573.4 | 527.4 | 547.9 | 654.4 |
+| Medium, optimized default | 600.0 | 363.6 | 311.9 | 406.0 |
+| Medium, 32 MiB owned pool | 226.7 | 189.8 | 160.9 | 186.0 |
+| Medium, 6 MiB indexed | 522.4 | 495.5 | 495.0 | 473.4 |
+
+The 32 MiB pool improved the batch average at all four thread counts in
+this window. The default and 32 MiB owned pool reached their best result
+at four threads on this machine. The indexed reader's shared decode gate
+serializes cold scratch reservations. The timings alone cannot attribute
+the scaling to that gate. A separate worker-sampling run compares the
+indexed medium path at one and eight threads and the owned alternatives
+at eight. It is queued after the other local measurements, with the
+provenance and traces under `target/bench/leb-thread-profile/`.
+
 Auto base also completed with matching input and workload settings.
 The random-chart median was 1,183 µs on the corrected reference,
 1,066 µs on the default candidate and 943 µs with positional centers.
@@ -1275,6 +1298,13 @@ The full owned-reader RAM sweep queues legacy retention and 16/32/64/128
 MiB on both LEB tiers after the local timing and profiling commands.
 It uses 100,000 charts per worker at 1/2/4/8 processes.
 Commands and artifacts are under `target/bench/owned-cache-ram-matrix/`.
+The legacy-control report passed the local manifest and checkpoint
+comparison. At eight processes on macOS arm64, steady summed RSS was
+458.9 MB for base and 758.5 MB for medium. Summed sampled physical
+footprint was 277.5 and 608.6 MB. The sweep reports macOS process
+measurements separately from Linux PSS. A [hosted LEB medium run](https://github.com/g-battaglia/libephemeris/actions/runs/43918300315)
+compares the published release with the 32 MiB candidate using Linux PSS
+at the same four process counts.
 
 ## 15. Step 1a experiment
 
