@@ -1752,7 +1752,9 @@ The x86-64 job's comparison report also records 2,100,000 identical
 calls and six matching warnings. Its 1 / 2 / 4 / 8-worker reference
 PSS was 67.42 / 127.80 / 245.48 / 477.60 MB versus 67.47 / 127.78 /
 245.52 / 477.51 MB on the candidate. Both reports were read from the
-job archive. Full x86-64 capture verification is in progress.
+job archive. All x86-64 capture records and trailers were checked.
+The x86-64 installed-wheel tests also had 1,454 passes and 32 skips
+on each Python version.
 
 The Linux lab uses an isolated ARM64 guest and the same installed
 candidate wheel. Its guest filesystem declined reflink creation.
@@ -1785,10 +1787,21 @@ holds a read-only mapping to account for its shared pages.
 [Linux file seals](https://man7.org/linux/man-pages/man2/F_ADD_SEALS.2const.html)
 and [cgroup memory counters](https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files).
 
-This remains a lab screen: the controller supplies the owner
-descriptor. The 100,000-chart repeats at 1 / 2 / 4 / 8 workers and
-retention after initial owner exit are running. Raw files are in
-`target/bench/linux-medium-lab/`.
+At eight workers and 100,000 charts per worker over full coverage,
+the owned and sealed chart digests matched. Worker PSS changed from
+430.1 to 166.3 MB and the container's `anon + file` charges from
+503.1 to 248.5 MB. The median of per-worker batch averages rose
+from 1,295 to 1,387 µs per chart. The mapped inode retained its
+pinned digest and all seals after the initial owner exited and
+another worker continued to hold it.
+
+The controller supplies the owner descriptor for both reports. The
+remaining 1 / 2 / 4-worker repeats are running. A local native
+candidate (`fe894aaf`) tests a read-only sealed mapping using the
+ordinary owned cache. Admission requires the kernel seals and an
+exact match to the original pinned source. The lab passes the
+descriptor path explicitly. Its build and fallback tests are queued.
+Raw files are in `target/bench/linux-medium-lab/`.
 
 ## 15. Step 1a experiment
 
