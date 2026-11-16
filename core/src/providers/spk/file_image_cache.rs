@@ -59,11 +59,10 @@ impl FileImageKey {
 }
 
 /// Small lifetime carrier owned strongly only by actual file-backed kernels.
-/// The cache holds a weak carrier, rather than a direct weak unsized byte Arc:
-/// its weak byte/index fields are dropped with the last kernel, allowing the
-/// large byte allocation itself to retire even before the hint is pruned.
+/// The weak carrier avoids retaining the digest state after the last kernel.
+/// Weak byte references do not retain the Vec's coefficient allocation.
 pub(super) struct FileImageOwner {
-    bytes: Weak<[u8]>,
+    bytes: Weak<Vec<u8>>,
     index: Weak<SpkIndex>,
     endian: DafEndian,
     // Fixed metadata on this existing owner; no bytes or descriptor is retained.
@@ -237,6 +236,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn decoded_image_and_clones_retain_the_original_buffer() {
+        let bytes = crate::spk::moon_test_kernel_bytes();
+        let original = bytes.as_ptr();
+        let kernel = SpkKernel::decode("owned-buffer", bytes).unwrap();
+        assert_eq!(kernel.bytes().as_ptr(), original);
+        assert_eq!(kernel.clone().bytes().as_ptr(), original);
+    }
+
+    #[test]
     fn immutable_digest_is_shared_by_concurrent_readers_and_has_fixed_owner_cost() {
         use sha2::{Digest, Sha256};
         use std::sync::Barrier;
@@ -277,7 +285,7 @@ mod tests {
         ));
         // Report the compiled storage delta rather than predicting padding.
         struct PreviousFileImageOwner {
-            _bytes: Weak<[u8]>,
+            _bytes: Weak<Vec<u8>>,
             _index: Weak<SpkIndex>,
             _endian: DafEndian,
         }

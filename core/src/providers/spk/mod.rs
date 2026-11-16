@@ -351,7 +351,7 @@ pub trait CenterProvider {
 #[derive(Clone)]
 pub struct SpkKernel {
     path: String,
-    bytes: Arc<[u8]>,
+    bytes: Arc<Vec<u8>>,
     endian: DafEndian,
     index: Arc<SpkIndex>,
     source_file: Option<Arc<std::fs::File>>,

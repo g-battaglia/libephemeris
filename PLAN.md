@@ -678,3 +678,22 @@ measuring the two changes together before selecting a default.
 - [ ] Measure 100,000-chart process memory and 1/2/4/8 thread throughput.
 - [ ] Re-profile cold misses and quantify decoder context reuse and workspace.
 - [ ] Select a default after the data access changes and RAM acceptance check.
+
+## 16. Step 1b opening-copy experiment
+
+The first storage change moves the Vec received by the SPK parser into a
+shared owner. Acquiring a kernel no longer copies the whole Vec into an Arc
+slice. This preserves the public immutable byte view and record evaluator.
+The regression test checks that the parser and its clones retain the original
+buffer address. The earlier digest and weak-owner test still passes.
+
+Mac arm64, medium tier, controlled 1,000-chart samples, default LEB retention:
+
+| Mode | After first call before → after | After 1,000 charts before → after |
+| --- | ---: | ---: |
+| auto | 535.5 → 335.1 MB RSS | 676.6 → 474.8 MB RSS |
+| skyfield | 794.6 → 474.1 MB RSS | 996.0 → 675.5 MB RSS |
+
+This removes the transient full-file copy and the allocator pages it leaves
+resident. The owned kernel image and its decoded segments still consume RAM.
+Positional SPK records and lazy acquisition remain part of step 1b.
