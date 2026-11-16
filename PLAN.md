@@ -775,3 +775,43 @@ and the process and thread matrix are still open before selecting a default.
 The next storage experiment is positional I/O for managed data under the
 immutable-data contract. The public owned-image path supplies callers with
 a stable byte slice for the life of the kernel.
+
+## 17. Step 1b positional automatic-center prototype
+
+`LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS=1` selects the prototype for
+scalar `auto` calls. It defers acquisition of a published planet-center
+supplement until the first offset request. The open descriptor is scanned
+against the published SHA-256 pin before its summary index can be used.
+Record offsets and split-time Chebyshev evaluation share the existing code.
+Explicit image and complete session APIs retain their owned byte views.
+Native DE reads and PCTR continue through their ordinary acquisition paths.
+
+The first prototype used an identity check before and after every offset
+evaluation. On macOS arm64, medium tier and legacy LEB retention, on the
+same wheel (`503ae7a5`) and data:
+
+| Metric | Owned | Positional, checks on every sample |
+| --- | ---: | ---: |
+| RSS after 5,000 random charts | 274.2 MB | 73.8 MB |
+| Physical footprint after 5,000 random charts | 258.9 MB | 58.4 MB |
+| Median random chart | 1,189 µs | 1,947 µs |
+| Median first call with OS pages warm | 74.7 ms | 69.3 ms |
+
+The focused scalar comparison matched all 20,000 calls across base and
+medium bit for bit. A four-second sample during the `auto/medium` workload
+recorded 1,677 samples in `fstat`. The revision checks the descriptor before
+and after each cache miss. Cache hits use the previously admitted immutable
+words, so a cached result can retain the original value after an external
+in-place write. New reads refuse ordinary changes detected by the descriptor
+size and modification time. This remains dependent on replace-by-rename and
+does not protect against a writer that restores the observed metadata.
+The pinned descriptor survives atomic replacement of its path.
+
+Run the paired benchmark in `tools/bench/benchmark.py` with and without
+`--positional-centers` on the same installed wheel, using
+`--mode auto --tier medium --workload random_chart --workload memory
+--workload cold_start --workers 1 --calls 5000 --memory-calls 5000`.
+For a scalar-only replay, use `bitdiff.py run --profile auto-centers
+--candidate-positional-centers` with the same wheel as both inputs. Raw reports
+and the sampling trace are in `target/bench/spk-positional-qualification/`.
+The all-mode corpus and revised latency measurements are still open.
