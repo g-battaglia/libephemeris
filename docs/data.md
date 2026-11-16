@@ -112,6 +112,13 @@ during cache warm-up. [Performance plan and results](../PLAN.md).
 
 ## Large LEB files
 
+`base_core.leb2` discovered at the configured data root can share the
+immutable base data built into the wheel. The runtime checks every byte
+against the bundled file and uses the shared bytes when they match. This
+preserves the discovered path and gives each admitted image a fresh
+coefficient cache. Explicit paths and indexed readers use their
+configured acquisition policy.
+
 `owned` retains a complete immutable snapshot. `indexed` keeps a read-only file
 descriptor, indexes and bounded decoded chunks:
 

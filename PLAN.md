@@ -615,6 +615,9 @@ selected from the measured results; none of it needs to be decided now.
   from the sidereal-mode transition and report the count on each wheel.
   The local 10,000-call release/candidate smoke matched, including one
   warning-emitting call on each side.
+  An additional 25,518-call prefix across all six mode/tier cases against
+  the published wheel matched exactly, with six real warning calls per
+  wheel. Captures are in `target/bench/spk-registration-lookup/warning-prefix/`.
 - [x] Run a 10,000-call PR check and support full manual runs on both
   Linux architectures and Windows. Keep the macOS verification local.
 - [ ] Pass the full comparison against the published reference on all
@@ -1065,8 +1068,15 @@ path containing the cold decode gate. With the 32 MiB pool, the most
 frequent caller was chunk directory lookup (4,816 wait samples).
 An isolated shared-read directory experiment passed 244 bundled LEB
 tests, including single publication under concurrent first access.
-Its paired thread timing is queued under
-`target/bench/leb-shared-directory-read/`.
+Its paired timing used LEB medium, five repeats of 6,000 charts each.
+At 32 MiB, median batch time per chart at 1 / 2 / 4 / 8 threads was
+155.1 / 113.3 / 97.9 / 169.7 µs with the current lock and
+154.0 / 101.9 / 79.0 / 95.8 µs with concurrent cache-hit reads.
+The legacy-retention medians moved by 0.4–2.2% across thread counts.
+The local 10,000-call gate with the candidate pool active matched,
+including the expected sidereal warning.
+The shared-read change is in PR #87 for combined qualification.
+Raw comparison artifacts are in `target/bench/leb-shared-directory-read/`.
 
 Auto base also completed with matching input and workload settings.
 The random-chart median was 1,183 µs on the corrected reference,
@@ -1137,6 +1147,11 @@ The [full corrected-reference matrix](https://github.com/g-battaglia/libephemeri
 is running on the revision with the lookup change.
 Raw timings and both local gates are under
 `target/bench/spk-registration-lookup/`.
+The latest runtime's Rust release suite passed 3,247 library tests with
+the three requested features and the pinned v3 test input. Integration
+and documentation tests passed. The isolated wheel's Python suite
+passed 1,486 tests. The unchanged consumer and external replays are
+running under `target/bench/spk-registration-lookup/current-suites/`.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.
 
@@ -1411,8 +1426,12 @@ measurements gave the following steady sums in decimal MB.
 
 At eight workers the sampled footprint after the first chart was
 308.0 → 225.5 MB. Summed RSS includes the executable's resident pages
-in each process. The [Linux follow-up](https://github.com/g-battaglia/libephemeris/actions/runs/43924104899)
-checks proportional attribution on both architectures.
+in each process. In the [Linux follow-up](https://github.com/g-battaglia/libephemeris/actions/runs/43924104899),
+ARM64 steady summed PSS changed from 38.5 / 72.3 / 133.4 / 258.8 MB
+to 37.2 / 61.2 / 104.0 / 186.0 MB at 1 / 2 / 4 / 8 workers. At
+eight workers anonymous RSS fell from 241.4 to 159.5 MB. The x86-64
+job is still in progress. The base snapshot change is now in PR #87
+for combined qualification.
 Mac random-chart medians were 541.7 → 576.6 µs and consecutive medians
 were 106.8 → 111.4 µs across five independent repeats. The median first
 call moved from 1.49 to 1.92 ms on first use and from 1.45 to 1.95 ms
