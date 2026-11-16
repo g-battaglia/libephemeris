@@ -872,3 +872,34 @@ The indexed policy reduces retained heap, with a roughly 46% cost on this
 random-date workload. The medium memory saving warrants checking a larger
 coefficient cache under the positional reader's live allocation limits.
 No release default has been selected.
+
+## 18. Step 1b coefficient windows for indexed LEB
+
+A four-second `auto`-independent `leb/medium` sample put full-frame
+coefficient reconstruction at the top of the indexed reader profile
+(1,400 samples). `pread` and `fstat` had 86 and 34 samples. The change
+validates and decompresses the full frame but reconstructs and retains
+only the selected window of at most 64 KiB. Positional admission still
+uses the existing frame, compressed-range, window and working limits.
+The retained working lease covers the actual selected word allocation.
+
+All 243 LEB tests passed, including cross-window bit equality and releasing
+the indexed retention and working leases on cooling. The two indexed wheels
+matched all 10,000 smoke calls. The standard installed-wheel Python suite
+passed 1,486 tests.
+
+Initial macOS arm64 screening, matching indexed policies, same pinned data,
+five fresh processes with 1,000 charts each. Auto memory jobs were running
+during the screening, so the timings are preliminary.
+
+| Tier | Full decoded chunks, random | Selected windows, random | Full decoded chunks, consecutive | Selected windows, consecutive |
+| --- | ---: | ---: | ---: | ---: |
+| base | 842.4 µs | 613.1 µs | 117.2 µs | 117.7 µs |
+| medium | 851.1 µs | 623.0 µs | 124.4 µs | 124.1 µs |
+
+Use `benchmark.py --mode leb --leb-reader indexed` with the same pinned set.
+Use `bitdiff.py run --leb-reader indexed` to set the same reader on both
+sides. Raw profiles are under `target/bench/indexed-sampling/` and the
+comparison and timing reports are under
+`target/bench/indexed-windows-qualification/`. The quiet timing repeat,
+100,000-chart memory confirmation and full corpus are still open.
