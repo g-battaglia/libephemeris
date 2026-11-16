@@ -744,6 +744,18 @@ status. The unchanged and optimized wheels both reproduce that focused
 failure with the larger directory selection. Both pass when the explicit
 test core is pinned outside that directory. The raw qualification logs
 are `target/bench/optimized-corrected-{rust,python-pinned}-suite.log`.
+Using a wheel-only overlay verified by the candidate extension hash,
+Kerykeion's unchanged offline suite passed 13,436 tests with 1,392 skips
+and three deselections. Kerykeion-parity's unchanged source suite passed
+51 tests. Logs are `target/bench/optimized-corrected-kerykeion*.log`.
+
+The Windows positional and indexed comparisons started before the
+timeout increase. Their Linux jobs passed. The Windows jobs reached the
+90-minute limit, including the
+[positional run](https://github.com/g-battaglia/libephemeris/actions/runs/43870941467)
+where the candidate finished and the published capture was still in the
+last configuration. The corrected-reference Windows runs retain the
+150-minute job allowance.
 
 The full external Swiss comparison ran the fast and slow pytest lanes
 against both wheel overlays with network policy sealed. Each run evaluated
