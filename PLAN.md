@@ -875,7 +875,7 @@ No release default has been selected.
 
 ## 18. Step 1b coefficient windows for indexed LEB
 
-A four-second `auto`-independent `leb/medium` sample put full-frame
+A four-second profile of `leb/medium` put full-frame
 coefficient reconstruction at the top of the indexed reader profile
 (1,400 samples). `pread` and `fstat` had 86 and 34 samples. The change
 validates and decompresses the full frame but reconstructs and retains
@@ -886,7 +886,8 @@ The retained working lease covers the actual selected word allocation.
 All 243 LEB tests passed, including cross-window bit equality and releasing
 the indexed retention and working leases on cooling. The two indexed wheels
 matched all 10,000 smoke calls. The standard installed-wheel Python suite
-passed 1,486 tests.
+passed 1,486 tests. With indexed mode explicit, both Python wheels
+also passed all 1,486 tests.
 
 Initial macOS arm64 screening, matching indexed policies, same pinned data,
 five fresh processes with 1,000 charts each. Auto memory jobs were running
