@@ -8,10 +8,11 @@ workloads **without changing numerical output**. The work is incremental:
 every phase must justify itself with the results it actually obtains, not
 with a desired final figure.
 
-The baseline harness and Phase 1 candidates are in draft pull requests.
+Draft [PR #87](https://github.com/g-battaglia/libephemeris/pull/87)
+holds the baseline harness, the SPK correction and the Phase 1 changes.
+Keep one PR for this effort and review individual changes by commit.
 Section 14 tracks the remaining baseline checks and links the measured
-results. Qualification against the published wheel remains open on
-Windows.
+results. Qualification against the published wheel remains open on Windows.
 
 ---
 
@@ -531,11 +532,10 @@ No final target is set. The expected direction, as hypotheses:
 
 ---
 
-## 11. Definition of done for every PR
+## 11. Definition of done
 
-The implementation checks below apply when the relevant code or harness exists.
-This initial plan-only draft is validated by reviewing the document and checking
-the diff; it does not claim benchmark, bit-identity or test-suite results.
+Apply these checks to the relevant changes in the consolidated draft.
+Section 14 and the step reports record completed runs and open requirements.
 
 - [ ] Harness results before and after, same machine and data.
 - [ ] Bit-identity gate: zero differing words, all modes, each platform.
@@ -661,11 +661,10 @@ from a concurrent benchmark changed inode ctime during the comparison.
 That could cause the reader to admit a new allocation for identical SPK
 bytes. A focused reproduction on the published wheel induced that metadata
 change and alternated between a value and `EphemerisRangeError`. The runtime
-bug has a separate fix in [PR #88](https://github.com/g-battaglia/libephemeris/pull/88).
-The composed qualification includes that fix alongside the optimization
-stack. PR #88 remains independently reviewable. Reproduce the composed
-qualification when integrating the stack so the tested correction is
-present in the final source.
+bug was originally investigated in [PR #88](https://github.com/g-battaglia/libephemeris/pull/88).
+The consolidated draft includes its correction alongside the optimization
+stack. Its runtime sources and Cargo manifests match the previously
+qualified composed build at `b565e146`.
 
 The harness now copies each input to an independent inode and validates the
 copy. The repeated local full run completed **2,100,000 calls with zero
@@ -1060,7 +1059,7 @@ lookups in routing and SPK center selection. An isolated candidate in
 `codex/spk-registration-lookup` scans live mappings for the smallest
 matching signed body key, preserving the selection of the sorted
 list even when several library aliases share a target. Test and measure
-the candidate before proposing a draft PR. Its focused SPK module suite
+the candidate before adding it to PR #87. Its focused SPK module suite
 passed all 150 tests, including duplicate, replaced and removed aliases.
 The wheel comparison and speed qualification are separate from that
 suite.
