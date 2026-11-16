@@ -625,16 +625,21 @@ Validation on macOS arm64:
   identical results when that call is run alone. Keep this qualification
   open and preserve the sequence captures for reproduction.
 
-The completed local full run compared **2,100,000 calls** and found **70
-differences**. All are `calc_pctr` or context `calc_pctr` results in
-`auto/medium`, each a value on one wheel and an `EphemerisRangeError` on the
-other. There were 35 in each direction. The result does not establish which
-wheel or sequence state is responsible. The captures and comparison JSON
-are in `target/bench/full/`. The gate remains open and the numeric reference
-has not been changed.
+The first local full run found 70 inconsistent `auto/medium` planet-centric
+results. The staging helper used hard links, so creating and removing links
+from a concurrent benchmark changed inode ctime during the comparison.
+That could cause the reader to admit a new allocation for identical SPK
+bytes. A focused reproduction on the published wheel induced that metadata
+change and alternated between a value and `EphemerisRangeError`. The runtime
+bug has a separate fix in [PR #88](https://github.com/g-battaglia/libephemeris/pull/88).
+
+The harness now copies each input to an independent inode and validates the
+copy. The repeated local full run completed **2,100,000 calls with zero
+differences**, using the same published and rebuilt wheels as the first run.
+Its captures and comparison JSON are in `target/bench/full-private/`.
 
 The hosted 10,000-call check passed on Linux x86-64, Linux ARM64 and Windows
-x86-64. The [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157)
-is in progress. A sample of the random-date base/leb workload on the published
+x86-64. Both Linux jobs passed the [full hosted comparison](https://github.com/g-battaglia/libephemeris/actions/runs/43853954157);
+the Windows full job is pending. A sample of the random-date base/leb workload on the published
 wheel put Zstandard decompression and LEB coefficient unpacking at the top of
 the stacks, supporting the cache experiment once qualification is resolved.
