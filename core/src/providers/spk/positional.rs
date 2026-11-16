@@ -235,8 +235,9 @@ impl PositionalCenters {
     }
 }
 
-/// Pinned data directories replace files by rename. Size and modification
-/// time guards detect ordinary in-place writes even on cached record reads.
+/// Pinned data directories replace files by rename. Each cache miss checks
+/// descriptor size and modification time around the read. A hit uses the
+/// immutable words admitted from the acquired descriptor.
 struct VerifiedImage {
     file: File,
     cursor: Mutex<()>,
@@ -304,18 +305,18 @@ impl VerifiedImage {
         jd: f64,
         fraction: f64,
     ) -> Result<(ChebState, Descriptor)> {
-        validate_identity(&self.file, &self.identity)?;
-        let result = relative_state(&self.index, target, jd, fraction, |offset, count| {
+        relative_state(&self.index, target, jd, fraction, |offset, count| {
             self.cache.acquire(offset, count, || {
                 let _cursor = self
                     .cursor
                     .lock()
                     .unwrap_or_else(|error| error.into_inner());
-                read_words(&mut &self.file, self.endian, offset, count)
+                validate_identity(&self.file, &self.identity)?;
+                let words = read_words(&mut &self.file, self.endian, offset, count)?;
+                validate_identity(&self.file, &self.identity)?;
+                Ok(words)
             })
-        });
-        validate_identity(&self.file, &self.identity)?;
-        result
+        })
     }
 }
 
@@ -385,7 +386,7 @@ mod tests {
     }
 
     #[test]
-    fn verified_reads_reject_mutation_after_cache_hits() {
+    fn verified_reads_keep_admitted_words_and_reject_changed_file_on_miss() {
         use sha2::{Digest, Sha256};
         let bytes = image(2, DafEndian::Little);
         let path = save(&bytes);
@@ -403,8 +404,12 @@ mod tests {
             .unwrap()
             .set_len(3080)
             .unwrap();
+        assert_eq!(
+            image.relative_state(2000002, 2451545.0, 0.5).unwrap(),
+            expected
+        );
         assert!(matches!(
-            image.relative_state(2000002, 2451545.0, 0.5),
+            image.relative_state(2000002, 2451545.0, -0.5),
             Err(Error::SpkCorrupt { what, .. }) if what == "immutable SPK file changed"
         ));
         std::fs::remove_file(path).unwrap();
