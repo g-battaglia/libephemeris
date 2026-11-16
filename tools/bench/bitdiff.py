@@ -171,6 +171,9 @@ def capture(options):
     spec = json.loads(options.spec.read_text(encoding="utf-8"))
     build = identity(options.wheel, options.commit, options.build_options)
     build["leb_cache_mib"] = os.environ.get("LIBEPHEMERIS_LEB_CACHE_MB")
+    build["positional_centers"] = (
+        os.environ.get("LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS") == "1"
+    )
     if options.role == "baseline" and build["version"] != "4.0.0":
         raise PrerequisiteError("baseline interpreter must have the published 4.0.0 wheel")
     part = options.output.with_suffix(".partial")
@@ -282,6 +285,8 @@ def run(options):
                 env = environment(data)
                 if role == "candidate" and options.candidate_cache_mib is not None:
                     env["LIBEPHEMERIS_LEB_CACHE_MB"] = str(options.candidate_cache_mib)
+                if role == "candidate" and options.candidate_positional_centers:
+                    env["LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS"] = "1"
                 status = subprocess.run(args, cwd=tmp, env=env, stderr=log).returncode
             if status:
                 raise ValueError(f"{role} capture failed ({status}); see {log.name}")
@@ -302,6 +307,7 @@ def main():
     runner.add_argument("--data", type=Path, required=True)
     runner.add_argument("--output", type=Path, required=True)
     runner.add_argument("--candidate-cache-mib", type=int)
+    runner.add_argument("--candidate-positional-centers", action="store_true")
     for role in ("baseline", "candidate"):
         runner.add_argument(f"--{role}", type=Path, required=True)
         runner.add_argument(f"--{role}-wheel", type=lambda p: Path(p).resolve())

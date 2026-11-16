@@ -162,7 +162,10 @@ impl LebProviderCache {
                 ctx.tier(),
                 skip_closed,
             )?;
-            let provider = if ctx.mode() == ProviderMode::Auto && !ctx.spk_registry().is_empty() {
+            let registry = ctx.spk_registry();
+            let provider = if ctx.mode() == ProviderMode::Auto
+                && (!registry.is_empty() || registry.has_positional_centers())
+            {
                 BoundProvider::WithCenters(Box::new(provider), ctx.spk_registry().clone())
             } else {
                 provider
@@ -524,7 +527,7 @@ impl BoundProvider<'_> {
             crate::constants::PLUTO => (999, 9),
             _ => return Ok(None),
         };
-        if registry.body_info(target).is_none() {
+        if !registry.has_leb_center_candidate(target) {
             return Ok(None);
         }
         let whole = jd_tt.floor();
@@ -753,7 +756,7 @@ impl StateProvider for BoundProvider<'_> {
     }
     fn body_center_offset_at(&self, body: i32, jd_tt: f64) -> Result<Option<[f64; 3]>> {
         self.center_offset_using(body, jd_tt, &|registry, target, whole, fraction| {
-            registry.eval_body_relative_two_part_jd(target, whole, fraction)
+            registry.eval_leb_center(target, whole, fraction)
         })
     }
 

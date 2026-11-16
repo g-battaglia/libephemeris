@@ -311,7 +311,6 @@ fn chebyshev_record_at_two_part_jd(
 }
 
 /// Select a record with the same quotient/remainder order as owned reads.
-#[cfg(feature = "nbody")]
 pub(super) fn chebyshev_record_coordinates(
     init_et: f64,
     int_len: f64,

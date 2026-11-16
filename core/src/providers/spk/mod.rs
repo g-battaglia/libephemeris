@@ -193,6 +193,9 @@ pub const TYPE_CHEBYSHEV_POS: i32 = 2;
 /// Used for analytically computed satellites.
 pub const TYPE_CHEBYSHEV_POS_VEL: i32 = 3;
 
+const AUTOMATIC_PLANET_CENTERS: [(i32, i32); 5] =
+    [(599, 5), (699, 6), (799, 7), (899, 8), (999, 9)];
+
 /// Decoded type 2/3 segment: directory and access to record words.
 ///
 /// Layout (NAIF SPK Required Reading): `N` records of `RSIZE` words
@@ -415,6 +418,7 @@ pub struct SpkRegistry {
     decoded: HashMap<String, Arc<DecodedSpkCache>>,
     /// Automatically selected center target → (owned image key, system barycenter).
     automatic_centers: HashMap<i32, (String, i32)>,
+    positional_centers: Option<Arc<PositionalCenters>>,
 }
 
 /// Directory results and decoded records belonging to one installed kernel image.
@@ -456,6 +460,11 @@ impl PartialEq for SpkRegistry {
         self.kernels == other.kernels
             && self.bodies == other.bodies
             && self.automatic_centers == other.automatic_centers
+            && match (&self.positional_centers, &other.positional_centers) {
+                (None, None) => true,
+                (Some(left), Some(right)) => Arc::ptr_eq(left, right),
+                _ => false,
+            }
     }
 }
 
@@ -838,8 +847,8 @@ pub use index::resolve_spk_cache_dir;
 pub use index::spk_coverage_covers_request;
 pub use index::spk_date_range_for_tier;
 pub use index::spk_date_range_for_tier_name;
-#[cfg(feature = "nbody")]
 mod positional;
+pub(crate) use positional::PositionalCenters;
 #[cfg(feature = "nbody")]
 pub(crate) use positional::PositionalChebyshev;
 mod evaluation;

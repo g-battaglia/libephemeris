@@ -1,4 +1,4 @@
-//! Bounded record reads for the retained ASSIST asteroid image.
+//! Bounded record reads for immutable SPK images.
 //!
 //! The caller keeps the acquired file immutable. One descriptor index and an
 //! open file are retained; coefficient payloads are read only for the selected
@@ -9,38 +9,25 @@ use super::evaluation::{
     chebyshev_record_coordinates, eval_selected_chebyshev_record, select_two_part_jd,
 };
 use super::{ChebState, DafEndian, Descriptor, Error, FileRecord, Result, SpkIndex};
-use std::fs::File;
+use std::fs::{File, Metadata};
 use std::io::{Read, Seek, SeekFrom};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
+#[cfg(feature = "nbody")]
 pub(crate) struct PositionalChebyshev {
     file: File,
     endian: DafEndian,
     index: SpkIndex,
 }
 
+#[cfg(feature = "nbody")]
 impl PositionalChebyshev {
     /// Acquire one immutable regular SPK without copying its payload.
     pub(crate) fn open(path: &Path) -> Result<Self> {
-        let mut file = File::open(path).map_err(|error| {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                Error::SpkFileNotFound {
-                    path: path.display().to_string(),
-                }
-            } else {
-                corrupt("SPK file read", 0)
-            }
-        })?;
-        let length = file.metadata().map_err(|_| corrupt("SPK file length", 0))?;
-        if !length.is_file() {
-            return Err(corrupt("SPK source must be a regular file", 0));
-        }
-        let length = usize::try_from(length.len()).map_err(|_| corrupt("SPK file length", 0))?;
-        let mut header = [0; super::RECORD_BYTES];
-        file.read_exact(&mut header)
-            .map_err(|_| corrupt("SPK file record", 0))?;
-        let endian = FileRecord::parse(&header)?.endian;
-        let index = SpkIndex::read_directory_from(&mut file, length)?;
+        let mut file = open(path)?;
+        let identity = metadata(&file)?;
+        let (endian, index) = read_index(&mut file, &identity)?;
         Ok(Self {
             file,
             endian,
@@ -92,69 +79,252 @@ impl PositionalChebyshev {
         fraction: f64,
     ) -> Result<(ChebState, Descriptor)> {
         super::resolve_chain(&self.index, target)?;
-        let descriptor = select_two_part_jd(&self.index, target, jd, fraction)?.descriptor;
-        if !matches!(
-            descriptor.seg_type,
-            super::TYPE_CHEBYSHEV_POS | super::TYPE_CHEBYSHEV_POS_VEL
-        ) {
-            return Err(Error::SpkUnsupportedType {
-                seg_type: descriptor.seg_type,
-            });
+        relative_state(&self.index, target, jd, fraction, |offset, count| {
+            read_words::<Vec<f64>>(&mut self.file, self.endian, offset, count)
+        })
+    }
+}
+
+fn open(path: &Path) -> Result<File> {
+    crate::leb::open_regular_file(path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            Error::SpkFileNotFound {
+                path: path.display().to_string(),
+            }
+        } else {
+            corrupt("SPK file read", 0)
         }
-        let start = (descriptor.initial_address as usize - 1) * 8;
-        let length = (descriptor.final_address - descriptor.initial_address + 1) as usize;
-        if length < 4 {
-            return Err(corrupt("SPK segment length", start));
+    })
+}
+
+fn metadata(file: &File) -> Result<Metadata> {
+    file.metadata().map_err(|_| corrupt("SPK file length", 0))
+}
+
+fn read_index(file: &mut File, identity: &Metadata) -> Result<(DafEndian, SpkIndex)> {
+    let length = usize::try_from(identity.len()).map_err(|_| corrupt("SPK file length", 0))?;
+    let mut header = [0; super::RECORD_BYTES];
+    file.seek(SeekFrom::Start(0))
+        .and_then(|_| file.read_exact(&mut header))
+        .map_err(|_| corrupt("SPK file record", 0))?;
+    let endian = FileRecord::parse(&header)?.endian;
+    let index = SpkIndex::read_directory_from(file, length)?;
+    Ok((endian, index))
+}
+
+fn relative_state<W: AsRef<[f64]>>(
+    index: &SpkIndex,
+    target: i32,
+    jd: f64,
+    fraction: f64,
+    mut read: impl FnMut(usize, usize) -> Result<W>,
+) -> Result<(ChebState, Descriptor)> {
+    let descriptor = select_two_part_jd(index, target, jd, fraction)?.descriptor;
+    if descriptor.frame != super::FRAME_J2000 {
+        return Err(Error::SpkUnsupportedFrame {
+            frame: descriptor.frame,
+        });
+    }
+    if !matches!(
+        descriptor.seg_type,
+        super::TYPE_CHEBYSHEV_POS | super::TYPE_CHEBYSHEV_POS_VEL
+    ) {
+        return Err(Error::SpkUnsupportedType {
+            seg_type: descriptor.seg_type,
+        });
+    }
+    let start = (descriptor.initial_address as usize - 1) * 8;
+    let length = (descriptor.final_address - descriptor.initial_address + 1) as usize;
+    if length < 4 {
+        return Err(corrupt("SPK segment length", start));
+    }
+    let trailer = read(start + (length - 4) * 8, 4)?;
+    let directory = chebyshev_directory(
+        descriptor.seg_type,
+        length,
+        start,
+        trailer.as_ref().try_into().expect("four directory words"),
+    )?;
+    let end = directory.init_et + directory.n_records as f64 * directory.int_len;
+    if !end.is_finite() {
+        return Err(corrupt("SPK Chebyshev directory", start));
+    }
+    let (index, offset, _interior, hi, lo) = chebyshev_record_coordinates(
+        directory.init_et,
+        directory.int_len,
+        directory.n_records,
+        jd,
+        fraction,
+    )?;
+    let record_offset = start + index * directory.record_words * 8;
+    let record = read(record_offset, directory.record_words)?;
+    let state = eval_selected_chebyshev_record(
+        &directory,
+        descriptor.seg_type,
+        record.as_ref(),
+        index,
+        offset,
+        record_offset,
+        Some((hi, lo)),
+    )?
+    .0;
+    Ok((state, descriptor))
+}
+
+fn read_words<W: FromIterator<f64>>(
+    file: &mut (impl Read + Seek),
+    endian: DafEndian,
+    offset: usize,
+    count: usize,
+) -> Result<W> {
+    let length = count
+        .checked_mul(8)
+        .ok_or_else(|| corrupt("SPK record length", offset))?;
+    let mut bytes = vec![0; length];
+    file.seek(SeekFrom::Start(offset as u64))
+        .map_err(|_| corrupt("SPK record seek", offset))?;
+    file.read_exact(&mut bytes)
+        .map_err(|_| corrupt("SPK record read", offset))?;
+    Ok(bytes
+        .chunks_exact(8)
+        .map(|word| endian.read_f64(word))
+        .collect())
+}
+
+/// Lazily opens the first admissible pinned planet-center image. The opened
+/// descriptor remains authoritative across pathname replacement.
+#[derive(Debug)]
+pub(crate) struct PositionalCenters {
+    candidates: Vec<(PathBuf, &'static str)>,
+    owner: OnceLock<Option<VerifiedImage>>,
+}
+
+impl PositionalCenters {
+    pub(crate) fn new(candidates: Vec<(PathBuf, &'static str)>) -> Self {
+        Self {
+            candidates,
+            owner: OnceLock::new(),
         }
-        let trailer = self.words(start + (length - 4) * 8, 4)?;
-        let directory = chebyshev_directory(
-            descriptor.seg_type,
-            length,
-            start,
-            trailer.try_into().expect("four directory words"),
-        )?;
-        let end = directory.init_et + directory.n_records as f64 * directory.int_len;
-        if !end.is_finite() {
-            return Err(corrupt("SPK Chebyshev directory", start));
-        }
-        let (index, offset, _interior, hi, lo) = chebyshev_record_coordinates(
-            directory.init_et,
-            directory.int_len,
-            directory.n_records,
-            jd,
-            fraction,
-        )?;
-        let record_offset = start + index * directory.record_words * 8;
-        let record = self.words(record_offset, directory.record_words)?;
-        let state = eval_selected_chebyshev_record(
-            &directory,
-            descriptor.seg_type,
-            &record,
-            index,
-            offset,
-            record_offset,
-            Some((hi, lo)),
-        )?
-        .0;
-        Ok((state, descriptor))
     }
 
-    fn words(&mut self, offset: usize, count: usize) -> Result<Vec<f64>> {
-        let length = count
-            .checked_mul(8)
-            .ok_or_else(|| corrupt("SPK record length", offset))?;
-        let mut bytes = vec![0; length];
-        self.file
-            .seek(SeekFrom::Start(offset as u64))
-            .map_err(|_| corrupt("SPK record seek", offset))?;
-        self.file
-            .read_exact(&mut bytes)
-            .map_err(|_| corrupt("SPK record read", offset))?;
-        Ok(bytes
-            .chunks_exact(8)
-            .map(|word| self.endian.read_f64(word))
-            .collect())
+    pub(crate) fn relative_state(
+        &self,
+        target: i32,
+        jd: f64,
+        fraction: f64,
+    ) -> Result<(ChebState, Descriptor)> {
+        let image = self
+            .owner
+            .get_or_init(|| {
+                self.candidates.iter().find_map(|(path, pin)| {
+                    if !path.is_file() {
+                        return None;
+                    }
+                    match VerifiedImage::open(path, pin) {
+                        Ok(image) => Some(image),
+                        Err(error) => {
+                            log::warn!("Ignoring planet-center image {}: {error}", path.display());
+                            None
+                        }
+                    }
+                })
+            })
+            .as_ref()
+            .ok_or(Error::SpkBodyNotFound { target })?;
+        image.relative_state(target, jd, fraction)
     }
+}
+
+/// Pinned data directories replace files by rename. Size and modification
+/// time guards detect ordinary in-place writes even on cached record reads.
+struct VerifiedImage {
+    file: File,
+    cursor: Mutex<()>,
+    identity: Metadata,
+    endian: DafEndian,
+    index: SpkIndex,
+    cache: super::records::RecordCache,
+}
+
+impl std::fmt::Debug for VerifiedImage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VerifiedImage")
+            .field("bytes", &self.identity.len())
+            .field("descriptors", &self.index.len())
+            .finish()
+    }
+}
+
+impl VerifiedImage {
+    fn open(path: &Path, pin: &str) -> Result<Self> {
+        use sha2::{Digest, Sha256};
+
+        let mut file = open(path)?;
+        let identity = metadata(&file)?;
+        let mut hash = Sha256::new();
+        let mut buffer = vec![0; 64 * 1024];
+        let mut remaining = identity.len();
+        while remaining > 0 {
+            let count = remaining.min(buffer.len() as u64) as usize;
+            file.read_exact(&mut buffer[..count])
+                .map_err(|_| corrupt("SPK digest read", 0))?;
+            hash.update(&buffer[..count]);
+            remaining -= count as u64;
+        }
+        validate_identity(&file, &identity)?;
+        if crate::download::hex_of(&hash.finalize()) != pin {
+            return Err(corrupt("SPK digest does not match the pinned image", 0));
+        }
+        let (endian, index) = read_index(&mut file, &identity)?;
+        validate_identity(&file, &identity)?;
+        for (target, parent) in super::AUTOMATIC_PLANET_CENTERS {
+            if index
+                .segments_for(target)
+                .any(|segment| segment.descriptor.center != parent)
+            {
+                return Err(corrupt(
+                    "planet-center segment has the wrong system barycenter",
+                    0,
+                ));
+            }
+        }
+        Ok(Self {
+            file,
+            cursor: Mutex::new(()),
+            identity,
+            endian,
+            index,
+            cache: Default::default(),
+        })
+    }
+
+    fn relative_state(
+        &self,
+        target: i32,
+        jd: f64,
+        fraction: f64,
+    ) -> Result<(ChebState, Descriptor)> {
+        validate_identity(&self.file, &self.identity)?;
+        let result = relative_state(&self.index, target, jd, fraction, |offset, count| {
+            self.cache.acquire(offset, count, || {
+                let _cursor = self
+                    .cursor
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner());
+                read_words(&mut &self.file, self.endian, offset, count)
+            })
+        });
+        validate_identity(&self.file, &self.identity)?;
+        result
+    }
+}
+
+fn validate_identity(file: &File, expected: &Metadata) -> Result<()> {
+    let actual = metadata(file)?;
+    if actual.len() != expected.len() || actual.modified().ok() != expected.modified().ok() {
+        return Err(corrupt("immutable SPK file changed", 0));
+    }
+    Ok(())
 }
 
 fn corrupt(what: &str, offset: usize) -> Error {
@@ -164,7 +334,7 @@ fn corrupt(what: &str, offset: usize) -> Error {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "nbody"))]
 mod tests {
     use super::super::{SegSpec, SpkKernel};
     use super::*;
@@ -212,6 +382,52 @@ mod tests {
         ));
         std::fs::write(&path, bytes).unwrap();
         path
+    }
+
+    #[test]
+    fn verified_reads_reject_mutation_after_cache_hits() {
+        use sha2::{Digest, Sha256};
+        let bytes = image(2, DafEndian::Little);
+        let path = save(&bytes);
+        assert!(VerifiedImage::open(&path, "wrong pin").is_err());
+        let pin = crate::download::hex_of(&Sha256::digest(&bytes));
+        let image = VerifiedImage::open(&path, &pin).unwrap();
+        let expected = image.relative_state(2000002, 2451545.0, 0.5).unwrap();
+        assert_eq!(
+            image.relative_state(2000002, 2451545.0, 0.5).unwrap(),
+            expected
+        );
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_len(3080)
+            .unwrap();
+        assert!(matches!(
+            image.relative_state(2000002, 2451545.0, 0.5),
+            Err(Error::SpkCorrupt { what, .. }) if what == "immutable SPK file changed"
+        ));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn verified_reads_retain_the_acquired_file_after_replacement() {
+        use sha2::{Digest, Sha256};
+        let bytes = image(2, DafEndian::Little);
+        let path = save(&bytes);
+        let pin = crate::download::hex_of(&Sha256::digest(&bytes));
+        let image = VerifiedImage::open(&path, &pin).unwrap();
+        let expected = image.relative_state(2000002, 2451545.0, -0.5).unwrap();
+        let replacement = save(&vec![0; bytes.len()]);
+        std::fs::rename(replacement, &path).unwrap();
+        assert!(VerifiedImage::open(&path, &pin).is_err());
+        assert_eq!(
+            image.relative_state(2000002, 2451545.0, -0.5).unwrap(),
+            expected
+        );
+        assert!(image.relative_state(2000002, 2451545.0, 0.5).is_ok());
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]

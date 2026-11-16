@@ -967,7 +967,7 @@ impl Runtime {
         let session = if body == crate::constants::ECL_NUT {
             self.model_session()?
         } else {
-            self.shared_session_for(resources)?
+            self.scalar_position_session(resources)?
         };
         let mut position = session.position_with_native_minor_and_main_image(
             &supplier,

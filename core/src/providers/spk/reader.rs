@@ -227,12 +227,7 @@ pub fn icrs_to_ecliptic_j2000(v: [f64; 3]) -> [f64; 3] {
 impl SpkRegistry {
     /// Empty registry: no kernels, no body registrations.
     pub fn new() -> Self {
-        Self {
-            kernels: HashMap::new(),
-            bodies: HashMap::new(),
-            decoded: HashMap::new(),
-            automatic_centers: HashMap::new(),
-        }
+        Self::default()
     }
 
     /// True when no kernel image is stored.
@@ -344,7 +339,7 @@ impl SpkRegistry {
     /// Targets 599/699/799/899/999 must name their own system barycenters.
     /// The caller verifies the immutable image against its published digest.
     pub(crate) fn register_automatic_planet_centers(&mut self, key: &str) -> Result<()> {
-        for (target, parent) in [(599, 5), (699, 6), (799, 7), (899, 8), (999, 9)] {
+        for (target, parent) in AUTOMATIC_PLANET_CENTERS {
             let kernel = self.kernel(key).ok_or_else(|| Error::SpkFileNotFound {
                 path: key.to_owned(),
             })?;
@@ -381,6 +376,36 @@ impl SpkRegistry {
                 .insert(target, (key.clone(), *parent));
         }
         Ok(())
+    }
+
+    pub(crate) fn set_positional_centers(&mut self, source: PositionalCenters) {
+        self.positional_centers = Some(Arc::new(source));
+    }
+
+    pub(crate) fn retain_positional_centers_from(&mut self, source: &Self) {
+        self.positional_centers = source.positional_centers.clone();
+    }
+
+    pub(crate) fn has_positional_centers(&self) -> bool {
+        self.positional_centers.is_some()
+    }
+
+    pub(crate) fn has_leb_center_candidate(&self, target: i32) -> bool {
+        self.bodies.contains_key(&target) || self.has_positional_centers()
+    }
+
+    pub(crate) fn eval_leb_center(
+        &self,
+        target: i32,
+        jd: f64,
+        fraction: f64,
+    ) -> Result<(ChebState, Descriptor)> {
+        if !self.bodies.contains_key(&target)
+            && let Some(centers) = &self.positional_centers
+        {
+            return centers.relative_state(target, jd, fraction);
+        }
+        self.eval_body_relative_two_part_jd(target, jd, fraction)
     }
 
     /// Actual automatic mappings and their immutable image keys.
@@ -682,6 +707,7 @@ impl SpkRegistry {
     /// keep those allocations alive until their last owner is dropped.
     pub fn clear(&mut self) {
         self.automatic_centers.clear();
+        self.positional_centers = None;
         self.kernels.clear();
         self.bodies.clear();
         self.decoded.clear();

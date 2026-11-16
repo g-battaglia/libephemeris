@@ -303,6 +303,8 @@ def run(options):
                     env["LIBEPHEMERIS_LEB_CACHE_MB"] = str(options.leb_cache_mib)
                 if options.leb_reader is not None:
                     env["LIBEPHEMERIS_LEB_READER"] = options.leb_reader
+                if options.positional_centers:
+                    env["LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS"] = "1"
                 for parallel in ((options.workers or (1, 2, 4, 8)) if workload in ("threads", "memory") else (1,)):
                     spec = {"schema": SCHEMA, "mode": mode, "tier": tier, "workload": workload,
                             "flags": options.flags, "dates": jds, "parallelism": parallel}
@@ -334,6 +336,7 @@ def run(options):
                         "samples": samples, "summary": summarize(samples),
                         "chart_probe_routes": routes.get((mode, tier), {}).get("routes"),
                         "leb_cache_mib": options.leb_cache_mib, "leb_reader": options.leb_reader,
+                        "positional_centers": options.positional_centers,
                         "cold_condition": options.cold_condition if workload == "cold_start" else None,
                     })
             report["status"] = "complete"
@@ -363,6 +366,7 @@ def main():
     cli.add_argument("--native", type=lambda p: Path(p).resolve())
     cli.add_argument("--leb-cache-mib", type=int)
     cli.add_argument("--leb-reader", choices=("owned", "indexed"))
+    cli.add_argument("--positional-centers", action="store_true")
     cli.add_argument("--mode", choices=MODES, action="append")
     cli.add_argument("--tier", choices=TIERS, action="append")
     cli.add_argument("--workload", choices=WORKLOADS, action="append")
