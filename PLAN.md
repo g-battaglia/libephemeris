@@ -715,3 +715,33 @@ The opening-copy wheel (commit `abd6e262`, wheel SHA-256
 matched the 4.0.0 wheel on all 2,100,000 macOS arm64 corpus calls with 32 MiB
 of LEB coefficient capacity. The capture is under
 `target/bench/spk-copy-qualification/full/`.
+
+### Decode only the selected SPK record
+
+Registry evaluation now retains type 2 and 3 directory results and decodes
+the selected record from the shared immutable image. Each installed image
+holds at most 128 cached records and 1 MiB of decoded coefficient words.
+Active references, allocation overhead, the raw image and type 21 segments
+are accounted for separately. The 153 SPK tests passed, including a regression
+that compares eager and on-demand evaluation bits across record joins and at
+the closed endpoints.
+
+Mac arm64, medium tier, 1900–2100, legacy LEB retention. One process per
+memory sample with 5,000 random charts. Latency is the pooled median over
+five independent processes with 5,000 charts each.
+
+| Mode | RSS after first call | RSS after 5,000 charts | Physical footprint after 5,000 charts | Median per chart |
+| --- | ---: | ---: | ---: | ---: |
+| auto | 335.3 → 272.3 MB | 475.7 → 274.6 MB | 460.5 → 259.2 MB | 1,172 → 1,189 µs |
+| skyfield | 474.4 → 354.6 MB | 675.8 → 355.4 MB | 660.9 → 340.3 MB | 1,555 → 1,591 µs |
+
+The comparison uses the opening-copy wheel and the on-demand record wheel
+(commit `7009b012`, SHA-256
+`4c80d771e503c043603365298476fd424f31d5c504ee5778d64fc33336db8385`).
+Raw reports and vmmap output are under
+`target/bench/spk-copy-qualification/`. The new wheel's 2,100,000-call
+comparison is running with the configured LEB cache of 32 MiB. Full-size
+process, thread and cold-start measurements are still open. The next storage
+experiment is positional I/O for managed data under the immutable-data
+contract. The public owned-image path supplies callers with a stable byte
+slice for the life of the kernel.
