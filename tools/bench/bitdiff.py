@@ -151,6 +151,17 @@ def requests(mode, tier, inventory, count, seed):
         yield position(("calc_ut", "calc")[i // 10 % 2], date, body, flags)
 
 
+def auto_center_requests(count, seed):
+    """Keep the scalar session active throughout the planet-center experiment."""
+    rng = random.Random(seed)
+    flags = (2, SPEED, SPEED | 32768, SPEED | 4096, SPEED | 8, SPEED | 16)
+    for index in range(count):
+        jd = J2000 if index < 2 else J2000 + rng.uniform(-36_525, 36_525)
+        api = "calc_ut" if index % 2 == 0 else "calc"
+        body = 5 + (index // 2) % 5
+        yield position(api, jd, body, flags[(index // 10) % len(flags)])
+
+
 def outcome(fn, args):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -187,12 +198,15 @@ def capture(options):
             ctx.set_topo(*SITE)
             context_apis = {api: getattr(ctx, api.removeprefix("context.")) for api in POSITION
                             if api.startswith("context.")}
-            cases = requests(mode, tier, spec["public"]["data"], spec["count"], spec["seed"])
+            if spec["public"]["profile"] == "auto-centers":
+                cases = auto_center_requests(spec["count"], spec["seed"])
+            else:
+                cases = requests(mode, tier, spec["public"]["data"], spec["count"], spec["seed"])
             for index, (api, args) in enumerate(itertools.islice(cases, spec["count"])):
                 fn = context_apis[api] if api.startswith("context.") else getattr(eph, api)
                 result = outcome(fn, args)
                 if index < 2 and "error" in result:
-                    fn(*args)  # Fail loudly when an expected supported route cannot calculate Mars.
+                    fn(*args)  # Fail loudly if either required preflight call failed.
                 if index == 0 and mode != "skyfield" and build["leb_cache_mib"] is not None:
                     usage = eph.get_leb_cache_usage()
                     if usage is None or usage[1] != int(build["leb_cache_mib"]) * 1024**2:
@@ -260,8 +274,9 @@ def run(options):
     report = options.output / "comparison.json"
     report.unlink(missing_ok=True)
     full = options.profile == "full"
-    modes = MODES if full else ("leb",)
-    tiers = TIERS if full else ("base",)
+    centers = options.profile == "auto-centers"
+    modes = MODES if full else ("auto",) if centers else ("leb",)
+    tiers = TIERS if full or centers else ("base",)
     count = FULL_PER_CONFIG if full else SMOKE_COUNT
     matrix = list(itertools.product(modes, tiers))
     with tempfile.TemporaryDirectory(prefix="ephemeris-bitdiff-") as tmp:
@@ -303,7 +318,7 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     sub = cli.add_subparsers(dest="action", required=True)
     runner = sub.add_parser("run")
-    runner.add_argument("--profile", choices=("smoke", "full"), default="smoke")
+    runner.add_argument("--profile", choices=("smoke", "full", "auto-centers"), default="smoke")
     runner.add_argument("--data", type=Path, required=True)
     runner.add_argument("--output", type=Path, required=True)
     runner.add_argument("--candidate-cache-mib", type=int)
