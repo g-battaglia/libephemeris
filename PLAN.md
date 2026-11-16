@@ -1168,9 +1168,14 @@ The archived Linux captures for the combined
 [default](https://github.com/g-battaglia/libephemeris/actions/runs/43928262541)
 and [32 MiB plus positional](https://github.com/g-battaglia/libephemeris/actions/runs/43928798173)
 cases each contain 2,100,000 identical requests per architecture, with
-six matching warning calls. The default Windows job also passed. Its
-capture archive is being verified locally. The 32 MiB plus positional
+six matching warning calls. The archived default Windows captures
+were also checked locally and contain 2,100,000 identical requests,
+again including all six warning calls. The 32 MiB plus positional
 Windows job is still running.
+The unchanged combined-wheel consumer replays passed on Kerykeion
+(13,436 passed, 1,392 skipped, three deselected), Kerykeion Parity
+(51 passed), and Astrologer Studio (2,139 passed, 43 skipped). The
+remaining combined downstream and scientific replays are open.
 Raw samples, traces, build hash and pinned inputs are under
 `target/bench/phase1-composed-profiles/`.
 
@@ -1539,9 +1544,11 @@ the steady summed PSS for `.leb` medium fell from 77.3 / 138.9 /
 257.5 / 492.7 MB to 34.4 / 64.2 / 122.0 / 232.5 MB. For base it
 moved from 39.1 / 60.8 / 104.6 / 186.3 MB to 34.4 / 65.1 / 122.4 /
 232.4 MB. The existing bundled base reader uses less PSS at multiple
-processes in this comparison. The same ARM64 wheel matched
-2,100,000 corrected-reference calls in the indexed and positional
-configuration, with six warning-emitting calls on each side.
+processes in this comparison. The x86-64 memory run confirmed the result
+at eight workers with 493.6 → 235.5 MB in medium and 187.5 → 236.3 MB
+in base. The archived ARM64 and x86-64 captures each matched 2,100,000
+corrected-reference calls in the indexed and positional configuration,
+with six warning-emitting calls on each side.
 
 ## 15. Step 1a experiment
 
