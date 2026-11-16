@@ -929,3 +929,18 @@ The candidate matched the 10,000-call indexed smoke corpus. The same-policy
 full comparison with the 4.0.0 wheel and the 100,000-chart memory comparison
 are in progress. A quiet timing repeat is still required to quantify the
 latency change. Reports are under `target/bench/indexed-capacity-qualification/`.
+
+The same revised wheel completed 100,000 random charts with the following
+process memory. This longer run supersedes the 5,000-chart memory snapshot
+for selecting a budget.
+
+| Tier | Owned → indexed RSS, default 8 MiB | Owned → indexed footprint |
+| --- | ---: | ---: |
+| base | 57.1 → 65.4 MB | 34.8 → 37.2 MB |
+| medium | 94.8 → 70.4 MB | 75.5 → 43.8 MB |
+
+The base tier requires a smaller budget to meet the RAM target. Use
+`benchmark.py --leb-reader indexed --indexed-cache-mib 2` (or 4, 6, 8)
+to vary the shared indexed ceiling on the same staged data. This writes a
+temporary `leb_limits.cache_bytes` setting for the worker. A timing sweep
+and 100,000-chart base runs at the lower budgets are queued.
