@@ -145,6 +145,15 @@ The manual `auto-edge` profile runs the first 30,000 calls of each
 Skyfield runs. The wheel workflow also compares the published wheel
 against itself in independent processes and retains the control captures
 in `reports/bitdiff/published-control/`.
+
+The manual `satellites` profile compares 320 calls for named Pluto
+satellites and the Charon alias in Skyfield medium. It checks module
+positions, planet-centric positions and the direct moon API at J2000
+and around the segment edges. Local runs use `--profile satellites` and
+expect the pinned `plu017.bsp` next to `de440.bsp` and the medium planet
+centers file in the data directory. The manual workflow fetches and
+verifies the fixture. [NAIF satellite archive](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/).
+
 Set the manual workflow's `rust_toolchain` to `1.99.1` to build with the
 toolchain identified in the published Windows 4.0.0 wheel.
 Each wheel report records any Rust source revisions embedded in the

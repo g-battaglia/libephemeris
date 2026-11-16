@@ -17,7 +17,7 @@ import tempfile
 import warnings
 
 from common import (
-    J2000, KERNELS, MODES, SCHEMA, SEED, SITE, TIERS,
+    J2000, KERNELS, MODES, SATELLITE_KERNEL, SCHEMA, SEED, SITE, TIERS,
     PrerequisiteError, configure, dump, environment, identity, prepare,
 )
 
@@ -29,6 +29,8 @@ FLAGS = (
 # Orthodox planets, nodes, apsides, Earth, major asteroids, fictitious,
 # numbered asteroid, unknown satellite ID, ecliptic/nutation and invalid ID.
 BODIES = (*range(23), 40, 55, 10001, 100433, 9599, -1, -9999)
+# Public satellite IDs and their DAF targets. 9051 is Charon's alias.
+SATELLITE_TARGETS = {9051: 901, 9901: 901, 9902: 902, 9903: 903}
 BODY_CLASSES = {
     body: name
     for name, bodies in (
@@ -40,6 +42,7 @@ BODY_CLASSES = {
         ("fictitious_body", (40, 55)),
         ("numbered_asteroid", (10001, 100433)),
         ("unresolved_planetary_moon_id", (9599,)),
+        ("planetary_moon", SATELLITE_TARGETS),
         ("ecliptic_nutation", (-1,)),
         ("invalid_sentinel", (-9999,)),
     )
@@ -55,6 +58,7 @@ PROFILES = {
     "smoke": (("leb",), ("base",), SMOKE_COUNT),
     "full": (MODES, TIERS, FULL_PER_CONFIG),
     "auto-edge": (("auto",), TIERS, AUTO_EDGE_COUNT),
+    "satellites": (("skyfield",), ("medium",), 320),
 }
 
 
@@ -72,6 +76,19 @@ def encode(value):
 
 def position(api, jd, body, flags):
     return api, (jd, body, 14, flags) if "pctr" in api else (jd, body, flags)
+
+
+def satellite_requests(inventory):
+    segments = inventory[SATELLITE_KERNEL]["coverage"]["segments_tdb"]
+    spans = {target: (left, right) for target, _, left, right in segments}
+    for body, target in SATELLITE_TARGETS.items():
+        lower, upper = spans[target]
+        epochs = (J2000, math.nextafter(lower, -math.inf), lower,
+                  upper, math.nextafter(upper, math.inf))
+        for api in ("calc", "calc_ut", "calc_pctr", "calc_moon_position"):
+            for jd in epochs:
+                for flags in (2, SPEED, 16402, 4354):
+                    yield position(api, jd, body, flags)
 
 
 def requests(mode, tier, inventory, count, seed):
@@ -199,20 +216,32 @@ def capture(options):
         print(dump({"schema": SCHEMA, "spec": spec["public"], "build": build}), file=out)
         total = 0
         coverage = Counter()
+        inventory = spec["public"]["data"]
+        data = os.environ["LIBEPHEMERIS_DATA_DIR"]
         for mode, tier in spec["matrix"]:
             print(f"{options.role} {mode}/{tier}: starting {spec['count']:,} calls",
                   file=sys.stderr, flush=True)
             configure(eph, mode, tier)
-            ctx = eph.EphemerisContext(os.environ["LIBEPHEMERIS_DATA_DIR"], KERNELS[tier])
-            ctx.set_topo(*SITE)
-            context_apis = {api: getattr(ctx, api.removeprefix("context.")) for api in POSITION
-                            if api.startswith("context.")}
-            cases = requests(mode, tier, spec["public"]["data"], spec["count"], spec["seed"])
+            if spec["public"]["profile"] == "satellites":
+                eph.set_ephe_path(data)
+                eph.set_ephemeris_file(KERNELS[tier])
+                eph.register_moon_spk(str(Path(data) / SATELLITE_KERNEL))
+                for body in SATELLITE_TARGETS:
+                    if eph.calc_moon_position(J2000, body, SPEED) is None:
+                        raise PrerequisiteError(f"satellite test cannot calculate body {body} at J2000")
+                context_apis = {}
+                cases = satellite_requests(inventory)
+            else:
+                ctx = eph.EphemerisContext(data, KERNELS[tier])
+                ctx.set_topo(*SITE)
+                context_apis = {api: getattr(ctx, api.removeprefix("context.")) for api in POSITION
+                                if api.startswith("context.")}
+                cases = requests(mode, tier, inventory, spec["count"], spec["seed"])
             for index, (api, args) in enumerate(itertools.islice(cases, spec["count"])):
                 fn = context_apis[api] if api.startswith("context.") else getattr(eph, api)
                 result = outcome(fn, args)
                 if index < 2 and "error" in result:
-                    fn(*args)  # Fail loudly when an expected supported route cannot calculate Mars.
+                    fn(*args)  # Fail loudly if a required position is unavailable.
                 row = [mode, tier, index, api, encode(args), result]
                 print(dump(row), file=out)
                 coverage[f"{mode}/{tier}/{api}"] += 1
@@ -257,7 +286,7 @@ def compare(left, right):
             mode, tier, _, api, encoded_args, result = row_a
             key = f"{mode}/{tier}/{api}"
             coverage[key] += 1
-            if api in POSITION:
+            if api in POSITION or api == "calc_moon_position":
                 args = encoded_args.get("tuple", []) if isinstance(encoded_args, dict) else []
                 expected_arity = 4 if "pctr" in api else 3
                 if not isinstance(args, list) or len(args) != expected_arity or any(
@@ -302,7 +331,8 @@ def run(options):
     matrix = list(itertools.product(modes, tiers))
     with tempfile.TemporaryDirectory(prefix="ephemeris-bitdiff-") as tmp:
         data = Path(tmp) / "data"
-        inventory = prepare(options.data, data, modes, tiers, companions=options.profile != "smoke")
+        inventory = prepare(options.data, data, modes, tiers,
+                            companions=options.profile != "smoke", satellites=options.profile == "satellites")
         spec_path = Path(tmp) / "spec.json"
         spec_path.write_text(dump({
             "matrix": matrix, "count": count, "seed": SEED,
