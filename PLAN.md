@@ -680,6 +680,13 @@ also runs the published wheel twice as a control. The focused profile
 omits the preceding LEB runs in the full sequence. The unchanged-build
 Windows full comparison and diagnosis remain open.
 
+The exact Windows wheel binaries embed Rust standard-library source
+revisions `58cf8f9c35b355199727627d07ae34a4e2846d67` (published, 1.99.1)
+and `0ef1bc386059596dada8fb65b50425aab2ea637a` (candidate, 1.100.0).
+These identify the compiler and standard library difference independently
+of the runner's current `rustc -Vv`. The optional wheel workflow toolchain
+matches the published build for a controlled rerun.
+
 The fresh-process startup report now includes import, first-call and first-
 chart medians and p95s. The warm-page condition explicitly primes the staged
 inputs. First use has only the staging reads. Both controls passed a
