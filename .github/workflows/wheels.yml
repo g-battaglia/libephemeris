@@ -34,9 +34,14 @@ on:
         type: boolean
         default: false
       linux_memory:
-        description: Record RSS and PSS with 1, 2, 4 and 8 base LEB processes on Linux
+        description: Record RSS and PSS with 1, 2, 4 and 8 processes on Linux
         type: boolean
         default: false
+      linux_memory_case:
+        description: Mode and tier for the Linux memory comparison
+        type: choice
+        options: [leb/base, leb/medium, auto/base, auto/medium, skyfield/base, skyfield/medium]
+        default: leb/base
 
 permissions:
   contents: read
@@ -196,6 +201,7 @@ jobs:
           BITDIFF_CACHE_MIB: ${{ inputs.candidate_cache_mib }}
           BITDIFF_POSITIONAL_CENTERS: ${{ inputs.candidate_positional_centers }}
           BITDIFF_LINUX_MEMORY: ${{ inputs.linux_memory && runner.os == 'Linux' }}
+          BITDIFF_LINUX_MEMORY_CASE: ${{ inputs.linux_memory_case || 'leb/base' }}
         run: |
           args=(--profile "$BITDIFF_PROFILE" --output reports/bitdiff)
           if [[ -n "$BITDIFF_CACHE_MIB" ]]; then
@@ -205,7 +211,7 @@ jobs:
             args+=(--candidate-positional-centers)
           fi
           if [[ "$BITDIFF_LINUX_MEMORY" == true ]]; then
-            args+=(--linux-memory)
+            args+=(--linux-memory --linux-memory-case "$BITDIFF_LINUX_MEMORY_CASE")
           fi
           "$PYTHON_312" tools/bench/wheel_check.py "${args[@]}"
 

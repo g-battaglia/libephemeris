@@ -104,6 +104,12 @@ macOS. Allocator resident bytes give a narrower view than all anonymous
 memory. On Windows unavailable memory fields are null. Use a platform with
 the required counters when qualifying a RAM claim.
 
+For hosted checks, enable `linux_memory` in the manual wheel workflow
+and choose a `linux_memory_case` such as `auto/medium`. The selected
+mode and tier run against the published and rebuilt wheels with 1, 2, 4
+and 8 workers and 100,000 charts per worker. Pinned companion inputs
+are staged for LEB and Auto. Raw Linux reports are in the wheel artifacts.
+
 ## Bit identity
 
 ```sh
@@ -137,6 +143,8 @@ against itself in independent processes and retains the control captures
 in `reports/bitdiff/published-control/`.
 Set the manual workflow's `rust_toolchain` to `1.99.1` to build with the
 toolchain identified in the published Windows 4.0.0 wheel.
+Each wheel report records any Rust source revisions embedded in the
+extension. The host's `rustc -Vv` is recorded independently.
 The full manual matrix allows 150 minutes per job. Smoke and focused
 comparisons retain the 90-minute cap.
 
