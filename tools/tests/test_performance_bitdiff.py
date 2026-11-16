@@ -3,16 +3,19 @@
 import copy
 import gzip
 import json
+import os
 from pathlib import Path
 import shutil
 import struct
+import subprocess
 import sys
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bench"))
+from benchmark import verify_cold_os_pages  # noqa: E402
 from bitdiff import compare, encode, outcome  # noqa: E402
-from common import ROOT, digest, prepare  # noqa: E402
+from common import ROOT, PrerequisiteError, digest, prepare, rust_source_revisions  # noqa: E402
 
 
 def capture(path, result, *, truncate=False):
@@ -78,3 +81,23 @@ def test_staging_keeps_each_run_on_an_independent_inode(tmp_path):
     assert not first.samefile(second)
     assert original.stat().st_ctime_ns == before.st_ctime_ns
     assert digest(first) == digest(second) == inventory["leb/base_core.leb2"]["sha256"]
+
+
+def test_rust_source_paths_across_binary_read_boundary(tmp_path):
+    binary = tmp_path / "extension"
+    revision = b"58cf8f9c35b355199727627d07ae34a4e2846d67"
+    binary.write_bytes(b"\x00" * (1024 * 1024 - 12) + b"/rustc/" + revision + b"/library"
+                       + b"\x00\\rustc\\" + revision + b"\\library")
+    assert rust_source_revisions(binary) == [revision.decode("ascii")]
+
+
+@pytest.mark.parametrize("reported", ["4096\n", "", "0\n0\n"])
+def test_cold_start_refuses_unverified_input_residency(tmp_path, monkeypatch, reported):
+    (tmp_path / "input").write_bytes(b"sample")
+    monkeypatch.setattr(os, "posix_fadvise", lambda *_: None, raising=False)
+    monkeypatch.setattr(os, "POSIX_FADV_DONTNEED", 4, raising=False)
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: subprocess.CompletedProcess(
+        "fincore", 0, stdout=reported,
+    ))
+    with pytest.raises(PrerequisiteError, match="fincore"):
+        verify_cold_os_pages(tmp_path, ["input"])
