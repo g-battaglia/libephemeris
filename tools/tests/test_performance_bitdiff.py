@@ -57,8 +57,35 @@ def test_exact_comparison(tmp_path, change):
     left, right = tmp_path / "baseline.gz", tmp_path / "candidate.gz"
     capture(left, original)
     capture(right, changed)
-    assert compare(left, left)["status"] == "identical"
-    assert compare(left, right)["differences"] == 1
+    identical = compare(left, left)
+    assert identical["status"] == "identical"
+    assert identical["difference_counts"] == {}
+    different = compare(left, right)
+    assert different["differences"] == 1
+    if change == "warning":
+        transitions = {}
+    elif change == "error":
+        transitions = {"builtins.ValueError -> builtins.TypeError": 1}
+    else:
+        transitions = {"value -> value": 1}
+    assert different["difference_counts"] == {
+        "leb/base/calc_ut": {
+            "requests": 1,
+            "result_transitions": transitions,
+            "changed_warnings": int(change == "warning"),
+        },
+    }
+
+
+def test_difference_counts_distinguish_value_from_range_error(tmp_path):
+    left, right = tmp_path / "left.gz", tmp_path / "right.gz"
+    error = "libephemeris.EphemerisRangeError"
+    capture(left, {"value": None, "warnings": []})
+    capture(right, {"error": error, "warnings": [["builtins.UserWarning", "changed"]]})
+    forward = compare(left, right)["difference_counts"]["leb/base/calc_ut"]
+    backward = compare(right, left)["difference_counts"]["leb/base/calc_ut"]
+    assert forward == {"requests": 1, "result_transitions": {f"value -> {error}": 1}, "changed_warnings": 1}
+    assert backward == {"requests": 1, "result_transitions": {f"{error} -> value": 1}, "changed_warnings": 1}
 
 
 def test_incomplete_capture(tmp_path):

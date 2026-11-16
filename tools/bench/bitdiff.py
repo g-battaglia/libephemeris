@@ -274,6 +274,9 @@ def compare(left, right):
         coverage = Counter()
         successes = Counter()
         error_types = Counter()
+        difference_counts = Counter()
+        result_transitions = defaultdict(Counter)
+        changed_warnings = Counter()
         positions = defaultdict(lambda: (set(), set(), set()))
         for i in range(expected):
             row_a, row_b = json.loads(next(a)), json.loads(next(b))
@@ -301,10 +304,18 @@ def compare(left, right):
                 successes[key] += 1
             else:
                 error_types[result["error"]] += 1
-            if dump(result) != dump(row_b[-1]):
+            candidate_result = row_b[-1]
+            if dump(result) != dump(candidate_result):
                 differences += 1
+                difference_counts[key] += 1
+                before = result.get("error", "value")
+                after = candidate_result.get("error", "value")
+                if before != after or dump(result.get("value")) != dump(candidate_result.get("value")):
+                    result_transitions[key][f"{before} -> {after}"] += 1
+                if result["warnings"] != candidate_result["warnings"]:
+                    changed_warnings[key] += 1
                 if len(first) < 10:
-                    first.append({"request": row_a[:5], "baseline": result, "candidate": row_b[-1]})
+                    first.append({"request": row_a[:5], "baseline": result, "candidate": candidate_result})
         trailer = {"count": expected, "coverage": dict(coverage)}
         if json.loads(next(a)) != trailer or json.loads(next(b)) != trailer or a.read(1) or b.read(1):
             raise ValueError("invalid capture trailer or unexpected records")
@@ -317,6 +328,11 @@ def compare(left, right):
                                        "center_ids": sorted(centers), "requested_flags": sorted(flags)}
         return {"schema": SCHEMA, "status": "different" if differences else "identical",
                 "count": expected, "differences": differences, "first_differences": first,
+                "difference_counts": {
+                    key: {"requests": count, "result_transitions": dict(result_transitions[key]),
+                          "changed_warnings": changed_warnings[key]}
+                    for key, count in difference_counts.items()
+                },
                 "coverage": dict(coverage), "baseline_successes": dict(successes),
                 "baseline_error_types": dict(error_types),
                 "position_inventory": position_inventory,

@@ -139,6 +139,10 @@ The report lists exact requested flag masks, target IDs grouped by body
 class, and observed center IDs for each mode, tier and position entry
 point. This inventory includes requests that returned errors. Re-run
 `bitdiff.py compare` on earlier captures to generate it for those runs.
+On a difference, the report counts all affected requests by mode, tier
+and API, including changes between values and typed errors. The warning
+count can overlap result changes. The report also retains the first ten
+differences with their full requests and outcomes.
 
 The manual `auto-edge` profile runs the first 30,000 calls of each
 `auto` tier with pinned LEB companions and SPKs. It omits the LEB and

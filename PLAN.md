@@ -723,6 +723,14 @@ The focused paired controls and the effect of the center-retention fix
 remain under investigation. The strict bit comparator still fails on any
 observed difference.
 
+Replaying the SPK Windows comparison with the complete difference counts
+confirmed 556 changes between values and `EphemerisRangeError`, all on
+planet-centric calls in Auto. Six Auto context position results differed
+with values on both sides. No warnings changed. A replay of the Windows
+owned-reader comparison against the corrected reference again found zero
+differences. Each replay is saved as `replay-with-difference-counts.json`
+in its corresponding local artifact directory.
+
 The [focused Windows center-retention run](https://github.com/g-battaglia/libephemeris/actions/runs/43878253315)
 completed both 60,000-request comparisons. The same published binary
 produced 594 differences in its self-comparison, including 592 changes
