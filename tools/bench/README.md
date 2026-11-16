@@ -63,9 +63,11 @@ The defaults time random charts, consecutive charts and chart components.
 Repeat `--workload` to select other cases. `--window 1550-2650` and
 `--window coverage` probe broader windows. Dates are restricted to the
 intersection of the relevant raw coverage and an interior margin. The report
-records the actual date interval and a Python chart provider trace. A failed
-calculation or unexpected provider fails the run. Use `--companions` to include
-published companion groups. Compare reports using the same options and inputs.
+records the date interval and a Python provider trace. The single-position
+workloads trace the measured Mars call with its actual flags. Chart workloads
+trace all chart bodies. A failed calculation or unexpected provider fails
+the run. Use `--companions` to include published companion groups. Compare
+reports using the same options and inputs.
 
 Each timing repeat is a fresh process. The default is five repeats, with
 median and nearest-rank p95 over pooled individual timings. Thread throughput

@@ -29,6 +29,7 @@ CHART_BODIES = [*range(10), 11]
 WORKLOADS = ("random_chart", "seq_chart", "same_date_chart", "chart_anatomy", "seq_position",
              "time_series", "houses", "sidtime", "ayanamsha", "fixstar", "topo", "threads",
              "cold_start", "memory")
+POSITION_WORKLOADS = ("seq_position", "time_series", "topo")
 SERIES = 100_000
 
 
@@ -119,15 +120,20 @@ def worker(path, *, probe=False):
     configure(eph, spec["mode"], spec["tier"])
     chart, other, planets = operations(spec, eph)
     if probe:
+        position_probe = workload in POSITION_WORKLOADS
+        bodies = (4,) if position_probe else CHART_BODIES
         token = eph.start_tracing()
         try:
-            planets(jds[0], CHART_BODIES)
+            if position_probe:
+                other[workload](jds[0])
+            else:
+                planets(jds[0], bodies)
             routes = eph.get_trace_results()
         finally:
             token.reset()
         expected = "Skyfield" if spec["mode"] == "skyfield" else "LEB"
-        if any(routes.get(body) != expected for body in CHART_BODIES):
-            raise PrerequisiteError(f"unexpected provider for chart: {routes}")
+        if any(routes.get(body) != expected for body in bodies):
+            raise PrerequisiteError(f"unexpected provider for {workload}: {routes}")
         emit(routes)
         return
     if workload in ("cold_start", "memory"):
@@ -350,6 +356,8 @@ def run(options):
                     count = 1
                 jds, span = dates(report["data"], tier, mode, workload, count, options.seed, options.window)
                 env = environment(data)
+                position_probe = workload in POSITION_WORKLOADS
+                route_key = (mode, tier, workload if position_probe else "chart")
                 for parallel in ((options.workers or (1, 2, 4, 8)) if workload in ("threads", "memory") else (1,)):
                     spec = {"schema": SCHEMA, "mode": mode, "tier": tier, "workload": workload,
                             "flags": options.flags, "dates": jds, "parallelism": parallel}
@@ -359,8 +367,8 @@ def run(options):
                             [sys.executable, "-E", "-s", str(Path(__file__).resolve()), "--worker", str(job)])
                     if options.native and workload in ("threads", "cold_start", "memory"):
                         raise PrerequisiteError(f"native example does not implement {workload}")
-                    if not options.native and (mode, tier) not in routes:
-                        routes[mode, tier] = json.loads(
+                    if not options.native and route_key not in routes:
+                        routes[route_key] = json.loads(
                             subprocess.check_output([*args, "--probe"], env=env, cwd=tmp, text=True)
                         )
                     samples = []
@@ -382,7 +390,8 @@ def run(options):
                         "mode": mode, "tier": tier, "workload": workload, "flags": options.flags,
                         "parallelism": parallel, "requests_per_run": count, "date_range": span,
                         "samples": samples, "summary": summarize(samples),
-                        "chart_probe_routes": routes.get((mode, tier)),
+                        "chart_probe_routes": routes.get(route_key) if not position_probe else None,
+                        "position_probe_routes": routes.get(route_key) if position_probe else None,
                         "cold_condition": options.cold_condition if workload == "cold_start" else None,
                         "startup_steps_per_process": {"calc_ut": 1, "charts": 1}
                         if workload in ("cold_start", "memory") else None,

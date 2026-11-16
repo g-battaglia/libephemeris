@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bench"))
+import benchmark  # noqa: E402
 from benchmark import linux_resident_bytes, verify_cold_os_pages  # noqa: E402
 from bitdiff import compare, encode, outcome  # noqa: E402
 from common import ROOT, PrerequisiteError, digest, prepare, rust_source_revisions  # noqa: E402
@@ -145,6 +146,26 @@ def test_wheel_check_reports_missing_input(tmp_path, monkeypatch):
     report = json.loads((output / "comparison.json").read_text())
     assert report["status"] == "missing_prerequisite"
     assert "base_core.leb2" in report["error"]
+
+
+@pytest.mark.parametrize("workload, flags, actual_flags", (
+    ("seq_position", 266, 266), ("time_series", 258, 258), ("topo", 258, 33026),
+))
+def test_position_preflight_probes_only_the_measured_route(tmp_path, monkeypatch, capsys,
+                                                         workload, flags, actual_flags):
+    calls = []
+    eph = SimpleNamespace(calc_ut=lambda *args: calls.append(args),
+                          sidtime=None, get_ayanamsa_ut=None,
+                          start_tracing=lambda: SimpleNamespace(reset=lambda: None),
+                          get_trace_results=lambda: {4: "Skyfield"})
+    monkeypatch.setitem(sys.modules, "libephemeris", eph)
+    monkeypatch.setattr(benchmark, "configure", lambda *_: None)
+    spec = tmp_path / "job.json"
+    spec.write_text(json.dumps(dict(mode="skyfield", tier="base", workload=workload,
+                                    dates=[2451545.], flags=flags)))
+    benchmark.worker(spec, probe=True)
+    assert calls == [(2451545., 4, actual_flags)]
+    assert json.loads(capsys.readouterr().out) == {"4": "Skyfield"}
 
 
 def test_rust_source_paths_across_binary_read_boundary(tmp_path):

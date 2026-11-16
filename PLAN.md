@@ -585,9 +585,11 @@ selected from the measured results; none of it needs to be decided now.
 - [x] Collect the macOS timing pairs across all six mode and tier cases,
   including chart components, 100,000-position series, random date ranges
   and 1/2/4/8 threads. Record five independent samples and the p95 unit.
-- [ ] Archive all 1/2/4/8-process macOS RAM pairs and the Linux LEB base
-  RAM pair with its released companion files. Keep the available RSS,
-  anonymous, file, peak and proportional counters separate.
+- [x] Archive the 1/2/4/8-process macOS RAM pairs across all six cases.
+  Retain per-process RSS, peak RSS, footprint and raw `vmmap` snapshots.
+- [ ] Archive the Linux LEB base RAM pair with its released companion
+  files. Keep the available RSS, anonymous, file, peak and proportional
+  counters separate.
 - [ ] Finish the Linux startup matrix for the remaining five mode and tier
   cases. Compare first use, explicitly warm pages and verified cold pages.
 
@@ -921,6 +923,14 @@ case at 1/2/4/8 processes. At eight, published/rebuilt summed RSS was
 This pair uses the same input hashes. Its figures are separate from the
 earlier storage screens with different staging layouts.
 
+The two Skyfield pairs complete the macOS RAM matrix. At eight processes,
+published/rebuilt steady summed RSS was 1,538.4/1,530.0 MB in base and
+8,012.9/8,020.1 MB in medium. Summed sampled per-process physical
+footprint was 1,416.5/1,408.2 and 7,897.8/7,901.9 MB respectively.
+All six pairs used matching input manifests and 100,000 charts per
+process. Each kept the four phase checkpoints at 1/2/4/8 workers.
+Group PSS is unavailable on macOS.
+
 The ARM64 portion of the [Linux base/Skyfield run](https://github.com/g-battaglia/libephemeris/actions/runs/43886540807)
 completed with 1249.6/1249.0 MB summed RSS and 1112.2/1111.2 MB summed
 PSS at eight processes. The x86-64 job is a separate measurement.
@@ -933,6 +943,15 @@ sample contains 100,000 calls. The pairing was checked for the input
 inventory, seed, effective date range, flags, case order and sample
 counts. These coverage runs shared the machine with RAM and numerical
 qualification. Raw data is under `target/bench/phase0-macos-timing/`.
+
+The separate Mars sweep completed both builds at all six mode and tier
+pairs with masks 2, 258, 266, 322, 4354 and 33026. Each case retained
+five fresh-process samples of 1,200 consecutive dates. The initial
+heliocentric Skyfield probe misclassified the workload by tracing a
+whole chart. It now traces only Mars for single-position workloads,
+using the requested flags, and keeps the whole-chart trace for chart
+workloads. The paired traces match in
+`target/bench/phase0-seq-position-flags-qualified/`.
 
 The unchanged external `leb all` campaign is running sequentially against
 the published and composed wheel overlays with network policy sealed.
@@ -995,9 +1014,16 @@ cover [LEB medium](https://github.com/g-battaglia/libephemeris/actions/runs/4390
 [Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679339),
 [Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679363)
 and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903680097).
-The LEB medium pair finished on both architectures. It staged four inputs
-and checked zero resident input bytes in every cold sample. Each report
-has one date, one first position and one first chart per fresh process.
+LEB medium, both Auto pairs and Skyfield base have now completed on both
+Linux architectures alongside the earlier LEB base run. The archived
+pairs match their input manifests. Each cold sample reported zero input
+bytes resident before spawning. The newer reports count one date, one
+first position and one first chart per fresh process.
+
+Additional Linux startup measurements compare the published wheel against
+[the SPK storage changes](https://github.com/g-battaglia/libephemeris/actions/runs/43905660043)
+and [the opted-in positional reader](https://github.com/g-battaglia/libephemeris/actions/runs/43905659756).
+Both use Auto medium and keep the first call and first chart separate.
 
 The paired Auto medium SPK comparison completed on both Linux
 architectures with identical pinned input manifests. Steady summed PSS
@@ -1060,3 +1086,10 @@ decoded coefficients between calls is excluded from default selection.
 This screen shared the host with other work. The positive-budget cases
 are in progress. Raw timings and memory snapshots are under
 `target/bench/leb-owned-small-budget-screening/`.
+
+At 1 MiB, random-chart medians were 13.7 ms in base and 15.3 ms in
+medium. At 10,000 charts, steady RSS was 52.0 and 88.0 MB. The process
+pool divides its budget among eight shards and cannot retain complete
+chunks larger than a shard's allowance. The follow-up experiment
+reuses the existing bounded coefficient windows for those chunks.
+The prototype is isolated in `codex/leb-process-cache-windows`.
