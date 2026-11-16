@@ -182,6 +182,7 @@ def capture(options):
     spec = json.loads(options.spec.read_text(encoding="utf-8"))
     build = identity(options.wheel, options.commit, options.build_options)
     build["leb_cache_mib"] = os.environ.get("LIBEPHEMERIS_LEB_CACHE_MB")
+    build["leb_reader"] = os.environ.get("LIBEPHEMERIS_LEB_READER")
     build["positional_centers"] = (
         os.environ.get("LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS") == "1"
     )
@@ -302,6 +303,8 @@ def run(options):
                 if value is not None:
                     args.extend(["--" + name.replace("_", "-"), str(value)])
             env = environment(data)
+            if options.leb_reader:
+                env["LIBEPHEMERIS_LEB_READER"] = options.leb_reader
             if role == "candidate" and options.candidate_cache_mib is not None:
                 env["LIBEPHEMERIS_LEB_CACHE_MB"] = str(options.candidate_cache_mib)
             if role == "candidate" and options.candidate_positional_centers:
@@ -333,6 +336,8 @@ def main():
     runner.add_argument("--data", type=Path, required=True)
     runner.add_argument("--output", type=Path, required=True)
     runner.add_argument("--candidate-cache-mib", type=int)
+    runner.add_argument("--leb-reader", choices=("owned", "indexed"),
+                        help="use this LEB acquisition policy in both processes")
     runner.add_argument("--candidate-positional-centers", action="store_true")
     for role in ("baseline", "candidate"):
         runner.add_argument(f"--{role}", type=Path, required=True)
