@@ -1738,6 +1738,28 @@ archives also contain 2,100,000 identical requests and six matching
 warning calls. The archived Windows pytest reports contain 1,454
 passes and 32 skips on both Python versions.
 
+The [final default matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43949734696)
+has qualified Linux ARM64 at `0319bacb`: all 2,100,000 calls matched the
+corrected reference and all six warning-emitting calls matched. Capture
+headers, bodies and trailers were checked. Installed-wheel tests on
+Python 3.12 and 3.14 each had 1,454 passes and 32 skips.
+On the same data and 100,000 random medium charts per worker over
+1900–2100, steady summed PSS for 1 / 2 / 4 / 8 workers was
+67.23 / 126.74 / 242.40 / 475.03 MB on the reference and
+64.67 / 124.77 / 243.13 / 474.47 MB on the candidate. The
+eight-process default footprint was effectively unchanged.
+
+The Linux lab uses an isolated ARM64 guest and the same installed
+candidate wheel. Its guest filesystem declined reflink creation.
+A copied unnamed snapshot retained the exact pinned digest after
+the isolated source was truncated. The owned, direct indexed and
+private indexed paths matched position, house and flag bits over
+1,000 full-coverage charts. The private path moved process PSS from
+68.3 to 37.8 MB, while `mincore` found an additional 32.1 MB of
+resident cache pages in the private file. These unmapped pages are
+outside process PSS. This screen does not establish a physical-memory
+gain on Linux. Raw evidence is under `target/bench/linux-medium-lab/`.
+
 ## 15. Step 1a experiment
 
 An opt-in process pool retains whole decoded chunks across runtime-owned LEB
