@@ -268,9 +268,13 @@ holds roughly one date. The budget cannot be set from Python.
   atomic counters; lookups are sharded or read-mostly; decompression happens
   outside any shared lock. The `threads` workload is the check.
 
-**Estimate.** With a budget that holds the dates in use, a random-date chart
-should approach the consecutive-date cost (862 µs towards ~180 µs). Warm-up
-cost and the budget needed for each tier are to be measured.
+**Observed.** For random dates in 1900–2100 on macOS, 32 MiB reduced
+the paired chart median from 589.7 to 138.2 µs in base and from 591.9
+to 149.4 µs in medium. Larger budgets reached the same timing plateau
+in the sweep. Every tested opt-in budget raised memory in the paired
+macOS run, and the medium full-coverage workload lost throughput at
+32 MiB. The default remains the per-image policy. Section 15 records
+the budget sweep and the warm-up results.
 
 **Decision this step informs.** How much of the random-date problem a cache
 alone solves, and therefore whether phase 3 is needed for steady state at all
@@ -321,9 +325,12 @@ profiling shows that whole-file hashing dominates start-up, changing *when*
 verification happens is an integrity decision to be made explicitly, not a
 side effect of this step.
 
-**Estimate.** Anonymous memory in `auto` should fall from hundreds of MB to
-tens; first call from hundreds of ms to a few ms plus whatever verification
-costs. Both to be measured in the three cold-start conditions.
+**Observed.** In Linux x86-64 Auto medium at eight workers, summed PSS
+moved from 4,760 to 3,158 MB with default SPK storage and to 1,553 MB in
+the separate positional-center pair. In the default storage pair the
+median first call was 470 → 346 ms on first use, 458 → 350 ms with
+warm pages and 560 → 502 ms with verified cold pages. Section 14 records
+the other startup cases and their input conditions.
 
 ### 4.3 Step 1c — reuse of identical results and removal of copies
 
@@ -353,19 +360,14 @@ Only items that are bit-identical by construction.
    (`core/src/providers/leb/index.rs:87`, `:112`); hashing is about a quarter
    of the no-speed path in the profile.
 
-**Estimate, decomposed against section 2.2.** None of this is established.
-
-| Part | Today | What could reduce it | Status |
-| --- | --- | --- | --- |
-| First body, 37 µs | Half of it is two-word sine/cosine | Items 1–2 here; phase 4 for the rest | Unquantified until item 2 is confirmed |
-| Other ten bodies, 11.8 µs each | Two-word polynomial rates, deflection, hashing, allocation | Items 3, 6, 7 | No breakdown yet; needs its own profile |
-| Houses, 25 µs | Nutation series is about 80 % | Item 5, if a duplicate exists | Residual with the current implementation estimated at 15–17 µs; this is not a proven lower bound, and further bit-identical optimisation of the series is simply not quantified today |
-
-A chart at 180 µs becomes about 165 µs if the first body reaches 22 µs and
-about 157 µs if houses reach 17 µs. Anything below that requires savings on
-the ten other bodies or on fixed overhead that have **not yet been
-identified**. The first task of this step is therefore a profile of "body
-after the first" to see whether those savings exist.
+**Observed.** In the native macOS base/LEB chart profile, medians were
+23.38 µs for the first body, 69.58 µs for the ten subsequent bodies
+combined and 14.75 µs for houses. In a separate paired macOS benchmark,
+reusing reference-obliquity constants changed the first-body median
+from 24.33 to 23.88 µs and the full chart median from 110.92 to 110.42 µs.
+The median for the ten subsequent bodies stayed at 71.71 µs in that pair.
+The measured paths and remaining CPU candidates are recorded in the
+individual profiles and section 14.
 
 ### 4.4 Exit criterion for phase 1
 
@@ -531,15 +533,31 @@ The phase 1 comparisons give these results:
   first body, 69.58 µs for the other ten and 14.75 µs for houses.
   Decompression still dominates indexed random charts. The scalar
   Python/native comparison does not currently justify a batch API for speed.
-- With eight Linux x86-64 workers, medium Auto PSS fell from 4.76 to
-  3.16 GB in the default storage pair and to 1.55 GB in a separate pair
-  with positional centers. Default LEB reduces memory for the bundled
-  base tier; the authenticated macOS medium path is in the draft.
-  The [latest wheel matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43949734696)
-  includes the Linux default-medium comparison.
 - In the paired macOS runs, the SPK lookup change reduced Skyfield chart
-  latency by about 40%. Numerical qualification for the additional change
-  continues in the full matrix.
+  latency by about 40%. The [default wheel matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43949734696)
+  qualified the improved lookup against the corrected reference.
+
+The following comparisons used eight processes and 100,000 charts per
+process. Each row is a separate paired run. Values are decimal MB.
+
+| Mode and path | Host | Steady memory | Scope |
+| --- | --- | ---: | --- |
+| LEB base, bundled snapshot | macOS ARM64 | Footprint 276.0 → 206.8 | Bundled base comparison |
+| LEB base, bundled snapshot | Linux x86-64 | PSS 261.0 → 187.7 | Bundled base comparison |
+| LEB medium, default | macOS ARM64 | Footprint 526.4 → 198.3 | Full coverage against PyPI 4.0.0 |
+| LEB medium, default | Linux x86-64 | PSS 477.6 → 477.5 | 1900–2100 against the corrected reference |
+| LEB medium, shared opt-in | Linux ARM64 | PSS 443.4 → 182.9 | Full coverage, same wheel with sharing off and on |
+| Auto medium, default SPK storage | Linux x86-64 | PSS 4,760.3 → 3,157.7 | Published wheel against the SPK storage candidate |
+| Auto medium, positional-center opt-in | Linux x86-64 | PSS 4,760.2 → 1,553.1 | Separate positional-center comparison |
+| Skyfield medium, SPK storage | Linux x86-64 | PSS 5,290.8 → 2,728.5 | Separate Skyfield comparison |
+
+Section 14 records paths, inputs and verification for each pair. In the
+matched macOS medium comparison the default snapshot changed median chart
+time from 597 to 626 µs and the warm first call from 3.7 to 16.2 ms. In
+the separate eight-worker Linux ARM64 opt-in run, the per-worker batch
+averages were about 1.2 ms per chart and the median first call changed
+from 13.6 to 30.9 ms. The Linux measurement at one worker showed no
+material RAM saving.
 
 ---
 
@@ -566,7 +584,8 @@ Section 14 and the step reports record completed runs and open requirements.
       reference-obliquity memo calls the same two-word routine with the
       same constant. The Auto center-retention correction affects source
       selection and is qualified separately.
-- [ ] Estimates in this plan replaced by the measured values.
+- [x] Replace Phase 1 estimates with the paired measurements in sections 4
+      and 10. Individual reports retain workloads, inputs and raw samples.
 
 ---
 
@@ -1905,13 +1924,34 @@ includes both Linux memory comparisons. A repeatable installed-wheel
 lifecycle check uses independent processes and exercises creator exit,
 recreation after the last holder, an occupied lock and incorrect sealed
 bytes. It passed on the unprivileged ARM64 candidate and rejected the
-preceding wheel with sharing unavailable.
+preceding wheel with sharing unavailable. The
+[published-wheel medium check](https://github.com/g-battaglia/libephemeris/actions/runs/43966964284)
+passed the lifecycle scenarios on Linux ARM64 and x86-64. The archived
+captures and local replay matched 10,000 requests and one warning call
+against PyPI 4.0.0 on each architecture. Python 3.12 and 3.14 each had
+1,454 installed-wheel passes and 32 skips on both Linux jobs. The same
+run passed the Windows medium check against PyPI without the Linux
+opt-in, with 10,000 matching calls, one warning call and the same Python
+test counts. Windows Rust test targets type-checked successfully.
 
 The macOS wheel rebuilt after the Linux integration passed 1,486 Python
 tests. Rust on the same source passed 3,248 library tests plus integration
 and 24 documentation tests when configured with the pinned data-v3
-fixture. Reports are under `target/bench/macos-after-linux-sharing/` and
+fixture. The rebuilt wheel at `42acb11a` also matched the corrected
+reference on 2,100,000 requests across all six mode/tier pairs, including
+all six warning-emitting calls. Reports are under
+`target/bench/macos-after-linux-sharing/` and
 `target/bench/linux-medium-lab/macos-post-integration-rust-pinned.log`.
+
+In the local ARM64 guest, the first parallel release test build was
+killed by SIGKILL. With one build job, LTO disabled and four codegen
+units, the Rust 1.100.0 library suite ran to completion on both sides of
+the Linux sharing change. Both builds had 3,246 passes, 18 ignored
+tests and identical failures in the obliquity/nutation, heliacal and
+topocentric pinned-value tests. The observed and expected values match
+between `6cd28816` and `54c3547f`. The failures are retained as a guest
+qualification limitation. Raw logs and the word-for-word comparison are
+under `target/bench/linux-medium-lab/`.
 
 ## 15. Step 1a experiment
 
