@@ -20,6 +20,11 @@ on:
         type: choice
         options: [smoke, full, auto-edge, auto-centers]
         default: smoke
+      comparison_platform:
+        description: Platform family for the corrected-reference comparison
+        type: choice
+        options: [windows, linux]
+        default: windows
       candidate_cache_mib:
         description: Optional LEB process cache budget for candidate only
         type: string
@@ -39,16 +44,15 @@ permissions:
 jobs:
   wheels:
     name: ${{ matrix.platform }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.platform == 'windows-x86_64' && 'windows-latest' || matrix.platform == 'linux-aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.bitdiff_profile == 'full' && 150 || 90 }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: windows-x86_64
-            runner: windows-latest
-            target: x86_64-pc-windows-msvc
-            manylinux: ''
+        platform: ${{ fromJSON(inputs.comparison_platform == 'linux' && '["linux-x86_64","linux-aarch64"]' || '["windows-x86_64"]') }}
+    env:
+      RUST_TARGET: ${{ matrix.platform == 'windows-x86_64' && 'x86_64-pc-windows-msvc' || matrix.platform == 'linux-aarch64' && 'aarch64-unknown-linux-gnu' || 'x86_64-unknown-linux-gnu' }}
+      MANYLINUX_TAG: ${{ matrix.platform != 'windows-x86_64' && '2014' || '' }}
     steps:
       # Checksum-pinned JSON and license inputs must retain their Git bytes.
       - name: Preserve source line endings on Windows
@@ -63,7 +67,7 @@ jobs:
       - name: Record candidate
         shell: bash
         env:
-          TARGET: ${{ matrix.target }}
+          TARGET: ${{ env.RUST_TARGET }}
         run: |
           mkdir -p reports
           printf 'Commit: %s\nTarget: %s\n' "$(git rev-parse HEAD)" "$TARGET" | tee reports/source.txt >> "$GITHUB_STEP_SUMMARY"
@@ -82,8 +86,8 @@ jobs:
         with:
           maturin-version: '1.9.4'
           rust-toolchain: '1.99.1'
-          target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux }}
+          target: ${{ env.RUST_TARGET }}
+          manylinux: ${{ env.MANYLINUX_TAG }}
           args: --release --locked --out dist
 
       - name: Check out corrected reference
@@ -98,7 +102,8 @@ jobs:
         with:
           maturin-version: '1.9.4'
           rust-toolchain: '1.99.1'
-          target: ${{ matrix.target }}
+          target: ${{ env.RUST_TARGET }}
+          manylinux: ${{ env.MANYLINUX_TAG }}
           working-directory: fixed-reference
           args: --release --locked --out dist
 
@@ -108,7 +113,7 @@ jobs:
         env:
           PYTHON_312: ${{ steps.python312.outputs.python-path }}
           PYTHON_314: ${{ steps.python314.outputs.python-path }}
-          TARGET: ${{ matrix.target }}
+          TARGET: ${{ env.RUST_TARGET }}
           PYTHONUTF8: '1'
         run: |
           python - <<'PY'
