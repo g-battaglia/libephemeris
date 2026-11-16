@@ -8,8 +8,10 @@ workloads **without changing numerical output**. The work is incremental:
 every phase must justify itself with the results it actually obtains, not
 with a desired final figure.
 
-Status: planning only; no implementation changes. Reported baseline measurements
-must be reproduced in phase 0 before optimisation starts.
+The baseline harness and Phase 1 candidates are in draft pull requests.
+Section 14 tracks the remaining baseline checks and links the measured
+results. Qualification against the published wheel remains open on
+Windows.
 
 ---
 
@@ -590,8 +592,8 @@ selected from the measured results; none of it needs to be decided now.
 - [x] Archive the Linux LEB base RAM pair with its released companion
   files. Keep the available RSS, anonymous, file, peak and proportional
   counters separate.
-- [ ] Finish the Linux startup matrix for the remaining five mode and tier
-  cases. Compare first use, explicitly warm pages and verified cold pages.
+- [x] Archive the Linux startup matrix for all six mode and tier cases.
+  Compare first use, explicitly warm pages and verified cold pages.
 
 ### Numerical and consumer validation
 
@@ -609,9 +611,9 @@ selected from the measured results; none of it needs to be decided now.
   reference and optimized checks are reported separately.
 - [x] Run Rust release tests with `bundled-data,nbody,python-internals`,
   installed-wheel Python tests and harness tests. Preserve their logs.
-- [ ] Finish the external validation and downstream qualification. Track
-  missing prerequisites and classify candidate failures against the paired
-  published run. Keep the suites and their baselines intact.
+- [x] Execute the external validation and downstream comparisons on the
+  unchanged suites. Record missing prerequisites and compare failure
+  inventories against the published run.
 
 Local reports and logs are under `target/bench/`. The first five-repeat
 candidate run on macOS arm64 (Python 3.12, base/leb, 500 charts per repeat)
@@ -802,7 +804,12 @@ passed the full 2,100,000-call comparison of two independent captures of
 the wheel with the center correction.
 The [optimization check](https://github.com/g-battaglia/libephemeris/actions/runs/43883394649)
 applies the same isolated correction to the reference and optimized wheels
-and uses Rust 1.99.1 for both builds. A separate
+and uses Rust 1.99.1 for both builds. The indexed and positional
+configuration of the optimized wheel matched all 2,100,000 requests.
+The same corrected-reference corpus is running on Linux ARM64 and
+x86-64 for [indexed readers](https://github.com/g-battaglia/libephemeris/actions/runs/43909331459)
+and [the 32 MiB owned reader](https://github.com/g-battaglia/libephemeris/actions/runs/43909331865).
+A separate
 [strict run](https://github.com/g-battaglia/libephemeris/actions/runs/43882398843)
 with the unmodified runtime and the published Windows Rust toolchain
 still found 572 differences over 2,100,000 calls on Windows. The
@@ -874,14 +881,18 @@ The source of the transient inventory change remains unresolved. The
 external standalone rounds and verification commands were outside these
 runs. The full logs are `target/bench/validation-full-leb{,-baseline}.log`.
 
-The later external `leb all` campaigns use the published wheel and the
-composed candidate against the untouched validation checkout at
-`5a2051f2`. Both pytest lanes have finished on both wheels. The JUnit
-inventories contain the same 21,359 case IDs with identical outcomes for
-every ID, including 62 failures and 147 skips on each wheel. The published
-campaign also finished the standalone rounds, verification and parity.
-Those stages produced baseline failures and the composed candidate is
-running the same stages. See `target/bench/validation-complete-*.log`.
+The external `leb all` campaigns finished against the unchanged validation
+checkout at `5a2051f2`. The published wheel and composed candidate have
+identical outcomes on all 21,359 pytest IDs, including 62 failures and
+147 skips in each run. All 273 standalone rounds and all 19 verification
+scripts have matching exit statuses. The 269 round wrapper records and
+19 verification records match in assertions, failed predicates, call
+counts, qualifiers and reported errors. Four rounds reached the same
+timeout on both wheels. The complete parity JSON and execution evidence
+match, including 3,330 assertions and 253 failures in each run. The result
+records the existing scientific failures with their original thresholds.
+Logs and the paired audit are under `target/bench/validation-complete-*.log`
+and `target/bench/validation-campaign-comparison.json`.
 
 On the hosted Linux ARM64 runner, the paired base/LEB comparison completed
 100,000 charts per worker at 1/2/4/8 processes. At eight processes, published
@@ -953,6 +964,12 @@ inventory, seed, effective date range, flags, case order and sample
 counts. These coverage runs shared the machine with RAM and numerical
 qualification. Raw data is under `target/bench/phase0-macos-timing/`.
 
+The README chart table now uses the reproducible base-tier run at
+`target/bench/readme-baseline.json`. Its published LEB medians were
+118 µs for consecutive dates and 606 µs for random dates. The earlier
+timing run measured 171 and 876 µs under different host load. File
+digests, workload parameters and route probes agree across both runs.
+
 The separate Mars sweep completed both builds at all six mode and tier
 pairs with masks 2, 258, 266, 322, 4354 and 33026. Each case retained
 five fresh-process samples of 1,200 consecutive dates. The initial
@@ -967,12 +984,35 @@ the published and composed wheel overlays with network policy sealed.
 This adds the standalone rounds, verification scripts and parity
 matrix to the external pytest cases. Raw console logs are in
 `target/bench/validation-complete-{published,optimized}.log`.
-The paired Step 1 timing sweep is queued behind the active local
-memory, timing and external-validation processes. It samples each
-workload with the corrected reference and the default optimized wheel,
-and tests the indexed, process-cache and positional settings on their
-applicable routes. Its commands and reports are under
+The paired Step 1 timing sweep runs after the baseline memory and
+external-validation processes. It samples each workload with the corrected
+reference and the default optimized wheel, and tests the indexed,
+process-cache and positional settings on their applicable routes. Its
+commands and reports are under
 `target/bench/phase1-composed-timing/`.
+
+The LEB portion completed all 30 report pairs. Both builds use matching
+data, routes, epoch sequences and five fresh processes per case. Random
+chart medians in µs are shown below, with 300 charts per process.
+
+| Tier and window | Corrected reference | Optimized default | Indexed | 32 MiB owned pool |
+| --- | ---: | ---: | ---: | ---: |
+| Base, 1900–2100 | 589.7 | 606.0 | 593.4 | 138.2 |
+| Base, full coverage | 592.9 | 586.1 | 612.1 | 137.4 |
+| Medium, 1900–2100 | 591.9 | 580.6 | 510.6 | 149.4 |
+| Medium, full coverage | 603.5 | 605.3 | 674.7 | 925.5 |
+
+The indexed ceiling is 2 MiB in base and 6 MiB in medium. Across the
+1900–2100 samples, the 32 MiB pool's p95 for the first 100 charts per
+process was 939.2 µs in base and 1,039.6 µs in medium. The last 100
+charts measured 147.7 and 233.6 µs. Medium full coverage still had
+a p95 of 1,074.6 µs in the last 100 charts. Report the date-window and
+warm-up dependence alongside the median speedup.
+Auto base also completed with matching input and workload settings.
+The random-chart median was 1,183 µs on the corrected reference,
+1,066 µs on the default candidate and 943 µs with positional centers.
+Consecutive chart medians were 863, 766 and 606 µs respectively.
+The local comparison audit is `target/bench/phase1-composed-timing/comparison.json`.
 Four native hot-stack samples are queued after that sweep. They cover
 base chart components, medium indexed LEB, medium positional Auto and
 medium Skyfield. The profiling build, staged-input manifests, requests
@@ -1023,12 +1063,16 @@ The additional Linux startup pairs cover
 [Auto base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679854),
 [Auto medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903679339),
 [Skyfield base](https://github.com/g-battaglia/libephemeris/actions/runs/43903679363)
-and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43903680097).
-LEB medium, both Auto pairs and Skyfield base have now completed on both
-Linux architectures alongside the earlier LEB base run. The archived
-pairs match their input manifests. Each cold sample reported zero input
-bytes resident before spawning. The newer reports count one date, one
-first position and one first chart per fresh process.
+and [Skyfield medium](https://github.com/g-battaglia/libephemeris/actions/runs/43910066861).
+The initial Skyfield medium dispatch stayed queued with zero jobs while
+the cancellation endpoint reported that it had completed. The replacement
+dispatch reached both Linux runners.
+All six cases completed on both Linux architectures. The archived pairs
+match their input manifests. Each of the 120 cold launches across both
+builds reported zero input bytes resident before spawning. The newer
+reports count one date, one first position and one first chart per fresh
+process. The verified summary is
+`target/bench/linux-startup-matrix-summary.json`.
 
 Additional Linux startup measurements compare the published wheel against
 [the SPK storage changes](https://github.com/g-battaglia/libephemeris/actions/runs/43905660043)
@@ -1125,8 +1169,51 @@ chunks larger than a shard's allowance. The follow-up experiment
 reuses the existing bounded coefficient windows for those chunks.
 The prototype is isolated in `codex/leb-process-cache-windows`.
 Its first build passed 245 LEB Rust tests and matched all 10,000 smoke
-requests with the candidate's 1 MiB cache active. Its paired timing and
-memory screen remains in progress.
+requests with the candidate's 1 MiB cache active.
+
+The unmodified process cache at 2 MiB measured 13.4/13.6 ms median
+per random chart in base/medium and 54.2/94.0 MB steady RSS. At 4 MiB,
+these were 0.84/0.84 ms and 62.5/96.7 MB. Both RSS readings follow
+10,000 charts on the same companion-inclusive workload.
+
+In the separate 1 MiB prototype screen, bounded windows improved random
+chart medians from 13.73 to 0.77 ms in base and from 13.60 to 0.77 ms in
+medium. At 1,000 charts, steady RSS moved 49.9 → 47.7 MB and
+87.3 → 85.2 MB. Consecutive chart medians were still about 2.10 ms.
+This screen compares the same small configured budget on both builds.
+The subsequent same-wheel sweep paired 2 and 3 MiB with legacy
+retention. Medians reflect five fresh processes of 1,500 charts each.
+Memory is steady single-worker RSS after 10,000 charts.
+
+| Setting | Base random median | Medium random median | Base RSS | Medium RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Legacy | 599 µs | 599 µs | 49.5 MB | 87.3 MB |
+| 2 MiB windows | 659 µs | 663 µs | 53.4 MB | 90.8 MB |
+| 3 MiB windows | 1,062 µs | 1,073 µs | 59.6 MB | 94.7 MB |
+
+The small-budget variants fail the latency and RAM criteria for a default.
+Keep this prototype outside the draft optimization chain. Local
+cache-screen artifacts are under `target/bench/leb-process-cache-windows/`.
+
+The companion-inclusive medium-only follow-up compared authenticated
+positional acquisition with the ordinary owned path, using the same
+experimental wheel on both sides. In a separate check the positional
+path retained a descriptor for the pinned core after serving the Mars
+probe. At eight processes and 100,000 charts per process, summed RSS
+fell from 671.3 to 615.1 MB and summed sampled physical footprint fell
+from 520.4 to 456.5 MB. At one worker RSS fell from 84.4 to 70.4 MB.
+The same-wheel random-chart median rose from 609.1 to 637.7 µs and
+p95 fell from 711.8 to 683.6 µs. The consecutive medians were 115.8
+and 121.2 µs. These separate timing samples used five fresh processes
+of 3,000 charts each over the covered part of 1550–2650. The digest
+check also increased first-call time in the earlier startup trial.
+Keep automatic positional acquisition experimental.
+Raw results are in `target/bench/managed-leb-medium-follow-up/`.
+
+The full owned-reader RAM sweep queues legacy retention and 16/32/64/128
+MiB on both LEB tiers after the local timing and profiling commands.
+It uses 100,000 charts per worker at 1/2/4/8 processes.
+Commands and artifacts are under `target/bench/owned-cache-ram-matrix/`.
 
 ## 15. Step 1a experiment
 
