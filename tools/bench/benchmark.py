@@ -401,7 +401,8 @@ def run(options):
                 shared.mkdir(mode=0o700)
             if options.cold_condition == "page_cache_cold" and sys.platform != "linux":
                 raise PrerequisiteError("verified input page eviction requires Linux")
-            report["data"] = prepare(options.data, data, modes, tiers, companions=options.companions)
+            data_tiers = LEB_TIERS if "extended" in tiers else tiers
+            report["data"] = prepare(options.data, data, modes, data_tiers, companions=options.companions)
             if options.iers_data:
                 report["iers_data"] = prepare_iers(options.iers_data, data)
             if options.native:

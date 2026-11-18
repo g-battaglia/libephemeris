@@ -17,7 +17,7 @@ import tempfile
 import warnings
 
 from common import (
-    J2000, KERNELS, MODES, SATELLITE_KERNEL, SCHEMA, SEED, SITE, TIERS,
+    J2000, KERNELS, LEB_TIERS, MODES, SATELLITE_KERNEL, SCHEMA, SEED, SITE, TIERS,
     PrerequisiteError, configure, dump, environment, identity, prepare, prepare_iers,
     shared_medium_identity,
 )
@@ -414,7 +414,7 @@ def run(options):
     matrix = list(itertools.product(modes, tiers))
     with tempfile.TemporaryDirectory(prefix="ephemeris-bitdiff-") as tmp:
         data = Path(tmp) / "data"
-        inventory = prepare(options.data, data, modes, tiers,
+        inventory = prepare(options.data, data, modes, LEB_TIERS if extended else tiers,
                             companions=extended or options.profile in ("full", "auto-edge"),
                             satellites=options.profile == "satellites")
         iers = prepare_iers(options.iers_data, data) if options.iers_data else None

@@ -35,8 +35,9 @@ and a dedicated profiling build for sampling.
 
 For sealed extended LEB, use `bitdiff.py run --profile leb-extended-indexed`
 with the same interpreter, wheel, data and output options as the full gate.
-This profile adds 350,000 scalar calls and requires the four released
-extended LEB2 files. It selects indexed readers and needs no SPK kernel.
+This profile adds 350,000 scalar calls and requires the released LEB2 groups
+for base, medium and extended to exercise the cumulative inventory. It
+selects indexed readers and needs no SPK kernel.
 Pass `--iers-data /path/to/captured/iers_cache` to stage and hash the three
 observed-clock files from a deployment snapshot. Both processes use the same
 snapshot, and downloads stay disabled. The wheel workflow can run the

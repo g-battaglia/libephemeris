@@ -13,7 +13,7 @@ import venv
 
 from bitdiff import PROFILES
 from common import (
-    KERNEL_PINS, KERNELS, MANIFEST, MODES, ROOT, SATELLITE_KERNEL, SCHEMA, TIERS,
+    KERNEL_PINS, KERNELS, LEB_TIERS, MANIFEST, MODES, ROOT, SATELLITE_KERNEL, SCHEMA, TIERS,
     PrerequisiteError, command, digest, dump,
 )
 
@@ -56,11 +56,13 @@ def provision_data(options, root, data, cli, memory_mode, memory_tier):
         # on some hosted runners. Use the same release bytes with a socket
         # timeout and verify them before the offline comparison.
         manifest = json.loads(MANIFEST.read_text())["files"]
-        for group in ("core", "apogee", "asteroids", "exotics"):
-            name = f"extended_{group}.leb2"
-            downloads.append((f"leb/{name}",
-                              f"https://github.com/g-battaglia/libephemeris/releases/download/data-v4/{name}",
-                              manifest[name]["sha256"]))
+        for tier in LEB_TIERS:
+            for group in ("core", "apogee", "asteroids", "exotics"):
+                name = f"{tier}_{group}.leb2"
+                if name != "base_core.leb2":  # staged from the checkout above
+                    downloads.append((f"leb/{name}",
+                                      f"https://github.com/g-battaglia/libephemeris/releases/download/data-v4/{name}",
+                                      manifest[name]["sha256"]))
     for tier in sorted(spk_tiers):
         name = KERNELS[tier]
         centers = f"planet_centers_{tier}.bsp"
