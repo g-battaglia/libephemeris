@@ -499,11 +499,10 @@ impl EphemerisContext {
             }
         }
         #[cfg(feature = "bundled-data")]
-        if matches!(policy, crate::leb::LebReadPolicy::Owned)
-            && self.leb_file().is_none()
-            && let Some(image) = crate::leb::exact_installed_base(path)?
-        {
-            return Ok(image);
+        if matches!(policy, crate::leb::LebReadPolicy::Owned) && self.leb_file().is_none() {
+            if let Some(image) = crate::leb::exact_installed_base(path)? {
+                return Ok(image);
+            }
         }
         policy.open(path)
     }

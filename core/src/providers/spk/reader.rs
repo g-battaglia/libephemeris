@@ -407,10 +407,10 @@ impl SpkRegistry {
         jd: f64,
         fraction: f64,
     ) -> Result<(ChebState, Descriptor)> {
-        if !self.bodies.contains_key(&target)
-            && let Some(centers) = &self.positional_centers
-        {
-            return centers.relative_state(target, jd, fraction);
+        if !self.bodies.contains_key(&target) {
+            if let Some(centers) = &self.positional_centers {
+                return centers.relative_state(target, jd, fraction);
+            }
         }
         self.eval_body_relative_two_part_jd(target, jd, fraction)
     }

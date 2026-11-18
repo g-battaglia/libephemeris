@@ -279,7 +279,7 @@ impl Runtime {
                     image.clone()
                 } else {
                     let acquired = (|| {
-                        #[cfg(target_os = "macos")]
+                        #[cfg(any(target_os = "macos", target_os = "linux"))]
                         if pool.is_none()
                             && matches!(policy, crate::leb::LebReadPolicy::Owned)
                             && context.leb_file().is_none()
@@ -287,25 +287,20 @@ impl Runtime {
                             && context.tier() == crate::context::Tier::Medium
                             && path.file_name().and_then(|name| name.to_str())
                                 == Some("medium_core.leb2")
-                            && let Some(image) = LebFile::try_private_apfs_snapshot(&path)
                         {
-                            return Ok(image);
-                        }
-                        #[cfg(target_os = "linux")]
-                        if pool.is_none()
-                            && matches!(policy, crate::leb::LebReadPolicy::Owned)
-                            && context.leb_file().is_none()
-                            && context.mode() == ProviderMode::SealedLeb
-                            && context.tier() == crate::context::Tier::Medium
-                            && path.file_name().and_then(|name| name.to_str())
-                                == Some("medium_core.leb2")
-                            && let Some(shared) = std::env::var_os("LIBEPHEMERIS_LEB_SHARED_DIR")
-                            && let Some(image) = LebFile::try_sealed_linux_medium_snapshot(
-                                &path,
-                                std::path::Path::new(&shared),
-                            )
-                        {
-                            return Ok(image);
+                            #[cfg(target_os = "macos")]
+                            let snapshot = LebFile::try_private_apfs_snapshot(&path);
+                            #[cfg(target_os = "linux")]
+                            let snapshot = std::env::var_os("LIBEPHEMERIS_LEB_SHARED_DIR")
+                                .and_then(|dir| {
+                                    LebFile::try_sealed_linux_medium_snapshot(
+                                        &path,
+                                        std::path::Path::new(&dir),
+                                    )
+                                });
+                            if let Some(image) = snapshot {
+                                return Ok(image);
+                            }
                         }
                         let image = context.open_leb_file(&path)?;
                         Ok(match &pool {
