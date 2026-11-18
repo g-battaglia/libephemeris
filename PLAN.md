@@ -1,7 +1,7 @@
 # LibEphemeris performance plan
 
-Revision 3. Incorporates external review and the owner's explicit RAM-reduction
-requirement.
+Revision 4. The qualification summary at the front records the latest checks
+and deployment-shaped measurements. Later sections preserve the experiment log.
 
 Goal: reduce the time and memory cost of LibEphemeris 4.x on realistic
 workloads **without changing numerical output**. The work is incremental:
@@ -12,7 +12,91 @@ Draft [PR #87](https://github.com/g-battaglia/libephemeris/pull/87)
 holds the baseline harness, the SPK correction and the Phase 1 changes.
 Keep one PR for this effort and review individual changes by commit.
 Section 14 tracks the remaining baseline checks and links the measured
-results. Qualification against the published wheel remains open on Windows.
+results. The Windows Auto reference and its released-wheel limitation are
+recorded in the qualification summary.
+
+---
+
+## Current qualification
+
+The draft combines the measurement harness and the measured Phase 1 changes.
+The release comparison is direct against the published 4.0.0 wheel on
+macOS and Linux. The Windows full Auto gate uses `d86cea0f`, which adds the
+SPK role-retention correction to 4.0.0. A Windows control using the released
+build configuration disagreed across independent processes in Auto, so
+bit identity to the published Windows wheel remains unqualified for Auto.
+The Windows extended indexed LEB gate compares directly to the published wheel.
+
+The [extended indexed wheel matrix](https://github.com/g-battaglia/libephemeris/actions/runs/44271681814)
+matched 350,000 scalar calls per platform on Linux ARM64, Linux x86-64
+and Windows x86-64. The profile uses the cumulative base, medium and
+extended inventory and defaults to IERS disabled on hosted runners.
+Local runs use the application image's observed IERS snapshot.
+
+| Mode and case | Measured memory result | Timing context |
+| --- | --- | --- |
+| LEB base, Linux ARM64, eight workers | Summed PSS 259 → 186 MB | Default bundled reader |
+| LEB medium, macOS, eight workers | Physical footprint 526 → 198 MB | Random chart median 597 → 626 µs, warm first call 3.66 → 16.19 ms |
+| LEB medium, Linux ARM64, eight workers | Default reader flat. Opt-in compressed sharing PSS 443 → 183 MB and cgroup anon + file 516 → 255 MB | Opt-in warm first call 13.6 → 30.9 ms on the ordinary owned reader |
+| Auto medium, Linux x86-64, eight workers | Default storage PSS 4.76 → 3.16 GB. Experimental positional comparison 4.76 → 1.55 GB | Separate opt-in positional center policy |
+| Skyfield medium, Linux x86-64, eight workers | Summed PSS 5.29 → 2.73 GB | Paired macOS chart timing separately showed roughly 40% lower median |
+| LEB extended/indexed, application, one web worker | Container usage 279.8 → 277.9 MB at idle and 306.6 → 307.8 MB at nominal 10 requests/s | CPU 39.9 → 39.6 ms/success, HTTP p95 169.6 → 167.2 ms at that load |
+
+The application comparison uses the same pinned image contents and data,
+apart from the wheel, on a local native Linux ARM64 container limited to
+one vCPU and approximately 2 GB. Both wheels run with sealed networking,
+the indexed reader and prewarm. Each variant ran three times with the same
+seeded open-loop arrivals and shifted synthetic dates. At four concurrent
+requests the closed-loop medians were 26.50 and 27.25 successful requests/s,
+with p95 of 285 and 272 ms. The 930 open-loop responses per wheel had
+zero errors. Across paired responses, 882 digests matched and the remaining
+48 came from the endpoint which evaluates the current instant.
+
+The one-worker application results place both wheels within a few MB of each
+other, with similar end-to-end latency. With two web workers
+the candidate used about 553 MB at idle and 610 MB at nominal 10 requests/s,
+with comparable or lower goodput. The shared Linux medium reader and the
+owned-cache tuning remain specific to their documented configurations.
+
+The reference API was also exercised through the same application and its
+supported backend switch, with two runs on compressed ephemeris files and
+one analytical planetary fallback run with ancillary data. On the file
+route, usage was 272.3 MB at idle and 293.2 MB at nominal 10 requests/s.
+At that offered rate the candidate recorded 39.6 CPU-ms/success and 167 ms
+HTTP p95, and the reference recorded 39.0 CPU-ms/success and 205 ms p95.
+At four concurrent clients the reference served 29.75 successful requests/s
+at 230 ms p95 and the candidate served 27.25 at 272 ms p95. Both routes
+responded successfully across the measured mix. The backend switch compares
+application configurations using different ephemeris models.
+
+The separate 1900–2100 random-chart microbenchmark used the cumulative
+inventory and the image's IERS snapshot. The application wheel pair moved
+from 830 to 526 µs at the median and from 943 to 787 µs at p95, with
+15,000 charts per wheel. The reference API measured 37 µs with compressed
+files and 101 µs in its fileless analytical mode on the same dates and
+call sequence. The latter figures compare different ephemeris models.
+After 100,000 charts per worker the released and candidate wheels used
+34.2 and 41.8 MB summed PSS at one worker, and 132.0 and 169.5 MB at five.
+The higher retained-coefficient capacity is a speed and memory trade-off.
+
+In a diagnostic container, the measured native entry points accounted
+for 1.67 of 15.54 container CPU-seconds over 370 successful requests.
+The timing wraps the public native functions in the web process. Native
+class methods and subprocesses are outside the attribution. `rise_trans`
+used 0.68 CPU-seconds and `calc_ut` used 0.47 in that window.
+
+The application cache screen tested 2, 6, 8, 16 and 32 MiB in the indexed
+reader. At nominal 5 requests/s, the 2 MiB setting reduced mean container
+usage from 303.2 to 299.9 MB, with p95 moving from 132.0 to 138.1 ms.
+The other settings were within approximately 1 MB of the default. In the
+separate chart benchmark, the 2 MiB setting achieved a 659 µs median and
+724 µs p95, with steady PSS of 34.3 MB at one worker and 132.3 MB at five.
+Keep the 8 MiB default for its chart median and document the smaller
+setting for memory-constrained indexed workloads. The decoded
+coefficient lengths for the four extended images alone sum to 18.0 GB,
+compared with 2.87 GB on disk. A decoded archive, batch API or deeper CPU
+work needs separate workload evidence. The RAM target for this application
+configuration remains open.
 
 ---
 
@@ -685,7 +769,7 @@ Validation on macOS arm64:
   plus integration and documentation tests. The installed-wheel Python
   suite passed 1,482 tests.
 - The external scientific checkout's selected historical calendar lane
-  passed 30 tests. The full external qualification campaign remains open.
+  passed 30 tests. The complete campaign results are recorded later in this section.
 - Kerykeion offline passed 13,436 tests, kerykeion-parity's source suite
   passed 51, and the Astrologer Studio backend passed 2,139. The Astrologer
   API suite had missing qualification fixtures for its dependency pair and
@@ -932,7 +1016,7 @@ where the candidate finished and the published capture was still in the
 last configuration. The corrected-reference Windows runs retain the
 150-minute job allowance.
 
-The full external Swiss comparison ran the fast and slow pytest lanes
+The full external reference API comparison ran the fast and slow pytest lanes
 against both wheel overlays with network policy sealed. Each run evaluated
 21,359 cases. Both had 147 skips and the same 62 failing case IDs. The
 rebuilt wheel had one additional failure in a Chiron SPK input-stability
@@ -1396,8 +1480,8 @@ single-worker RSS after 10,000 charts moved from 49.4 to 48.1 MB in base
 and from 87.2 to 85.5 MB in medium. Random-chart medians moved from
 580 to 17,660 µs and from 601 to 19,501 µs respectively. Releasing all
 decoded coefficients between calls is excluded from default selection.
-This screen shared the host with other work. The positive-budget cases
-are in progress. Raw timings and memory snapshots are under
+This screen shared the host with other work. The positive-budget results
+follow below. Raw timings and memory snapshots are under
 `target/bench/leb-owned-small-budget-screening/`.
 
 At 1 MiB, random-chart medians were 13.7 ms in base and 15.3 ms in
@@ -1883,8 +1967,8 @@ median of per-worker batch averages was 1,275 → 1,269 µs per chart
 in this single run. The first-call median was 13.4 → 34.9 ms. The
 fallback also matched when the descriptor was absent or a correctly
 sealed image of the expected length differed near the end from the
-pinned original. This is a local ARM64 prototype. Automatic discovery
-and validation on the wheel matrix remain open.
+pinned original. The subsequent automatic-discovery qualification is
+documented later in this section.
 
 An unprivileged repeat with 10,000 full-coverage charts per worker
 used the Python registry and native evaluator, with no separate
@@ -2113,7 +2197,7 @@ with `bundled-data,nbody,python-internals` and the pinned data-v3 fixture.
 The sealed external planet-center and planet-centric selections ran in
 `auto` and `skyfield` with both wheels. Each run had 34 passes and two
 matching import failures in the legacy planet-map introspection tests.
-The full scientific campaign remains open.
+The complete scientific comparison is recorded in section 14.
 
 ### 100,000-chart memory comparison
 
@@ -2183,7 +2267,8 @@ wheel (`dd21b595`, SHA-256
 `54628e7c9c84b6cbb069b441905a3ad5bf29ab560b697adb0ad90688c845c5d6`)
 again matched 20,000 focused calls. All 155 SPK tests and 1,486 Python tests
 passed. The revised wheel also matched all 2,100,000 macOS calls with the
-32 MiB LEB pool, zero differences. The hosted comparison is underway.
+32 MiB LEB pool, zero differences. Section 14 records the composed
+hosted comparison.
 
 | Metric, same revised wheel and setup | Owned | Positional, checks around uncached reads |
 | --- | ---: | ---: |
@@ -2266,8 +2351,8 @@ in medium. Other qualification was active on the host in this repeat.
 At 100,000 random charts, one indexed worker reached 46.9 MB RSS and
 23.9 MB footprint in base, and 46.7 MB RSS and 24.3 MB footprint in medium.
 The prior indexed reader reached 51.5 and 52.4 MB RSS respectively in the
-same workload. The full indexed [wheel matrix](https://github.com/g-battaglia/libephemeris/actions/runs/43873289950)
-is underway.
+same workload. The [hosted run](https://github.com/g-battaglia/libephemeris/actions/runs/43873289950)
+records the platform checks for this revision.
 
 ## 19. Step 1b indexed cache capacity
 
@@ -2290,9 +2375,8 @@ this host, so these are screening measurements.
 | medium | 744.9 → 419.0 µs | 151.9 → 122.9 µs | 87.1 → 46.5 MB |
 
 The candidate matched the 10,000-call indexed smoke corpus. The same-policy
-full comparison with the 4.0.0 wheel and the 100,000-chart memory comparison
-are in progress. A quiet timing repeat is still required to quantify the
-latency change. Reports are under `target/bench/indexed-capacity-qualification/`.
+full comparison, the 100,000-chart comparisons and the quiet timing
+repeat follow below. Reports are under `target/bench/indexed-capacity-qualification/`.
 
 The same revised wheel completed 100,000 random charts with the following
 process memory. This longer run supersedes the 5,000-chart memory snapshot
@@ -2306,8 +2390,8 @@ for selecting a budget.
 The base tier requires a smaller budget to meet the RAM target. Use
 `benchmark.py --leb-reader indexed --indexed-cache-mib 2` (or 4, 6, 8)
 to vary the shared indexed ceiling on the same staged data. This writes a
-temporary `leb_limits.cache_bytes` setting for the worker. A timing sweep
-and 100,000-chart base runs at the lower budgets are queued.
+temporary `leb_limits.cache_bytes` setting for the worker. The timing
+and memory results for lower budgets follow below.
 
 The full macOS indexed comparison with the published release passed all
 2,100,000 calls with zero differences. The host had finished the other
@@ -2327,8 +2411,8 @@ steady physical footprint from 34.8 to 32.8 MB in the single-worker runs.
 Consecutive chart medians rose from 110.6 to 115.0 µs in base and from
 116.4 to 121.6 µs in medium with the 8 MiB budget. These are candidate
 budgets for automatically discovered pinned data, with the random p95 and
-consecutive latency regressions recorded. A repeat with the complete
-companion groups and 1/2/4/8 processes is underway.
+consecutive latency regressions recorded. Section 14 records the later
+comparisons with the complete companion groups.
 
 Two follow-up experiments left the performance candidate unchanged. The
 paired scalar Vondrak rate loop measured 105.8 → 106.1 µs per consecutive
