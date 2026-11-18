@@ -10,7 +10,7 @@ The following example uses CPython 3.12 and uv. On Windows use
 `Scripts/python.exe` in each environment. Keep the selected data directory
 stable throughout a run. The drivers stage only named, hash-checked source
 files in a temporary data directory, use sealed network policy and disable IERS
-and automatic SPK downloads. Use the release inputs rather than locally
+by default, with automatic SPK downloads disabled. Use the release inputs rather than locally
 regenerated files with matching names.
 
 ```sh
@@ -32,6 +32,17 @@ base and medium LEB2 groups, `de440s.bsp`, `de440.bsp` and the base and medium
 planet-centre kernels. The wheel workflow stages those inputs when manually
 dispatched with `bitdiff_profile=full`. Use the installed wheel for measurement
 and a dedicated profiling build for sampling.
+
+For sealed extended LEB, use `bitdiff.py run --profile leb-extended-indexed`
+with the same interpreter, wheel, data and output options as the full gate.
+This profile adds 350,000 scalar calls and requires the four released
+extended LEB2 files. It selects indexed readers and needs no SPK kernel.
+Pass `--iers-data /path/to/captured/iers_cache` to stage and hash the three
+observed-clock files from a deployment snapshot. Both processes use the same
+snapshot, and downloads stay disabled. The wheel workflow can run the
+profile with `bitdiff_profile=leb-extended-indexed` and IERS disabled.
+For timing and memory, use `--mode leb --tier extended --leb-reader indexed
+--companions` with the same optional IERS input.
 
 ## Time and memory
 

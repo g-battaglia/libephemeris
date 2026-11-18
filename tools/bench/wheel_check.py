@@ -35,6 +35,8 @@ def provision_data(options, root, data, cli, memory_mode, memory_tier):
         spk_tiers.add("medium")
     elif options.profile == "leb-medium":
         leb_tiers.add("medium")
+    elif options.profile == "leb-extended-indexed":
+        leb_tiers.add("extended")
     elif options.profile != "smoke":
         leb_tiers.update(TIERS)
         spk_tiers.update(TIERS)

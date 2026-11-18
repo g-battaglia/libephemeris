@@ -18,7 +18,8 @@ import warnings
 
 from common import (
     J2000, KERNELS, MODES, SATELLITE_KERNEL, SCHEMA, SEED, SITE, TIERS,
-    PrerequisiteError, configure, dump, environment, identity, prepare, shared_medium_identity,
+    PrerequisiteError, configure, dump, environment, identity, prepare, prepare_iers,
+    shared_medium_identity,
 )
 
 # Public request bits, including flags that may be rejected for particular bodies.
@@ -58,6 +59,7 @@ SID_MODE_WITH_UNSUPPORTED_BIT = 1 | (1 << 29)
 PROFILES = {
     "smoke": (("leb",), ("base",), SMOKE_COUNT),
     "leb-medium": (("leb",), ("medium",), SMOKE_COUNT),
+    "leb-extended-indexed": (("leb",), ("extended",), FULL_PER_CONFIG),
     "full": (MODES, TIERS, FULL_PER_CONFIG),
     "auto-edge": (("auto",), TIERS, AUTO_EDGE_COUNT),
     "auto-centers": (("auto",), TIERS, SMOKE_COUNT),
@@ -94,7 +96,7 @@ def satellite_requests(inventory):
                     yield position(api, jd, body, flags)
 
 
-def requests(mode, tier, inventory, count, seed):
+def requests(mode, tier, inventory, count, seed, *, with_context=True):
     rng = random.Random(seed)
     core = inventory.get(f"leb/{tier}_core.leb2")
     if mode == "skyfield":
@@ -107,7 +109,11 @@ def requests(mode, tier, inventory, count, seed):
     site = SITE[1], SITE[0]
     jd = J2000 + 123.5
     yield "calc_ut", (jd, 4, SPEED)
-    yield "context.calc_ut", (jd, 4, SPEED)
+    if with_context:
+        yield "context.calc_ut", (jd, 4, SPEED)
+    else:
+        yield "calc_ut", (jd, 1, SPEED)
+    position_apis = POSITION if with_context else tuple(api for api in POSITION if not api.startswith("context."))
     for api in ("houses", "houses_ex", "houses_ex2", "houses_with_fallback"):
         for system in ("P", "W", "G"):
             yield api, (jd, *site, system, "O") if api.endswith("fallback") else (jd, *site, system)
@@ -141,7 +147,7 @@ def requests(mode, tier, inventory, count, seed):
         for api in ("sol_eclipse_how", "sol_eclipse_when_loc", "lun_eclipse_how", "lun_eclipse_when_loc"):
             yield api, (epoch, SITE_ARGS)
 
-    for api in POSITION:
+    for api in position_apis:
         for body in BODIES:
             for flags in FLAGS:
                 yield position(api, jd, body, flags)
@@ -182,8 +188,8 @@ def requests(mode, tier, inventory, count, seed):
     # The last block provides dense date coverage on common chart routes.
     bits = (8, 16, 32, 64, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072)
     for mask in range(1 << len(bits)):
-        api = POSITION[mask % len(POSITION)]
-        body = mask // len(POSITION) % 15
+        api = position_apis[mask % len(position_apis)]
+        body = mask // len(position_apis) % 15
         flags = 2 | sum(bit for i, bit in enumerate(bits) if mask & (1 << i))
         yield position(api, rng.uniform(lower + 3, upper - 3), body, flags)
     for i in itertools.count():
@@ -222,6 +228,9 @@ def capture(options):
     import libephemeris as eph
 
     spec = json.loads(options.spec.read_text(encoding="utf-8"))
+    profile = spec["public"]["profile"]
+    extended = profile == "leb-extended-indexed"
+    iers = bool(spec["public"].get("iers"))
     build = identity(options.wheel, options.commit, options.build_options)
     build["leb_cache_mib"] = os.environ.get("LIBEPHEMERIS_LEB_CACHE_MB")
     build["leb_reader"] = os.environ.get("LIBEPHEMERIS_LEB_READER")
@@ -241,8 +250,20 @@ def capture(options):
         for mode, tier in spec["matrix"]:
             print(f"{options.role} {mode}/{tier}: starting {spec['count']:,} calls",
                   file=sys.stderr, flush=True)
-            configure(eph, mode, tier)
-            if spec["public"]["profile"] == "satellites":
+            configure(eph, mode, tier, iers=iers)
+            if extended:
+                token = eph.start_tracing()
+                try:
+                    for body in (0, 1, 4):
+                        eph.calc_ut(J2000, body, SPEED)
+                    routes = eph.get_trace_results()
+                finally:
+                    token.reset()
+                if any(routes.get(body) != "LEB" for body in (0, 1, 4)):
+                    raise PrerequisiteError(f"expected extended LEB provider: {routes}")
+                context_apis = {}
+                cases = requests(mode, tier, inventory, spec["count"], spec["seed"], with_context=False)
+            elif profile == "satellites":
                 eph.set_ephe_path(data)
                 eph.set_ephemeris_file(KERNELS[tier])
                 eph.register_moon_spk(str(Path(data) / SATELLITE_KERNEL))
@@ -256,7 +277,7 @@ def capture(options):
                 ctx.set_topo(*SITE)
                 context_apis = {api: getattr(ctx, api.removeprefix("context.")) for api in POSITION
                                 if api.startswith("context.")}
-                if spec["public"]["profile"] == "auto-centers":
+                if profile == "auto-centers":
                     cases = auto_center_requests(spec["count"], spec["seed"])
                 else:
                     cases = requests(mode, tier, inventory, spec["count"], spec["seed"])
@@ -380,6 +401,11 @@ def run(options):
     report = options.output / "comparison.json"
     report.unlink(missing_ok=True)
     modes, tiers, count = PROFILES[options.profile]
+    extended = options.profile == "leb-extended-indexed"
+    if extended and options.leb_reader not in (None, "indexed"):
+        raise PrerequisiteError("the extended comparison requires the indexed reader")
+    if options.iers_data and not extended:
+        raise PrerequisiteError("--iers-data is supported by the extended indexed profile")
     if options.candidate_shared_leb and (
         sys.platform != "linux" or "leb" not in modes or "medium" not in tiers
         or options.leb_reader == "indexed" or options.candidate_cache_mib is not None
@@ -389,13 +415,14 @@ def run(options):
     with tempfile.TemporaryDirectory(prefix="ephemeris-bitdiff-") as tmp:
         data = Path(tmp) / "data"
         inventory = prepare(options.data, data, modes, tiers,
-                            companions=options.profile in ("full", "auto-edge"),
+                            companions=extended or options.profile in ("full", "auto-edge"),
                             satellites=options.profile == "satellites")
+        iers = prepare_iers(options.iers_data, data) if options.iers_data else None
         spec_path = Path(tmp) / "spec.json"
         spec_path.write_text(dump({
             "matrix": matrix, "count": count, "seed": SEED,
             "public": {"data": inventory, "profile": options.profile, "matrix": matrix,
-                       "seed": SEED, "expected_count": count * len(matrix)},
+                       "seed": SEED, "expected_count": count * len(matrix), "iers": iers},
         }), encoding="utf-8")
         shared = Path(tmp) / "leb-shared"
         if options.candidate_shared_leb:
@@ -410,8 +437,10 @@ def run(options):
                 if value is not None:
                     args.extend(["--" + name.replace("_", "-"), str(value)])
             env = environment(data)
-            if options.leb_reader:
-                env["LIBEPHEMERIS_LEB_READER"] = options.leb_reader
+            if options.leb_reader or extended:
+                env["LIBEPHEMERIS_LEB_READER"] = options.leb_reader or "indexed"
+            if iers:
+                env["LIBEPHEMERIS_IERS_AUTO_DOWNLOAD"] = "false"
             if role == "candidate" and options.candidate_cache_mib is not None:
                 env["LIBEPHEMERIS_LEB_CACHE_MB"] = str(options.candidate_cache_mib)
             if role == "candidate" and options.candidate_positional_centers:
@@ -447,6 +476,7 @@ def main():
     runner.add_argument("--profile", choices=PROFILES, default="smoke")
     runner.add_argument("--data", type=Path, required=True)
     runner.add_argument("--output", type=Path, required=True)
+    runner.add_argument("--iers-data", type=Path, help="use the same captured IERS files in both builds")
     runner.add_argument("--candidate-cache-mib", type=int)
     runner.add_argument("--leb-reader", choices=("owned", "indexed"),
                         help="use this LEB acquisition policy in both processes")

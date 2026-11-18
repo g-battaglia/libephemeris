@@ -22,8 +22,9 @@ import time
 import warnings
 
 from common import (
-    J2000, KERNELS, MODES, SCHEMA, SEED, SITE, TIERS, PrerequisiteError,
-    command, configure, digest, dump, environment, identity, prepare, shared_medium_identity,
+    J2000, KERNELS, LEB_TIERS, MODES, SCHEMA, SEED, SITE, TIERS, PrerequisiteError,
+    command, configure, digest, dump, environment, identity, prepare, prepare_iers,
+    shared_medium_identity,
 )
 
 CHART_BODIES = [*range(10), 11]
@@ -128,7 +129,7 @@ def worker(path, *, probe=False):
     warnings.simplefilter("ignore")  # Timing excludes warning display.
     if workload == "memory" and not probe:
         checkpoint("after_import", eph)
-    configure(eph, spec["mode"], spec["tier"])
+    configure(eph, spec["mode"], spec["tier"], iers=spec.get("iers", False))
     chart, other, planets = operations(spec, eph)
     if probe:
         position_probe = workload in POSITION_WORKLOADS
@@ -377,7 +378,7 @@ def timed_sample(args, env, cwd, names, condition):
 def run(options):
     report = {"schema": SCHEMA, "status": "incomplete", "seed": options.seed,
               "runs": [], "site": SITE, "network_policy": "sealed",
-              "delta_t_model": "smh2016", "iers_enabled": False}
+              "delta_t_model": "smh2016", "iers_enabled": options.iers_data is not None}
     options.output.parent.mkdir(parents=True, exist_ok=True)
     try:
         with tempfile.TemporaryDirectory(prefix="ephemeris-bench-") as tmp:
@@ -401,6 +402,8 @@ def run(options):
             if options.cold_condition == "page_cache_cold" and sys.platform != "linux":
                 raise PrerequisiteError("verified input page eviction requires Linux")
             report["data"] = prepare(options.data, data, modes, tiers, companions=options.companions)
+            if options.iers_data:
+                report["iers_data"] = prepare_iers(options.iers_data, data)
             if options.native:
                 report["build"] = {"binary": str(options.native), "sha256": digest(options.native),
                                    "platform": platform.platform(), "rustc_on_host": command("rustc", "-Vv"),
@@ -422,6 +425,8 @@ def run(options):
                     count = 1
                 jds, span = dates(report["data"], tier, mode, workload, count, options.seed, options.window)
                 env = environment(data)
+                if options.iers_data:
+                    env["LIBEPHEMERIS_IERS_AUTO_DOWNLOAD"] = "false"
                 if options.leb_cache_mib is not None:
                     env["LIBEPHEMERIS_LEB_CACHE_MB"] = str(options.leb_cache_mib)
                 if options.leb_reader is not None:
@@ -436,7 +441,8 @@ def run(options):
                 route_key = (mode, tier, workload if position_probe else "chart")
                 for parallel in ((options.workers or (1, 2, 4, 8)) if workload in ("threads", "memory") else (1,)):
                     spec = {"schema": SCHEMA, "mode": mode, "tier": tier, "workload": workload,
-                            "flags": options.flags, "dates": jds, "parallelism": parallel}
+                            "flags": options.flags, "dates": jds, "parallelism": parallel,
+                            "iers": report["iers_enabled"]}
                     job = scratch / "job.json"
                     job.write_text(dump(spec), encoding="utf-8")
                     args = ([str(options.native), str(job)] if options.native else
@@ -497,6 +503,7 @@ def main():
     cli.add_argument("--worker", type=Path)
     cli.add_argument("--probe", action="store_true")
     cli.add_argument("--data", type=Path)
+    cli.add_argument("--iers-data", type=Path)
     cli.add_argument("--output", type=Path)
     cli.add_argument("--wheel", type=Path)
     cli.add_argument("--commit")
@@ -508,7 +515,7 @@ def main():
     cli.add_argument("--positional-centers", action="store_true")
     cli.add_argument("--shared-leb-medium", action="store_true")
     cli.add_argument("--mode", choices=MODES, action="append")
-    cli.add_argument("--tier", choices=TIERS, action="append")
+    cli.add_argument("--tier", choices=LEB_TIERS, action="append")
     cli.add_argument("--workload", choices=WORKLOADS, action="append")
     cli.add_argument("--window", choices=("1900-2100", "1550-2650", "coverage"), default="1900-2100")
     cli.add_argument("--cold-condition", choices=("first_use", "page_cache_warm", "page_cache_cold"),
@@ -516,7 +523,7 @@ def main():
     cli.add_argument("--calls", type=int, default=1000)
     cli.add_argument("--memory-calls", type=int, default=SERIES)
     cli.add_argument("--series-calls", type=int, default=SERIES)
-    cli.add_argument("--workers", type=int, choices=(1, 2, 4, 8), action="append")
+    cli.add_argument("--workers", type=int, choices=(1, 2, 3, 4, 5, 8), action="append")
     cli.add_argument("--companions", action="store_true", help="include the released companion groups")
     cli.add_argument("--repeats", type=int, default=5)
     cli.add_argument("--flags", type=int, default=258)
@@ -538,6 +545,8 @@ def main():
         or options.leb_cache_mib is not None
     ):
         cli.error("--indexed-cache-mib needs --leb-reader indexed and a nonnegative limit")
+    if options.native and options.iers_data:
+        cli.error("--iers-data is supported by the Python driver")
     return run(options)
 
 

@@ -177,7 +177,7 @@ def test_position_preflight_probes_only_the_measured_route(tmp_path, monkeypatch
                           start_tracing=lambda: SimpleNamespace(reset=lambda: None),
                           get_trace_results=lambda: {4: "Skyfield"})
     monkeypatch.setitem(sys.modules, "libephemeris", eph)
-    monkeypatch.setattr(benchmark, "configure", lambda *_: None)
+    monkeypatch.setattr(benchmark, "configure", lambda *_, **__: None)
     spec = tmp_path / "job.json"
     spec.write_text(json.dumps(dict(mode="skyfield", tier="base", workload=workload,
                                     dates=[2451545.], flags=flags)))

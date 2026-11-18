@@ -18,7 +18,7 @@ on:
       bitdiff_profile:
         description: Numerical comparison corpus
         type: choice
-        options: [smoke, leb-medium, full, auto-edge, auto-centers, satellites]
+        options: [smoke, leb-medium, leb-extended-indexed, full, auto-edge, auto-centers, satellites]
         default: smoke
       rust_toolchain:
         description: Rust toolchain for wheels built by this run

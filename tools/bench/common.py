@@ -17,6 +17,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = 1
 MODES = ("leb", "auto", "skyfield")
 TIERS = ("base", "medium")
+LEB_TIERS = (*TIERS, "extended")
+IERS_FILES = ("deltat.data", "finals2000A.data", "leap_seconds.dat")
 SEED = 20261116
 J2000 = 2451545.0
 SITE = (12.5, 41.9, 50.0)
@@ -118,11 +120,11 @@ def shared_medium_identity():
     raise PrerequisiteError("worker did not map the requested sealed LEB image")
 
 
-def configure(eph, mode, tier):
+def configure(eph, mode, tier, *, iers=False):
     eph.set_network_policy("sealed")
     eph.set_calc_mode(mode)
     eph.set_precision_tier(tier)
-    eph.set_iers_delta_t_enabled(False)
+    eph.set_iers_delta_t_enabled(iers)
     eph.set_auto_spk_download(False)
     eph.set_delta_t_model("smh2016")
     eph.set_sid_mode(0)
@@ -202,6 +204,8 @@ def prepare(source, destination, modes, tiers, *, companions=False, satellites=F
             if companions:
                 names.update(f"leb/{tier}_{group}.leb2" for group in ("apogee", "asteroids", "exotics"))
         if {"skyfield", "auto"}.intersection(modes):
+            if tier not in KERNELS:
+                raise PrerequisiteError(f"no pinned SPK inventory for {tier}; use LEB mode")
             names.update((KERNELS[tier], f"planet_centers_{tier}.bsp"))
 
     inventory = {}
@@ -227,4 +231,18 @@ def prepare(source, destination, modes, tiers, *, companions=False, satellites=F
             coverage = {"segments_tdb": spk_index(target)}
         inventory[name] = {"path": str(path.resolve()), "sha256": sha, "bytes": target.stat().st_size,
                            "coverage": coverage}
+    return inventory
+
+
+def prepare_iers(source, data):
+    destination = data / "iers_cache"
+    destination.mkdir(parents=True)
+    inventory = {}
+    for name in IERS_FILES:
+        path = source / name
+        if not path.is_file() or not path.stat().st_size:
+            raise PrerequisiteError(f"missing IERS input: {path}")
+        target = destination / name
+        shutil.copyfile(path, target)
+        inventory[name] = {"sha256": digest(target), "bytes": target.stat().st_size}
     return inventory
