@@ -47,7 +47,7 @@ Your app consumes LibEphemeris calculations as an external service rather than i
   Stephenson–Morrison–Hohenkerk (2016) reconstruction of Earth's rotation for
   historical dates, with UTC, UT1 and TT always kept explicit.
 - **Native speed.** Rust calculation kernels and shared coefficient caches.
-  See [performance](#performance) for timed chart workloads by data route.
+  See [performance](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/README.md#performance) for timed chart workloads by data route.
 - **Offline and reproducible.** The base data ship inside the wheel. A sealed
   network policy, explicit data routes and SHA-256-identified datasets keep
   every result reproducible.

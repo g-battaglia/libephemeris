@@ -75,6 +75,7 @@ include = [
     { path = "python/libephemeris/py.typed", format = ["wheel", "sdist"] },
 ]
 exclude = [
+    "PLAN.md",
     "docs/_build/**",
     "tools/leb_generation/build/**",
     "tools/leb_generation/*.egg-info/**",

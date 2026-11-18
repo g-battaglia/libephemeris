@@ -31,8 +31,11 @@ def test_bindings_resolve_actual_engine_manifest():
 def test_owner_retired_process_documents_are_absent():
     # The owner removed these development directives from the product tree.
     # Check the actual checkout too, not merely source-package export filters.
-    for name in ('AGENTS.md', 'PLAN.md', 'PROGRESS.md'):
+    for name in ('AGENTS.md', 'PROGRESS.md'):
         assert not (ROOT / name).exists()
+    # The PR's tracked qualification log belongs to the checkout only.
+    project = tomllib.loads((ROOT / 'pyproject.toml').read_text())
+    assert 'PLAN.md' in project['tool']['maturin']['exclude']
 
 
 def test_license_packaging_uses_actual_core_notices():
