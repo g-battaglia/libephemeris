@@ -6,7 +6,7 @@ independent implementation and published data-v4 inventory.
 The import remains `import libephemeris`. Calculations now run in Rust through
 PyO3; Python names, argument order, flags and ordinary result layouts remain
 familiar. Python requires 3.12+. Use [installation](docs/installation.md) to
-select 4.0.0 explicitly after publication, or build the prepared source locally.
+select 4.1.0 explicitly after publication, or build the prepared source locally.
 
 | Previous assumption | v4 behavior / action |
 | --- | --- |

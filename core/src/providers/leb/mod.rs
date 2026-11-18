@@ -888,7 +888,6 @@ pub use decode::check_asset;
 pub use decode::check_single_tier;
 pub use decode::check_tier_subset;
 pub use decode::decode_chunk_index;
-use decode::decode_delta_t_table;
 pub use decode::decode_section_table;
 pub use decode::read_blob;
 use decode::read_f32;

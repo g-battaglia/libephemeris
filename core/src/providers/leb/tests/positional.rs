@@ -36,6 +36,68 @@ fn bits(value: (Vec<f64>, Vec<f64>)) -> (Vec<u64>, Vec<u64>) {
 }
 
 #[test]
+fn indexed_star_reads_respect_range_limit_and_later_duplicates() {
+    let mut ids = vec![7; 65];
+    ids.push(42);
+    ids[0] = 42;
+    let mut records = star_payload(&ids);
+    let last_ra = 65 * STAR_ENTRY_SIZE + 4;
+    records[last_ra..last_ra + 8].copy_from_slice(&(-0.0_f64).to_le_bytes());
+    records.extend_from_slice(&[0xff; STAR_ENTRY_SIZE - 1]);
+    let bytes = aux_image(vec![(SECTION_STARS, records)]);
+    let temporary = TemporaryImage::new(&bytes);
+    for maximum in [STAR_ENTRY_SIZE - 1, STAR_ENTRY_SIZE, 177, 4096] {
+        let limits = IndexedLimits {
+            compressed_bytes: maximum,
+            ..Default::default()
+        };
+        let indexed = LebFile::open_indexed(&temporary.0, limits).unwrap();
+        let result = indexed.get_star(42);
+        if maximum < STAR_ENTRY_SIZE {
+            assert!(matches!(
+                result,
+                Err(Error::ResourceLimit { required: 64, .. })
+            ));
+        } else {
+            assert_eq!(
+                result.unwrap().ra_j2000_deg().to_bits(),
+                (-0.0_f64).to_bits()
+            );
+            assert_eq!(
+                indexed.get_star(21).unwrap_err(),
+                Error::LebStarNotFound { star_id: 21 }
+            );
+        }
+    }
+}
+
+#[test]
+fn short_auxiliary_images_keep_the_first_failing_offset() {
+    let bytes = aux_image(vec![
+        (SECTION_DELTA_T, delta_t_payload(&[(0.0, 1.0), (1.0, 2.0)])),
+        (SECTION_STARS, star_payload(&[7; 67])),
+    ]);
+    let index = FileIndex::decode(&bytes).unwrap();
+    let table = index.section(SECTION_DELTA_T).unwrap().offset() as usize + DELTA_T_HEADER_SIZE;
+    let short = &bytes[..table + DELTA_T_ENTRY_SIZE];
+    assert_eq!(
+        index.delta_t(short, -1.0).unwrap_err(),
+        Error::LebCorrupt {
+            what: "LEB Delta-T table".into(),
+            offset: table
+        }
+    );
+    let record = index.section(SECTION_STARS).unwrap().offset() as usize + 65 * STAR_ENTRY_SIZE;
+    assert_eq!(
+        index.get_star(&bytes[..record + 1], 7).unwrap_err(),
+        Error::LebCorrupt {
+            what: "LEB star catalog".into(),
+            offset: record
+        }
+    );
+}
+
+#[test]
 fn indexed_windows_charge_only_retained_words_to_the_live_budget() {
     let words: Vec<_> = (0..30_000_u32)
         .map(|word| (f64::from(word) / 32.0).to_bits())

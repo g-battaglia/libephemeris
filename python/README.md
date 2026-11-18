@@ -19,9 +19,9 @@ uv pip install --python .venv/bin/python dist/*.whl
 .venv/bin/python -m pytest python/tests
 ```
 
-Python version **4.0.0** prepares the stable native release; registry publication
+Python version **4.1.0** prepares the stable native release; registry publication
 is a separate maintainer action. See the shared
-[beginner's manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/beginners-manual/en/README.md),
-[migration guide](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/MIGRATION.md) and [release instructions](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/CONTRIBUTING.md).
-For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/README.md#license);
+[beginner's manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/beginners-manual/en/README.md),
+[migration guide](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/MIGRATION.md) and [release instructions](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/CONTRIBUTING.md).
+For private licensing inquiries, see the [project contact](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/README.md#license);
 requests are evaluated case by case.

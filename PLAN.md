@@ -17,6 +17,16 @@ recorded in the qualification summary.
 
 ---
 
+## Python 4.1.0 candidate
+
+The candidate pairs Python 4.1.0 with Rust core 1.1.0 and the published
+1.0.0 data crate. It uses the existing LEB files and indexed cache default.
+Owned Delta-T queries borrow the original row bytes and call the common
+interpolator. Catalog scans group positional reads within the configured
+range limit. Name lookup uses the generated stable catalog order, including
+first-match precedence for equal normalized names. Numeric IDs, generator
+inputs and stored astronomical measurements retain their release values.
+
 ## Current qualification
 
 The draft combines the measurement harness and the measured Phase 1 changes.

@@ -42,7 +42,7 @@ def test_canonical_measurements_and_ordered_maps_match_the_shipped_rust_snapshot
         assert original[:4] == new[:4] == tuple(canonical[:4])
         assert struct.pack("<7d", *original[4:]) == struct.pack("<7d", *new[4:])
         assert struct.pack("<7d", *original[4:]) == struct.pack("<7d", *canonical[4:])
-    for name in ("REF_SORTED_IDS", "NOMEN_SORTED_IDS", "NAME_TO_ID_UPPER", "ALIASES_UPPER",
+    for name in ("REF_NAME_ROWS", "NOMEN_SORTED_IDS", "NAME_TO_ID_UPPER", "ALIASES_UPPER",
                  "NOMEN_UPPER_KEYS", "STAR_ALIASES", "STAR_NAME_TO_HIP", "NAME_HIP_FIX",
                  "GREEK_LETTER_ABBREV", "CONSTELLATION_ABBREV", "UNICODE_ND_RANGES"):
         assert array(actual, name) == array(rendered, name), name

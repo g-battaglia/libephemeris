@@ -1,6 +1,12 @@
-# LibEphemeris 4.0.0 — native Rust rewrite
+# LibEphemeris release notes
 
-**Stable release preparation:** Python `4.0.0`; Rust core/data `1.0.0`.
+## Python 4.1.0 release preparation
+
+Python 4.1.0 uses Rust core 1.1.0 and bundled data 1.0.0. Existing installations can keep their LEB files, configuration and public API calls. This release improves indexed coefficient decoding, SPK storage, stored Delta-T queries and fixed-star lookups. The [performance plan](PLAN.md) records the workloads, memory trade-offs and qualification results.
+
+## Python 4.0.0 release history
+
+**Previous stable preparation:** Python `4.0.0`; Rust core/data `1.0.0`.
 Source tag: `python-v4.0.0`. Earlier tags and published packages remain immutable.
 Registry publication and platform availability must be checked separately from
 these source notes. Preparing Python packages does not publish Rust crates.

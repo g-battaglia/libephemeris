@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.0 (Python) · 1.1.0 (Rust core) — Unreleased
+
+- Reduce memory used by SPK records and improve LEB2 coefficient decoding on existing files. Resource usage depends on the reader, cache budget and workload.
+- Interpolate stored Delta-T directly from an owned image, read fixed-star records in bounded groups, and search the built-in catalog using its stable name order.
+- Continue to use the published data-v4 files and the 1.0.0 bundled data crate.
+
 ## 4.0.0 (Python) · 1.0.0 (Rust core/data) — Stable preparation
 
 - Promote the qualified Python b4 implementation without changing numerical formulas, data-v4 coefficient bytes, scientific references or tolerances.

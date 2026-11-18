@@ -54,7 +54,7 @@ mod tests {
         ] {
             assert_eq!(pep440_version("4.0.0", pre).unwrap(), expected);
         }
-        assert_eq!(package_version(), "4.0.0");
+        assert_eq!(package_version(), "4.1.0");
     }
 
     #[test]

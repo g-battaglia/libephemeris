@@ -1864,9 +1864,17 @@ impl FileIndex {
                 what: "LEB Delta-T table".to_string(),
                 offset: base,
             })?;
-        if let LebSource::Slice(_) = bytes {
-            let (jds, vals) = decode_delta_t_table(bytes, data_base, header.n_entries(), base)?;
-            return eval_delta_t(&jds, &vals, jd);
+        if let LebSource::Slice(image) = bytes {
+            // Raw FileIndex callers can supply a shorter image than the one
+            // used to build the index. Reject a truncated tail even when the
+            // requested epoch would clamp to the first row.
+            let size = (header.n_entries() as usize)
+                .checked_mul(DELTA_T_ENTRY_SIZE)
+                .ok_or_else(|| Error::LebCorrupt {
+                    what: "LEB Delta-T table".into(),
+                    offset: base,
+                })?;
+            reader::slice_at(image, data_base, size, "LEB Delta-T table")?;
         }
         evaluation::eval_delta_t_rows(header.n_entries() as usize, jd, |index| {
             let at = index
@@ -1898,21 +1906,34 @@ impl FileIndex {
             .section(SECTION_STARS)
             .ok_or(Error::LebStarNotFound { star_id })?;
         let base = usize::try_from(section.offset()).unwrap_or(usize::MAX);
-        let count = star_count(section.size());
+        const WHAT: &str = "LEB star catalog";
+        // Batch positional reads without raising the caller's per-read limit.
+        // If even one record exceeds that limit, range() reports its usual error.
+        let page_bytes = match bytes {
+            LebSource::Slice(_) => 4096,
+            LebSource::Positional(file) => 4096.min(file.limits.compressed_bytes),
+        };
+        let per_page = (page_bytes / STAR_ENTRY_SIZE).max(1);
+        let mut remaining = star_count(section.size());
         let mut at = base;
         let mut found = None;
-        for _ in 0..count {
-            let record = bytes.range(at, STAR_ENTRY_SIZE, "LEB star catalog")?;
-            let entry = StarEntry::decode(&record, 0).map_err(|_| Error::LebCorrupt {
-                what: "LEB star catalog".to_string(),
-                offset: at,
-            })?;
-            if entry.star_id() == star_id {
-                found = Some(entry);
+        while remaining > 0 {
+            // Stop at the last complete record so a truncated input reports
+            // the same failing record offset as a sequence of single reads.
+            let available = bytes.len().saturating_sub(at) / STAR_ENTRY_SIZE;
+            let count = remaining.min(per_page.min(available.max(1)) as u64) as usize;
+            let page = bytes.range(at, count * STAR_ENTRY_SIZE, WHAT)?;
+            for record in page.chunks_exact(STAR_ENTRY_SIZE) {
+                let entry = StarEntry::decode(record, 0).map_err(|_| Error::LebCorrupt {
+                    what: WHAT.into(),
+                    offset: at,
+                })?;
+                if entry.star_id() == star_id {
+                    found = Some(entry);
+                }
+                at += STAR_ENTRY_SIZE; // range() checked the end of the entire page.
             }
-            at = at
-                .checked_add(STAR_ENTRY_SIZE)
-                .ok_or(Error::LebStarNotFound { star_id })?;
+            remaining -= count as u64;
         }
         found.ok_or(Error::LebStarNotFound { star_id })
     }

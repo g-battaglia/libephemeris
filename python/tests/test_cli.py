@@ -11,7 +11,7 @@ def test_cli_version_returns_success(monkeypatch, capfd):
     assert cli_main() == 0
     output = capfd.readouterr()
     # Exact output rejects a stale beta extension with the same version prefix.
-    assert output.out.strip() == "libephemeris, version 4.0.0"
+    assert output.out.strip() == "libephemeris, version 4.1.0"
     assert output.err == ""
 
 

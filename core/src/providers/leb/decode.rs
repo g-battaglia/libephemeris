@@ -167,8 +167,7 @@ pub(super) fn insert_checked_section(
 /// Read one segment's coefficient words from an uncompressed aux table
 /// (`components` blocks of `degree + 1` little-endian f64 at
 /// `data_base + seg_idx * seg_bytes`) with an explicit image-bounds
-/// check. Used by nutation evaluation; Delta-T pairs use
-/// [`decode_delta_t_table`].
+/// check for nutation evaluation.
 pub(super) fn with_table_words<R>(
     bytes: LebSource<'_>,
     data_base: usize,
@@ -211,50 +210,6 @@ pub(super) fn with_table_words<R>(
         offset: at,
     })?;
     bytes.with_words(at, end - at, what, consume)
-}
-
-/// Decode `n_entries` `(jd, delta_t_days)` pairs at `data_base`.
-/// Bounds-checked against the image; a short table is
-/// [`Error::LebCorrupt`].
-pub(super) fn decode_delta_t_table(
-    bytes: LebSource<'_>,
-    data_base: usize,
-    n_entries: u32,
-    section_offset: usize,
-) -> Result<(Vec<f64>, Vec<f64>)> {
-    const WHAT: &str = "LEB Delta-T table";
-    let need = (n_entries as u64)
-        .checked_mul(DELTA_T_ENTRY_SIZE as u64)
-        .ok_or_else(|| Error::LebCorrupt {
-            what: WHAT.to_string(),
-            offset: section_offset,
-        })?;
-    let need_len = usize::try_from(need).map_err(|_| Error::LebCorrupt {
-        what: WHAT.to_string(),
-        offset: section_offset,
-    })?;
-    let end = data_base
-        .checked_add(need_len)
-        .ok_or_else(|| Error::LebCorrupt {
-            what: WHAT.to_string(),
-            offset: data_base,
-        })?;
-    let blob = bytes.range(data_base, end - data_base, WHAT)?;
-    let mut jds = Vec::with_capacity(n_entries as usize);
-    let mut vals = Vec::with_capacity(n_entries as usize);
-    for chunk in blob.chunks_exact(DELTA_T_ENTRY_SIZE) {
-        let jd = f64::from_le_bytes(chunk[0..8].try_into().map_err(|_| Error::LebCorrupt {
-            what: WHAT.to_string(),
-            offset: data_base,
-        })?);
-        let dt = f64::from_le_bytes(chunk[8..16].try_into().map_err(|_| Error::LebCorrupt {
-            what: WHAT.to_string(),
-            offset: data_base,
-        })?);
-        jds.push(jd);
-        vals.push(dt);
-    }
-    Ok((jds, vals))
 }
 
 /// Decode one segment's raw coefficients (`components` blocks of
