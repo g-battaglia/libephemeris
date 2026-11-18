@@ -205,7 +205,7 @@ pinned base data, a sealed network policy and the 1900–2100 window.
 Consecutive dates are spaced by 0.37 days. Random dates use a fixed seed.
 The `auto` chart trace used the LEB route for the chart bodies. This mode
 can apply planet-centre corrections and use a different rate calculation.
-See the [benchmark commands](tools/bench/README.md) to reproduce the
+See the [benchmark commands](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/tools/bench/README.md) to reproduce the
 measurements on your data and hardware.
 
 ## Data and offline operation
