@@ -1,6 +1,7 @@
 """Provision isolated wheel environments and run the CI comparison."""
 
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
@@ -12,7 +13,7 @@ import venv
 
 from bitdiff import PROFILES
 from common import (
-    KERNEL_PINS, KERNELS, MODES, ROOT, SATELLITE_KERNEL, SCHEMA, TIERS,
+    KERNEL_PINS, KERNELS, MANIFEST, MODES, ROOT, SATELLITE_KERNEL, SCHEMA, TIERS,
     PrerequisiteError, command, digest, dump,
 )
 
@@ -35,9 +36,7 @@ def provision_data(options, root, data, cli, memory_mode, memory_tier):
         spk_tiers.add("medium")
     elif options.profile == "leb-medium":
         leb_tiers.add("medium")
-    elif options.profile == "leb-extended-indexed":
-        leb_tiers.add("extended")
-    elif options.profile != "smoke":
+    elif options.profile not in ("smoke", "leb-extended-indexed"):
         leb_tiers.update(TIERS)
         spk_tiers.update(TIERS)
     if options.linux_memory or options.linux_startup:
@@ -52,26 +51,38 @@ def provision_data(options, root, data, cli, memory_mode, memory_tier):
         subprocess.run([str(cli), "download", f"leb2-{tier}", "--data-dir", str(data),
                         "--no-progress"], cwd=root, check=True)
     downloads = []
+    if options.profile == "leb-extended-indexed":
+        # The release CLI's transfer deadline is too short for a 1.5 GB asset
+        # on some hosted runners. Use the same release bytes with a socket
+        # timeout and verify them before the offline comparison.
+        manifest = json.loads(MANIFEST.read_text())["files"]
+        for group in ("core", "apogee", "asteroids", "exotics"):
+            name = f"extended_{group}.leb2"
+            downloads.append((f"leb/{name}",
+                              f"https://github.com/g-battaglia/libephemeris/releases/download/data-v4/{name}",
+                              manifest[name]["sha256"]))
     for tier in sorted(spk_tiers):
         name = KERNELS[tier]
+        centers = f"planet_centers_{tier}.bsp"
         downloads.extend((
-            (name, f"https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/{name}"),
-            (f"planet_centers_{tier}.bsp",
-             "https://github.com/g-battaglia/libephemeris/releases/download/data-v2rc1/"
-             f"planet_centers_{tier}.bsp"),
+            (name, f"https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/{name}", KERNEL_PINS[name]),
+            (centers,
+             f"https://github.com/g-battaglia/libephemeris/releases/download/data-v2rc1/{centers}",
+             KERNEL_PINS[centers]),
         ))
     if options.profile == "satellites":
         downloads.append((
             SATELLITE_KERNEL,
             "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/a_old_versions/"
             f"{SATELLITE_KERNEL}",
+            KERNEL_PINS[SATELLITE_KERNEL],
         ))
-    for file_name, url in downloads:
+    for file_name, url, expected in downloads:
         print(f"Downloading and verifying {file_name}", flush=True)
         path = data / file_name
         with urllib.request.urlopen(url, timeout=120) as src, path.open("wb") as dest:
             shutil.copyfileobj(src, dest, length=1024 * 1024)
-        if digest(path) != KERNEL_PINS[file_name]:
+        if digest(path) != expected:
             raise PrerequisiteError(f"downloaded {file_name} does not match its pin")
 
 
