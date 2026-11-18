@@ -36,11 +36,11 @@ def test_distribution_versions_are_deliberately_independent():
     binding = tomllib.loads((ROOT / "python/Cargo.toml").read_text())
     python = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     tools = tomllib.loads((ROOT / "tools/leb_generation/pyproject.toml").read_text())["project"]
-    assert core["version"] == "1.0.0"
+    assert core["version"] == "1.1.0"
     assert data["version"] == "1.0.0"
-    assert binding["package"]["version"] == "4.0.0"
+    assert binding["package"]["version"] == "4.1.0"
     assert core_manifest["dependencies"]["libephemeris-core-data"]["version"] == "=1.0.0"
-    assert binding["dependencies"]["libephemeris-core"]["version"] == "=1.0.0"
+    assert binding["dependencies"]["libephemeris-core"]["version"] == "=1.1.0"
     assert "version" not in python and python["dynamic"] == ["version"]
     assert "Development Status :: 5 - Production/Stable" in python["classifiers"]
     assert not any("Beta" in classifier for classifier in python["classifiers"])

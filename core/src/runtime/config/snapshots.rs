@@ -42,8 +42,34 @@ impl Runtime {
     }
 
     pub(super) fn shared_session_for(&self, resources: SessionResources) -> Result<Arc<Session>> {
+        self.calculation_session(resources, false)
+    }
+
+    pub(super) fn scalar_position_session(
+        &self,
+        resources: SessionResources,
+    ) -> Result<Arc<Session>> {
+        let positional_centers = self
+            .sources
+            .environment("LIBEPHEMERIS_EXPERIMENTAL_POSITIONAL_CENTERS")
+            == Some("1");
+        self.calculation_session(resources, positional_centers)
+    }
+
+    fn calculation_session(
+        &self,
+        resources: SessionResources,
+        positional_centers: bool,
+    ) -> Result<Arc<Session>> {
         if let Some(snapshot) = &self.lock().cached_session {
-            if snapshot.resources >= resources {
+            if snapshot.resources >= resources
+                && (positional_centers
+                    || !snapshot
+                        .session
+                        .context()
+                        .spk_registry()
+                        .has_positional_centers())
+            {
                 return Ok(Arc::clone(&snapshot.session));
             }
         }
@@ -78,17 +104,35 @@ impl Runtime {
             let cached = state
                 .center_images
                 .as_ref()
-                .is_some_and(|(path, selected, _)| path == &directory && *selected == tier);
+                .is_some_and(|(path, selected, registry)| {
+                    path == &directory
+                        && *selected == tier
+                        && (positional_centers || !registry.has_positional_centers())
+                });
             if !cached {
                 let mut centers = context.clone();
                 centers.spk_registry_mut().clear();
-                crate::positions::attach_optional_center_images(&mut centers)?;
+                if positional_centers {
+                    let candidates: Vec<_> =
+                        crate::positions::automatic_center_candidates(&context)
+                            .into_iter()
+                            .filter(|(path, _)| path.is_file())
+                            .map(|(path, asset)| (path, asset.sha256()))
+                            .collect();
+                    if !candidates.is_empty() {
+                        centers
+                            .spk_registry_mut()
+                            .set_positional_centers(crate::spk::PositionalCenters::new(candidates));
+                    }
+                } else {
+                    crate::positions::attach_optional_center_images(&mut centers)?;
+                }
                 state.center_images = Some((directory, tier, centers.spk_registry().clone()));
             }
             if let Some((_, _, centers)) = &state.center_images {
-                context
-                    .spk_registry_mut()
-                    .retain_automatic_centers_from(centers)?;
+                let registry = context.spk_registry_mut();
+                registry.retain_automatic_centers_from(centers)?;
+                registry.retain_positional_centers_from(centers);
             }
         }
         let cacheable = context.mode() != ProviderMode::Auto || !context.leb_files().is_empty();

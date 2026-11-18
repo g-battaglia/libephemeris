@@ -25,12 +25,11 @@ data from `~/.libephemeris` or `LIBEPHEMERIS_TEST_DATA_DIR`, as usual.
 
 ## 1. Prepare the release commit
 
-1. Choose unused registry versions. This preparation promotes Python `4.0.0`
-   (binding Cargo `4.0.0`) and Rust core/data `1.0.0` from the qualified Python
-   b4 source. Update the exact internal dependencies and workspace records in
-   `Cargo.lock`; retain every external dependency and all scientific data bytes.
-2. Pin Python and stable Rust README/project source links to `python-v4.0.0`.
-   The unchanged optional tools keep their own existing version and source tag.
+1. This preparation targets Python `4.1.0` and Rust core `1.1.0`. The
+   bundled data crate stays at `1.0.0`. Keep the internal dependency pins
+   and workspace records in `Cargo.lock` aligned with the manifests.
+2. Pin the new Python and Rust core source links to `python-v4.1.0`.
+   The data crate and optional tools keep their respective source tags.
    The script and Sphinx read the source tag from the `Documentation` URL in
    `pyproject.toml`; release-link tests must agree.
 3. Update the stable classifiers, `CHANGELOG.md`, release notes and migration
@@ -79,7 +78,7 @@ them after any file is published. Verify the installed release separately:
 
 ```bash
 uv run --isolated --no-project --refresh --python 3.12 \
-  --with libephemeris==4.0.0 python -I -c 'import libephemeris; print(libephemeris.__version__)'
+  --with libephemeris==4.1.0 python -I -c 'import libephemeris; print(libephemeris.__version__)'
 ```
 
 Do not claim that a source preparation, tag or local wheel establishes registry
@@ -92,7 +91,7 @@ The steps are the same; only the branch changes.
 | | From `main` | From a dedicated branch |
 |---|---|---|
 | Use for | regular releases | preparation before merging or an older release line |
-| Start | merge the qualified release PR, then `git switch main && git pull --ff-only` | create and push `release/4.0.0` from the commit to release |
+| Start | merge the qualified release PR, then `git switch main && git pull --ff-only` | create and push `release/4.1.0` from the commit to release |
 | Afterwards | nothing | merge the qualified branch into `main` if its changes belong there |
 
 Do not rebuild already published files after a merge. The immutable source tag

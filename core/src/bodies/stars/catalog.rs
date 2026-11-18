@@ -11,7 +11,7 @@
 use crate::errors::Error;
 use crate::star_catalog_tables::{
     ALIASES_UPPER, CONSTELLATION_ABBREV, GREEK_LETTER_ABBREV, NAME_HIP_FIX, NAME_TO_ID_UPPER,
-    NOMEN_SORTED_IDS, NOMEN_UPPER_KEYS, REF_SORTED_IDS, STAR_ALIASES, STAR_CATALOG,
+    NOMEN_SORTED_IDS, NOMEN_UPPER_KEYS, REF_NAME_ROWS, STAR_ALIASES, STAR_CATALOG,
     STAR_NAME_TO_HIP, UNICODE_ND_RANGES,
 };
 
@@ -338,15 +338,20 @@ fn is_nomen_shaped_alias(upper_stripped: &str) -> bool {
     NOMEN_UPPER_KEYS.binary_search(&upper_stripped).is_ok()
 }
 
+/// First catalog row whose normalized name is at least `key`. Stable
+/// generator order gives equal names the same precedence as a linear scan.
+fn lower_bound_name(key: &str) -> Option<&'static StarCatalogEntry> {
+    let i = REF_NAME_ROWS
+        .partition_point(|&row| ref_star_key(STAR_CATALOG[row as usize].name).as_str() < key);
+    REF_NAME_ROWS.get(i).map(|&row| &STAR_CATALOG[row as usize])
+}
+
 /// Exact normalized catalog name or non-nomenclature alias. Both public
 /// resolver families must identify the physical catalog row before considering
 /// the legacy leading-decimal index grammar. Comma/wildcard rules remain with
 /// their respective callers.
 fn exact_star_name_entry(key: &str) -> Option<&'static StarCatalogEntry> {
-    if let Some(entry) = STAR_CATALOG
-        .iter()
-        .find(|entry| ref_star_key(entry.name) == key)
-    {
+    if let Some(entry) = lower_bound_name(key).filter(|entry| ref_star_key(entry.name) == key) {
         return Some(entry);
     }
     STAR_ALIASES.iter().find_map(|(alias, star_id)| {
@@ -455,10 +460,10 @@ pub fn resolve_star_ref(star_name: &str) -> Result<StarMatch, StarResolveError> 
 
     if sstar.chars().next().is_some_and(is_decimal_digit) {
         let star_nr = sequential_number(&sstar);
-        let ordered = REF_SORTED_IDS;
+        let ordered = REF_NAME_ROWS;
         let hit = match star_nr {
             Some(n) if n >= 1 && n <= ordered.len() as u64 => {
-                star_entry_by_id(ordered[n as usize - 1])
+                Some(&STAR_CATALOG[ordered[n as usize - 1] as usize])
             }
             _ => None,
         };
@@ -505,12 +510,10 @@ pub fn resolve_star2(star_name: &str) -> Result<StarMatch, StarResolveError> {
             return Err(miss_v2(format!("invalid search string {skey}")));
         }
         let prefix = &skey[..skey.len() - 1];
-        for id in REF_SORTED_IDS {
-            if let Some(entry) = star_entry_by_id(*id) {
-                if ref_star_key(entry.name).starts_with(prefix) {
-                    return Ok(found(entry));
-                }
-            }
+        if let Some(entry) =
+            lower_bound_name(prefix).filter(|e| ref_star_key(e.name).starts_with(prefix))
+        {
+            return Ok(found(entry));
         }
         return Err(miss_v2(format!("star search string {skey} did not match")));
     }

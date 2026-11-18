@@ -2692,7 +2692,7 @@ mod live_row_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::star_catalog_tables::{REF_SORTED_IDS, STAR_CATALOG};
+    use crate::star_catalog_tables::{REF_NAME_ROWS, STAR_CATALOG};
 
     #[test]
     fn catalog_ids_stay_in_fixed_star_namespace_and_preserve_entries() {
@@ -2777,7 +2777,7 @@ mod tests {
                 "alias target {id} missing from catalog"
             );
         }
-        for id in REF_SORTED_IDS.iter().chain(NOMEN_SORTED_IDS.iter()) {
+        for id in NOMEN_SORTED_IDS {
             assert!(star_entry_by_id(*id).is_some());
         }
         let mut sorted = ids.clone();
@@ -2789,11 +2789,9 @@ mod tests {
     fn emitted_sort_orders_match_rust_key_functions() {
         // The generator computed these with the model key functions; the
         // Rust keys must reproduce them over every row.
-        let mut by_ref: Vec<i32> = STAR_CATALOG.iter().map(|e| e.id()).collect();
-        by_ref.sort_by_key(|id| {
-            ref_star_key(star_entry_by_id(*id).expect("sorted id in catalog").name())
-        });
-        assert_eq!(by_ref, REF_SORTED_IDS);
+        let mut by_ref: Vec<u32> = (0..STAR_CATALOG.len() as u32).collect();
+        by_ref.sort_by_key(|&row| ref_star_key(STAR_CATALOG[row as usize].name()));
+        assert_eq!(by_ref, REF_NAME_ROWS);
         let mut by_nomen: Vec<i32> = STAR_CATALOG.iter().map(|e| e.id()).collect();
         by_nomen.sort_by_key(|id| {
             nomen_stripped(
@@ -2899,7 +2897,7 @@ mod tests {
         assert_eq!(miss_message(resolve_star_ref("")), "star name empty");
         // Sequential numbers index the name-sorted catalog.
         let first = resolve_star_ref("1").expect("seq 1");
-        assert_eq!(first.star_id, REF_SORTED_IDS[0]);
+        assert_eq!(first.star_id, STAR_CATALOG[REF_NAME_ROWS[0] as usize].id);
         assert!(resolve_star_ref("0").is_err());
         assert!(resolve_star_ref("1448").is_err());
     }
@@ -2960,7 +2958,7 @@ mod tests {
         // Unknown numeric suffixes retain their public sequential grammar.
         assert_eq!(
             resolve_star_ref("10unknown").unwrap().star_id,
-            REF_SORTED_IDS[9]
+            STAR_CATALOG[REF_NAME_ROWS[9] as usize].id
         );
         assert_eq!(
             resolve_star2("10unknown").unwrap().star_id,
@@ -2970,12 +2968,15 @@ mod tests {
 
     #[test]
     fn sequential_indices_use_unicode_decimal_digits_and_bounded_arithmetic() {
-        assert_eq!(resolve_star_ref("١").unwrap().star_id, REF_SORTED_IDS[0]);
+        assert_eq!(
+            resolve_star_ref("١").unwrap().star_id,
+            STAR_CATALOG[REF_NAME_ROWS[0] as usize].id
+        );
         assert_eq!(resolve_star2("１").unwrap().star_id, NOMEN_SORTED_IDS[0]);
         let leading_zeros = format!("{}1", "0".repeat(20_000));
         assert_eq!(
             resolve_star_ref(&leading_zeros).unwrap().star_id,
-            REF_SORTED_IDS[0]
+            STAR_CATALOG[REF_NAME_ROWS[0] as usize].id
         );
         for query in ["²", "99999999999999999999999"] {
             assert!(matches!(

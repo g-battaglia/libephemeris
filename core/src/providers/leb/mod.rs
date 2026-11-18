@@ -79,6 +79,8 @@ pub use convert::{Leb2ConversionReport, Leb2ConvertOptions, convert_leb1_to_leb2
 mod bundled;
 #[cfg(feature = "bundled-data")]
 pub use bundled::bundled_base_core;
+#[cfg(feature = "bundled-data")]
+pub(crate) use bundled::{bundled_base_core_with_process_cache, exact_installed_base};
 
 /// Common header size in bytes (`<4sIIIdddI20s`).
 pub const HEADER_SIZE: usize = 64;
@@ -828,11 +830,15 @@ impl LebFile {
 mod access;
 mod access_api;
 mod packing;
+mod process_cache;
+pub(crate) use process_cache::{configured_cache, process_cache_usage, set_process_cache_bytes};
 mod resources;
 pub(crate) use access::LebSource;
 pub use access::{IndexedLimits, LebReadPolicy};
 pub(crate) use resources::IndexedResources;
 use resources::{CoefficientWords, TrackedVec};
+#[cfg(target_os = "linux")]
+mod sealed_snapshot;
 mod storage;
 pub(crate) use storage::HashCacheAdvice;
 pub(crate) use storage::open_regular_file;
@@ -882,7 +888,6 @@ pub use decode::check_asset;
 pub use decode::check_single_tier;
 pub use decode::check_tier_subset;
 pub use decode::decode_chunk_index;
-use decode::decode_delta_t_table;
 pub use decode::decode_section_table;
 pub use decode::read_blob;
 use decode::read_f32;

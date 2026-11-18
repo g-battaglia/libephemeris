@@ -227,12 +227,7 @@ pub fn icrs_to_ecliptic_j2000(v: [f64; 3]) -> [f64; 3] {
 impl SpkRegistry {
     /// Empty registry: no kernels, no body registrations.
     pub fn new() -> Self {
-        Self {
-            kernels: HashMap::new(),
-            bodies: HashMap::new(),
-            decoded: HashMap::new(),
-            automatic_centers: HashMap::new(),
-        }
+        Self::default()
     }
 
     /// True when no kernel image is stored.
@@ -259,9 +254,7 @@ impl SpkRegistry {
     /// still fail.
     pub fn register_image(&mut self, path: &str, bytes: Vec<u8>) -> Result<()> {
         let kernel = SpkKernel::decode(path, bytes)?;
-        let cache = DecodedSpkCache {
-            entries: (0..kernel.index.len()).map(|_| OnceLock::new()).collect(),
-        };
+        let cache = DecodedSpkCache::for_segments(kernel.index.len());
         self.automatic_centers.retain(|_, (key, _)| key != path);
         self.decoded.insert(path.to_string(), Arc::new(cache));
         self.kernels.insert(path.to_string(), kernel);
@@ -346,7 +339,7 @@ impl SpkRegistry {
     /// Targets 599/699/799/899/999 must name their own system barycenters.
     /// The caller verifies the immutable image against its published digest.
     pub(crate) fn register_automatic_planet_centers(&mut self, key: &str) -> Result<()> {
-        for (target, parent) in [(599, 5), (699, 6), (799, 7), (899, 8), (999, 9)] {
+        for (target, parent) in AUTOMATIC_PLANET_CENTERS {
             let kernel = self.kernel(key).ok_or_else(|| Error::SpkFileNotFound {
                 path: key.to_owned(),
             })?;
@@ -373,16 +366,53 @@ impl SpkRegistry {
     /// Retain automatic offset images and mappings by sharing their owners.
     /// Explicit destination registrations stay authoritative. No I/O occurs.
     pub(crate) fn retain_automatic_centers_from(&mut self, source: &Self) -> Result<()> {
-        for (&target, (key, parent)) in &source.automatic_centers {
-            if self.bodies.contains_key(&target) && !self.automatic_centers.contains_key(&target) {
-                continue;
-            }
+        // Replacing an image clears its previous automatic roles. Select
+        // eligible targets before replacing any image so the other mappings
+        // from that image cannot be mistaken for explicit registrations.
+        let inherited: Vec<_> = source
+            .automatic_centers
+            .iter()
+            .filter(|&(target, _)| {
+                !self.bodies.contains_key(target) || self.automatic_centers.contains_key(target)
+            })
+            .collect();
+        for (&target, (key, parent)) in inherited {
             self.retain_kernel_from(source, key)?;
             self.register_body(target, key, target)?;
             self.automatic_centers
                 .insert(target, (key.clone(), *parent));
         }
         Ok(())
+    }
+
+    pub(crate) fn set_positional_centers(&mut self, source: PositionalCenters) {
+        self.positional_centers = Some(Arc::new(source));
+    }
+
+    pub(crate) fn retain_positional_centers_from(&mut self, source: &Self) {
+        self.positional_centers = source.positional_centers.clone();
+    }
+
+    pub(crate) fn has_positional_centers(&self) -> bool {
+        self.positional_centers.is_some()
+    }
+
+    pub(crate) fn has_leb_center_candidate(&self, target: i32) -> bool {
+        self.bodies.contains_key(&target) || self.has_positional_centers()
+    }
+
+    pub(crate) fn eval_leb_center(
+        &self,
+        target: i32,
+        jd: f64,
+        fraction: f64,
+    ) -> Result<(ChebState, Descriptor)> {
+        if !self.bodies.contains_key(&target) {
+            if let Some(centers) = &self.positional_centers {
+                return centers.relative_state(target, jd, fraction);
+            }
+        }
+        self.eval_body_relative_two_part_jd(target, jd, fraction)
     }
 
     /// Actual automatic mappings and their immutable image keys.
@@ -406,10 +436,7 @@ impl SpkRegistry {
         let Some((_, parent)) = self.automatic_centers.get(&body) else {
             return Ok(body);
         };
-        self.registered_bodies()
-            .into_iter()
-            .find(|entry| entry.naif_id == *parent)
-            .map(|entry| entry.body)
+        self.body_for_naif_target(*parent)
             .ok_or(Error::SpkUnregisteredBody { body: *parent })
     }
 
@@ -438,12 +465,10 @@ impl SpkRegistry {
             Err(Error::SpkOutOfRange { .. }) => {}
             Err(error) => return Err(error),
         }
-        let registration = self
-            .registered_bodies()
-            .into_iter()
-            .find(|entry| entry.naif_id == *parent)
+        let body = self
+            .body_for_naif_target(*parent)
             .ok_or(Error::SpkUnregisteredBody { body: *parent })?;
-        self.serving(registration.body)
+        self.serving(body)
     }
 
     /// Resolve the registered target and its optional offset coverage together.
@@ -643,9 +668,7 @@ impl SpkRegistry {
     /// consumed; no body registration or numerical sample is manufactured.
     pub fn retain_owned_kernel(&mut self, kernel: SpkKernel) {
         let key = kernel.path.clone();
-        let cache = DecodedSpkCache {
-            entries: (0..kernel.index.len()).map(|_| OnceLock::new()).collect(),
-        };
+        let cache = DecodedSpkCache::for_segments(kernel.index.len());
         self.automatic_centers.retain(|_, (path, _)| path != &key);
         self.decoded.insert(key.clone(), Arc::new(cache));
         self.kernels.insert(key, kernel);
@@ -664,6 +687,14 @@ impl SpkRegistry {
             .collect();
         out.sort_by_key(|r| r.body);
         out
+    }
+
+    /// Match the first alias in the body-key order of `registered_bodies`.
+    pub(crate) fn body_for_naif_target(&self, target: i32) -> Option<i32> {
+        self.bodies
+            .iter()
+            .filter_map(|(&body, (_, naif_id))| (*naif_id == target).then_some(body))
+            .min()
     }
 
     /// Drop the kernel image stored under `path` together with every
@@ -686,6 +717,7 @@ impl SpkRegistry {
     /// keep those allocations alive until their last owner is dropped.
     pub fn clear(&mut self) {
         self.automatic_centers.clear();
+        self.positional_centers = None;
         self.kernels.clear();
         self.bodies.clear();
         self.decoded.clear();
@@ -749,7 +781,7 @@ impl SpkRegistry {
         })?;
         let result = cache.entries[at].get_or_init(|| match segment.descriptor.seg_type {
             TYPE_CHEBYSHEV_POS | TYPE_CHEBYSHEV_POS_VEL => {
-                decode_chebyshev(kernel.bytes(), segment, kernel.endian())
+                super::decode::decode_chebyshev_image(kernel, segment, cache)
                     .map(DecodedSpkSegment::Chebyshev)
             }
             TYPE_EMDA => {
@@ -1062,12 +1094,8 @@ impl SpkRegistry {
                 return Ok(offsets);
             }
             if kernel.index().segments_for(center).next().is_none() {
-                if let Some(entry) = self
-                    .registered_bodies()
-                    .into_iter()
-                    .find(|entry| entry.naif_id == center)
-                {
-                    (kernel, target) = self.serving(entry.body)?;
+                if let Some(body) = self.body_for_naif_target(center) {
+                    (kernel, target) = self.serving(body)?;
                     continue;
                 }
             }
@@ -1251,12 +1279,8 @@ impl SpkRegistry {
                 break;
             }
             if kernel.index().segments_for(center).next().is_none() {
-                if let Some(entry) = self
-                    .registered_bodies()
-                    .into_iter()
-                    .find(|entry| entry.naif_id == center)
-                {
-                    (kernel, target) = self.serving(entry.body)?;
+                if let Some(body) = self.body_for_naif_target(center) {
+                    (kernel, target) = self.serving(body)?;
                     continue;
                 }
             }
@@ -2505,6 +2529,42 @@ mod acquired_file_ownership_tests {
     }
 
     #[test]
+    fn cached_record_reads_match_eager_decoding_bitwise() {
+        for data_type in [2, 3] {
+            let registry = relative_polynomial_registry(data_type);
+            let kernel = registry.kernel("relative-polynomial").unwrap();
+            let segment = kernel.index().all_segments().next().unwrap();
+            let eager = decode_chebyshev(kernel.bytes(), segment, kernel.endian()).unwrap();
+            let DecodedSpkSegment::Chebyshev(lazy) =
+                registry.cached_segment(kernel, segment).unwrap()
+            else {
+                panic!("expected a Chebyshev segment");
+            };
+            assert!(lazy.words.is_empty());
+            assert!(lazy.image_records.is_some());
+            let delta = 2.0_f64.powi(-40);
+            for fraction in [-2.0, -1.5, -delta, 0.0, delta, 1.5, 2.0] {
+                let bits = |segment| {
+                    let (state, interior, tangent) =
+                        evaluation::eval_chebyshev_two_part_jd_with_domain(
+                            segment,
+                            J2000_JD_TDB,
+                            fraction,
+                        )
+                        .unwrap();
+                    (
+                        state.position_km.map(f64::to_bits),
+                        state.velocity_km_s.map(f64::to_bits),
+                        interior,
+                        tangent.map(|value| value.map(f64::to_bits)),
+                    )
+                };
+                assert_eq!(bits(lazy), bits(&eager));
+            }
+        }
+    }
+
+    #[test]
     fn relative_absence_domains_refuse_descriptor_endpoints_and_missing_metadata() {
         let registry = relative_polynomial_registry(2);
         for fraction in [-3.0, 3.0] {
@@ -2602,6 +2662,42 @@ mod acquired_file_ownership_tests {
             .unwrap();
         assert!(!registry.is_automatic_center(599));
         assert_eq!(registry.primary_body_for_coverage(599).unwrap(), 599);
+    }
+
+    #[test]
+    fn replacing_a_shared_center_image_keeps_all_inherited_targets_automatic() {
+        let image = build_image(
+            DafEndian::Little,
+            &[vec![(599, 5), (699, 6), (799, 7)]
+                .into_iter()
+                .map(|(target, center)| SegSpec {
+                    start: 0.0,
+                    end: 86_400.0,
+                    target,
+                    center,
+                    frame: FRAME_J2000,
+                    seg_type: TYPE_CHEBYSHEV_POS,
+                    name: "PLANET CENTER",
+                })
+                .collect()],
+        );
+        let mut destination = SpkRegistry::new();
+        let mut source = SpkRegistry::new();
+        for registry in [&mut destination, &mut source] {
+            registry.register_image("centers", image.clone()).unwrap();
+            registry
+                .register_automatic_planet_centers("centers")
+                .unwrap();
+        }
+        destination.register_image("explicit", image).unwrap();
+        destination.register_body(799, "explicit", 799).unwrap();
+
+        destination.retain_automatic_centers_from(&source).unwrap();
+
+        assert!(destination.is_automatic_center(599));
+        assert!(destination.is_automatic_center(699));
+        assert!(!destination.is_automatic_center(799));
+        assert_eq!(destination.body_info(799).unwrap().kernel, "explicit");
     }
 
     #[test]

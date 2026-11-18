@@ -25,6 +25,8 @@ from .state import (
     close as close,
     reset_session as reset_session,
     set_leb_file as set_leb_file,
+    set_leb_cache_bytes as set_leb_cache_bytes,
+    get_leb_cache_usage as get_leb_cache_usage,
     get_leb_reader as get_leb_reader,
     set_calc_mode as set_calc_mode,
     get_calc_mode as get_calc_mode,

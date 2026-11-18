@@ -2,7 +2,7 @@
 //! Public entry points and types are exposed through the parent API.
 
 use super::*;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
 
 #[path = "pressure_victim.rs"]
 mod pressure_victim;
@@ -15,6 +15,9 @@ use pressure_victim::CachedStorage;
 /// The bound caps retained coefficient entries, never correctness: every entry is
 /// a pure memo of the owner's borrowed image.
 const MAX_CACHED_CHUNKS: usize = 16;
+// Bound map overhead independently of the indexed coefficient byte budget.
+// With 64 KiB windows, the legacy limit could use only 1 MiB of an 8 MiB budget.
+const MAX_INDEXED_CACHED_CHUNKS: usize = 256;
 
 /// Maximum coefficient allocation retained for one contiguous-image window.
 const MAX_COEFFICIENT_WINDOW_BYTES: usize = 64 * 1024;
@@ -69,14 +72,16 @@ pub const DEFAULT_CHUNK_CACHE_BYTES: usize = 1024 * 1024;
 /// oversized chunks can be evaluated without retention.
 pub struct LebChunkCache {
     inner: Mutex<ChunkCacheInner>,
-    chunk_indexes: Mutex<ChunkIndexCacheInner>,
+    chunk_indexes: RwLock<ChunkIndexCacheInner>,
     resources: Option<Arc<IndexedResources>>,
     // Additional per-cache metadata: one optional nonzero u64 (8 bytes).
     // Only private immutable-image constructors enable numerical reuse.
     word_image_identity: Option<std::num::NonZeroU64>,
-    // Only owned/static/shared contiguous images use partial decoded windows.
-    // Indexed leases and mmap acquisition retain their original decode route.
+    // Contiguous owned images and positional files can retain bounded
+    // segment windows. Raw slice and, independently, mapped callers use
+    // their original complete-frame entries.
     segment_windows: bool,
+    managed: Option<super::process_cache::ManagedCache>,
 }
 
 /// Immutable per-body directories paired with the cache owner's snapshot.
@@ -179,6 +184,7 @@ impl ChunkCacheInner {
 impl LebChunkCache {
     pub(super) fn with_indexed_resources(resources: Arc<IndexedResources>) -> Self {
         let mut cache = Self::with_image_byte_budget(resources.limits.cache_bytes);
+        cache.segment_windows = true;
         cache.resources = Some(resources);
         cache
     }
@@ -199,10 +205,11 @@ impl LebChunkCache {
                 max_bytes,
                 ..ChunkCacheInner::default()
             }),
-            chunk_indexes: Mutex::new(ChunkIndexCacheInner::default()),
+            chunk_indexes: RwLock::new(ChunkIndexCacheInner::default()),
             resources: None,
             word_image_identity: None,
             segment_windows: false,
+            managed: None,
         }
     }
 
@@ -220,6 +227,15 @@ impl LebChunkCache {
         cache
     }
 
+    pub(super) fn use_process_cache(&mut self, pool: Arc<super::process_cache::ProcessCache>) {
+        if let Some(image) = self.word_image_identity {
+            self.managed = Some(super::process_cache::ManagedCache::new(pool, image));
+            // Retain complete chunks in the process pool. Windowing could
+            // otherwise decompress the same frame repeatedly for nearby rows.
+            self.segment_windows = false;
+        }
+    }
+
     pub(super) fn word_image_identity(&self) -> Option<std::num::NonZeroU64> {
         self.word_image_identity
     }
@@ -227,15 +243,15 @@ impl LebChunkCache {
     /// Retained directory vector capacities, excluding map/Arc/allocator overhead.
     /// No parsing, file reads or hashing occur; coefficient budgets are independent.
     pub(crate) fn retained_chunk_index_bytes(&self) -> usize {
-        self.lock_chunk_indexes().resident_bytes
+        self.read_chunk_indexes().resident_bytes
     }
 
     /// Lock directory metadata without holding the coefficient guard.
     /// As with the coefficient guard, recover poisoning rather than invalidate
     /// an otherwise usable immutable snapshot.
-    fn lock_chunk_indexes(&self) -> MutexGuard<'_, ChunkIndexCacheInner> {
+    fn read_chunk_indexes(&self) -> RwLockReadGuard<'_, ChunkIndexCacheInner> {
         self.chunk_indexes
-            .lock()
+            .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
@@ -248,7 +264,14 @@ impl LebChunkCache {
         entry: &BodyEntry,
         body_id: i32,
     ) -> Result<Arc<TrackedVec<ChunkEntry>>> {
-        let mut inner = self.lock_chunk_indexes();
+        if let Some(chunks) = self.read_chunk_indexes().entries.get(&body_id) {
+            return Ok(Arc::clone(chunks));
+        }
+        let mut inner = self
+            .chunk_indexes
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // A concurrent miss may have published the directory before the write lock.
         if let Some(chunks) = inner.entries.get(&body_id) {
             return Ok(Arc::clone(chunks));
         }
@@ -294,7 +317,7 @@ impl LebChunkCache {
     /// Test-only initialization evidence; never changes public coefficient counters.
     #[cfg(test)]
     pub(super) fn chunk_index_test_stats(&self) -> (usize, usize) {
-        let inner = self.lock_chunk_indexes();
+        let inner = self.read_chunk_indexes();
         (inner.parse_calls, inner.entries.len())
     }
 
@@ -303,6 +326,9 @@ impl LebChunkCache {
     /// their shared owner and conservative extra map metadata; historical dense
     /// map/Arc overhead remains excluded.
     pub fn memory_usage(&self) -> (usize, usize) {
+        if let Some(cache) = self.managed.as_ref().filter(|cache| cache.enabled()) {
+            return cache.memory_usage();
+        }
         let inner = self.lock_inner();
         (inner.resident_bytes, inner.max_bytes)
     }
@@ -318,6 +344,11 @@ impl LebChunkCache {
             inner.entries.clear();
             inner.resident_bytes = 0;
         }
+        drop(inner);
+        // An explicit per-image override leaves the shared process pool.
+        if let Some(cache) = &self.managed {
+            cache.disable();
+        }
     }
 
     /// Release retained decoded coefficients, without closing the image or resetting
@@ -326,6 +357,9 @@ impl LebChunkCache {
     /// entries. This is not an image reset: never reuse the cache with another
     /// container after clearing.
     pub fn clear(&self) {
+        if let Some(cache) = &self.managed {
+            cache.clear();
+        }
         let mut inner = self.lock_inner();
         inner.entries.clear();
         inner.resident_bytes = 0;
@@ -333,6 +367,9 @@ impl LebChunkCache {
 
     /// `(hits, misses, resident_entries)` for measurement.
     pub fn stats(&self) -> (u64, u64, usize) {
+        if let Some(cache) = self.managed.as_ref().filter(|cache| cache.enabled()) {
+            return cache.stats();
+        }
         let inner = self.lock_inner();
         (inner.hits, inner.misses, inner.entries.len())
     }
@@ -390,6 +427,9 @@ impl LebChunkCache {
         index: Option<&FileIndex>,
         decode: impl FnOnce() -> Result<TrackedVec<f64>>,
     ) -> Result<CachedStorage> {
+        if let Some(cache) = self.managed.as_ref().filter(|cache| cache.enabled()) {
+            return cache.get_or_decode(key, decode).map(CachedStorage::Dense);
+        }
         if let Some(hit) = self.hit(&key) {
             if index.is_some() || matches!(hit, CachedStorage::Dense(_)) {
                 return Ok(hit);
@@ -437,14 +477,19 @@ impl LebChunkCache {
                 },
             );
         }
-        if inner.entries.len() < MAX_CACHED_CHUNKS
+        let max_entries = if self.resources.is_some() {
+            MAX_INDEXED_CACHED_CHUNKS
+        } else {
+            MAX_CACHED_CHUNKS
+        };
+        if inner.entries.len() < max_entries
             && size > inner.max_bytes.saturating_sub(inner.resident_bytes)
         {
             if let Some(index) = index {
                 self.compact_first_victim(&mut inner, index, size);
             }
         }
-        while inner.entries.len() >= MAX_CACHED_CHUNKS
+        while inner.entries.len() >= max_entries
             || size > inner.max_bytes.saturating_sub(inner.resident_bytes)
         {
             inner.evict_oldest();
@@ -492,7 +537,7 @@ mod cache_tests;
 
 #[cfg(test)]
 #[path = "tests/window_cache.rs"]
-mod window_cache_tests;
+pub(in crate::leb) mod window_cache_tests;
 
 #[cfg(test)]
 mod word_image_identity_tests {
@@ -1428,9 +1473,8 @@ impl FileIndex {
                         offset: 0,
                     })?;
                 let seg_count = chunk.segment_count();
-                if let (Some(memo), LebSource::Slice(_), Ok(key_idx), Some(window)) = (
+                if let (Some(memo), Ok(key_idx), Some(window)) = (
                     cache.filter(|memo| memo.segment_windows),
-                    bytes,
                     u32::try_from(chunk_idx),
                     coefficient_window(entry, local, seg_count),
                 ) {
@@ -1451,10 +1495,12 @@ impl FileIndex {
                                 &what,
                             )?;
                             bytes.check_frame(expected)?;
+                            let allocation =
+                                bytes.reserve_decode(expected, chunk.compressed_size())?;
                             let compressed =
                                 bytes.blob(chunk.blob_offset(), chunk.compressed_size(), &what)?;
-                            // Validate the complete frame before retaining only the
-                            // selected rows. Slice images have no indexed leases.
+                            // The full frame is validated before the selected
+                            // rows take over the working allocation lease.
                             let values = reader::decompress_body_window_words_limited(
                                 &compressed,
                                 expected,
@@ -1464,9 +1510,13 @@ impl FileIndex {
                                 window,
                                 bytes.window_limit(),
                             )?;
+                            let capacity = values.capacity() * std::mem::size_of::<f64>();
+                            drop(compressed);
+                            let allocation =
+                                allocation.map(|lease| lease.retain(capacity)).transpose()?;
                             Ok(TrackedVec {
                                 values,
-                                _allocation: None,
+                                _allocation: allocation,
                             })
                         },
                     )?;
@@ -1814,9 +1864,17 @@ impl FileIndex {
                 what: "LEB Delta-T table".to_string(),
                 offset: base,
             })?;
-        if let LebSource::Slice(_) = bytes {
-            let (jds, vals) = decode_delta_t_table(bytes, data_base, header.n_entries(), base)?;
-            return eval_delta_t(&jds, &vals, jd);
+        if let LebSource::Slice(image) = bytes {
+            // Raw FileIndex callers can supply a shorter image than the one
+            // used to build the index. Reject a truncated tail even when the
+            // requested epoch would clamp to the first row.
+            let size = (header.n_entries() as usize)
+                .checked_mul(DELTA_T_ENTRY_SIZE)
+                .ok_or_else(|| Error::LebCorrupt {
+                    what: "LEB Delta-T table".into(),
+                    offset: base,
+                })?;
+            reader::slice_at(image, data_base, size, "LEB Delta-T table")?;
         }
         evaluation::eval_delta_t_rows(header.n_entries() as usize, jd, |index| {
             let at = index
@@ -1848,21 +1906,34 @@ impl FileIndex {
             .section(SECTION_STARS)
             .ok_or(Error::LebStarNotFound { star_id })?;
         let base = usize::try_from(section.offset()).unwrap_or(usize::MAX);
-        let count = star_count(section.size());
+        const WHAT: &str = "LEB star catalog";
+        // Batch positional reads without raising the caller's per-read limit.
+        // If even one record exceeds that limit, range() reports its usual error.
+        let page_bytes = match bytes {
+            LebSource::Slice(_) => 4096,
+            LebSource::Positional(file) => 4096.min(file.limits.compressed_bytes),
+        };
+        let per_page = (page_bytes / STAR_ENTRY_SIZE).max(1);
+        let mut remaining = star_count(section.size());
         let mut at = base;
         let mut found = None;
-        for _ in 0..count {
-            let record = bytes.range(at, STAR_ENTRY_SIZE, "LEB star catalog")?;
-            let entry = StarEntry::decode(&record, 0).map_err(|_| Error::LebCorrupt {
-                what: "LEB star catalog".to_string(),
-                offset: at,
-            })?;
-            if entry.star_id() == star_id {
-                found = Some(entry);
+        while remaining > 0 {
+            // Stop at the last complete record so a truncated input reports
+            // the same failing record offset as a sequence of single reads.
+            let available = bytes.len().saturating_sub(at) / STAR_ENTRY_SIZE;
+            let count = remaining.min(per_page.min(available.max(1)) as u64) as usize;
+            let page = bytes.range(at, count * STAR_ENTRY_SIZE, WHAT)?;
+            for record in page.chunks_exact(STAR_ENTRY_SIZE) {
+                let entry = StarEntry::decode(record, 0).map_err(|_| Error::LebCorrupt {
+                    what: WHAT.into(),
+                    offset: at,
+                })?;
+                if entry.star_id() == star_id {
+                    found = Some(entry);
+                }
+                at += STAR_ENTRY_SIZE; // range() checked the end of the entire page.
             }
-            at = at
-                .checked_add(STAR_ENTRY_SIZE)
-                .ok_or(Error::LebStarNotFound { star_id })?;
+            remaining -= count as u64;
         }
         found.ok_or(Error::LebStarNotFound { star_id })
     }

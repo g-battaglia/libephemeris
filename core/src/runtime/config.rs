@@ -386,6 +386,30 @@ impl Runtime {
         Ok(())
     }
 
+    /// Opt owned runtime readers into the process-wide decoded coefficient
+    /// budget, or resize it. Zero disables retention. Existing managed images
+    /// share the new limit immediately.
+    pub fn set_leb_cache_bytes(&self, bytes: usize) {
+        crate::leb::set_process_cache_bytes(bytes);
+        self.edit().invalidate_readers();
+    }
+
+    /// `(retained bytes, budget bytes, entry count)` for the process pool.
+    /// Explicit SDK-owned and indexed readers use their own limits.
+    pub fn leb_cache_usage(&self) -> Option<(usize, usize, usize)> {
+        crate::leb::process_cache_usage()
+    }
+
+    /// Resolve the optional process budget without opening data.
+    pub(crate) fn configured_leb_cache_bytes(&self) -> Result<Option<usize>> {
+        let state = self.lock();
+        state
+            .reloaded_sources
+            .as_ref()
+            .unwrap_or(&self.sources)
+            .leb_cache_bytes()
+    }
+
     /// Select an explicit local LEB path, or remove that override with `None`.
     ///
     /// `None` resumes captured file selection and then ordinary discovery; it
@@ -943,7 +967,7 @@ impl Runtime {
         let session = if body == crate::constants::ECL_NUT {
             self.model_session()?
         } else {
-            self.shared_session_for(resources)?
+            self.scalar_position_session(resources)?
         };
         let mut position = session.position_with_native_minor_and_main_image(
             &supplier,
@@ -1963,7 +1987,11 @@ mod tests {
         let runtime = discovery_runtime(&directory);
         let owned = runtime.session().unwrap();
         let expected = owned.calc(2451545.0, SUN, FLG_SWIEPH | FLG_SPEED).unwrap();
-        assert!(owned.context().leb_files()[0].allocated_image_bytes() > 0);
+        // Owned discovery can use an exact copy from the executable's static data.
+        // The policy distinction is a contiguous immutable snapshot.
+        let snapshot = &owned.context().leb_files()[0];
+        let retained_bytes = snapshot.bytes().unwrap();
+        assert!(!retained_bytes.is_empty());
         let expected_inventory = runtime.leb_inventory().unwrap();
         runtime
             .set_leb_read_policy(Some(LebReadPolicy::Indexed(IndexedLimits::default())))
@@ -1988,7 +2016,11 @@ mod tests {
         runtime
             .set_leb_read_policy(Some(LebReadPolicy::Owned))
             .unwrap();
-        assert!(runtime.session().unwrap().context().leb_files()[0].allocated_image_bytes() > 0);
+        let owned_again = runtime.session().unwrap();
+        assert!(
+            owned_again.context().leb_files()[0].bytes().unwrap() == retained_bytes,
+            "owned policy must restore the same contiguous snapshot"
+        );
         assert_eq!(
             indexed
                 .calc(2451545.0, SUN, FLG_SWIEPH | FLG_SPEED)

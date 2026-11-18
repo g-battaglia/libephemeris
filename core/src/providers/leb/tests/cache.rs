@@ -26,6 +26,32 @@ fn capacity_and_entry_limits_account_allocations_not_lengths() {
 }
 
 #[test]
+fn indexed_capacity_is_bounded_by_coefficients_and_entry_overhead() {
+    let resources = IndexedResources::new(IndexedLimits {
+        cache_bytes: 8192,
+        ..IndexedLimits::default()
+    });
+    let cache = LebChunkCache::with_indexed_resources(Arc::clone(&resources));
+    for id in 0..300 {
+        cache
+            .get_or_decode((id, 0), || Ok(vec![f64::from(id)]))
+            .unwrap();
+    }
+    assert_eq!(cache.stats().2, MAX_INDEXED_CACHED_CHUNKS);
+    assert_eq!(cache.memory_usage().0, MAX_INDEXED_CACHED_CHUNKS * 8);
+    assert_eq!(resources.retained.used(), cache.memory_usage().0);
+    cache.set_byte_budget(128);
+    assert_eq!(resources.retained.used(), 0);
+    for id in 0..32 {
+        cache
+            .get_or_decode((id, 0), || Ok(vec![f64::from(id)]))
+            .unwrap();
+    }
+    assert_eq!(cache.stats().2, 16);
+    assert_eq!(resources.retained.used(), 128);
+}
+
+#[test]
 fn auxiliary_walk_preserves_recent_body_coefficients_with_fixed_capacity() {
     let cache = LebChunkCache::new();
     let body = cache.get_or_decode((0, 0), || Ok(vec![2.0; 8])).unwrap();

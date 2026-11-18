@@ -485,7 +485,8 @@ impl EphemerisContext {
     /// Open under the resolved policy, sharing the first compatible attached
     /// indexed image's resource domain. No process-global store is involved.
     pub(crate) fn open_leb_file(&self, path: &std::path::Path) -> Result<LebFile> {
-        if let crate::leb::LebReadPolicy::Indexed(limits) = self.leb_read_policy() {
+        let policy = self.leb_read_policy();
+        if let crate::leb::LebReadPolicy::Indexed(limits) = policy {
             for file in &self.leb_files {
                 if let crate::leb::LebSource::Positional(source) = file.source()? {
                     if source.limits == limits {
@@ -497,7 +498,13 @@ impl EphemerisContext {
                 }
             }
         }
-        self.leb_read_policy().open(path)
+        #[cfg(feature = "bundled-data")]
+        if matches!(policy, crate::leb::LebReadPolicy::Owned) && self.leb_file().is_none() {
+            if let Some(image) = crate::leb::exact_installed_base(path)? {
+                return Ok(image);
+            }
+        }
+        policy.open(path)
     }
 
     /// Default context: no observer (geocentric), tropical, medium tier

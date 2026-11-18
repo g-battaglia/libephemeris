@@ -306,7 +306,9 @@ impl SpkKernel {
         let index = SpkIndex::parse(&bytes)?;
         Ok(Self {
             path: path.to_string(),
-            bytes: bytes.into(),
+            // Share the Vec owner without copying the complete kernel into
+            // an Arc slice during acquisition.
+            bytes: Arc::new(bytes),
             endian,
             index: Arc::new(index),
             source_file: None,
@@ -334,7 +336,7 @@ impl SpkKernel {
         use sha2::{Digest, Sha256};
         match &self.file_image_owner {
             Some(owner) => *owner.sha256(&self.bytes),
-            None => Sha256::digest(&self.bytes).into(),
+            None => Sha256::digest(self.bytes()).into(),
         }
     }
 

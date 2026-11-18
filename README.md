@@ -5,19 +5,19 @@
   <a href="https://pypi.org/project/libephemeris/"><img src="https://img.shields.io/pypi/pyversions/libephemeris.svg" alt="Python versions"></a>
   <a href="https://pepy.tech/project/libephemeris"><img src="https://static.pepy.tech/badge/libephemeris/month" alt="Monthly downloads"></a>
   <a href="https://pepy.tech/project/libephemeris"><img src="https://static.pepy.tech/personalized-badge/libephemeris?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads/total" alt="Total downloads"></a>
-  <a href="https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/COPYING"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License: AGPL-3.0"></a>
+  <a href="https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/COPYING"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License: AGPL-3.0"></a>
 </p>
 
 **A high-precision ephemeris engine for astrology: native Rust speed, a Python API, NASA/JPL DE440/DE441 data and IAU standards.**
 
-**Version:** Python `4.0.0` · Rust core `1.0.0` · Python 3.12+ · [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/COPYING)
+**Version:** Python `4.1.0` · Rust core `1.1.0` · Python 3.12+ · [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/COPYING)
 
-[Get started](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/README.md#first-calculation)
-· [Scientific precision](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/README.md#scientific-precision)
-· [Documentation](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/README.md)
-· [English manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/beginners-manual/en/README.md)
-· [Italian manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/beginners-manual/it/README.md)
-· [Release notes](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/RELEASE_NOTES.md)
+[Get started](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/README.md#first-calculation)
+· [Scientific precision](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/README.md#scientific-precision)
+· [Documentation](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/README.md)
+· [English manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/beginners-manual/en/README.md)
+· [Italian manual](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/beginners-manual/it/README.md)
+· [Release notes](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/RELEASE_NOTES.md)
 
 LibEphemeris computes the sky an astrology application is built on: positions
 and speeds of the Sun, Moon and planets, houses and angles, sidereal zodiacs,
@@ -46,9 +46,8 @@ Your app consumes LibEphemeris calculations as an external service rather than i
 - **Modern Delta-T.** IERS observations for the modern era and the
   Stephenson–Morrison–Hohenkerk (2016) reconstruction of Earth's rotation for
   historical dates, with UTC, UT1 and TT always kept explicit.
-- **Native speed.** About **9 µs** per planetary position and **11 µs** per
-  Placidus house solution. A complete chart takes about **0.11 ms**, roughly
-  **8× faster than v3**.
+- **Native speed.** Rust calculation kernels and shared coefficient caches.
+  See [performance](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/README.md#performance) for timed chart workloads by data route.
 - **Offline and reproducible.** The base data ship inside the wheel. A sealed
   network policy, explicit data routes and SHA-256-identified datasets keep
   every result reproducible.
@@ -72,7 +71,7 @@ Your app consumes LibEphemeris calculations as an external service rather than i
 | **Stars and minor bodies** | 1,447-star catalog; asteroids, centaurs and trans-Neptunian bodies where suitable data exist |
 | **Local sky** | Topocentric positions, rise/set/transit, refraction, twilight and visibility models |
 
-The [cookbook](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/beginners-manual/en/15-cookbook.md)
+The [cookbook](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/beginners-manual/en/15-cookbook.md)
 combines these building blocks into twelve practical recipes. Interpretation and
 aspect orbs are left to the application.
 
@@ -86,11 +85,11 @@ Wheels include the Rust engine and the base coefficient data, so the first
 calculation needs no download. NumPy is the only Python runtime dependency.
 Prebuilt wheels cover macOS ARM64, Linux x86_64/aarch64 and Windows x86_64;
 other platforms can
-[build from source](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/installation.md#build-from-source).
+[build from source](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/installation.md#build-from-source).
 Wider date ranges are separate datasets (see
-[Data and offline operation](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/README.md#data-and-offline-operation)).
+[Data and offline operation](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/README.md#data-and-offline-operation)).
 
-Rust applications can use [`libephemeris-core`](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/rust.md)
+Rust applications can use [`libephemeris-core`](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/rust.md)
 directly, without Python: the `bundled-data` feature embeds the base data image
 and `nbody` enables native numerical integration.
 
@@ -146,7 +145,7 @@ A few conventions to keep in mind:
   `EphemerisContext` and configure shared resources before starting workers.
   Native calls release the GIL but remain synchronous.
 
-[Python conventions](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/python.md)
+[Python conventions](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/python.md)
 covers units, flags and time-conversion domains in detail.
 
 ## Scientific precision
@@ -172,7 +171,7 @@ Measured results:
   construction to **0.0024 microarcseconds** over 29,265 test pairs spanning
   ±2,000 Julian centuries.
 
-The [source register](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/sources.md)
+The [source register](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/sources.md)
 documents where each model comes from and separates published models from
 project conventions. Hypothetical bodies whose published models are incomplete
 fail instead of returning invented orbits.
@@ -182,7 +181,7 @@ frame, centre and observer all matter, and for historical dates Delta-T can
 dominate timing uncertainty. The documented migration criteria include
 **0.001″ for angles** and **1 second for events** under aligned inputs; they are
 not universal accuracy guarantees. See
-[precision and limitations](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/limitations.md)
+[precision and limitations](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/limitations.md)
 for scope and qualifications. Scientific accuracy concerns the calculated
 quantities, not astrological interpretation.
 
@@ -192,17 +191,22 @@ Calculation kernels, JPL/SPK evaluation, LEB reading and N-body integration all
 run in Rust. Immutable data and decoded caches are shared across contexts
 instead of being rebuilt for each request.
 
-| Operation | v4.0.0 | v3.2.2 |
-| --- | --- | --- |
-| Position with speed, LEB data | ~9 µs | ~82 µs |
-| Position with speed, direct JPL route | ~75 µs | — |
-| Placidus houses | ~11 µs | ~30 µs |
-| Complete chart: Sun–Pluto, true node and houses | **~0.11 ms** | ~0.92 ms |
+| Mode, base tier | Consecutive chart | Random-date chart |
+| --- | ---: | ---: |
+| `leb` | 118 µs | 606 µs |
+| `auto` | 787 µs | 1.07 ms |
+| `skyfield` | 1.64 ms | 1.77 ms |
 
-A single core computes roughly **9,000 complete charts per second** from the
-bundled data. Figures are medians of warmed calls with the published wheels on
-an Apple M5 Pro with CPython 3.12, in sealed LEB mode on identical data; actual
-times depend on workload, data route, cache state and hardware.
+These are medians for the published Python 4.0.0 wheel on an Apple M5 Pro
+with CPython 3.12.13. Each case uses five fresh processes with 300 charts
+per process. A chart computes Sun–Pluto and the true node with
+`FLG_SWIEPH | FLG_SPEED` (258), followed by Placidus houses. The driver uses
+pinned base data, a sealed network policy and the 1900–2100 window.
+Consecutive dates are spaced by 0.37 days. Random dates use a fixed seed.
+The `auto` chart trace used the LEB route for the chart bodies. This mode
+can apply planet-centre corrections and use a different rate calculation.
+See the [benchmark commands](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/tools/bench/README.md) to reproduce the
+measurements on your data and hardware.
 
 ## Data and offline operation
 
@@ -229,23 +233,23 @@ Nominal JPL tiers cover **1850–2150** (`base`), **1550–2650** (`medium`) and
 including the margin an event search needs around its interval; a wider tier
 does not mean higher accuracy. For reproducible results, record data versions
 and calculation settings.
-See [data setup](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/data.md)
-and the [CLI reference](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/cli.md).
+See [data setup](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/data.md)
+and the [CLI reference](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/cli.md).
 
 ## Documentation
 
-- **Beginner manuals:** [English](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/beginners-manual/en/README.md) · [Italiano](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/beginners-manual/it/README.md), fifteen chapters and twelve recipes each.
-- **Reference:** [Python](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/python.md) · [Rust](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/rust.md) · [Generated API](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/api_reference.rst) · [Documentation index](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/README.md).
-- **Science:** [Sources and provenance](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/sources.md) · [Precision and limitations](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/limitations.md) · [Data format](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/docs/data-format.md).
-- **Migration:** [API compatibility and changed behavior](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/MIGRATION.md). Familiar names and flags do not imply identical models or exception handling.
-- **Development:** [Contributing](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/CONTRIBUTING.md) · [Rust core](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/core/README.md) · [Python bindings](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/python/README.md) · [Changelog](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/CHANGELOG.md).
+- **Beginner manuals:** [English](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/beginners-manual/en/README.md) · [Italiano](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/beginners-manual/it/README.md), fifteen chapters and twelve recipes each.
+- **Reference:** [Python](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/python.md) · [Rust](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/rust.md) · [Generated API](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/api_reference.rst) · [Documentation index](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/README.md).
+- **Science:** [Sources and provenance](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/sources.md) · [Precision and limitations](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/limitations.md) · [Data format](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/docs/data-format.md).
+- **Migration:** [API compatibility and changed behavior](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/MIGRATION.md). Familiar names and flags do not imply identical models or exception handling.
+- **Development:** [Contributing](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/CONTRIBUTING.md) · [Rust core](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/core/README.md) · [Python bindings](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/python/README.md) · [Changelog](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/CHANGELOG.md).
 
 ## License
 
-LibEphemeris is distributed under the [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/COPYING);
-contributions are accepted under the [CLA](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/CLA.md).
-External components keep their [own terms](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/THIRD_PARTY_NOTICES.md),
-and the manuals keep their [original licensing notice](https://github.com/g-battaglia/libephemeris/blob/python-v4.0.0/beginners-manual/README.md#provenance-and-license).
+LibEphemeris is distributed under the [AGPL-3.0](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/COPYING);
+contributions are accepted under the [CLA](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/CLA.md).
+External components keep their [own terms](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/THIRD_PARTY_NOTICES.md),
+and the manuals keep their [original licensing notice](https://github.com/g-battaglia/libephemeris/blob/python-v4.1.0/beginners-manual/README.md#provenance-and-license).
 
 For private licensing, contact Giacomo Battaglia at
 [kerykeion.astrology@gmail.com](mailto:kerykeion.astrology@gmail.com).

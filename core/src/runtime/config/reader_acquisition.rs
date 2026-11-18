@@ -200,6 +200,16 @@ impl Runtime {
             return Ok(());
         }
         let policy = context.leb_read_policy();
+        let pool = match policy {
+            crate::leb::LebReadPolicy::Owned => {
+                let sources = state.reloaded_sources.as_ref().unwrap_or(&self.sources);
+                match crate::leb::configured_cache(None) {
+                    Some(pool) => Some(pool),
+                    None => crate::leb::configured_cache(sources.leb_cache_bytes()?),
+                }
+            }
+            crate::leb::LebReadPolicy::Indexed(_) => None,
+        };
         if state.reader_policy != Some(policy) {
             state.invalidate_readers();
             state.reader_policy = Some(policy);
@@ -215,7 +225,11 @@ impl Runtime {
         };
         #[cfg(feature = "bundled-data")]
         if paths.is_empty() {
-            context.attach_leb_file(crate::leb::bundled_base_core()?);
+            let image = match &pool {
+                Some(pool) => crate::leb::bundled_base_core_with_process_cache(pool.clone()),
+                None => crate::leb::bundled_base_core(),
+            };
+            context.attach_leb_file(image?);
         }
         for path in paths {
             let core_guard = if let Some(primary) = context.leb_file() {
@@ -264,7 +278,37 @@ impl Runtime {
                 if let Some((_, image)) = state.reader.iter().find(|(loaded, _)| loaded == &path) {
                     image.clone()
                 } else {
-                    let image = match context.open_leb_file(&path) {
+                    let acquired = (|| {
+                        #[cfg(any(target_os = "macos", target_os = "linux"))]
+                        if pool.is_none()
+                            && matches!(policy, crate::leb::LebReadPolicy::Owned)
+                            && context.leb_file().is_none()
+                            && context.mode() == ProviderMode::SealedLeb
+                            && context.tier() == crate::context::Tier::Medium
+                            && path.file_name().and_then(|name| name.to_str())
+                                == Some("medium_core.leb2")
+                        {
+                            #[cfg(target_os = "macos")]
+                            let snapshot = LebFile::try_private_apfs_snapshot(&path);
+                            #[cfg(target_os = "linux")]
+                            let snapshot = std::env::var_os("LIBEPHEMERIS_LEB_SHARED_DIR")
+                                .and_then(|dir| {
+                                    LebFile::try_sealed_linux_medium_snapshot(
+                                        &path,
+                                        std::path::Path::new(&dir),
+                                    )
+                                });
+                            if let Some(image) = snapshot {
+                                return Ok(image);
+                            }
+                        }
+                        let image = context.open_leb_file(&path)?;
+                        Ok(match &pool {
+                            Some(pool) => image.with_process_cache(pool.clone()),
+                            None => image,
+                        })
+                    })();
+                    let image = match acquired {
                         Ok(image) => image,
                         Err(error)
                             if guarded

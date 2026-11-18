@@ -1,4 +1,4 @@
-//! Contiguous-image coefficient windows, independent of astronomical data.
+//! Bounded coefficient windows, independent of astronomical data.
 use super::*;
 
 fn shuffled(words: &[u64], segments: u32, degree: u32, components: u32) -> Vec<u8> {
@@ -15,7 +15,7 @@ fn shuffled(words: &[u64], segments: u32, degree: u32, components: u32) -> Vec<u
     bytes
 }
 
-fn image(segments: u32, degree: u32, components: u32, words: &[u64]) -> Vec<u8> {
+pub(in crate::leb) fn image(segments: u32, degree: u32, components: u32, words: &[u64]) -> Vec<u8> {
     fn put<const N: usize>(bytes: &mut [u8], offset: usize, value: [u8; N]) {
         bytes[offset..offset + N].copy_from_slice(&value);
     }
@@ -88,6 +88,17 @@ fn windows_reconstruct_exact_words_ranges_and_partial_tails() {
             .collect();
         let frame =
             zstd::encode_all(shuffled(&words, segments, degree, components).as_slice(), 1).unwrap();
+        let empty = reader::decompress_body_window_words_limited(
+            &frame,
+            (words.len() * 8) as u64,
+            segments,
+            degree,
+            components,
+            segments..segments,
+            None,
+        )
+        .unwrap();
+        assert!(empty.is_empty());
         for first in 0..segments {
             let end = (first + 4).min(segments);
             let selected = reader::decompress_body_window_words_limited(
@@ -228,10 +239,6 @@ fn contiguous_windows_share_hits_without_changing_rows_or_scalar_results() {
     assert!(!raw.segment_windows);
     assert!(raw.lock_inner().entries.contains_key(&CacheKey::Body(0, 0)));
     assert!(!LebChunkCache::with_image_byte_budget(1024).segment_windows);
-    assert!(
-        !LebChunkCache::with_indexed_resources(IndexedResources::new(IndexedLimits::default()))
-            .segment_windows
-    );
 }
 
 #[test]

@@ -109,6 +109,34 @@ pub(super) fn chebyshev_directory(
 /// is [`Error::SpkUnsupportedType`] (type 21 arrives through the type-21
 /// evaluation layer).
 pub fn decode_chebyshev(bytes: &[u8], segment: &Segment, endian: DafEndian) -> Result<ChebSegment> {
+    let mut decoded = decode_chebyshev_layout(bytes, segment, endian)?;
+    let count = decoded.n_records * decoded.record_words;
+    let end = decoded.data_offset + count * 8;
+    decoded.words = bytes[decoded.data_offset..end]
+        .chunks_exact(8)
+        .map(|word| endian.read_f64(word))
+        .collect();
+    Ok(decoded)
+}
+
+pub(super) fn decode_chebyshev_image(
+    kernel: &SpkKernel,
+    segment: &Segment,
+    cache: &DecodedSpkCache,
+) -> Result<ChebSegment> {
+    let mut decoded = decode_chebyshev_layout(kernel.bytes(), segment, kernel.endian())?;
+    decoded.image_records = Some(super::records::ImageRecords::new(
+        kernel,
+        Arc::clone(&cache.records),
+    ));
+    Ok(decoded)
+}
+
+fn decode_chebyshev_layout(
+    bytes: &[u8],
+    segment: &Segment,
+    endian: DafEndian,
+) -> Result<ChebSegment> {
     let d = &segment.descriptor;
     if d.seg_type != TYPE_CHEBYSHEV_POS && d.seg_type != TYPE_CHEBYSHEV_POS_VEL {
         return Err(Error::SpkUnsupportedType {
@@ -138,17 +166,14 @@ pub fn decode_chebyshev(bytes: &[u8], segment: &Segment, endian: DafEndian) -> R
         data_offset,
         std::array::from_fn(|i| read(len_words - 4 + i as u64)),
     )?;
-    let mut words = Vec::with_capacity(n_records * rsize);
-    for w in 0..(n_records * rsize) as u64 {
-        words.push(read(w));
-    }
     Ok(ChebSegment {
         seg_type: d.seg_type,
         init_et,
         int_len,
         record_words: rsize,
         n_records,
-        words,
+        words: Vec::new(),
+        image_records: None,
         data_offset,
     })
 }

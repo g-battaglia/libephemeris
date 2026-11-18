@@ -341,7 +341,7 @@ def render_catalog(catalog, input_sha256: str) -> str:
     name_to_hip, hip_fix = dict(catalog["name_to_hip"]), dict(catalog["hip_fix"])
     greek, constellations = dict(catalog["greek"]), dict(catalog["constellations"])
     nd_runs = catalog["decimal_ranges"]
-    ref_sorted_ids = [row[0] for row in sorted(rows, key=lambda r: ref_star_key(r[1]))]
+    ref_name_rows = sorted(range(len(rows)), key=lambda i: ref_star_key(rows[i][1]))
     nomen_sorted_ids = [row[0] for row in sorted(rows, key=lambda r: nomen_key(r[2]))]
 
     name_to_id_upper = [(row[1].upper(), row[0]) for row in rows]
@@ -425,11 +425,10 @@ def render_catalog(catalog, input_sha256: str) -> str:
     emit_id_block(
         out,
         [
-            "/// Star ids in order (sorted by the",
-            "/// traditional-name key; retained as the stable v 1 catalog index).",
+            "/// Catalog row indices in stable traditional-name order (v1 sequence numbers).",
         ],
-        "pub(crate) const REF_SORTED_IDS: &[i32] = &[",
-        ref_sorted_ids,
+        "pub(crate) const REF_NAME_ROWS: &[u32] = &[",
+        ref_name_rows,
     )
     emit_id_block(
         out,

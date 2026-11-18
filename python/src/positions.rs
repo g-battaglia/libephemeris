@@ -181,6 +181,18 @@ fn set_leb_file(filepath: Option<PathBuf>) {
     runtime().set_leb_file(filepath);
 }
 
+/// Set the process-wide decoded coefficient budget, in bytes.
+#[pyfunction]
+fn set_leb_cache_bytes(py: Python<'_>, bytes: usize) {
+    py.detach(|| runtime().set_leb_cache_bytes(bytes));
+}
+
+/// Return retained bytes, budget and entry count, or None before activation.
+#[pyfunction]
+fn get_leb_cache_usage() -> Option<(usize, usize, usize)> {
+    runtime().leb_cache_usage()
+}
+
 /// Override whether observed IERS Delta-T data participates in model clocks.
 ///
 /// enabled is True or False; None clears the explicit override and restores
@@ -224,6 +236,8 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(set_calc_mode, module)?)?;
     module.add_function(wrap_pyfunction!(set_precision_tier, module)?)?;
     module.add_function(wrap_pyfunction!(set_leb_file, module)?)?;
+    module.add_function(wrap_pyfunction!(set_leb_cache_bytes, module)?)?;
+    module.add_function(wrap_pyfunction!(get_leb_cache_usage, module)?)?;
     module.add_function(wrap_pyfunction!(set_iers_delta_t_enabled, module)?)?;
     module.add_function(wrap_pyfunction!(set_delta_t_userdef, module)?)?;
     module.add_function(wrap_pyfunction!(set_delta_t_model, module)?)?;

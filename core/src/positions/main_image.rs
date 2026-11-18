@@ -112,30 +112,34 @@ pub(crate) fn loader_target(filename: &str) -> Result<(String, String)> {
     Ok((url, name))
 }
 
+/// The legacy base alias follows the tier-specific candidate.
+pub(crate) fn automatic_center_candidates(
+    context: &EphemerisContext,
+) -> Vec<(PathBuf, &'static crate::download::AssetEntry)> {
+    let Some(directory) = context.jpl_data_dir() else {
+        return Vec::new();
+    };
+    let names: &[&str] = match context.tier() {
+        crate::context::Tier::Base => &["planet_centers_base.bsp", "planet_centers.bsp"],
+        crate::context::Tier::Medium => &["planet_centers_medium.bsp"],
+        crate::context::Tier::Extended => &["planet_centers_extended.bsp"],
+    };
+    names
+        .iter()
+        .filter_map(|name| {
+            crate::download::asset_by_name(name).map(|asset| (directory.join(name), asset))
+        })
+        .collect()
+}
+
 /// Load an optional, digest-verified center-offset image for the resolved tier.
 /// Only existing local assets are considered; absent or rejected supplements
 /// leave the DE system barycenters available. Exact opened bytes are checked.
 pub(super) fn attach_automatic_centers(context: &mut EphemerisContext) -> Result<()> {
-    let Some(directory) = context.jpl_data_dir().cloned() else {
-        return Ok(());
-    };
-    let tier = match context.tier() {
-        crate::context::Tier::Base => "base",
-        crate::context::Tier::Medium => "medium",
-        crate::context::Tier::Extended => "extended",
-    };
-    let mut names = vec![format!("planet_centers_{tier}.bsp")];
-    if tier == "base" {
-        names.push("planet_centers.bsp".to_owned());
-    }
-    for name in names {
-        let path = directory.join(&name);
+    for (path, asset) in automatic_center_candidates(context) {
         if !path.is_file() {
             continue;
         }
-        let Some(asset) = crate::download::asset_by_name(&name) else {
-            continue;
-        };
         let mut supplement = crate::spk::SpkRegistry::new();
         let key = match supplement.register_file(&path) {
             Ok(key) => key,
@@ -152,8 +156,9 @@ pub(super) fn attach_automatic_centers(context: &mut EphemerisContext) -> Result
         );
         if digest != asset.sha256() {
             log::warn!(
-                "Ignoring planet-center image {}: digest does not match {name}",
-                path.display()
+                "Ignoring planet-center image {}: digest does not match {}",
+                path.display(),
+                asset.name()
             );
             continue;
         }

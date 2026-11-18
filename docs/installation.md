@@ -1,7 +1,7 @@
 # Installation
 
-Python requires **3.12+**. This stable preparation uses Python `4.0.0` and Rust
-core/data `1.0.0`. These instructions do not imply that the packages have already
+Python requires **3.12+**. This stable preparation uses Python `4.1.0` and Rust
+core `1.1.0` with data `1.0.0`. These instructions do not imply that the packages have already
 been published to PyPI or crates.io; those are separate maintainer actions.
 
 ## Python wheel
@@ -9,11 +9,11 @@ been published to PyPI or crates.io; those are separate maintainer actions.
 After publication, select v4 explicitly:
 
 ```sh
-python -m pip install "libephemeris==4.0.0"
+python -m pip install "libephemeris==4.1.0"
 ```
 
 Before publication, install a locally built wheel using the instructions below.
-An unqualified stable install may select v3 instead. Check the imported package:
+Check the installed version and import path:
 
 ```python
 import libephemeris
@@ -56,7 +56,7 @@ After registry publication:
 
 ```toml
 [dependencies]
-libephemeris-core = { version = "1.0.0", features = ["bundled-data"] }
+libephemeris-core = { version = "1.1.0", features = ["bundled-data"] }
 ```
 
 Before publication, use `path = "/path/to/libephemeris/core"` instead of the
@@ -73,7 +73,7 @@ compiler for Zstandard. From the repository root:
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python maturin==1.9.4
 .venv/bin/maturin build --release --locked --interpreter .venv/bin/python --out dist
-uv pip install --python .venv/bin/python dist/libephemeris-4.0.0-*.whl
+uv pip install --python .venv/bin/python dist/libephemeris-4.1.0-*.whl
 cargo build --locked -p libephemeris-core --release
 ```
 

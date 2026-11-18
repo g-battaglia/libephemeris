@@ -68,6 +68,8 @@ this uses `USERPROFILE` and the native profile API, not the working directory.
 | `LIBEPHEMERIS_AUTO_SPK` | Automatic minor-body SPK acquisition |
 | `LIBEPHEMERIS_STRICT_PRECISION` | Refuse approximate fallback |
 | `LIBEPHEMERIS_LEB_READER` | `owned` or `indexed` storage |
+| `LIBEPHEMERIS_LEB_CACHE_MB` | Opt-in process budget for decoded owned LEB coefficients, in MiB |
+| `LIBEPHEMERIS_LEB_SHARED_DIR` | Linux opt-in directory for sharing the pinned medium core across processes |
 
 For deterministic offline work, set the network policy to `sealed`, select
 local resources and choose whether to use local IERS data. The
@@ -79,7 +81,73 @@ validated when consumed, not necessarily when set.
 provisioning command requests a download. `allow` permits acquisition but does
 not itself start it. Avoid global configuration changes during concurrent work.
 
+To experiment with more decoded-chunk retention, set
+`LIBEPHEMERIS_LEB_CACHE_MB` before the first LEB calculation or use
+`leb_cache_bytes` under `[libephemeris]` in TOML. The environment value wins
+over TOML. In Python, `set_leb_cache_bytes(bytes)` activates or resizes the
+process pool. Use zero to disable retention and `get_leb_cache_usage()` to
+read retained bytes, the budget and the number of entries. Existing readers
+attached by the caller and the explicit `indexed` policy retain their own
+limits. Without an opt-in the existing per-image defaults apply.
+
+The pool divides the budget over eight independently locked LRU shards.
+Individual chunks bigger than their shard's quota are evaluated without
+retention. The budget counts decoded coefficient vector capacity. File
+images, cache metadata, active borrows, decoder work and other runtime memory
+are additional. Each worker process has its own pool. Compare total RSS
+and throughput on the target workload before choosing a budget.
+
+In one paired test on an Apple M5 Pro using Python 3.12, both settings
+used the same wheel and the pinned LEB core files. The workload used
+sealed LEB mode, random dates in 1900–2100 and speeds. Timings use five
+fresh processes of 1,000 charts. RSS comes from a separate single-worker
+run after 5,000 charts.
+
+| Tier | Median chart, per-image → 32 MiB process pool | RSS, per-image → 32 MiB process pool |
+| --- | ---: | ---: |
+| Base | 536 → 126 µs | 46.7 → 72.5 MB |
+| Medium | 552 → 132 µs | 84.0 → 109.8 MB |
+
+The full timing comparison also covers wider windows and reports p95
+during cache warm-up. [Performance plan and results](../PLAN.md).
+
 ## Large LEB files
+
+`base_core.leb2` discovered at the configured data root can share the
+immutable base data built into the wheel. The runtime checks every byte
+against the bundled file and uses the shared bytes when they match. This
+preserves the discovered path and gives each admitted image a fresh
+coefficient cache. Explicit paths and indexed readers use their
+configured acquisition policy.
+
+On macOS, automatic discovery in LEB mode can hold the pinned medium core
+as a private APFS clone. The process temporary directory must allow
+cloning on the same filesystem as the ephemeris data. The runtime
+unlinks the clone, verifies its digest, and reads through the retained
+descriptor. Failed clone creation or verification falls back to the
+ordinary owned image. Explicit paths and configured process caches use
+their existing acquisition path. A Rust caller borrowing the complete
+image materializes verified contiguous bytes on demand.
+
+On Apple Silicon, eight processes running 100,000 full-coverage medium
+charts each reduced the sampled footprint from 526 to 198 MB compared
+with the published 4.0.0 wheel. In a same-wheel comparison with the
+ordinary owned path, median random chart time rose from 597 to 626 µs
+and the warm-page first call from 3.7 to 16.2 ms.
+[Measurements and input details](../PLAN.md).
+
+On Linux, a multiprocess deployment can set `LIBEPHEMERIS_LEB_SHARED_DIR`
+to the same existing absolute directory in every worker. Use a dedicated
+local runtime directory owned by the worker UID with permissions `0700`.
+Workers need a shared PID namespace and permission to open peers' file
+descriptors through `/proc`. This applies to the automatically discovered,
+pinned `medium_core.leb2` in sealed LEB mode using the ordinary `owned`
+cache. Explicit input files, indexed readers and configured process pools
+keep their own policies. Each worker verifies its source against the pinned
+image before using the immutable kernel-sealed copy. The last holder's exit
+releases the shared image. Unavailable coordination or failed verification
+falls back to ordinary acquisition. The first calculation includes the
+verification cost.
 
 `owned` retains a complete immutable snapshot. `indexed` keeps a read-only file
 descriptor, indexes and bounded decoded chunks:
@@ -121,3 +189,28 @@ Related runtime images share allocation-domain counters; do not sum them once
 per image. Independent opens need not share a budget. These limits do **not**
 bound process RSS, Python/SPK allocations or the OS cache. The static bundled
 image is already zero-copy and is not converted into an indexed file.
+
+### Measured multi-process LEB memory
+
+In sealed LEB mode on Linux, eight processes each calculated 100,000
+random charts with speeds over the covered portion of 1550–2650. The
+same wheel and released companion files were used for both readers.
+The indexed reader used `leb_limits.cache_bytes = 6291456` (6 MiB).
+The table reports steady proportional set size summed across all workers.
+
+| Tier | Linux ARM64, owned → indexed | Linux x86-64, owned → indexed |
+| --- | ---: | ---: |
+| Base | 254.3 → 229.8 MB | 257.4 → 232.2 MB |
+| Medium | 560.4 → 229.1 MB | 563.5 → 231.8 MB |
+
+PSS apportions shared resident pages across processes. The comparable
+macOS base run recorded summed RSS of 455.1 → 515.7 MB. Raw Linux
+artifacts include the 1/2/4/8-worker cases, opening peaks and the
+separate anonymous and file-backed counters.
+[Paired Linux reports](https://github.com/g-battaglia/libephemeris/actions/runs/43879751526).
+
+To run the same comparison from a source checkout, pass `--workload memory
+--window 1550-2650 --companions` to the benchmark driver. Use
+`--leb-reader owned` for one run and `--leb-reader indexed
+--indexed-cache-mib 6` for the other.
+[Benchmark setup](../tools/bench/README.md).
