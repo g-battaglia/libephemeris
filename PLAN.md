@@ -27,6 +27,46 @@ range limit. Name lookup uses the generated stable catalog order, including
 first-match precedence for equal normalized names. Numeric IDs, generator
 inputs and stored astronomical measurements retain their release values.
 
+On macOS ARM64 the installed 4.1.0 candidate matched the published 4.0.0
+wheel on all 2,100,000 full-corpus calls and 350,000 cumulative
+extended/indexed calls with the local IERS snapshot. Another 16,734
+public Python results covered both readers, every built-in star ID and
+name, the two UT star APIs, Delta-T, missing records and non-finite dates.
+The dedicated Rust replay matched all 75,312 serialized rows against the
+preceding PR core. The wheel and its source archive passed the packaging
+checks. All 55 previously shipped Python typing modules retained their
+existing declarations. The hosted [extended matrix](https://github.com/g-battaglia/libephemeris/actions/runs/44322521272)
+compared with the published wheel on Linux ARM64, Linux x86-64 and Windows.
+
+Five alternating local release-build pairs compared the new core with
+`3beb7e2c`. Median of each process's mean time per call, in microseconds:
+
+| Operation | Before | 4.1 candidate |
+|---|---:|---:|
+| Stored Delta-T, owned | 3.65 | 0.12 |
+| Stored star by ID, indexed | 1,459 | 39 |
+| Full Rust fixstar_ut, eight names | 74.5 | 37.5 |
+
+These are operation-level measurements taken while other validation was
+active. The separate container results below describe whole charts and
+process memory. The published data-v4 manifest and LEB files require no migration.
+
+The external Kerykeion test fixture registry recognizes 4.0.0 and
+requires a reviewed model entry for 4.1.0. It stops three modules at
+collection and rejects further fixture-backed cases. In an independent
+replay, 82 complete subject/Arabic-part outputs from its own recipes were
+byte-identical between the two installed versions in extended/indexed
+mode. The consumer registry qualification stays open. The external
+scientific pytest comparison matched the published outcome on all
+21,359 case IDs, including pre-existing failures.
+
+To reproduce the numerical gates with isolated installed wheels, run the
+`full` and `leb-extended-indexed` profiles documented in
+[the benchmark guide](tools/bench/README.md). Use the same pinned data
+directory on both sides and pass the IERS directory to the extended
+profile. The local logs, direct replays, wheel checksums and raw timing
+samples are under `target/bench/v410/`.
+
 ## Current qualification
 
 The draft combines the measurement harness and the measured Phase 1 changes.
