@@ -98,6 +98,43 @@ compared with 2.87 GB on disk. A decoded archive, batch API or deeper CPU
 work needs separate workload evidence. The RAM target for this application
 configuration remains open.
 
+### Local follow-up on indexed decoding
+
+Two separate prototypes used the same twelve pinned images. Each indexed
+timing case used five fresh processes per arm, 3,000 charts per process and
+alternating A/B order. All measurements in this follow-up ran locally.
+
+- A 16 KiB indexed window improved the macOS 2 MiB cache's modern
+  random-chart median from 592 to 493 µs. At the default 8 MiB, the
+  modern median moved from 402 to 475 µs and p95 for dates within a
+  20-year interval moved from 132 to 266 µs. Keep the 64 KiB window.
+- Reconstructing adjacent rows within each shuffled byte lane uses the
+  existing output allocation. On macOS ARM64 at 8 MiB, the modern median
+  moved from 418 to 382 µs and the p95 from 653 to 561 µs. Peak RSS was
+  21.87 and 21.86 MB. On local Linux ARM64 with the image's IERS data,
+  the modern median moved from 515 to 498 µs and the broad-coverage
+  median from 769 to 695 µs. The consecutive-date median was effectively
+  flat on both systems.
+- The macOS owned-reader comparison used five repeats of 2,000 charts.
+  It measured random-chart medians of
+  598 → 505 µs for base and 588 → 504 µs for medium. Consecutive
+  medians stayed within 1% of the earlier build.
+- With the same two locally built Linux wheels in the API image at
+  nominal 10 requests/s, idle usage was 277.9 MB in both arms and
+  mean load usage was 306.4 → 306.6 MB. CPU was 41.0 → 41.2 ms
+  per success. Each arm completed 650 requests. The p95 ranged
+  from 160 to 183 ms before the change and from 164 to 167 ms
+  after it. The isolated engine measurements justify retaining the rewrite.
+- In a separate application run, limiting glibc to two allocation
+  arenas kept idle usage near 278 MB and lowered mean usage under load
+  by about 2.4 MB. Latency varied across the two runs per arm, so the
+  deployment keeps its ordinary allocator configuration.
+
+The cumulative extended indexed comparison and the ordinary LEB smoke
+case matched 350,000 and 10,000 calls on both local operating systems.
+Raw reports and local reproduction scripts are under
+`target/bench/local-indexed-screen/`.
+
 ---
 
 ## 1. Ground rules

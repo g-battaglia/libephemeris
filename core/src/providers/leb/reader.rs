@@ -877,10 +877,25 @@ pub(super) fn decompress_body_window_words_limited(
         what: "LEB2 coefficient window".into(),
         offset: 0,
     })?;
-    let mut words = Vec::with_capacity(word_count);
-    for_each_segment_word_range(&decoded, segment_count, window, |word| {
-        words.push(f64::from_le_bytes(word))
-    });
+    let mut words = vec![0.0; word_count];
+    if words.is_empty() {
+        return Ok(words);
+    }
+    // Walk adjacent rows in each shuffled byte lane and write each word at
+    // its final position in the selected segment-major window.
+    let rows = (window.end - window.start) as usize;
+    let coefficients = word_count / rows;
+    let lane_words = decoded.len() / SHUFFLE_LANES;
+    let lanes: [&[u8]; SHUFFLE_LANES] =
+        std::array::from_fn(|lane| &decoded[lane * lane_words..(lane + 1) * lane_words]);
+    for coefficient in 0..coefficients {
+        let first = coefficient * segment_count as usize + window.start as usize;
+        let block = lanes.map(|lane| &lane[first..first + rows]);
+        for (segment, row) in words.chunks_exact_mut(coefficients).enumerate() {
+            let bytes = std::array::from_fn(|lane| block[lane][segment]);
+            row[coefficient] = f64::from_le_bytes(bytes);
+        }
+    }
     Ok(words)
 }
 
@@ -892,15 +907,6 @@ pub(super) fn decompress_body_window_words_limited(
 fn for_each_segment_word(
     decoded: &[u8],
     segment_count: u32,
-    consume: impl FnMut([u8; SHUFFLE_LANES]),
-) {
-    for_each_segment_word_range(decoded, segment_count, 0..segment_count, consume);
-}
-
-fn for_each_segment_word_range(
-    decoded: &[u8],
-    segment_count: u32,
-    window: std::ops::Range<u32>,
     mut consume: impl FnMut([u8; SHUFFLE_LANES]),
 ) {
     let words = decoded.len() / SHUFFLE_LANES;
@@ -909,7 +915,7 @@ fn for_each_segment_word_range(
         return;
     }
     let coefficients_per_segment = words / segments;
-    for segment in window.start as usize..window.end as usize {
+    for segment in 0..segments {
         for coefficient in 0..coefficients_per_segment {
             let source_word = coefficient * segments + segment;
             let word = std::array::from_fn(|lane| decoded[lane * words + source_word]);

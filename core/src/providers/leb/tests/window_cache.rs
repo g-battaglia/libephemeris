@@ -88,6 +88,17 @@ fn windows_reconstruct_exact_words_ranges_and_partial_tails() {
             .collect();
         let frame =
             zstd::encode_all(shuffled(&words, segments, degree, components).as_slice(), 1).unwrap();
+        let empty = reader::decompress_body_window_words_limited(
+            &frame,
+            (words.len() * 8) as u64,
+            segments,
+            degree,
+            components,
+            segments..segments,
+            None,
+        )
+        .unwrap();
+        assert!(empty.is_empty());
         for first in 0..segments {
             let end = (first + 4).min(segments);
             let selected = reader::decompress_body_window_words_limited(
